@@ -466,12 +466,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   const [currentSection, setCurrentSection] = useState<string>("");
   const [showIhmModal, setShowIhmModal] = useState(false);
   
-  // Fetch IHM data for the component
-  const { data: ihmData } = useQuery({
-    queryKey: [`/api/ihm/component/${componentData.componentId}`],
-    enabled: FEATURES.IHM && !!componentData.componentId,
-  });
-  
   // New fields and sections tracking
   const [customFields, setCustomFields] = useState<Record<string, any[]>>({});
   const [customSections, setCustomSections] = useState<any[]>([]);
@@ -606,6 +600,12 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       classCode: "",
       information: ""
     }
+  });
+
+  // Fetch IHM data for the component
+  const { data: ihmData } = useQuery({
+    queryKey: [`/api/ihm/component/${componentData.componentId}`],
+    enabled: FEATURES.IHM && !!componentData.componentId,
   });
 
   // Handle node selection
