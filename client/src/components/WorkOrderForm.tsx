@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, FileText, ArrowLeft } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, ArrowLeft, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import WorkInstructionsDialog from "./WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
+import { FEATURES, IHM_ACTIONS } from '@/config/features';
 
 interface WorkOrderFormProps {
   isOpen: boolean;
@@ -242,7 +243,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
-    sparePartsConsumed: []
+    sparePartsConsumed: [],
+    // IHM fields
+    ihmUpdate: {
+      enabled: false,
+      action: "",
+      targetComponent: "",
+      targetSpare: "",
+      quantity: "",
+      location: "",
+      materials: [],
+      remarks: ""
+    }
   });
 
   // Ranks for dropdowns
@@ -1617,6 +1629,132 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* B5. IHM Update (only show if feature is enabled) */}
+                  {FEATURES.IHM && (
+                    <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-md font-medium flex items-center gap-2" style={{ color: '#16569e' }}>
+                          B5. IHM Update 
+                          <AlertCircle className="h-4 w-4 text-blue-500" />
+                        </h4>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={executionData.ihmUpdate.enabled}
+                            onChange={(e) => setExecutionData(prev => ({
+                              ...prev,
+                              ihmUpdate: { ...prev.ihmUpdate, enabled: e.target.checked }
+                            }))}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm text-gray-600">Update IHM Status</span>
+                        </label>
+                      </div>
+                      
+                      {executionData.ihmUpdate.enabled && (
+                        <div className="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm text-gray-700">IHM Action</Label>
+                              <Select
+                                value={executionData.ihmUpdate.action}
+                                onValueChange={(value) => setExecutionData(prev => ({
+                                  ...prev,
+                                  ihmUpdate: { ...prev.ihmUpdate, action: value }
+                                }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select action" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {IHM_ACTIONS.map(action => (
+                                    <SelectItem key={action} value={action}>
+                                      {action}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-sm text-gray-700">Target Component/Equipment</Label>
+                              <Input
+                                type="text"
+                                value={executionData.ihmUpdate.targetComponent}
+                                onChange={(e) => setExecutionData(prev => ({
+                                  ...prev,
+                                  ihmUpdate: { ...prev.ihmUpdate, targetComponent: e.target.value }
+                                }))}
+                                placeholder="Component code or name"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <Label className="text-sm text-gray-700">Material/Spare Part</Label>
+                              <Input
+                                type="text"
+                                value={executionData.ihmUpdate.targetSpare}
+                                onChange={(e) => setExecutionData(prev => ({
+                                  ...prev,
+                                  ihmUpdate: { ...prev.ihmUpdate, targetSpare: e.target.value }
+                                }))}
+                                placeholder="Part code"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-sm text-gray-700">Quantity</Label>
+                              <Input
+                                type="text"
+                                value={executionData.ihmUpdate.quantity}
+                                onChange={(e) => setExecutionData(prev => ({
+                                  ...prev,
+                                  ihmUpdate: { ...prev.ihmUpdate, quantity: e.target.value }
+                                }))}
+                                placeholder="kg/units"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-sm text-gray-700">Location</Label>
+                              <Input
+                                type="text"
+                                value={executionData.ihmUpdate.location}
+                                onChange={(e) => setExecutionData(prev => ({
+                                  ...prev,
+                                  ihmUpdate: { ...prev.ihmUpdate, location: e.target.value }
+                                }))}
+                                placeholder="Location on ship"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label className="text-sm text-gray-700">Remarks</Label>
+                            <Textarea
+                              value={executionData.ihmUpdate.remarks}
+                              onChange={(e) => setExecutionData(prev => ({
+                                ...prev,
+                                ihmUpdate: { ...prev.ihmUpdate, remarks: e.target.value }
+                              }))}
+                              placeholder="Additional notes about IHM change..."
+                              className="min-h-[60px]"
+                            />
+                          </div>
+                          
+                          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                            <p className="text-xs text-yellow-800">
+                              <strong>Note:</strong> IHM updates made during work order completion will be logged to the IHM maintenance log 
+                              and require approval before updating the main IHM register.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Rejection Comments (only show in approval mode) */}
                   {isApprovalMode && (

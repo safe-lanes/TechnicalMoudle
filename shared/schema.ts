@@ -125,6 +125,62 @@ export const insertFormVersionUsageSchema = createInsertSchema(formVersionUsage)
 export type InsertFormVersionUsage = z.infer<typeof insertFormVersionUsageSchema>;
 export type FormVersionUsage = typeof formVersionUsage.$inferSelect;
 
+// IHM (Inventory of Hazardous Materials) Tables
+export const ihmItems = pgTable("ihm_items", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  componentId: text("component_id").notNull(),
+  spareId: text("spare_id"),
+  presence: text("presence").notNull(), // Unknown | Present | Not Present
+  materials: text("materials").array(), // Asbestos, PCB, PFOS, etc.
+  evidenceType: text("evidence_type"), // MD | SDoC | Test | None
+  evidenceFileName: text("evidence_file_name"),
+  verifiedDate: text("verified_date"),
+  supplier: text("supplier"),
+  remarks: text("remarks"),
+  vesselId: text("vessel_id").notNull().default("V001"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  componentIdIdx: index("idx_ihm_component_id").on(table.componentId),
+  spareIdIdx: index("idx_ihm_spare_id").on(table.spareId),
+}));
+
+export const insertIhmItemSchema = createInsertSchema(ihmItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertIhmItem = z.infer<typeof insertIhmItemSchema>;
+export type IhmItem = typeof ihmItems.$inferSelect;
+
+// IHM Maintenance Log Table
+export const ihmMaintenanceLog = pgTable("ihm_maintenance_log", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  workOrderId: text("work_order_id").notNull(),
+  action: text("action").notNull(), // Installed | Removed | Replaced
+  targetComponent: text("target_component"),
+  targetSpare: text("target_spare"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }),
+  location: text("location"),
+  materials: text("materials").array(),
+  remarks: text("remarks"),
+  vesselId: text("vessel_id").notNull().default("V001"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  userId: text("user_id").notNull(),
+}, (table) => ({
+  workOrderIdIdx: index("idx_ihm_log_wo_id").on(table.workOrderId),
+  createdAtIdx: index("idx_ihm_log_created").on(table.createdAt),
+}));
+
+export const insertIhmMaintenanceLogSchema = createInsertSchema(ihmMaintenanceLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertIhmMaintenanceLog = z.infer<typeof insertIhmMaintenanceLogSchema>;
+export type IhmMaintenanceLog = typeof ihmMaintenanceLog.$inferSelect;
+
 // Spares Table
 export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

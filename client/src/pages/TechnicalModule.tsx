@@ -9,6 +9,7 @@ import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
+import IhmReports from "./reports/IhmReports";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -27,6 +28,8 @@ export const TechnicalModule: React.FC = () => {
       return { subModule: "pms", menuItem: "spares" };
     } else if (location.startsWith("/stores")) {
       return { subModule: "pms", menuItem: "stores" };
+    } else if (location.startsWith("/reports")) {
+      return { subModule: "pms", menuItem: "reports" };
     }
     return { subModule: "pms", menuItem: "dashboard" };
   };
@@ -90,6 +93,8 @@ export const TechnicalModule: React.FC = () => {
             <AdminPanel />
           ) : selectedSubModule === "admin" && selectedMenuItem === "alerts" ? (
             <Alerts />
+          ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
+            <IhmReports />
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">

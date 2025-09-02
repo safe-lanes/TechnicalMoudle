@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search, AlertCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +33,9 @@ import { useToast } from "@/hooks/use-toast";
 import { getComponentCategory } from "@/utils/componentUtils";
 import AddFieldModal from "@/components/modals/AddFieldModal";
 import AddSectionModal from "@/components/modals/AddSectionModal";
+import { FEATURES } from '@/config/features';
+import IhmManagementModal from '@/components/modals/IhmManagementModal';
+import { useQuery } from '@tanstack/react-query';
 
 interface ComponentNode {
   id: string;
@@ -461,6 +464,13 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [currentSection, setCurrentSection] = useState<string>("");
+  const [showIhmModal, setShowIhmModal] = useState(false);
+  
+  // Fetch IHM data for the component
+  const { data: ihmData } = useQuery({
+    queryKey: [`/api/ihm/component/${componentData.componentId}`],
+    enabled: FEATURES.IHM && !!componentData.componentId,
+  });
   
   // New fields and sections tracking
   const [customFields, setCustomFields] = useState<Record<string, any[]>>({});
@@ -1127,12 +1137,44 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Component Category</Label>
-                      <Input 
-                        value={selectedNode ? getComponentCategory(selectedNode.id) : ''}
-                        readOnly
-                        className="border-gray-300 bg-gray-50"
-                        title="Component Category is derived from the component's tree position"
-                      />
+                      <div className="flex gap-2">
+                        <Input 
+                          value={selectedNode ? getComponentCategory(selectedNode.id) : ''}
+                          readOnly
+                          className="border-gray-300 bg-gray-50 flex-1"
+                          title="Component Category is derived from the component's tree position"
+                        />
+                        {FEATURES.IHM && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              {ihmData?.presence === 'Present' && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  IHM Present
+                                </span>
+                              )}
+                              {ihmData?.presence === 'Not Present' && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                                  IHM Not Present
+                                </span>
+                              )}
+                              {(!ihmData || ihmData?.presence === 'Unknown') && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+                                  IHM Unknown
+                                </span>
+                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowIhmModal(true)}
+                              >
+                                Manage IHM
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <EditableLabel fieldKey="location" />
@@ -1880,6 +1922,16 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
         }}
         nextSectionLetter={String.fromCharCode(72 + customSections.length + 1)} // Start from I (H=72, I=73)
       />
+      
+      {/* IHM Management Modal */}
+      {FEATURES.IHM && (
+        <IhmManagementModal
+          isOpen={showIhmModal}
+          onClose={() => setShowIhmModal(false)}
+          componentId={componentData.componentId}
+          type="component"
+        />
+      )}
     </Dialog>
   );
 };

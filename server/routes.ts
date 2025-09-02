@@ -672,6 +672,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", formRoutes);
   app.use("/api/change-requests", createChangeRequestsRouter(storage));
 
+  // IHM (Inventory of Hazardous Materials) Routes
+  // Only active when FEATURE_IHM is enabled
+  
+  // Get IHM item for a component
+  app.get("/api/ihm/component/:componentId", async (req, res) => {
+    try {
+      const item = await storage.getIhmItem(req.params.componentId, 'component');
+      res.json(item || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch IHM item" });
+    }
+  });
+
+  // Get IHM item for a spare
+  app.get("/api/ihm/spare/:spareId", async (req, res) => {
+    try {
+      const item = await storage.getIhmItem(req.params.spareId, 'spare');
+      res.json(item || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch IHM item" });
+    }
+  });
+
+  // Create or update IHM item
+  app.post("/api/ihm", async (req, res) => {
+    try {
+      const item = await storage.upsertIhmItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save IHM item" });
+    }
+  });
+
+  // Get IHM maintenance log
+  app.get("/api/ihm/maintenance-log", async (req, res) => {
+    try {
+      const { vesselId = 'V001', from, to, action, component, spare } = req.query;
+      const log = await storage.getIhmMaintenanceLog({
+        vesselId: vesselId as string,
+        from: from as string,
+        to: to as string,
+        action: action as string,
+        component: component as string,
+        spare: spare as string,
+      });
+      res.json(log);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch IHM maintenance log" });
+    }
+  });
+
+  // Create IHM maintenance log entry
+  app.post("/api/ihm/maintenance-log", async (req, res) => {
+    try {
+      const entry = await storage.createIhmMaintenanceLogEntry(req.body);
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create IHM log entry" });
+    }
+  });
+
+  // Get IHM status report by component
+  app.get("/api/ihm/status-report", async (req, res) => {
+    try {
+      const { vesselId = 'V001' } = req.query;
+      const report = await storage.getIhmStatusReport(vesselId as string);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch IHM status report" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

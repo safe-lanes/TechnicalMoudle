@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { useLocation } from "wouter";
 import { getComponentCategory } from "@/utils/componentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
+import { FEATURES } from '@/config/features';
+import { useQuery } from '@tanstack/react-query';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import {
@@ -1321,6 +1323,9 @@ const SparesSection: React.FC = () => {
             <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Min</th>
             <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Stock</th>
             <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Location</th>
+            {FEATURES.IHM && (
+              <th className="text-center py-2 px-3 font-medium text-[#8798ad]" title="IHM Status">IHM</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -1457,6 +1462,18 @@ const SparesSection: React.FC = () => {
                   spare.location
                 )}
               </td>
+              {FEATURES.IHM && (
+                <td className="py-3 px-3 text-center">
+                  {/* Mock IHM status - in real implementation, fetch from API */}
+                  {spare.partCode === 'SP-ME-001' ? (
+                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" title="IHM Present" />
+                  ) : spare.partCode === 'SP-ME-002' ? (
+                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" title="IHM Not Present" />
+                  ) : (
+                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" title="IHM Unknown" />
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

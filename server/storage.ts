@@ -150,6 +150,13 @@ export interface IStorage {
   
   // Seed forms method
   seedForms(): Promise<void>;
+  
+  // IHM methods
+  getIhmItem(id: string, type: 'component' | 'spare'): Promise<any | undefined>;
+  upsertIhmItem(item: any): Promise<any>;
+  getIhmMaintenanceLog(filters: any): Promise<any[]>;
+  createIhmMaintenanceLogEntry(entry: any): Promise<any>;
+  getIhmStatusReport(vesselId: string): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -1630,6 +1637,101 @@ export class MemStorage implements IStorage {
     
     // Re-initialize forms
     await this.initializeFormDefinitions();
+  }
+  
+  // IHM methods implementation
+  private ihmItems: Map<string, any> = new Map();
+  private ihmMaintenanceLog: any[] = [];
+  private currentIhmItemId: number = 1;
+  private currentIhmLogId: number = 1;
+  
+  async getIhmItem(id: string, type: 'component' | 'spare'): Promise<any | undefined> {
+    const key = `${type}_${id}`;
+    return this.ihmItems.get(key);
+  }
+  
+  async upsertIhmItem(item: any): Promise<any> {
+    const key = item.spareId ? `spare_${item.spareId}` : `component_${item.componentId}`;
+    const existing = this.ihmItems.get(key);
+    
+    if (existing) {
+      const updated = { ...existing, ...item, updatedAt: new Date() };
+      this.ihmItems.set(key, updated);
+      return updated;
+    } else {
+      const newItem = { 
+        id: this.currentIhmItemId++, 
+        ...item, 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      };
+      this.ihmItems.set(key, newItem);
+      return newItem;
+    }
+  }
+  
+  async getIhmMaintenanceLog(filters: any): Promise<any[]> {
+    let logs = [...this.ihmMaintenanceLog];
+    
+    if (filters.vesselId) {
+      logs = logs.filter(log => log.vesselId === filters.vesselId);
+    }
+    if (filters.from) {
+      const fromDate = new Date(filters.from);
+      logs = logs.filter(log => new Date(log.createdAt) >= fromDate);
+    }
+    if (filters.to) {
+      const toDate = new Date(filters.to);
+      logs = logs.filter(log => new Date(log.createdAt) <= toDate);
+    }
+    if (filters.action) {
+      logs = logs.filter(log => log.action === filters.action);
+    }
+    if (filters.component) {
+      logs = logs.filter(log => log.targetComponent === filters.component);
+    }
+    if (filters.spare) {
+      logs = logs.filter(log => log.targetSpare === filters.spare);
+    }
+    
+    return logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  
+  async createIhmMaintenanceLogEntry(entry: any): Promise<any> {
+    const newEntry = {
+      id: this.currentIhmLogId++,
+      ...entry,
+      createdAt: new Date()
+    };
+    this.ihmMaintenanceLog.push(newEntry);
+    return newEntry;
+  }
+  
+  async getIhmStatusReport(vesselId: string): Promise<any[]> {
+    const report: any[] = [];
+    
+    // Get all components for this vessel
+    const components = await this.getComponents(vesselId);
+    
+    for (const component of components) {
+      const ihmItem = await this.getIhmItem(component.id, 'component');
+      if (ihmItem) {
+        report.push({
+          componentId: component.id,
+          componentName: component.name,
+          componentCode: component.componentCode,
+          presence: ihmItem.presence,
+          materials: ihmItem.materials || [],
+          evidenceType: ihmItem.evidenceType,
+          evidenceFileName: ihmItem.evidenceFileName,
+          verifiedDate: ihmItem.verifiedDate,
+          supplier: ihmItem.supplier,
+          remarks: ihmItem.remarks
+        });
+      }
+    }
+    
+    return report;
   }
 }
 
