@@ -12,6 +12,18 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { FEATURES } from '@/config/features';
+
+// IHM constants
+const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
+const IHM_EVIDENCE_TYPES = ["None", "MD", "SDoC", "Test"] as const;
 
 interface AddComponentFormProps {
   open: boolean;
@@ -76,7 +88,11 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     serviceNote: '',
     noteDate: '',
     nextNote: '',
-    noteLevel: ''
+    noteLevel: '',
+    
+    // IHM fields
+    ihmPresence: 'Unknown' as typeof IHM_PRESENCE[number],
+    ihmEvidenceType: 'None' as typeof IHM_EVIDENCE_TYPES[number]
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -250,6 +266,62 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                 </div>
               </div>
             </div>
+
+            {/* IHM Information (if feature enabled) */}
+            {FEATURES.IHM && (
+              <div className="bg-white rounded-lg border">
+                <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <span className="bg-[#52baf3] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">IHM</span>
+                    Inventory of Hazardous Materials
+                  </h3>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="ihm-presence" className="text-xs">IHM Presence</Label>
+                      <Select 
+                        value={formData.ihmPresence} 
+                        onValueChange={(value) => handleInputChange('ihmPresence', value)}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Select IHM presence" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {IHM_PRESENCE.map(status => (
+                            <SelectItem key={status} value={status}>{status}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="ihm-evidence" className="text-xs">IHM Evidence Type</Label>
+                      <Select 
+                        value={formData.ihmEvidenceType} 
+                        onValueChange={(value) => handleInputChange('ihmEvidenceType', value)}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Select evidence type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {IHM_EVIDENCE_TYPES.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="ihm-notes" className="text-xs">IHM Notes</Label>
+                      <Input 
+                        id="ihm-notes" 
+                        className="h-8 text-sm" 
+                        placeholder="Additional IHM information"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* B. Running Hours & Condition Monitoring Metrics */}
             <div className="bg-white rounded-lg border">

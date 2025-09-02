@@ -5,11 +5,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Archive, Download } from "lucide-react";
+import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Archive, Download, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
+import { FEATURES } from "@/config/features";
+
+// IHM constants
+const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
+const IHM_EVIDENCE_TYPES = ["None", "MD", "SDoC", "Test"] as const;
 
 interface StoreItem {
   id: number;
@@ -24,6 +29,9 @@ interface StoreItem {
   category: "stores" | "lubes" | "chemicals" | "others";
   notes?: string;
   isArchived?: boolean;
+  // IHM fields
+  ihmPresence?: typeof IHM_PRESENCE[number];
+  ihmEvidenceType?: typeof IHM_EVIDENCE_TYPES[number];
 }
 
 interface StoresHistoryItem {
@@ -1311,7 +1319,8 @@ const Stores: React.FC = () => {
             </div>
             <div className="col-span-1">Min</div>
             <div className="col-span-1">Stock</div>
-            <div className="col-span-2">Location</div>
+            <div className={FEATURES.IHM ? "col-span-1" : "col-span-2"}>Location</div>
+            {FEATURES.IHM && <div className="col-span-1">IHM</div>}
           </div>
         </div>
 
@@ -1343,9 +1352,21 @@ const Stores: React.FC = () => {
                     {item.stock}
                   </span>
                 </div>
-                <div className="col-span-1 text-gray-600">
+                <div className={FEATURES.IHM ? "col-span-1 text-gray-600" : "col-span-1 text-gray-600"}>
                   {item.location}
                 </div>
+                {FEATURES.IHM && (
+                  <div className="col-span-1 flex justify-center">
+                    {/* Mock IHM status - in real implementation, would come from API */}
+                    {item.itemCode === 'ST-TOOL-001' ? (
+                      <AlertCircle className="h-4 w-4 text-red-500" title="IHM Present" />
+                    ) : item.itemCode === 'ST-CONS-001' ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" title="IHM Not Present" />
+                    ) : (
+                      <HelpCircle className="h-4 w-4 text-gray-400" title="IHM Unknown" />
+                    )}
+                  </div>
+                )}
                 <div className="col-span-1 flex gap-1">
                   <Button 
                     variant="ghost" 
@@ -1504,6 +1525,44 @@ const Stores: React.FC = () => {
                 rows={3}
               />
             </div>
+            
+            {/* IHM Fields */}
+            {FEATURES.IHM && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="ihmPresence">IHM Presence</Label>
+                  <Select 
+                    value={editForm.ihmPresence || "Unknown"} 
+                    onValueChange={(value) => setEditForm({...editForm, ihmPresence: value as typeof IHM_PRESENCE[number]})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select IHM presence" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IHM_PRESENCE.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ihmEvidenceType">IHM Evidence Type</Label>
+                  <Select 
+                    value={editForm.ihmEvidenceType || "None"} 
+                    onValueChange={(value) => setEditForm({...editForm, ihmEvidenceType: value as typeof IHM_EVIDENCE_TYPES[number]})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select evidence type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IHM_EVIDENCE_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
@@ -1567,6 +1626,36 @@ const Stores: React.FC = () => {
                 rows={3}
               />
             </div>
+            
+            {/* IHM Warning - only show if feature is enabled and status is unknown */}
+            {FEATURES.IHM && receivingItem && (
+              <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800">IHM Status Check Required</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      This item has unknown IHM status or missing evidence. 
+                      Please verify hazardous materials presence and upload evidence documents if applicable.
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="mt-2 text-xs"
+                      onClick={() => {
+                        // In real implementation, open IHM evidence upload modal
+                        toast({ 
+                          title: "IHM Evidence Upload", 
+                          description: "IHM evidence upload functionality would open here" 
+                        });
+                      }}
+                    >
+                      Upload IHM Evidence
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
