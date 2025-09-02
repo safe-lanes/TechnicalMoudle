@@ -3,7 +3,7 @@ export const FEATURES = {
   // IHM (Inventory of Hazardous Materials) feature flag
   // When ON: Shows IHM status chips, management buttons, and reports
   // When OFF: No IHM-related UI elements are displayed
-  IHM: import.meta.env.VITE_FEATURE_IHM === 'true' || false,
+  IHM: import.meta.env.VITE_FEATURE_IHM === 'true' || true,
 };
 
 // IHM material options
