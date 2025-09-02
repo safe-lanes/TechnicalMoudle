@@ -34,6 +34,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import Alerts from './Alerts';
 import Forms from '@/components/admin/Forms';
+import { FEATURES } from '@/config/features';
 
 interface Template {
   id: string;
@@ -433,6 +434,12 @@ export default function BulkImport() {
 
               <p className="text-sm text-gray-500 mb-6">
                 Date format: Accepted DD-MMM-YYYY, DD-MM-YYYY, or ISO (YYYY-MM-DD)
+                {FEATURES.IHM && selectedTemplate?.type === 'spares' && (
+                  <span className="block mt-1">
+                    IHM fields: Presence (Unknown/Present/Not Present), Material Type (Asbestos/PCB/PFOS/etc.), 
+                    Evidence Type (MD/SDoC/Test/None)
+                  </span>
+                )}
               </p>
 
               {/* Dry Run Preview */}
@@ -446,6 +453,17 @@ export default function BulkImport() {
               {dryRunResult && (
                 <div className="mb-6">
                   <h3 className="font-semibold mb-4">Dry-Run Preview</h3>
+                  
+                  {/* IHM Column Notice for Spares */}
+                  {FEATURES.IHM && selectedTemplate?.type === 'spares' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>IHM Columns Available:</strong> This template includes IHM (Inventory of Hazardous Materials) columns
+                        for tracking hazardous materials presence and evidence. Columns: IHM Presence, IHM Material Type, 
+                        IHM Evidence Type, IHM Evidence URL.
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Summary Pills */}
                   <div className="flex gap-4 mb-4">
@@ -470,8 +488,11 @@ export default function BulkImport() {
                         <TableRow>
                           <TableHead className="w-16">Row</TableHead>
                           <TableHead className="w-24">Status</TableHead>
-                          {dryRunResult.columns.slice(0, 3).map(col => (
-                            <TableHead key={col}>{col}</TableHead>
+                          {/* Show more columns if IHM is enabled and it's a spares template */}
+                          {dryRunResult.columns.slice(0, FEATURES.IHM && selectedTemplate?.type === 'spares' ? 5 : 3).map(col => (
+                            <TableHead key={col} className={col.toLowerCase().includes('ihm') ? 'text-blue-600' : ''}>
+                              {col}
+                            </TableHead>
                           ))}
                           <TableHead>Error(s)</TableHead>
                         </TableRow>
@@ -496,8 +517,9 @@ export default function BulkImport() {
                                 {row.status.toUpperCase()}
                               </Badge>
                             </TableCell>
-                            {dryRunResult.columns.slice(0, 3).map(col => (
-                              <TableCell key={col} className="max-w-xs truncate">
+                            {/* Show more columns if IHM is enabled and it's a spares template */}
+                            {dryRunResult.columns.slice(0, FEATURES.IHM && selectedTemplate?.type === 'spares' ? 5 : 3).map(col => (
+                              <TableCell key={col} className={`max-w-xs truncate ${col.toLowerCase().includes('ihm') ? 'text-blue-600' : ''}`}>
                                 {row.normalized[col] || '-'}
                               </TableCell>
                             ))}

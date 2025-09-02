@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Trash2, Plus, FileSpreadsheet, X, Minus } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Trash2, Plus, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { ComponentNode, componentTree } from "@/data/componentTree";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { FEATURES, IHM_PRESENCE, IHM_EVIDENCE_TYPES } from '@/config/features';
 
 interface Spare {
   id: number;
@@ -73,7 +74,10 @@ const Spares: React.FC = () => {
     critical: "No",
     rob: "",
     min: "",
-    location: ""
+    location: "",
+    // IHM fields
+    ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
+    ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
   });
   
   const { toast } = useToast();
@@ -680,7 +684,7 @@ const Spares: React.FC = () => {
             <>
               {/* Inventory Table Header */}
               <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                <div className="grid grid-cols-10 gap-4 text-sm font-semibold text-[#ffffff]">
+                <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm font-semibold text-[#ffffff]`}>
                   <div className="text-[#ffffff]">Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
@@ -690,6 +694,7 @@ const Spares: React.FC = () => {
                   <div className="text-center">Min</div>
                   <div className="text-center">Stock</div>
                   <div>Location</div>
+                  {FEATURES.IHM && <div className="text-center">IHM</div>}
                   <div className="text-center">Actions</div>
                 </div>
               </div>
@@ -705,7 +710,7 @@ const Spares: React.FC = () => {
                 ) : (
                   filteredSpares.map((spare: Spare) => (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className="grid grid-cols-10 gap-4 text-sm items-center">
+                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm items-center`}>
                         <div className="text-gray-900">{spare.partCode}</div>
                         <div className="text-gray-700">{spare.partName}</div>
                         <div className="text-gray-700">{spare.componentName}</div>
@@ -735,6 +740,18 @@ const Spares: React.FC = () => {
                           )}
                         </div>
                         <div className="text-gray-700">{spare.location || '-'}</div>
+                        {FEATURES.IHM && (
+                          <div className="flex justify-center">
+                            {/* Mock IHM status - in real implementation, would come from API */}
+                            {spare.partCode === 'SP-ME-001' ? (
+                              <AlertCircle className="h-4 w-4 text-red-500" title="IHM Present" />
+                            ) : spare.partCode === 'SP-ME-002' ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" title="IHM Not Present" />
+                            ) : (
+                              <HelpCircle className="h-4 w-4 text-gray-400" title="IHM Unknown" />
+                            )}
+                          </div>
+                        )}
                         <div className="flex gap-1 justify-center">
                           <Button 
                             size="sm" 
@@ -948,6 +965,36 @@ const Spares: React.FC = () => {
                 placeholder="Optional"
               />
             </div>
+            
+            {/* IHM Warning - only show if feature is enabled and status is unknown */}
+            {FEATURES.IHM && selectedSpare && (
+              <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-800">IHM Status Check Required</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      This spare part has unknown IHM status or missing evidence. 
+                      Please verify hazardous materials presence and upload evidence documents if applicable.
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="mt-2 text-xs"
+                      onClick={() => {
+                        // In real implementation, open IHM evidence upload modal
+                        toast({ 
+                          title: "IHM Evidence Upload", 
+                          description: "IHM evidence upload functionality would open here" 
+                        });
+                      }}
+                    >
+                      Upload IHM Evidence
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
@@ -1236,6 +1283,58 @@ const Spares: React.FC = () => {
                 placeholder="e.g., Store Room A"
               />
             </div>
+            
+            {/* IHM Section - only show if feature is enabled */}
+            {FEATURES.IHM && (
+              <div className="border border-gray-200 rounded-lg p-4 bg-blue-50/30">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-500" />
+                  IHM (Inventory of Hazardous Materials)
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="add-ihm-presence">IHM Presence</Label>
+                    <Select 
+                      value={addSpareForm.ihmPresence} 
+                      onValueChange={(value: typeof IHM_PRESENCE[number]) => 
+                        setAddSpareForm({...addSpareForm, ihmPresence: value})
+                      }
+                    >
+                      <SelectTrigger id="add-ihm-presence">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_PRESENCE.map(presence => (
+                          <SelectItem key={presence} value={presence}>
+                            {presence}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="add-ihm-evidence">Evidence Type</Label>
+                    <Select 
+                      value={addSpareForm.ihmEvidenceType} 
+                      onValueChange={(value: typeof IHM_EVIDENCE_TYPES[number]) => 
+                        setAddSpareForm({...addSpareForm, ihmEvidenceType: value})
+                      }
+                    >
+                      <SelectTrigger id="add-ihm-evidence">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IHM_EVIDENCE_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddSpareModalOpen(false)}>
