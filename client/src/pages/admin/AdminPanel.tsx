@@ -286,11 +286,27 @@ export default function BulkImport() {
 
   const [activeTab, setActiveTab] = useState<'bulk-import' | 'alerts' | 'forms' | 'admin4'>('bulk-import');
 
+  // Get the display title based on the active tab
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case 'bulk-import':
+        return 'Bulk Data Import';
+      case 'alerts':
+        return 'Alerts';
+      case 'forms':
+        return 'Forms';
+      case 'admin4':
+        return 'Admin 4';
+      default:
+        return 'Bulk Data Import';
+    }
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Bulk Data Import</h1>
+        <h1 className="text-3xl font-bold">{getTabTitle()}</h1>
         <div className="mt-4 flex gap-2">
           <Button 
             variant={activeTab === 'bulk-import' ? "default" : "outline"}
