@@ -690,7 +690,9 @@ const Stores: React.FC = () => {
     customUom: "",
     min: 0,
     location: "",
-    notes: ""
+    notes: "",
+    ihmPresence: 'Unknown' as 'Unknown' | 'Present' | 'Not Present',
+    ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test'
   });
   
   // Receive modal state
@@ -967,7 +969,9 @@ const Stores: React.FC = () => {
       customUom: isCustomUom ? (item.uom || "") : "",
       min: item.min,
       location: item.location,
-      notes: item.notes || ""
+      notes: item.notes || "",
+      ihmPresence: 'Unknown',
+      ihmEvidenceType: 'None'
     });
     setIsEditModalOpen(true);
   };
@@ -1300,100 +1304,110 @@ const Stores: React.FC = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
-          <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
-            <div className="col-span-2">
+          <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
+            <div>
               {activeTab === "lubes" ? "Lube Grade" : 
                activeTab === "chemicals" ? "Chem Code" : "Item Code"}
             </div>
-            <div className="col-span-2">
+            <div>
               {activeTab === "lubes" ? "Lube Type" : 
                activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
             </div>
-            <div className="col-span-2">
+            <div>
               {activeTab === "lubes" ? "Application" : 
                activeTab === "chemicals" ? "Application Area" : "Stores Category"}
             </div>
-            <div className="col-span-1">UOM</div>
-            <div className="col-span-1">
+            <div>UOM</div>
+            <div>
               {activeTab === "lubes" || activeTab === "chemicals" ? "ROB" : "ROB"}
             </div>
-            <div className="col-span-1">Min</div>
-            <div className="col-span-1">Stock</div>
-            <div className={FEATURES.IHM ? "col-span-1" : "col-span-2"}>Location</div>
-            {FEATURES.IHM && <div className="col-span-1">IHM</div>}
+            <div>Min</div>
+            <div>Stock</div>
+            <div>Location</div>
+            {FEATURES.IHM && <div className="text-center">IHM</div>}
+            <div className="text-right pr-2">Actions</div>
           </div>
         </div>
 
         {/* Table Body */}
         <div className="divide-y divide-gray-200">
           {filteredItems.map((item) => (
-            <div key={item.id} className="p-4 hover:bg-gray-50">
-              <div className="grid grid-cols-12 gap-4 items-center text-sm">
-                <div className="col-span-2 font-medium text-gray-900">
+            <div key={item.id} className="hover:bg-gray-50">
+              <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
+                <div className="font-medium text-gray-900 truncate">
                   {item.itemCode}
                 </div>
-                <div className="col-span-2 text-gray-700">
+                <div className="text-gray-700 truncate">
                   {item.itemName}
                 </div>
-                <div className="col-span-2 text-gray-600">
+                <div className="text-gray-600 truncate">
                   {item.storesCategory}
                 </div>
-                <div className="col-span-1 text-gray-700">
+                <div className="text-gray-700 text-center">
                   {item.uom || "-"}
                 </div>
-                <div className="col-span-1 text-gray-700">
+                <div className="text-gray-700 text-center">
                   {item.rob}
                 </div>
-                <div className="col-span-1 text-gray-700">
+                <div className="text-gray-700 text-center">
                   {item.min}
                 </div>
-                <div className="col-span-1">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStockColor(item.stock)}`}>
+                <div className="text-center">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
                     {item.stock}
                   </span>
                 </div>
-                <div className={FEATURES.IHM ? "col-span-1 text-gray-600" : "col-span-1 text-gray-600"}>
+                <div className="text-gray-600 truncate">
                   {item.location}
                 </div>
                 {FEATURES.IHM && (
-                  <div className="col-span-1 flex justify-center">
+                  <div className="flex justify-center">
                     {/* Mock IHM status - in real implementation, would come from API */}
                     {item.itemCode === 'ST-TOOL-001' ? (
-                      <AlertCircle className="h-4 w-4 text-red-500" title="IHM Present" />
+                      <div title="IHM Present">
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      </div>
                     ) : item.itemCode === 'ST-CONS-001' ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" title="IHM Not Present" />
+                      <div title="IHM Not Present">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
                     ) : (
-                      <HelpCircle className="h-4 w-4 text-gray-400" title="IHM Unknown" />
+                      <div title="IHM Unknown">
+                        <HelpCircle className="h-4 w-4 text-gray-400" />
+                      </div>
                     )}
                   </div>
                 )}
-                <div className="col-span-1 flex gap-1">
+                <div className="flex gap-1 justify-end pr-2 whitespace-nowrap">
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0 hover:bg-gray-100"
                     onClick={() => openEditModal(item)}
-                    title="Edit Item"
+                    aria-label="Edit Item"
+                    title="Edit"
                   >
-                    <Edit className="h-4 w-4 text-gray-500" />
+                    <Edit className="h-3.5 w-3.5 text-gray-500" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0 hover:bg-gray-100"
                     onClick={() => openReceiveModal(item)}
+                    aria-label="Receive Item"
                     title="Receive"
                   >
-                    <Plus className="h-4 w-4 text-gray-500" />
+                    <Plus className="h-3.5 w-3.5 text-gray-500" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0 hover:bg-gray-100"
                     onClick={() => handleArchive(item)}
+                    aria-label="Archive Item"
                     title="Archive"
                   >
-                    <Archive className="h-4 w-4 text-gray-400" />
+                    <Archive className="h-3.5 w-3.5 text-gray-400" />
                   </Button>
                 </div>
               </div>

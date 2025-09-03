@@ -1,0 +1,149 @@
+Here’s a precise, do-this-not-that prompt for Replit to fix the Stores table row height and move the action icons to the end of each row.
+
+---
+
+# Prompt: Compact single-row layout for Stores table + move action icons to last column
+
+## What I want
+
+In **PMS → Stores → Inventory** the table currently shows the action icons (edit / view / add / delete, etc.) in a *second line* inside the first column. That makes each row tall and the table looks bulky.
+
+**Fix it** so that:
+
+1. **Every item is a single compact row** (no line breaks created by the action icons).
+2. The **action icons appear in a dedicated “Actions” column at the far right**, aligned on one line.
+3. Rows maintain standard height (middle-aligned content), and icons never wrap to a new line.
+4. On small screens, actions can collapse into a kebab “⋮” menu.
+
+> Do **not** change the data order of existing columns. Only add a new last column for actions and move the icon buttons there.
+
+---
+
+## Where to change
+
+Find the Stores inventory table component (search codebase for any of these):
+
+* `"Stores Inventory"` header, or columns: `"Item Code","Item Name","UOM","ROB","Min","Stock","Location","IHM"`.
+* Common filenames might be: `StoresTable`, `StoresInventory`, `StoresList`, `.tsx/.jsx/.vue`.
+
+You will see the icon buttons currently rendered inside the **Item Code** cell or a leading cell. **Remove them from there** and render them into the last “Actions” column.
+
+---
+
+## Required structural changes
+
+### 1) Add a last column header
+
+```jsx
+// After the existing <th>IHM</th>
+<th className="w-1 whitespace-nowrap text-right pr-3">Actions</th>
+```
+
+### 2) Render actions into the last cell of each row
+
+```jsx
+<tr key={row.id} className="align-middle">
+  {/* ...existing tds for Item Code → IHM... */}
+
+  <td className="actions-cell text-right pr-3">
+    <div className="actions-inline">
+      {/* Keep the same handlers you already have */}
+      <button aria-label="Edit"   onClick={() => onEdit(row)}   className="icon-btn">{/* edit icon */}</button>
+      <button aria-label="Add"    onClick={() => onAdd(row)}    className="icon-btn">{/* plus icon */}</button>
+      <button aria-label="Delete" onClick={() => onDelete(row)} className="icon-btn">{/* trash icon */}</button>
+      {/* any other actions */}
+    </div>
+
+    {/* Responsive fallback: hidden on lg, shown on small */}
+    <div className="actions-menu">
+      <button aria-label="More" className="icon-btn">{/* ⋮ */}</button>
+      <div className="menu">
+        <button onClick={() => onEdit(row)}>Edit</button>
+        <button onClick={() => onAdd(row)}>Add</button>
+        <button onClick={() => onDelete(row)}>Delete</button>
+      </div>
+    </div>
+  </td>
+</tr>
+```
+
+> Important: **Do not** leave any leftover wrapper that forces the icons into a new `<tr>`, block `<div>` with `display:block`, or inserted `<br/>`. All actions must sit inline inside the same row (`<tr>`).
+
+---
+
+## CSS (or Tailwind classes) to guarantee compact, single-line rows
+
+If using **plain CSS**, add:
+
+```css
+/* Make rows compact and vertically centered */
+table.stores-table tr { vertical-align: middle; }
+table.stores-table td, table.stores-table th { padding-top: 10px; padding-bottom: 10px; }
+
+/* Actions column: keep everything in one line, right-aligned */
+.actions-cell { white-space: nowrap; }
+.actions-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;           /* spacing between icons */
+}
+
+/* Icon button sizing */
+.icon-btn {
+  display: inline-flex;
+  width: 28px; height: 28px;
+  align-items: center; justify-content: center;
+  border-radius: 6px;
+  border: none; background: transparent;
+  cursor: pointer;
+}
+.icon-btn:hover { background: rgba(0,0,0,0.06); }
+
+/* Responsive: show kebab on small, hide inline; reverse on large */
+@media (max-width: 992px) {
+  .actions-inline { display: none; }
+  .actions-menu   { display: inline-block; position: relative; }
+}
+@media (min-width: 993px) {
+  .actions-inline { display: inline-flex; }
+  .actions-menu   { display: none; }
+}
+
+/* Simple dropdown (optional) */
+.actions-menu .menu {
+  position: absolute; right: 0; top: 36px;
+  background: #fff; border: 1px solid #e6e8ec; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  display: none; min-width: 140px; z-index: 10;
+}
+.actions-menu:hover .menu { display: block; }
+.actions-menu .menu button {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 12px; background: none; border: 0; cursor: pointer;
+}
+.actions-menu .menu button:hover { background: #f3f4f6; }
+```
+
+If using **Tailwind**, equivalent classes were added inline above. Ensure cells have `whitespace-nowrap` and icons use `inline-flex gap-2 items-center`.
+
+---
+
+## Clean-up tasks
+
+* Remove the old icons markup from the first column (or wherever they were).
+* Ensure there’s **no extra `<tr>` or second line** inside any cell due to the action zone.
+* Make sure row content doesn’t wrap (add `whitespace-nowrap` to narrow columns like `ROB`, `Min`, `Stock`, `IHM` if needed).
+
+---
+
+## Acceptance criteria
+
+* Each item appears in **one row only**; no row is taller because of the actions.
+* **Actions** are visible **on the far right** (desktop) and **inside a kebab menu** (mobile).
+* No horizontal scroll bars introduced on standard desktop widths.
+* Keyboard and screen-reader friendly (buttons have `aria-label`s).
+* No change to existing business logic. Only layout/markup moved.
+
+---
+
+If anything is unclear about file locations or naming, **search for the table headers listed above** and implement this exact structure and CSS.
