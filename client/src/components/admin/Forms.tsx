@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Edit, Search } from 'lucide-react';
+import FormConfigurationModal from './FormConfigurationModal';
 
 interface FormItem {
   id: string;
@@ -14,6 +15,8 @@ interface FormItem {
 
 export default function Forms() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedForm, setSelectedForm] = useState<FormItem | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   
   // Mock data for forms
   const [forms] = useState<FormItem[]>([
@@ -46,13 +49,14 @@ export default function Forms() {
     form.formSubGroup.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (formId: string) => {
-    console.log('Editing form:', formId);
-    // Implement edit functionality
+  const handleEdit = (form: FormItem) => {
+    setSelectedForm(form);
+    setShowConfigModal(true);
   };
 
   return (
-    <Card className="p-0 overflow-hidden">
+    <>
+      <Card className="p-0 overflow-hidden">
       {/* Search Bar */}
       <div className="p-4 border-b bg-gray-50">
         <div className="relative max-w-sm">
@@ -99,7 +103,7 @@ export default function Forms() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleEdit(form.id)}
+                      onClick={() => handleEdit(form)}
                       className="h-8 w-8 p-0"
                     >
                       <Edit className="h-4 w-4 text-gray-600" />
@@ -117,6 +121,22 @@ export default function Forms() {
           </tbody>
         </table>
       </div>
-    </Card>
+      </Card>
+
+      {/* Form Configuration Modal */}
+      {showConfigModal && selectedForm && (
+        <FormConfigurationModal
+          isOpen={showConfigModal}
+          onClose={() => {
+            setShowConfigModal(false);
+            setSelectedForm(null);
+          }}
+          formName={selectedForm.formName}
+          formSubGroup={selectedForm.formSubGroup !== 'NA' ? selectedForm.formSubGroup : undefined}
+          currentVersion={selectedForm.versionNo}
+          versionDate={selectedForm.versionDate}
+        />
+      )}
+    </>
   );
 }
