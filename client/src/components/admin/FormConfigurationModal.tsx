@@ -458,7 +458,7 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   const [isAddMode, setIsAddMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Permission state - mock for now, should come from user context
+  // Permission state - Admin Forms should allow FULL editing (labels and data)
   const [hasFormConfigPermission] = useState(true);
   
   // Modal states for adding fields and sections

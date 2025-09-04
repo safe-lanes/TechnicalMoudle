@@ -457,8 +457,8 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   const [isAddMode, setIsAddMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Permission state - mock for now, should come from user context
-  const [hasFormConfigPermission] = useState(true);
+  // Permission state - Components module should NOT allow label editing
+  const [hasFormConfigPermission] = useState(false);
   
   // Modal states for adding fields and sections
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
