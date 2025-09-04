@@ -802,47 +802,49 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   };
 
   // Editable Label Component with deletion support
-  const EditableLabel = ({ fieldKey, className = "text-sm text-[#8798ad]" }: { fieldKey: string, className?: string }) => {
-    const [tempLabel, setTempLabel] = useState(fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey);
-    
-    if (editingLabel === fieldKey) {
-      return (
-        <Input
-          value={tempLabel}
-          onChange={(e) => setTempLabel(e.target.value)}
-          onBlur={() => handleLabelSave(fieldKey, tempLabel)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleLabelSave(fieldKey, tempLabel);
-            } else if (e.key === 'Escape') {
-              setTempLabel(fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey);
-              handleLabelCancel();
-            } else if (e.key === 'Delete') {
-              e.preventDefault();
-              handleFieldDelete(fieldKey);
-            }
-          }}
-          className="h-6 text-sm border-[#52baf3] focus:border-[#52baf3]"
-          autoFocus
-        />
-      );
+  const EditableLabel = ({ fieldKey, className = "" }: { fieldKey: string; className?: string }) => {
+    const isEditing = editingLabel === fieldKey;
+    const label = fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey;
+    const isNewField = sessionAddedFields.has(fieldKey);
+    const isModified = sessionModifiedFields.has(fieldKey);
+
+    // If no permission, just return a plain label
+    if (!hasFormConfigPermission) {
+      return <Label className={className || "text-sm text-[#8798ad]"}>{label}</Label>;
     }
 
+    // Admin has permission - allow editing
     return (
-      <Label 
-        className={`${className} text-[#52baf3] cursor-pointer hover:underline`}
-        onClick={() => handleLabelEdit(fieldKey)}
-        onKeyDown={(e) => {
-          if (e.key === 'Delete') {
-            e.preventDefault();
-            handleFieldDelete(fieldKey);
-          }
-        }}
-        tabIndex={0}
-        title="Click to edit field label, press Delete to remove field"
-      >
-        {fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey}
-      </Label>
+      <div className="flex items-center gap-1">
+        {isEditing ? (
+          <Input
+            value={label}
+            onChange={(e) => setFieldLabels(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+            onBlur={() => setEditingLabel(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setEditingLabel(null);
+              }
+            }}
+            className="h-6 text-sm"
+            autoFocus
+          />
+        ) : (
+          <Label className={className || "text-sm text-[#8798ad]"}>
+            {label}
+            {isNewField && <span className="ml-1 text-green-600 text-xs">(New)</span>}
+            {isModified && !isNewField && <span className="ml-1 text-blue-600 text-xs">(Modified)</span>}
+          </Label>
+        )}
+        {hasFormConfigPermission && !isEditing && (
+          <button
+            onClick={() => setEditingLabel(fieldKey)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Edit3 className="h-3 w-3 text-gray-400" />
+          </button>
+        )}
+      </div>
     );
   };
 
