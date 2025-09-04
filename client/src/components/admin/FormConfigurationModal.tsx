@@ -916,26 +916,44 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   const EditableLabel = ({ fieldKey, className = "" }: { fieldKey: string; className?: string }) => {
     const isEditing = editingLabel === fieldKey;
     const label = fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey;
+    const [tempLabel, setTempLabel] = useState(label);
     const isNewField = sessionAddedFields.has(fieldKey);
     const isModified = sessionModifiedFields.has(fieldKey);
+
+    // Update tempLabel when label changes
+    useEffect(() => {
+      setTempLabel(label);
+    }, [label]);
 
     if (!hasFormConfigPermission) {
       return <Label className={className || "text-sm text-[#8798ad]"}>{label}</Label>;
     }
 
+    const handleLabelSave = () => {
+      setFieldLabels(prev => ({ ...prev, [fieldKey]: tempLabel }));
+      setEditingLabel(null);
+      // Mark as modified
+      if (!sessionAddedFields.has(fieldKey)) {
+        setSessionModifiedFields(prev => new Set([...Array.from(prev), fieldKey]));
+      }
+    };
+
     return (
       <div className="group flex items-center gap-1">
         {isEditing ? (
           <Input
-            value={label}
-            onChange={(e) => setFieldLabels(prev => ({ ...prev, [fieldKey]: e.target.value }))}
-            onBlur={() => setEditingLabel(null)}
+            value={tempLabel}
+            onChange={(e) => setTempLabel(e.target.value)}
+            onBlur={handleLabelSave}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                handleLabelSave();
+              } else if (e.key === 'Escape') {
+                setTempLabel(label);
                 setEditingLabel(null);
               }
             }}
-            className="h-6 text-sm"
+            className="h-6 text-sm border-[#52baf3]"
             autoFocus
           />
         ) : (
