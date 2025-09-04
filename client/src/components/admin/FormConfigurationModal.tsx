@@ -924,7 +924,7 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
     }
 
     return (
-      <div className="flex items-center gap-1">
+      <div className="group flex items-center gap-1">
         {isEditing ? (
           <Input
             value={label}
@@ -939,7 +939,10 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
             autoFocus
           />
         ) : (
-          <Label className={className || "text-sm text-[#8798ad]"}>
+          <Label 
+            className={`${className || "text-sm text-[#8798ad]"} ${hasFormConfigPermission ? 'cursor-pointer hover:text-[#52baf3]' : ''}`}
+            onClick={hasFormConfigPermission ? () => setEditingLabel(fieldKey) : undefined}
+          >
             {label}
             {isNewField && <span className="ml-1 text-green-600 text-xs">(New)</span>}
             {isModified && !isNewField && <span className="ml-1 text-blue-600 text-xs">(Modified)</span>}
