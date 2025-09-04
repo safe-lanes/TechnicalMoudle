@@ -18,7 +18,9 @@ export const TechnicalModule: React.FC = () => {
   
   // Derive state from URL
   const getStateFromUrl = () => {
-    if (location.startsWith("/admin/")) {
+    if (location === "/admin") {
+      return { subModule: "admin", menuItem: "forms" }; // Default to forms when accessing /admin
+    } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
     } else if (location.startsWith("/pms/")) {
@@ -91,8 +93,8 @@ export const TechnicalModule: React.FC = () => {
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
             <AdminPanel />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "alerts" ? (
-            <Alerts />
+          ) : selectedSubModule === "admin" ? (
+            <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <IhmReports />
           ) : (
