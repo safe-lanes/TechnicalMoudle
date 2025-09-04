@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search, AlertCircle, History, GitBranch, Clock, RotateCcw, Save } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { getComponentCategory } from "@/utils/componentUtils";
 import AddFieldModal from "@/components/modals/AddFieldModal";
@@ -43,6 +44,19 @@ interface ComponentNode {
   name: string;
   children?: ComponentNode[];
   isExpanded?: boolean;
+}
+
+interface FormVersion {
+  id: string;
+  version: string;
+  timestamp: Date;
+  author: string;
+  changes: string;
+  fieldLabels: Record<string, string>;
+  deletedFields: Set<string>;
+  customFields: any[];
+  customSections: any[];
+  componentData: any;
 }
 
 interface FormConfigurationModalProps {
@@ -472,6 +486,15 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   const [customSections, setCustomSections] = useState<any[]>([]);
   const [formVersion, setFormVersion] = useState(1);
   
+  // Version control state
+  const [versions, setVersions] = useState<FormVersion[]>([]);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showSaveVersion, setShowSaveVersion] = useState(false);
+  const [versionComment, setVersionComment] = useState("");
+  const [selectedVersion, setSelectedVersion] = useState<FormVersion | null>(null);
+  const [showVersionComparison, setShowVersionComparison] = useState(false);
+  const [currentVersionId, setCurrentVersionId] = useState("1");
+  
   // Track newly added fields for session
   const [sessionAddedFields, setSessionAddedFields] = useState<Set<string>>(new Set());
   const [sessionModifiedFields, setSessionModifiedFields] = useState<Set<string>>(new Set());
@@ -742,6 +765,78 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
       }
       return newSet;
     });
+  };
+  
+  // Version control functions
+  const saveVersion = () => {
+    const newVersion: FormVersion = {
+      id: `v${versions.length + 1}`,
+      version: `1.${versions.length}.0`,
+      timestamp: new Date(),
+      author: "Admin User",
+      changes: versionComment || `Version ${versions.length + 1}`,
+      fieldLabels: { ...fieldLabels },
+      deletedFields: new Set(deletedFields),
+      customFields: { ...customFields },
+      customSections: [...customSections],
+      componentData: { ...componentData }
+    };
+    
+    const updatedVersions = [...versions, newVersion];
+    setVersions(updatedVersions);
+    setCurrentVersionId(newVersion.id);
+    
+    // Save to localStorage
+    const versionsToStore = updatedVersions.map(v => ({
+      ...v,
+      timestamp: v.timestamp.toISOString(),
+      deletedFields: Array.from(v.deletedFields)
+    }));
+    localStorage.setItem(`form-versions-${formName}`, JSON.stringify(versionsToStore));
+    
+    setShowSaveVersion(false);
+    setVersionComment("");
+    
+    toast({
+      title: "Version Saved",
+      description: `Version ${newVersion.version} has been saved successfully.`
+    });
+  };
+  
+  const loadVersion = (version: FormVersion) => {
+    setFieldLabels(version.fieldLabels as any);
+    setDeletedFields(new Set(version.deletedFields));
+    setCustomFields(version.customFields);
+    setCustomSections(version.customSections);
+    setComponentData(version.componentData as any);
+    setCurrentVersionId(version.id);
+    setShowVersionHistory(false);
+    
+    toast({
+      title: "Version Loaded",
+      description: `Form has been restored to version ${version.version}.`
+    });
+  };
+  
+  const compareVersions = (version1: FormVersion, version2: FormVersion) => {
+    const changes: string[] = [];
+    
+    // Compare field labels
+    Object.keys(version2.fieldLabels).forEach(key => {
+      if (version1.fieldLabels[key] !== version2.fieldLabels[key]) {
+        changes.push(`Label "${key}": "${version1.fieldLabels[key]}" → "${version2.fieldLabels[key]}"`);
+      }
+    });
+    
+    // Check for deleted fields
+    const v1Deleted = Array.from(version1.deletedFields);
+    const v2Deleted = Array.from(version2.deletedFields);
+    const newlyDeleted = v2Deleted.filter(f => !v1Deleted.includes(f));
+    if (newlyDeleted.length > 0) {
+      changes.push(`Deleted fields: ${newlyDeleted.join(", ")}`);
+    }
+    
+    return changes;
   };
 
   // Render component tree
@@ -1042,12 +1137,36 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-none h-[95vh] flex flex-col">
         <DialogHeader className="pb-4 pr-12">
           <div className="flex items-center justify-between">
-            <DialogTitle>Component Register - {isAddMode ? 'Add Component' : 'Edit Component'}</DialogTitle>
+            <div className="flex items-center gap-4">
+              <DialogTitle>Component Register - {isAddMode ? 'Add Component' : 'Edit Component'}</DialogTitle>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Clock className="h-4 w-4" />
+                <span>Version: {versions.find(v => v.id === currentVersionId)?.version || '1.0.0'}</span>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowVersionHistory(true)}
+                className="border-[#52baf3] text-[#52baf3] hover:bg-[#52baf3]/10"
+              >
+                <History className="h-4 w-4 mr-1" />
+                Version History
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setShowSaveVersion(true)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Save className="h-4 w-4 mr-1" />
+                Save Version
+              </Button>
               <Button 
                 size="sm" 
                 className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
@@ -1989,6 +2108,141 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
         />
       )}
     </Dialog>
+    
+    {/* Save Version Dialog */}
+    <Dialog open={showSaveVersion} onOpenChange={setShowSaveVersion}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Save Form Version</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Version Comment</Label>
+            <Textarea
+              placeholder="Describe the changes in this version..."
+              value={versionComment}
+              onChange={(e) => setVersionComment(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowSaveVersion(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveVersion} className="bg-green-600 hover:bg-green-700">
+              <Save className="h-4 w-4 mr-1" />
+              Save Version
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Version History Dialog */}
+    <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
+      <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Version History</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="h-[60vh]">
+          <div className="space-y-4">
+            {versions.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No version history available</p>
+            ) : (
+              versions.slice().reverse().map((version) => (
+                <div
+                  key={version.id}
+                  className={`border rounded-lg p-4 ${
+                    version.id === currentVersionId ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Version {version.version}</span>
+                        {version.id === currentVersionId && (
+                          <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">Current</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{version.changes}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(version.timestamp).toLocaleString()}
+                        </span>
+                        <span>by {version.author}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {version.id !== currentVersionId && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedVersion(version);
+                              setShowVersionComparison(true);
+                            }}
+                          >
+                            <GitBranch className="h-3 w-3 mr-1" />
+                            Compare
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => loadVersion(version)}
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Restore
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Version Comparison Dialog */}
+    <Dialog open={showVersionComparison} onOpenChange={setShowVersionComparison}>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Version Comparison</DialogTitle>
+        </DialogHeader>
+        {selectedVersion && (
+          <ScrollArea className="h-[60vh]">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Current Version ({versions.find(v => v.id === currentVersionId)?.version})</h3>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Version {selectedVersion.version}</h3>
+                </div>
+              </div>
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Changes</h3>
+                <ul className="space-y-2">
+                  {selectedVersion && compareVersions(
+                    versions.find(v => v.id === currentVersionId) || selectedVersion,
+                    selectedVersion
+                  ).map((change, index) => (
+                    <li key={index} className="text-sm flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span>{change}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </ScrollArea>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
