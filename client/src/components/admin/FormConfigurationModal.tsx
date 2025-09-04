@@ -926,7 +926,7 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
     }, [label]);
 
     if (!hasFormConfigPermission) {
-      return <Label className={className || "text-sm text-[#8798ad]"}>{label}</Label>;
+      return <div className={className || "text-sm text-[#8798ad]"}>{label}</div>;
     }
 
     const handleLabelSave = () => {
@@ -957,21 +957,29 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
             autoFocus
           />
         ) : (
-          <Label 
+          <div 
             className={`${className || "text-sm text-[#8798ad]"} ${hasFormConfigPermission ? 'cursor-pointer hover:text-[#52baf3]' : ''}`}
-            onClick={hasFormConfigPermission ? () => setEditingLabel(fieldKey) : undefined}
+            onClick={hasFormConfigPermission ? () => {
+              console.log('Label clicked:', fieldKey);
+              setEditingLabel(fieldKey);
+            } : undefined}
           >
             {label}
             {isNewField && <span className="ml-1 text-green-600 text-xs">(New)</span>}
             {isModified && !isNewField && <span className="ml-1 text-blue-600 text-xs">(Modified)</span>}
-          </Label>
+          </div>
         )}
         {hasFormConfigPermission && !isEditing && (
           <button
-            onClick={() => setEditingLabel(fieldKey)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Edit button clicked:', fieldKey);
+              setEditingLabel(fieldKey);
+            }}
+            className="opacity-50 hover:opacity-100 transition-opacity"
+            title="Click to edit label"
           >
-            <Edit3 className="h-3 w-3 text-gray-400" />
+            <Edit3 className="h-3 w-3 text-gray-400 hover:text-[#52baf3]" />
           </button>
         )}
       </div>
