@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,12 +17,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search, AlertCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { getComponentCategory } from "@/utils/componentUtils";
+import AddFieldModal from "@/components/modals/AddFieldModal";
+import AddSectionModal from "@/components/modals/AddSectionModal";
 import { FEATURES } from '@/config/features';
-import { ScrollArea } from "@/components/ui/scroll-area";
+import IhmManagementModal from '@/components/modals/IhmManagementModal';
+import { useQuery } from '@tanstack/react-query';
+
+interface ComponentNode {
+  id: string;
+  code: string;
+  name: string;
+  children?: ComponentNode[];
+  isExpanded?: boolean;
+}
 
 interface FormConfigurationModalProps {
   isOpen: boolean;
@@ -33,131 +54,986 @@ interface FormConfigurationModalProps {
   versionDate?: string;
 }
 
+// Use the same component tree data as Components screen
+const dummyComponents: ComponentNode[] = [
+  {
+    id: "1",
+    code: "1",
+    name: "Ship General",
+    children: [
+      {
+        id: "1.1",
+        code: "1.1",
+        name: "Fresh Water System",
+        children: [
+          {
+            id: "1.1.1",
+            code: "1.1.1",
+            name: "Hydrophore Unit",
+            children: [
+              {
+                id: "1.1.1.1",
+                code: "1.1.1.1",
+                name: "Pressure Vessel"
+              },
+              {
+                id: "1.1.1.2",
+                code: "1.1.1.2",
+                name: "Feed Pump"
+              },
+              {
+                id: "1.1.1.3",
+                code: "1.1.1.3",
+                name: "Pressure Switch"
+              }
+            ]
+          },
+          {
+            id: "1.1.2",
+            code: "1.1.2",
+            name: "Potable Water Maker",
+            children: []
+          },
+          {
+            id: "1.1.3",
+            code: "1.1.3",
+            name: "UV Sterilizer",
+            children: []
+          }
+        ]
+      },
+      {
+        id: "1.2",
+        code: "1.2",
+        name: "Sewage Treatment System",
+        children: []
+      },
+      {
+        id: "1.3",
+        code: "1.3",
+        name: "HVAC – Accommodation",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "2", 
+    code: "2",
+    name: "Hull",
+    children: [
+      {
+        id: "2.1",
+        code: "2.1",
+        name: "Ballast Tanks",
+        children: []
+      },
+      {
+        id: "2.2",
+        code: "2.2",
+        name: "Cathodic Protection",
+        children: []
+      },
+      {
+        id: "2.3",
+        code: "2.3",
+        name: "Hull Openings – Hatches",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "3",
+    code: "3", 
+    name: "Equipment for Cargo",
+    children: [
+      {
+        id: "3.1",
+        code: "3.1",
+        name: "Cargo Cranes",
+        children: []
+      },
+      {
+        id: "3.2",
+        code: "3.2",
+        name: "Hatch Cover Hydraulics",
+        children: []
+      },
+      {
+        id: "3.3",
+        code: "3.3",
+        name: "Cargo Hold Ventilation",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "4",
+    code: "4",
+    name: "Ship's Equipment",
+    children: [
+      {
+        id: "4.1",
+        code: "4.1",
+        name: "Mooring System",
+        children: []
+      },
+      {
+        id: "4.2",
+        code: "4.2",
+        name: "Windlass",
+        children: []
+      },
+      {
+        id: "4.3",
+        code: "4.3",
+        name: "Steering Gear",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "5",
+    code: "5",
+    name: "Equipment for Crew & Passengers",
+    children: [
+      {
+        id: "5.1",
+        code: "5.1",
+        name: "Lifeboat System",
+        children: []
+      },
+      {
+        id: "5.2",
+        code: "5.2",
+        name: "Fire Main System",
+        children: []
+      },
+      {
+        id: "5.3",
+        code: "5.3",
+        name: "Emergency Lighting",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "6",
+    code: "6",
+    name: "Machinery Main Components",
+    isExpanded: true,
+    children: [
+      {
+        id: "6.1",
+        code: "6.1",
+        name: "Main Engine",
+        isExpanded: true,
+        children: [
+          {
+            id: "6.1.1",
+            code: "6.1.1",
+            name: "Cylinder Head",
+            isExpanded: true,
+            children: [
+              {
+                id: "6.1.1.1",
+                code: "6.1.1.1",
+                name: "Valve Seats"
+              },
+              {
+                id: "6.1.1.2",
+                code: "6.1.1.2",
+                name: "Injector Sleeve"
+              },
+              {
+                id: "6.1.1.3",
+                code: "6.1.1.3",
+                name: "Rocker Arm"
+              }
+            ]
+          },
+          {
+            id: "6.1.2",
+            code: "6.1.2",
+            name: "Main Bearings",
+            children: []
+          },
+          {
+            id: "6.1.3",
+            code: "6.1.3",
+            name: "Cylinder Liners",
+            children: []
+          }
+        ]
+      },
+      {
+        id: "6.2",
+        code: "6.2",
+        name: "Diesel Generators",
+        children: [
+          {
+            id: "6.2.1",
+            code: "6.2.1",
+            name: "DG #1",
+            children: []
+          },
+          {
+            id: "6.2.2",
+            code: "6.2.2",
+            name: "DG #2",
+            children: []
+          },
+          {
+            id: "6.2.3",
+            code: "6.2.3",
+            name: "DG #3",
+            children: []
+          }
+        ]
+      },
+      {
+        id: "6.3",
+        code: "6.3",
+        name: "Auxiliary Boiler",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "7",
+    code: "7",
+    name: "Systems for Machinery Main Components",
+    children: [
+      {
+        id: "7.1",
+        code: "7.1",
+        name: "Fuel Oil System",
+        children: []
+      }
+    ]
+  },
+  {
+    id: "8",
+    code: "8",
+    name: "Ship Common Systems",
+    children: []
+  }
+];
+
+// Function to get mock data for a component based on its code
+const getComponentMockData = (code: string) => {
+  // Generate realistic mock data based on component code and type
+  const getComponentDetails = (code: string, name?: string) => {
+    // Parse component hierarchy from code
+    const levels = code.split('.');
+    const topLevel = levels[0];
+    
+    // Department mapping based on top-level code
+    const departmentMap: { [key: string]: string } = {
+      "1": "Hull & Deck",
+      "2": "Deck Machinery",
+      "3": "Accommodation",
+      "4": "Ship's Equipment",
+      "5": "Safety Equipment",
+      "6": "Engine Department",
+      "7": "Engine Systems",
+      "8": "Common Systems"
+    };
+    
+    // Location mapping
+    const locationMap: { [key: string]: string } = {
+      "1": "Main Deck",
+      "2": "Fore Deck",
+      "3": "Accommodation Block",
+      "4": "Main Deck",
+      "5": "Bridge/Safety Station",
+      "6": "Engine Room",
+      "7": "Engine Room",
+      "8": "Various"
+    };
+    
+    // Criticality based on component level and type
+    const isCritical = topLevel === "6" || topLevel === "7" || (topLevel === "1" && levels.length > 2);
+    
+    // Generate appropriate maker based on component type
+    const getMaker = () => {
+      if (topLevel === "6") return ["MAN B&W", "Wärtsilä", "Caterpillar", "Yanmar"][Math.floor(Math.random() * 4)];
+      if (topLevel === "1") return ["Hyundai", "Samsung", "Daewoo"][Math.floor(Math.random() * 3)];
+      if (topLevel === "2") return ["MacGregor", "TTS Marine", "Rolls-Royce"][Math.floor(Math.random() * 3)];
+      if (topLevel === "3") return ["Marine Air Systems", "Novenco", "Heinen & Hopman"][Math.floor(Math.random() * 3)];
+      if (topLevel === "4") return ["Kongsberg", "Furuno", "JRC"][Math.floor(Math.random() * 3)];
+      if (topLevel === "5") return ["Viking", "Survitec", "LALIZAS"][Math.floor(Math.random() * 3)];
+      return "OEM Manufacturer";
+    };
+    
+    // Generate model based on code
+    const model = `${getMaker().split(' ')[0].toUpperCase()}-${code.replace(/\./g, '')}-${levels.length > 2 ? 'ADV' : 'STD'}`;
+    
+    // Generate serial number
+    const serialNo = `SN-${new Date().getFullYear()}-${code.replace(/\./g, '')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+    
+    // Rating based on component type
+    const getRating = () => {
+      if (topLevel === "6" && levels.length === 3) return "7,200 kW";
+      if (topLevel === "6" && levels.length === 4) return "High Performance";
+      if (topLevel === "2") return "SWL 25 MT";
+      if (topLevel === "7") return "Medium Pressure";
+      return "Standard";
+    };
+    
+    return {
+      maker: getMaker(),
+      model: model,
+      serialNo: serialNo,
+      drawingNo: `DWG-${code.replace(/\./g, '-')}`,
+      department: departmentMap[topLevel] || "General",
+      critical: isCritical ? "Yes" : "No",
+      classItem: isCritical ? "Yes" : "No",
+      location: locationMap[topLevel] || "Ship",
+      commissionedDate: "2020-01-15",
+      installationDate: "2019-12-20",
+      rating: getRating(),
+      conditionBased: levels.length > 2 ? "Yes" : "No",
+      noOfUnits: levels.length === 4 ? "6" : levels.length === 3 ? "2" : "1",
+      eqptSystemDept: departmentMap[topLevel] || "General",
+      parentComponent: levels.length > 1 ? `Level ${levels.slice(0, -1).join('.')}` : "Ship Structure",
+      dimensionsSize: levels.length === 4 ? "0.5m x 0.3m" : levels.length === 3 ? "2m x 1m" : "5m x 3m",
+      notes: `Component ${code} - ${isCritical ? 'Critical for vessel operations' : 'Standard equipment'}`
+    };
+  };
+  
+  // Special cases for specific well-known components
+  const specialCases: { [key: string]: any } = {
+    "6.1.1": {
+      maker: "MAN Energy Solutions",
+      model: "6S60MC-C",
+      serialNo: "ME-2020-001",
+      drawingNo: "DWG-6-1-1",
+      department: "Engine Department",
+      critical: "Yes",
+      classItem: "Yes",
+      location: "Engine Room",
+      commissionedDate: "2020-02-01",
+      installationDate: "2020-01-15",
+      rating: "7,200 kW @ 105 RPM",
+      conditionBased: "Yes",
+      noOfUnits: "1",
+      eqptSystemDept: "Engine Department",
+      parentComponent: "6.1 Main Engine",
+      dimensionsSize: "15m x 3m x 4m",
+      notes: "Main propulsion engine - 6 cylinder, 2-stroke diesel"
+    },
+    "1.1.1.1": {
+      maker: "Grundfos",
+      model: "CR-64-3",
+      serialNo: "PV-2020-001",
+      drawingNo: "DWG-1-1-1-1",
+      department: "Hull & Deck",
+      critical: "Yes",
+      classItem: "No",
+      location: "Fresh Water Room",
+      commissionedDate: "2020-01-01",
+      installationDate: "2019-11-15",
+      rating: "300 L/min @ 6 Bar",
+      conditionBased: "Yes",
+      noOfUnits: "2",
+      eqptSystemDept: "Hull & Deck",
+      parentComponent: "1.1.1 Hydrophore Unit",
+      dimensionsSize: "2m x 1m x 1.5m",
+      notes: "Pressure vessel for fresh water system"
+    }
+  };
+  
+  // Return special case if exists, otherwise generate based on pattern
+  return specialCases[code] || getComponentDetails(code);
+};
+
 const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   isOpen,
   onClose,
   formName
 }) => {
   const { toast } = useToast();
+  const [selectedNode, setSelectedNode] = useState<ComponentNode | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
+  const [isAddMode, setIsAddMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   
-  // Form state matching ComponentRegisterForm exactly
-  const [formData, setFormData] = useState({
-    componentCode: "",
-    componentName: "",
-    department: "",
-    location: "",
-    model: "",
-    maker: "",
-    type: "",
-    noOfUnits: "",
-    runningHours: "",
-    runningHoursMeasuredOn: "",
-    condition: "Good",
-    criticalEquipment: "No",
-    manufacturer: "",
-    serialNumber: "",
-    capacity: "",
-    yearOfMake: "",
-    yearOfInstallation: "",
-    ihmStatus: "Unknown",
-    ihmMaterials: [],
-    ihmDocumentation: [],
-    ihmMaintenanceDate: "",
-    ihmRemarks: ""
+  // Permission state - mock for now, should come from user context
+  const [hasFormConfigPermission] = useState(true);
+  
+  // Modal states for adding fields and sections
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [currentSection, setCurrentSection] = useState<string>("");
+  const [showIhmModal, setShowIhmModal] = useState(false);
+  
+  // New fields and sections tracking
+  const [customFields, setCustomFields] = useState<Record<string, any[]>>({});
+  const [customSections, setCustomSections] = useState<any[]>([]);
+  const [formVersion, setFormVersion] = useState(1);
+  
+  // Track newly added fields for session
+  const [sessionAddedFields, setSessionAddedFields] = useState<Set<string>>(new Set());
+  const [sessionModifiedFields, setSessionModifiedFields] = useState<Set<string>>(new Set());
+
+  // Auto-generate component code based on parent
+  const generateComponentCode = (parent: ComponentNode | null) => {
+    if (!parent) return "";
+    // Calculate next available number at this level
+    const siblingCount = parent.children?.length || 0;
+    return `${parent.code}.${siblingCount + 1}`;
+  };
+
+  // State for editable field labels and deletable fields
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [deletedFields, setDeletedFields] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [fieldLabels, setFieldLabels] = useState({
+    maker: "Maker",
+    model: "Model", 
+    serialNo: "Serial No",
+    drawingNo: "Drawing No",
+    location: "Location",
+    critical: "Critical",
+    installation: "Installation Date",
+    commissionedDate: "Commissioned Date",
+    rating: "Rating",
+    conditionBased: "Condition Based",
+    noOfUnits: "No of Units",
+    eqptSystemDept: "Eqpt / System Department",
+    parentComponent: "Parent Component",
+    dimensionsSize: "Dimensions/Size",
+    notes: "Notes",
+    runningHours: "Running Hours",
+    dateUpdated: "Date Updated",
+    nextDue: "Next Due",
+    metric: "Metric",
+    alertsThresholds: "Alerts/ Thresholds",
+    woTitle: "WO Title",
+    assignedTo: "Assigned To",
+    maintenanceType: "Maintenance Type",
+    frequency: "Frequency",
+    initialNextDue: "Initial Next Due",
+    classificationProvider: "Classification Provider",
+    certificateNo: "Certificate No.",
+    lastDataSurvey: "Last Data Survey",
+    nextDataSurvey: "Next Data Survey",
+    surveyType: "Survey Type",
+    classRequirements: "Class Requirements",
+    classCode: "Class Code",
+    information: "Information"
   });
 
-  const [selectedParent, setSelectedParent] = useState<{ code: string; name: string } | null>(null);
-  const [showParentSelector, setShowParentSelector] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-
-  // Component tree data
-  const componentTree = [
-    {
-      id: "1",
-      code: "1",
-      name: "Ship General",
-      children: [
-        {
-          id: "1.1",
-          code: "1.1",
-          name: "Fresh Water System",
-          children: [
-            { id: "1.1.1", code: "1.1.1", name: "Hydrophore Unit" },
-            { id: "1.1.2", code: "1.1.2", name: "Potable Water Maker" }
-          ]
-        }
-      ]
+  const [componentData, setComponentData] = useState({
+    componentId: "601.003.XXX",
+    componentName: "",
+    serialNo: "",
+    drawingNo: "",
+    componentCode: "",
+    equipmentCategory: "",
+    location: "",
+    installation: "",
+    componentType: "",
+    rating: "",
+    noOfUnits: "",
+    equipmentDepartment: "",
+    parentComponent: "",
+    facility: "",
+    runningHoursUnit1: "",
+    runningHoursUnit2: "",
+    maker: "",
+    model: "",
+    department: "",
+    critical: "No",
+    classItem: "No",
+    conditionBased: "No",
+    dimensionsSize: "",
+    notes: "",
+    commissionedDate: "",
+    installationDate: "",
+    eqptSystemDept: "",
+    // Section B: Running Hours & Condition Monitoring
+    runningHours: "20000",
+    dateUpdated: "",
+    metric: "",
+    alertsThresholds: "",
+    // Section C: Work Orders
+    woTitle: "",
+    assignedTo: "",
+    maintenanceType: "",
+    frequency: "",
+    initialNextDue: "",
+    // Section D: Maintenance History
+    workOrderNo: "WO-2025-01", 
+    performedBy: "Kane",
+    totalTimeHrs: "3",
+    completionDate: "08-Jan-2025",
+    status: "Completed",
+    // Section E: Spare Parts
+    partCode: "SP-306-001",
+    partName: "Fuel Injection",
+    minQty: "5",
+    criticalQty: "5",
+    locationStore: "Engine Room R-3",
+    // Section H: Requisitions  
+    reqNo: "REQ-2025-089",
+    reqPart: "Fuel Injection Pump",
+    reqQty: "2",
+    reqDate: "15-Jan-2025",
+    reqStatus: "Pending",
+    conditionMonitoringMetrics: {
+      metric: "",
+      interval: "",
+      temperature: "",
+      pressure: ""
     },
-    {
-      id: "2",
-      code: "2", 
-      name: "Hull",
-      children: [
-        { id: "2.1", code: "2.1", name: "Ballast Tanks" },
-        { id: "2.2", code: "2.2", name: "Cathodic Protection" }
-      ]
+    workOrders: [],
+    maintenanceHistory: [],
+    spares: [],
+    drawings: [],
+    classificationData: {
+      classificationProvider: "",
+      certificateNo: "",
+      lastDataSurvey: "",
+      nextDataSurvey: "",
+      surveyType: "",
+      classRequirements: "",
+      classCode: "",
+      information: ""
     }
-  ];
+  });
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
+  // Fetch IHM data for the component
+  const { data: ihmData } = useQuery<{
+    presence?: 'Unknown' | 'Present' | 'Not Present';
+    evidenceType?: string;
+    materials?: string[];
+  }>({
+    queryKey: [`/api/ihm/component/${componentData.componentId}`],
+    enabled: FEATURES.IHM && !!componentData.componentId,
+  });
+
+  // Handle node selection
+  const handleNodeSelect = (node: ComponentNode) => {
+    setSelectedNode(node);
+    setIsAddMode(false);
+    // Load mock data for the selected component
+    const mockData = getComponentMockData(node.code);
+    setComponentData(prev => ({
       ...prev,
-      [field]: value
+      componentName: node.name,
+      componentCode: node.code,
+      serialNo: mockData.serialNo || '',
+      drawingNo: mockData.drawingNo || '',
+      maker: mockData.maker || '',
+      model: mockData.model || '',
+      location: mockData.location || '',
+      installation: mockData.installationDate || '',
+      rating: mockData.rating || '',
+      noOfUnits: mockData.noOfUnits || '',
+      equipmentDepartment: mockData.eqptSystemDept || '',
+      parentComponent: mockData.parentComponent || '',
+      critical: mockData.critical || 'No',
+      classItem: mockData.classItem || 'No',
+      conditionBased: mockData.conditionBased || 'No',
+      dimensionsSize: mockData.dimensionsSize || '',
+      notes: mockData.notes || '',
+      commissionedDate: mockData.commissionedDate || '',
+      department: mockData.department || ''
     }));
   };
 
-  const toggleNodeExpansion = (nodeId: string) => {
-    const newExpanded = new Set(expandedNodes);
-    if (newExpanded.has(nodeId)) {
-      newExpanded.delete(nodeId);
-    } else {
-      newExpanded.add(nodeId);
+  // Handle Add Sub Component
+  const handleAddSubComponent = () => {
+    if (!selectedNode) {
+      toast({
+        title: "No Parent Selected",
+        description: "Select a parent in the tree to add a child component.",
+        variant: "destructive"
+      });
+      return;
     }
-    setExpandedNodes(newExpanded);
+    setIsAddMode(true);
+    const newCode = generateComponentCode(selectedNode);
+    // Reset form for new component
+    setComponentData({
+      componentId: "601.003.XXX",
+      componentName: "",
+      serialNo: "",
+      drawingNo: "",
+      componentCode: newCode,
+      equipmentCategory: "",
+      location: "",
+      installation: "",
+      componentType: "",
+      rating: "",
+      noOfUnits: "",
+      equipmentDepartment: "",
+      parentComponent: selectedNode.name,
+      facility: "",
+      runningHoursUnit1: "",
+      runningHoursUnit2: "",
+      maker: "",
+      model: "",
+      department: "",
+      critical: "No",
+      classItem: "No",
+      conditionBased: "No",
+      dimensionsSize: "",
+      notes: "",
+      commissionedDate: "",
+      installationDate: "",
+      eqptSystemDept: "",
+      runningHours: "20000",
+      dateUpdated: "",
+      metric: "",
+      alertsThresholds: "",
+      woTitle: "",
+      assignedTo: "",
+      maintenanceType: "",
+      frequency: "",
+      initialNextDue: "",
+      workOrderNo: "WO-2025-01",
+      performedBy: "Kane",
+      totalTimeHrs: "3",
+      completionDate: "08-Jan-2025",
+      status: "Completed",
+      partCode: "SP-306-001",
+      partName: "Fuel Injection",
+      minQty: "5",
+      criticalQty: "5",
+      locationStore: "Engine Room R-3",
+      reqNo: "REQ-2025-089",
+      reqPart: "Fuel Injection Pump",
+      reqQty: "2",
+      reqDate: "15-Jan-2025",
+      reqStatus: "Pending",
+      conditionMonitoringMetrics: {
+        metric: "",
+        interval: "",
+        temperature: "",
+        pressure: ""
+      },
+      workOrders: [],
+      maintenanceHistory: [],
+      spares: [],
+      drawings: [],
+      classificationData: {
+        classificationProvider: "",
+        certificateNo: "",
+        lastDataSurvey: "",
+        nextDataSurvey: "",
+        surveyType: "",
+        classRequirements: "",
+        classCode: "",
+        information: ""
+      }
+    });
   };
 
-  const renderComponentTree = (nodes: any[], level = 0) => {
-    return nodes.map(node => {
+  // Toggle node expansion
+  const toggleNode = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Render component tree
+  const renderComponentTree = (nodes: ComponentNode[], level: number = 0) => {
+    return nodes.map((node) => {
       const hasChildren = node.children && node.children.length > 0;
       const isExpanded = expandedNodes.has(node.id);
-      
+      const isSelected = selectedNode?.id === node.id;
+
       return (
         <div key={node.id}>
-          <div 
-            className={`flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer ${
-              selectedParent?.code === node.code ? 'bg-blue-50 border-l-2 border-blue-500' : ''
+          <div
+            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-white/10 ${
+              isSelected ? "bg-white/20" : ""
             }`}
-            style={{ paddingLeft: `${level * 20 + 8}px` }}
-            onClick={() => {
-              setSelectedParent({ code: node.code, name: node.name });
-              setShowParentSelector(false);
-            }}
+            style={{ paddingLeft: `${level * 20 + 12}px` }}
+            onClick={() => handleNodeSelect(node)}
           >
-            {hasChildren && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleNodeExpansion(node.id);
-                }}
-                className="p-0.5"
-              >
-                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              </button>
-            )}
-            {!hasChildren && <span className="w-4" />}
-            <span className="text-sm">{node.code} - {node.name}</span>
+            <button
+              className="mr-2 flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (hasChildren) {
+                  toggleNode(node.id);
+                }
+              }}
+            >
+              {hasChildren ? (
+                isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-white" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-white" />
+                )
+              ) : (
+                <ChevronRight className="h-4 w-4 text-white/50" />
+              )}
+            </button>
+            <span className="text-sm text-white">
+              {node.code} {node.name}
+            </span>
           </div>
           {hasChildren && isExpanded && (
-            <div>{renderComponentTree(node.children, level + 1)}</div>
+            <div>{renderComponentTree(node.children!, level + 1)}</div>
           )}
         </div>
       );
     });
   };
 
-  const handleSave = () => {
+  const handleInputChange = (field: string, value: string) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      setComponentData(prev => {
+        const parentValue = prev[parent as keyof typeof prev];
+        return {
+          ...prev,
+          [parent]: {
+            ...(typeof parentValue === 'object' ? parentValue : {}),
+            [child]: value
+          }
+        };
+      });
+    } else {
+      setComponentData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+    
+    // Mark field as modified
+    if (!sessionAddedFields.has(field)) {
+      setSessionModifiedFields(prev => new Set([...Array.from(prev), field]));
+    }
+  };
+
+  // Edit label functionality
+  const EditableLabel = ({ fieldKey, className = "" }: { fieldKey: string; className?: string }) => {
+    const isEditing = editingLabel === fieldKey;
+    const label = fieldLabels[fieldKey as keyof typeof fieldLabels] || fieldKey;
+    const isNewField = sessionAddedFields.has(fieldKey);
+    const isModified = sessionModifiedFields.has(fieldKey);
+
+    if (!hasFormConfigPermission) {
+      return <Label className={className || "text-sm text-[#8798ad]"}>{label}</Label>;
+    }
+
+    return (
+      <div className="flex items-center gap-1">
+        {isEditing ? (
+          <Input
+            value={label}
+            onChange={(e) => setFieldLabels(prev => ({ ...prev, [fieldKey]: e.target.value }))}
+            onBlur={() => setEditingLabel(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setEditingLabel(null);
+              }
+            }}
+            className="h-6 text-sm"
+            autoFocus
+          />
+        ) : (
+          <Label className={className || "text-sm text-[#8798ad]"}>
+            {label}
+            {isNewField && <span className="ml-1 text-green-600 text-xs">(New)</span>}
+            {isModified && !isNewField && <span className="ml-1 text-blue-600 text-xs">(Modified)</span>}
+          </Label>
+        )}
+        {hasFormConfigPermission && !isEditing && (
+          <button
+            onClick={() => setEditingLabel(fieldKey)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Edit3 className="h-3 w-3 text-gray-400" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Deletable field wrapper
+  const DeletableField = ({ fieldKey, children }: { fieldKey: string; children: React.ReactNode }) => {
+    if (deletedFields.has(fieldKey)) {
+      return null;
+    }
+
+    if (!hasFormConfigPermission) {
+      return <div className="space-y-2">{children}</div>;
+    }
+
+    return (
+      <div className="space-y-2 group relative">
+        {children}
+        {hasFormConfigPermission && (
+          <button
+            onClick={() => setShowDeleteConfirm(fieldKey)}
+            className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-gray-200 rounded-full p-1"
+          >
+            <Trash2 className="h-3 w-3 text-red-600" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const confirmFieldDelete = () => {
+    if (showDeleteConfirm) {
+      setDeletedFields(prev => new Set([...Array.from(prev), showDeleteConfirm]));
+      setShowDeleteConfirm(null);
+      toast({
+        title: "Field Deleted",
+        description: `The "${fieldLabels[showDeleteConfirm as keyof typeof fieldLabels]}" field has been removed.`,
+      });
+    }
+  };
+
+  const cancelFieldDelete = () => {
+    setShowDeleteConfirm(null);
+  };
+
+  // Render custom field based on its type
+  const renderCustomField = (field: any) => {
+    if (!field) return null;
+
+    const getValue = () => {
+      const val = componentData[field.key as keyof typeof componentData];
+      if (typeof val === 'string' || typeof val === 'number') {
+        return String(val);
+      }
+      return '';
+    };
+
+    const fieldElement = (() => {
+      switch (field.type) {
+        case 'text':
+          return (
+            <Input
+              value={getValue()}
+              onChange={(e) => handleInputChange(field.key, e.target.value)}
+              placeholder={field.placeholder}
+              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+              required={field.required}
+            />
+          );
+        case 'number':
+          return (
+            <Input
+              type="number"
+              value={getValue()}
+              onChange={(e) => handleInputChange(field.key, e.target.value)}
+              placeholder={field.placeholder}
+              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+              required={field.required}
+            />
+          );
+        case 'date':
+          return (
+            <Input
+              type="date"
+              value={getValue()}
+              onChange={(e) => handleInputChange(field.key, e.target.value)}
+              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+              required={field.required}
+            />
+          );
+        case 'select':
+          return (
+            <Select
+              value={getValue()}
+              onValueChange={(value) => handleInputChange(field.key, value)}
+            >
+              <SelectTrigger className="border-[#52baf3] border-2">
+                <SelectValue placeholder={field.placeholder || "Select..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {field.options?.map((option: string) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          );
+        case 'textarea':
+          return (
+            <Textarea
+              value={getValue()}
+              onChange={(e) => handleInputChange(field.key, e.target.value)}
+              placeholder={field.placeholder}
+              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+              rows={field.rows || 3}
+              required={field.required}
+            />
+          );
+        case 'toggle':
+          return (
+            <div className="flex items-center gap-2">
+              <Switch
+                id={field.key}
+                checked={getValue() === 'true'}
+                onCheckedChange={(checked) => handleInputChange(field.key, checked ? 'true' : 'false')}
+                className="data-[state=checked]:bg-[#52baf3]"
+              />
+              <Label htmlFor={field.key} className="text-sm">
+                {field.label}
+              </Label>
+            </div>
+          );
+        default:
+          return null;
+      }
+    })();
+
+    if (!fieldElement) return null;
+
+    return (
+      <div key={field.key} className="space-y-2">
+        {field.type !== 'toggle' && (
+          <Label className="text-sm text-[#8798ad]">
+            {field.label}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+            <span className="ml-1 text-green-600 text-xs">(Custom)</span>
+          </Label>
+        )}
+        {fieldElement}
+      </div>
+    );
+  };
+
+  const handleSubmit = () => {
+    // Validate required fields
+    if (!componentData.componentName) {
+      toast({
+        title: "Validation Error",
+        description: "Component Name is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (isAddMode && selectedNode) {
+      const expectedCode = generateComponentCode(selectedNode);
+      if (componentData.componentCode !== expectedCode) {
+        toast({
+          title: "Validation Error", 
+          description: "Component Code must match tree position.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     toast({
       title: "Form Configuration Saved",
       description: "The form configuration has been saved successfully."
@@ -166,573 +1042,953 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
   };
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[800px] max-h-[90vh] p-0 overflow-hidden">
-          <div className="bg-white">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-3 border-b">
-              <div className="flex items-center gap-4">
-                <button onClick={onClose}>
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-                <h2 className="text-lg font-semibold">Component Register - Add Component</h2>
-                <span className="text-sm text-gray-500">Configuration Mode</span>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="w-[95vw] max-w-none h-[95vh] flex flex-col">
+        <DialogHeader className="pb-4 pr-12">
+          <div className="flex items-center justify-between">
+            <DialogTitle>Component Register - {isAddMode ? 'Add Component' : 'Edit Component'}</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                onClick={handleAddSubComponent}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Sub Component
+              </Button>
+              <Button 
+                size="sm" 
+                className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                onClick={handleSubmit}
+              >
+                Save
+              </Button>
+              <Button variant="outline" size="sm" onClick={onClose}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar - Components Tree */}
+          <div className="w-80 bg-[#52baf3] text-white p-4 overflow-auto">
+            <div className="mb-4">
+              <h3 className="font-semibold text-white mb-2">COMPONENTS</h3>
+              <div className="mb-3">
+                <Input
+                  placeholder="Search components..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-white/20 border-white/30 text-white placeholder-white/60"
+                />
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="text-green-600 border-green-600">
-                  Preview Mode
-                </Button>
-                <Button variant="outline" size="sm" className="text-blue-600 border-blue-600">
-                  Edit Config
-                </Button>
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleSave}>
-                  Save
-                </Button>
+              <div className="space-y-0">
+                {renderComponentTree(dummyComponents)}
               </div>
             </div>
+          </div>
 
-            {/* Version and Status Bar */}
-            <div className="flex items-center gap-4 px-6 py-2 border-b text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600">Version No:</span>
-                <span>01</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600">Version Date:</span>
-                <Input type="date" className="h-7 w-32" defaultValue="2024-01-15" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600">Select Date:</span>
-                <Input type="date" className="h-7 w-32" />
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-gray-600">Status:</span>
-                <span className="text-green-600 font-medium">Draft</span>
-              </div>
-            </div>
-
-            <ScrollArea className="h-[calc(90vh-140px)]">
-              <div className="p-6 space-y-6">
-                {/* Component Information Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600">▶</span>
-                    <h3 className="font-semibold">Component Information</h3>
-                    <Button variant="ghost" size="sm" className="ml-auto text-gray-500">
-                      + Add Field
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Component Code</Label>
-                      <div className="flex gap-1">
-                        <Input
-                          value={formData.componentCode}
-                          onChange={(e) => handleInputChange('componentCode', e.target.value)}
-                          placeholder="Type / System / Category"
-                        />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Department Type</Label>
-                      <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="deck">Deck</SelectItem>
-                          <SelectItem value="engine">Engine</SelectItem>
-                          <SelectItem value="electrical">Electrical</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Running Hrs</Label>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          value={formData.runningHours}
-                          onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                        />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Component Name</Label>
-                      <Input
-                        value={formData.componentName}
-                        onChange={(e) => handleInputChange('componentName', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Commissioned Date</Label>
-                      <Input
-                        type="date"
-                        onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Condition Rating</Label>
-                      <Select value={formData.condition} onValueChange={(value) => handleInputChange('condition', value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Good">Good</SelectItem>
-                          <SelectItem value="Fair">Fair</SelectItem>
-                          <SelectItem value="Poor">Poor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Department Type</Label>
-                      <Input
-                        value={formData.type}
-                        onChange={(e) => handleInputChange('type', e.target.value)}
-                        placeholder="Type / System / Category"
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Serial</Label>
-                      <Input
-                        value={formData.serialNumber}
-                        onChange={(e) => handleInputChange('serialNumber', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Equipment Group</Label>
-                      <div className="flex gap-1">
-                        <Input placeholder="Equipment Group" />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">No of Units</Label>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          value={formData.noOfUnits}
-                          onChange={(e) => handleInputChange('noOfUnits', e.target.value)}
-                        />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Blue toggle fields */}
-                    <div className="flex items-center gap-8">
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="class-item" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="class-item" className="text-sm text-blue-600">Class Item</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="critical" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="critical" className="text-sm text-blue-600">Critical</Label>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-8">
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="ihm-item" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="ihm-item" className="text-sm text-blue-600">IHM Item</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="safety-critical" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="safety-critical" className="text-sm text-blue-600">Safety Critical</Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Running Hours & Condition Monitoring Metrics Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Running Hours & Condition Monitoring Metrics</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Running Group</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="main">Main</SelectItem>
-                          <SelectItem value="aux">Auxiliary</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Type</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="engine">Engine</SelectItem>
-                          <SelectItem value="pump">Pump</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">RH since date</Label>
-                      <Input type="date" />
-                    </div>
-                  </div>
-
-                  <div className="pl-6">
-                    <Label className="text-sm">Condition Monitoring Metrics</Label>
-                    <Textarea 
-                      className="mt-1"
-                      placeholder="Enter condition monitoring metrics"
-                      rows={2}
+          {/* Right Content Area */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="bg-white border border-gray-200 rounded-lg">
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <Input 
+                      value={componentData.componentName || ''}
+                      onChange={(e) => handleInputChange('componentName', e.target.value)}
+                      placeholder="Component Name (required)"
+                      className="text-lg font-semibold mb-1"
+                      required
                     />
-                  </div>
-
-                  <div className="pl-6">
-                    <Label className="text-sm">Matrix</Label>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add New Section
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          Picture / Thumbnail
-                        </Button>
-                      </div>
+                    <div className="text-sm text-gray-500">
+                      Component Code: {componentData.componentCode || 'Auto-generated'}
                     </div>
                   </div>
-                </div>
-
-                {/* Work Orders Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Work Orders</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Bill No.</Label>
-                      <Input placeholder="Enter bill number" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Job Title</Label>
-                      <Input placeholder="Enter job title" />
-                    </div>
-
-                    <div className="flex items-center gap-8">
-                      <Label className="text-sm">Assigned to:</Label>
-                      <div className="flex gap-2">
-                        <Label className="text-sm">Duty Basis</Label>
-                        <Label className="text-sm">Online</Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Maintenance History Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Maintenance History</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Work Order No</Label>
-                      <Input placeholder="Enter work order number" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Performed By</Label>
-                      <Input placeholder="Enter name" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Total Crew Hrs</Label>
-                      <Input type="number" placeholder="Hours" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Completion Date</Label>
-                      <Input type="date" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Status</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Spares Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Spares</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Part Code</Label>
-                      <Input placeholder="Enter part code" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Part Name</Label>
-                      <Input placeholder="Enter part name" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Min</Label>
-                      <Input type="number" placeholder="Minimum quantity" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Current</Label>
-                      <Input type="number" placeholder="Current quantity" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Location</Label>
-                      <Input placeholder="Storage location" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Drawings & Manuals Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Drawings & Manuals</h3>
-                    <Button variant="ghost" size="sm" className="ml-auto text-gray-500">
-                      + Add Field
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Classification & Regulatory Data Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600">▶</span>
-                    <h3 className="font-semibold">Classification & Regulatory Data</h3>
-                    <Button variant="ghost" size="sm" className="ml-auto text-gray-500">
-                      + Add Field
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Classification Society</Label>
-                      <Input placeholder="Enter classification society" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Approval No.</Label>
-                      <Input placeholder="Enter approval number" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Last Survey Date</Label>
-                      <Input type="date" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Survey Type</Label>
-                      <Input placeholder="Enter survey type" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Class Requirement</Label>
-                      <Input placeholder="Enter class requirement" />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Certificate</Label>
-                      <Input placeholder="Certificate number" />
-                    </div>
-
-                    <div className="col-span-3 flex items-center gap-8">
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="ihm-hull" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="ihm-hull" className="text-sm text-blue-600">IHM (Hull)</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="ihm-hull-2" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="ihm-hull-2" className="text-sm text-blue-600">IHM (Hull)</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="ihm-hull-3" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="ihm-hull-3" className="text-sm text-blue-600">IHM (Hull)</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="ihm-hull-4" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="ihm-hull-4" className="text-sm text-blue-600">IHM (Hull)</Label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Next Section Fields */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">▼</span>
-                    <h3 className="font-semibold">Next Section Fields</h3>
-                    <Button variant="ghost" size="sm" className="ml-auto text-gray-500">
-                      + Add Field
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pl-6">
-                    <div>
-                      <Label className="text-sm">Field 1</Label>
-                      <div className="flex gap-1">
-                        <Input />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Field 2</Label>
-                      <div className="flex gap-1">
-                        <Input />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm">Field 3</Label>
-                      <div className="flex gap-1">
-                        <Input />
-                        <Button size="icon" variant="ghost" className="h-9 w-9">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="col-span-3 flex items-center gap-8">
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="field-4" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="field-4" className="text-sm text-blue-600">Field 4</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="field-5" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="field-5" className="text-sm text-blue-600">Field 5</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="field-6" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="field-6" className="text-sm text-blue-600">Field 6</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          id="field-7" 
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <Label htmlFor="field-7" className="text-sm text-blue-600">Field 7</Label>
-                      </div>
-                    </div>
+                  <div className="flex gap-2">
+                    <Select defaultValue="vessel">
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vessel">Vessel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Search Components" className="w-48" />
+                    <Select defaultValue="criticality">
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="criticality">Criticality</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
-            </ScrollArea>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Parent Component Selector Dialog */}
-      <Dialog open={showParentSelector} onOpenChange={setShowParentSelector}>
-        <DialogContent className="max-w-2xl max-h-[70vh]">
-          <DialogHeader>
-            <DialogTitle>Select Parent Component</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search components..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <div className="p-6 space-y-6">
+                {/* A. Component Information */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">A. Component Information</h4>
+                    {hasFormConfigPermission && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setCurrentSection('A');
+                          setShowAddFieldModal(true);
+                        }}
+                        className="text-[#52baf3] hover:text-[#52baf3]"
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add field
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-6">
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="maker" />
+                      <Input 
+                        value={componentData.maker}
+                        onChange={(e) => handleInputChange('maker', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="model" />
+                      <Input 
+                        value={componentData.model}
+                        onChange={(e) => handleInputChange('model', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="serialNo" />
+                      <Input 
+                        value={componentData.serialNo}
+                        onChange={(e) => handleInputChange('serialNo', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="drawingNo" />
+                      <Input 
+                        value={componentData.drawingNo}
+                        onChange={(e) => handleInputChange('drawingNo', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                      <Input 
+                        value={componentData.componentCode}
+                        readOnly
+                        className="border-gray-300 bg-gray-50"
+                        title="Component Code is auto-generated based on tree position"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Component Category</Label>
+                      <Input 
+                        value={selectedNode ? getComponentCategory(selectedNode.id) : ''}
+                        readOnly
+                        className="border-gray-300 bg-gray-50"
+                        title="Component Category is derived from the component's tree position"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="location" />
+                      <Input 
+                        value={componentData.location}
+                        onChange={(e) => handleInputChange('location', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="critical" />
+                      <Input 
+                        value={componentData.critical}
+                        onChange={(e) => handleInputChange('critical', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="installation" />
+                      <Input 
+                        value={componentData.installation}
+                        onChange={(e) => handleInputChange('installation', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="commissionedDate" />
+                      <Input 
+                        value={componentData.commissionedDate}
+                        onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="rating" />
+                      <Input 
+                        value={componentData.rating}
+                        onChange={(e) => handleInputChange('rating', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="conditionBased" />
+                      <Input 
+                        value={componentData.conditionBased}
+                        onChange={(e) => handleInputChange('conditionBased', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <DeletableField fieldKey="noOfUnits">
+                      <EditableLabel fieldKey="noOfUnits" />
+                      <Input 
+                        value={componentData.noOfUnits}
+                        onChange={(e) => handleInputChange('noOfUnits', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="eqptSystemDept">
+                      <EditableLabel fieldKey="eqptSystemDept" />
+                      <Input 
+                        value={componentData.equipmentDepartment}
+                        onChange={(e) => handleInputChange('equipmentDepartment', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="parentComponent">
+                      <EditableLabel fieldKey="parentComponent" />
+                      <Input 
+                        value={componentData.parentComponent}
+                        onChange={(e) => handleInputChange('parentComponent', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="dimensionsSize">
+                      <EditableLabel fieldKey="dimensionsSize" />
+                      <Input 
+                        value={componentData.dimensionsSize}
+                        onChange={(e) => handleInputChange('dimensionsSize', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                  </div>
+                  
+                  {/* IHM Row - Full width below No of Units */}
+                  {FEATURES.IHM && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Label className="text-sm font-medium text-[#8798ad]">IHM</Label>
+                          {ihmData?.presence === 'Present' ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              Attention
+                            </span>
+                          ) : ihmData?.presence === 'Not Present' ? (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              Compliant
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              Unknown
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setShowIhmModal(true)}
+                        >
+                          Manage IHM
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4">
+                    <DeletableField fieldKey="notes">
+                      <EditableLabel fieldKey="notes" />
+                      <Textarea 
+                        value={componentData.notes}
+                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                        placeholder="Notes"
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        rows={2}
+                      />
+                    </DeletableField>
+                  </div>
+                  
+                  {/* Custom Fields for Section A */}
+                  {customFields['A'] && customFields['A'].length > 0 && (
+                    <div className="grid grid-cols-4 gap-6 mt-6 pt-6 border-t border-gray-200">
+                      {customFields['A'].map(field => renderCustomField(field))}
+                    </div>
+                  )}
+                </div>
+
+                {/* B. Running Hours & Condition Monitoring Metrics */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">B. Running Hours & Condition Monitoring Metrics</h4>
+                    {hasFormConfigPermission && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setCurrentSection('B');
+                          setShowAddFieldModal(true);
+                        }}
+                        className="text-[#52baf3] hover:text-[#52baf3]"
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add field
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 mb-4">
+                    <DeletableField fieldKey="runningHours">
+                      <EditableLabel fieldKey="runningHours" />
+                      <Input 
+                        value={componentData.runningHours}
+                        onChange={(e) => handleInputChange('runningHours', e.target.value)}
+                        placeholder="20000"
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="dateUpdated">
+                      <EditableLabel fieldKey="dateUpdated" />
+                      <Input 
+                        value={componentData.dateUpdated}
+                        onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
+                        placeholder="dd-mm-yyyy"
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-medium text-gray-900">Condition Monitoring Metrics</h5>
+                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Metric
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <DeletableField fieldKey="metric">
+                        <EditableLabel fieldKey="metric" />
+                        <Input 
+                          value={componentData.metric}
+                          onChange={(e) => handleInputChange('metric', e.target.value)}
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                      <DeletableField fieldKey="alertsThresholds">
+                        <EditableLabel fieldKey="alertsThresholds" />
+                        <Input 
+                          value={componentData.alertsThresholds}
+                          onChange={(e) => handleInputChange('alertsThresholds', e.target.value)}
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                    </div>
+                  </div>
+                  
+                  {/* Custom Fields for Section B */}
+                  {customFields['B'] && customFields['B'].length > 0 && (
+                    <div className="grid grid-cols-2 gap-6 mt-6 pt-6 border-t border-gray-200">
+                      {customFields['B'].map(field => renderCustomField(field))}
+                    </div>
+                  )}
+                </div>
+
+                {/* C. Work Orders */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">C. Work Orders</h4>
+                    <div className="flex gap-2">
+                      {hasFormConfigPermission && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCurrentSection('C');
+                            setShowAddFieldModal(true);
+                          }}
+                          className="text-[#52baf3] hover:text-[#52baf3]"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add field
+                        </Button>
+                      )}
+                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add W.O
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div></div>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {isAddMode ? (
+                        <div className="px-4 py-8 text-center text-sm text-gray-500">
+                          No work orders yet. Click "Add W.O" to create one.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="px-4 py-3">
+                            <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                              <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                              <div className="text-gray-900">Chief Engineer</div>
+                              <div className="text-gray-900">Running Hours</div>
+                              <div className="text-gray-900">500</div>
+                              <div className="text-gray-900">02-Jun-2025</div>
+                              <div className="flex gap-2">
+                                <button className="text-gray-400 hover:text-gray-600">
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="px-4 py-3">
+                            <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                              <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                              <div className="text-gray-900">Chief Engineer</div>
+                              <div className="text-gray-900">Calendar</div>
+                              <div className="text-gray-900">30</div>
+                              <div className="text-gray-900">02-Jun-2025</div>
+                              <div className="flex gap-2">
+                                <button className="text-gray-400 hover:text-gray-600">
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* D. Maintenance History */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">D. Maintenance History</h4>
+                    <div className="flex gap-2">
+                      {hasFormConfigPermission && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCurrentSection('D');
+                            setShowAddFieldModal(true);
+                          }}
+                          className="text-[#52baf3] hover:text-[#52baf3]"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add field
+                        </Button>
+                      )}
+                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add M History
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                        </div>
+                      </div>
+                    </div>
+                    {isAddMode ? (
+                      <div className="px-4 py-8 text-center text-sm text-gray-500">
+                        No maintenance history yet. Click "Add M History" to create one.
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3">
+                        <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                          <div>
+                            <Input 
+                              value={componentData.workOrderNo}
+                              onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.performedBy}
+                              onChange={(e) => handleInputChange('performedBy', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.totalTimeHrs}
+                              onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.completionDate}
+                              onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.status}
+                              onChange={(e) => handleInputChange('status', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* E. Spares */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">E. Spares</h4>
+                    <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Spares
+                    </Button>
+                  </div>
+                  <div className="border border-gray-200 rounded">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3">
+                      <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                        <div>
+                          <Input 
+                            value={componentData.partCode}
+                            onChange={(e) => handleInputChange('partCode', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.partName}
+                            onChange={(e) => handleInputChange('partName', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.minQty}
+                            onChange={(e) => handleInputChange('minQty', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.criticalQty}
+                            onChange={(e) => handleInputChange('criticalQty', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.locationStore}
+                            onChange={(e) => handleInputChange('locationStore', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* F. Drawings & Manuals */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">F. Drawings & Manuals</h4>
+                    <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Document
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                      <div className="flex items-center gap-2">
+                        <EditableLabel fieldKey="woTitle" className="text-sm" />
+                      </div>
+                      <Upload className="h-4 w-4 text-[#52baf3]" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                      <div className="flex items-center gap-2">
+                        <EditableLabel fieldKey="assignedTo" className="text-sm" />
+                      </div>
+                      <Upload className="h-4 w-4 text-[#52baf3]" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                      <div className="flex items-center gap-2">
+                        <EditableLabel fieldKey="metric" className="text-sm" />
+                      </div>
+                      <Upload className="h-4 w-4 text-[#52baf3]" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                      <div className="flex items-center gap-2">
+                        <EditableLabel fieldKey="alertsThresholds" className="text-sm" />
+                      </div>
+                      <Upload className="h-4 w-4 text-[#52baf3]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* G. Classification & Regulatory Data */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-4 text-[#16569e]">G. Classification & Regulatory Data</h4>
+                  <div className="grid grid-cols-2 gap-6">
+                    <DeletableField fieldKey="classificationProvider">
+                      <EditableLabel fieldKey="classificationProvider" />
+                      <Input 
+                        value={componentData.classificationData.classificationProvider}
+                        onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="certificateNo">
+                      <EditableLabel fieldKey="certificateNo" />
+                      <Input 
+                        value={componentData.classificationData.certificateNo}
+                        onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="lastDataSurvey">
+                      <EditableLabel fieldKey="lastDataSurvey" />
+                      <Input 
+                        value={componentData.classificationData.lastDataSurvey}
+                        onChange={(e) => handleInputChange('classificationData.lastDataSurvey', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="nextDataSurvey">
+                      <EditableLabel fieldKey="nextDataSurvey" />
+                      <Input 
+                        value={componentData.classificationData.nextDataSurvey}
+                        onChange={(e) => handleInputChange('classificationData.nextDataSurvey', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="surveyType">
+                      <EditableLabel fieldKey="surveyType" />
+                      <Input 
+                        value={componentData.classificationData.surveyType}
+                        onChange={(e) => handleInputChange('classificationData.surveyType', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="classRequirements">
+                      <EditableLabel fieldKey="classRequirements" />
+                      <Input 
+                        value={componentData.classificationData.classRequirements}
+                        onChange={(e) => handleInputChange('classificationData.classRequirements', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="classCode">
+                      <EditableLabel fieldKey="classCode" />
+                      <Input 
+                        value={componentData.classificationData.classCode}
+                        onChange={(e) => handleInputChange('classificationData.classCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                    <DeletableField fieldKey="information">
+                      <EditableLabel fieldKey="information" />
+                      <Input 
+                        value={componentData.classificationData.information}
+                        onChange={(e) => handleInputChange('classificationData.information', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </DeletableField>
+                  </div>
+                </div>
+
+                {/* H. Requisitions */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-[#16569e]">H. Requisitions</h4>
+                    <div className="flex gap-2">
+                      {hasFormConfigPermission && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCurrentSection('H');
+                            setShowAddFieldModal(true);
+                          }}
+                          className="text-[#52baf3] hover:text-[#52baf3]"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add field
+                        </Button>
+                      )}
+                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Requisition
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3">
+                      <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                        <div>
+                          <Input 
+                            value={componentData.reqNo}
+                            onChange={(e) => handleInputChange('reqNo', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.reqPart}
+                            onChange={(e) => handleInputChange('reqPart', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.reqQty}
+                            onChange={(e) => handleInputChange('reqQty', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.reqDate}
+                            onChange={(e) => handleInputChange('reqDate', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Input 
+                            value={componentData.reqStatus}
+                            onChange={(e) => handleInputChange('reqStatus', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Render Custom Sections */}
+                {customSections.map((section) => (
+                  <div key={section.id}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-lg font-semibold text-[#52baf3]">{section.title}</h4>
+                      {hasFormConfigPermission && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setCurrentSection(section.id);
+                            setShowAddFieldModal(true);
+                          }}
+                          className="text-[#52baf3] hover:text-[#52baf3]"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add field
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      {section.fields?.map((field: any) => renderCustomField(field))}
+                      {customFields[section.id]?.map((field: any) => renderCustomField(field))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add New Section Button - Only for admins */}
+                {hasFormConfigPermission && (
+                  <div className="mt-6 pt-6 border-t">
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto sm:float-right text-[#52baf3] hover:text-[#52baf3] border-[#52baf3]"
+                      onClick={() => setShowAddSectionModal(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add new section
+                    </Button>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <div className="flex justify-end pt-6">
+                  <Button 
+                    size="lg" 
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-base font-medium"
+                    onClick={handleSubmit}
+                  >
+                    Submit
+                  </Button>
+                </div>
+              </div>
             </div>
-            <ScrollArea className="h-[400px] border rounded-lg p-4">
-              {renderComponentTree(componentTree)}
-            </ScrollArea>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+      </DialogContent>
+
+      {/* Field Deletion Confirmation Dialog */}
+      <AlertDialog open={!!showDeleteConfirm} onOpenChange={cancelFieldDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Field</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the "{showDeleteConfirm ? fieldLabels[showDeleteConfirm as keyof typeof fieldLabels] : ''}" field? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelFieldDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFieldDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Field Modal */}
+      <AddFieldModal
+        isOpen={showAddFieldModal}
+        onClose={() => {
+          setShowAddFieldModal(false);
+          setCurrentSection('');
+        }}
+        onSave={(fieldData) => {
+          // Add field to the appropriate section
+          setCustomFields(prev => ({
+            ...prev,
+            [currentSection]: [...(prev[currentSection] || []), fieldData]
+          }));
+          
+          // Mark field as newly added
+          setSessionAddedFields(prev => new Set([...Array.from(prev), fieldData.key]));
+          
+          // Increment form version
+          setFormVersion(prev => prev + 1);
+          
+          toast({
+            title: "Field Added",
+            description: `Field "${fieldData.label}" has been added to Section ${currentSection}.`,
+          });
+          
+          setShowAddFieldModal(false);
+          setCurrentSection('');
+        }}
+        section={currentSection}
+        existingKeys={Object.keys(fieldLabels)}
+        isAdmin={hasFormConfigPermission}
+      />
+
+      {/* Add Section Modal */}
+      <AddSectionModal
+        isOpen={showAddSectionModal}
+        onClose={() => setShowAddSectionModal(false)}
+        onSave={(sectionData) => {
+          // Add new section
+          setCustomSections(prev => [...prev, sectionData]);
+          
+          // Increment form version
+          setFormVersion(prev => prev + 1);
+          
+          toast({
+            title: "Section Added",
+            description: `Section "${sectionData.title}" has been added to the form.`,
+          });
+          
+          setShowAddSectionModal(false);
+        }}
+        nextSectionLetter={String.fromCharCode(72 + customSections.length + 1)} // Start from I (H=72, I=73)
+      />
+      
+      {/* IHM Management Modal */}
+      {FEATURES.IHM && (
+        <IhmManagementModal
+          isOpen={showIhmModal}
+          onClose={() => setShowIhmModal(false)}
+          componentId={componentData.componentId}
+          type="component"
+        />
+      )}
+    </Dialog>
   );
 };
 
