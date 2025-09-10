@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, AlertCircle, Clock, Package, FileText, Wrench, ChevronRight, RefreshCw } from 'lucide-react';
 import { format, addDays, startOfDay, endOfDay, differenceInDays, subDays, isAfter, isBefore } from 'date-fns';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { FEATURES } from '@/config/features';
 
 // Types for dashboard data
@@ -62,7 +62,7 @@ export default function Dashboard() {
     return null;
   }
 
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [selectedVessel, setSelectedVessel] = useState('vessel-1');
   const [dateWindow, setDateWindow] = useState<DateWindow>('7d');
   const [whatIfDeferDays, setWhatIfDeferDays] = useState(0);
@@ -317,42 +317,42 @@ export default function Dashboard() {
           value={kpis?.overdueWorkOrders || 0}
           icon={AlertCircle}
           color="border-red-500"
-          onClick={() => navigate('/work-orders?status=overdue')}
+          onClick={() => setLocation('/work-orders?status=overdue')}
         />
         <KPITile
           title="Due in 7 Days"
           value={kpis?.dueNext7Days || 0}
           icon={Clock}
           color="border-yellow-500"
-          onClick={() => navigate('/work-orders?dueIn=7')}
+          onClick={() => setLocation('/work-orders?dueIn=7')}
         />
         <KPITile
           title="RH Due Soon"
           value={kpis?.runningHoursDueSoon || 0}
           icon={Wrench}
           color="border-orange-500"
-          onClick={() => navigate('/work-orders?type=rh-due')}
+          onClick={() => setLocation('/work-orders?type=rh-due')}
         />
         <KPITile
           title="Critical Spares Low"
           value={kpis?.criticalSparesBelowMin || 0}
           icon={Package}
           color="border-purple-500"
-          onClick={() => navigate('/spares?critical=true&belowMin=true')}
+          onClick={() => setLocation('/spares?critical=true&belowMin=true')}
         />
         <KPITile
           title="Certs Expiring"
           value={kpis?.certificatesExpiring30Days || 0}
           icon={FileText}
           color="border-blue-500"
-          onClick={() => navigate('/certificates?expiringIn=30')}
+          onClick={() => setLocation('/certificates?expiringIn=30')}
         />
         <KPITile
           title="Pending Requests"
           value={kpis?.pendingChangeRequests || 0}
           icon={CalendarIcon}
           color="border-indigo-500"
-          onClick={() => navigate('/modify-pms/change-requests?status=Pending')}
+          onClick={() => setLocation('/modify-pms/change-requests?status=Pending')}
         />
       </div>
 
@@ -380,7 +380,7 @@ export default function Dashboard() {
                     <div
                       key={date}
                       className={`${getHeatmapColor(data.count)} border rounded p-2 cursor-pointer hover:opacity-80 transition-opacity`}
-                      onClick={() => navigate(`/work-orders?date=${date}`)}
+                      onClick={() => setLocation(`/work-orders?date=${date}`)}
                       title={`${format(new Date(date), 'MMM d')}: ${data.count} WOs`}
                     >
                       <div className="text-center">
@@ -484,7 +484,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>My Work Queue</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/work-orders?assignedToMe=true')}>
+            <Button variant="ghost" size="sm" onClick={() => setLocation('/work-orders?assignedToMe=true')}>
               View All <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </CardHeader>
@@ -494,7 +494,7 @@ export default function Dashboard() {
                 <div 
                   key={wo.id} 
                   className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/work-orders/${wo.id}`)}
+                  onClick={() => setLocation(`/work-orders/${wo.id}`)}
                 >
                   <div className="flex-1">
                     <div className="font-medium text-sm">{wo.workOrderNo}</div>
@@ -526,7 +526,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Critical Spares at Risk</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/spares?critical=true&belowMin=true')}>
+            <Button variant="ghost" size="sm" onClick={() => setLocation('/spares?critical=true&belowMin=true')}>
               View All <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </CardHeader>
@@ -536,7 +536,7 @@ export default function Dashboard() {
                 <div 
                   key={spare.id}
                   className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/spares/${spare.id}`)}
+                  onClick={() => setLocation(`/spares/${spare.id}`)}
                 >
                   <div className="flex-1">
                     <div className="font-medium text-sm">{spare.itemCode}</div>
@@ -564,7 +564,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Certificates Expiring</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/certificates')}>
+            <Button variant="ghost" size="sm" onClick={() => setLocation('/certificates')}>
               View All <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </CardHeader>
@@ -574,7 +574,7 @@ export default function Dashboard() {
                 <div 
                   key={cert.id}
                   className="flex items-center justify-between p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/certificates/${cert.id}`)}
+                  onClick={() => setLocation(`/certificates/${cert.id}`)}
                 >
                   <div className="flex-1">
                     <div className="font-medium text-sm truncate">{cert.name}</div>
@@ -614,7 +614,7 @@ export default function Dashboard() {
                   {kpis.ihmUnknownItems} items with unknown status or missing evidence
                 </p>
               </div>
-              <Button onClick={() => navigate('/components?ihmStatus=unknown')}>
+              <Button onClick={() => setLocation('/components?ihmStatus=unknown')}>
                 Review IHM Items <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
