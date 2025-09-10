@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TopMenuBar } from "@/components/TopMenuBar";
 import { SideMenuBar } from "@/components/SideMenuBar";
+import Dashboard from "./pms/Dashboard";
 import Components from "./pms/Components";
 import WorkOrders from "./pms/WorkOrders";
 import RunningHours from "./pms/RunningHours";
@@ -79,7 +80,9 @@ export const TechnicalModule: React.FC = () => {
         
         {/* Main Content Area */}
         <div className="flex-1">
-          {selectedSubModule === "pms" && selectedMenuItem === "components" ? (
+          {selectedSubModule === "pms" && selectedMenuItem === "dashboard" ? (
+            <Dashboard />
+          ) : selectedSubModule === "pms" && selectedMenuItem === "components" ? (
             <Components />
           ) : selectedSubModule === "pms" && selectedMenuItem === "work-orders" ? (
             <WorkOrders />

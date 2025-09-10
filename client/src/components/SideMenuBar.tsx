@@ -79,6 +79,8 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
         setLocation("/spares");
       } else if (itemId === "stores") {
         setLocation("/stores");
+      } else if (itemId === "dashboard") {
+        setLocation("/pms/dashboard");
       } else {
         setLocation(`/pms/${itemId}`);
       }
