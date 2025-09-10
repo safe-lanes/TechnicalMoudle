@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
-import { FEATURES } from "@/config/features";
 
 interface TopMenuBarProps {
   selectedSubModule: string;
@@ -22,8 +21,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
   selectedSubModule, 
   onSubModuleChange 
 }) => {
-  const [, setLocation] = useLocation();
-  
   const menuItems = [
     {
       id: "module",
@@ -31,12 +28,11 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       icon: Grid3X3,
       isModule: true,
     },
-    ...(FEATURES.DASHBOARD ? [{
+    {
       id: "dashboard",
       label: "Dashboard",
       icon: BarChart3,
-      isDashboard: true,
-    }] : []),
+    },
     {
       id: "cert-surveys",
       label: "Cert. & Surveys",
@@ -81,14 +77,7 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.isModule) return;
-                if (item.isDashboard) {
-                  setLocation('/dashboard');
-                } else {
-                  onSubModuleChange(item.id);
-                }
-              }}
+              onClick={() => !item.isModule && onSubModuleChange(item.id)}
               className={cn(
                 "flex flex-col items-center justify-center px-6 min-w-[100px] transition-all duration-200 relative",
                 "hover:bg-gray-50",

@@ -4,11 +4,6 @@ export const FEATURES = {
   // When ON: Shows IHM status chips, management buttons, and reports
   // When OFF: No IHM-related UI elements are displayed
   IHM: import.meta.env.VITE_FEATURE_IHM === 'true' || true,
-  
-  // Dashboard feature flag
-  // When ON: Shows comprehensive dashboard with KPIs, heatmap, and widgets
-  // When OFF: Dashboard route is not accessible
-  DASHBOARD: import.meta.env.VITE_FEATURE_DASHBOARD === 'true' || true,
 };
 
 // IHM material options

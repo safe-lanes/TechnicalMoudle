@@ -19,73 +19,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Work Orders API routes (for Target Picker and Dashboard)
+  // Work Orders API routes (for Target Picker - placeholder)
   app.get("/api/work-orders", async (req, res) => {
     try {
-      // Sample work order data for dashboard
-      const today = new Date();
-      const workOrders = [
-        {
-          id: 1,
-          workOrderNo: "WO-2025-001",
-          title: "Main Engine Overhaul",
-          componentName: "Main Engine",
-          dueDate: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "In Progress",
-          assignedTo: "current-user",
-          department: "Engine",
-          maintenanceType: "Calendar",
-          category: "Engine Room"
-        },
-        {
-          id: 2,
-          workOrderNo: "WO-2025-002",
-          title: "Generator #1 Inspection",
-          componentName: "Generator #1",
-          dueDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "Pending",
-          assignedTo: "current-user",
-          department: "Electrical",
-          maintenanceType: "Running Hours",
-          currentRunningHours: 9800,
-          runningHoursThreshold: 10000,
-          category: "Electrical"
-        },
-        {
-          id: 3,
-          workOrderNo: "WO-2025-003",
-          title: "Lifeboat Davit Maintenance",
-          componentName: "Lifeboat Davit",
-          dueDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "Pending",
-          department: "Deck",
-          maintenanceType: "Calendar",
-          category: "Deck Equipment"
-        },
-        {
-          id: 4,
-          workOrderNo: "WO-2025-004",
-          title: "Fire Pump Test",
-          componentName: "Fire Pump",
-          dueDate: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "Pending",
-          department: "Engine",
-          maintenanceType: "Calendar",
-          category: "Safety Equipment"
-        },
-        {
-          id: 5,
-          workOrderNo: "WO-2025-005",
-          title: "Navigation Lights Check",
-          componentName: "Navigation Lights",
-          dueDate: new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-          status: "Pending",
-          department: "Electrical",
-          maintenanceType: "Calendar",
-          category: "Navigation Equipment"
-        }
-      ];
-      res.json(workOrders);
+      // Return empty array for now - will be implemented when Work Orders module is built
+      res.json([]);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work orders" });
     }
@@ -803,68 +741,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch IHM status report" });
-    }
-  });
-
-  // Dashboard API Routes (Read-only aggregations)
-  
-  // Get dashboard KPIs
-  app.get("/api/dashboard/kpis", async (req, res) => {
-    try {
-      const { vesselId = 'V001', from, to } = req.query;
-      
-      // Since we don't have all modules fully implemented, return sample data
-      // In production, these would aggregate from actual tables
-      const kpis = {
-        overdueWorkOrders: 5,
-        dueNext7Days: 12,
-        runningHoursDueSoon: 3,
-        criticalSparesBelowMin: 2,
-        certificatesExpiring30Days: 4,
-        pendingChangeRequests: 7,
-        ihmUnknownItems: 15
-      };
-      
-      res.json(kpis);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch dashboard KPIs" });
-    }
-  });
-  
-  // Get certificates (placeholder for dashboard)
-  app.get("/api/certificates", async (req, res) => {
-    try {
-      // Sample certificate data for dashboard
-      const certificates = [
-        {
-          id: 1,
-          name: "Safety Management Certificate",
-          type: "Class",
-          expiryDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 2,
-          name: "International Load Line Certificate",
-          type: "Statutory",
-          expiryDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 3,
-          name: "MARPOL Certificate",
-          type: "Statutory",
-          expiryDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 4,
-          name: "Cargo Ship Safety Equipment Certificate",
-          type: "Class",
-          expiryDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-        }
-      ];
-      
-      res.json(certificates);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch certificates" });
     }
   });
 

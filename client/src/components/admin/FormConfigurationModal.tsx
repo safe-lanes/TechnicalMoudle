@@ -959,7 +959,10 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
         ) : (
           <div 
             className={`${className || "text-sm text-[#8798ad]"} ${hasFormConfigPermission ? 'cursor-pointer hover:text-[#52baf3]' : ''}`}
-            onClick={hasFormConfigPermission ? () => setEditingLabel(fieldKey) : undefined}
+            onClick={hasFormConfigPermission ? () => {
+              console.log('Label clicked:', fieldKey);
+              setEditingLabel(fieldKey);
+            } : undefined}
           >
             {label}
             {isNewField && <span className="ml-1 text-green-600 text-xs">(New)</span>}
@@ -970,6 +973,7 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              console.log('Edit button clicked:', fieldKey);
               setEditingLabel(fieldKey);
             }}
             className="opacity-50 hover:opacity-100 transition-opacity"
