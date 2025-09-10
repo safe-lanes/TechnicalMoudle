@@ -1,0 +1,143 @@
+Perfect — here’s a **tight, copy-paste prompt** for Replit to build a standout **Dashboard** that only uses our **existing modules/data**. No new schemas, no invasive UI edits, no “AI magic.” It’s an **add-on** surface with simple summary endpoints (or client aggregation) over data we already have.
+
+---
+
+# DASHBOARD (ADD-ON) — Build Brief
+
+## Guardrails (do not break anything)
+
+* **Do not modify** existing modules (Components, Work Orders, Spares/Stores, Running Hours, Certificates, Modify PMS, IHM, Alerts).
+* **No schema changes.** If you need data, **read** from existing endpoints/tables only.
+* Put the dashboard behind a feature flag: `FEATURE_DASHBOARD=true`. If `false` → it doesn’t render.
+* UI **theme + spacing** must match our current app components.
+
+## Route & Layout
+
+* New route: `/dashboard`.
+* Top header: **Vessel selector** (if user has multiple) + **Date window** (Today | 7d | 30d).
+* Body = responsive **grid of widgets** (cards). All widgets **click-through** to their source module with pre-applied filters.
+
+---
+
+## Data sources (use existing modules only)
+
+* **Work Orders (Planned only):** due date, status, assignedTo, componentId/category, maintenanceType (RH/Calendar), frequency.
+* **Running Hours:** current hours per component + last updated.
+* **Spares/Stores:** item code, name, UOM, ROB, Min, `is_critical`, location.
+* **Certificates/Surveys:** certificate name, expiry date (we already show these in Components/Regulatory).
+* **Modify PMS:** change requests (Pending/Approved/Rejected).
+* **IHM (if enabled):** item/component status (`Unknown/Present/Not Present`), evidence flag.
+* **Defects/Unplanned WOs (if module present):** status, age (read-only counts).
+
+> If a dedicated summary endpoint doesn’t exist, fetch the list API and **aggregate client-side**. Otherwise, add **read-only summary endpoints** that **only** aggregate existing tables.
+
+---
+
+## Widgets to build (minimal but standout)
+
+### 1) KPI Tiles (top row)
+
+* **Overdue WOs** (count) → click opens Work Orders filtered: `status≠Completed AND due_date < today`.
+* **Due next 7 days** (count) → opens filtered list.
+* **RH Due Soon** (count) → WOs with RH trigger where `currentRH ≥ thresholdWindow` (use our existing RH field; thresholdWindow = within next 200 RH or configurable).
+* **Critical Spares below Min** (count) → opens Spares filtered `is_critical=true & ROB<Min`.
+* **Certificates expiring ≤30 days** (count) → opens Certificates filtered `expiry ≤ today+30d`.
+* **Pending Change Requests** (count) → opens Modify PMS filtered `status=Pending`.
+
+> All tiles: show tiny delta (↑/↓ vs previous period) if easy to compute; otherwise omit.
+
+### 2) **Workload Heatmap (standout)**
+
+* A 30-day **calendar heatmap** for the selected vessel/date window.
+* Color = number of planned WOs due that day (green→amber→red).
+* Hover: show counts by **department** (Deck/Engine/Electrical) and **criticality**.
+* Click a day → deep-link to Work Orders list with `due_date=that day`.
+
+> Data: Work Orders only (due\_date + status). **No new data model.**
+
+### 3) **“What-If” Mini Panel (standout, zero writes)**
+
+* Simple **simulation controls** (right side of heatmap):
+
+  * **Defer** WOs by: `[0, +3, +7] days` (client-side only)
+  * **Filter by Department** (Deck/Engine/Electrical)
+* When toggled, recompute the **heatmap** and **KPI tiles** **client-side** to show hypothetical impact (more/less due/overdue).
+* **No data is saved.** Add a “Reset” button.
+
+> This is read-only math on the already-fetched WOs. No backend change.
+
+### 4) **My Work Queue**
+
+* List of **assigned to me** (current user): Due Today / Overdue / Next 7d.
+* Each row shows: WO#, Title, Component, Due date, Status badge.
+* Row actions: “Open WO”. (No new edits here.)
+
+### 5) **Spares Risk Snapshot**
+
+* Table of **critical spares below Min** (Part Code, Name, ROB, Min, Location).
+* Optional action: “Open Spares” (deep link to item).
+
+### 6) **Certificates Pane**
+
+* Table: Certificate | Expiry | Days left.
+* Default filter: ≤90 days. Quick chips: 30/60/90.
+
+### (Optional) 7) **IHM Attention** (only if `FEATURE_IHM=true`)
+
+* Small card: count of **IHM Unknown/Present without evidence** → deep link to IHM view.
+
+---
+
+## API/aggregation approach (read-only)
+
+Prefer existing list endpoints. If needed, add **summary endpoints** that **aggregate only**:
+
+* `GET /api/dashboard/kpis?vesselId&from&to`
+
+  * returns counts for tiles (computed from Work Orders, Spares, Certificates, Modify PMS)
+* `GET /api/dashboard/workorders?…` (reuse current API) → used to render heatmap + queue
+* `GET /api/dashboard/spares?criticalBelowMin=1` (or reuse Spares list and filter client-side)
+* `GET /api/dashboard/certificates?expiringIn=90`
+* `GET /api/change-requests?status=Pending` (already exists for Modify PMS)
+
+**Do not** write. **Do not** change existing tables.
+
+---
+
+## UI/UX rules
+
+* Match current card styles, typography, and colors.
+* Each widget has a **title, count/charts, and a link** (“View all”).
+* All counts are clickable; always deep-link to the source module with the applied filter.
+* Responsive: on mobile, stack tiles → heatmap → queues → spares → certificates.
+
+---
+
+## Performance
+
+* Initial load: request only what’s needed for visible widgets.
+* Cache results per `vesselId+dateWindow` in memory for 60–120s.
+* Recompute the What-If view **client-side** only (no extra network).
+
+---
+
+## Acceptance Criteria
+
+1. Visiting `/dashboard` (flag on) shows **KPI tiles**, **Heatmap**, **My Work Queue**, **Spares Risk**, **Certificates**, and (if enabled) **IHM** card.
+2. **All widgets** deep-link to their existing modules with correct filters (no new editors).
+3. **What-If** controls **only** affect the visual heatmap/KPIs locally; no database writes.
+4. **No schema or existing endpoint changes**; any added endpoints are **read-only summaries**.
+5. Styles and spacing are consistent with current app; no layout regressions elsewhere.
+6. With `FEATURE_DASHBOARD=false`, nothing renders and nothing breaks.
+
+---
+
+## Quick dev notes
+
+* Use our existing **cards/tables/badges**.
+* Use a small heatmap component (simple grid; no 3D).
+* Keep code modular: `DashboardKpis`, `DashboardHeatmap`, `DashboardWhatIf`, `DashboardQueue`, `DashboardSpares`, `DashboardCerts`, `DashboardIhm`.
+
+---
+
+If anything is unclear (e.g., which endpoint to call for a given widget), **ask before coding** so we don’t touch core modules.
