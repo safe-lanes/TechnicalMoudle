@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { format, subDays, startOfMonth, endOfMonth, startOfYear } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, startOfYear, differenceInDays } from "date-fns";
 import {
   LayoutDashboard,
   RefreshCw,
@@ -21,7 +21,19 @@ import {
   ExternalLink,
   Ship,
   BarChart3,
-  Activity
+  Activity,
+  Settings,
+  Anchor,
+  Shield,
+  FileText,
+  AlertCircle,
+  Wrench,
+  Navigation,
+  Radio,
+  ShieldCheck,
+  HelpCircle,
+  ClipboardCheck,
+  FileCheck
 } from "lucide-react";
 import {
   ComposedChart,
@@ -40,11 +52,19 @@ import {
   ResponsiveContainer,
   Legend,
   Line,
-  LineChart
+  LineChart,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Types for dashboard data
 interface WorkOrderMock {
@@ -54,9 +74,31 @@ interface WorkOrderMock {
   dueDate: string;
   status: "pending" | "in_progress" | "completed" | "overdue";
   priority: "critical" | "routine";
+  department: "engine" | "deck";
   vesselId: string;
   createdDate: string;
   completedDate?: string;
+  equipmentCategory?: string;
+  riskLevel?: "low" | "medium" | "high";
+}
+
+interface Certificate {
+  id: string;
+  name: string;
+  expiryDate: string;
+  daysRemaining: number;
+  status: "valid" | "expiring" | "expired";
+  category: "class" | "flag" | "safety" | "pollution";
+}
+
+interface DefectReport {
+  id: string;
+  equipment: string;
+  description: string;
+  severity: "low" | "medium" | "high" | "critical";
+  reportedDate: string;
+  status: "open" | "in_progress" | "resolved";
+  department: "engine" | "deck";
 }
 
 interface DashboardFilters {
@@ -72,6 +114,7 @@ const Dashboard: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('dashboard-dark-mode') === 'true';
   });
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Dashboard filters
   const [filters, setFilters] = useState<DashboardFilters>(() => {
@@ -112,7 +155,25 @@ const Dashboard: React.FC = () => {
     { id: 'ytd', label: 'Year to Date', isYTD: true }
   ];
 
-  // Mock Work Orders Data (realistic for demo)
+  // Mock Certificates Data
+  const mockCertificates: Certificate[] = useMemo(() => [
+    { id: "CERT-001", name: "Annual Class Survey", expiryDate: "2024-02-15", daysRemaining: 25, status: "expiring", category: "class" },
+    { id: "CERT-002", name: "IOPP Certificate", expiryDate: "2024-06-30", daysRemaining: 160, status: "valid", category: "pollution" },
+    { id: "CERT-003", name: "Safety Management Certificate", expiryDate: "2024-01-10", daysRemaining: -10, status: "expired", category: "safety" },
+    { id: "CERT-004", name: "Load Line Certificate", expiryDate: "2024-08-20", daysRemaining: 210, status: "valid", category: "flag" },
+    { id: "CERT-005", name: "Fire Safety Certificate", expiryDate: "2024-01-25", daysRemaining: 5, status: "expiring", category: "safety" }
+  ], []);
+
+  // Mock Defect Reports
+  const mockDefects: DefectReport[] = useMemo(() => [
+    { id: "DEF-001", equipment: "Main Engine Turbocharger", description: "Abnormal vibration at high RPM", severity: "high", reportedDate: "2024-01-18", status: "open", department: "engine" },
+    { id: "DEF-002", equipment: "Deck Crane #2", description: "Hydraulic leak in slewing motor", severity: "medium", reportedDate: "2024-01-17", status: "in_progress", department: "deck" },
+    { id: "DEF-003", equipment: "Emergency Generator", description: "Starting battery voltage low", severity: "critical", reportedDate: "2024-01-19", status: "open", department: "engine" },
+    { id: "DEF-004", equipment: "Fire Pump", description: "Pressure gauge malfunction", severity: "low", reportedDate: "2024-01-16", status: "resolved", department: "deck" },
+    { id: "DEF-005", equipment: "Navigation Radar", description: "Intermittent display issues", severity: "medium", reportedDate: "2024-01-18", status: "in_progress", department: "deck" }
+  ], []);
+
+  // Enhanced Mock Work Orders with Department and Categories
   const mockWorkOrders: WorkOrderMock[] = useMemo(() => [
     {
       id: "WO-2024-001",
@@ -121,6 +182,9 @@ const Dashboard: React.FC = () => {
       dueDate: "2024-01-15",
       status: "overdue",
       priority: "critical",
+      department: "engine",
+      equipmentCategory: "Engine machinery",
+      riskLevel: "high",
       vesselId: "V001",
       createdDate: "2024-01-01",
     },
@@ -131,6 +195,9 @@ const Dashboard: React.FC = () => {
       dueDate: "2024-01-20",
       status: "pending",
       priority: "routine",
+      department: "engine",
+      equipmentCategory: "Engine machinery",
+      riskLevel: "low",
       vesselId: "V001",
       createdDate: "2024-01-05",
     },
@@ -139,8 +206,11 @@ const Dashboard: React.FC = () => {
       title: "Steering Gear Oil Change",
       component: "3.1 Steering Gear",
       dueDate: "2024-01-25",
-      status: "in_progress", 
+      status: "in_progress",
       priority: "routine",
+      department: "deck",
+      equipmentCategory: "Deck machinery",
+      riskLevel: "medium",
       vesselId: "V002",
       createdDate: "2024-01-10",
     },
@@ -151,17 +221,23 @@ const Dashboard: React.FC = () => {
       dueDate: "2024-01-12",
       status: "completed",
       priority: "critical",
+      department: "engine",
+      equipmentCategory: "Safety Equipment",
+      riskLevel: "high",
       vesselId: "V001",
       createdDate: "2024-01-01",
       completedDate: "2024-01-11",
     },
     {
       id: "WO-2024-005",
-      title: "Compressor Filter Replacement",
-      component: "5.2.1 Air Filter",
+      title: "Life Raft Annual Service",
+      component: "LSA.1 Life Raft",
       dueDate: "2024-01-30",
       status: "pending",
-      priority: "routine",
+      priority: "critical",
+      department: "deck",
+      equipmentCategory: "Safety Equipment", 
+      riskLevel: "high",
       vesselId: "V003",
       createdDate: "2024-01-15",
     },
@@ -172,6 +248,9 @@ const Dashboard: React.FC = () => {
       dueDate: "2024-01-08",
       status: "overdue",
       priority: "critical",
+      department: "engine",
+      equipmentCategory: "Safety Equipment",
+      riskLevel: "high",
       vesselId: "V002",
       createdDate: "2023-12-25",
     },
@@ -182,19 +261,51 @@ const Dashboard: React.FC = () => {
       dueDate: "2024-02-01",
       status: "pending",
       priority: "critical",
+      department: "deck",
+      equipmentCategory: "Safety Equipment",
+      riskLevel: "high",
       vesselId: "V001",
       createdDate: "2024-01-18",
     },
     {
       id: "WO-2024-008",
-      title: "Auxiliary Engine Service",
-      component: "6.2 Auxiliary Engine",
+      title: "Navigation Equipment Calibration",
+      component: "NAV.1 GPS/Radar",
       dueDate: "2024-01-18",
       status: "completed",
       priority: "routine",
+      department: "deck",
+      equipmentCategory: "Navigation & Radio",
+      riskLevel: "medium",
       vesselId: "V003",
       createdDate: "2024-01-05",
       completedDate: "2024-01-17",
+    },
+    {
+      id: "WO-2024-009",
+      title: "Cargo Crane Wire Rope Inspection",
+      component: "CARGO.1 Crane #1",
+      dueDate: "2024-01-22",
+      status: "pending",
+      priority: "routine",
+      department: "deck",
+      equipmentCategory: "Cargo handling",
+      riskLevel: "medium",
+      vesselId: "V001",
+      createdDate: "2024-01-08",
+    },
+    {
+      id: "WO-2024-010",
+      title: "Hull Tank Inspection - Fore Peak",
+      component: "HULL.1 Fore Peak Tank",
+      dueDate: "2024-02-10",
+      status: "pending",
+      priority: "routine",
+      department: "deck",
+      equipmentCategory: "Hull structure",
+      riskLevel: "low",
+      vesselId: "V002",
+      createdDate: "2024-01-10",
     }
   ], []);
 
@@ -221,24 +332,78 @@ const Dashboard: React.FC = () => {
     });
   }, [mockWorkOrders, filters]);
 
-  // Calculate KPIs
+  // Calculate Department-specific KPIs
+  const departmentKPIs = useMemo(() => {
+    const engineWOs = filteredWorkOrders.filter(wo => wo.department === 'engine');
+    const deckWOs = filteredWorkOrders.filter(wo => wo.department === 'deck');
+    
+    return {
+      engine: {
+        total: engineWOs.length,
+        overdue: engineWOs.filter(wo => wo.status === 'overdue').length,
+        completed: engineWOs.filter(wo => wo.status === 'completed').length,
+        pending: engineWOs.filter(wo => wo.status === 'pending').length
+      },
+      deck: {
+        total: deckWOs.length,
+        overdue: deckWOs.filter(wo => wo.status === 'overdue').length,
+        completed: deckWOs.filter(wo => wo.status === 'completed').length,
+        pending: deckWOs.filter(wo => wo.status === 'pending').length
+      }
+    };
+  }, [filteredWorkOrders]);
+
+  // Equipment Category Breakdown
+  const equipmentCategoryData = useMemo(() => {
+    const categories = [
+      "Engine machinery",
+      "Deck machinery", 
+      "Safety Equipment",
+      "Navigation & Radio",
+      "Cargo handling",
+      "Hull structure",
+      "Electronic equipment"
+    ];
+    
+    return categories.map(cat => ({
+      category: cat,
+      total: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat).length,
+      overdue: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat && wo.status === 'overdue').length,
+      pending: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat && wo.status === 'pending').length
+    }));
+  }, [filteredWorkOrders]);
+
+  // Calculate Enhanced KPIs
   const kpis = useMemo(() => {
     const activeWOs = filteredWorkOrders.filter(wo => wo.status !== 'completed').length;
     const overdueWOs = filteredWorkOrders.filter(wo => wo.status === 'overdue').length;
     const completedWOs = filteredWorkOrders.filter(wo => wo.status === 'completed').length;
+    const highRiskWOs = filteredWorkOrders.filter(wo => wo.riskLevel === 'high').length;
     
     // Calculate low stock items
     const lowStockItems = sparesData.filter((spare: any) => spare.rob < spare.min).length;
+    
+    // Certificate metrics
+    const expiringCerts = mockCertificates.filter(cert => cert.status === 'expiring').length;
+    const expiredCerts = mockCertificates.filter(cert => cert.status === 'expired').length;
+    
+    // Defect metrics
+    const openDefects = mockDefects.filter(def => def.status === 'open').length;
+    const criticalDefects = mockDefects.filter(def => def.severity === 'critical' || def.severity === 'high').length;
     
     return {
       activeWorkOrders: activeWOs,
       overdueTasks: overdueWOs,
       completedThisPeriod: completedWOs,
-      criticalStockAlerts: lowStockItems
+      criticalStockAlerts: lowStockItems,
+      expiringCertificates: expiringCerts + expiredCerts,
+      openDefects: openDefects,
+      highRiskTasks: highRiskWOs,
+      criticalDefects: criticalDefects
     };
-  }, [filteredWorkOrders, sparesData]);
+  }, [filteredWorkOrders, sparesData, mockCertificates, mockDefects]);
 
-  // Generate sparkline data (last 12 data points)
+  // Generate sparkline data
   const generateSparklineData = (type: string) => {
     const points = [];
     for (let i = 11; i >= 0; i--) {
@@ -247,16 +412,22 @@ const Dashboard: React.FC = () => {
       
       switch (type) {
         case 'active':
-          value = Math.floor(Math.random() * 10) + 15; // 15-25 range
+          value = Math.floor(Math.random() * 10) + 15;
           break;
         case 'overdue':
-          value = Math.floor(Math.random() * 5) + 3; // 3-8 range
+          value = Math.floor(Math.random() * 5) + 3;
           break;
         case 'completed':
-          value = Math.floor(Math.random() * 8) + 5; // 5-13 range
+          value = Math.floor(Math.random() * 8) + 5;
           break;
         case 'critical':
-          value = Math.floor(Math.random() * 6) + 8; // 8-14 range
+          value = Math.floor(Math.random() * 6) + 8;
+          break;
+        case 'defects':
+          value = Math.floor(Math.random() * 4) + 2;
+          break;
+        case 'certificates':
+          value = Math.floor(Math.random() * 3) + 1;
           break;
       }
       
@@ -264,6 +435,16 @@ const Dashboard: React.FC = () => {
     }
     return points;
   };
+
+  // Risk Assessment Radar Data
+  const riskRadarData = [
+    { category: 'Main Engine', engineRisk: 75, deckRisk: 0, fullMark: 100 },
+    { category: 'Safety Systems', engineRisk: 60, deckRisk: 85, fullMark: 100 },
+    { category: 'Navigation', engineRisk: 20, deckRisk: 70, fullMark: 100 },
+    { category: 'Cargo Equipment', engineRisk: 30, deckRisk: 65, fullMark: 100 },
+    { category: 'Hull & Structure', engineRisk: 25, deckRisk: 80, fullMark: 100 },
+    { category: 'Pollution Control', engineRisk: 55, deckRisk: 45, fullMark: 100 }
+  ];
 
   // Chart data
   const workOrderStatusData = [
@@ -301,18 +482,6 @@ const Dashboard: React.FC = () => {
     { name: 'Lubes', total: 45, belowMin: 2 },
     { name: 'Chemicals', total: 32, belowMin: 1 }
   ];
-
-  // Top overdue work orders
-  const topOverdueWOs = filteredWorkOrders
-    .filter(wo => wo.status === 'overdue')
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 10);
-
-  // Top low stock items
-  const topLowStockItems = sparesData
-    .filter((spare: any) => spare.rob < spare.min)
-    .sort((a: any, b: any) => (a.rob / a.min) - (b.rob / b.min))
-    .slice(0, 10);
 
   // Update filters
   const updateFilters = (newFilters: Partial<DashboardFilters>) => {
@@ -363,7 +532,6 @@ const Dashboard: React.FC = () => {
   // Refresh data
   const handleRefresh = () => {
     setLastUpdated(new Date());
-    // Trigger refetch of queries
     window.location.reload();
   };
 
@@ -382,10 +550,6 @@ const Dashboard: React.FC = () => {
     setLocation(`/spares?${params.toString()}`);
   };
 
-  const navigateToComponent = (componentId: string) => {
-    setLocation(`/pms/components?component=${componentId}`);
-  };
-
   // KPI Card Component
   const KPICard = ({ 
     title, 
@@ -395,16 +559,18 @@ const Dashboard: React.FC = () => {
     change, 
     changeType, 
     sparklineData,
-    onClick
+    onClick,
+    subtitle
   }: {
     title: string;
-    value: number;
+    value: number | string;
     icon: React.ElementType;
     color: string;
-    change: string;
-    changeType: 'positive' | 'negative' | 'neutral';
-    sparklineData: any[];
+    change?: string;
+    changeType?: 'positive' | 'negative' | 'neutral';
+    sparklineData?: any[];
     onClick: () => void;
+    subtitle?: string;
   }) => (
     <Card 
       className="hover:shadow-md transition-shadow cursor-pointer group"
@@ -415,35 +581,40 @@ const Dashboard: React.FC = () => {
           <div>
             <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-            <p className={`text-sm flex items-center mt-1 ${
-              changeType === 'positive' ? 'text-green-600' : 
-              changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
-            }`}>
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {change}
-            </p>
+            {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            {change && (
+              <p className={`text-sm flex items-center mt-1 ${
+                changeType === 'positive' ? 'text-green-600' : 
+                changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                <TrendingUp className="h-3 w-3 mr-1" />
+                {change}
+              </p>
+            )}
           </div>
           <div className={`p-3 rounded-lg ${color}`}>
             <Icon className="h-6 w-6" />
           </div>
         </div>
         
-        {/* Mini Sparkline */}
-        <div className="h-12">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sparklineData}>
-              <Line 
-                type="monotone" 
-                dataKey="value" 
-                stroke={color.includes('blue') ? '#3b82f6' : 
-                        color.includes('red') ? '#ef4444' :
-                        color.includes('green') ? '#10b981' : '#6b7280'}
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {sparklineData && (
+          <div className="h-12">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparklineData}>
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke={color.includes('blue') ? '#3b82f6' : 
+                          color.includes('red') ? '#ef4444' :
+                          color.includes('green') ? '#10b981' : 
+                          color.includes('yellow') ? '#f59e0b' : '#6b7280'}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
         
         <ExternalLink className="h-4 w-4 text-gray-400 group-hover:text-[#52baf3] transition-colors float-right" />
       </CardContent>
@@ -463,12 +634,16 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center">
             <LayoutDashboard className="h-8 w-8 text-[#52baf3] mr-3" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">PMS Dashboard</h1>
-              <p className="text-gray-600 dark:text-gray-400">Maritime Planned Maintenance Control Center</p>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">E-PMS Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-400">Electronic Planned Maintenance System Control Center</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              E-PMS Active
+            </Badge>
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Last updated: {format(lastUpdated, 'HH:mm:ss')}
             </div>
@@ -517,390 +692,715 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-6 space-y-8">
-        {/* KPI Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard
-            title="Active Work Orders"
-            value={kpis.activeWorkOrders}
-            icon={ClipboardList}
-            color="bg-blue-50 text-blue-600 border-blue-200"
-            change="+2 from last week"
-            changeType="positive"
-            sparklineData={generateSparklineData('active')}
-            onClick={() => navigateToWorkOrders('active')}
-          />
-          
-          <KPICard
-            title="Overdue Tasks"
-            value={kpis.overdueTasks}
-            icon={AlertTriangle}
-            color="bg-red-50 text-red-600 border-red-200"
-            change="+1 this week"
-            changeType="negative"
-            sparklineData={generateSparklineData('overdue')}
-            onClick={() => navigateToWorkOrders('overdue')}
-          />
-          
-          <KPICard
-            title="Completed This Period"
-            value={kpis.completedThisPeriod}
-            icon={CheckCircle}
-            color="bg-green-50 text-green-600 border-green-200"
-            change="+15% vs last period"
-            changeType="positive"
-            sparklineData={generateSparklineData('completed')}
-            onClick={() => navigateToWorkOrders('completed')}
-          />
-          
-          <KPICard
-            title="Critical Stock Alerts"
-            value={kpis.criticalStockAlerts}
-            icon={Package}
-            color="bg-yellow-50 text-yellow-600 border-yellow-200"
-            change="-2 from last check"
-            changeType="positive"
-            sparklineData={generateSparklineData('critical')}
-            onClick={() => navigateToSpares('low')}
-          />
-        </div>
+      <div className="p-6">
+        {/* Navigation Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="departments">Departments</TabsTrigger>
+            <TabsTrigger value="equipment">Equipment</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          </TabsList>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Work Orders by Status - Donut Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="h-5 w-5 text-[#52baf3] mr-2" />
-                Work Orders by Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={workOrderStatusData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      dataKey="value"
-                      onClick={(data) => navigateToWorkOrders(data.name.toLowerCase())}
-                      className="cursor-pointer"
-                    >
-                      {workOrderStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          <TabsContent value="overview" className="space-y-8">
+            {/* Enhanced KPI Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <KPICard
+                title="Active Work Orders"
+                value={kpis.activeWorkOrders}
+                icon={ClipboardList}
+                color="bg-blue-50 text-blue-600 border-blue-200"
+                change="+2 from last week"
+                changeType="positive"
+                sparklineData={generateSparklineData('active')}
+                onClick={() => navigateToWorkOrders('active')}
+              />
+              
+              <KPICard
+                title="Overdue Tasks"
+                value={kpis.overdueTasks}
+                icon={AlertTriangle}
+                color="bg-red-50 text-red-600 border-red-200"
+                change="+1 this week"
+                changeType="negative"
+                sparklineData={generateSparklineData('overdue')}
+                onClick={() => navigateToWorkOrders('overdue')}
+                subtitle="Immediate attention required"
+              />
+              
+              <KPICard
+                title="Certificates Status"
+                value={`${kpis.expiringCertificates}`}
+                icon={FileCheck}
+                color="bg-yellow-50 text-yellow-600 border-yellow-200"
+                change={kpis.expiringCertificates > 0 ? "Action needed" : "All valid"}
+                changeType={kpis.expiringCertificates > 0 ? "negative" : "positive"}
+                sparklineData={generateSparklineData('certificates')}
+                onClick={() => setActiveTab('compliance')}
+                subtitle="Expiring/Expired"
+              />
+              
+              <KPICard
+                title="Open Defects"
+                value={kpis.openDefects}
+                icon={AlertCircle}
+                color="bg-orange-50 text-orange-600 border-orange-200"
+                change={`${kpis.criticalDefects} critical`}
+                changeType={kpis.criticalDefects > 0 ? "negative" : "neutral"}
+                sparklineData={generateSparklineData('defects')}
+                onClick={() => setLocation('/defects')}
+                subtitle="Total reported issues"
+              />
+            </div>
 
-          {/* Completion Trend - Area Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Activity className="h-5 w-5 text-[#52baf3] mr-2" />
-                Work Order Trend
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={completionTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area 
-                      type="monotone" 
-                      dataKey="completed" 
-                      stackId="1"
-                      stroke="#10b981" 
-                      fill="#10b981" 
-                      fillOpacity={0.6}
-                      name="Completed"
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="created" 
-                      stackId="2"
-                      stroke="#3b82f6" 
-                      fill="#3b82f6" 
-                      fillOpacity={0.6}
-                      name="Created"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Work Orders by Status - Donut Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <BarChart3 className="h-5 w-5 text-[#52baf3] mr-2" />
+                    Work Orders by Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={workOrderStatusData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          dataKey="value"
+                          onClick={(data) => navigateToWorkOrders(data.name.toLowerCase())}
+                          className="cursor-pointer"
+                        >
+                          {workOrderStatusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Second Chart Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Upcoming Maintenance Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="h-5 w-5 text-[#52baf3] mr-2" />
-                Upcoming Maintenance Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={upcomingMaintenanceData} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" />
-                    <Tooltip />
-                    <Bar 
-                      dataKey="critical" 
-                      stackId="a" 
-                      fill="#ef4444" 
-                      name="Critical"
-                      onClick={(data) => navigateToWorkOrders('critical')}
-                      className="cursor-pointer"
-                    />
-                    <Bar 
-                      dataKey="routine" 
-                      stackId="a" 
-                      fill="#10b981" 
-                      name="Routine"
-                      onClick={(data) => navigateToWorkOrders('routine')}
-                      className="cursor-pointer"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Completion Trend - Area Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Activity className="h-5 w-5 text-[#52baf3] mr-2" />
+                    Maintenance Trend
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={completionTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Area 
+                          type="monotone" 
+                          dataKey="completed" 
+                          stackId="1"
+                          stroke="#10b981" 
+                          fill="#10b981" 
+                          fillOpacity={0.6}
+                          name="Completed"
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="created" 
+                          stackId="2"
+                          stroke="#3b82f6" 
+                          fill="#3b82f6" 
+                          fillOpacity={0.6}
+                          name="Created"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Inventory Health */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Archive className="h-5 w-5 text-[#52baf3] mr-2" />
-                Inventory Health
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {inventoryHealthData.map((item, index) => (
-                  <div key={index} className="cursor-pointer" onClick={() => navigateToSpares()}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">{item.name}</span>
-                      <span className="text-sm text-gray-500">{item.belowMin}/{item.total}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+            {/* Defect Reports & Critical Spares */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Active Defect Reports */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-orange-500 mr-2" />
+                    Active Defect Reports
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {mockDefects.filter(d => d.status !== 'resolved').slice(0, 5).map((defect) => (
                       <div 
-                        className="bg-green-500 h-2 rounded-full relative"
-                        style={{ width: `${((item.total - item.belowMin) / item.total) * 100}%` }}
+                        key={defect.id}
+                        className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
+                          defect.severity === 'critical' ? 'bg-red-50 dark:bg-red-900/20' :
+                          defect.severity === 'high' ? 'bg-orange-50 dark:bg-orange-900/20' :
+                          'bg-gray-50 dark:bg-gray-800'
+                        }`}
+                        onClick={() => setLocation('/defects')}
                       >
-                        {item.belowMin > 0 && (
-                          <div 
-                            className="absolute right-0 top-0 bg-red-500 h-2 rounded-r-full"
-                            style={{ width: `${(item.belowMin / (item.total - item.belowMin)) * 100}%` }}
-                          />
-                        )}
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{defect.equipment}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">{defect.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={defect.severity === 'critical' ? 'destructive' : 
+                                        defect.severity === 'high' ? 'secondary' : 'outline'}>
+                            {defect.severity}
+                          </Badge>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {defect.department === 'engine' ? 'Engine' : 'Deck'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Low Stock Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Package className="h-5 w-5 text-yellow-500 mr-2" />
+                    Critical Stock Alerts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {sparesData
+                      .filter((spare: any) => spare.rob < spare.min)
+                      .sort((a: any, b: any) => (a.rob / a.min) - (b.rob / b.min))
+                      .slice(0, 5)
+                      .map((item: any) => (
+                        <div 
+                          key={item.id}
+                          className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 cursor-pointer transition-colors"
+                          onClick={() => navigateToSpares('low')}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.partName}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">{item.partCode}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                              {item.rob}/{item.min}
+                            </p>
+                            <p className="text-xs text-gray-500">{item.location || 'N/A'}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="departments" className="space-y-8">
+            {/* Department Overview Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Engine Department */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Settings className="h-5 w-5 text-blue-500 mr-2" />
+                    Engine Department Maintenance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                        <p className="text-2xl font-bold text-blue-600">{departmentKPIs.engine.total}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Total Tasks</p>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded">
+                        <p className="text-2xl font-bold text-red-600">{departmentKPIs.engine.overdue}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Overdue</p>
+                      </div>
+                    </div>
+                    
+                    <Progress value={(departmentKPIs.engine.completed / departmentKPIs.engine.total) * 100} className="h-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Completion Rate: {Math.round((departmentKPIs.engine.completed / departmentKPIs.engine.total) * 100)}%
+                    </p>
+                    
+                    <div className="pt-2">
+                      <p className="text-sm font-medium mb-2">Key Systems:</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>Main Engine</span>
+                          <Badge variant="outline" className="text-xs">3 tasks</Badge>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Auxiliary Engines</span>
+                          <Badge variant="outline" className="text-xs">2 tasks</Badge>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Boilers & Heaters</span>
+                          <Badge variant="outline" className="text-xs">1 task</Badge>
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </CardContent>
+              </Card>
 
-        {/* Smart Lists Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Needs Attention */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                Needs Attention - Overdue Work Orders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {topOverdueWOs.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No overdue work orders</p>
-                ) : (
-                  topOverdueWOs.map((wo) => (
+              {/* Deck Department */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Anchor className="h-5 w-5 text-green-500 mr-2" />
+                    Deck Department Maintenance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                        <p className="text-2xl font-bold text-green-600">{departmentKPIs.deck.total}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Total Tasks</p>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded">
+                        <p className="text-2xl font-bold text-red-600">{departmentKPIs.deck.overdue}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Overdue</p>
+                      </div>
+                    </div>
+                    
+                    <Progress value={(departmentKPIs.deck.completed / departmentKPIs.deck.total) * 100} className="h-2" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Completion Rate: {Math.round((departmentKPIs.deck.completed / departmentKPIs.deck.total) * 100)}%
+                    </p>
+                    
+                    <div className="pt-2">
+                      <p className="text-sm font-medium mb-2">Key Systems:</p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>Life Saving Appliances</span>
+                          <Badge variant="outline" className="text-xs">2 tasks</Badge>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Fire Fighting Equipment</span>
+                          <Badge variant="outline" className="text-xs">1 task</Badge>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Navigation Equipment</span>
+                          <Badge variant="outline" className="text-xs">1 task</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Risk Assessment Radar Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Shield className="h-5 w-5 text-[#52baf3] mr-2" />
+                  Department Risk Assessment Matrix
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={riskRadarData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="category" />
+                      <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                      <Radar name="Engine Dept" dataKey="engineRisk" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+                      <Radar name="Deck Dept" dataKey="deckRisk" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
+                      <Legend />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="equipment" className="space-y-8">
+            {/* Equipment Categories Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {equipmentCategoryData.map((category, index) => {
+                const icons = {
+                  "Engine machinery": Settings,
+                  "Deck machinery": Anchor,
+                  "Safety Equipment": ShieldCheck,
+                  "Navigation & Radio": Navigation,
+                  "Cargo handling": Package,
+                  "Hull structure": Ship,
+                  "Electronic equipment": Radio
+                };
+                const Icon = icons[category.category as keyof typeof icons] || HelpCircle;
+                
+                return (
+                  <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center">
+                        <Icon className="h-4 w-4 text-[#52baf3] mr-2" />
+                        {category.category}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Total Tasks</span>
+                          <Badge variant="outline">{category.total}</Badge>
+                        </div>
+                        {category.overdue > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">Overdue</span>
+                            <Badge variant="destructive">{category.overdue}</Badge>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Pending</span>
+                          <Badge variant="secondary">{category.pending}</Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Upcoming Maintenance Timeline */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="h-5 w-5 text-[#52baf3] mr-2" />
+                  Equipment Maintenance Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={upcomingMaintenanceData} layout="horizontal">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" />
+                      <Tooltip />
+                      <Bar 
+                        dataKey="critical" 
+                        stackId="a" 
+                        fill="#ef4444" 
+                        name="Critical"
+                        onClick={() => navigateToWorkOrders('critical')}
+                        className="cursor-pointer"
+                      />
+                      <Bar 
+                        dataKey="routine" 
+                        stackId="a" 
+                        fill="#10b981" 
+                        name="Routine"
+                        onClick={() => navigateToWorkOrders('routine')}
+                        className="cursor-pointer"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Inventory Health */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Archive className="h-5 w-5 text-[#52baf3] mr-2" />
+                  Spare Parts Inventory Health
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {inventoryHealthData.map((item, index) => (
+                    <div key={index} className="cursor-pointer" onClick={() => navigateToSpares()}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">{item.name}</span>
+                        <span className="text-sm text-gray-500">{item.belowMin}/{item.total}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full relative"
+                          style={{ width: `${((item.total - item.belowMin) / item.total) * 100}%` }}
+                        >
+                          {item.belowMin > 0 && (
+                            <div 
+                              className="absolute right-0 top-0 bg-red-500 h-2 rounded-r-full"
+                              style={{ width: `${(item.belowMin / (item.total - item.belowMin)) * 100}%` }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="compliance" className="space-y-8">
+            {/* Certificate Status Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Valid Certificates</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-green-600">
+                    {mockCertificates.filter(c => c.status === 'valid').length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">All documentation current</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Expiring Soon</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-yellow-600">
+                    {mockCertificates.filter(c => c.status === 'expiring').length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">Within 30 days</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Expired</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-red-600">
+                    {mockCertificates.filter(c => c.status === 'expired').length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">Immediate action required</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Certificate Details List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="h-5 w-5 text-[#52baf3] mr-2" />
+                  Certificate & Survey Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {mockCertificates.map((cert) => (
                     <div 
-                      key={wo.id}
-                      className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer transition-colors"
-                      onClick={() => navigateToWorkOrders('overdue')}
+                      key={cert.id}
+                      className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${
+                        cert.status === 'expired' ? 'bg-red-50 dark:bg-red-900/20 border-red-200' :
+                        cert.status === 'expiring' ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200' :
+                        'bg-green-50 dark:bg-green-900/20 border-green-200'
+                      }`}
                     >
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{wo.title}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">{wo.component}</p>
+                        <p className="font-medium">{cert.name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Category: {cert.category.charAt(0).toUpperCase() + cert.category.slice(1)}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-red-600 dark:text-red-400">Due: {format(new Date(wo.dueDate), 'MMM dd')}</p>
-                        <p className="text-xs text-gray-500">
-                          {Math.ceil((new Date().getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24))} days overdue
+                        <Badge variant={
+                          cert.status === 'expired' ? 'destructive' :
+                          cert.status === 'expiring' ? 'secondary' : 'default'
+                        }>
+                          {cert.status === 'expired' ? 'Expired' :
+                           cert.status === 'expiring' ? `${cert.daysRemaining} days` :
+                           'Valid'}
+                        </Badge>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Expires: {format(new Date(cert.expiryDate), 'MMM dd, yyyy')}
                         </p>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Low Stock Items */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Package className="h-5 w-5 text-yellow-500 mr-2" />
-                Low Stock Items
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {topLowStockItems.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">All items above minimum stock</p>
-                ) : (
-                  topLowStockItems.map((item: any) => (
-                    <div 
-                      key={item.id}
-                      className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 cursor-pointer transition-colors"
-                      onClick={() => navigateToSpares('low')}
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.partName}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">{item.partCode}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                          {item.rob}/{item.min}
-                        </p>
-                        <p className="text-xs text-gray-500">{item.location || 'N/A'}</p>
-                      </div>
+            {/* Class & Flag Requirements */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Shield className="h-5 w-5 text-blue-500 mr-2" />
+                    Classification Society Requirements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Annual Survey</span>
+                      <Badge variant="secondary">Due in 25 days</Badge>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Intermediate Survey</span>
+                      <Badge variant="default">Completed</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Special Survey</span>
+                      <Badge variant="outline">2025</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Drydocking</span>
+                      <Badge variant="outline">2025</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Quick Glance Widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <ClipboardCheck className="h-5 w-5 text-green-500 mr-2" />
+                    Regulatory Compliance Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">ISM Compliance</span>
+                      <Badge variant="default">Compliant</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">ISPS Compliance</span>
+                      <Badge variant="default">Compliant</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">MLC Compliance</span>
+                      <Badge variant="default">Compliant</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">MARPOL Compliance</span>
+                      <Badge variant="destructive">Review needed</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Quick Access Cards - Always visible */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-8">
           {/* Running Hours Widget */}
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/pms/running-hrs')}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="h-5 w-5 text-[#52baf3] mr-2" />
-                Running Hours Overview
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <Clock className="h-4 w-4 text-[#52baf3] mr-2" />
+                Running Hours
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm">Main Engine</span>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Main Engine</span>
                   <span className="font-medium">12,450 hrs</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Aux Engine #1</span>
+                <div className="flex justify-between text-xs">
+                  <span>Aux Engine #1</span>
                   <span className="font-medium">8,230 hrs</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">Emergency Gen</span>
+                <div className="flex justify-between text-xs">
+                  <span>Emergency Gen</span>
                   <span className="font-medium">456 hrs</span>
                 </div>
-                <div className="text-xs text-gray-500 mt-4">
-                  Last updated: {format(new Date(), 'MMM dd, HH:mm')}
-                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Recent Inventory Activity */}
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateToSpares()}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Store className="h-5 w-5 text-[#52baf3] mr-2" />
-                Recent Inventory Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium">Oil Filter received</p>
-                    <p className="text-xs text-gray-500">SP-001-045</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-green-600">+5</p>
-                    <p className="text-xs text-gray-500">Today</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium">Gasket consumed</p>
-                    <p className="text-xs text-gray-500">SP-002-012</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-red-600">-2</p>
-                    <p className="text-xs text-gray-500">Yesterday</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium">Bearing received</p>
-                    <p className="text-xs text-gray-500">SP-003-089</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-green-600">+1</p>
-                    <p className="text-xs text-gray-500">2 days ago</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Status */}
+          {/* PMS Status Widget */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                System Status
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                PMS System Status
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">PMS Database</span>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    <span className="text-sm text-green-600">Online</span>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span>E-PMS Status</span>
+                  <Badge variant="default" className="text-xs">Active</Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Data Sync</span>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    <span className="text-sm text-green-600">Synced</span>
-                  </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Data Sync</span>
+                  <Badge variant="default" className="text-xs">Synced</Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Backup Status</span>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    <span className="text-sm text-green-600">Current</span>
-                  </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Last Backup</span>
+                  <span className="font-medium">2 hrs ago</span>
                 </div>
-                <div className="text-xs text-gray-500 mt-4">
-                  All systems operational
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity Widget */}
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateToSpares()}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <Store className="h-4 w-4 text-[#52baf3] mr-2" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span>Oil Filter received</span>
+                  <span className="text-green-600">+5</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span>Gasket consumed</span>
+                  <span className="text-red-600">-2</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span>WO completed</span>
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Manufacturer Recommendations */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <Wrench className="h-4 w-4 text-[#52baf3] mr-2" />
+                Maker Recommendations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span>Compliant</span>
+                  <Badge variant="default" className="text-xs">85%</Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Overdue</span>
+                  <Badge variant="destructive" className="text-xs">3</Badge>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Modified</span>
+                  <Badge variant="secondary" className="text-xs">12</Badge>
                 </div>
               </div>
             </CardContent>
