@@ -634,7 +634,7 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center">
             <LayoutDashboard className="h-8 w-8 text-[#52baf3] mr-3" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">E-PMS Dashboard</h1>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
               <p className="text-gray-600 dark:text-gray-400">Electronic Planned Maintenance System Control Center</p>
             </div>
           </div>
@@ -691,7 +691,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
       <div className="p-6">
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
