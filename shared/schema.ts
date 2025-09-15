@@ -450,3 +450,50 @@ export const insertAlertConfigSchema = createInsertSchema(alertConfig).omit({
 
 export type InsertAlertConfig = z.infer<typeof insertAlertConfigSchema>;
 export type AlertConfig = typeof alertConfig.$inferSelect;
+
+// Work Orders Table
+export const workOrders = pgTable("work_orders", {
+  id: text("id").primaryKey(),
+  vesselId: text("vessel_id").notNull().default("V001"),
+  component: text("component").notNull(),
+  componentCode: text("component_code"),
+  workOrderNo: text("work_order_no").notNull(),
+  templateCode: text("template_code"),
+  executionId: text("execution_id"),
+  jobTitle: text("job_title").notNull(),
+  assignedTo: text("assigned_to").notNull(),
+  dueDate: text("due_date").notNull(), // ISO date string
+  status: text("status").notNull(), // 'Completed' | 'Due' | 'Due (Grace P)' | 'Overdue' | 'Postponed' | 'Pending Approval'
+  dateCompleted: text("date_completed"),
+  submittedDate: text("submitted_date"),
+  formData: json("form_data"), // Form submission data
+  taskType: text("task_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
+  maintenanceBasis: text("maintenance_basis"), // 'Calendar' | 'Running Hours'
+  frequencyValue: text("frequency_value"),
+  frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days'
+  approverRemarks: text("approver_remarks"),
+  isExecution: boolean("is_execution").notNull().default(false),
+  templateId: text("template_id"),
+  approver: text("approver"),
+  approvalDate: text("approval_date"),
+  rejectionDate: text("rejection_date"),
+  nextDueDate: text("next_due_date"),
+  nextDueReading: text("next_due_reading"),
+  currentReading: text("current_reading"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdIdx: index("idx_wo_vessel").on(table.vesselId),
+  statusIdx: index("idx_wo_status").on(table.status),
+  dueDateIdx: index("idx_wo_due_date").on(table.dueDate),
+  componentCodeIdx: index("idx_wo_component").on(table.componentCode),
+  templateCodeIdx: index("idx_wo_template").on(table.templateCode),
+}));
+
+export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
+export type WorkOrder = typeof workOrders.$inferSelect;
