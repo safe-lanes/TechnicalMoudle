@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema } from "@shared/schema";
 import { z } from "zod";
 import bulkRoutes from "./routes/bulk";
 import alertRoutes from "./routes/alerts";
@@ -19,13 +19,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Work Orders API routes (for Target Picker - placeholder)
+  // Work Orders API routes
+  
+  // Get all work orders with optional vessel filter
   app.get("/api/work-orders", async (req, res) => {
     try {
-      // Return empty array for now - will be implemented when Work Orders module is built
-      res.json([]);
+      const vesselId = req.query.vesselId as string;
+      const workOrders = await storage.getWorkOrders(vesselId);
+      res.json(workOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work orders" });
+    }
+  });
+  
+  // Get single work order
+  app.get("/api/work-orders/:id", async (req, res) => {
+    try {
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ error: "Work order not found" });
+      }
+      res.json(workOrder);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch work order" });
+    }
+  });
+  
+  // Create new work order
+  app.post("/api/work-orders", async (req, res) => {
+    try {
+      const validatedData = insertWorkOrderSchema.parse(req.body);
+      const workOrder = await storage.createWorkOrder(validatedData);
+      res.status(201).json(workOrder);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid work order data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create work order" });
+    }
+  });
+  
+  // Update work order
+  app.patch("/api/work-orders/:id", async (req, res) => {
+    try {
+      const partialWorkOrderSchema = insertWorkOrderSchema.partial();
+      const validatedData = partialWorkOrderSchema.parse(req.body);
+      const workOrder = await storage.updateWorkOrder(req.params.id, validatedData);
+      res.json(workOrder);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid work order data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update work order" });
+    }
+  });
+  
+  // Delete work order
+  app.delete("/api/work-orders/:id", async (req, res) => {
+    try {
+      await storage.deleteWorkOrder(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete work order" });
     }
   });
   

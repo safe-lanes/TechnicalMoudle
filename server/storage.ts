@@ -44,7 +44,10 @@ import {
   type InsertFormVersion,
   formVersionUsage,
   type FormVersionUsage,
-  type InsertFormVersionUsage
+  type InsertFormVersionUsage,
+  workOrders,
+  type WorkOrder,
+  type InsertWorkOrder
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -157,6 +160,13 @@ export interface IStorage {
   getIhmMaintenanceLog(filters: any): Promise<any[]>;
   createIhmMaintenanceLogEntry(entry: any): Promise<any>;
   getIhmStatusReport(vesselId: string): Promise<any[]>;
+  
+  // Work Order methods
+  getWorkOrders(vesselId?: string): Promise<WorkOrder[]>;
+  getWorkOrder(id: string): Promise<WorkOrder | undefined>;
+  createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder>;
+  updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;
+  deleteWorkOrder(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -189,6 +199,8 @@ export class MemStorage implements IStorage {
   private currentFormVersionId: number;
   private formVersionUsages: FormVersionUsage[];
   private currentFormUsageId: number;
+  private workOrders: Map<string, WorkOrder>;
+  private currentWorkOrderId: number;
 
   constructor() {
     this.users = new Map();
@@ -220,12 +232,15 @@ export class MemStorage implements IStorage {
     this.currentFormVersionId = 1;
     this.formVersionUsages = [];
     this.currentFormUsageId = 1;
+    this.workOrders = new Map();
+    this.currentWorkOrderId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
     this.initializeSpares();
     this.initializeAlertPolicies();
     this.initializeFormDefinitions();
+    this.initializeWorkOrders();
   }
   
   private async initializeFormDefinitions() {
@@ -529,7 +544,8 @@ export class MemStorage implements IStorage {
       newMeterStart: audit.newMeterStart?.toString() || null,
       enteredAtUTC: audit.enteredAtUTC || new Date(),
       notes: audit.notes || null,
-      version: audit.version || 1
+      version: audit.version || 1,
+      meterReplaced: audit.meterReplaced ?? false
     };
     this.runningHoursAudits.push(fullAudit);
     return fullAudit;
@@ -829,7 +845,17 @@ export class MemStorage implements IStorage {
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
     const id = this.currentHistoryId++;
-    const fullHistory: SpareHistory = { ...history, id };
+    const fullHistory: SpareHistory = { 
+      ...history, 
+      id,
+      componentCode: history.componentCode ?? null,
+      componentSpareCode: history.componentSpareCode ?? null,
+      remarks: history.remarks ?? null,
+      reference: history.reference ?? null,
+      dateLocal: history.dateLocal ?? null,
+      tz: history.tz ?? null,
+      place: history.place ?? null
+    };
     this.sparesHistory.push(fullHistory);
     return fullHistory;
   }
@@ -1080,9 +1106,20 @@ export class MemStorage implements IStorage {
       const newComp: Component = {
         ...comp,
         id: comp.id || String(Date.now() + Math.random()),
-        vesselId: comp.vesselId || 'V001',
-        currentCumulativeRH: comp.currentCumulativeRH || "0",
-        lastUpdated: comp.lastUpdated || new Date().toISOString().split('T')[0]
+        vesselId: comp.vesselId ?? 'V001',
+        currentCumulativeRH: comp.currentCumulativeRH ?? "0",
+        lastUpdated: comp.lastUpdated ?? new Date().toISOString().split('T')[0],
+        componentCode: comp.componentCode ?? null,
+        parentId: comp.parentId ?? null,
+        maker: comp.maker ?? null,
+        model: comp.model ?? null,
+        serialNo: comp.serialNo ?? null,
+        deptCategory: comp.deptCategory ?? null,
+        componentCategory: comp.componentCategory ?? null,
+        location: comp.location ?? null,
+        commissionedDate: comp.commissionedDate ?? null,
+        critical: comp.critical ?? false,
+        classItem: comp.classItem ?? false
       };
       this.components.set(newComp.id, newComp);
       created.push(newComp);
@@ -1119,8 +1156,20 @@ export class MemStorage implements IStorage {
         const newComp: Component = {
           ...comp,
           id,
-          currentCumulativeRH: comp.currentCumulativeRH || "0",
-          lastUpdated: comp.lastUpdated || new Date().toISOString().split('T')[0]
+          vesselId: comp.vesselId ?? 'V001',
+          currentCumulativeRH: comp.currentCumulativeRH ?? "0",
+          lastUpdated: comp.lastUpdated ?? new Date().toISOString().split('T')[0],
+          componentCode: comp.componentCode ?? null,
+          parentId: comp.parentId ?? null,
+          maker: comp.maker ?? null,
+          model: comp.model ?? null,
+          serialNo: comp.serialNo ?? null,
+          deptCategory: comp.deptCategory ?? null,
+          componentCategory: comp.componentCategory ?? null,
+          location: comp.location ?? null,
+          commissionedDate: comp.commissionedDate ?? null,
+          critical: comp.critical ?? false,
+          classItem: comp.classItem ?? false
         };
         this.components.set(id, newComp);
         created++;
@@ -1137,15 +1186,13 @@ export class MemStorage implements IStorage {
       const newSpare: Spare = {
         ...spare,
         id,
-        robStock: spare.robStock || 0,
-        consumed: spare.consumed || 0,
-        received: spare.received || 0,
-        status: spare.status || 'active',
-        minStock: spare.minStock || 0,
-        stockStatus: this.calculateStockStatus(spare.robStock || 0, spare.minStock || 0),
-        issuedWithUnit: spare.issuedWithUnit || 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        vesselId: spare.vesselId ?? 'V001',
+        rob: spare.rob ?? 0,
+        min: spare.min ?? 0,
+        componentCode: spare.componentCode ?? null,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        location: spare.location ?? null,
+        deleted: false
       };
       this.spares.set(id, newSpare);
       created.push(newSpare);
@@ -1156,11 +1203,11 @@ export class MemStorage implements IStorage {
   async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
     const updated: Spare[] = [];
     for (const { robId, data } of updates) {
-      // Find spare by robId
-      const existingEntry = Array.from(this.spares.entries()).find(([_, spare]) => spare.robId === robId);
+      // Find spare by componentSpareCode (since robId doesn't exist in schema)
+      const existingEntry = Array.from(this.spares.entries()).find(([_, spare]) => spare.componentSpareCode === robId);
       if (existingEntry) {
         const [id, existing] = existingEntry;
-        const updatedSpare = { ...existing, ...data, updatedAt: new Date() };
+        const updatedSpare = { ...existing, ...data };
         this.spares.set(id, updatedSpare);
         updated.push(updatedSpare);
       }
@@ -1173,16 +1220,20 @@ export class MemStorage implements IStorage {
     let updated = 0;
     
     for (const spare of spares) {
-      // Try to find existing spare by robId
-      const existingEntry = Array.from(this.spares.entries()).find(([_, s]) => s.robId === spare.robId);
+      // Try to find existing spare by componentSpareCode
+      const existingEntry = Array.from(this.spares.entries()).find(([_, s]) => 
+        s.componentSpareCode === spare.componentSpareCode && spare.componentSpareCode
+      );
       
       if (existingEntry) {
         const [id, existing] = existingEntry;
         const updatedSpare = {
           ...existing,
           ...spare,
-          stockStatus: this.calculateStockStatus(spare.robStock || existing.robStock, spare.minStock || existing.minStock),
-          updatedAt: new Date()
+          vesselId: spare.vesselId ?? existing.vesselId,
+          componentCode: spare.componentCode ?? existing.componentCode,
+          componentSpareCode: spare.componentSpareCode ?? existing.componentSpareCode,
+          location: spare.location ?? existing.location
         };
         this.spares.set(id, updatedSpare);
         updated++;
@@ -1191,15 +1242,13 @@ export class MemStorage implements IStorage {
         const newSpare: Spare = {
           ...spare,
           id,
-          robStock: spare.robStock || 0,
-          consumed: spare.consumed || 0,
-          received: spare.received || 0,
-          status: spare.status || 'active',
-          minStock: spare.minStock || 0,
-          stockStatus: this.calculateStockStatus(spare.robStock || 0, spare.minStock || 0),
-          issuedWithUnit: spare.issuedWithUnit || 0,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          vesselId: spare.vesselId ?? 'V001',
+          rob: spare.rob ?? 0,
+          min: spare.min ?? 0,
+          componentCode: spare.componentCode ?? null,
+          componentSpareCode: spare.componentSpareCode ?? null,
+          location: spare.location ?? null,
+          deleted: false
         };
         this.spares.set(id, newSpare);
         created++;
@@ -1213,8 +1262,8 @@ export class MemStorage implements IStorage {
     let archived = 0;
     for (const id of ids) {
       if (this.components.has(id)) {
-        const comp = this.components.get(id)!;
-        this.components.set(id, { ...comp, status: 'archived' });
+        // Note: Component schema doesn't have status field, so we just delete them
+        this.components.delete(id);
         archived++;
       }
     }
@@ -1226,17 +1275,17 @@ export class MemStorage implements IStorage {
     for (const id of ids) {
       if (this.spares.has(id)) {
         const spare = this.spares.get(id)!;
-        this.spares.set(id, { ...spare, status: 'archived' });
+        this.spares.set(id, { ...spare, deleted: true });
         archived++;
       }
     }
     return archived;
   }
 
-  private calculateStockStatus(robStock: number, minStock: number): string {
-    if (robStock === 0) return 'Out of Stock';
-    if (robStock < minStock) return 'Minimum';
-    if (robStock < minStock * 1.5) return 'Low';
+  private calculateStockStatus(rob: number, min: number): string {
+    if (rob === 0) return 'Out of Stock';
+    if (rob < min) return 'Minimum';
+    if (rob < min * 1.5) return 'Low';
     return 'OK';
   }
 
@@ -1361,6 +1410,13 @@ export class MemStorage implements IStorage {
     const newPolicy: AlertPolicy = {
       id: this.currentAlertPolicyId++,
       ...policy,
+      enabled: policy.enabled ?? true,
+      priority: policy.priority ?? 'medium',
+      emailEnabled: policy.emailEnabled ?? false,
+      inAppEnabled: policy.inAppEnabled ?? true,
+      thresholds: policy.thresholds ?? '{}',
+      scopeFilters: policy.scopeFilters ?? '{}',
+      recipients: policy.recipients ?? '{}',
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1426,6 +1482,12 @@ export class MemStorage implements IStorage {
     const newEvent: AlertEvent = {
       id: this.currentAlertEventId++,
       ...event,
+      vesselId: event.vesselId ?? null,
+      objectType: event.objectType ?? null,
+      objectId: event.objectId ?? null,
+      state: event.state ?? null,
+      ackBy: event.ackBy ?? null,
+      ackAt: event.ackAt ?? null,
       createdAt: new Date()
     };
     this.alertEvents.set(newEvent.id, newEvent);
@@ -1456,6 +1518,10 @@ export class MemStorage implements IStorage {
     const newDelivery: AlertDelivery = {
       id: this.currentAlertDeliveryId++,
       ...delivery,
+      status: delivery.status ?? 'pending',
+      errorMessage: delivery.errorMessage ?? null,
+      sentAt: delivery.sentAt ?? null,
+      acknowledgedAt: delivery.acknowledgedAt ?? null,
       createdAt: new Date()
     };
     this.alertDeliveries.set(newDelivery.id, newDelivery);
@@ -1470,7 +1536,7 @@ export class MemStorage implements IStorage {
     const updated = {
       ...delivery,
       status,
-      errorMessage,
+      errorMessage: errorMessage ?? null,
       sentAt: status === 'sent' ? new Date() : delivery.sentAt,
       acknowledgedAt: status === 'acknowledged' ? new Date() : delivery.acknowledgedAt
     };
@@ -1498,6 +1564,12 @@ export class MemStorage implements IStorage {
       const newConfig: AlertConfig = {
         id: this.currentAlertConfigId++,
         ...config,
+        quietHoursEnabled: config.quietHoursEnabled ?? false,
+        quietHoursStart: config.quietHoursStart ?? null,
+        quietHoursEnd: config.quietHoursEnd ?? null,
+        escalationEnabled: config.escalationEnabled ?? false,
+        escalationHours: config.escalationHours ?? 24,
+        escalationRecipients: config.escalationRecipients ?? '[]',
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -1522,7 +1594,8 @@ export class MemStorage implements IStorage {
   async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
     const newForm: FormDefinition = {
       id: this.currentFormDefinitionId++,
-      ...form
+      ...form,
+      subgroup: form.subgroup ?? null
     };
     this.formDefinitions.set(newForm.id, newForm);
     return newForm;
@@ -1554,7 +1627,8 @@ export class MemStorage implements IStorage {
     const newVersion: FormVersion = {
       id: this.currentFormVersionId++,
       ...version,
-      versionDate: version.versionDate || new Date()
+      versionDate: version.versionDate || new Date(),
+      changelog: version.changelog ?? null
     };
     this.formVersions.set(newVersion.id, newVersion);
     return newVersion;
@@ -1732,6 +1806,240 @@ export class MemStorage implements IStorage {
     }
     
     return report;
+  }
+  
+  private initializeWorkOrders() {
+    const initialWorkOrders = [
+      {
+        id: "1",
+        vesselId: "V001",
+        component: "Main Engine",
+        componentCode: "6.1.1",
+        templateCode: "WO-6.1.1-OHM6",
+        workOrderNo: "WO-2025-03",
+        jobTitle: "Main Engine Overhaul - Replace Main Bearings",
+        assignedTo: "Chief Engineer",
+        dueDate: "02-Jun-2025",
+        status: "Completed",
+        dateCompleted: "02-Jun-2025",
+        taskType: "Overhaul",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "6",
+        frequencyUnit: "Months",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "2",
+        vesselId: "V001",
+        component: "Diesel Generator 1",
+        componentCode: "6.2.1",
+        templateCode: "WO-6.2.1-SRVM3",
+        workOrderNo: "WO-2025-17",
+        jobTitle: "DG1 - Replace Fuel Injectors",
+        assignedTo: "2nd Engineer",
+        dueDate: "05-Jun-2025",
+        status: "Due (Grace P)",
+        taskType: "Service",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "3",
+        frequencyUnit: "Months",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "3",
+        vesselId: "V001",
+        component: "Steering Gear",
+        componentCode: "1.5.1",
+        templateCode: "WO-1.5.1-INSM3",
+        workOrderNo: "WO-2025-54",
+        jobTitle: "Steering Gear - 3 Monthly XXX",
+        assignedTo: "2nd Engineer",
+        dueDate: "16-Jun-2025",
+        status: "Due",
+        taskType: "Inspection",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "3",
+        frequencyUnit: "Months",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "4",
+        vesselId: "V001",
+        component: "Main Cooling Seawater Pump",
+        componentCode: "7.1.2.1",
+        templateCode: "WO-7.1.2.1-SRVRH2000",
+        workOrderNo: "WO-2025-19",
+        jobTitle: "MCSP - Replace Mechanical Seal",
+        assignedTo: "3rd Engineer",
+        dueDate: "23-Jun-2025",
+        status: "Due",
+        taskType: "Service",
+        maintenanceBasis: "Running Hours",
+        frequencyValue: "2000",
+        frequencyUnit: "",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "5",
+        vesselId: "V001",
+        component: "Main Air Compressor",
+        componentCode: "7.4.1",
+        templateCode: "WO-7.4.1-OHRH1000",
+        workOrderNo: "WO-2025-03",
+        jobTitle: "Main Air Compressor - Work Order XXX",
+        assignedTo: "3rd Engineer",
+        dueDate: "30-Jun-2025",
+        status: "Completed",
+        dateCompleted: "30-Jun-2025",
+        taskType: "Overhaul",
+        maintenanceBasis: "Running Hours",
+        frequencyValue: "1000",
+        frequencyUnit: "",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "6",
+        vesselId: "V001",
+        component: "Mooring Winch Forward",
+        componentCode: "3.3.1",
+        templateCode: "WO-3.3.1-INSM6",
+        workOrderNo: "WO-2025-17",
+        jobTitle: "Mooring Winch Forward - Work Order XXX",
+        assignedTo: "2nd Engineer",
+        dueDate: "02-Jun-2025",
+        status: "Overdue",
+        taskType: "Inspection",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "6",
+        frequencyUnit: "Months",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "7",
+        vesselId: "V001",
+        component: "Bow Thruster",
+        componentCode: "5.2.1",
+        templateCode: "WO-5.2.1-OHY1",
+        workOrderNo: "WO-2025-54",
+        jobTitle: "Bow Thruster - Work Order XXX",
+        assignedTo: "Chief Engineer",
+        dueDate: "09-Jun-2025",
+        status: "Postponed",
+        taskType: "Overhaul",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "1",
+        frequencyUnit: "Years",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "8",
+        vesselId: "V001",
+        component: "Fire Pump",
+        componentCode: "8.1.2",
+        templateCode: "WO-8.1.2-TSTM1",
+        workOrderNo: "WO-2025-13",
+        jobTitle: "Fire Pump - Work Order XXX",
+        assignedTo: "2nd Engineer",
+        dueDate: "16-Jun-2025",
+        status: "Completed",
+        dateCompleted: "16-Jun-2025",
+        taskType: "Testing",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "1",
+        frequencyUnit: "Months",
+        isExecution: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    for (const workOrder of initialWorkOrders) {
+      this.workOrders.set(workOrder.id, workOrder as WorkOrder);
+    }
+    
+    this.currentWorkOrderId = 9;
+  }
+  
+  // WorkOrder CRUD methods
+  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const allWorkOrders = Array.from(this.workOrders.values());
+    if (vesselId) {
+      return allWorkOrders.filter(wo => wo.vesselId === vesselId);
+    }
+    return allWorkOrders;
+  }
+  
+  async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    return this.workOrders.get(id);
+  }
+  
+  async createWorkOrder(workOrderData: InsertWorkOrder): Promise<WorkOrder> {
+    const workOrder: WorkOrder = {
+      ...workOrderData,
+      id: this.currentWorkOrderId.toString(),
+      componentCode: workOrderData.componentCode ?? null,
+      templateCode: workOrderData.templateCode ?? null,
+      executionId: workOrderData.executionId ?? null,
+      vesselId: workOrderData.vesselId ?? 'V001',
+      dateCompleted: workOrderData.dateCompleted ?? null,
+      submittedDate: workOrderData.submittedDate ?? null,
+      formData: workOrderData.formData ?? null,
+      taskType: workOrderData.taskType ?? null,
+      maintenanceBasis: workOrderData.maintenanceBasis ?? null,
+      frequencyValue: workOrderData.frequencyValue ?? null,
+      frequencyUnit: workOrderData.frequencyUnit ?? null,
+      approverRemarks: workOrderData.approverRemarks ?? null,
+      templateId: workOrderData.templateId ?? null,
+      approver: workOrderData.approver ?? null,
+      approvalDate: workOrderData.approvalDate ?? null,
+      rejectionDate: workOrderData.rejectionDate ?? null,
+      nextDueDate: workOrderData.nextDueDate ?? null,
+      nextDueReading: workOrderData.nextDueReading ?? null,
+      currentReading: workOrderData.currentReading ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.workOrders.set(workOrder.id, workOrder);
+    this.currentWorkOrderId++;
+    return workOrder;
+  }
+  
+  async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const existing = this.workOrders.get(id);
+    if (!existing) {
+      throw new Error(`WorkOrder with id ${id} not found`);
+    }
+    
+    const updated: WorkOrder = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+  
+  async deleteWorkOrder(id: string): Promise<void> {
+    if (!this.workOrders.has(id)) {
+      throw new Error(`WorkOrder with id ${id} not found`);
+    }
+    this.workOrders.delete(id);
   }
 }
 
