@@ -297,7 +297,10 @@ const Dashboard: React.FC = () => {
       return {
         activeWorkOrders: 0,
         overdueTasks: 0,
+        overdueCount: 0,
+        totalMonthlyTasks: 0,
         completedThisPeriod: 0,
+        dueSoon: 0,
         criticalStockAlerts: 0,
         expiringCertificates: 0,
         openDefects: 0,
@@ -307,10 +310,14 @@ const Dashboard: React.FC = () => {
     }
 
     // Work order calculations using real data
+    const totalMonthlyWOs = filteredWorkOrders.length; // Total monthly planned maintenance tasks
     const activeWOs = filteredWorkOrders.filter(wo => !isCompleted(wo)).length;
     const overdueWOs = filteredWorkOrders.filter(wo => isOverdue(wo)).length;
     const completedWOs = filteredWorkOrders.filter(wo => isCompleted(wo)).length;
     const dueSoonWOs = filteredWorkOrders.filter(wo => isDueSoon(wo)).length;
+    
+    // Calculate overdue percentage of total monthly planned maintenance tasks
+    const overduePercentage = totalMonthlyWOs > 0 ? (overdueWOs / totalMonthlyWOs) * 100 : 0;
     
     // Calculate low stock items
     const lowStockItems = sparesData.filter((spare: any) => spare.rob < spare.min).length;
@@ -325,7 +332,9 @@ const Dashboard: React.FC = () => {
     
     return {
       activeWorkOrders: activeWOs,
-      overdueTasks: overdueWOs, // Only counts status "Overdue"
+      overdueTasks: overduePercentage, // Percentage of total monthly planned maintenance tasks
+      overdueCount: overdueWOs, // Absolute count for reference
+      totalMonthlyTasks: totalMonthlyWOs, // Total monthly planned maintenance tasks
       completedThisPeriod: completedWOs,
       dueSoon: dueSoonWOs, // New KPI for due soon
       criticalStockAlerts: lowStockItems,
@@ -695,14 +704,14 @@ const Dashboard: React.FC = () => {
               
               <KPICard
                 title="Overdue Tasks"
-                value={kpis.overdueTasks}
+                value={`${kpis.overdueTasks.toFixed(1)}%`}
                 icon={AlertTriangle}
                 color="bg-red-50 text-red-600 border-red-200"
-                change="+1 this week"
+                change={kpis.overdueCount > 0 ? `${kpis.overdueCount} of ${kpis.totalMonthlyTasks} tasks` : "0 of " + kpis.totalMonthlyTasks + " tasks"}
                 changeType="negative"
                 sparklineData={generateSparklineData('overdue')}
                 onClick={() => navigateToWorkOrders('overdue')}
-                subtitle="Immediate attention required"
+                subtitle="% of monthly planned maintenance"
               />
               
               <KPICard
