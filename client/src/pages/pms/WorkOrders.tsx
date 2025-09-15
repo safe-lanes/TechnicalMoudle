@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pen, Timer } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,35 +18,11 @@ import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
+import { WorkOrder, InsertWorkOrder } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
-interface WorkOrder {
-  id: string;
-  component: string;
-  componentCode?: string;
-  workOrderNo: string;
-  templateCode?: string;
-  executionId?: string;
-  jobTitle: string;
-  assignedTo: string;
-  dueDate: string;
-  status: string;
-  dateCompleted?: string;
-  submittedDate?: string;
-  formData?: any;
-  taskType?: string;
-  maintenanceBasis?: string;
-  frequencyValue?: string;
-  frequencyUnit?: string;
-  approverRemarks?: string;
-  isExecution?: boolean;
-  templateId?: string;
-  approver?: string;
-  approvalDate?: string;
-  rejectionDate?: string;
-  nextDueDate?: string;
-  nextDueReading?: string;
-  currentReading?: string;
-}
+// Using WorkOrder type from shared schema
+// The WorkOrder interface is now imported from @shared/schema
 
 // Helper function to generate template code
 const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: string, unit?: string) => {
@@ -67,229 +45,7 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
   return `WO-${componentCode}-${taskCode}${freqTag}`.toUpperCase();
 };
 
-const initialWorkOrders: WorkOrder[] = [
-  {
-    id: "1",
-    component: "Main Engine",
-    componentCode: "6.1.1",
-    templateCode: "WO-6.1.1-OHM6",
-    workOrderNo: "WO-2025-03",
-    jobTitle: "Main Engine Overhaul - Replace Main Bearings",
-    assignedTo: "Chief Engineer",
-    dueDate: "02-Jun-2025",
-    status: "Completed",
-    dateCompleted: "02-Jun-2025",
-    taskType: "Overhaul",
-    maintenanceBasis: "Calendar",
-    frequencyValue: "6",
-    frequencyUnit: "Months"
-  },
-  {
-    id: "2",
-    component: "Diesel Generator 1",
-    componentCode: "6.2.1",
-    templateCode: "WO-6.2.1-SRVM3",
-    workOrderNo: "WO-2025-17",
-    jobTitle: "DG1 - Replace Fuel Injectors",
-    assignedTo: "2nd Engineer",
-    dueDate: "05-Jun-2025",
-    status: "Due (Grace P)",
-    taskType: "Service",
-    maintenanceBasis: "Calendar",
-    frequencyValue: "3",
-    frequencyUnit: "Months"
-  },
-  {
-    id: "3",
-    component: "Steering Gear",
-    componentCode: "1.5.1",
-    templateCode: "WO-1.5.1-INSM3",
-    workOrderNo: "WO-2025-54",
-    jobTitle: "Steering Gear - 3 Monthly XXX",
-    assignedTo: "2nd Engineer",
-    dueDate: "16-Jun-2025",
-    status: "Due",
-    taskType: "Inspection",
-    maintenanceBasis: "Calendar",
-    frequencyValue: "3",
-    frequencyUnit: "Months"
-  },
-  {
-    id: "4",
-    component: "Main Cooling Seawater Pump",
-    componentCode: "7.1.2.1",
-    templateCode: "WO-7.1.2.1-SRVRH2000",
-    workOrderNo: "WO-2025-19",
-    jobTitle: "MCSP - Replace Mechanical Seal",
-    assignedTo: "3rd Engineer",
-    dueDate: "23-Jun-2025",
-    status: "Due",
-    taskType: "Service",
-    maintenanceBasis: "Running Hours",
-    frequencyValue: "2000",
-    frequencyUnit: ""
-  },
-  {
-    id: "5",
-    component: "Main Air Compressor",
-    componentCode: "7.4.1",
-    templateCode: "WO-7.4.1-OHRH1000",
-    workOrderNo: "WO-2025-03",
-    jobTitle: "Main Air Compressor - Work Order XXX",
-    assignedTo: "3rd Engineer",
-    dueDate: "30-Jun-2025",
-    status: "Completed",
-    dateCompleted: "30-Jun-2025",
-    taskType: "Overhaul",
-    maintenanceBasis: "Running Hours",
-    frequencyValue: "1000",
-    frequencyUnit: ""
-  },
-    {
-      id: "6",
-      component: "Mooring Winch Forward",
-      componentCode: "3.3.1",
-      templateCode: "WO-3.3.1-INSM6",
-      workOrderNo: "WO-2025-17",
-      jobTitle: "Mooring Winch Forward - Work Order XXX",
-      assignedTo: "2nd Engineer",
-      dueDate: "02-Jun-2025",
-      status: "Overdue",
-      taskType: "Inspection",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "6",
-      frequencyUnit: "Months"
-    },
-    {
-      id: "7",
-      component: "Bow Thruster",
-      componentCode: "5.2.1",
-      templateCode: "WO-5.2.1-OHY1",
-      workOrderNo: "WO-2025-54",
-      jobTitle: "Bow Thruster - Work Order XXX",
-      assignedTo: "Chief Engineer",
-      dueDate: "09-Jun-2025",
-      status: "Postponed",
-      taskType: "Overhaul",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "1",
-      frequencyUnit: "Years"
-    },
-    {
-      id: "8",
-      component: "Fire Pump",
-      componentCode: "8.1.2",
-      templateCode: "WO-8.1.2-TSTM1",
-      workOrderNo: "WO-2025-13",
-      jobTitle: "Fire Pump - Work Order XXX",
-      assignedTo: "2nd Engineer",
-      dueDate: "16-Jun-2025",
-      status: "Completed",
-      dateCompleted: "16-Jun-2025",
-      taskType: "Testing",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "1",
-      frequencyUnit: "Months"
-    },
-    {
-      id: "9",
-      component: "Main Engine",
-      componentCode: "6.1.1",
-      templateCode: "WO-6.1.1-SRVRH3000",
-      workOrderNo: "WO-2025-03",
-      jobTitle: "Main Engine - Replace Piston Rings (#3 Unit)",
-      assignedTo: "Chief Engineer",
-      dueDate: "23-Jun-2025",
-      status: "Due",
-      taskType: "Service",
-      maintenanceBasis: "Running Hours",
-      frequencyValue: "3000",
-      frequencyUnit: ""
-    },
-    {
-      id: "10",
-      component: "Diesel Generator 1",
-      componentCode: "6.2.1",
-      templateCode: "WO-6.2.1-INSRH500",
-      workOrderNo: "WO-2025-17",
-      jobTitle: "Diesel Generator 1 - Work Order XXX",
-      assignedTo: "2nd Engineer",
-      dueDate: "30-Jun-2025",
-      status: "Completed",
-      dateCompleted: "30-Jun-2025",
-      taskType: "Inspection",
-      maintenanceBasis: "Running Hours",
-      frequencyValue: "500",
-      frequencyUnit: ""
-    },
-    {
-      id: "11",
-      component: "Steering Gear",
-      componentCode: "1.5.1",
-      templateCode: "WO-1.5.1-OHY2",
-      workOrderNo: "WO-2025-54",
-      jobTitle: "Steering Gear - Work Order XXX",
-      assignedTo: "2nd Engineer",
-      dueDate: "02-Jun-2025",
-      status: "Overdue",
-      taskType: "Overhaul",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "2",
-      frequencyUnit: "Years"
-    },
-    {
-      id: "12",
-      component: "Main Cooling Seawater Pump",
-      componentCode: "7.1.2.1",
-      templateCode: "WO-7.1.2.1-INSRH1000",
-      workOrderNo: "WO-2025-19",
-      jobTitle: "Main Cooling Seawater Pump - Work Order XXX",
-      assignedTo: "3rd Engineer",
-      dueDate: "09-Aug-2025",
-      status: "Due",
-      taskType: "Inspection",
-      maintenanceBasis: "Running Hours",
-      frequencyValue: "1000",
-      frequencyUnit: ""
-    },
-    // Sample execution with Pending Approval status
-    {
-      id: "exec-001",
-      executionId: "2025-WO-1.1.1.1.11-INSM3-01",
-      templateCode: "WO-1.1.1.1.11-INSM3",
-      component: "Fresh Water Pump #1",
-      componentCode: "1.1.1.1.11",
-      workOrderNo: "2025-WO-1.1.1.1.11-INSM3-01",
-      jobTitle: "Pump Inspection Execution",
-      assignedTo: "2nd Engineer",
-      dueDate: "2025-01-15",
-      submittedDate: "2025-01-10",
-      status: "Pending Approval",
-      isExecution: true,
-      taskType: "Inspection",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "3",
-      frequencyUnit: "Months"
-    },
-    {
-      id: "exec-002",
-      executionId: "2025-WO-1.1.1.1.13-SRVW4-01",
-      templateCode: "WO-1.1.1.1.13-SRVW4",
-      component: "Fresh Water Pump #2",
-      componentCode: "1.1.1.1.13",
-      workOrderNo: "2025-WO-1.1.1.1.13-SRVW4-01",
-      jobTitle: "Weekly Service Execution",
-      assignedTo: "3rd Engineer",
-      dueDate: "2025-01-12",
-      submittedDate: "2025-01-08",
-      status: "Pending Approval",
-      isExecution: true,
-      taskType: "Service",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "4",
-      frequencyUnit: "Weeks"
-    }
-];
+// Sample data moved to seed data in storage - now fetched from API
 
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -307,23 +63,59 @@ const WorkOrders: React.FC = () => {
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location] = useLocation();
+  const { toast } = useToast();
   
-  // Backfill templateCode for existing work orders if missing
-  const backfilledWorkOrders = initialWorkOrders.map(wo => {
-    if (!wo.templateCode && wo.componentCode && wo.taskType) {
-      const templateCode = generateTemplateCode(
-        wo.componentCode,
-        wo.taskType,
-        wo.maintenanceBasis || "Calendar",
-        wo.frequencyValue || "",
-        wo.frequencyUnit
-      );
-      return { ...wo, templateCode };
-    }
-    return wo;
+  // Fetch work orders using React Query
+  const vesselId = "V001"; // Default vessel ID
+  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrder[]>({
+    queryKey: ['/api/work-orders', vesselId],
+    enabled: true, // Always fetch on mount
   });
   
-  const [workOrdersList, setWorkOrdersList] = useState<WorkOrder[]>(backfilledWorkOrders);
+  // Create work order mutation
+  const createWorkOrderMutation = useMutation({
+    mutationFn: async (data: InsertWorkOrder) => {
+      const response = await apiRequest('POST', '/api/work-orders', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders', vesselId] });
+      toast({ title: "Success", description: "Work order created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create work order" });
+    }
+  });
+  
+  // Update work order mutation
+  const updateWorkOrderMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertWorkOrder> }) => {
+      const response = await apiRequest('PATCH', `/api/work-orders/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders', vesselId] });
+      toast({ title: "Success", description: "Work order updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update work order" });
+    }
+  });
+  
+  // Delete work order mutation
+  const deleteWorkOrderMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('DELETE', `/api/work-orders/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders', vesselId] });
+      toast({ title: "Success", description: "Work order deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete work order" });
+    }
+  });
 
   // Handle preview mode from "View Changes" button
   useEffect(() => {
@@ -358,8 +150,8 @@ const WorkOrders: React.FC = () => {
       const executionId = `${year}-${templateCode}-${sequence}`;
       
       // Create new execution record
-      const executionRecord: WorkOrder = {
-        id: `exec-${Date.now()}`,
+      const executionData: InsertWorkOrder = {
+        vesselId: vesselId,
         component: formData.data.component,
         componentCode: formData.data.componentCode,
         workOrderNo: executionId,
@@ -375,21 +167,34 @@ const WorkOrders: React.FC = () => {
         templateId: workOrderId
       };
       
-      setWorkOrdersList(prev => [...prev, executionRecord]);
-      setActiveTab("Pending Approval");
+      createWorkOrderMutation.mutate(executionData, {
+        onSuccess: () => {
+          setActiveTab("Pending Approval");
+        }
+      });
     } else if (formData?.type === 'template') {
       // Update template
-      setWorkOrdersList(prev => 
-        prev.map(wo => 
-          wo.id === workOrderId 
-            ? { 
-                ...wo, 
-                ...formData.data,
-                templateCode: formData.data.woTemplateCode || formData.data.templateCode || wo.templateCode
-              }
-            : wo
+      const updateData = {
+        ...formData.data,
+        templateCode: formData.data.woTemplateCode || formData.data.templateCode
+      };
+      
+      updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
+    } else if (formData?.type === 'new') {
+      // Create new work order
+      const newWorkOrderData: InsertWorkOrder = {
+        vesselId: vesselId,
+        ...formData.data,
+        templateCode: formData.data.woTemplateCode || formData.data.templateCode || generateTemplateCode(
+          formData.data.componentCode || "",
+          formData.data.taskType || "",
+          formData.data.maintenanceBasis || "Calendar",
+          formData.data.frequencyValue || "",
+          formData.data.frequencyUnit
         )
-      );
+      };
+      
+      createWorkOrderMutation.mutate(newWorkOrderData);
     }
   };
 
@@ -484,77 +289,66 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
-    setWorkOrdersList(prev => 
-      prev.map(wo => {
-        if (wo.executionId === workOrderId || wo.id === workOrderId) {
-          // Update execution status to Approved
-          const updatedWO = { 
-            ...wo, 
-            status: "Approved",
-            dateCompleted: new Date().toISOString().split('T')[0],
-            approver: "Current User", // Replace with actual user
-            approverRemarks,
-            approvalDate: new Date().toISOString()
-          };
-
-          // Reset maintenance cycle on the template
-          if (wo.maintenanceBasis === "Calendar") {
-            const completionDate = new Date();
-            const freq = parseInt(wo.frequencyValue || "0");
-            if (wo.frequencyUnit === "Days") {
-              completionDate.setDate(completionDate.getDate() + freq);
-            } else if (wo.frequencyUnit === "Weeks") {
-              completionDate.setDate(completionDate.getDate() + (freq * 7));
-            } else if (wo.frequencyUnit === "Months") {
-              completionDate.setMonth(completionDate.getMonth() + freq);
-            } else if (wo.frequencyUnit === "Years") {
-              completionDate.setFullYear(completionDate.getFullYear() + freq);
-            }
-            updatedWO.nextDueDate = completionDate.toISOString().split('T')[0];
-          } else if (wo.maintenanceBasis === "Running Hours" && wo.currentReading) {
-            updatedWO.nextDueReading = (parseInt(wo.currentReading) + parseInt(wo.frequencyValue || "0")).toString();
-          }
-
-          return updatedWO;
-        }
-        return wo;
-      })
-    );
+    const workOrder = workOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    if (!workOrder) return;
+    
+    // Calculate next due date/reading
+    let nextDueDate = undefined;
+    let nextDueReading = undefined;
+    
+    if (workOrder.maintenanceBasis === "Calendar") {
+      const completionDate = new Date();
+      const freq = parseInt(workOrder.frequencyValue || "0");
+      if (workOrder.frequencyUnit === "Days") {
+        completionDate.setDate(completionDate.getDate() + freq);
+      } else if (workOrder.frequencyUnit === "Weeks") {
+        completionDate.setDate(completionDate.getDate() + (freq * 7));
+      } else if (workOrder.frequencyUnit === "Months") {
+        completionDate.setMonth(completionDate.getMonth() + freq);
+      } else if (workOrder.frequencyUnit === "Years") {
+        completionDate.setFullYear(completionDate.getFullYear() + freq);
+      }
+      nextDueDate = completionDate.toISOString().split('T')[0];
+    } else if (workOrder.maintenanceBasis === "Running Hours" && workOrder.currentReading) {
+      nextDueReading = (parseInt(workOrder.currentReading) + parseInt(workOrder.frequencyValue || "0")).toString();
+    }
+    
+    const updateData = {
+      status: "Approved",
+      dateCompleted: new Date().toISOString().split('T')[0],
+      approver: "Current User", // Replace with actual user
+      approverRemarks,
+      approvalDate: new Date().toISOString(),
+      nextDueDate,
+      nextDueReading
+    };
+    
+    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
   };
 
   const handleReject = (workOrderId: string, rejectionComments: string) => {
-    setWorkOrdersList(prev => 
-      prev.map(wo => {
-        if (wo.executionId === workOrderId || wo.id === workOrderId) {
-          return { 
-            ...wo, 
-            status: "Rejected",
-            approver: "Current User", // Replace with actual user
-            approverRemarks: rejectionComments,
-            rejectionDate: new Date().toISOString()
-          };
-        }
-        return wo;
-      })
-    );
+    const updateData = {
+      status: "Rejected",
+      approver: "Current User", // Replace with actual user
+      approverRemarks: rejectionComments,
+      rejectionDate: new Date().toISOString()
+    };
+    
+    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
   };
 
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
-    setWorkOrdersList(prev => 
-      prev.map(wo => 
-        wo.id === workOrderId 
-          ? { 
-              ...wo, 
-              status: "Postponed",
-              dueDate: postponeData.nextDueDate || wo.dueDate
-            }
-          : wo
-      )
-    );
+    const updateData = {
+      status: "Postponed",
+      dueDate: postponeData.nextDueDate
+    };
+    
+    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
   };
 
   const handleAddWorkOrderClick = () => {
-    const newWorkOrder: WorkOrder = {
+    // Create a temporary work order object for the form
+    const newWorkOrder = {
       id: `new-${Date.now()}`,
       component: "",
       componentCode: "",
@@ -563,8 +357,9 @@ const WorkOrders: React.FC = () => {
       jobTitle: "",
       assignedTo: "",
       dueDate: "",
-      status: "Draft"
-    };
+      status: "Draft",
+      vesselId: vesselId
+    } as WorkOrder;
     setSelectedWorkOrder(newWorkOrder);
     setWorkOrderFormOpen(true);
   };
@@ -765,8 +560,8 @@ const WorkOrders: React.FC = () => {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
       </div>
 
       {/* Footer */}
