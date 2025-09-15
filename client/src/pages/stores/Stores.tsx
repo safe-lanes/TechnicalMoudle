@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Archive, Download, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Minus, Archive, Download, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -698,6 +698,14 @@ const Stores: React.FC = () => {
   // Receive modal state
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [receivingItem, setReceivingItem] = useState<StoreItem | null>(null);
+  const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
+  const [consumingItem, setConsumingItem] = useState<StoreItem | null>(null);
+  const [consumeForm, setConsumeForm] = useState({
+    quantity: "",
+    dateLocal: new Date().toISOString().split('T')[0],
+    workOrder: "",
+    remarks: ""
+  });
   const [receiveForm, setReceiveForm] = useState({
     quantity: "",
     dateLocal: new Date().toISOString().split('T')[0],
@@ -1073,6 +1081,67 @@ const Stores: React.FC = () => {
     toast({ title: "Success", description: `Received ${quantity} ${receivingItem.uom || 'units'}` });
   };
   
+  // Handle Consume
+  const openConsumeModal = (item: StoreItem) => {
+    setConsumingItem(item);
+    setConsumeForm({
+      quantity: "",
+      dateLocal: new Date().toISOString().split('T')[0],
+      workOrder: "",
+      remarks: ""
+    });
+    setIsConsumeModalOpen(true);
+  };
+  
+  const saveConsume = () => {
+    if (!consumingItem) return;
+    
+    const quantity = parseInt(consumeForm.quantity);
+    if (!quantity || quantity < 1) {
+      toast({ title: "Error", description: "Quantity must be at least 1", variant: "destructive" });
+      return;
+    }
+    
+    if (!consumeForm.dateLocal) {
+      toast({ title: "Error", description: "Date is required", variant: "destructive" });
+      return;
+    }
+    
+    if (quantity > consumingItem.rob) {
+      toast({ title: "Error", description: "Insufficient stock. Cannot consume more than available ROB", variant: "destructive" });
+      return;
+    }
+    
+    const newRob = consumingItem.rob - quantity;
+    const newStock = calculateStockStatus(newRob, consumingItem.min);
+    
+    const updatedItems = items.map(item => {
+      if (item.id === consumingItem.id) {
+        return {
+          ...item,
+          rob: newRob,
+          stock: newStock
+        };
+      }
+      return item;
+    });
+    
+    // Add to history
+    addToHistory(
+      consumingItem,
+      'CONSUME',
+      -quantity,
+      newRob,
+      '',
+      consumeForm.workOrder,
+      consumeForm.remarks
+    );
+    
+    setItems(updatedItems);
+    setIsConsumeModalOpen(false);
+    toast({ title: "Success", description: `Consumed ${quantity} ${consumingItem.uom || 'units'}` });
+  };
+  
   // Handle Archive
   const handleArchive = (item: StoreItem) => {
     const confirmMessage = item.rob > 0 
@@ -1393,6 +1462,16 @@ const Stores: React.FC = () => {
                     variant="ghost" 
                     size="sm" 
                     className="h-7 w-7 p-0 hover:bg-gray-100"
+                    onClick={() => openConsumeModal(item)}
+                    aria-label="Consume Item"
+                    title="Consume"
+                  >
+                    <Minus className="h-3.5 w-3.5 text-gray-500" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 w-7 p-0 hover:bg-gray-100"
                     onClick={() => openReceiveModal(item)}
                     aria-label="Receive Item"
                     title="Receive"
@@ -1676,6 +1755,96 @@ const Stores: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={saveReceive}>Receive</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consume Item Modal */}
+      <Dialog open={isConsumeModalOpen} onOpenChange={setIsConsumeModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Consume {consumingItem?.itemName}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Current ROB:</span>
+                <span className="font-medium">{consumingItem?.rob} {consumingItem?.uom || 'units'}</span>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consume-quantity">
+                Quantity to Consume ({consumingItem?.uom || 'units'})
+              </Label>
+              <Input
+                id="consume-quantity"
+                type="number"
+                min="1"
+                max={consumingItem?.rob}
+                value={consumeForm.quantity}
+                onChange={(e) => setConsumeForm({...consumeForm, quantity: e.target.value})}
+                placeholder={`Max: ${consumingItem?.rob}`}
+              />
+              {consumeForm.quantity && parseInt(consumeForm.quantity) > (consumingItem?.rob || 0) && (
+                <p className="text-xs text-red-600">Cannot consume more than available stock</p>
+              )}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consume-date">Date Consumed</Label>
+              <Input
+                id="consume-date"
+                type="date"
+                value={consumeForm.dateLocal}
+                onChange={(e) => setConsumeForm({...consumeForm, dateLocal: e.target.value})}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consume-workOrder">Work Order / Reference</Label>
+              <Input
+                id="consume-workOrder"
+                value={consumeForm.workOrder}
+                onChange={(e) => setConsumeForm({...consumeForm, workOrder: e.target.value})}
+                placeholder="e.g., WO-2024-001"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consume-remarks">Remarks</Label>
+              <Textarea
+                id="consume-remarks"
+                value={consumeForm.remarks}
+                onChange={(e) => setConsumeForm({...consumeForm, remarks: e.target.value})}
+                rows={3}
+                placeholder="Additional notes or reason for consumption"
+              />
+            </div>
+            {consumeForm.quantity && consumingItem && (
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">ROB After Consumption:</span>
+                  <span className={`font-medium ${
+                    (consumingItem.rob - parseInt(consumeForm.quantity)) < consumingItem.min 
+                      ? 'text-red-600' 
+                      : 'text-blue-700'
+                  }`}>
+                    {consumingItem.rob - parseInt(consumeForm.quantity)} {consumingItem.uom || 'units'}
+                    {(consumingItem.rob - parseInt(consumeForm.quantity)) < consumingItem.min && 
+                      <span className="text-xs ml-2">(Below minimum)</span>
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConsumeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveConsume}
+              disabled={!consumeForm.quantity || parseInt(consumeForm.quantity) > (consumingItem?.rob || 0)}
+            >
+              Consume
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
