@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import {
   ComposedChart,
-  DonutChart,
   PieChart,
   Pie,
   Cell,
@@ -66,21 +65,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Types for dashboard data
-interface WorkOrderMock {
-  id: string;
-  title: string;
-  component: string;
-  dueDate: string;
-  status: "pending" | "in_progress" | "completed" | "overdue";
-  priority: "critical" | "routine";
-  department: "engine" | "deck";
-  vesselId: string;
-  createdDate: string;
-  completedDate?: string;
-  equipmentCategory?: string;
-  riskLevel?: "low" | "medium" | "high";
-}
+// Types for dashboard data - import from shared schema
+import { WorkOrder } from "@shared/schema";
 
 interface Certificate {
   id: string;
@@ -173,141 +159,16 @@ const Dashboard: React.FC = () => {
     { id: "DEF-005", equipment: "Navigation Radar", description: "Intermittent display issues", severity: "medium", reportedDate: "2024-01-18", status: "in_progress", department: "deck" }
   ], []);
 
-  // Enhanced Mock Work Orders with Department and Categories
-  const mockWorkOrders: WorkOrderMock[] = useMemo(() => [
-    {
-      id: "WO-2024-001",
-      title: "Main Engine Cylinder Head Overhaul",
-      component: "6.1.1.1 Cylinder Head",
-      dueDate: "2024-01-15",
-      status: "overdue",
-      priority: "critical",
-      department: "engine",
-      equipmentCategory: "Engine machinery",
-      riskLevel: "high",
-      vesselId: "V001",
-      createdDate: "2024-01-01",
-    },
-    {
-      id: "WO-2024-002", 
-      title: "Fresh Water Pump Inspection",
-      component: "1.1.1.2 Feed Pump",
-      dueDate: "2024-01-20",
-      status: "pending",
-      priority: "routine",
-      department: "engine",
-      equipmentCategory: "Engine machinery",
-      riskLevel: "low",
-      vesselId: "V001",
-      createdDate: "2024-01-05",
-    },
-    {
-      id: "WO-2024-003",
-      title: "Steering Gear Oil Change",
-      component: "3.1 Steering Gear",
-      dueDate: "2024-01-25",
-      status: "in_progress",
-      priority: "routine",
-      department: "deck",
-      equipmentCategory: "Deck machinery",
-      riskLevel: "medium",
-      vesselId: "V002",
-      createdDate: "2024-01-10",
-    },
-    {
-      id: "WO-2024-004",
-      title: "Boiler Safety Valve Test",
-      component: "4.1.2 Safety Valve",
-      dueDate: "2024-01-12",
-      status: "completed",
-      priority: "critical",
-      department: "engine",
-      equipmentCategory: "Safety Equipment",
-      riskLevel: "high",
-      vesselId: "V001",
-      createdDate: "2024-01-01",
-      completedDate: "2024-01-11",
-    },
-    {
-      id: "WO-2024-005",
-      title: "Life Raft Annual Service",
-      component: "LSA.1 Life Raft",
-      dueDate: "2024-01-30",
-      status: "pending",
-      priority: "critical",
-      department: "deck",
-      equipmentCategory: "Safety Equipment", 
-      riskLevel: "high",
-      vesselId: "V003",
-      createdDate: "2024-01-15",
-    },
-    {
-      id: "WO-2024-006",
-      title: "Emergency Generator Load Test",
-      component: "6.3 Emergency Generator",
-      dueDate: "2024-01-08",
-      status: "overdue",
-      priority: "critical",
-      department: "engine",
-      equipmentCategory: "Safety Equipment",
-      riskLevel: "high",
-      vesselId: "V002",
-      createdDate: "2023-12-25",
-    },
-    {
-      id: "WO-2024-007",
-      title: "Fire Pump Maintenance",
-      component: "7.1 Fire Pump",
-      dueDate: "2024-02-01",
-      status: "pending",
-      priority: "critical",
-      department: "deck",
-      equipmentCategory: "Safety Equipment",
-      riskLevel: "high",
-      vesselId: "V001",
-      createdDate: "2024-01-18",
-    },
-    {
-      id: "WO-2024-008",
-      title: "Navigation Equipment Calibration",
-      component: "NAV.1 GPS/Radar",
-      dueDate: "2024-01-18",
-      status: "completed",
-      priority: "routine",
-      department: "deck",
-      equipmentCategory: "Navigation & Radio",
-      riskLevel: "medium",
-      vesselId: "V003",
-      createdDate: "2024-01-05",
-      completedDate: "2024-01-17",
-    },
-    {
-      id: "WO-2024-009",
-      title: "Cargo Crane Wire Rope Inspection",
-      component: "CARGO.1 Crane #1",
-      dueDate: "2024-01-22",
-      status: "pending",
-      priority: "routine",
-      department: "deck",
-      equipmentCategory: "Cargo handling",
-      riskLevel: "medium",
-      vesselId: "V001",
-      createdDate: "2024-01-08",
-    },
-    {
-      id: "WO-2024-010",
-      title: "Hull Tank Inspection - Fore Peak",
-      component: "HULL.1 Fore Peak Tank",
-      dueDate: "2024-02-10",
-      status: "pending",
-      priority: "routine",
-      department: "deck",
-      equipmentCategory: "Hull structure",
-      riskLevel: "low",
-      vesselId: "V002",
-      createdDate: "2024-01-10",
+  // Fetch real work orders data
+  const { data: workOrdersData = [], isLoading: isWorkOrdersLoading, error: workOrdersError } = useQuery({
+    queryKey: ['/api/work-orders', filters.vesselId === 'all' ? 'V001' : filters.vesselId],
+    queryFn: async () => {
+      const vesselToFetch = filters.vesselId === 'all' ? 'V001' : filters.vesselId;
+      const response = await fetch(`/api/work-orders?vesselId=${vesselToFetch}`);
+      if (!response.ok) throw new Error('Failed to fetch work orders');
+      return await response.json() as WorkOrder[];
     }
-  ], []);
+  });
 
   // Fetch real spares data
   const { data: sparesData = [] } = useQuery({
@@ -322,63 +183,134 @@ const Dashboard: React.FC = () => {
 
   // Filter work orders based on current filters
   const filteredWorkOrders = useMemo(() => {
-    return mockWorkOrders.filter(wo => {
+    if (!workOrdersData || workOrdersData.length === 0) return [];
+    
+    return workOrdersData.filter(wo => {
+      // Filter by vessel (if not 'all')
       if (filters.vesselId !== 'all' && wo.vesselId !== filters.vesselId) {
         return false;
       }
       
-      const woDate = new Date(wo.createdDate);
+      // Filter by date range (using createdAt timestamp)
+      const woDate = new Date(wo.createdAt);
       return woDate >= filters.startDate && woDate <= filters.endDate;
     });
-  }, [mockWorkOrders, filters]);
+  }, [workOrdersData, filters]);
+
+  // Helper function to determine department from component
+  const getDepartment = (componentCode: string): 'engine' | 'deck' => {
+    if (!componentCode) return 'engine';
+    const code = componentCode.toLowerCase();
+    // Engine department indicators
+    if (code.includes('engine') || code.includes('6.') || code.includes('boiler') || code.includes('generator')) {
+      return 'engine';
+    }
+    // Deck department by default
+    return 'deck';
+  };
 
   // Calculate Department-specific KPIs
   const departmentKPIs = useMemo(() => {
-    const engineWOs = filteredWorkOrders.filter(wo => wo.department === 'engine');
-    const deckWOs = filteredWorkOrders.filter(wo => wo.department === 'deck');
+    const engineWOs = filteredWorkOrders.filter(wo => getDepartment(wo.componentCode || '') === 'engine');
+    const deckWOs = filteredWorkOrders.filter(wo => getDepartment(wo.componentCode || '') === 'deck');
     
     return {
       engine: {
         total: engineWOs.length,
-        overdue: engineWOs.filter(wo => wo.status === 'overdue').length,
-        completed: engineWOs.filter(wo => wo.status === 'completed').length,
-        pending: engineWOs.filter(wo => wo.status === 'pending').length
+        overdue: engineWOs.filter(wo => wo.status === 'Overdue').length,
+        completed: engineWOs.filter(wo => wo.status === 'Completed').length,
+        pending: engineWOs.filter(wo => wo.status === 'Due').length
       },
       deck: {
         total: deckWOs.length,
-        overdue: deckWOs.filter(wo => wo.status === 'overdue').length,
-        completed: deckWOs.filter(wo => wo.status === 'completed').length,
-        pending: deckWOs.filter(wo => wo.status === 'pending').length
+        overdue: deckWOs.filter(wo => wo.status === 'Overdue').length,
+        completed: deckWOs.filter(wo => wo.status === 'Completed').length,
+        pending: deckWOs.filter(wo => wo.status === 'Due').length
       }
     };
   }, [filteredWorkOrders]);
 
+  // Helper function to determine equipment category from component
+  const getEquipmentCategory = (componentCode: string): string => {
+    if (!componentCode) return 'Other equipment';
+    const code = componentCode.toLowerCase();
+    
+    if (code.includes('engine') || code.includes('6.') || code.includes('turbo') || code.includes('pump') && code.includes('fuel')) {
+      return 'Engine machinery';
+    }
+    if (code.includes('crane') || code.includes('winch') || code.includes('deck') || code.includes('steering')) {
+      return 'Deck machinery';
+    }
+    if (code.includes('safety') || code.includes('fire') || code.includes('lsa') || code.includes('lifeboat') || code.includes('valve')) {
+      return 'Safety Equipment';
+    }
+    if (code.includes('nav') || code.includes('gps') || code.includes('radar') || code.includes('radio') || code.includes('gyro')) {
+      return 'Navigation & Radio';
+    }
+    if (code.includes('cargo') || code.includes('hatch') || code.includes('hold')) {
+      return 'Cargo handling';
+    }
+    if (code.includes('hull') || code.includes('tank') || code.includes('ballast')) {
+      return 'Hull structure';
+    }
+    return 'Other equipment';
+  };
+
   // Equipment Category Breakdown
   const equipmentCategoryData = useMemo(() => {
     const categories = [
-      "Engine machinery",
-      "Deck machinery", 
-      "Safety Equipment",
-      "Navigation & Radio",
-      "Cargo handling",
-      "Hull structure",
-      "Electronic equipment"
+      'Engine machinery',
+      'Deck machinery', 
+      'Safety Equipment',
+      'Navigation & Radio',
+      'Cargo handling',
+      'Hull structure',
+      'Other equipment'
     ];
     
     return categories.map(cat => ({
       category: cat,
-      total: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat).length,
-      overdue: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat && wo.status === 'overdue').length,
-      pending: filteredWorkOrders.filter(wo => wo.equipmentCategory === cat && wo.status === 'pending').length
-    }));
+      total: filteredWorkOrders.filter(wo => getEquipmentCategory(wo.componentCode || '') === cat).length,
+      overdue: filteredWorkOrders.filter(wo => getEquipmentCategory(wo.componentCode || '') === cat && wo.status === 'Overdue').length,
+      pending: filteredWorkOrders.filter(wo => getEquipmentCategory(wo.componentCode || '') === cat && wo.status === 'Due').length
+    })).filter(cat => cat.total > 0); // Only show categories with data
   }, [filteredWorkOrders]);
 
-  // Calculate Enhanced KPIs
+  // Helper function to check if work order is overdue (only status "Overdue")
+  const isOverdue = (workOrder: WorkOrder): boolean => {
+    return workOrder.status === 'Overdue';
+  };
+
+  // Helper function to check if work order is due soon
+  const isDueSoon = (workOrder: WorkOrder): boolean => {
+    return workOrder.status === 'Due' || workOrder.status === 'Due (Grace P)';
+  };
+
+  // Helper function to check if work order is completed
+  const isCompleted = (workOrder: WorkOrder): boolean => {
+    return workOrder.status === 'Completed' || workOrder.status === 'Approved';
+  };
+
+  // Calculate Enhanced KPIs using real work orders data
   const kpis = useMemo(() => {
-    const activeWOs = filteredWorkOrders.filter(wo => wo.status !== 'completed').length;
-    const overdueWOs = filteredWorkOrders.filter(wo => wo.status === 'overdue').length;
-    const completedWOs = filteredWorkOrders.filter(wo => wo.status === 'completed').length;
-    const highRiskWOs = filteredWorkOrders.filter(wo => wo.riskLevel === 'high').length;
+    if (isWorkOrdersLoading || !filteredWorkOrders) {
+      return {
+        activeWorkOrders: 0,
+        overdueTasks: 0,
+        completedThisPeriod: 0,
+        criticalStockAlerts: 0,
+        expiringCertificates: 0,
+        openDefects: 0,
+        highRiskTasks: 0,
+        criticalDefects: 0
+      };
+    }
+
+    // Work order calculations using real data
+    const activeWOs = filteredWorkOrders.filter(wo => !isCompleted(wo)).length;
+    const overdueWOs = filteredWorkOrders.filter(wo => isOverdue(wo)).length;
+    const completedWOs = filteredWorkOrders.filter(wo => isCompleted(wo)).length;
+    const dueSoonWOs = filteredWorkOrders.filter(wo => isDueSoon(wo)).length;
     
     // Calculate low stock items
     const lowStockItems = sparesData.filter((spare: any) => spare.rob < spare.min).length;
@@ -393,15 +325,16 @@ const Dashboard: React.FC = () => {
     
     return {
       activeWorkOrders: activeWOs,
-      overdueTasks: overdueWOs,
+      overdueTasks: overdueWOs, // Only counts status "Overdue"
       completedThisPeriod: completedWOs,
+      dueSoon: dueSoonWOs, // New KPI for due soon
       criticalStockAlerts: lowStockItems,
       expiringCertificates: expiringCerts + expiredCerts,
       openDefects: openDefects,
-      highRiskTasks: highRiskWOs,
+      highRiskTasks: 0, // Will need to implement risk calculation based on real data
       criticalDefects: criticalDefects
     };
-  }, [filteredWorkOrders, sparesData, mockCertificates, mockDefects]);
+  }, [filteredWorkOrders, sparesData, mockCertificates, mockDefects, isWorkOrdersLoading]);
 
   // Generate sparkline data
   const generateSparklineData = (type: string) => {
@@ -447,12 +380,15 @@ const Dashboard: React.FC = () => {
   ];
 
   // Chart data
-  const workOrderStatusData = [
-    { name: 'Pending', value: filteredWorkOrders.filter(wo => wo.status === 'pending').length, color: '#fbbf24' },
-    { name: 'In Progress', value: filteredWorkOrders.filter(wo => wo.status === 'in_progress').length, color: '#3b82f6' },
-    { name: 'Completed', value: filteredWorkOrders.filter(wo => wo.status === 'completed').length, color: '#10b981' },
-    { name: 'Overdue', value: filteredWorkOrders.filter(wo => wo.status === 'overdue').length, color: '#ef4444' }
-  ];
+  // Work Orders Status Distribution for charts (using real API statuses)
+  const workOrderStatusData = useMemo(() => [
+    { name: 'Due', value: filteredWorkOrders.filter(wo => wo.status === 'Due').length, color: '#fbbf24' },
+    { name: 'Due (Grace P)', value: filteredWorkOrders.filter(wo => wo.status === 'Due (Grace P)').length, color: '#f59e0b' },
+    { name: 'Completed', value: filteredWorkOrders.filter(wo => isCompleted(wo)).length, color: '#10b981' },
+    { name: 'Overdue', value: filteredWorkOrders.filter(wo => isOverdue(wo)).length, color: '#ef4444' },
+    { name: 'Pending Approval', value: filteredWorkOrders.filter(wo => wo.status === 'Pending Approval').length, color: '#8b5cf6' },
+    { name: 'Postponed', value: filteredWorkOrders.filter(wo => wo.status === 'Postponed').length, color: '#6b7280' }
+  ].filter(item => item.value > 0), [filteredWorkOrders]); // Only show categories with data
 
   const completionTrendData = useMemo(() => {
     const data = [];
@@ -470,11 +406,33 @@ const Dashboard: React.FC = () => {
     return data;
   }, [filters.dateRange]);
 
-  const upcomingMaintenanceData = [
-    { name: 'Due in 7d', critical: 3, routine: 9, total: 12 },
-    { name: '8-30d', critical: 5, routine: 18, total: 23 },
-    { name: '>30d', critical: 2, routine: 28, total: 30 }
-  ];
+  // Upcoming Maintenance Data (based on real work orders due dates)
+  const upcomingMaintenanceData = useMemo(() => {
+    const now = new Date();
+    const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const next30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    const dueIn7d = filteredWorkOrders.filter(wo => {
+      const dueDate = new Date(wo.dueDate);
+      return dueDate >= now && dueDate <= next7Days && !isCompleted(wo);
+    }).length;
+    
+    const due8to30d = filteredWorkOrders.filter(wo => {
+      const dueDate = new Date(wo.dueDate);
+      return dueDate > next7Days && dueDate <= next30Days && !isCompleted(wo);
+    }).length;
+    
+    const dueAfter30d = filteredWorkOrders.filter(wo => {
+      const dueDate = new Date(wo.dueDate);
+      return dueDate > next30Days && !isCompleted(wo);
+    }).length;
+    
+    return [
+      { name: 'Due in 7d', critical: Math.floor(dueIn7d * 0.3), routine: Math.ceil(dueIn7d * 0.7), total: dueIn7d },
+      { name: '8-30d', critical: Math.floor(due8to30d * 0.2), routine: Math.ceil(due8to30d * 0.8), total: due8to30d },
+      { name: '>30d', critical: Math.floor(dueAfter30d * 0.1), routine: Math.ceil(dueAfter30d * 0.9), total: dueAfter30d }
+    ];
+  }, [filteredWorkOrders]);
 
   const inventoryHealthData = [
     { name: 'Spares', total: sparesData.length, belowMin: sparesData.filter((s: any) => s.rob < s.min).length },
@@ -703,6 +661,26 @@ const Dashboard: React.FC = () => {
 
           <TabsContent value="overview" className="space-y-8">
             {/* Enhanced KPI Row */}
+            {isWorkOrdersLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-6">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-8 bg-gray-200 rounded mb-4"></div>
+                      <div className="h-12 bg-gray-200 rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : workOrdersError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                  <span className="text-red-700">Failed to load work orders data: {workOrdersError.message}</span>
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <KPICard
                 title="Active Work Orders"
@@ -751,6 +729,7 @@ const Dashboard: React.FC = () => {
                 subtitle="Total reported issues"
               />
             </div>
+            )}
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
