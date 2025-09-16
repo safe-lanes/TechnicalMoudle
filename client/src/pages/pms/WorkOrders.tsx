@@ -157,7 +157,7 @@ const WorkOrders: React.FC = () => {
         workOrderNo: executionId,
         templateCode: templateCode,
         executionId: executionId,
-        jobTitle: formData.data.jobTitle,
+        jobTitle: formData.data.woTitle || formData.data.jobTitle,
         assignedTo: formData.data.assignedTo,
         dueDate: formData.data.dueDate || "",
         status: "Pending Approval",
