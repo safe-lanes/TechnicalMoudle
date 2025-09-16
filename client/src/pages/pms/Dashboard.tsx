@@ -77,15 +77,6 @@ interface Certificate {
   category: "class" | "flag" | "safety" | "pollution";
 }
 
-interface DefectReport {
-  id: string;
-  equipment: string;
-  description: string;
-  severity: "low" | "medium" | "high" | "critical";
-  reportedDate: string;
-  status: "open" | "in_progress" | "resolved";
-  department: "engine" | "deck";
-}
 
 interface DashboardFilters {
   vesselId: string;
@@ -151,13 +142,6 @@ const Dashboard: React.FC = () => {
   ], []);
 
   // Mock Defect Reports
-  const mockDefects: DefectReport[] = useMemo(() => [
-    { id: "DEF-001", equipment: "Main Engine Turbocharger", description: "Abnormal vibration at high RPM", severity: "high", reportedDate: "2024-01-18", status: "open", department: "engine" },
-    { id: "DEF-002", equipment: "Deck Crane #2", description: "Hydraulic leak in slewing motor", severity: "medium", reportedDate: "2024-01-17", status: "in_progress", department: "deck" },
-    { id: "DEF-003", equipment: "Emergency Generator", description: "Starting battery voltage low", severity: "critical", reportedDate: "2024-01-19", status: "open", department: "engine" },
-    { id: "DEF-004", equipment: "Fire Pump", description: "Pressure gauge malfunction", severity: "low", reportedDate: "2024-01-16", status: "resolved", department: "deck" },
-    { id: "DEF-005", equipment: "Navigation Radar", description: "Intermittent display issues", severity: "medium", reportedDate: "2024-01-18", status: "in_progress", department: "deck" }
-  ], []);
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading, error: workOrdersError } = useQuery({
@@ -326,9 +310,6 @@ const Dashboard: React.FC = () => {
     const expiringCerts = mockCertificates.filter(cert => cert.status === 'expiring').length;
     const expiredCerts = mockCertificates.filter(cert => cert.status === 'expired').length;
     
-    // Defect metrics
-    const openDefects = mockDefects.filter(def => def.status === 'open').length;
-    const criticalDefects = mockDefects.filter(def => def.severity === 'critical' || def.severity === 'high').length;
     
     return {
       activeWorkOrders: activeWOs,
@@ -339,11 +320,9 @@ const Dashboard: React.FC = () => {
       dueSoon: dueSoonWOs, // New KPI for due soon
       criticalStockAlerts: lowStockItems,
       expiringCertificates: expiringCerts + expiredCerts,
-      openDefects: openDefects,
-      highRiskTasks: 0, // Will need to implement risk calculation based on real data
-      criticalDefects: criticalDefects
+      highRiskTasks: 0 // Will need to implement risk calculation based on real data
     };
-  }, [filteredWorkOrders, sparesData, mockCertificates, mockDefects, isWorkOrdersLoading]);
+  }, [filteredWorkOrders, sparesData, mockCertificates, isWorkOrdersLoading]);
 
   // Generate sparkline data
   const generateSparklineData = (type: string) => {
@@ -727,15 +706,15 @@ const Dashboard: React.FC = () => {
               />
               
               <KPICard
-                title="Open Defects"
-                value={kpis.openDefects}
-                icon={AlertCircle}
+                title="Critical Stock Alerts"
+                value={kpis.criticalStockAlerts}
+                icon={Package}
                 color="bg-orange-50 text-orange-600 border-orange-200"
-                change={`${kpis.criticalDefects} critical`}
-                changeType={kpis.criticalDefects > 0 ? "negative" : "neutral"}
-                sparklineData={generateSparklineData('defects')}
-                onClick={() => setLocation('/defects')}
-                subtitle="Total reported issues"
+                change={kpis.criticalStockAlerts > 0 ? "Attention needed" : "All stock OK"}
+                changeType={kpis.criticalStockAlerts > 0 ? "negative" : "positive"}
+                sparklineData={generateSparklineData('critical')}
+                onClick={() => setLocation('/spares')}
+                subtitle="Low stock items"
               />
             </div>
             )}
@@ -817,47 +796,8 @@ const Dashboard: React.FC = () => {
               </Card>
             </div>
 
-            {/* Defect Reports & Critical Spares */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Active Defect Reports */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertCircle className="h-5 w-5 text-orange-500 mr-2" />
-                    Active Defect Reports
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {mockDefects.filter(d => d.status !== 'resolved').slice(0, 5).map((defect) => (
-                      <div 
-                        key={defect.id}
-                        className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
-                          defect.severity === 'critical' ? 'bg-red-50 dark:bg-red-900/20' :
-                          defect.severity === 'high' ? 'bg-orange-50 dark:bg-orange-900/20' :
-                          'bg-gray-50 dark:bg-gray-800'
-                        }`}
-                        onClick={() => setLocation('/defects')}
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{defect.equipment}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">{defect.description}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={defect.severity === 'critical' ? 'destructive' : 
-                                        defect.severity === 'high' ? 'secondary' : 'outline'}>
-                            {defect.severity}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {defect.department === 'engine' ? 'Engine' : 'Deck'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
+            {/* Critical Stock Alerts */}
+            <div className="grid grid-cols-1 gap-6">
               {/* Low Stock Items */}
               <Card>
                 <CardHeader>
