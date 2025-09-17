@@ -1307,31 +1307,6 @@ const Dashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Manufacturer Recommendations */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center">
-                <Wrench className="h-4 w-4 text-[#52baf3] mr-2" />
-                Maker Recommendations
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span>Compliant</span>
-                  <Badge variant="default" className="text-xs">85%</Badge>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span>Overdue</span>
-                  <Badge variant="destructive" className="text-xs">3</Badge>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span>Modified</span>
-                  <Badge variant="secondary" className="text-xs">12</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
