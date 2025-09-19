@@ -5,9 +5,10 @@ import { FormHelper } from '../helpers/form.helper';
 import { TableHelper } from '../helpers/table.helper';
 import { ModalHelper } from '../helpers/modal.helper';
 import { ScreenshotHelper } from '../helpers/screenshot.helper';
-import { generateRunningHoursData } from '../fixtures/test-data';
+import { generateRunningHoursData, generateUniqueId } from '../fixtures/test-data';
+import { nanoid } from 'nanoid';
 
-test.describe('Running Hours Module Tests', () => {
+test.describe('Running Hours Module - Comprehensive Tests', () => {
   let authHelper: AuthHelper;
   let navHelper: NavigationHelper;
   let formHelper: FormHelper;
@@ -27,32 +28,93 @@ test.describe('Running Hours Module Tests', () => {
     await navHelper.navigateToRunningHours();
   });
 
-  test('Running hours list loads correctly', async ({ page }) => {
-    // Verify table is visible
-    await expect(page.locator('[data-testid="table-running-hours"]')).toBeVisible();
-    
-    // Verify columns are present
-    await expect(page.locator('text="Component"')).toBeVisible();
-    await expect(page.locator('text="Running Hours"')).toBeVisible();
-    await expect(page.locator('text="Last Updated"')).toBeVisible();
-    
-    await screenshotHelper.captureHappyPath('running-hours', 'list_loaded');
+  test.describe('List Display Verification', () => {
+    test('Running hours list displays all required columns', async ({ page }) => {
+      // Verify table is visible
+      await expect(page.locator('[data-testid="table-running-hours"]')).toBeVisible();
+      
+      // Verify all required columns are present
+      const requiredColumns = [
+        'Component',
+        'Category', 
+        'Running Hours',
+        'Last Updated',
+        'Utilization Rate'
+      ];
+      
+      for (const column of requiredColumns) {
+        await expect(page.locator(`thead th:has-text("${column}")`)).toBeVisible();
+      }
+      
+      // Verify Update RH button is present in each row
+      const rowCount = await tableHelper.getRowCount('table-running-hours');
+      if (rowCount > 0) {
+        const firstRowButton = await page.locator('[data-testid="table-running-hours"] tbody tr').first().locator('[data-testid="button-update-hours"]');
+        await expect(firstRowButton).toBeVisible();
+      }
+      
+      await screenshotHelper.captureHappyPath('running-hours', 'list_display_verification');
+    });
+
+    test('Can search and filter components', async ({ page }) => {
+      // Test search functionality
+      await tableHelper.searchTable('Generator');
+      await page.waitForTimeout(1000);
+      
+      // Verify search filters results
+      const searchResults = await tableHelper.getRowCount('table-running-hours');
+      const rows = page.locator('[data-testid="table-running-hours"] tbody tr');
+      
+      for (let i = 0; i < searchResults; i++) {
+        const rowText = await rows.nth(i).innerText();
+        expect(rowText.toLowerCase()).toContain('generator');
+      }
+      
+      await screenshotHelper.captureHappyPath('running-hours', 'search_filter_results');
+      
+      // Clear search
+      await page.fill('[data-testid="input-table-search"]', '');
+      await page.waitForTimeout(500);
+    });
+
+    test('Can sort by columns', async ({ page }) => {
+      // Sort by Running Hours
+      const sortButton = page.locator('[data-testid="sort-running-hours"]');
+      if (await sortButton.count() > 0) {
+        await sortButton.click();
+        await page.waitForTimeout(500);
+        
+        // Verify sort indicator is visible
+        await expect(sortButton.locator('svg')).toBeVisible();
+        
+        // Click again for reverse sort
+        await sortButton.click();
+        await page.waitForTimeout(500);
+        
+        await screenshotHelper.captureHappyPath('running-hours', 'sorted_list');
+      }
+    });
+
+    test('Displays utilization rate correctly', async ({ page }) => {
+      // Wait for utilization rates to load
+      await page.waitForTimeout(2000);
+      
+      // Check if utilization rates are displayed
+      const utilizationCells = page.locator('[data-testid="table-running-hours"] tbody td:nth-child(5)');
+      const count = await utilizationCells.count();
+      
+      if (count > 0) {
+        const firstRate = await utilizationCells.first().innerText();
+        // Utilization rate should be either a number with "hrs/day" or "N/A"
+        expect(firstRate).toMatch(/(\d+(\.\d+)?\s*hrs\/day|N\/A|Calculating\.\.\.)/);
+      }
+      
+      await screenshotHelper.captureHappyPath('running-hours', 'utilization_rates_display');
+    });
   });
 
-  test('Can search for components', async ({ page }) => {
-    await tableHelper.searchTable('Diesel Generator');
-    
-    // Verify search results
-    await page.waitForTimeout(1000);
-    const rowCount = await tableHelper.getRowCount('table-running-hours');
-    if (rowCount > 0) {
-      await tableHelper.verifyRowContent(0, ['Diesel Generator']);
-    }
-    
-    await screenshotHelper.captureHappyPath('running-hours', 'search_results');
-  });
-
-  test('Can update running hours - set total mode', async ({ page }) => {
+  test.describe('Individual Update Operations', () => {
+    test('Set Total - Updates running hours with mandatory fields', async ({ page }) => {
     const rowCount = await tableHelper.getRowCount('table-running-hours');
     if (rowCount > 0) {
       // Click update button on first row
