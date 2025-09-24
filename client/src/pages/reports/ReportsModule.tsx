@@ -23,6 +23,7 @@ import {
   Shield
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
+import RunningHoursReports from "./RunningHoursReports";
 
 interface ReportCategory {
   id: string;
@@ -211,10 +212,11 @@ const ReportsModule = () => {
     return <MaintenanceReports onBack={handleBackToMain} />;
   }
 
+  if (selectedCategory === "running-hours") {
+    return <RunningHoursReports onBack={handleBackToMain} />;
+  }
+
   // TODO: Add other category components when implemented
-  // if (selectedCategory === "running-hours") {
-  //   return <RunningHoursReports onBack={handleBackToMain} />;
-  // }
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
