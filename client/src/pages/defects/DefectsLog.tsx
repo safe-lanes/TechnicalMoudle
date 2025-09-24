@@ -7,7 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, Search } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, Search, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { DefectFormSimple } from "./DefectFormSimple";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -26,6 +28,7 @@ export default function DefectsLog() {
   const [filters, setFilters] = useState<DefectsFilters>({
     includeClosedDefects: false,
   });
+  const [showNewDefectForm, setShowNewDefectForm] = useState(false);
 
   const { data: defects = [], isLoading } = useQuery({
     queryKey: ['/api/defects', filters],
@@ -96,9 +99,20 @@ export default function DefectsLog() {
                 Filters
               </div>
             </Button>
-            <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm">
-              + New Defect
-            </Button>
+            <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" data-testid="button-new-defect">
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Defect
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DefectFormSimple 
+                  onSuccess={() => setShowNewDefectForm(false)}
+                  onCancel={() => setShowNewDefectForm(false)}
+                />
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
