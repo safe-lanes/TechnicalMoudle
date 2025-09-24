@@ -24,8 +24,11 @@ import {
   Users,
   Settings,
   Eye,
-  Play
+  Play,
+  Loader2
 } from "lucide-react";
+import { reportGenerator } from "@/lib/reportGenerator";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaintenanceReport {
   id: string;
@@ -50,6 +53,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
+  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const reports: MaintenanceReport[] = [
     {
@@ -216,14 +221,64 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack }) => {
     }
   };
 
-  const handleGenerateReport = (reportId: string, format: string) => {
-    console.log(`Generating ${format} report for ${reportId}`);
-    // Will implement actual report generation later
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+    const reportKey = `${reportId}-${format}`;
+    
+    if (generatingReports.has(reportKey)) {
+      return; // Already generating this report
+    }
+
+    try {
+      setGeneratingReports(prev => new Set(prev).add(reportKey));
+      
+      toast({
+        title: "Generating Report",
+        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
+      });
+
+      // Get current filters
+      const filters = {
+        vessel: "MV Atlantic Star", // Will be dynamic later
+        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
+        priority: selectedPriority !== "all" ? selectedPriority : undefined,
+        search: searchQuery || undefined,
+      };
+
+      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
+      const report = reports.find(r => r.id === reportId);
+      const filename = reportGenerator.generateFilename(
+        report?.name || 'maintenance-report', 
+        format, 
+        'MV_Atlantic_Star'
+      );
+      
+      await reportGenerator.downloadReport(blob, filename);
+      
+      toast({
+        title: "Report Generated",
+        description: `${format} report downloaded successfully!`,
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Generation Failed",
+        description: `Failed to generate ${format} report. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reportKey);
+        return newSet;
+      });
+    }
   };
 
   const handlePreviewReport = (reportId: string) => {
-    console.log(`Previewing report ${reportId}`);
-    // Will implement report preview later
+    // For now, generate a PDF preview
+    handleGenerateReport(reportId, 'PDF');
   };
 
   return (
@@ -422,9 +477,14 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack }) => {
                         size="sm" 
                         onClick={() => handleGenerateReport(report.id, 'PDF')}
                         className="bg-red-600 hover:bg-red-700 text-white px-3"
+                        disabled={generatingReports.has(`${report.id}-PDF`)}
                         data-testid={`button-pdf-${report.id}`}
                       >
-                        PDF
+                        {generatingReports.has(`${report.id}-PDF`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'PDF'
+                        )}
                       </Button>
                     )}
                     {report.outputs.includes('Excel') && (
@@ -432,15 +492,25 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack }) => {
                         size="sm" 
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
                         className="bg-green-600 hover:bg-green-700 text-white px-3"
+                        disabled={generatingReports.has(`${report.id}-Excel`)}
                         data-testid={`button-excel-${report.id}`}
                       >
-                        Excel
+                        {generatingReports.has(`${report.id}-Excel`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Excel'
+                        )}
                       </Button>
                     )}
                     {report.outputs.includes('Dashboard') && (
                       <Button 
                         size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'Dashboard')}
+                        onClick={() => {
+                          toast({
+                            title: "Dashboard View",
+                            description: "Dashboard view will be implemented in the next phase",
+                          });
+                        }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3"
                         data-testid={`button-dashboard-${report.id}`}
                       >

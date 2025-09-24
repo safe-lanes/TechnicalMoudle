@@ -805,7 +805,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Report generation endpoints
+  app.post('/api/reports/generate', async (req, res) => {
+    try {
+      const { reportId, format, data, template } = req.body;
+      
+      // Validate input
+      if (!reportId || !format || !data) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      if (!['PDF', 'Excel', 'CSV'].includes(format)) {
+        return res.status(400).json({ error: 'Invalid format' });
+      }
+
+      // For now, we'll generate mock reports
+      // In a real implementation, this would use a proper report generation library
+      const mockReportContent = generateMockReport(reportId, format, data, template);
+      
+      // Set appropriate headers for file download
+      const formatMetadata = getFormatMetadata(format);
+      const filename = `${reportId}_${new Date().toISOString().split('T')[0]}.${formatMetadata.extension}`;
+      
+      res.setHeader('Content-Type', formatMetadata.mimeType);
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(mockReportContent);
+      
+    } catch (error) {
+      console.error('Report generation error:', error);
+      res.status(500).json({ error: 'Failed to generate report' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
+}
+
+// Format metadata mapping function
+function getFormatMetadata(format: string): { extension: string; mimeType: string } {
+  const formatMap: Record<string, { extension: string; mimeType: string }> = {
+    'PDF': { extension: 'pdf', mimeType: 'application/pdf' },
+    'Excel': { extension: 'xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    'CSV': { extension: 'csv', mimeType: 'text/csv' }
+  };
+  return formatMap[format] || { extension: format.toLowerCase(), mimeType: 'application/octet-stream' };
+}
+
+// Mock report generation function
+function generateMockReport(reportId: string, format: string, data: any, template?: any): Buffer {
+  const reportContent = `
+MARITIME PMS REPORT
+==================
+
+Report ID: ${reportId}
+Format: ${format}
+Generated: ${new Date().toLocaleString()}
+Vessel: ${data.vessel || 'Unknown'}
+Category: ${data.category || 'Unknown'}
+
+${data.title || 'Report Title'}
+${'-'.repeat((data.title || 'Report Title').length)}
+
+Total Records: ${data.metadata?.totalRecords || 0}
+
+Sample Data:
+${JSON.stringify(data.data?.slice(0, 5) || [], null, 2)}
+
+--- END OF REPORT ---
+`;
+
+  // For PDF and Excel, we'd normally use proper libraries
+  // For this demo, we'll return the content as a buffer
+  return Buffer.from(reportContent, 'utf-8');
 }
