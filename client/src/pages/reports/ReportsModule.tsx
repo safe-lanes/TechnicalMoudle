@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import MaintenanceReports from "./MaintenanceReports";
 import RunningHoursReports from "./RunningHoursReports";
+import SparesReports from "./SparesReports";
 
 interface ReportCategory {
   id: string;
@@ -214,6 +215,10 @@ const ReportsModule = () => {
 
   if (selectedCategory === "running-hours") {
     return <RunningHoursReports onBack={handleBackToMain} />;
+  }
+
+  if (selectedCategory === "spares") {
+    return <SparesReports onBack={handleBackToMain} />;
   }
 
   // TODO: Add other category components when implemented
