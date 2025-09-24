@@ -86,6 +86,12 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
       }
     } else if (subModule === "admin") {
       setLocation(`/admin/${itemId}`);
+    } else if (subModule === "defects") {
+      if (itemId === "active") {
+        setLocation("/defects");
+      } else {
+        setLocation(`/defects/${itemId}`);
+      }
     }
     // Still call the callback for state management if provided
     onItemSelect?.(itemId);
