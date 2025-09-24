@@ -46,9 +46,15 @@ interface AdminReport {
 
 interface AlertsApprovalsAdminReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack }) => {
+const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack, globalFilters }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");

@@ -30,6 +30,7 @@ import ComplianceReports from "./ComplianceReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
+import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
 interface ReportCategory {
   id: string;
@@ -56,6 +57,12 @@ interface RecentReport {
 const ReportsModule = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [globalFilters, setGlobalFilters] = useState<FilterValues>({
+    vessel: "all",
+    department: "all",
+    dateRange: { from: null, to: null },
+    priority: "all"
+  });
 
   const reportCategories: ReportCategory[] = [
     {
@@ -204,6 +211,19 @@ const ReportsModule = () => {
     setSelectedCategory(null);
   };
 
+  const handleFiltersChange = (filters: FilterValues) => {
+    setGlobalFilters(filters);
+  };
+
+  const handleFiltersReset = () => {
+    setGlobalFilters({
+      vessel: "all",
+      department: "all",
+      dateRange: { from: null, to: null },
+      priority: "all"
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -215,35 +235,35 @@ const ReportsModule = () => {
 
   // Render category-specific views
   if (selectedCategory === "maintenance") {
-    return <MaintenanceReports onBack={handleBackToMain} />;
+    return <MaintenanceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "running-hours") {
-    return <RunningHoursReports onBack={handleBackToMain} />;
+    return <RunningHoursReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "spares") {
-    return <SparesReports onBack={handleBackToMain} />;
+    return <SparesReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "stores") {
-    return <StoresReports onBack={handleBackToMain} />;
+    return <StoresReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "compliance") {
-    return <ComplianceReports onBack={handleBackToMain} />;
+    return <ComplianceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "ihm") {
-    return <IhmReports onBack={handleBackToMain} />;
+    return <IhmReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "change-requests") {
-    return <ChangeRequestReports onBack={handleBackToMain} />;
+    return <ChangeRequestReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   if (selectedCategory === "alerts-admin") {
-    return <AlertsApprovalsAdminReports onBack={handleBackToMain} />;
+    return <AlertsApprovalsAdminReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
 
   // TODO: Add other category components when implemented
@@ -287,6 +307,13 @@ const ReportsModule = () => {
           </Button>
         </div>
       </div>
+
+      {/* Global Filters */}
+      <GlobalFilters
+        filters={globalFilters}
+        onFiltersChange={handleFiltersChange}
+        onReset={handleFiltersReset}
+      />
 
       {/* Statistics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

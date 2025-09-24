@@ -47,9 +47,15 @@ interface MaintenanceReport {
 
 interface MaintenanceReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack }) => {
+const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalFilters }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");

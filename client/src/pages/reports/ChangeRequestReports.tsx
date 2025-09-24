@@ -43,9 +43,15 @@ interface ChangeRequestReport {
 
 interface ChangeRequestReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack }) => {
+const ChangeRequestReports: React.FC<ChangeRequestReportsProps> = ({ onBack, globalFilters }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");

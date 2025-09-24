@@ -42,9 +42,15 @@ interface ComplianceReport {
 
 interface ComplianceReportsProps {
   onBack: () => void;
+  globalFilters?: {
+    vessel: string;
+    department: string;
+    dateRange: { from: Date | null; to: Date | null };
+    priority: string;
+  };
 }
 
-const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
+const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFilters }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedArea, setSelectedArea] = useState<string>("all");
