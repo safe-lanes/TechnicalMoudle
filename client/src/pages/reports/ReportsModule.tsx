@@ -29,6 +29,7 @@ import StoresReports from "./StoresReports";
 import ComplianceReports from "./ComplianceReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
+import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
 
 interface ReportCategory {
   id: string;
@@ -135,7 +136,7 @@ const ReportsModule = () => {
       iconBgLight: "bg-indigo-100 text-indigo-600"
     },
     {
-      id: "admin",
+      id: "alerts-admin",
       title: "Alerts, Approvals & Admin",
       description: "Alert monitoring, approval trails, data quality, and user activity",
       icon: AlertTriangle,
@@ -239,6 +240,10 @@ const ReportsModule = () => {
 
   if (selectedCategory === "change-requests") {
     return <ChangeRequestReports onBack={handleBackToMain} />;
+  }
+
+  if (selectedCategory === "alerts-admin") {
+    return <AlertsApprovalsAdminReports onBack={handleBackToMain} />;
   }
 
   // TODO: Add other category components when implemented
