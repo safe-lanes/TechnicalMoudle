@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, Search, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { DefectFormSimple } from "./DefectFormSimple";
+import DefectFormExact from "./DefectFormExact";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -106,10 +106,9 @@ export default function DefectsLog() {
                   New Defect
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DefectFormSimple 
-                  onSuccess={() => setShowNewDefectForm(false)}
-                  onCancel={() => setShowNewDefectForm(false)}
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+                <DefectFormExact 
+                  onClose={() => setShowNewDefectForm(false)}
                 />
               </DialogContent>
             </Dialog>

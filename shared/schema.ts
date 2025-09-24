@@ -520,8 +520,13 @@ export const defects = pgTable("defects", {
   equipmentType: text("equipment_type"),
   equipmentMake: text("equipment_make"),
   equipmentModel: text("equipment_model"),
+  equipmentSerialNo: text("equipment_serial_no"), // Serial No field from screenshot
+  equipmentLocation: text("equipment_location"), // Location field from screenshot
+  equipmentSystem: text("equipment_system"), // System field from screenshot
   componentId: text("component_id"), // Link to PMS component
   purchaseOrderRef: text("purchase_order_ref"),
+  responsibleDept: text("responsible_dept"), // Responsible Dept from screenshot
+  verifiedDate: text("verified_date"), // Verified Date from screenshot
   defectCategory: text("defect_category"), // Additional defect category field
   viqVersion: text("viq_version"), // VIQ VER
   viqRef: text("viq_ref"), // VIQ REF
