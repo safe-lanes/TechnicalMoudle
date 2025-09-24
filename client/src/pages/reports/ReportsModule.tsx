@@ -28,6 +28,7 @@ import SparesReports from "./SparesReports";
 import StoresReports from "./StoresReports";
 import ComplianceReports from "./ComplianceReports";
 import IhmReports from "./IhmReports";
+import ChangeRequestReports from "./ChangeRequestReports";
 
 interface ReportCategory {
   id: string;
@@ -234,6 +235,10 @@ const ReportsModule = () => {
 
   if (selectedCategory === "ihm") {
     return <IhmReports onBack={handleBackToMain} />;
+  }
+
+  if (selectedCategory === "change-requests") {
+    return <ChangeRequestReports onBack={handleBackToMain} />;
   }
 
   // TODO: Add other category components when implemented
