@@ -522,10 +522,14 @@ export const defects = pgTable("defects", {
   equipmentModel: text("equipment_model"),
   componentId: text("component_id"), // Link to PMS component
   purchaseOrderRef: text("purchase_order_ref"),
-  viqVerRef: text("viq_ver_ref"), // VIQ Version/Reference
+  defectCategory: text("defect_category"), // Additional defect category field
+  viqVersion: text("viq_version"), // VIQ VER
+  viqRef: text("viq_ref"), // VIQ REF
   sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
-  immediateCauses: text("immediate_causes").array(), // Array of immediate causes
-  rootCauses: text("root_causes").array(), // Array of root causes
+  immediateCause: text("immediate_cause"), // Single immediate cause
+  immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
+  rootCause: text("root_cause"), // Single root cause
+  rootCauseExplanation: text("root_cause_explanation"), // Further explanation
   holdReason: text("hold_reason"), // For On Hold status
   nextReviewDate: text("next_review_date"), // For On Hold items
   reportedBy: text("reported_by").notNull(),
