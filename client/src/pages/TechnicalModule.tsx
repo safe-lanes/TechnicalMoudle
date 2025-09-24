@@ -10,7 +10,7 @@ import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
-import IhmReports from "./reports/IhmReports";
+import ReportsModule from "./reports/ReportsModule";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -99,7 +99,7 @@ export const TechnicalModule: React.FC = () => {
           ) : selectedSubModule === "admin" ? (
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
-            <IhmReports />
+            <ReportsModule />
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
