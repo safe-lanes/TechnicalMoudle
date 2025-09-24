@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -9,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { 
+  ArrowLeft,
+  Search,
   FileText,
   Download,
   Calendar,
@@ -17,9 +21,16 @@ import {
   HelpCircle,
   Package,
   Wrench,
-  TrendingUp
+  TrendingUp,
+  Recycle,
+  Shield,
+  BarChart3,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { FEATURES } from '@/config/features';
+import { reportGenerator } from "@/lib/reportGenerator";
+import { useToast } from "@/hooks/use-toast";
 
 interface IhmSummary {
   totalComponents: number;
@@ -37,9 +48,34 @@ interface IhmMaterial {
   percentage: number;
 }
 
-const IhmReports = () => {
+interface IhmReport {
+  id: string;
+  name: string;
+  description: string;
+  purpose: string;
+  frequency: string;
+  fields: string[];
+  filters: string[];
+  outputs: string[];
+  icon: React.ElementType;
+  priority: 'high' | 'medium' | 'low';
+  lastGenerated?: string;
+  estimatedTime: string;
+  reportType: 'inventory' | 'compliance';
+}
+
+interface IhmReportsProps {
+  onBack: () => void;
+}
+
+const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
   const [reportType, setReportType] = useState("summary");
   const [dateRange, setDateRange] = useState("last30days");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   // Mock data - in real implementation, fetch from API
   const summary: IhmSummary = {
@@ -87,6 +123,152 @@ const IhmReports = () => {
     }
   ];
 
+  // Define the 2 IHM report types for the Reports module
+  const reports: IhmReport[] = [
+    {
+      id: "ihm-inventory-status",
+      name: "IHM Inventory Status Report",
+      description: "Comprehensive inventory of hazardous materials onboard with quantities, locations, and safety compliance status",
+      purpose: "Track hazardous materials inventory & regulatory compliance (Captain/Chief Eng)",
+      frequency: "Monthly",
+      fields: ["Material Name", "Hazard Class", "Quantity", "Location", "Container Type", "SDS Available", "Compliance Status", "Last Updated"],
+      filters: ["Vessel", "Material Type", "Hazard Class", "Location", "Compliance Status"],
+      outputs: ["PDF", "Excel", "Dashboard"],
+      icon: Recycle,
+      priority: "high",
+      lastGenerated: "2 days ago",
+      estimatedTime: "3-4 min",
+      reportType: "inventory"
+    },
+    {
+      id: "ihm-compliance-audit",
+      name: "IHM Compliance & Audit Report",
+      description: "Detailed compliance audit report covering IHM management procedures, documentation, and regulatory requirements",
+      purpose: "IHM compliance verification & audit preparation (Captain/Environmental Officer)",
+      frequency: "Quarterly",
+      fields: ["Compliance Area", "Requirement", "Status", "Evidence", "Non-Conformities", "Corrective Actions", "Deadline", "Risk Assessment"],
+      filters: ["Vessel", "Compliance Area", "Status", "Risk Level", "Due Actions"],
+      outputs: ["PDF", "Excel"],
+      icon: Shield,
+      priority: "high",
+      lastGenerated: "1 week ago",
+      estimatedTime: "4-5 min",
+      reportType: "compliance"
+    }
+  ];
+
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesFrequency = selectedFrequency === "all" || 
+                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
+    
+    const matchesType = selectedType === "all" || report.reportType === selectedType;
+    
+    return matchesSearch && matchesFrequency && matchesType;
+  });
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'inventory': return 'bg-green-100 text-green-800';
+      case 'compliance': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTypeStats = () => {
+    const inventory = reports.filter(r => r.reportType === 'inventory').length;
+    const compliance = reports.filter(r => r.reportType === 'compliance').length;
+    const highPriority = reports.filter(r => r.priority === 'high').length;
+    
+    return { inventory, compliance, highPriority };
+  };
+
+  const stats = getTypeStats();
+
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+    const reportKey = `${reportId}-${format}`;
+    
+    if (generatingReports.has(reportKey)) {
+      return; // Already generating this report
+    }
+
+    try {
+      setGeneratingReports(prev => new Set(prev).add(reportKey));
+      
+      toast({
+        title: "Generating Report",
+        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
+      });
+
+      // Get current filters
+      const filters = {
+        vessel: "MV Atlantic Star", // Will be dynamic later
+        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
+        type: selectedType !== "all" ? selectedType : undefined,
+        search: searchQuery || undefined,
+      };
+
+      // Use the maintenance report generator - will create specific IHM generator later
+      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
+      const report = reports.find(r => r.id === reportId);
+      const filename = reportGenerator.generateFilename(
+        report?.name || 'ihm-report', 
+        format, 
+        'MV_Atlantic_Star'
+      );
+      
+      await reportGenerator.downloadReport(blob, filename);
+      
+      toast({
+        title: "Report Generated",
+        description: `${format} report downloaded successfully!`,
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast({
+        title: "Generation Failed",
+        description: `Failed to generate ${format} report. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reportKey);
+        return newSet;
+      });
+    }
+  };
+
+  const handlePreviewReport = (reportId: string) => {
+    // For now, generate a PDF preview
+    handleGenerateReport(reportId, 'PDF');
+  };
+
+  const handleLegacyExport = () => {
+    // Maintain compatibility with existing export functionality
+    toast({
+      title: "Exporting IHM Dashboard",
+      description: "Generating comprehensive IHM dashboard export...",
+    });
+    
+    // Generate a comprehensive IHM dashboard report
+    handleGenerateReport('ihm-dashboard-legacy', 'PDF');
+  };
+
   if (!FEATURES.IHM) {
     return (
       <div className="p-6 bg-[#fafafa] h-full">
@@ -100,27 +282,89 @@ const IhmReports = () => {
   }
 
   return (
-    <div className="p-6 bg-[#fafafa] h-full overflow-auto">
-      {/* Header */}
+    <div className="p-6 bg-[#fafafa] min-h-screen">
+      {/* Header with Back Button - New Reports Module Style */}
       <div className="mb-6">
+        <div className="flex items-center gap-4 mb-4">
+          <Button 
+            variant="outline" 
+            onClick={onBack}
+            className="flex items-center gap-2"
+            data-testid="button-back-to-reports"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Reports
+          </Button>
+          <div className="h-6 border-l border-gray-300" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500 text-white">
+                <Recycle className="h-5 w-5" />
+              </div>
+              IHM (Inventory of Hazardous Materials)
+            </h1>
+            <p className="text-gray-600">2 specialized reports for hazardous materials inventory management and regulatory compliance</p>
+          </div>
+        </div>
+
+        {/* Search and Filters - New Reports Module Style */}
+        <div className="flex gap-4 items-center mb-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search IHM reports..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-ihm-reports"
+            />
+          </div>
+          
+          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
+            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
+              <SelectValue placeholder="Filter by frequency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Frequencies</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-48" data-testid="select-type-filter">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="inventory">Inventory</SelectItem>
+              <SelectItem value="compliance">Compliance</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Legacy Export Button - Maintain Existing Functionality */}
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-semibold text-gray-800">IHM Reports</h1>
           <div className="flex gap-2">
             <Button variant="outline" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Last Updated: {summary.lastUpdated}
             </Button>
-            <Button className="bg-[#52baf3] hover:bg-[#40a8e0] text-white flex items-center gap-2">
+            <Button 
+              onClick={handleLegacyExport}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+              data-testid="button-export-ihm-dashboard"
+            >
               <Download className="h-4 w-4" />
-              Export Report
+              Export IHM Dashboard
             </Button>
           </div>
         </div>
 
-        {/* Report Type Selection */}
+        {/* Legacy Report Type Selection - Maintain Existing Functionality */}
         <div className="flex gap-4 items-center">
           <Select value={reportType} onValueChange={setReportType}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[200px]" data-testid="select-report-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -132,7 +376,7 @@ const IhmReports = () => {
           </Select>
 
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid="select-date-range">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -145,58 +389,258 @@ const IhmReports = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <Card className="p-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <Package className="h-5 w-5 text-blue-500" />
-            <span className="text-xs text-gray-500">Total</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">{summary.totalComponents}</div>
-          <div className="text-xs text-gray-600">Components</div>
+      {/* New Reports Module Style - Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Reports</p>
+                <p className="text-2xl font-bold text-gray-800" data-testid="text-ihm-total-reports">2</p>
+              </div>
+              <Recycle className="h-8 w-8 text-emerald-500" />
+            </div>
+          </CardContent>
         </Card>
-
-        <Card className="p-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <span className="text-xs text-gray-500">Known</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">{summary.knownStatus}</div>
-          <div className="text-xs text-gray-600">Status Known</div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">High Priority</p>
+                <p className="text-2xl font-bold text-red-600" data-testid="text-ihm-high-priority">{stats.highPriority}</p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
         </Card>
-
-        <Card className="p-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <HelpCircle className="h-5 w-5 text-gray-400" />
-            <span className="text-xs text-gray-500">Unknown</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">{summary.unknownStatus}</div>
-          <div className="text-xs text-gray-600">Status Unknown</div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Inventory Reports</p>
+                <p className="text-2xl font-bold text-green-600" data-testid="text-ihm-inventory-count">{stats.inventory}</p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
         </Card>
-
-        <Card className="p-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <span className="text-xs text-gray-500">With IHM</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">{summary.withIHM}</div>
-          <div className="text-xs text-gray-600">Contains HazMat</div>
-        </Card>
-
-        <Card className="p-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <span className="text-xs text-gray-500">Without IHM</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">{summary.withoutIHM}</div>
-          <div className="text-xs text-gray-600">No HazMat</div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Compliance Reports</p>
+                <p className="text-2xl font-bold text-blue-600" data-testid="text-ihm-compliance-count">{stats.compliance}</p>
+              </div>
+              <Shield className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      {/* Materials Breakdown */}
-      <Card className="p-6 bg-white mb-6">
+      {/* New Reports Module Style - Report Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {filteredReports.map((report) => {
+          const Icon = report.icon;
+          return (
+            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`ihm-report-card-${report.id}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{report.name}</CardTitle>
+                      <div className="flex gap-2 mt-1">
+                        <Badge className={getPriorityColor(report.priority)} variant="secondary">
+                          {report.priority.toUpperCase()}
+                        </Badge>
+                        <Badge className={getTypeColor(report.reportType)} variant="secondary">
+                          {report.reportType.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>{report.frequency}</p>
+                    <p>{report.estimatedTime}</p>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-gray-700 text-sm mb-2">{report.description}</p>
+                  <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {report.fields.slice(0, 3).map((field, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {field}
+                        </Badge>
+                      ))}
+                      {report.fields.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{report.fields.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
+                    <div className="flex gap-1">
+                      {report.outputs.map((output, index) => (
+                        <Badge key={index} className="text-xs bg-emerald-100 text-emerald-700">
+                          {output}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {report.lastGenerated && (
+                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
+                )}
+
+                <div className="flex gap-2 pt-3 border-t">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => handlePreviewReport(report.id)}
+                    className="flex items-center gap-2"
+                    data-testid={`button-preview-${report.id}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </Button>
+                  
+                  <div className="flex gap-1">
+                    {report.outputs.includes('PDF') && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleGenerateReport(report.id, 'PDF')}
+                        className="bg-red-600 hover:bg-red-700 text-white px-3"
+                        disabled={generatingReports.has(`${report.id}-PDF`)}
+                        data-testid={`button-pdf-${report.id}`}
+                      >
+                        {generatingReports.has(`${report.id}-PDF`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'PDF'
+                        )}
+                      </Button>
+                    )}
+                    {report.outputs.includes('Excel') && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleGenerateReport(report.id, 'Excel')}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3"
+                        disabled={generatingReports.has(`${report.id}-Excel`)}
+                        data-testid={`button-excel-${report.id}`}
+                      >
+                        {generatingReports.has(`${report.id}-Excel`) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Excel'
+                        )}
+                      </Button>
+                    )}
+                    {report.outputs.includes('Dashboard') && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          toast({
+                            title: "Dashboard View",
+                            description: "Dashboard view will be implemented in the next phase",
+                          });
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
+                        data-testid={`button-dashboard-${report.id}`}
+                      >
+                        View
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {filteredReports.length === 0 && (
+        <div className="text-center py-8 mb-6">
+          <Recycle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
+          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
+        </div>
+      )}
+
+      {/* Legacy IHM Dashboard - Maintain Existing Functionality */}
+
+      {/* Legacy IHM Summary Cards - Maintain Existing Dashboard */}
+      <div className="mb-4">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-[#52baf3]" />
+          <BarChart3 className="h-5 w-5 text-emerald-600" />
+          IHM Component Status Overview
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <Card className="p-4 bg-white" data-testid="card-total-components">
+            <div className="flex items-center justify-between mb-2">
+              <Package className="h-5 w-5 text-blue-500" />
+              <span className="text-xs text-gray-500">Total</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{summary.totalComponents}</div>
+            <div className="text-xs text-gray-600">Components</div>
+          </Card>
+
+          <Card className="p-4 bg-white" data-testid="card-known-status">
+            <div className="flex items-center justify-between mb-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <span className="text-xs text-gray-500">Known</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{summary.knownStatus}</div>
+            <div className="text-xs text-gray-600">Status Known</div>
+          </Card>
+
+          <Card className="p-4 bg-white" data-testid="card-unknown-status">
+            <div className="flex items-center justify-between mb-2">
+              <HelpCircle className="h-5 w-5 text-gray-400" />
+              <span className="text-xs text-gray-500">Unknown</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{summary.unknownStatus}</div>
+            <div className="text-xs text-gray-600">Status Unknown</div>
+          </Card>
+
+          <Card className="p-4 bg-white" data-testid="card-with-ihm">
+            <div className="flex items-center justify-between mb-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <span className="text-xs text-gray-500">With IHM</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{summary.withIHM}</div>
+            <div className="text-xs text-gray-600">Contains HazMat</div>
+          </Card>
+
+          <Card className="p-4 bg-white" data-testid="card-without-ihm">
+            <div className="flex items-center justify-between mb-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <span className="text-xs text-gray-500">Without IHM</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{summary.withoutIHM}</div>
+            <div className="text-xs text-gray-600">No HazMat</div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Legacy Materials Breakdown - Maintain Existing Functionality */}
+      <Card className="p-6 bg-white mb-6" data-testid="card-materials-breakdown">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-emerald-600" />
           Hazardous Materials Distribution
         </h2>
         <div className="overflow-x-auto">
@@ -220,7 +664,7 @@ const IhmReports = () => {
                   <td className="py-3 px-3">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
-                        className="bg-[#52baf3] h-2 rounded-full"
+                        className="bg-emerald-600 h-2 rounded-full"
                         style={{ width: `${mat.percentage}%` }}
                       />
                     </div>
@@ -232,10 +676,10 @@ const IhmReports = () => {
         </div>
       </Card>
 
-      {/* Recent Changes */}
-      <Card className="p-6 bg-white">
+      {/* Legacy Recent Changes - Maintain Existing Functionality */}
+      <Card className="p-6 bg-white mb-6" data-testid="card-recent-changes">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <Wrench className="h-5 w-5 text-[#52baf3]" />
+          <Wrench className="h-5 w-5 text-emerald-600" />
           Recent IHM Changes
         </h2>
         <div className="overflow-x-auto">
@@ -273,6 +717,20 @@ const IhmReports = () => {
           </table>
         </div>
       </Card>
+
+      {/* IHM Integration Notice */}
+      <div className="mt-8 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <FileText className="h-5 w-5 text-emerald-600 mt-0.5" />
+          <div>
+            <h4 className="font-semibold text-emerald-900">IHM Reports Integration</h4>
+            <p className="text-sm text-emerald-800 mt-1">
+              These reports maintain compatibility with existing IHM functionality while providing enhanced reporting capabilities. 
+              All existing IHM data and workflows are preserved and integrated into this new reporting interface.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
