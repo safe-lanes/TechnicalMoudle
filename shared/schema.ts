@@ -498,3 +498,107 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
 
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
 export type WorkOrder = typeof workOrders.$inferSelect;
+
+// Defects Table for maritime defect tracking
+export const defects = pgTable("defects", {
+  id: text("id").primaryKey(),
+  vesselId: text("vessel_id").notNull(),
+  vesselName: text("vessel_name").notNull(),
+  issueDate: text("issue_date").notNull(), // DD-MM-YYYY format
+  category: text("category").notNull(), // 'Defect' | 'COC' | 'Observation' | 'NCR'
+  defectType: text("defect_type"), // 'Routine' | 'Corrective' | 'Emergency'
+  description: text("description").notNull(),
+  actionTakenRequested: text("action_taken_requested"),
+  targetDate: text("target_date"), // DD-MM-YYYY format
+  dateCompleted: text("date_completed"), // DD-MM-YYYY format
+  status: text("status").notNull().default("Open"), // 'Open' | 'In Progress' | 'On Hold' | 'Closed'
+  priority: text("priority").default("Medium"), // 'Low' | 'Medium' | 'High'
+  critical: boolean("critical").notNull().default(false),
+  severity: integer("severity").default(1), // 1-Minor, 2-Moderate, 3-Major
+  source: text("source"), // 'SIRE' | 'PSC' | 'Internal' | 'Class'
+  equipmentCategory: text("equipment_category"), // 'Deck' | 'Navigation' | 'Machinery' | etc.
+  equipmentType: text("equipment_type"),
+  equipmentMake: text("equipment_make"),
+  equipmentModel: text("equipment_model"),
+  componentId: text("component_id"), // Link to PMS component
+  purchaseOrderRef: text("purchase_order_ref"),
+  viqVerRef: text("viq_ver_ref"), // VIQ Version/Reference
+  sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
+  immediateCauses: text("immediate_causes").array(), // Array of immediate causes
+  rootCauses: text("root_causes").array(), // Array of root causes
+  holdReason: text("hold_reason"), // For On Hold status
+  nextReviewDate: text("next_review_date"), // For On Hold items
+  reportedBy: text("reported_by").notNull(),
+  assignedTo: text("assigned_to"),
+  reviewedBy: text("reviewed_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  vesselIdIdx: index("idx_defect_vessel").on(table.vesselId),
+  statusIdx: index("idx_defect_status").on(table.status),
+  issueDateIdx: index("idx_defect_issue_date").on(table.issueDate),
+  categoryIdx: index("idx_defect_category").on(table.category),
+  criticalIdx: index("idx_defect_critical").on(table.critical),
+  componentIdIdx: index("idx_defect_component").on(table.componentId),
+}));
+
+export const insertDefectSchema = createInsertSchema(defects).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefect = z.infer<typeof insertDefectSchema>;
+export type Defect = typeof defects.$inferSelect;
+
+// Defect Actions Table for corrective/preventive actions
+export const defectActions = pgTable("defect_actions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  defectId: text("defect_id").notNull(),
+  actionType: text("action_type").notNull(), // 'Corrective' | 'Preventive' | 'Containment' | 'Long-term fix'
+  actionDescription: text("action_description").notNull(),
+  proposedBy: text("proposed_by").notNull(),
+  responsibility: text("responsibility").notNull(), // user/role responsible
+  dueDate: text("due_date").notNull(), // DD-MM-YYYY format
+  dateCompleted: text("date_completed"), // DD-MM-YYYY format
+  status: text("status").notNull().default("Open"), // 'Open' | 'In Progress' | 'Closed'
+  justification: text("justification"), // Required if due date is pushed after overdue
+  attachmentUrls: text("attachment_urls").array(), // Evidence attachments
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  defectIdIdx: index("idx_action_defect").on(table.defectId),
+  statusIdx: index("idx_action_status").on(table.status),
+  dueDateIdx: index("idx_action_due_date").on(table.dueDate),
+  responsibilityIdx: index("idx_action_responsibility").on(table.responsibility),
+}));
+
+export const insertDefectActionSchema = createInsertSchema(defectActions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDefectAction = z.infer<typeof insertDefectActionSchema>;
+export type DefectAction = typeof defectActions.$inferSelect;
+
+// Defect Attachments Table for photos and documents
+export const defectAttachments = pgTable("defect_attachments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  defectId: text("defect_id").notNull(),
+  filename: text("filename").notNull(),
+  url: text("url").notNull(),
+  attachmentType: text("attachment_type").notNull(), // 'photo' | 'document' | 'evidence'
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (table) => ({
+  defectIdIdx: index("idx_attachment_defect").on(table.defectId),
+  typeIdx: index("idx_attachment_type").on(table.attachmentType),
+}));
+
+export const insertDefectAttachmentSchema = createInsertSchema(defectAttachments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertDefectAttachment = z.infer<typeof insertDefectAttachmentSchema>;
+export type DefectAttachment = typeof defectAttachments.$inferSelect;
