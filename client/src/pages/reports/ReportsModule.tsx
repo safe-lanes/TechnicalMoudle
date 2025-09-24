@@ -22,6 +22,7 @@ import {
   Users,
   Shield
 } from "lucide-react";
+import MaintenanceReports from "./MaintenanceReports";
 
 interface ReportCategory {
   id: string;
@@ -190,7 +191,10 @@ const ReportsModule = () => {
 
   const handleCategoryClick = (categoryId: string) => {
     setSelectedCategory(categoryId);
-    // Will implement category detail view later
+  };
+
+  const handleBackToMain = () => {
+    setSelectedCategory(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -201,6 +205,16 @@ const ReportsModule = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Render category-specific views
+  if (selectedCategory === "maintenance") {
+    return <MaintenanceReports onBack={handleBackToMain} />;
+  }
+
+  // TODO: Add other category components when implemented
+  // if (selectedCategory === "running-hours") {
+  //   return <RunningHoursReports onBack={handleBackToMain} />;
+  // }
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
