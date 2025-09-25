@@ -758,7 +758,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 </div>
                 <Button 
                   type="button"
-                  className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200" 
+                  variant="outline"
+                  className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" 
                   size="sm" 
                   onClick={addAction}
                   data-testid="button-add-action"
@@ -791,9 +792,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <TableCell>{action.dueDate}</TableCell>
                       <TableCell>{action.dateCompleted || "-"}</TableCell>
                       <TableCell>
-                        <Badge variant={action.status === "Close" ? "default" : "secondary"}>
-                          {action.status}
-                        </Badge>
+                        {action.status}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -827,11 +826,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Footer */}
           <div className="flex items-center justify-between pt-6">
             <div className="flex items-center gap-2">
-              <Button className="bg-blue-600 text-white hover:bg-blue-700" size="sm" data-testid="button-upload">
+              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" size="sm" data-testid="button-upload">
                 <Upload className="w-4 h-4 mr-2" />
                 UPLOAD
               </Button>
-              <Button className="bg-blue-600 text-white hover:bg-blue-700" size="sm" data-testid="button-view-attachments">
+              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" size="sm" data-testid="button-view-attachments">
                 <Eye className="w-4 h-4 mr-2" />
                 VIEW
               </Button>
