@@ -221,7 +221,6 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="vesselId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>VESSEL</FormLabel>
                         <Select 
                           onValueChange={(value) => {
                             field.onChange(value);
@@ -231,7 +230,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                         >
                           <FormControl>
                             <SelectTrigger data-testid="select-vessel">
-                              <SelectValue />
+                              <SelectValue placeholder="VESSEL" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -249,11 +248,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="source"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>SOURCE</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-source">
-                              <SelectValue />
+                              <SelectValue placeholder="SOURCE" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -273,11 +271,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="defectCategory"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>DEFECT CATEGORY</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-defect-category">
-                              <SelectValue />
+                              <SelectValue placeholder="DEFECT CATEGORY" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -295,11 +292,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="defectType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>DEFECT TYPE</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-defect-type">
-                              <SelectValue />
+                              <SelectValue placeholder="DEFECT TYPE" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -324,11 +320,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentCategory"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>CATEGORY</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-equipment-category">
-                              <SelectValue />
+                              <SelectValue placeholder="CATEGORY" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -347,11 +342,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>TYPE</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-equipment-type">
-                              <SelectValue />
+                              <SelectValue placeholder="TYPE" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -370,11 +364,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentMake"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>MAKE</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-equipment-make">
-                              <SelectValue />
+                              <SelectValue placeholder="MAKE" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -393,11 +386,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentModel"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>MODEL</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-equipment-model">
-                              <SelectValue />
+                              <SelectValue placeholder="MODEL" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -423,11 +415,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="issueDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>DATE ISSUED</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             type="date"
+                            placeholder="DATE ISSUED"
                             data-testid="input-issue-date"
                           />
                         </FormControl>
@@ -440,12 +432,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="targetDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>TARGET DATE</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             value={field.value || ""}
                             type="date"
+                            placeholder="TARGET DATE"
                             data-testid="input-target-date"
                           />
                         </FormControl>
@@ -458,12 +450,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="dateCompleted"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>DATE COMPLETED</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             value={field.value || ""}
                             type="date"
+                            placeholder="DATE COMPLETED"
                             data-testid="input-date-completed"
                           />
                         </FormControl>
@@ -484,11 +476,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="purchaseOrderRef"
                     render={({ field }) => (
                       <FormItem className="flex-1">
-                        <FormLabel>PO REF</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             value={field.value || ""}
+                            placeholder="PO REF"
                             data-testid="input-po-ref"
                           />
                         </FormControl>
@@ -500,7 +492,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     control={form.control}
                     name="critical"
                     render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2 mt-6">
+                      <FormItem className="flex items-center space-x-2">
                         <FormControl>
                           <Checkbox
                             checked={field.value}
@@ -530,12 +522,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DESCRIPTION</FormLabel>
                     <FormControl>
                       <Textarea 
                         {...field}
                         rows={4}
-                        placeholder="Describe the defect..."
+                        placeholder="DESCRIPTION"
                         data-testid="textarea-description"
                       />
                     </FormControl>
@@ -579,11 +570,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="viqVersion"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>VIQ VER</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger className="w-32" data-testid="select-viq-version">
-                              <SelectValue />
+                              <SelectValue placeholder="VIQ VER" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -601,11 +591,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="viqRef"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>VIQ REF</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger className="w-32" data-testid="select-viq-ref">
-                              <SelectValue />
+                              <SelectValue placeholder="VIQ REF" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -623,11 +612,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="sfiCodeRef"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>SFI CODE REF</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                           <FormControl>
                             <SelectTrigger className="w-40" data-testid="select-sfi-code">
-                              <SelectValue />
+                              <SelectValue placeholder="SFI CODE REF" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
