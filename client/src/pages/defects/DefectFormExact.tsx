@@ -184,13 +184,14 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-blue-600 font-medium text-sm">{defectRef}</span>
+          <span className="font-medium text-sm" style={{color: '#16569e'}}>{defectRef}</span>
           <Button variant="outline" size="sm" className="text-gray-600" data-testid="button-view">
             <Eye className="w-4 h-4 mr-1" />
             View
           </Button>
           <Button 
-            className="bg-blue-600 hover:bg-blue-700 text-white" 
+            className="text-white hover:opacity-90"
+            style={{backgroundColor: '#16569e'}} 
             size="sm" 
             onClick={() => form.handleSubmit(handleSubmit)()}
             disabled={createDefectMutation.isPending}
@@ -206,16 +207,16 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Details Section - 3 Column Layout */}
           <div className="bg-gray-50 p-6">
             <div className="pb-4">
-              <div className="border-b border-blue-200 pb-2">
-                <h2 className="text-blue-600 font-semibold text-base">Details</h2>
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Details</h2>
               </div>
             </div>
             <div>
               <div className="grid grid-cols-3 gap-8">
                 {/* Basic Column */}
                 <div className="space-y-4">
-                  <div className="border-b border-blue-200 pb-1">
-                    <h3 className="font-semibold text-blue-600 text-sm">Basic</h3>
+                  <div className="border-b pb-1" style={{borderColor: '#16569e'}}>
+                    <h3 className="font-semibold text-sm" style={{color: '#16569e'}}>Basic</h3>
                   </div>
                   
                   <FormField
@@ -313,8 +314,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
                 {/* Equipment/Hardware Column */}
                 <div className="space-y-4">
-                  <div className="border-b border-blue-200 pb-1">
-                    <h3 className="font-semibold text-blue-600 text-sm">Equipment / Hardware</h3>
+                  <div className="border-b pb-1" style={{borderColor: '#16569e'}}>
+                    <h3 className="font-semibold text-sm" style={{color: '#16569e'}}>Equipment / Hardware</h3>
                   </div>
                   
                   <FormField
@@ -408,8 +409,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
                 {/* Date Column */}
                 <div className="space-y-4">
-                  <div className="border-b border-blue-200 pb-1">
-                    <h3 className="font-semibold text-blue-600 text-sm">Date</h3>
+                  <div className="border-b pb-1" style={{borderColor: '#16569e'}}>
+                    <h3 className="font-semibold text-sm" style={{color: '#16569e'}}>Date</h3>
                   </div>
                   
                   <FormField
@@ -469,8 +470,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
               {/* Purchase Order Section */}
               <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="border-b border-blue-200 pb-1 mb-4">
-                  <h3 className="font-semibold text-blue-600 text-sm">Purchase Order</h3>
+                <div className="border-b pb-1 mb-4" style={{borderColor: '#16569e'}}>
+                  <h3 className="font-semibold text-sm" style={{color: '#16569e'}}>Purchase Order</h3>
                 </div>
                 <div className="flex items-center gap-4">
                   <FormField
@@ -514,8 +515,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Description Section */}
           <div className="bg-gray-50 p-6">
             <div className="pb-4">
-              <div className="border-b border-blue-200 pb-2">
-                <h2 className="text-blue-600 font-semibold text-base">Description</h2>
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Description</h2>
               </div>
             </div>
             <div>
@@ -633,7 +634,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 
                 <Button 
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700" 
+                  className="hover:opacity-90"
+                  style={{backgroundColor: '#16569e'}} 
                   disabled={createDefectMutation.isPending}
                   data-testid="button-save-description"
                 >
@@ -646,8 +648,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Cause Analysis Section */}
           <div className="bg-gray-50 p-6">
             <div className="pb-4">
-              <div className="border-b border-blue-200 pb-2">
-                <h2 className="text-blue-600 font-semibold text-base">Cause Analysis</h2>
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Cause Analysis</h2>
               </div>
             </div>
             <div>
@@ -655,8 +657,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 {/* Row 1: Immediate Cause */}
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-blue-600 text-sm">Immediate Cause</h4>
-                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-immediate">
+                    <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Immediate Cause</h4>
+                    <Button variant="outline" size="sm" className="hover:opacity-80" style={{color: '#16569e', borderColor: '#16569e'}} data-testid="button-select-immediate">
                       Select
                     </Button>
                   </div>
@@ -703,8 +705,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 {/* Row 2: Root Cause */}
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-blue-600 text-sm">Root Cause</h4>
-                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-root">
+                    <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Root Cause</h4>
+                    <Button variant="outline" size="sm" className="hover:opacity-80" style={{color: '#16569e', borderColor: '#16569e'}} data-testid="button-select-root">
                       Select
                     </Button>
                   </div>
@@ -755,13 +757,14 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           <div className="bg-gray-50 p-6">
             <div className="pb-4">
               <div className="flex items-center justify-between">
-                <div className="border-b border-blue-200 pb-2">
-                  <h2 className="text-blue-600 font-semibold text-base">ACTIONS</h2>
+                <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                  <h2 className="font-semibold text-base" style={{color: '#16569e'}}>ACTIONS</h2>
                 </div>
                 <Button 
                   type="button"
                   variant="outline"
-                  className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" 
+                  className="hover:bg-gray-100 rounded-full px-4"
+                  style={{color: '#16569e', borderColor: '#16569e'}} 
                   size="sm" 
                   onClick={addAction}
                   data-testid="button-add-action"
@@ -828,11 +831,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Footer */}
           <div className="flex items-center justify-between pt-6">
             <div className="flex items-center gap-2">
-              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" size="sm" data-testid="button-upload">
+              <Button variant="outline" className="hover:bg-gray-100 rounded-full px-4" style={{color: '#16569e', borderColor: '#16569e'}} size="sm" data-testid="button-upload">
                 <Upload className="w-4 h-4 mr-2" />
                 UPLOAD
               </Button>
-              <Button variant="outline" className="text-blue-600 border-blue-300 hover:bg-blue-50 rounded-full px-4" size="sm" data-testid="button-view-attachments">
+              <Button variant="outline" className="hover:bg-gray-100 rounded-full px-4" style={{color: '#16569e', borderColor: '#16569e'}} size="sm" data-testid="button-view-attachments">
                 <Eye className="w-4 h-4 mr-2" />
                 VIEW
               </Button>
@@ -840,7 +843,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
             
             <Button 
               type="submit" 
-              className="bg-blue-600 hover:bg-blue-700 px-8"
+              className="hover:opacity-90 px-8"
+              style={{backgroundColor: '#16569e'}}
               disabled={createDefectMutation.isPending}
               data-testid="button-submit"
             >
