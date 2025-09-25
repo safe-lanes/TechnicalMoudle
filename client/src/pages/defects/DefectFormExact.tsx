@@ -204,11 +204,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           {/* Details Section - 3 Column Layout */}
-          <Card className="bg-gray-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold text-gray-900">Details</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b border-blue-200 pb-2">
+                <h2 className="text-blue-600 font-semibold text-base">Details</h2>
+              </div>
+            </div>
+            <div>
               <div className="grid grid-cols-3 gap-8">
                 {/* Basic Column */}
                 <div className="space-y-4">
@@ -506,17 +508,17 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Description Section */}
-          <Card className="bg-gray-50">
-            <CardHeader className="pb-3">
-              <div className="border-b border-blue-200 pb-1">
-                <CardTitle className="text-blue-600 font-semibold text-sm">Description</CardTitle>
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b border-blue-200 pb-2">
+                <h2 className="text-blue-600 font-semibold text-base">Description</h2>
               </div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <FormField
                 control={form.control}
                 name="description"
@@ -638,22 +640,22 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   {createDefectMutation.isPending ? "SAVING..." : "SAVE"}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Cause Analysis Section */}
-          <Card className="bg-gray-50">
-            <CardHeader className="pb-3">
-              <div className="border-b border-blue-200 pb-1">
-                <CardTitle className="text-blue-600 font-semibold text-sm">Cause Analysis</CardTitle>
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b border-blue-200 pb-2">
+                <h2 className="text-blue-600 font-semibold text-base">Cause Analysis</h2>
               </div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className="space-y-6">
                 {/* Row 1: Immediate Cause */}
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 text-sm">Immediate Cause</h4>
+                    <h4 className="font-semibold text-blue-600 text-sm">Immediate Cause</h4>
                     <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-immediate">
                       Select
                     </Button>
@@ -701,7 +703,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 {/* Row 2: Root Cause */}
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 text-sm">Root Cause</h4>
+                    <h4 className="font-semibold text-blue-600 text-sm">Root Cause</h4>
                     <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-root">
                       Select
                     </Button>
@@ -746,15 +748,15 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Actions Section */}
-          <Card className="bg-gray-50">
-            <CardHeader className="pb-3">
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
               <div className="flex items-center justify-between">
-                <div className="border-b border-blue-200 pb-1">
-                  <CardTitle className="text-blue-600 font-semibold text-sm">ACTIONS</CardTitle>
+                <div className="border-b border-blue-200 pb-2">
+                  <h2 className="text-blue-600 font-semibold text-base">ACTIONS</h2>
                 </div>
                 <Button 
                   type="button"
@@ -768,8 +770,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   ADD ACTION
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className="bg-gray-100 p-3 rounded">
                 <Table>
                 <TableHeader>
@@ -820,8 +822,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <p>Nature Of Action</p>
                 <p>All crew members have been briefed on the correct procedure to carry out in accordance with the Quality Management Manual section 3.2 Personal protective Equipment. All crew members have been briefed on the correct procedure to carry out in accordance with the Quality Management Manual section 3.2 Personal protective Equipment.</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-6">
