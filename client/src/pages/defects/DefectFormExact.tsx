@@ -181,6 +181,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       });
     }
 
+    // Check for critical defects without root cause (non-blocking warning)
+    if (data.critical && (!data.rootCause || 
+        (typeof data.rootCause === 'object' && !Array.isArray(data.rootCause) && 
+         (!data.rootCause.individualFactor?.length && !data.rootCause.systemFactor?.length)))) {
+      toast({
+        title: "Missing Root Cause",
+        description: "This critical defect should have a root cause analysis for thorough investigation.",
+        variant: "default",
+        style: { borderColor: '#16569e', color: '#16569e' }
+      });
+    }
+
     createDefectMutation.mutate(data);
   };
 
