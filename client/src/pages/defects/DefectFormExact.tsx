@@ -15,6 +15,7 @@ import { insertDefectSchema, type InsertDefect } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
+import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 
 // Vessel mapping for proper vesselName updates
 const vesselMap: Record<string, string> = {
@@ -60,6 +61,7 @@ interface DefectFormExactProps {
 export default function DefectFormExact({ onClose }: DefectFormExactProps) {
   const { toast } = useToast();
   const [defectRef] = useState(generateDefectRef());
+  const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [actions, setActions] = useState<Action[]>([
     {
       id: "1",
@@ -136,6 +138,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       });
     },
   });
+
+  const handleImmediateCauseSelect = () => {
+    setIsImmediateCauseModalOpen(true);
+  };
+
+  const handleImmediateCauseSubmit = (causeData: { unsafeAct: string[], unsafeCondition: string[] }) => {
+    // Store the structured data for backend persistence
+    form.setValue('immediateCause', causeData);
+    
+    // The form field already handles JSON stringification for display in the textarea
+    // when typeof field.value === 'object' in the render function
+  };
 
   const handleSubmit = (data: DefectFormData) => {
     createDefectMutation.mutate(data);
@@ -658,7 +672,15 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Immediate Cause</h4>
-                    <Button variant="outline" size="sm" className="hover:opacity-80" style={{color: '#16569e', borderColor: '#16569e'}} data-testid="button-select-immediate">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="hover:opacity-80" 
+                      style={{color: '#16569e', borderColor: '#16569e'}} 
+                      data-testid="button-select-immediate"
+                      onClick={handleImmediateCauseSelect}
+                      type="button"
+                    >
                       Select
                     </Button>
                   </div>
@@ -855,6 +877,14 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           </div>
         </form>
       </Form>
+
+      {/* Immediate Cause Modal */}
+      <ImmediateCauseModal
+        isOpen={isImmediateCauseModalOpen}
+        onClose={() => setIsImmediateCauseModalOpen(false)}
+        onSubmit={handleImmediateCauseSubmit}
+        initialData={form.getValues('immediateCause') as { unsafeAct: string[], unsafeCondition: string[] } | null}
+      />
     </div>
   );
 }
