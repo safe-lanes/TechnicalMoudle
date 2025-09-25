@@ -531,7 +531,7 @@ export const defects = pgTable("defects", {
   viqVersion: text("viq_version"), // VIQ VER
   viqRef: text("viq_ref"), // VIQ REF
   sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
-  immediateCause: text("immediate_cause"), // Single immediate cause
+  immediateCause: json("immediate_cause"), // Structured immediate cause with unsafe acts and conditions
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
   rootCause: text("root_cause"), // Single root cause
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
