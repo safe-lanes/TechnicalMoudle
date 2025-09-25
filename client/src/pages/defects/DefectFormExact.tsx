@@ -760,13 +760,15 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           </Card>
 
           {/* Actions Section */}
-          <Card>
-            <CardHeader>
+          <Card className="bg-gray-50">
+            <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle>ACTIONS</CardTitle>
+                <div className="border-b border-blue-200 pb-1">
+                  <CardTitle className="text-blue-600 font-semibold text-sm">ACTIONS</CardTitle>
+                </div>
                 <Button 
                   type="button"
-                  variant="outline" 
+                  className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200" 
                   size="sm" 
                   onClick={addAction}
                   data-testid="button-add-action"
@@ -777,7 +779,8 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="bg-gray-100 p-3 rounded">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Action Type</TableHead>
@@ -821,6 +824,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Note section under actions table */}
               <div className="mt-4 text-sm text-gray-600">
@@ -833,11 +837,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           {/* Footer */}
           <div className="flex items-center justify-between pt-6">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" data-testid="button-upload">
+              <Button className="bg-blue-600 text-white hover:bg-blue-700" size="sm" data-testid="button-upload">
                 <Upload className="w-4 h-4 mr-2" />
                 UPLOAD
               </Button>
-              <Button variant="outline" size="sm" data-testid="button-view-attachments">
+              <Button className="bg-blue-600 text-white hover:bg-blue-700" size="sm" data-testid="button-view-attachments">
                 <Eye className="w-4 h-4 mr-2" />
                 VIEW
               </Button>
