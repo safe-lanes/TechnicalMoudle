@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
+import RootCauseModal from "@/components/RootCauseModal";
 
 // Vessel mapping for proper vesselName updates
 const vesselMap: Record<string, string> = {
@@ -62,6 +63,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
   const { toast } = useToast();
   const [defectRef] = useState(generateDefectRef());
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
+  const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   const [actions, setActions] = useState<Action[]>([
     {
       id: "1",
@@ -151,10 +153,25 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
     // when typeof field.value === 'object' in the render function
   };
 
+  const handleRootCauseSelect = () => {
+    setIsRootCauseModalOpen(true);
+  };
+
+  const handleRootCauseSubmit = (causeData: { individualFactor: string[], systemFactor: string[] }) => {
+    // Store the structured data for backend persistence
+    form.setValue('rootCause', causeData);
+    
+    // Close the modal after successful submission
+    setIsRootCauseModalOpen(false);
+    
+    // The form field already handles JSON stringification for display in the textarea
+    // when typeof field.value === 'object' in the render function
+  };
+
   const handleSubmit = (data: DefectFormData) => {
     // Check for critical defects without immediate cause (non-blocking warning)
     if (data.critical && (!data.immediateCause || 
-        (typeof data.immediateCause === 'object' && 
+        (typeof data.immediateCause === 'object' && !Array.isArray(data.immediateCause) && 
          (!data.immediateCause.unsafeAct?.length && !data.immediateCause.unsafeCondition?.length)))) {
       toast({
         title: "Missing Immediate Cause",
@@ -742,7 +759,14 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Root Cause</h4>
-                    <Button variant="outline" size="sm" className="hover:opacity-80" style={{color: '#16569e', borderColor: '#16569e'}} data-testid="button-select-root">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="hover:opacity-80" 
+                      style={{color: '#16569e', borderColor: '#16569e'}} 
+                      data-testid="button-select-root"
+                      onClick={handleRootCauseSelect}
+                    >
                       Select
                     </Button>
                   </div>
@@ -755,7 +779,9 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                           <FormControl>
                             <Textarea 
                               {...field}
-                              value={field.value || ""}
+                              value={typeof field.value === 'object' && field.value ? 
+                                JSON.stringify(field.value, null, 2) : 
+                                (field.value || "")}
                               rows={3}
                               placeholder="ROOT CAUSE"
                               className="bg-white"
@@ -896,6 +922,14 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
         onClose={() => setIsImmediateCauseModalOpen(false)}
         onSubmit={handleImmediateCauseSubmit}
         initialData={form.getValues('immediateCause') as { unsafeAct: string[], unsafeCondition: string[] } | null}
+      />
+
+      {/* Root Cause Modal */}
+      <RootCauseModal
+        isOpen={isRootCauseModalOpen}
+        onClose={() => setIsRootCauseModalOpen(false)}
+        onSubmit={handleRootCauseSubmit}
+        initialData={form.getValues('rootCause') as { individualFactor: string[], systemFactor: string[] } | null}
       />
     </div>
   );
