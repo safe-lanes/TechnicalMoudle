@@ -207,6 +207,24 @@ export interface IStorage {
   deleteDefectAttachment(id: number): Promise<void>;
 }
 
+// Helper function to normalize and validate immediateCause structure
+function normalizeImmediateCause(data: any): { unsafeAct: string[], unsafeCondition: string[] } | null {
+  if (!data) return null;
+  
+  // If it's a string (for backward compatibility), return null to indicate no structured data
+  if (typeof data === 'string') return null;
+  
+  // If it's already an object, validate and normalize
+  if (typeof data === 'object') {
+    return {
+      unsafeAct: Array.isArray(data.unsafeAct) ? data.unsafeAct.filter((item: any) => typeof item === 'string') : [],
+      unsafeCondition: Array.isArray(data.unsafeCondition) ? data.unsafeCondition.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
+}
+
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private currentUserId: number;
@@ -2041,6 +2059,7 @@ export class MemStorage implements IStorage {
   async createWorkOrder(workOrderData: InsertWorkOrder): Promise<WorkOrder> {
     const workOrder: WorkOrder = {
       ...workOrderData,
+      isExecution: workOrderData.isExecution ?? false,
       id: this.currentWorkOrderId.toString(),
       componentCode: workOrderData.componentCode ?? null,
       templateCode: workOrderData.templateCode ?? null,
@@ -2262,14 +2281,23 @@ export class MemStorage implements IStorage {
       equipmentType: defectData.equipmentType || null,
       equipmentMake: defectData.equipmentMake || null,
       equipmentModel: defectData.equipmentModel || null,
+      equipmentSerialNo: defectData.equipmentSerialNo || null,
+      equipmentLocation: defectData.equipmentLocation || null,
+      equipmentSystem: defectData.equipmentSystem || null,
       componentId: defectData.componentId || null,
       purchaseOrderRef: defectData.purchaseOrderRef || null,
-      viqVerRef: defectData.viqVerRef || null,
+      viqRef: defectData.viqRef || null,
       sfiCodeRef: defectData.sfiCodeRef || null,
-      immediateCauses: defectData.immediateCauses || null,
-      rootCauses: defectData.rootCauses || null,
+      immediateCause: normalizeImmediateCause(defectData.immediateCause),
+      rootCause: defectData.rootCause || null,
       holdReason: defectData.holdReason || null,
       nextReviewDate: defectData.nextReviewDate || null,
+      responsibleDept: defectData.responsibleDept || null,
+      verifiedDate: defectData.verifiedDate || null,
+      defectCategory: defectData.defectCategory || null,
+      viqVersion: defectData.viqVersion || null,
+      immediateCauseExplanation: defectData.immediateCauseExplanation || null,
+      rootCauseExplanation: defectData.rootCauseExplanation || null,
       assignedTo: defectData.assignedTo || null,
       reviewedBy: defectData.reviewedBy || null,
       createdAt: new Date(),
@@ -2286,9 +2314,15 @@ export class MemStorage implements IStorage {
       throw new Error(`Defect with id ${id} not found`);
     }
     
+    // Normalize immediateCause if it's being updated
+    const normalizedUpdates = { ...updates };
+    if (normalizedUpdates.immediateCause !== undefined) {
+      normalizedUpdates.immediateCause = normalizeImmediateCause(normalizedUpdates.immediateCause);
+    }
+    
     const updated: Defect = {
       ...existing,
-      ...updates,
+      ...normalizedUpdates,
       updatedAt: new Date()
     };
     

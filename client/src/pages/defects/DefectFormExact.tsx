@@ -671,7 +671,9 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                           <FormControl>
                             <Textarea 
                               {...field}
-                              value={field.value || ""}
+                              value={typeof field.value === 'string' ? field.value : 
+                                     field.value && typeof field.value === 'object' ? 
+                                     JSON.stringify(field.value) : ""}
                               rows={3}
                               placeholder="IMMEDIATE CAUSE"
                               className="bg-white"
