@@ -518,9 +518,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           </Card>
 
           {/* Description Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Description</CardTitle>
+          <Card className="bg-gray-50">
+            <CardHeader className="pb-3">
+              <div className="border-b border-blue-200 pb-1">
+                <CardTitle className="text-blue-600 font-semibold text-sm">Description</CardTitle>
+              </div>
             </CardHeader>
             <CardContent>
               <FormField
