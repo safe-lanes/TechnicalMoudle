@@ -225,6 +225,24 @@ function normalizeImmediateCause(data: any): { unsafeAct: string[], unsafeCondit
   return null;
 }
 
+// Helper function to normalize and validate rootCause structure
+function normalizeRootCause(data: any): { individualFactor: string[], systemFactor: string[] } | string | null {
+  if (!data) return null;
+  
+  // If it's a string (for backward compatibility), preserve it as-is
+  if (typeof data === 'string') return data;
+  
+  // If it's already an object, validate and normalize
+  if (typeof data === 'object') {
+    return {
+      individualFactor: Array.isArray(data.individualFactor) ? data.individualFactor.filter((item: any) => typeof item === 'string') : [],
+      systemFactor: Array.isArray(data.systemFactor) ? data.systemFactor.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
+}
+
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private currentUserId: number;
@@ -2289,7 +2307,7 @@ export class MemStorage implements IStorage {
       viqRef: defectData.viqRef || null,
       sfiCodeRef: defectData.sfiCodeRef || null,
       immediateCause: normalizeImmediateCause(defectData.immediateCause),
-      rootCause: defectData.rootCause || null,
+      rootCause: normalizeRootCause(defectData.rootCause),
       holdReason: defectData.holdReason || null,
       nextReviewDate: defectData.nextReviewDate || null,
       responsibleDept: defectData.responsibleDept || null,
@@ -2314,10 +2332,13 @@ export class MemStorage implements IStorage {
       throw new Error(`Defect with id ${id} not found`);
     }
     
-    // Normalize immediateCause if it's being updated
+    // Normalize immediateCause and rootCause if they're being updated
     const normalizedUpdates = { ...updates };
     if (normalizedUpdates.immediateCause !== undefined) {
       normalizedUpdates.immediateCause = normalizeImmediateCause(normalizedUpdates.immediateCause);
+    }
+    if (normalizedUpdates.rootCause !== undefined) {
+      normalizedUpdates.rootCause = normalizeRootCause(normalizedUpdates.rootCause);
     }
     
     const updated: Defect = {
