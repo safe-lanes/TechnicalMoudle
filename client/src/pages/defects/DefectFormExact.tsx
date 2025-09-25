@@ -152,6 +152,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
   };
 
   const handleSubmit = (data: DefectFormData) => {
+    // Check for critical defects without immediate cause (non-blocking warning)
+    if (data.critical && (!data.immediateCause || 
+        (typeof data.immediateCause === 'object' && 
+         (!data.immediateCause.unsafeAct?.length && !data.immediateCause.unsafeCondition?.length)))) {
+      toast({
+        title: "Missing Immediate Cause",
+        description: "This critical defect should have an immediate cause analysis for proper investigation.",
+        variant: "default",
+        style: { borderColor: '#16569e', color: '#16569e' }
+      });
+    }
+
     createDefectMutation.mutate(data);
   };
 
