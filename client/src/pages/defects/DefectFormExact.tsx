@@ -650,99 +650,99 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h4 className="font-medium text-gray-900">Immediate Cause</h4>
-                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-immediate">
-                        Select
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={form.control}
-                        name="immediateCause"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Textarea 
-                                {...field}
-                                value={field.value || ""}
-                                rows={3}
-                                placeholder="Immediate cause details..."
-                                className="bg-white"
-                                data-testid="textarea-immediate-cause"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="immediateCauseExplanation"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Textarea 
-                                {...field}
-                                value={field.value || ""}
-                                rows={3}
-                                placeholder="Further explanation..."
-                                className="bg-white"
-                                data-testid="textarea-immediate-explanation"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                {/* Row 1: Immediate Cause */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 text-sm">Immediate Cause</h4>
+                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-immediate">
+                      Select
+                    </Button>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="immediateCause"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea 
+                              {...field}
+                              value={field.value || ""}
+                              rows={3}
+                              placeholder="IMMEDIATE CAUSE"
+                              className="bg-white"
+                              data-testid="textarea-immediate-cause"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="immediateCauseExplanation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea 
+                              {...field}
+                              value={field.value || ""}
+                              rows={3}
+                              placeholder="FURTHER EXPLANATION"
+                              className="bg-white"
+                              data-testid="textarea-immediate-explanation"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h4 className="font-medium text-gray-900">Root Cause</h4>
-                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-root">
-                        Select
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={form.control}
-                        name="rootCause"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Textarea 
-                                {...field}
-                                value={field.value || ""}
-                                rows={3}
-                                placeholder="Root cause details..."
-                                className="bg-white"
-                                data-testid="textarea-root-cause"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="rootCauseExplanation"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Textarea 
-                                {...field}
-                                value={field.value || ""}
-                                rows={3}
-                                placeholder="Further explanation..."
-                                className="bg-white"
-                                data-testid="textarea-root-explanation"
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                {/* Row 2: Root Cause */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 text-sm">Root Cause</h4>
+                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-root">
+                      Select
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="rootCause"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea 
+                              {...field}
+                              value={field.value || ""}
+                              rows={3}
+                              placeholder="ROOT CAUSE"
+                              className="bg-white"
+                              data-testid="textarea-root-cause"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="rootCauseExplanation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea 
+                              {...field}
+                              value={field.value || ""}
+                              rows={3}
+                              placeholder="FURTHER EXPLANATION"
+                              className="bg-white"
+                              data-testid="textarea-root-explanation"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
               </div>
