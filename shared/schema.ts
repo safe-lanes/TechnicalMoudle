@@ -533,7 +533,7 @@ export const defects = pgTable("defects", {
   sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
   immediateCause: json("immediate_cause"), // Structured immediate cause with unsafe acts and conditions
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
-  rootCause: text("root_cause"), // Single root cause
+  rootCause: json("root_cause"), // Structured root cause with individual and system factors
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
   holdReason: text("hold_reason"), // For On Hold status
   nextReviewDate: text("next_review_date"), // For On Hold items
