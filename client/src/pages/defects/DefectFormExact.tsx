@@ -94,7 +94,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       status: "Open",
       priority: "Medium",
       critical: false,
-      severity: 1, // Minor
+      severity: 2, // Minor
       source: "",
       equipmentCategory: "",
       equipmentType: "",
@@ -168,27 +168,29 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header with ID in top right */}
+      <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-4">
           <Button 
-            variant="outline" 
+            variant="ghost" 
             size="sm" 
             onClick={onClose}
+            className="text-gray-600 hover:text-gray-800"
             data-testid="button-back"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-4 h-4 mr-1" />
             Back
           </Button>
-          <h1 className="text-2xl font-semibold">Defect Report</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" data-testid="button-view">
-            <Eye className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-3">
+          <span className="text-blue-600 font-medium text-sm">{defectRef}</span>
+          <Button variant="outline" size="sm" className="text-gray-600" data-testid="button-view">
+            <Eye className="w-4 h-4 mr-1" />
             View
           </Button>
           <Button 
-            className="bg-blue-600 hover:bg-blue-700" 
+            className="bg-blue-600 hover:bg-blue-700 text-white" 
             size="sm" 
             onClick={() => form.handleSubmit(handleSubmit)()}
             disabled={createDefectMutation.isPending}
@@ -199,25 +201,20 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
         </div>
       </div>
 
-      {/* Reference Number */}
-      <div className="mb-6">
-        <Badge variant="outline" className="text-sm px-3 py-1">
-          {defectRef}
-        </Badge>
-      </div>
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           {/* Details Section - 3 Column Layout */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Details</CardTitle>
+          <Card className="bg-gray-50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold text-gray-900">Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-3 gap-8">
                 {/* Basic Column */}
                 <div className="space-y-4">
-                  <h3 className="font-medium text-gray-600">Basic</h3>
+                  <div className="border-b border-blue-200 pb-1">
+                    <h3 className="font-semibold text-blue-600 text-sm">Basic</h3>
+                  </div>
                   
                   <FormField
                     control={form.control}
@@ -318,7 +315,9 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
                 {/* Equipment/Hardware Column */}
                 <div className="space-y-4">
-                  <h3 className="font-medium text-gray-600">Equipment / Hardware</h3>
+                  <div className="border-b border-blue-200 pb-1">
+                    <h3 className="font-semibold text-blue-600 text-sm">Equipment / Hardware</h3>
+                  </div>
                   
                   <FormField
                     control={form.control}
@@ -415,7 +414,9 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
                 {/* Date Column */}
                 <div className="space-y-4">
-                  <h3 className="font-medium text-gray-600">Date</h3>
+                  <div className="border-b border-blue-200 pb-1">
+                    <h3 className="font-semibold text-blue-600 text-sm">Date</h3>
+                  </div>
                   
                   <FormField
                     control={form.control}
@@ -473,8 +474,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
               </div>
 
               {/* Purchase Order Section */}
-              <div className="mt-6 space-y-4">
-                <h3 className="font-medium text-blue-600">Purchase Order</h3>
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="border-b border-blue-200 pb-1 mb-4">
+                  <h3 className="font-semibold text-blue-600 text-sm">Purchase Order</h3>
+                </div>
                 <div className="flex items-center gap-4">
                   <FormField
                     control={form.control}
@@ -541,7 +544,33 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
               {/* Bottom Row with Severity and VIQ Fields */}
               <div className="flex items-center justify-between mt-4">
                 <div className="flex items-center gap-4">
-                  {getSeverityBadge(form.watch('severity') || 1)}
+                  <FormField
+                    control={form.control}
+                    name="severity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Select 
+                          onValueChange={(value) => field.onChange(parseInt(value))} 
+                          defaultValue={(field.value || 2).toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="bg-green-600 text-white border-green-600 hover:bg-green-700 min-w-[120px] h-10 font-medium">
+                              <SelectValue>
+                                {field.value === 1 ? "1 - Minor" : 
+                                 field.value === 3 ? "3 - Major" : 
+                                 "2 - Minor"}
+                              </SelectValue>
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1">1 - Minor</SelectItem>
+                            <SelectItem value="2">2 - Minor</SelectItem>
+                            <SelectItem value="3">3 - Major</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
                   
                   <FormField
                     control={form.control}
@@ -623,32 +652,35 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
           </Card>
 
           {/* Cause Analysis Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cause Analysis</CardTitle>
+          <Card className="bg-gray-50">
+            <CardHeader className="pb-3">
+              <div className="border-b border-blue-200 pb-1">
+                <CardTitle className="text-blue-600 font-semibold text-sm">Cause Analysis</CardTitle>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <FormLabel>Immediate Cause</FormLabel>
-                      <Button variant="outline" size="sm" data-testid="button-select-immediate">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h4 className="font-medium text-gray-900">Immediate Cause</h4>
+                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-immediate">
                         Select
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <FormField
                         control={form.control}
                         name="immediateCause"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>IMMEDIATE CAUSE</FormLabel>
                             <FormControl>
                               <Textarea 
                                 {...field}
                                 value={field.value || ""}
                                 rows={3}
+                                placeholder="Immediate cause details..."
+                                className="bg-white"
                                 data-testid="textarea-immediate-cause"
                               />
                             </FormControl>
@@ -660,12 +692,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                         name="immediateCauseExplanation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>FURTHER EXPLANATION</FormLabel>
                             <FormControl>
                               <Textarea 
                                 {...field}
                                 value={field.value || ""}
                                 rows={3}
+                                placeholder="Further explanation..."
+                                className="bg-white"
                                 data-testid="textarea-immediate-explanation"
                               />
                             </FormControl>
@@ -675,25 +708,26 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <FormLabel>Root Cause</FormLabel>
-                      <Button variant="outline" size="sm" data-testid="button-select-root">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h4 className="font-medium text-gray-900">Root Cause</h4>
+                      <Button variant="outline" size="sm" className="text-blue-600 border-blue-300" data-testid="button-select-root">
                         Select
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <FormField
                         control={form.control}
                         name="rootCause"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>ROOT CAUSE</FormLabel>
                             <FormControl>
                               <Textarea 
                                 {...field}
                                 value={field.value || ""}
                                 rows={3}
+                                placeholder="Root cause details..."
+                                className="bg-white"
                                 data-testid="textarea-root-cause"
                               />
                             </FormControl>
@@ -705,12 +739,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                         name="rootCauseExplanation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>FURTHER EXPLANATION</FormLabel>
                             <FormControl>
                               <Textarea 
                                 {...field}
                                 value={field.value || ""}
                                 rows={3}
+                                placeholder="Further explanation..."
+                                className="bg-white"
                                 data-testid="textarea-root-explanation"
                               />
                             </FormControl>
