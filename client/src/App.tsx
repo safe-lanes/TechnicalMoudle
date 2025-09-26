@@ -24,6 +24,8 @@ function App() {
                 <Route path="/spares" component={TechnicalModule} />
                 <Route path="/stores" component={TechnicalModule} />
                 <Route path="/reports" component={TechnicalModule} />
+                <Route path="/defects" component={TechnicalModule} />
+                <Route path="/defects/:subpage" component={TechnicalModule} />
                 <Route path="/admin" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 <Route component={NotFound} />

@@ -11,6 +11,7 @@ import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
 import ReportsModule from "./reports/ReportsModule";
+import DefectsLog from "./defects/DefectsLog";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -24,6 +25,11 @@ export const TechnicalModule: React.FC = () => {
     } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
+    } else if (location === "/defects") {
+      return { subModule: "defects", menuItem: "active" }; // Default to active when accessing /defects
+    } else if (location.startsWith("/defects/")) {
+      const subpage = location.replace("/defects/", "");
+      return { subModule: "defects", menuItem: subpage };
     } else if (location.startsWith("/pms/")) {
       const subpage = location.replace("/pms/", "");
       return { subModule: "pms", menuItem: subpage };
@@ -53,6 +59,8 @@ export const TechnicalModule: React.FC = () => {
     // Set default menu item based on submodule
     if (subModule === "admin") {
       setSelectedMenuItem("alerts"); // Default to alerts for admin
+    } else if (subModule === "defects") {
+      setSelectedMenuItem("active"); // Default to active for defects
     } else {
       setSelectedMenuItem("dashboard"); // Default to dashboard for other modules
     }
@@ -100,6 +108,8 @@ export const TechnicalModule: React.FC = () => {
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
+          ) : selectedSubModule === "defects" ? (
+            <DefectsLog />
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">

@@ -47,7 +47,16 @@ import {
   type InsertFormVersionUsage,
   workOrders,
   type WorkOrder,
-  type InsertWorkOrder
+  type InsertWorkOrder,
+  defects,
+  type Defect,
+  type InsertDefect,
+  defectActions,
+  type DefectAction,
+  type InsertDefectAction,
+  defectAttachments,
+  type DefectAttachment,
+  type InsertDefectAttachment
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -167,6 +176,71 @@ export interface IStorage {
   createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;
   deleteWorkOrder(id: string): Promise<void>;
+  
+  // Defects methods
+  getDefects(filters?: { 
+    vesselId?: string; 
+    status?: string; 
+    category?: string; 
+    critical?: boolean; 
+    includeClosedDefects?: boolean;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<Defect[]>;
+  getDefect(id: string): Promise<Defect | undefined>;
+  createDefect(defect: InsertDefect): Promise<Defect>;
+  updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect>;
+  deleteDefect(id: string): Promise<void>;
+  
+  // Defect Actions methods
+  getDefectActions(defectId: string): Promise<DefectAction[]>;
+  createDefectAction(action: InsertDefectAction): Promise<DefectAction>;
+  updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction>;
+  deleteDefectAction(id: number): Promise<void>;
+  
+  // Defect Attachments methods
+  getDefectAttachments(defectId: string): Promise<DefectAttachment[]>;
+  createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment>;
+  deleteDefectAttachment(id: number): Promise<void>;
+}
+
+// Helper function to normalize and validate immediateCause structure
+function normalizeImmediateCause(data: any): { unsafeAct: string[], unsafeCondition: string[] } | null {
+  if (!data) return null;
+  
+  // If it's a string (for backward compatibility), return null to indicate no structured data
+  if (typeof data === 'string') return null;
+  
+  // If it's already an object, validate and normalize
+  if (typeof data === 'object') {
+    return {
+      unsafeAct: Array.isArray(data.unsafeAct) ? data.unsafeAct.filter((item: any) => typeof item === 'string') : [],
+      unsafeCondition: Array.isArray(data.unsafeCondition) ? data.unsafeCondition.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
+}
+
+// Helper function to normalize and validate rootCause structure
+function normalizeRootCause(data: any): { individualFactor: string[], systemFactor: string[] } | string | null {
+  if (!data) return null;
+  
+  // If it's a string (for backward compatibility), preserve it as-is
+  if (typeof data === 'string') return data;
+  
+  // If it's already an object, validate and normalize
+  if (typeof data === 'object') {
+    return {
+      individualFactor: Array.isArray(data.individualFactor) ? data.individualFactor.filter((item: any) => typeof item === 'string') : [],
+      systemFactor: Array.isArray(data.systemFactor) ? data.systemFactor.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
 }
 
 export class MemStorage implements IStorage {
@@ -201,6 +275,12 @@ export class MemStorage implements IStorage {
   private currentFormUsageId: number;
   private workOrders: Map<string, WorkOrder>;
   private currentWorkOrderId: number;
+  private defects: Map<string, Defect>;
+  private currentDefectId: number;
+  private defectActions: Map<number, DefectAction>;
+  private currentDefectActionId: number;
+  private defectAttachments: Map<number, DefectAttachment>;
+  private currentDefectAttachmentId: number;
 
   constructor() {
     this.users = new Map();
@@ -234,6 +314,12 @@ export class MemStorage implements IStorage {
     this.currentFormUsageId = 1;
     this.workOrders = new Map();
     this.currentWorkOrderId = 1;
+    this.defects = new Map();
+    this.currentDefectId = 1;
+    this.defectActions = new Map();
+    this.currentDefectActionId = 1;
+    this.defectAttachments = new Map();
+    this.currentDefectAttachmentId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -241,6 +327,7 @@ export class MemStorage implements IStorage {
     this.initializeAlertPolicies();
     this.initializeFormDefinitions();
     this.initializeWorkOrders();
+    this.initializeDefects();
   }
   
   private async initializeFormDefinitions() {
@@ -1990,6 +2077,7 @@ export class MemStorage implements IStorage {
   async createWorkOrder(workOrderData: InsertWorkOrder): Promise<WorkOrder> {
     const workOrder: WorkOrder = {
       ...workOrderData,
+      isExecution: workOrderData.isExecution ?? false,
       id: this.currentWorkOrderId.toString(),
       componentCode: workOrderData.componentCode ?? null,
       templateCode: workOrderData.templateCode ?? null,
@@ -2040,6 +2128,307 @@ export class MemStorage implements IStorage {
       throw new Error(`WorkOrder with id ${id} not found`);
     }
     this.workOrders.delete(id);
+  }
+
+  private initializeDefects() {
+    // Add sample defects data matching the screenshot
+    const sampleDefects = [
+      {
+        id: "22/111/999",
+        vesselId: "V001",
+        vesselName: "Vessel Name Extra Long 1",
+        issueDate: "01-Sep-2019",
+        category: "Defect",
+        description: "S-Band was observed to be defective. There was no trace coming on the",
+        actionTakenRequested: "Requisition raised for shore Service. Expected at",
+        targetDate: "01-Sep-2024",
+        dateCompleted: "01-Sep-2024",
+        status: "Open",
+        priority: "High",
+        critical: false,
+        reportedBy: "Chief Engineer",
+        createdAt: new Date("2019-09-01"),
+        updatedAt: new Date("2024-09-01")
+      },
+      {
+        id: "22/112/999",
+        vesselId: "V001", 
+        vesselName: "Vessel Name Extra Long 2",
+        issueDate: "01-Sep-2019",
+        category: "COC",
+        description: "",
+        actionTakenRequested: "",
+        targetDate: null,
+        dateCompleted: null,
+        status: "Open",
+        priority: "Medium",
+        critical: true,
+        reportedBy: "Chief Officer",
+        createdAt: new Date("2019-09-01"),
+        updatedAt: new Date("2019-09-01")
+      }
+    ];
+
+    sampleDefects.forEach((defect) => {
+      this.defects.set(defect.id, defect as Defect);
+    });
+  }
+
+  // Defects CRUD methods
+  async getDefects(filters?: { 
+    vesselId?: string; 
+    status?: string; 
+    category?: string; 
+    critical?: boolean; 
+    includeClosedDefects?: boolean;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<Defect[]> {
+    let defects = Array.from(this.defects.values());
+    
+    if (filters) {
+      // Vessel filter
+      if (filters.vesselId) {
+        defects = defects.filter(d => d.vesselId === filters.vesselId);
+      }
+      
+      // Status filter
+      if (filters.status) {
+        defects = defects.filter(d => d.status === filters.status);
+      }
+      
+      // Category filter
+      if (filters.category) {
+        defects = defects.filter(d => d.category === filters.category);
+      }
+      
+      // Critical filter
+      if (filters.critical !== undefined) {
+        defects = defects.filter(d => d.critical === filters.critical);
+      }
+      
+      // Text search filter
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        defects = defects.filter(d => 
+          d.id.toLowerCase().includes(searchTerm) ||
+          d.description.toLowerCase().includes(searchTerm) ||
+          (d.actionTakenRequested && d.actionTakenRequested.toLowerCase().includes(searchTerm)) ||
+          d.vesselName.toLowerCase().includes(searchTerm)
+        );
+      }
+      
+      // Period filter
+      if (filters.period) {
+        const now = new Date();
+        let startDate: Date;
+        
+        switch (filters.period) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          default:
+            startDate = new Date(0); // All time
+        }
+        
+        if (filters.period !== 'all') {
+          defects = defects.filter(d => new Date(d.issueDate) >= startDate);
+        }
+      }
+      
+      // Due/Overdue filter
+      if (filters.dueOverdue) {
+        const now = new Date();
+        if (filters.dueOverdue === 'due') {
+          defects = defects.filter(d => d.targetDate && new Date(d.targetDate) >= now && d.status !== 'Closed');
+        } else if (filters.dueOverdue === 'overdue') {
+          defects = defects.filter(d => d.targetDate && new Date(d.targetDate) < now && d.status !== 'Closed');
+        }
+      }
+      
+      // Fleet filter (simplified implementation)
+      if (filters.fleet) {
+        // In a real system, this would filter by fleet assignment
+        // For now, we'll just show all defects if a fleet is selected
+      }
+      
+      // Group filter (simplified implementation)  
+      if (filters.group) {
+        // In a real system, this would group by department or equipment category
+        // For now, we'll filter by equipment category if available
+        if (filters.group === 'department' && defects.length > 0) {
+          defects = defects.filter(d => d.equipmentCategory);
+        }
+      }
+      
+      // Include closed defects filter
+      if (!filters.includeClosedDefects) {
+        defects = defects.filter(d => d.status !== 'Closed');
+      }
+    }
+    
+    return defects.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getDefect(id: string): Promise<Defect | undefined> {
+    return this.defects.get(id);
+  }
+
+  async createDefect(defectData: InsertDefect): Promise<Defect> {
+    const defect: Defect = {
+      ...defectData,
+      status: defectData.status || "Open",
+      priority: defectData.priority || "Medium",
+      critical: defectData.critical || false,
+      severity: defectData.severity || 1,
+      source: defectData.source || null,
+      defectType: defectData.defectType || null,
+      actionTakenRequested: defectData.actionTakenRequested || null,
+      targetDate: defectData.targetDate || null,
+      dateCompleted: defectData.dateCompleted || null,
+      equipmentCategory: defectData.equipmentCategory || null,
+      equipmentType: defectData.equipmentType || null,
+      equipmentMake: defectData.equipmentMake || null,
+      equipmentModel: defectData.equipmentModel || null,
+      equipmentSerialNo: defectData.equipmentSerialNo || null,
+      equipmentLocation: defectData.equipmentLocation || null,
+      equipmentSystem: defectData.equipmentSystem || null,
+      componentId: defectData.componentId || null,
+      purchaseOrderRef: defectData.purchaseOrderRef || null,
+      viqRef: defectData.viqRef || null,
+      sfiCodeRef: defectData.sfiCodeRef || null,
+      immediateCause: normalizeImmediateCause(defectData.immediateCause),
+      rootCause: normalizeRootCause(defectData.rootCause),
+      holdReason: defectData.holdReason || null,
+      nextReviewDate: defectData.nextReviewDate || null,
+      responsibleDept: defectData.responsibleDept || null,
+      verifiedDate: defectData.verifiedDate || null,
+      defectCategory: defectData.defectCategory || null,
+      viqVersion: defectData.viqVersion || null,
+      immediateCauseExplanation: defectData.immediateCauseExplanation || null,
+      rootCauseExplanation: defectData.rootCauseExplanation || null,
+      assignedTo: defectData.assignedTo || null,
+      reviewedBy: defectData.reviewedBy || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.defects.set(defect.id, defect);
+    return defect;
+  }
+
+  async updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect> {
+    const existing = this.defects.get(id);
+    if (!existing) {
+      throw new Error(`Defect with id ${id} not found`);
+    }
+    
+    // Normalize immediateCause and rootCause if they're being updated
+    const normalizedUpdates = { ...updates };
+    if (normalizedUpdates.immediateCause !== undefined) {
+      normalizedUpdates.immediateCause = normalizeImmediateCause(normalizedUpdates.immediateCause);
+    }
+    if (normalizedUpdates.rootCause !== undefined) {
+      normalizedUpdates.rootCause = normalizeRootCause(normalizedUpdates.rootCause);
+    }
+    
+    const updated: Defect = {
+      ...existing,
+      ...normalizedUpdates,
+      updatedAt: new Date()
+    };
+    
+    this.defects.set(id, updated);
+    return updated;
+  }
+
+  async deleteDefect(id: string): Promise<void> {
+    if (!this.defects.has(id)) {
+      throw new Error(`Defect with id ${id} not found`);
+    }
+    this.defects.delete(id);
+  }
+
+  // Defect Actions CRUD methods
+  async getDefectActions(defectId: string): Promise<DefectAction[]> {
+    return Array.from(this.defectActions.values())
+      .filter(action => action.defectId === defectId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createDefectAction(actionData: InsertDefectAction): Promise<DefectAction> {
+    const action: DefectAction = {
+      ...actionData,
+      id: this.currentDefectActionId,
+      status: actionData.status || "Open",
+      dateCompleted: actionData.dateCompleted || null,
+      justification: actionData.justification || null,
+      attachmentUrls: actionData.attachmentUrls || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.defectActions.set(this.currentDefectActionId, action);
+    this.currentDefectActionId++;
+    return action;
+  }
+
+  async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    const existing = this.defectActions.get(id);
+    if (!existing) {
+      throw new Error(`DefectAction with id ${id} not found`);
+    }
+    
+    const updated: DefectAction = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    this.defectActions.set(id, updated);
+    return updated;
+  }
+
+  async deleteDefectAction(id: number): Promise<void> {
+    if (!this.defectActions.has(id)) {
+      throw new Error(`DefectAction with id ${id} not found`);
+    }
+    this.defectActions.delete(id);
+  }
+
+  // Defect Attachments CRUD methods
+  async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
+    return Array.from(this.defectAttachments.values())
+      .filter(attachment => attachment.defectId === defectId)
+      .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+  }
+
+  async createDefectAttachment(attachmentData: InsertDefectAttachment): Promise<DefectAttachment> {
+    const attachment: DefectAttachment = {
+      ...attachmentData,
+      id: this.currentDefectAttachmentId,
+      uploadedAt: new Date()
+    };
+    
+    this.defectAttachments.set(this.currentDefectAttachmentId, attachment);
+    this.currentDefectAttachmentId++;
+    return attachment;
+  }
+
+  async deleteDefectAttachment(id: number): Promise<void> {
+    if (!this.defectAttachments.has(id)) {
+      throw new Error(`DefectAttachment with id ${id} not found`);
+    }
+    this.defectAttachments.delete(id);
   }
 }
 

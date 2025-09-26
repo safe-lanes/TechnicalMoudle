@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from "@shared/schema";
 import { z } from "zod";
 import bulkRoutes from "./routes/bulk";
 import alertRoutes from "./routes/alerts";
@@ -87,6 +87,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to delete work order" });
+    }
+  });
+  
+  // Defects API routes
+  
+  // Get all defects with optional filters
+  app.get("/api/defects", async (req, res) => {
+    try {
+      const filters = {
+        vesselId: req.query.vesselId as string,
+        status: req.query.status as string,
+        category: req.query.category as string,
+        critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
+        includeClosedDefects: req.query.includeClosedDefects === 'true',
+        search: req.query.search as string,
+        period: req.query.period as string,
+        fleet: req.query.fleet as string,
+        group: req.query.group as string,
+        dueOverdue: req.query.dueOverdue as string
+      };
+      const defects = await storage.getDefects(filters);
+      res.json(defects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch defects" });
+    }
+  });
+  
+  // Get single defect
+  app.get("/api/defects/:id", async (req, res) => {
+    try {
+      const defect = await storage.getDefect(req.params.id);
+      if (!defect) {
+        return res.status(404).json({ error: "Defect not found" });
+      }
+      res.json(defect);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch defect" });
+    }
+  });
+  
+  // Create new defect
+  app.post("/api/defects", async (req, res) => {
+    try {
+      const validatedData = insertDefectSchema.parse(req.body);
+      const defect = await storage.createDefect(validatedData);
+      res.status(201).json(defect);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid defect data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create defect" });
+    }
+  });
+  
+  // Update defect
+  app.patch("/api/defects/:id", async (req, res) => {
+    try {
+      const partialDefectSchema = insertDefectSchema.partial();
+      const validatedData = partialDefectSchema.parse(req.body);
+      const defect = await storage.updateDefect(req.params.id, validatedData);
+      res.json(defect);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid defect data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update defect" });
+    }
+  });
+  
+  // Delete defect
+  app.delete("/api/defects/:id", async (req, res) => {
+    try {
+      await storage.deleteDefect(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete defect" });
+    }
+  });
+  
+  // Get defect actions for a specific defect
+  app.get("/api/defects/:defectId/actions", async (req, res) => {
+    try {
+      const actions = await storage.getDefectActions(req.params.defectId);
+      res.json(actions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch defect actions" });
+    }
+  });
+  
+  // Create defect action
+  app.post("/api/defects/:defectId/actions", async (req, res) => {
+    try {
+      const actionData = {
+        ...req.body,
+        defectId: req.params.defectId
+      };
+      const validatedData = insertDefectActionSchema.parse(actionData);
+      const action = await storage.createDefectAction(validatedData);
+      res.status(201).json(action);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid action data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create defect action" });
+    }
+  });
+  
+  // Update defect action
+  app.patch("/api/defect-actions/:id", async (req, res) => {
+    try {
+      const partialActionSchema = insertDefectActionSchema.partial();
+      const validatedData = partialActionSchema.parse(req.body);
+      const action = await storage.updateDefectAction(parseInt(req.params.id), validatedData);
+      res.json(action);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid action data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update defect action" });
+    }
+  });
+  
+  // Delete defect action
+  app.delete("/api/defect-actions/:id", async (req, res) => {
+    try {
+      await storage.deleteDefectAction(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete defect action" });
+    }
+  });
+  
+  // Get defect attachments for a specific defect
+  app.get("/api/defects/:defectId/attachments", async (req, res) => {
+    try {
+      const attachments = await storage.getDefectAttachments(req.params.defectId);
+      res.json(attachments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch defect attachments" });
+    }
+  });
+  
+  // Create defect attachment
+  app.post("/api/defects/:defectId/attachments", async (req, res) => {
+    try {
+      const attachmentData = {
+        ...req.body,
+        defectId: req.params.defectId
+      };
+      const validatedData = insertDefectAttachmentSchema.parse(attachmentData);
+      const attachment = await storage.createDefectAttachment(validatedData);
+      res.status(201).json(attachment);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid attachment data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create defect attachment" });
+    }
+  });
+  
+  // Delete defect attachment
+  app.delete("/api/defect-attachments/:id", async (req, res) => {
+    try {
+      await storage.deleteDefectAttachment(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete defect attachment" });
     }
   });
   
