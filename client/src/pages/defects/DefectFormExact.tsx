@@ -490,12 +490,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="targetDate"
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel className="text-xs text-gray-500 uppercase tracking-wide">TARGET DATE</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             value={field.value || ""}
                             type="date"
-                            placeholder="TARGET DATE"
                             data-testid="input-target-date"
                           />
                         </FormControl>
@@ -508,12 +508,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="dateCompleted"
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel className="text-xs text-gray-500 uppercase tracking-wide">DATE COMPLETED</FormLabel>
                         <FormControl>
                           <Input 
                             {...field}
                             value={field.value || ""}
                             type="date"
-                            placeholder="DATE COMPLETED"
                             data-testid="input-date-completed"
                           />
                         </FormControl>
