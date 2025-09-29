@@ -1,0 +1,51 @@
+You are working on the Defect Report module. Implement the functionality for the "View" button. When the user clicks on "View", the form should switch into a clean read-only mode (view-only layout). Follow these exact requirements:
+
+1. **General Layout Behavior**
+   - The entire form should maintain the same UI alignment, section spacing, and borders as the existing edit mode. Do not change any margins, paddings, or alignment.
+   - The purpose is only to make all fields non-editable (read-only), while maintaining identical visual structure.
+
+2. **Field Rendering**
+   - Replace all input fields, dropdowns, date pickers, and checkboxes with **plain text labels** showing their selected values.
+   - Example: For dropdown “Defect Category” which shows “Defect”, the read-only view should simply display:
+     ```
+     Defect Category: Defect
+     ```
+   - Keep label titles bold and in the same font as current UI.
+   - Empty fields should display “—” (em dash) in muted grey text color (#9e9e9e).
+
+3. **Formatting Rules**
+   - Preserve the **three-column layout** — Basic, Equipment/Hardware, and Date — as in edit mode.
+   - Group all related fields under their respective headers (“Basic”, “Equipment/Hardware”, “Date”, etc.).
+   - Ensure section headers (like *Details*, *Cause Analysis*, *Actions*) remain in bold blue (#16569e) with the same divider lines.
+   - Disable the blue Save buttons and hide dropdown icons or calendars.
+   - For checkboxes (like “Critical”), show a ✅ if checked and ❌ if not.
+
+4. **Immediate Cause / Root Cause Display**
+   - Show the selected causes in a clean list format:
+     ```
+     Immediate Cause:
+     - Unsafe Acts: Non-conformance to Procedure, Improper use of Tools
+     - Unsafe Conditions: Maintenance Error, Defective Equipment
+     ```
+   - Bold the main categories ("Unsafe Acts", "Unsafe Conditions") and display selected options as bullet points below.
+   - Same logic applies for Root Cause — show **Individual Factors** and **System Factors** as grouped lists.
+
+5. **Actions Section**
+   - In view mode, the Actions table should remain visible but all icons (edit/delete) should be hidden.
+   - Only the listed data (Action Type, Responsibility, Due Date, etc.) should be displayed.
+   - Buttons like “Add Action” or “Upload” should be hidden or disabled.
+
+6. **Button Behavior**
+   - When user clicks **View**, switch to read-only mode.
+   - When user clicks **Edit**, return back to editable form mode.
+   - Ensure no field data is lost or reset during this mode switch.
+
+7. **Visual Style**
+   - Background color, card borders, and typography must remain exactly as current UI.
+   - Do NOT alter spacing, color theme, or existing alignment.
+   - Ensure responsive layout is preserved for all resolutions.
+
+8. **Validation**
+   - Verify that switching between View and Edit mode works seamlessly.
+   - Ensure all field values display correctly in view mode and restore properly when toggled back to edit mode.
+

@@ -62,6 +62,7 @@ interface DefectFormExactProps {
 export default function DefectFormExact({ onClose }: DefectFormExactProps) {
   const { toast } = useToast();
   const [defectRef] = useState(generateDefectRef());
+  const [isViewMode, setIsViewMode] = useState(false);
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   const [actions, setActions] = useState<Action[]>([
@@ -143,6 +144,21 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
   const handleImmediateCauseSelect = () => {
     setIsImmediateCauseModalOpen(true);
+  };
+
+  // Helper function to render read-only field value
+  const renderReadOnlyField = (label: string, value: string | undefined | null) => {
+    return (
+      <div className="py-2">
+        <span className="font-semibold text-sm">{label}: </span>
+        <span className="text-sm" style={value ? {} : { color: '#9e9e9e' }}>{value || '—'}</span>
+      </div>
+    );
+  };
+
+  // Helper function to render checkbox value
+  const renderCheckboxValue = (checked: boolean) => {
+    return checked ? '✅' : '❌';
   };
 
   const buildImmediateCauseText = (ic: { unsafeAct: string[]; unsafeCondition: string[] }): string => {
@@ -270,16 +286,22 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back
           </Button>
-          <Button variant="outline" size="sm" className="text-gray-600" data-testid="button-view">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-gray-600" 
+            onClick={() => setIsViewMode(!isViewMode)}
+            data-testid="button-view"
+          >
             <Eye className="w-4 h-4 mr-1" />
-            View
+            {isViewMode ? 'Edit' : 'View'}
           </Button>
           <Button 
             className="text-white hover:opacity-90"
             style={{backgroundColor: '#16569e'}} 
             size="sm" 
             onClick={() => form.handleSubmit(handleSubmit)()}
-            disabled={createDefectMutation.isPending}
+            disabled={createDefectMutation.isPending || isViewMode}
             data-testid="button-save-header"
           >
             {createDefectMutation.isPending ? "SAVING..." : "SAVE"}
@@ -309,24 +331,28 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="vesselId"
                     render={({ field }) => (
                       <FormItem>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue("vesselName", vesselMap[value] || "");
-                          }} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-vessel">
-                              <SelectValue placeholder="VESSEL" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="V001">MV SEAFARER</SelectItem>
-                            <SelectItem value="V002">MV VOYAGER</SelectItem>
-                            <SelectItem value="V003">MV EXPLORER</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("VESSEL", form.watch("vesselName") || "")
+                        ) : (
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue("vesselName", vesselMap[value] || "");
+                            }} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-vessel">
+                                <SelectValue placeholder="VESSEL" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="V001">MV SEAFARER</SelectItem>
+                              <SelectItem value="V002">MV VOYAGER</SelectItem>
+                              <SelectItem value="V003">MV EXPLORER</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -336,20 +362,24 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="source"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-source">
-                              <SelectValue placeholder="SOURCE" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="SIRE">SIRE</SelectItem>
-                            <SelectItem value="PSC">PSC</SelectItem>
-                            <SelectItem value="Internal">Internal</SelectItem>
-                            <SelectItem value="Class">Class</SelectItem>
-                            <SelectItem value="External">External</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("SOURCE", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-source">
+                                <SelectValue placeholder="SOURCE" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="SIRE">SIRE</SelectItem>
+                              <SelectItem value="PSC">PSC</SelectItem>
+                              <SelectItem value="Internal">Internal</SelectItem>
+                              <SelectItem value="Class">Class</SelectItem>
+                              <SelectItem value="External">External</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -359,18 +389,22 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="defectCategory"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-defect-category">
-                              <SelectValue placeholder="DEFECT CATEGORY" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Minor">Minor</SelectItem>
-                            <SelectItem value="Major">Major</SelectItem>
-                            <SelectItem value="Catastrophic">Catastrophic</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("DEFECT CATEGORY", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-defect-category">
+                                <SelectValue placeholder="DEFECT CATEGORY" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Minor">Minor</SelectItem>
+                              <SelectItem value="Major">Major</SelectItem>
+                              <SelectItem value="Catastrophic">Catastrophic</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -380,18 +414,22 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="defectType"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-defect-type">
-                              <SelectValue placeholder="DEFECT TYPE" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Routine">Routine</SelectItem>
-                            <SelectItem value="Corrective">Corrective</SelectItem>
-                            <SelectItem value="Emergency">Emergency</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("DEFECT TYPE", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-defect-type">
+                                <SelectValue placeholder="DEFECT TYPE" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Routine">Routine</SelectItem>
+                              <SelectItem value="Corrective">Corrective</SelectItem>
+                              <SelectItem value="Emergency">Emergency</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -408,19 +446,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentCategory"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-equipment-category">
-                              <SelectValue placeholder="CATEGORY" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Deck">Deck</SelectItem>
-                            <SelectItem value="Navigation">Navigation</SelectItem>
-                            <SelectItem value="Machinery">Machinery</SelectItem>
-                            <SelectItem value="Safety">Safety</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("CATEGORY", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-equipment-category">
+                                <SelectValue placeholder="CATEGORY" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Deck">Deck</SelectItem>
+                              <SelectItem value="Navigation">Navigation</SelectItem>
+                              <SelectItem value="Machinery">Machinery</SelectItem>
+                              <SelectItem value="Safety">Safety</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -430,19 +472,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentType"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-equipment-type">
-                              <SelectValue placeholder="TYPE" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Pump">Pump</SelectItem>
-                            <SelectItem value="Valve">Valve</SelectItem>
-                            <SelectItem value="Motor">Motor</SelectItem>
-                            <SelectItem value="Sensor">Sensor</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("TYPE", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-equipment-type">
+                                <SelectValue placeholder="TYPE" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Pump">Pump</SelectItem>
+                              <SelectItem value="Valve">Valve</SelectItem>
+                              <SelectItem value="Motor">Motor</SelectItem>
+                              <SelectItem value="Sensor">Sensor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -452,19 +498,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentMake"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-equipment-make">
-                              <SelectValue placeholder="MAKE" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Wartsila">Wartsila</SelectItem>
-                            <SelectItem value="MAN">MAN</SelectItem>
-                            <SelectItem value="Caterpillar">Caterpillar</SelectItem>
-                            <SelectItem value="ABB">ABB</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("MAKE", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-equipment-make">
+                                <SelectValue placeholder="MAKE" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Wartsila">Wartsila</SelectItem>
+                              <SelectItem value="MAN">MAN</SelectItem>
+                              <SelectItem value="Caterpillar">Caterpillar</SelectItem>
+                              <SelectItem value="ABB">ABB</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -474,19 +524,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="equipmentModel"
                     render={({ field }) => (
                       <FormItem>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-equipment-model">
-                              <SelectValue placeholder="MODEL" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="W32">W32</SelectItem>
-                            <SelectItem value="6L20">6L20</SelectItem>
-                            <SelectItem value="3508">3508</SelectItem>
-                            <SelectItem value="VFD">VFD</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {isViewMode ? (
+                          renderReadOnlyField("MODEL", field.value || "")
+                        ) : (
+                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-equipment-model">
+                                <SelectValue placeholder="MODEL" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="W32">W32</SelectItem>
+                              <SelectItem value="6L20">6L20</SelectItem>
+                              <SelectItem value="3508">3508</SelectItem>
+                              <SelectItem value="VFD">VFD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -504,24 +558,28 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <label className="relative block cursor-pointer">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
-                              <span className="text-gray-400 text-sm">
-                                DATE ISSUED
-                              </span>
-                              <span className="flex items-center gap-2">
-                                {field.value && <span className="text-black">{field.value}</span>}
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                              </span>
-                            </div>
-                            <input
-                              type="date"
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              data-testid="input-issue-date"
-                            />
-                          </label>
+                          {isViewMode ? (
+                            renderReadOnlyField("DATE ISSUED", field.value || "")
+                          ) : (
+                            <label className="relative block cursor-pointer">
+                              <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                                <span className="text-gray-400 text-sm">
+                                  DATE ISSUED
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  {field.value && <span className="text-black">{field.value}</span>}
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                </span>
+                              </div>
+                              <input
+                                type="date"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                data-testid="input-issue-date"
+                              />
+                            </label>
+                          )}
                         </FormControl>
                       </FormItem>
                     )}
@@ -533,24 +591,28 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <label className="relative block cursor-pointer">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
-                              <span className="text-gray-400 text-sm">
-                                TARGET DATE
-                              </span>
-                              <span className="flex items-center gap-2">
-                                {field.value && <span className="text-black">{field.value}</span>}
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                              </span>
-                            </div>
-                            <input
-                              type="date"
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              data-testid="input-target-date"
-                            />
-                          </label>
+                          {isViewMode ? (
+                            renderReadOnlyField("TARGET DATE", field.value || "")
+                          ) : (
+                            <label className="relative block cursor-pointer">
+                              <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                                <span className="text-gray-400 text-sm">
+                                  TARGET DATE
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  {field.value && <span className="text-black">{field.value}</span>}
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                </span>
+                              </div>
+                              <input
+                                type="date"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                data-testid="input-target-date"
+                              />
+                            </label>
+                          )}
                         </FormControl>
                       </FormItem>
                     )}
@@ -562,24 +624,28 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <label className="relative block cursor-pointer">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
-                              <span className="text-gray-400 text-sm">
-                                DATE COMPLETED
-                              </span>
-                              <span className="flex items-center gap-2">
-                                {field.value && <span className="text-black">{field.value}</span>}
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                              </span>
-                            </div>
-                            <input
-                              type="date"
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              data-testid="input-date-completed"
-                            />
-                          </label>
+                          {isViewMode ? (
+                            renderReadOnlyField("DATE COMPLETED", field.value || "")
+                          ) : (
+                            <label className="relative block cursor-pointer">
+                              <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                                <span className="text-gray-400 text-sm">
+                                  DATE COMPLETED
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  {field.value && <span className="text-black">{field.value}</span>}
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                </span>
+                              </div>
+                              <input
+                                type="date"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value)}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                data-testid="input-date-completed"
+                              />
+                            </label>
+                          )}
                         </FormControl>
                       </FormItem>
                     )}
@@ -599,12 +665,16 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormControl>
-                          <Input 
-                            {...field}
-                            value={field.value || ""}
-                            placeholder="PO REF"
-                            data-testid="input-po-ref"
-                          />
+                          {isViewMode ? (
+                            renderReadOnlyField("PO REF", field.value || "")
+                          ) : (
+                            <Input 
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="PO REF"
+                              data-testid="input-po-ref"
+                            />
+                          )}
                         </FormControl>
                       </FormItem>
                     )}
@@ -615,14 +685,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     name="critical"
                     render={({ field }) => (
                       <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-critical"
-                          />
-                        </FormControl>
-                        <FormLabel>Critical</FormLabel>
+                        {isViewMode ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-sm">Critical: </span>
+                            <span className="text-sm">{renderCheckboxValue(field.value || false)}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-critical"
+                              />
+                            </FormControl>
+                            <FormLabel>Critical</FormLabel>
+                          </>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -755,7 +834,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   type="submit"
                   className="hover:opacity-90"
                   style={{backgroundColor: '#16569e'}} 
-                  disabled={createDefectMutation.isPending}
+                  disabled={createDefectMutation.isPending || isViewMode}
                   data-testid="button-save-description"
                 >
                   {createDefectMutation.isPending ? "SAVING..." : "SAVE"}
@@ -777,17 +856,19 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Immediate Cause</h4>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="hover:opacity-80" 
-                      style={{color: '#16569e', borderColor: '#16569e'}} 
-                      data-testid="button-select-immediate"
-                      onClick={handleImmediateCauseSelect}
-                      type="button"
-                    >
-                      Select
-                    </Button>
+                    {!isViewMode && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="hover:opacity-80" 
+                        style={{color: '#16569e', borderColor: '#16569e'}} 
+                        data-testid="button-select-immediate"
+                        onClick={handleImmediateCauseSelect}
+                        type="button"
+                      >
+                        Select
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -796,16 +877,27 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={typeof field.value === 'string' ? field.value : 
-                                     field.value && typeof field.value === 'object' ? 
-                                     buildImmediateCauseText(field.value as { unsafeAct: string[], unsafeCondition: string[] }) : ""}
-                              rows={3}
-                              placeholder="IMMEDIATE CAUSE"
-                              className="bg-white"
-                              data-testid="textarea-immediate-cause"
-                            />
+                            {isViewMode ? (
+                              <div className="py-2">
+                                <span className="font-semibold text-sm">IMMEDIATE CAUSE: </span>
+                                <pre className="text-sm whitespace-pre-wrap font-sans">
+                                  {typeof field.value === 'string' ? field.value : 
+                                   field.value && typeof field.value === 'object' ? 
+                                   buildImmediateCauseText(field.value as { unsafeAct: string[], unsafeCondition: string[] }) : "—"}
+                                </pre>
+                              </div>
+                            ) : (
+                              <Textarea 
+                                {...field}
+                                value={typeof field.value === 'string' ? field.value : 
+                                       field.value && typeof field.value === 'object' ? 
+                                       buildImmediateCauseText(field.value as { unsafeAct: string[], unsafeCondition: string[] }) : ""}
+                                rows={3}
+                                placeholder="IMMEDIATE CAUSE"
+                                className="bg-white"
+                                data-testid="textarea-immediate-cause"
+                              />
+                            )}
                           </FormControl>
                         </FormItem>
                       )}
@@ -816,14 +908,21 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={field.value || ""}
-                              rows={3}
-                              placeholder="FURTHER EXPLANATION"
-                              className="bg-white"
-                              data-testid="textarea-immediate-explanation"
-                            />
+                            {isViewMode ? (
+                              <div className="py-2">
+                                <span className="font-semibold text-sm">FURTHER EXPLANATION: </span>
+                                <p className="text-sm">{field.value || "—"}</p>
+                              </div>
+                            ) : (
+                              <Textarea 
+                                {...field}
+                                value={field.value || ""}
+                                rows={3}
+                                placeholder="FURTHER EXPLANATION"
+                                className="bg-white"
+                                data-testid="textarea-immediate-explanation"
+                              />
+                            )}
                           </FormControl>
                         </FormItem>
                       )}
@@ -835,16 +934,19 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-sm" style={{color: '#16569e'}}>Root Cause</h4>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="hover:opacity-80" 
-                      style={{color: '#16569e', borderColor: '#16569e'}} 
-                      data-testid="button-select-root"
-                      onClick={handleRootCauseSelect}
-                    >
-                      Select
-                    </Button>
+                    {!isViewMode && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="hover:opacity-80" 
+                        style={{color: '#16569e', borderColor: '#16569e'}} 
+                        data-testid="button-select-root"
+                        onClick={handleRootCauseSelect}
+                        type="button"
+                      >
+                        Select
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -853,16 +955,27 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={typeof field.value === 'object' && field.value ? 
-                                buildRootCauseText(field.value as { individualFactor: string[], systemFactor: string[] }) : 
-                                String(field.value || "")}
-                              rows={3}
-                              placeholder="ROOT CAUSE"
-                              className="bg-white"
-                              data-testid="textarea-root-cause"
-                            />
+                            {isViewMode ? (
+                              <div className="py-2">
+                                <span className="font-semibold text-sm">ROOT CAUSE: </span>
+                                <pre className="text-sm whitespace-pre-wrap font-sans">
+                                  {typeof field.value === 'object' && field.value ? 
+                                    buildRootCauseText(field.value as { individualFactor: string[], systemFactor: string[] }) : 
+                                    field.value || "—"}
+                                </pre>
+                              </div>
+                            ) : (
+                              <Textarea 
+                                {...field}
+                                value={typeof field.value === 'object' && field.value ? 
+                                  buildRootCauseText(field.value as { individualFactor: string[], systemFactor: string[] }) : 
+                                  String(field.value || "")}
+                                rows={3}
+                                placeholder="ROOT CAUSE"
+                                className="bg-white"
+                                data-testid="textarea-root-cause"
+                              />
+                            )}
                           </FormControl>
                         </FormItem>
                       )}
@@ -873,14 +986,21 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={field.value || ""}
-                              rows={3}
-                              placeholder="FURTHER EXPLANATION"
-                              className="bg-white"
-                              data-testid="textarea-root-explanation"
-                            />
+                            {isViewMode ? (
+                              <div className="py-2">
+                                <span className="font-semibold text-sm">FURTHER EXPLANATION: </span>
+                                <p className="text-sm">{field.value || "—"}</p>
+                              </div>
+                            ) : (
+                              <Textarea 
+                                {...field}
+                                value={field.value || ""}
+                                rows={3}
+                                placeholder="FURTHER EXPLANATION"
+                                className="bg-white"
+                                data-testid="textarea-root-explanation"
+                              />
+                            )}
                           </FormControl>
                         </FormItem>
                       )}
@@ -898,18 +1018,20 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                 <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
                   <h2 className="font-semibold text-base" style={{color: '#16569e'}}>ACTIONS</h2>
                 </div>
-                <Button 
-                  type="button"
-                  variant="outline"
-                  className="hover:bg-gray-100 rounded-full px-4"
-                  style={{color: '#16569e', borderColor: '#16569e'}} 
-                  size="sm" 
-                  onClick={addAction}
-                  data-testid="button-add-action"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  ADD ACTION
-                </Button>
+                {!isViewMode && (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="hover:bg-gray-100 rounded-full px-4"
+                    style={{color: '#16569e', borderColor: '#16569e'}} 
+                    size="sm" 
+                    onClick={addAction}
+                    data-testid="button-add-action"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    ADD ACTION
+                  </Button>
+                )}
               </div>
             </div>
             <div>
@@ -938,19 +1060,21 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                         {action.status}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" data-testid={`button-edit-action-${action.id}`}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => removeAction(action.id)}
-                            data-testid={`button-delete-action-${action.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {!isViewMode && (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" data-testid={`button-edit-action-${action.id}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => removeAction(action.id)}
+                              data-testid={`button-delete-action-${action.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -983,7 +1107,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
               type="submit" 
               className="hover:opacity-90 px-8"
               style={{backgroundColor: '#16569e'}}
-              disabled={createDefectMutation.isPending}
+              disabled={createDefectMutation.isPending || isViewMode}
               data-testid="button-submit"
             >
               {createDefectMutation.isPending ? "SUBMITTING..." : "SUBMIT"}
