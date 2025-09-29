@@ -494,6 +494,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                           <Input 
                             {...field}
                             value={field.value || ""}
+                            type="date"
                             placeholder="TARGET DATE"
                             data-testid="input-target-date"
                           />
@@ -511,6 +512,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                           <Input 
                             {...field}
                             value={field.value || ""}
+                            type="date"
                             placeholder="DATE COMPLETED"
                             data-testid="input-date-completed"
                           />
