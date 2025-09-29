@@ -475,7 +475,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                            <div 
+                              className="flex items-center justify-between border rounded-md px-3 py-2 bg-white cursor-pointer"
+                              onClick={() => {
+                                const input = document.getElementById('issue-date-input');
+                                if (input) (input as HTMLInputElement).showPicker();
+                              }}
+                            >
                               <span className="text-gray-400 text-sm">
                                 DATE ISSUED
                               </span>
@@ -484,10 +490,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
-                            <Input 
-                              {...field}
+                            <input
+                              id="issue-date-input"
                               type="date"
-                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="sr-only"
                               data-testid="input-issue-date"
                             />
                           </div>
@@ -503,7 +511,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                            <div 
+                              className="flex items-center justify-between border rounded-md px-3 py-2 bg-white cursor-pointer"
+                              onClick={() => {
+                                const input = document.getElementById('target-date-input');
+                                if (input) (input as HTMLInputElement).showPicker();
+                              }}
+                            >
                               <span className="text-gray-400 text-sm">
                                 TARGET DATE
                               </span>
@@ -512,11 +526,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
-                            <Input 
-                              {...field}
-                              value={field.value || ""}
+                            <input
+                              id="target-date-input"
                               type="date"
-                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="sr-only"
                               data-testid="input-target-date"
                             />
                           </div>
@@ -532,7 +547,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                            <div 
+                              className="flex items-center justify-between border rounded-md px-3 py-2 bg-white cursor-pointer"
+                              onClick={() => {
+                                const input = document.getElementById('date-completed-input');
+                                if (input) (input as HTMLInputElement).showPicker();
+                              }}
+                            >
                               <span className="text-gray-400 text-sm">
                                 DATE COMPLETED
                               </span>
@@ -541,11 +562,12 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
-                            <Input 
-                              {...field}
-                              value={field.value || ""}
+                            <input
+                              id="date-completed-input"
                               type="date"
-                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="sr-only"
                               data-testid="input-date-completed"
                             />
                           </div>
