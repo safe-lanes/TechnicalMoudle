@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Eye, Upload, Plus, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, Upload, Plus, Edit, Trash2, Calendar } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { insertDefectSchema, type InsertDefect } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -478,17 +478,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                             <Input 
                               {...field}
                               type="date"
-                              className="text-transparent"
-                              style={{
-                                color: field.value ? 'inherit' : 'transparent'
-                              }}
+                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
                               data-testid="input-issue-date"
                             />
-                            {!field.value && (
-                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
-                                DATE ISSUED
-                              </div>
-                            )}
+                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                              <span className="text-gray-400 text-sm">
+                                {field.value ? "DATE ISSUED" : "DATE ISSUED"}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                {field.value && <span className="text-black">{field.value}</span>}
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                              </span>
+                            </div>
                           </div>
                         </FormControl>
                       </FormItem>
@@ -506,17 +507,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                               {...field}
                               value={field.value || ""}
                               type="date"
-                              className="text-transparent"
-                              style={{
-                                color: field.value ? 'inherit' : 'transparent'
-                              }}
+                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
                               data-testid="input-target-date"
                             />
-                            {!field.value && (
-                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
+                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                              <span className="text-gray-400 text-sm">
                                 TARGET DATE
-                              </div>
-                            )}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                {field.value && <span className="text-black">{field.value}</span>}
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                              </span>
+                            </div>
                           </div>
                         </FormControl>
                       </FormItem>
@@ -534,17 +536,18 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                               {...field}
                               value={field.value || ""}
                               type="date"
-                              className="text-transparent"
-                              style={{
-                                color: field.value ? 'inherit' : 'transparent'
-                              }}
+                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
                               data-testid="input-date-completed"
                             />
-                            {!field.value && (
-                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
+                            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                              <span className="text-gray-400 text-sm">
                                 DATE COMPLETED
-                              </div>
-                            )}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                {field.value && <span className="text-black">{field.value}</span>}
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                              </span>
+                            </div>
                           </div>
                         </FormControl>
                       </FormItem>
