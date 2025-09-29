@@ -225,7 +225,11 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
     <div className="max-w-6xl mx-auto p-6 bg-white">
       {/* Header with ID in top right */}
       <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center">
+          <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-medium text-sm" style={{color: '#16569e'}}>{defectRef}</span>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -236,10 +240,6 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="font-medium text-sm" style={{color: '#16569e'}}>{defectRef}</span>
           <Button variant="outline" size="sm" className="text-gray-600" data-testid="button-view">
             <Eye className="w-4 h-4 mr-1" />
             View
@@ -793,7 +793,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                               {...field}
                               value={typeof field.value === 'object' && field.value ? 
                                 JSON.stringify(field.value, null, 2) : 
-                                (field.value || "")}
+                                String(field.value || "")}
                               rows={3}
                               placeholder="ROOT CAUSE"
                               className="bg-white"
