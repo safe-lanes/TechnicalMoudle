@@ -145,16 +145,49 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
     setIsImmediateCauseModalOpen(true);
   };
 
+  const buildImmediateCauseText = (ic: { unsafeAct: string[]; unsafeCondition: string[] }): string => {
+    const sections: string[] = [];
+    if (ic?.unsafeAct?.length) {
+      sections.push(
+        "UNSAFE ACT",
+        ...ic.unsafeAct.map(item => `• ${item}`)
+      );
+    }
+    if (ic?.unsafeCondition?.length) {
+      if (sections.length) sections.push(""); // blank line between sections
+      sections.push(
+        "UNSAFE CONDITION",
+        ...ic.unsafeCondition.map(item => `• ${item}`)
+      );
+    }
+    return sections.join("\n");
+  };
+
   const handleImmediateCauseSubmit = (causeData: { unsafeAct: string[], unsafeCondition: string[] }) => {
     // Store the structured data for backend persistence
     form.setValue('immediateCause', causeData);
-    
-    // The form field already handles JSON stringification for display in the textarea
-    // when typeof field.value === 'object' in the render function
   };
 
   const handleRootCauseSelect = () => {
     setIsRootCauseModalOpen(true);
+  };
+
+  const buildRootCauseText = (rc: { individualFactor: string[]; systemFactor: string[] }): string => {
+    const sections: string[] = [];
+    if (rc?.individualFactor?.length) {
+      sections.push(
+        "INDIVIDUAL FACTOR",
+        ...rc.individualFactor.map(item => `• ${item}`)
+      );
+    }
+    if (rc?.systemFactor?.length) {
+      if (sections.length) sections.push(""); // blank line between sections
+      sections.push(
+        "SYSTEM FACTOR",
+        ...rc.systemFactor.map(item => `• ${item}`)
+      );
+    }
+    return sections.join("\n");
   };
 
   const handleRootCauseSubmit = (causeData: { individualFactor: string[], systemFactor: string[] }) => {
@@ -163,9 +196,6 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
     
     // Close the modal after successful submission
     setIsRootCauseModalOpen(false);
-    
-    // The form field already handles JSON stringification for display in the textarea
-    // when typeof field.value === 'object' in the render function
   };
 
   const handleSubmit = (data: DefectFormData) => {
@@ -770,7 +800,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                               {...field}
                               value={typeof field.value === 'string' ? field.value : 
                                      field.value && typeof field.value === 'object' ? 
-                                     JSON.stringify(field.value) : ""}
+                                     buildImmediateCauseText(field.value as { unsafeAct: string[], unsafeCondition: string[] }) : ""}
                               rows={3}
                               placeholder="IMMEDIATE CAUSE"
                               className="bg-white"
@@ -826,7 +856,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                             <Textarea 
                               {...field}
                               value={typeof field.value === 'object' && field.value ? 
-                                JSON.stringify(field.value, null, 2) : 
+                                buildRootCauseText(field.value as { individualFactor: string[], systemFactor: string[] }) : 
                                 String(field.value || "")}
                               rows={3}
                               placeholder="ROOT CAUSE"

@@ -1,0 +1,150 @@
+Great—here’s a crisp **copy-paste prompt for Replit** to implement **Option A** (keep the textarea, show clean plain text with uppercase section headers and bullets). It is **functionality-only** and must not change any colors, fonts, spacing, or layout anywhere.
+
+---
+
+## PROMPT FOR REPLIT — Clean plaintext summary in the existing textareas (Immediate & Root Cause)
+
+**Goal**
+Stop showing raw JSON (brackets/quotes/keys) in the **Immediate Cause** and **Root Cause** textareas. Keep the current textareas and render a **human-readable plaintext summary** with **UPPERCASE section headers** and **• bullets**.
+**Do not change any UI styling or layout.**
+
+### Scope
+
+* Applies to **both** fields:
+
+  * Immediate Cause → textarea with placeholder “IMMEDIATE CAUSE”
+  * Root Cause → textarea with placeholder “ROOT CAUSE”
+* The *selection modals* and *data model* stay as they are. This task only changes the **string that we write** into those textareas after Save (and on load).
+
+---
+
+### Formatting (exact)
+
+* **Immediate Cause** textarea content must follow this structure:
+
+  ```
+  UNSAFE ACT
+  • <selected item 1>
+  • <selected item 2>
+
+  UNSAFE CONDITION
+  • <selected item 1>
+  • <selected item 2>
+  ```
+
+  * Omit a section completely if it has **no selections**.
+  * Insert **one blank line** between the two sections **only if both are present**.
+* **Root Cause** textarea content must follow this structure:
+
+  ```
+  INDIVIDUAL FACTOR
+  • <selected item 1>
+  • <selected item 2>
+
+  SYSTEM FACTOR
+  • <selected item 1>
+  • <selected item 2>
+  ```
+
+  * Same rules as above for omission and blank line.
+
+> Note: These are plain characters in a normal `<textarea>`—no bold, no HTML.
+
+---
+
+### Implementation details
+
+**Data model (unchanged):**
+
+```json
+// Immediate
+{ "immediateCause": { "unsafeAct": string[], "unsafeCondition": string[] } }
+// Root
+{ "rootCause": { "individualFactor": string[], "systemFactor": string[] } }
+```
+
+**String builders (pseudo/TS):**
+
+```ts
+function buildImmediateCauseText(ic: { unsafeAct: string[]; unsafeCondition: string[] }): string {
+  const sections: string[] = [];
+  if (ic?.unsafeAct?.length) {
+    sections.push(
+      "UNSAFE ACT",
+      ...ic.unsafeAct.map(item => `• ${item}`)
+    );
+  }
+  if (ic?.unsafeCondition?.length) {
+    if (sections.length) sections.push(""); // blank line between sections
+    sections.push(
+      "UNSAFE CONDITION",
+      ...ic.unsafeCondition.map(item => `• ${item}`)
+    );
+  }
+  return sections.join("\n");
+}
+
+function buildRootCauseText(rc: { individualFactor: string[]; systemFactor: string[] }): string {
+  const sections: string[] = [];
+  if (rc?.individualFactor?.length) {
+    sections.push(
+      "INDIVIDUAL FACTOR",
+      ...rc.individualFactor.map(item => `• ${item}`)
+    );
+  }
+  if (rc?.systemFactor?.length) {
+    if (sections.length) sections.push(""); // blank line between sections
+    sections.push(
+      "SYSTEM FACTOR",
+      ...rc.systemFactor.map(item => `• ${item}`)
+    );
+  }
+  return sections.join("\n");
+}
+```
+
+**Where to use:**
+
+* After the user clicks **Save** in the **Immediate Cause** modal:
+
+  1. Persist arrays as you already do.
+  2. Compute `textarea.value = buildImmediateCauseText(updatedImmediateCause)`.
+* After the user clicks **Save** in the **Root Cause** modal:
+
+  1. Persist arrays as you already do.
+  2. Compute `textarea.value = buildRootCauseText(updatedRootCause)`.
+* On initial load of a defect, compute and place the same strings so there’s never raw JSON in the textareas.
+
+**Do not** use `JSON.stringify(...)` for these textareas. Join only the selected **labels** per the builders above.
+
+**Empty state:**
+
+* If both sections are empty for a field, set `textarea.value = ""` and let the **existing placeholder** show (e.g., “IMMEDIATE CAUSE”, “ROOT CAUSE”).
+
+**Editing:**
+
+* Keep textareas **editable** (as they are now). Users can add free text if they want; the next modal Save should overwrite with the freshly built list again (current behavior is fine).
+
+---
+
+### Must not change
+
+* No modifications to colors, fonts, borders, padding, margins, sizes, label positions, or button placements.
+* No component swaps (keep textarea elements).
+* No changes to other sections (e.g., Further Explanation, Actions).
+
+---
+
+### Test checklist (pass all)
+
+* Selecting multiple Immediate Causes shows clean plaintext with headers and bullets, no JSON artifacts.
+* Same for Root Cause.
+* If only one section has values, only that section renders with **no leading or trailing blank lines**.
+* If both sections have values, exactly **one blank line** separates them.
+* Clearing all selections results in an **empty textarea** and the placeholder is visible.
+* Reloading a saved defect reconstructs the same plaintext correctly.
+* No visual regressions elsewhere on the page.
+
+---
+
+Please implement exactly as above, ensuring **no UI/visual changes** beyond the content of the two textareas.
