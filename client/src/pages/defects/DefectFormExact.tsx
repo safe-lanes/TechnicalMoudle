@@ -474,12 +474,22 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input 
-                            {...field}
-                            type="date"
-                            placeholder="DATE ISSUED"
-                            data-testid="input-issue-date"
-                          />
+                          <div className="relative">
+                            <Input 
+                              {...field}
+                              type="date"
+                              className="text-transparent"
+                              style={{
+                                color: field.value ? 'inherit' : 'transparent'
+                              }}
+                              data-testid="input-issue-date"
+                            />
+                            {!field.value && (
+                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
+                                DATE ISSUED
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
                       </FormItem>
                     )}
@@ -491,13 +501,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input 
-                            {...field}
-                            value={field.value || ""}
-                            type="date"
-                            placeholder="TARGET DATE"
-                            data-testid="input-target-date"
-                          />
+                          <div className="relative">
+                            <Input 
+                              {...field}
+                              value={field.value || ""}
+                              type="date"
+                              className="text-transparent"
+                              style={{
+                                color: field.value ? 'inherit' : 'transparent'
+                              }}
+                              data-testid="input-target-date"
+                            />
+                            {!field.value && (
+                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
+                                TARGET DATE
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
                       </FormItem>
                     )}
@@ -509,13 +529,23 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input 
-                            {...field}
-                            value={field.value || ""}
-                            type="date"
-                            placeholder="DATE COMPLETED"
-                            data-testid="input-date-completed"
-                          />
+                          <div className="relative">
+                            <Input 
+                              {...field}
+                              value={field.value || ""}
+                              type="date"
+                              className="text-transparent"
+                              style={{
+                                color: field.value ? 'inherit' : 'transparent'
+                              }}
+                              data-testid="input-date-completed"
+                            />
+                            {!field.value && (
+                              <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-gray-400">
+                                DATE COMPLETED
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
                       </FormItem>
                     )}
