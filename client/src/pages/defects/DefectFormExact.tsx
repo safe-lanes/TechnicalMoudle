@@ -91,7 +91,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       id: defectRef,
       vesselId: "V001",
       vesselName: "MV SEAFARER",
-      issueDate: new Date().toISOString().split('T')[0],
+      issueDate: "",
       category: "Defect", // Default category
       defectType: "",
       description: "",
@@ -475,21 +475,21 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <Input 
-                              {...field}
-                              type="date"
-                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
-                              data-testid="input-issue-date"
-                            />
                             <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
                               <span className="text-gray-400 text-sm">
-                                {field.value ? "DATE ISSUED" : "DATE ISSUED"}
+                                DATE ISSUED
                               </span>
                               <span className="flex items-center gap-2">
                                 {field.value && <span className="text-black">{field.value}</span>}
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
+                            <Input 
+                              {...field}
+                              type="date"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              data-testid="input-issue-date"
+                            />
                           </div>
                         </FormControl>
                       </FormItem>
@@ -503,13 +503,6 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <Input 
-                              {...field}
-                              value={field.value || ""}
-                              type="date"
-                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
-                              data-testid="input-target-date"
-                            />
                             <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
                               <span className="text-gray-400 text-sm">
                                 TARGET DATE
@@ -519,6 +512,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
+                            <Input 
+                              {...field}
+                              value={field.value || ""}
+                              type="date"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              data-testid="input-target-date"
+                            />
                           </div>
                         </FormControl>
                       </FormItem>
@@ -532,13 +532,6 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                            <Input 
-                              {...field}
-                              value={field.value || ""}
-                              type="date"
-                              className="absolute inset-0 opacity-0 z-10 cursor-pointer"
-                              data-testid="input-date-completed"
-                            />
                             <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
                               <span className="text-gray-400 text-sm">
                                 DATE COMPLETED
@@ -548,6 +541,13 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                                 <Calendar className="h-4 w-4 text-gray-400" />
                               </span>
                             </div>
+                            <Input 
+                              {...field}
+                              value={field.value || ""}
+                              type="date"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              data-testid="input-date-completed"
+                            />
                           </div>
                         </FormControl>
                       </FormItem>
