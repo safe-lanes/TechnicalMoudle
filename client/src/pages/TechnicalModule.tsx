@@ -11,7 +11,9 @@ import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
 import ReportsModule from "./reports/ReportsModule";
-import DefectsLog from "./defects/DefectsLog";
+import DefectsActive from "./defects/DefectsActive";
+import DefectsResolved from "./defects/DefectsResolved";
+import DefectsReports from "./defects/DefectsReports";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -108,8 +110,12 @@ export const TechnicalModule: React.FC = () => {
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
-          ) : selectedSubModule === "defects" ? (
-            <DefectsLog />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "active" ? (
+            <DefectsActive />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "resolved" ? (
+            <DefectsResolved />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "reports" ? (
+            <DefectsReports />
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">

@@ -511,7 +511,7 @@ export const defects = pgTable("defects", {
   actionTakenRequested: text("action_taken_requested"),
   targetDate: text("target_date"), // DD-MM-YYYY format
   dateCompleted: text("date_completed"), // DD-MM-YYYY format
-  status: text("status").notNull().default("Open"), // 'Open' | 'In Progress' | 'On Hold' | 'Closed'
+  status: text("status").notNull().default("Open"), // 'Open' | 'Pending' | 'In-Progress' | 'Awaiting Parts' | 'Deferred' | 'Closed' | 'Cancelled'
   priority: text("priority").default("Medium"), // 'Low' | 'Medium' | 'High'
   critical: boolean("critical").notNull().default(false),
   severity: integer("severity").default(1), // 1-Minor, 2-Moderate, 3-Major
@@ -537,6 +537,12 @@ export const defects = pgTable("defects", {
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
   holdReason: text("hold_reason"), // For On Hold status
   nextReviewDate: text("next_review_date"), // For On Hold items
+  defermentFlag: boolean("deferment_flag").notNull().default(false),
+  defermentReason: text("deferment_reason"),
+  reportedTo: text("reported_to"), // 'Class' | 'Flag' | 'Port' | 'None'
+  operatingState: text("operating_state"), // 'Sailing' | 'Port' | 'Anchor'
+  routineBreakdown: text("routine_breakdown"), // 'Routine' | 'Breakdown'
+  raisedByUserId: text("raised_by_user_id"),
   reportedBy: text("reported_by").notNull(),
   assignedTo: text("assigned_to"),
   reviewedBy: text("reviewed_by"),

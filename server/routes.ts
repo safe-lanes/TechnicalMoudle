@@ -98,6 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters = {
         vesselId: req.query.vesselId as string,
         status: req.query.status as string,
+        statusView: req.query.statusView as 'active' | 'resolved' | undefined,
         category: req.query.category as string,
         critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
         includeClosedDefects: req.query.includeClosedDefects === 'true',
@@ -111,6 +112,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(defects);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch defects" });
+    }
+  });
+  
+  // Get defects count
+  app.get("/api/defects/count", async (req, res) => {
+    try {
+      const filters = {
+        statusView: req.query.statusView as 'active' | 'resolved' | undefined,
+        vesselId: req.query.vesselId as string,
+        status: req.query.status as string,
+        category: req.query.category as string,
+      };
+      const defects = await storage.getDefects(filters);
+      res.json({ count: defects.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get defects count" });
     }
   });
   
@@ -269,6 +286,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to delete defect attachment" });
+    }
+  });
+  
+  // Defects Reports API
+  app.post("/api/defects/reports/:reportKey", async (req, res) => {
+    try {
+      const { reportKey } = req.params;
+      const filters = req.body;
+      
+      // Get defects based on filters
+      const defects = await storage.getDefects(filters);
+      
+      // Generate report data based on report type
+      let reportData: any = {};
+      
+      switch (reportKey) {
+        case 'open-defects':
+          const activeDefects = defects.filter(d => ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status));
+          const today = new Date();
+          const overdue = activeDefects.filter(d => d.targetDate && new Date(d.targetDate) < today);
+          reportData = {
+            kpis: {
+              totalOpen: activeDefects.length,
+              dueThisMonth: activeDefects.filter(d => {
+                if (!d.targetDate) return false;
+                const target = new Date(d.targetDate);
+                return target.getMonth() === today.getMonth() && target.getFullYear() === today.getFullYear();
+              }).length,
+              overdue: overdue.length,
+              avgAge: activeDefects.reduce((sum, d) => {
+                const age = Math.floor((today.getTime() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                return sum + age;
+              }, 0) / (activeDefects.length || 1)
+            },
+            table: activeDefects
+          };
+          break;
+          
+        case 'closure-performance':
+          const closedDefects = defects.filter(d => d.status === 'Closed');
+          const closureMetrics = closedDefects.map(d => {
+            if (!d.dateCompleted || !d.issueDate) return null;
+            const days = Math.floor((new Date(d.dateCompleted).getTime() - new Date(d.issueDate).getTime()) / (1000 * 60 * 60 * 24));
+            const onTime = d.targetDate && new Date(d.dateCompleted) <= new Date(d.targetDate);
+            return { days, onTime };
+          }).filter((m): m is { days: number; onTime: boolean } => m !== null);
+          
+          reportData = {
+            kpis: {
+              medianDaysToClose: closureMetrics.length > 0 ? 
+                closureMetrics.sort((a, b) => a.days - b.days)[Math.floor(closureMetrics.length / 2)].days : 0,
+              percentOnTime: closureMetrics.length > 0 ?
+                (closureMetrics.filter(m => m.onTime).length / closureMetrics.length) * 100 : 0,
+              totalClosed: closedDefects.length
+            },
+            table: closedDefects
+          };
+          break;
+          
+        case 'root-cause':
+        case 'deferments':
+        case 'regulatory':
+        case 'aging':
+        case 'viq-sfi':
+          // Placeholder for other report types
+          reportData = {
+            kpis: { total: defects.length },
+            table: defects
+          };
+          break;
+          
+        default:
+          return res.status(400).json({ error: "Invalid report key" });
+      }
+      
+      res.json(reportData);
+    } catch (error) {
+      console.error('Report generation error:', error);
+      res.status(500).json({ error: "Failed to generate report" });
     }
   });
   

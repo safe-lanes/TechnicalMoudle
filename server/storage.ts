@@ -181,6 +181,7 @@ export interface IStorage {
   getDefects(filters?: { 
     vesselId?: string; 
     status?: string; 
+    statusView?: 'active' | 'resolved'; // Add support for active/resolved filtering
     category?: string; 
     critical?: boolean; 
     includeClosedDefects?: boolean;
@@ -2178,6 +2179,7 @@ export class MemStorage implements IStorage {
   async getDefects(filters?: { 
     vesselId?: string; 
     status?: string; 
+    statusView?: 'active' | 'resolved'; // Add support for active/resolved filtering
     category?: string; 
     critical?: boolean; 
     includeClosedDefects?: boolean;
@@ -2193,6 +2195,19 @@ export class MemStorage implements IStorage {
       // Vessel filter
       if (filters.vesselId) {
         defects = defects.filter(d => d.vesselId === filters.vesselId);
+      }
+      
+      // StatusView filter for Active/Resolved views
+      if (filters.statusView) {
+        if (filters.statusView === 'active') {
+          // Active: status IN {Open, Pending, In-Progress, Awaiting Parts, Deferred}
+          const activeStatuses = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'];
+          defects = defects.filter(d => activeStatuses.includes(d.status));
+        } else if (filters.statusView === 'resolved') {
+          // Resolved: status IN {Closed, Cancelled}
+          const resolvedStatuses = ['Closed', 'Cancelled'];
+          defects = defects.filter(d => resolvedStatuses.includes(d.status));
+        }
       }
       
       // Status filter
@@ -2318,6 +2333,12 @@ export class MemStorage implements IStorage {
       rootCauseExplanation: defectData.rootCauseExplanation || null,
       assignedTo: defectData.assignedTo || null,
       reviewedBy: defectData.reviewedBy || null,
+      defermentFlag: defectData.defermentFlag || false,
+      defermentReason: defectData.defermentReason || null,
+      reportedTo: defectData.reportedTo || null,
+      operatingState: defectData.operatingState || null,
+      routineBreakdown: defectData.routineBreakdown || null,
+      raisedByUserId: defectData.raisedByUserId || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
