@@ -14,6 +14,8 @@ import ReportsModule from "./reports/ReportsModule";
 import DefectsActive from "./defects/DefectsActive";
 import DefectsResolved from "./defects/DefectsResolved";
 import DefectsReports from "./defects/DefectsReports";
+import DefectsCoC from "./defects/DefectsCoC";
+import DefectsRecurring from "./defects/DefectsRecurring";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -28,7 +30,13 @@ export const TechnicalModule: React.FC = () => {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
     } else if (location === "/defects") {
-      return { subModule: "defects", menuItem: "active" }; // Default to active when accessing /defects
+      return { subModule: "defects", menuItem: "dashboard" }; // Default to dashboard when accessing /defects
+    } else if (location === "/defects/active") {
+      return { subModule: "defects", menuItem: "defect-log" };
+    } else if (location === "/defects/coc") {
+      return { subModule: "defects", menuItem: "coc" };
+    } else if (location === "/defects/recurring") {
+      return { subModule: "defects", menuItem: "recurring" };
     } else if (location.startsWith("/defects/")) {
       const subpage = location.replace("/defects/", "");
       return { subModule: "defects", menuItem: subpage };
@@ -121,8 +129,14 @@ export const TechnicalModule: React.FC = () => {
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
-          ) : selectedSubModule === "defects" && selectedMenuItem === "active" ? (
+          ) : selectedSubModule === "defects" && selectedMenuItem === "dashboard" ? (
             <DefectsActive />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "defect-log" ? (
+            <DefectsActive />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "coc" ? (
+            <DefectsCoC />
+          ) : selectedSubModule === "defects" && selectedMenuItem === "recurring" ? (
+            <DefectsRecurring />
           ) : selectedSubModule === "defects" && selectedMenuItem === "resolved" ? (
             <DefectsResolved />
           ) : selectedSubModule === "defects" && selectedMenuItem === "reports" ? (

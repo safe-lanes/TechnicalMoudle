@@ -16,6 +16,9 @@ import {
   CheckCircle,
   Users,
   Shield,
+  Flag,
+  RefreshCw,
+  List,
 } from "lucide-react";
 
 interface SideMenuBarProps {
@@ -27,6 +30,7 @@ interface SideMenuBarProps {
 interface MenuItem {
   id: string;
   label: string;
+  sublabel?: string;
   icon: React.ElementType;
 }
 
@@ -53,8 +57,10 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "due-dates", label: "Due Dates", icon: Clock },
   ],
   defects: [
-    { id: "active", label: "Active", icon: AlertTriangle },
-    { id: "resolved", label: "Resolved", icon: CheckCircle },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "defect-log", label: "Defect Log", icon: List },
+    { id: "coc", label: "CoC", sublabel: "Condition of Class", icon: Flag },
+    { id: "recurring", label: "Recurring Defects", icon: RefreshCw },
     { id: "reports", label: "Reports", icon: FileText },
   ],
   admin: [
@@ -87,8 +93,14 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
     } else if (subModule === "admin") {
       setLocation(`/admin/${itemId}`);
     } else if (subModule === "defects") {
-      if (itemId === "active") {
+      if (itemId === "dashboard") {
         setLocation("/defects");
+      } else if (itemId === "defect-log") {
+        setLocation("/defects/active");
+      } else if (itemId === "coc") {
+        setLocation("/defects/coc");
+      } else if (itemId === "recurring") {
+        setLocation("/defects/recurring");
       } else {
         setLocation(`/defects/${itemId}`);
       }
@@ -112,6 +124,9 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
               isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
               "group relative"
             )}
+            role="link"
+            aria-label={item.sublabel ? `${item.label}, ${item.sublabel}` : item.label}
+            aria-current={isSelected ? "page" : undefined}
           >
             <Icon
               className={cn(
@@ -122,10 +137,15 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             <span className="text-[10px] text-white text-center leading-tight">
               {item.label}
             </span>
+            {item.sublabel && (
+              <span className="text-[8px] text-blue-200 text-center leading-tight opacity-90">
+                {item.sublabel}
+              </span>
+            )}
             
             {/* Tooltip on hover */}
             <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-              {item.label}
+              {item.sublabel ? `${item.label} - ${item.sublabel}` : item.label}
             </div>
           </button>
         );
