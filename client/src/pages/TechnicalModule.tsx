@@ -17,7 +17,7 @@ import DefectsReports from "./defects/DefectsReports";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const params = useParams();
   
   // Derive state from URL
@@ -58,11 +58,22 @@ export const TechnicalModule: React.FC = () => {
 
   const handleSubModuleChange = (subModule: string) => {
     setSelectedSubModule(subModule);
-    // Set default menu item based on submodule
+    // Set default menu item based on submodule and navigate
     if (subModule === "admin") {
       setSelectedMenuItem("alerts"); // Default to alerts for admin
+      setLocation("/admin/alerts");
     } else if (subModule === "defects") {
       setSelectedMenuItem("active"); // Default to active for defects
+      setLocation("/defects");
+    } else if (subModule === "pms") {
+      setSelectedMenuItem("dashboard");
+      setLocation("/pms/dashboard");
+    } else if (subModule === "dashboard") {
+      setSelectedMenuItem("overview");
+      setLocation("/dashboard");
+    } else if (subModule === "cert-surveys") {
+      setSelectedMenuItem("certificates");
+      setLocation("/cert-surveys");
     } else {
       setSelectedMenuItem("dashboard"); // Default to dashboard for other modules
     }
