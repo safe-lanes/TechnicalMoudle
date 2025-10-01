@@ -110,7 +110,10 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
   };
 
   return (
-    <div className="w-20 min-h-screen flex flex-col items-center py-4 bg-[#16569e]">
+    <div className={cn(
+      "min-h-screen flex flex-col items-center py-4 bg-[#16569e]",
+      subModule === "defects" ? "w-28" : "w-20"
+    )}>
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem;
@@ -120,7 +123,8 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             key={item.id}
             onClick={() => handleItemClick(item.id)}
             className={cn(
-              "w-full h-14 mb-4 flex flex-col items-center justify-center transition-all duration-200",
+              "w-full mb-4 flex flex-col items-center justify-center transition-all duration-200 px-2",
+              subModule === "defects" ? "min-h-16 py-2" : "h-14",
               isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
               "group relative"
             )}
@@ -134,7 +138,10 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
                 isSelected ? "text-white" : "text-blue-100"
               )}
             />
-            <span className="text-[10px] text-white text-center leading-tight">
+            <span className={cn(
+              "text-white text-center leading-tight break-words",
+              subModule === "defects" ? "text-xs" : "text-[10px]"
+            )}>
               {item.label}
             </span>
             {item.sublabel && (
