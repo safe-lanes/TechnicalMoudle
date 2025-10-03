@@ -2454,7 +2454,11 @@ export class MemStorage implements IStorage {
 }
 
 // Use in-memory storage for Technical Module
-const storage: IStorage = new MemStorage();
-console.log("ℹ️  Technical Module using in-memory storage for development");
+// Import PersistentFileStorage instead of using MemStorage
+import { PersistentFileStorage } from "./persistentStorage";
+
+// ALWAYS use PersistentFileStorage - no fallback to MemStorage
+const storage: IStorage = new PersistentFileStorage('test-data.json');
+console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
 
 export { storage };

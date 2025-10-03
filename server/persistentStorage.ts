@@ -1,0 +1,1169 @@
+import fs from 'fs';
+import path from 'path';
+import { 
+  type User, 
+  type InsertUser,
+  type Component,
+  type InsertComponent,
+  type RunningHoursAudit,
+  type InsertRunningHoursAudit,
+  type Spare,
+  type InsertSpare,
+  type SpareHistory,
+  type InsertSpareHistory,
+  type ChangeRequest,
+  type InsertChangeRequest,
+  type ChangeRequestAttachment,
+  type InsertChangeRequestAttachment,
+  type ChangeRequestComment,
+  type InsertChangeRequestComment,
+  type AlertPolicy,
+  type InsertAlertPolicy,
+  type AlertEvent,
+  type InsertAlertEvent,
+  type AlertDelivery,
+  type InsertAlertDelivery,
+  type AlertConfig,
+  type InsertAlertConfig,
+  type FormDefinition,
+  type InsertFormDefinition,
+  type FormVersion,
+  type InsertFormVersion,
+  type FormVersionUsage,
+  type InsertFormVersionUsage,
+  type WorkOrder,
+  type InsertWorkOrder,
+  type Defect,
+  type InsertDefect,
+  type DefectAction,
+  type InsertDefectAction,
+  type DefectAttachment,
+  type InsertDefectAttachment
+} from "@shared/schema";
+import type { IStorage } from "./storage";
+
+interface PersistentData {
+  users: Record<number, User>;
+  components: Record<string, Component>;
+  runningHoursAudits: RunningHoursAudit[];
+  spares: Record<number, Spare>;
+  sparesHistory: SpareHistory[];
+  changeRequests: Record<number, ChangeRequest>;
+  changeRequestAttachments: ChangeRequestAttachment[];
+  changeRequestComments: ChangeRequestComment[];
+  alertPolicies: Record<number, AlertPolicy>;
+  alertEvents: Record<number, AlertEvent>;
+  alertDeliveries: Record<number, AlertDelivery>;
+  alertConfigs: Record<string, AlertConfig>;
+  formDefinitions: Record<number, FormDefinition>;
+  formVersions: Record<number, FormVersion>;
+  formVersionUsages: FormVersionUsage[];
+  workOrders: Record<string, WorkOrder>;
+  defects: Record<number, Defect>;
+  defectActions: DefectAction[];
+  defectAttachments: DefectAttachment[];
+  
+  // Counter state
+  counters: {
+    userId: number;
+    auditId: number;
+    spareId: number;
+    historyId: number;
+    changeRequestId: number;
+    attachmentId: number;
+    commentId: number;
+    alertPolicyId: number;
+    alertEventId: number;
+    alertDeliveryId: number;
+    alertConfigId: number;
+    formDefinitionId: number;
+    formVersionId: number;
+    workOrderId: number;
+    defectId: number;
+    defectActionId: number;
+    defectAttachmentId: number;
+  };
+}
+
+// Helper function to normalize immediateCause structure
+function normalizeImmediateCause(data: any): { unsafeAct: string[], unsafeCondition: string[] } | null {
+  if (!data) return null;
+  
+  if (typeof data === 'string') return null;
+  
+  if (typeof data === 'object') {
+    return {
+      unsafeAct: Array.isArray(data.unsafeAct) ? data.unsafeAct.filter((item: any) => typeof item === 'string') : [],
+      unsafeCondition: Array.isArray(data.unsafeCondition) ? data.unsafeCondition.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
+}
+
+// Helper function to normalize rootCause structure
+function normalizeRootCause(data: any): { individualFactor: string[], systemFactor: string[] } | string | null {
+  if (!data) return null;
+  
+  if (typeof data === 'string') return data;
+  
+  if (typeof data === 'object') {
+    return {
+      individualFactor: Array.isArray(data.individualFactor) ? data.individualFactor.filter((item: any) => typeof item === 'string') : [],
+      systemFactor: Array.isArray(data.systemFactor) ? data.systemFactor.filter((item: any) => typeof item === 'string') : []
+    };
+  }
+  
+  return null;
+}
+
+export class PersistentFileStorage implements IStorage {
+  private readonly dataFile: string;
+  private data: PersistentData;
+
+  constructor(filePath: string = 'test-data.json') {
+    this.dataFile = path.resolve(process.cwd(), filePath);
+    this.data = this.loadData();
+    console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
+    console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
+  }
+
+  private loadData(): PersistentData {
+    try {
+      if (fs.existsSync(this.dataFile)) {
+        const fileContent = fs.readFileSync(this.dataFile, 'utf-8');
+        const loadedData = JSON.parse(fileContent) as Partial<PersistentData>;
+        console.log(`📂 Loading existing data from ${this.dataFile}`);
+        
+        // Ensure all required fields exist with proper defaults
+        return {
+          users: loadedData.users || {},
+          components: loadedData.components || {},
+          runningHoursAudits: loadedData.runningHoursAudits || [],
+          spares: loadedData.spares || {},
+          sparesHistory: loadedData.sparesHistory || [],
+          changeRequests: loadedData.changeRequests || {},
+          changeRequestAttachments: loadedData.changeRequestAttachments || [],
+          changeRequestComments: loadedData.changeRequestComments || [],
+          alertPolicies: loadedData.alertPolicies || {},
+          alertEvents: loadedData.alertEvents || {},
+          alertDeliveries: loadedData.alertDeliveries || {},
+          alertConfigs: loadedData.alertConfigs || {},
+          formDefinitions: loadedData.formDefinitions || {},
+          formVersions: loadedData.formVersions || {},
+          formVersionUsages: loadedData.formVersionUsages || [],
+          workOrders: loadedData.workOrders || {},
+          defects: loadedData.defects || {},
+          defectActions: loadedData.defectActions || [],
+          defectAttachments: loadedData.defectAttachments || [],
+          counters: loadedData.counters || {
+            userId: 1,
+            auditId: 1,
+            spareId: 1,
+            historyId: 1,
+            changeRequestId: 1,
+            attachmentId: 1,
+            commentId: 1,
+            alertPolicyId: 1,
+            alertEventId: 1,
+            alertDeliveryId: 1,
+            alertConfigId: 1,
+            formDefinitionId: 1,
+            formVersionId: 1,
+            workOrderId: 1,
+            defectId: 1,
+            defectActionId: 1,
+            defectAttachmentId: 1
+          }
+        };
+      } else {
+        console.log(`📝 Creating new data file at ${this.dataFile}`);
+        return this.initializeEmptyData();
+      }
+    } catch (error) {
+      console.error('❌ Error loading data file:', error);
+      console.log('🔄 Initializing with empty data');
+      return this.initializeEmptyData();
+    }
+  }
+
+  private initializeEmptyData(): PersistentData {
+    const emptyData: PersistentData = {
+      users: {},
+      components: {},
+      runningHoursAudits: [],
+      spares: {},
+      sparesHistory: [],
+      changeRequests: {},
+      changeRequestAttachments: [],
+      changeRequestComments: [],
+      alertPolicies: {},
+      alertEvents: {},
+      alertDeliveries: {},
+      alertConfigs: {},
+      formDefinitions: {},
+      formVersions: {},
+      formVersionUsages: [],
+      workOrders: {},
+      defects: {},
+      defectActions: [],
+      defectAttachments: [],
+      counters: {
+        userId: 1,
+        auditId: 1,
+        spareId: 1,
+        historyId: 1,
+        changeRequestId: 1,
+        attachmentId: 1,
+        commentId: 1,
+        alertPolicyId: 1,
+        alertEventId: 1,
+        alertDeliveryId: 1,
+        alertConfigId: 1,
+        formDefinitionId: 1,
+        formVersionId: 1,
+        workOrderId: 1,
+        defectId: 1,
+        defectActionId: 1,
+        defectAttachmentId: 1
+      }
+    };
+    
+    // Initialize with seed data
+    this.initializeSeedData(emptyData);
+    this.persistData();
+    
+    return emptyData;
+  }
+
+  private initializeSeedData(data: PersistentData): void {
+    // Add seed users
+    const seedUser: User = {
+      id: 1,
+      username: "admin",
+      password: "admin123"
+    };
+    data.users[1] = seedUser;
+    data.counters.userId = 2;
+
+    // Add seed components
+    const seedComponents: Component[] = [
+      {
+        id: "ME001",
+        vesselId: "V001",
+        code: "ME001",
+        name: "Main Engine",
+        parent: null,
+        equipmentType: "ENGINE",
+        runningHours: 45230.5,
+        avgRunningHours: 18,
+        lastUpdated: new Date().toISOString(),
+        rank: 1,
+        archived: false
+      },
+      {
+        id: "AE001",
+        vesselId: "V001",
+        code: "AE001", 
+        name: "Auxiliary Engine #1",
+        parent: null,
+        equipmentType: "ENGINE",
+        runningHours: 22100.0,
+        avgRunningHours: 16,
+        lastUpdated: new Date().toISOString(),
+        rank: 2,
+        archived: false
+      }
+    ];
+    
+    seedComponents.forEach(comp => {
+      data.components[comp.id] = comp;
+    });
+
+    // Add seed work orders
+    const seedWorkOrders: WorkOrder[] = [
+      {
+        id: "1",
+        vesselId: "V001",
+        component: "Main Engine",
+        workOrderNumber: "WO-001",
+        description: "Main Engine 1000 Hour Service",
+        status: "Open",
+        priority: "High",
+        plannedDate: "2024-03-15",
+        completedDate: null,
+        assignedTo: "Chief Engineer"
+      },
+      {
+        id: "2",
+        vesselId: "V001",
+        component: "Auxiliary Engine #1",
+        workOrderNumber: "WO-002",
+        description: "Auxiliary Engine Oil Change",
+        status: "In Progress",
+        priority: "Medium",
+        plannedDate: "2024-03-20",
+        completedDate: null,
+        assignedTo: "2nd Engineer"
+      }
+    ];
+    
+    seedWorkOrders.forEach(wo => {
+      data.workOrders[wo.id] = wo;
+    });
+    data.counters.workOrderId = 3;
+
+    // Add seed defects
+    const seedDefects: Defect[] = [
+      {
+        id: 1,
+        vesselId: "V001",
+        defectNumber: "22/111/999",
+        vesselName: "Vessel Name Extra Long 1",
+        issueDate: "01-Sep-2019",
+        category: "Defect",
+        description: "S-Band was observed to be defective. There was no spare on board",
+        status: "Open",
+        priority: "High",
+        reportedBy: "Chief Engineer",
+        dateReported: "2024-01-15",
+        fleetCode: null,
+        componentCode: null,
+        componentName: null,
+        equipmentDescription: null,
+        immediateCause: null,
+        rootCause: null,
+        actionTaken: "Requisition raised for shore Service. Expected at next port",
+        targetDate: "01-Sep-2024",
+        raisedByUserId: "1",
+        routineBreakdown: null,
+        operatingState: null,
+        reportedTo: null,
+        defermentFlag: false
+      },
+      {
+        id: 2,
+        vesselId: "V001",
+        defectNumber: "22/112/999",
+        vesselName: "Vessel Name Extra Long 2",
+        issueDate: "01-Sep-2019",
+        category: "COC",
+        description: "Port anchor windlass brake issue",
+        status: "Open", 
+        priority: "Medium",
+        reportedBy: "Chief Officer",
+        dateReported: "2024-01-20",
+        fleetCode: null,
+        componentCode: null,
+        componentName: null,
+        equipmentDescription: null,
+        immediateCause: null,
+        rootCause: null,
+        actionTaken: null,
+        targetDate: null,
+        raisedByUserId: "1",
+        routineBreakdown: null,
+        operatingState: null,
+        reportedTo: null,
+        defermentFlag: false
+      }
+    ];
+
+    seedDefects.forEach(defect => {
+      data.defects[defect.id] = defect;
+    });
+    data.counters.defectId = 3;
+
+    console.log('🌱 Seed data initialized');
+  }
+
+  private persistData(): void {
+    try {
+      const tempFile = `${this.dataFile}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2), 'utf-8');
+      fs.renameSync(tempFile, this.dataFile);
+    } catch (error) {
+      console.error('❌ Error persisting data:', error);
+      throw error;
+    }
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    return this.data.users[id];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Object.values(this.data.users).find(user => user.username === username);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const id = this.data.counters.userId++;
+    const newUser: User = { ...user, id };
+    this.data.users[id] = newUser;
+    this.persistData();
+    return newUser;
+  }
+
+  // Component methods
+  async getComponents(vesselId: string): Promise<Component[]> {
+    return Object.values(this.data.components)
+      .filter(c => c.vesselId === vesselId && !c.archived);
+  }
+
+  async getComponent(id: string): Promise<Component | undefined> {
+    return this.data.components[id];
+  }
+
+  async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const component = this.data.components[id];
+    if (!component) {
+      throw new Error(`Component ${id} not found`);
+    }
+    const updated = { ...component, ...data };
+    this.data.components[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
+    const id = this.data.counters.auditId++;
+    const newAudit: RunningHoursAudit = {
+      ...audit,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    this.data.runningHoursAudits.push(newAudit);
+    this.persistData();
+    return newAudit;
+  }
+
+  async getRunningHoursAudits(componentId: string, limit: number = 10): Promise<RunningHoursAudit[]> {
+    return this.data.runningHoursAudits
+      .filter(a => a.componentId === componentId)
+      .sort((a, b) => new Date(b.readingDate).getTime() - new Date(a.readingDate).getTime())
+      .slice(0, limit);
+  }
+
+  async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]> {
+    return this.data.runningHoursAudits
+      .filter(a => {
+        const auditDate = new Date(a.readingDate);
+        return a.componentId === componentId &&
+               auditDate >= startDate &&
+               auditDate <= endDate;
+      })
+      .sort((a, b) => new Date(a.readingDate).getTime() - new Date(b.readingDate).getTime());
+  }
+
+  // Spares methods
+  async getSpares(vesselId: string): Promise<Spare[]> {
+    return Object.values(this.data.spares)
+      .filter(s => s.vesselId === vesselId && !s.archived);
+  }
+
+  async getSpare(id: number): Promise<Spare | undefined> {
+    return this.data.spares[id];
+  }
+
+  async createSpare(spare: InsertSpare): Promise<Spare> {
+    const id = this.data.counters.spareId++;
+    const newSpare: Spare = { ...spare, id };
+    this.data.spares[id] = newSpare;
+    this.persistData();
+    return newSpare;
+  }
+
+  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const spare = this.data.spares[id];
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    const updated = { ...spare, ...data };
+    this.data.spares[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteSpare(id: number): Promise<void> {
+    delete this.data.spares[id];
+    this.persistData();
+  }
+
+  async consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const spare = this.data.spares[id];
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    spare.consumed = (spare.consumed || 0) + quantity;
+    spare.rob = (spare.rob || 0) - quantity;
+    
+    const history: SpareHistory = {
+      id: this.data.counters.historyId++,
+      spareId: id,
+      vesselId: spare.vesselId,
+      type: 'CONSUMED',
+      partCode: spare.partCode,
+      partName: spare.partName,
+      quantity,
+      remainingBalance: spare.rob,
+      userId,
+      remarks,
+      place,
+      dateLocal,
+      tz,
+      createdAt: new Date().toISOString()
+    };
+    
+    this.data.sparesHistory.push(history);
+    this.persistData();
+    return spare;
+  }
+
+  async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const spare = this.data.spares[id];
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    spare.received = (spare.received || 0) + quantity;
+    spare.rob = (spare.rob || 0) + quantity;
+    
+    const history: SpareHistory = {
+      id: this.data.counters.historyId++,
+      spareId: id,
+      vesselId: spare.vesselId,
+      type: 'RECEIVED',
+      partCode: spare.partCode,
+      partName: spare.partName,
+      quantity,
+      remainingBalance: spare.rob,
+      userId,
+      remarks,
+      supplierPO,
+      place,
+      dateLocal,
+      tz,
+      createdAt: new Date().toISOString()
+    };
+    
+    this.data.sparesHistory.push(history);
+    this.persistData();
+    return spare;
+  }
+
+  async bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]> {
+    const updatedSpares: Spare[] = [];
+    
+    for (const update of updates) {
+      const spare = this.data.spares[update.id];
+      if (!spare) continue;
+      
+      if (update.consumed !== undefined) {
+        spare.consumed = (spare.consumed || 0) + update.consumed;
+        spare.rob = (spare.rob || 0) - update.consumed;
+      }
+      
+      if (update.received !== undefined) {
+        spare.received = (spare.received || 0) + update.received;
+        spare.rob = (spare.rob || 0) + update.received;
+      }
+      
+      updatedSpares.push(spare);
+    }
+    
+    this.persistData();
+    return updatedSpares;
+  }
+
+  // Spares History methods
+  async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+    return this.data.sparesHistory
+      .filter(h => h.vesselId === vesselId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
+    return this.data.sparesHistory
+      .filter(h => h.spareId === spareId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
+    const id = this.data.counters.historyId++;
+    const newHistory: SpareHistory = {
+      ...history,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    this.data.sparesHistory.push(newHistory);
+    this.persistData();
+    return newHistory;
+  }
+
+  // The rest of the methods will follow the same pattern...
+  // I'll continue with the most important ones for now
+
+  // Work Order methods
+  async getWorkOrders(vesselId: string): Promise<WorkOrder[]> {
+    return Object.values(this.data.workOrders)
+      .filter(wo => wo.vesselId === vesselId);
+  }
+
+  async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    return this.data.workOrders[id];
+  }
+
+  async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
+    const id = String(this.data.counters.workOrderId++);
+    const newWorkOrder: WorkOrder = { ...workOrder, id };
+    this.data.workOrders[id] = newWorkOrder;
+    this.persistData();
+    return newWorkOrder;
+  }
+
+  async updateWorkOrder(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
+    const workOrder = this.data.workOrders[id];
+    if (!workOrder) {
+      throw new Error(`Work order ${id} not found`);
+    }
+    const updated = { ...workOrder, ...data };
+    this.data.workOrders[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  // Defect methods
+  async getDefects(filters?: { statusView?: string; vesselId?: string; status?: string; includeClosed?: boolean }): Promise<Defect[]> {
+    let defects = Object.values(this.data.defects);
+    
+    if (filters) {
+      if (filters.vesselId) {
+        defects = defects.filter(d => d.vesselId === filters.vesselId);
+      }
+      
+      if (filters.statusView === 'active') {
+        defects = defects.filter(d => 
+          ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
+        );
+      } else if (filters.statusView === 'resolved') {
+        defects = defects.filter(d => 
+          ['Closed', 'Cancelled'].includes(d.status)
+        );
+      }
+      
+      if (filters.status) {
+        defects = defects.filter(d => d.status === filters.status);
+      }
+      
+      if (!filters.includeClosed) {
+        defects = defects.filter(d => !['Closed', 'Cancelled'].includes(d.status));
+      }
+    }
+    
+    return defects;
+  }
+
+  async getDefect(id: number): Promise<Defect | undefined> {
+    return this.data.defects[id];
+  }
+
+  async createDefect(defect: InsertDefect): Promise<Defect> {
+    const id = this.data.counters.defectId++;
+    const newDefect: Defect = { 
+      ...defect, 
+      id,
+      immediateCause: normalizeImmediateCause(defect.immediateCause),
+      rootCause: normalizeRootCause(defect.rootCause)
+    };
+    this.data.defects[id] = newDefect;
+    this.persistData();
+    return newDefect;
+  }
+
+  async updateDefect(id: number, data: Partial<Defect>): Promise<Defect> {
+    const defect = this.data.defects[id];
+    if (!defect) {
+      throw new Error(`Defect ${id} not found`);
+    }
+    
+    const updated = { 
+      ...defect, 
+      ...data,
+      immediateCause: data.immediateCause !== undefined ? normalizeImmediateCause(data.immediateCause) : defect.immediateCause,
+      rootCause: data.rootCause !== undefined ? normalizeRootCause(data.rootCause) : defect.rootCause
+    };
+    
+    this.data.defects[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteDefect(id: number): Promise<void> {
+    delete this.data.defects[id];
+    this.persistData();
+  }
+
+  async getDefectsCount(filters?: { statusView?: string; vesselId?: string }): Promise<number> {
+    const defects = await this.getDefects(filters);
+    return defects.length;
+  }
+
+  // Placeholder implementations for remaining methods
+  // These will need to be fully implemented based on requirements
+
+  async getChangeRequests(filters?: any): Promise<ChangeRequest[]> {
+    return Object.values(this.data.changeRequests);
+  }
+
+  async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
+    return this.data.changeRequests[id];
+  }
+
+  async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
+    const id = this.data.counters.changeRequestId++;
+    const newRequest: ChangeRequest = { ...request, id };
+    this.data.changeRequests[id] = newRequest;
+    this.persistData();
+    return newRequest;
+  }
+
+  async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
+    const request = this.data.changeRequests[id];
+    if (!request) throw new Error(`Change request ${id} not found`);
+    const updated = { ...request, ...data };
+    this.data.changeRequests[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { targetType, targetId, snapshotBeforeJson });
+  }
+
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { proposedChangesJson, movePreviewJson });
+  }
+
+  async deleteChangeRequest(id: number): Promise<void> {
+    delete this.data.changeRequests[id];
+    this.persistData();
+  }
+
+  async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { status: 'Submitted', submittedBy: userId, submittedDate: new Date().toISOString() });
+  }
+
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { status: 'Approved', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+  }
+
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { status: 'Rejected', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+  }
+
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { status: 'Returned', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+  }
+
+  async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
+    return this.data.changeRequestAttachments.filter(a => a.changeRequestId === changeRequestId);
+  }
+
+  async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
+    const id = this.data.counters.attachmentId++;
+    const newAttachment: ChangeRequestAttachment = { ...attachment, id };
+    this.data.changeRequestAttachments.push(newAttachment);
+    this.persistData();
+    return newAttachment;
+  }
+
+  async getChangeRequestComments(changeRequestId: number): Promise<ChangeRequestComment[]> {
+    return this.data.changeRequestComments.filter(c => c.changeRequestId === changeRequestId);
+  }
+
+  async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
+    const id = this.data.counters.commentId++;
+    const newComment: ChangeRequestComment = { ...comment, id, createdAt: new Date().toISOString() };
+    this.data.changeRequestComments.push(newComment);
+    this.persistData();
+    return newComment;
+  }
+
+  // Bulk operations
+  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
+    const created: Component[] = [];
+    for (const comp of components) {
+      const newComp: Component = { ...comp };
+      this.data.components[comp.id] = newComp;
+      created.push(newComp);
+    }
+    this.persistData();
+    return created;
+  }
+
+  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+    const updated: Component[] = [];
+    for (const { id, data } of components) {
+      const comp = this.data.components[id];
+      if (comp) {
+        const updatedComp = { ...comp, ...data };
+        this.data.components[id] = updatedComp;
+        updated.push(updatedComp);
+      }
+    }
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const comp of components) {
+      if (this.data.components[comp.id]) {
+        this.data.components[comp.id] = { ...this.data.components[comp.id], ...comp };
+        updated++;
+      } else {
+        this.data.components[comp.id] = { ...comp };
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
+
+  async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
+    const created: Spare[] = [];
+    for (const spare of spares) {
+      const id = this.data.counters.spareId++;
+      const newSpare: Spare = { ...spare, id };
+      this.data.spares[id] = newSpare;
+      created.push(newSpare);
+    }
+    this.persistData();
+    return created;
+  }
+
+  async bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    const updated: Spare[] = [];
+    for (const { robId, data } of spares) {
+      const spare = Object.values(this.data.spares).find(s => s.robId === robId);
+      if (spare) {
+        Object.assign(spare, data);
+        updated.push(spare);
+      }
+    }
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const spare of spares) {
+      const existing = Object.values(this.data.spares).find(s => s.robId === spare.robId);
+      if (existing) {
+        Object.assign(existing, spare);
+        updated++;
+      } else {
+        const id = this.data.counters.spareId++;
+        this.data.spares[id] = { ...spare, id };
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
+
+  async archiveComponentsByIds(ids: string[]): Promise<number> {
+    let archived = 0;
+    for (const id of ids) {
+      if (this.data.components[id]) {
+        this.data.components[id].archived = true;
+        archived++;
+      }
+    }
+    this.persistData();
+    return archived;
+  }
+
+  async archiveSparesByIds(ids: number[]): Promise<number> {
+    let archived = 0;
+    for (const id of ids) {
+      if (this.data.spares[id]) {
+        this.data.spares[id].archived = true;
+        archived++;
+      }
+    }
+    this.persistData();
+    return archived;
+  }
+
+  // Alert methods - placeholder implementations
+  async getAlertPolicies(): Promise<AlertPolicy[]> {
+    return Object.values(this.data.alertPolicies);
+  }
+
+  async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
+    return this.data.alertPolicies[id];
+  }
+
+  async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
+    const id = this.data.counters.alertPolicyId++;
+    const newPolicy: AlertPolicy = { ...policy, id };
+    this.data.alertPolicies[id] = newPolicy;
+    this.persistData();
+    return newPolicy;
+  }
+
+  async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
+    const policy = this.data.alertPolicies[id];
+    if (!policy) throw new Error(`Alert policy ${id} not found`);
+    const updated = { ...policy, ...data };
+    this.data.alertPolicies[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteAlertPolicy(id: number): Promise<void> {
+    delete this.data.alertPolicies[id];
+    this.persistData();
+  }
+
+  async getAlertEvents(filters?: any): Promise<AlertEvent[]> {
+    return Object.values(this.data.alertEvents);
+  }
+
+  async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
+    return this.data.alertEvents[id];
+  }
+
+  async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
+    const id = this.data.counters.alertEventId++;
+    const newEvent: AlertEvent = { ...event, id, createdAt: new Date().toISOString() };
+    this.data.alertEvents[id] = newEvent;
+    this.persistData();
+    return newEvent;
+  }
+
+  async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
+    const event = this.data.alertEvents[id];
+    if (!event) throw new Error(`Alert event ${id} not found`);
+    event.status = 'acknowledged';
+    event.acknowledgedBy = userId;
+    event.acknowledgedAt = new Date().toISOString();
+    this.persistData();
+    return event;
+  }
+
+  async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
+    return Object.values(this.data.alertDeliveries).filter(d => d.eventId === eventId);
+  }
+
+  async createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery> {
+    const id = this.data.counters.alertDeliveryId++;
+    const newDelivery: AlertDelivery = { ...delivery, id, createdAt: new Date().toISOString() };
+    this.data.alertDeliveries[id] = newDelivery;
+    this.persistData();
+    return newDelivery;
+  }
+
+  async updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery> {
+    const delivery = this.data.alertDeliveries[id];
+    if (!delivery) throw new Error(`Alert delivery ${id} not found`);
+    delivery.status = status;
+    if (errorMessage) delivery.errorMessage = errorMessage;
+    this.persistData();
+    return delivery;
+  }
+
+  async getAlertConfig(vesselId: string): Promise<AlertConfig | undefined> {
+    return this.data.alertConfigs[vesselId];
+  }
+
+  async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
+    const existing = this.data.alertConfigs[config.vesselId];
+    if (existing) {
+      Object.assign(existing, config);
+      this.persistData();
+      return existing;
+    } else {
+      const id = this.data.counters.alertConfigId++;
+      const newConfig: AlertConfig = { ...config, id };
+      this.data.alertConfigs[config.vesselId] = newConfig;
+      this.persistData();
+      return newConfig;
+    }
+  }
+
+  // Form methods - placeholder implementations
+  async getFormDefinitions(): Promise<FormDefinition[]> {
+    return Object.values(this.data.formDefinitions);
+  }
+
+  async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
+    return this.data.formDefinitions[id];
+  }
+
+  async getFormDefinitionByName(name: string): Promise<FormDefinition | undefined> {
+    return Object.values(this.data.formDefinitions).find(f => f.name === name);
+  }
+
+  async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
+    const id = this.data.counters.formDefinitionId++;
+    const newForm: FormDefinition = { ...form, id, createdAt: new Date().toISOString() };
+    this.data.formDefinitions[id] = newForm;
+    this.persistData();
+    return newForm;
+  }
+
+  async getFormVersions(formId: number): Promise<FormVersion[]> {
+    return Object.values(this.data.formVersions).filter(v => v.formId === formId);
+  }
+
+  async getFormVersion(id: number): Promise<FormVersion | undefined> {
+    return this.data.formVersions[id];
+  }
+
+  async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
+    const versions = Object.values(this.data.formVersions)
+      .filter(v => v.formId === formId && v.status === 'published')
+      .sort((a, b) => b.version - a.version);
+    return versions[0];
+  }
+
+  async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
+    const form = await this.getFormDefinitionByName(name);
+    if (!form) return undefined;
+    return this.getLatestPublishedVersion(form.id);
+  }
+
+  async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
+    const id = this.data.counters.formVersionId++;
+    const newVersion: FormVersion = { ...version, id, createdAt: new Date().toISOString() };
+    this.data.formVersions[id] = newVersion;
+    this.persistData();
+    return newVersion;
+  }
+
+  async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
+    const version = this.data.formVersions[id];
+    if (!version) throw new Error(`Form version ${id} not found`);
+    const updated = { ...version, ...data };
+    this.data.formVersions[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
+    return this.updateFormVersion(id, { 
+      status: 'published', 
+      publishedBy: userId, 
+      publishedAt: new Date().toISOString(),
+      changelog 
+    });
+  }
+
+  async discardFormVersion(id: number): Promise<void> {
+    delete this.data.formVersions[id];
+    this.persistData();
+  }
+
+  async createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage> {
+    const newUsage: FormVersionUsage = { ...usage, usedAt: new Date().toISOString() };
+    this.data.formVersionUsages.push(newUsage);
+    this.persistData();
+    return newUsage;
+  }
+
+  async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
+    return this.data.formVersionUsages.filter(u => u.formVersionId === formVersionId);
+  }
+
+  async seedForms(): Promise<void> {
+    // Seed forms if needed
+    this.persistData();
+  }
+
+  // IHM methods - not implemented yet
+  async getIhmItem(id: string, type: 'component' | 'spare'): Promise<any | undefined> {
+    return undefined;
+  }
+
+  async upsertIhmItem(item: any): Promise<any> {
+    return item;
+  }
+
+  async getIhmMaintenanceLog(filters: any): Promise<any[]> {
+    return [];
+  }
+
+  async createIhmMaintenanceLogEntry(entry: any): Promise<any> {
+    return entry;
+  }
+
+  async getIhmStatusReport(vesselId: string): Promise<any[]> {
+    return [];
+  }
+
+  // Additional placeholder methods
+  async deleteWorkOrder(id: string): Promise<void> {
+    delete this.data.workOrders[id];
+    this.persistData();
+  }
+
+  async getDefectActions(defectId: number): Promise<DefectAction[]> {
+    return this.data.defectActions.filter(a => a.defectId === defectId);
+  }
+
+  async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
+    const id = this.data.counters.defectActionId++;
+    const newAction: DefectAction = { ...action, id, createdAt: new Date().toISOString() };
+    this.data.defectActions.push(newAction);
+    this.persistData();
+    return newAction;
+  }
+
+  async getDefectAttachments(defectId: number): Promise<DefectAttachment[]> {
+    return this.data.defectAttachments.filter(a => a.defectId === defectId);
+  }
+
+  async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
+    const id = this.data.counters.defectAttachmentId++;
+    const newAttachment: DefectAttachment = { ...attachment, id, uploadedAt: new Date().toISOString() };
+    this.data.defectAttachments.push(newAttachment);
+    this.persistData();
+    return newAttachment;
+  }
+
+  async getDefectsReportData(reportKey: string, filters: any): Promise<any> {
+    // Return mock report data based on reportKey
+    const mockData = {
+      openDefectsDashboard: {
+        kpis: {
+          totalOpen: 125,
+          dueThisMonth: 32,
+          overdue: 18,
+          avgDaysOpen: 14.5
+        },
+        data: []
+      },
+      closurePerformance: {
+        kpis: {
+          closureRate: 78,
+          avgClosureTime: 21,
+          onTimeCompletion: 65,
+          backlog: 47
+        },
+        data: []
+      }
+    };
+    
+    return mockData[reportKey as keyof typeof mockData] || { kpis: {}, data: [] };
+  }
+}
