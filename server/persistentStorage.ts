@@ -59,7 +59,7 @@ interface PersistentData {
   formVersions: Record<number, FormVersion>;
   formVersionUsages: FormVersionUsage[];
   workOrders: Record<string, WorkOrder>;
-  defects: Record<number, Defect>;
+  defects: Record<string, Defect>;
   defectActions: DefectAction[];
   defectAttachments: DefectAttachment[];
   
@@ -124,6 +124,12 @@ export class PersistentFileStorage implements IStorage {
   constructor(filePath: string = 'test-data.json') {
     this.dataFile = path.resolve(process.cwd(), filePath);
     this.data = this.loadData();
+    
+    // Persist the initial data if it was newly created
+    if (!fs.existsSync(this.dataFile)) {
+      this.persistData();
+    }
+    
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
     console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
   }
@@ -231,7 +237,7 @@ export class PersistentFileStorage implements IStorage {
     
     // Initialize with seed data
     this.initializeSeedData(emptyData);
-    this.persistData();
+    // Don't call persistData here since this.data isn't set yet
     
     return emptyData;
   }
@@ -250,29 +256,41 @@ export class PersistentFileStorage implements IStorage {
     const seedComponents: Component[] = [
       {
         id: "ME001",
-        vesselId: "V001",
-        code: "ME001",
         name: "Main Engine",
-        parent: null,
-        equipmentType: "ENGINE",
-        runningHours: 45230.5,
-        avgRunningHours: 18,
+        componentCode: "ME001",
+        parentId: null,
+        category: "ENGINE",
+        currentCumulativeRH: "45230.5",
         lastUpdated: new Date().toISOString(),
-        rank: 1,
-        archived: false
+        vesselId: "V001",
+        maker: null,
+        model: null,
+        serialNo: null,
+        deptCategory: null,
+        componentCategory: null,
+        location: null,
+        commissionedDate: null,
+        critical: false,
+        classItem: false
       },
       {
         id: "AE001",
-        vesselId: "V001",
-        code: "AE001", 
         name: "Auxiliary Engine #1",
-        parent: null,
-        equipmentType: "ENGINE",
-        runningHours: 22100.0,
-        avgRunningHours: 16,
+        componentCode: "AE001",
+        parentId: null,
+        category: "ENGINE",
+        currentCumulativeRH: "22100.0",
         lastUpdated: new Date().toISOString(),
-        rank: 2,
-        archived: false
+        vesselId: "V001",
+        maker: null,
+        model: null,
+        serialNo: null,
+        deptCategory: null,
+        componentCategory: null,
+        location: null,
+        commissionedDate: null,
+        critical: false,
+        classItem: false
       }
     ];
     
@@ -286,25 +304,63 @@ export class PersistentFileStorage implements IStorage {
         id: "1",
         vesselId: "V001",
         component: "Main Engine",
-        workOrderNumber: "WO-001",
-        description: "Main Engine 1000 Hour Service",
-        status: "Open",
-        priority: "High",
-        plannedDate: "2024-03-15",
-        completedDate: null,
-        assignedTo: "Chief Engineer"
+        componentCode: "ME001",
+        workOrderNo: "WO-001",
+        templateCode: null,
+        executionId: null,
+        jobTitle: "Main Engine 1000 Hour Service",
+        assignedTo: "Chief Engineer",
+        dueDate: "2024-03-15",
+        status: "Due",
+        dateCompleted: null,
+        submittedDate: null,
+        formData: null,
+        taskType: "Service",
+        maintenanceBasis: "Running Hours",
+        frequencyValue: "1000",
+        frequencyUnit: "Hours",
+        approverRemarks: null,
+        isExecution: false,
+        templateId: null,
+        approver: null,
+        approvalDate: null,
+        rejectionDate: null,
+        nextDueDate: null,
+        nextDueReading: null,
+        currentReading: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       {
         id: "2",
         vesselId: "V001",
         component: "Auxiliary Engine #1",
-        workOrderNumber: "WO-002",
-        description: "Auxiliary Engine Oil Change",
-        status: "In Progress",
-        priority: "Medium",
-        plannedDate: "2024-03-20",
-        completedDate: null,
-        assignedTo: "2nd Engineer"
+        componentCode: "AE001",
+        workOrderNo: "WO-002",
+        templateCode: null,
+        executionId: null,
+        jobTitle: "Auxiliary Engine Oil Change",
+        assignedTo: "2nd Engineer",
+        dueDate: "2024-03-20",
+        status: "Due",
+        dateCompleted: null,
+        submittedDate: null,
+        formData: null,
+        taskType: "Service",
+        maintenanceBasis: "Calendar",
+        frequencyValue: "3",
+        frequencyUnit: "Months",
+        approverRemarks: null,
+        isExecution: false,
+        templateId: null,
+        approver: null,
+        approvalDate: null,
+        rejectionDate: null,
+        nextDueDate: null,
+        nextDueReading: null,
+        currentReading: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
     
@@ -316,56 +372,102 @@ export class PersistentFileStorage implements IStorage {
     // Add seed defects
     const seedDefects: Defect[] = [
       {
-        id: 1,
+        id: "1",
         vesselId: "V001",
-        defectNumber: "22/111/999",
         vesselName: "Vessel Name Extra Long 1",
         issueDate: "01-Sep-2019",
         category: "Defect",
+        defectType: "Corrective",
         description: "S-Band was observed to be defective. There was no spare on board",
+        actionTakenRequested: "Requisition raised for shore Service. Expected at next port",
+        targetDate: "01-Sep-2024",
+        dateCompleted: null,
         status: "Open",
         priority: "High",
-        reportedBy: "Chief Engineer",
-        dateReported: "2024-01-15",
-        fleetCode: null,
-        componentCode: null,
-        componentName: null,
-        equipmentDescription: null,
+        critical: false,
+        severity: 2,
+        source: "Internal",
+        equipmentCategory: "Navigation",
+        equipmentType: null,
+        equipmentMake: null,
+        equipmentModel: null,
+        equipmentSerialNo: null,
+        equipmentLocation: null,
+        equipmentSystem: null,
+        componentId: null,
+        purchaseOrderRef: null,
+        responsibleDept: null,
+        verifiedDate: null,
+        defectCategory: null,
+        viqVersion: null,
+        viqRef: null,
+        sfiCodeRef: null,
         immediateCause: null,
+        immediateCauseExplanation: null,
         rootCause: null,
-        actionTaken: "Requisition raised for shore Service. Expected at next port",
-        targetDate: "01-Sep-2024",
-        raisedByUserId: "1",
-        routineBreakdown: null,
-        operatingState: null,
+        rootCauseExplanation: null,
+        holdReason: null,
+        nextReviewDate: null,
+        defermentFlag: false,
+        defermentReason: null,
         reportedTo: null,
-        defermentFlag: false
+        reportedBy: "Chief Engineer",
+        operatingState: null,
+        routineBreakdown: null,
+        raisedByUserId: null,
+        assignedTo: null,
+        reviewedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       {
-        id: 2,
+        id: "2",
         vesselId: "V001",
-        defectNumber: "22/112/999",
         vesselName: "Vessel Name Extra Long 2",
         issueDate: "01-Sep-2019",
         category: "COC",
+        defectType: "Routine",
         description: "Port anchor windlass brake issue",
+        actionTakenRequested: null,
+        targetDate: null,
+        dateCompleted: null,
         status: "Open", 
         priority: "Medium",
-        reportedBy: "Chief Officer",
-        dateReported: "2024-01-20",
-        fleetCode: null,
-        componentCode: null,
-        componentName: null,
-        equipmentDescription: null,
+        critical: false,
+        severity: 1,
+        source: "Internal",
+        equipmentCategory: "Deck",
+        equipmentType: null,
+        equipmentMake: null,
+        equipmentModel: null,
+        equipmentSerialNo: null,
+        equipmentLocation: null,
+        equipmentSystem: null,
+        componentId: null,
+        purchaseOrderRef: null,
+        responsibleDept: null,
+        verifiedDate: null,
+        defectCategory: null,
+        viqVersion: null,
+        viqRef: null,
+        sfiCodeRef: null,
         immediateCause: null,
+        immediateCauseExplanation: null,
         rootCause: null,
-        actionTaken: null,
-        targetDate: null,
-        raisedByUserId: "1",
-        routineBreakdown: null,
-        operatingState: null,
+        rootCauseExplanation: null,
+        holdReason: null,
+        nextReviewDate: null,
+        defermentFlag: false,
+        defermentReason: null,
         reportedTo: null,
-        defermentFlag: false
+        reportedBy: "Chief Officer",
+        operatingState: null,
+        routineBreakdown: null,
+        raisedByUserId: null,
+        assignedTo: null,
+        reviewedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     ];
 
@@ -380,7 +482,7 @@ export class PersistentFileStorage implements IStorage {
   private persistData(): void {
     try {
       const tempFile = `${this.dataFile}.tmp`;
-      fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2), 'utf-8');
+      fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2));
       fs.renameSync(tempFile, this.dataFile);
     } catch (error) {
       console.error('❌ Error persisting data:', error);
@@ -408,7 +510,7 @@ export class PersistentFileStorage implements IStorage {
   // Component methods
   async getComponents(vesselId: string): Promise<Component[]> {
     return Object.values(this.data.components)
-      .filter(c => c.vesselId === vesselId && !c.archived);
+      .filter(c => c.vesselId === vesselId);
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
@@ -431,7 +533,12 @@ export class PersistentFileStorage implements IStorage {
     const newAudit: RunningHoursAudit = {
       ...audit,
       id,
-      createdAt: new Date().toISOString()
+      enteredAtUTC: audit.enteredAtUTC || new Date(),
+      version: audit.version || 1,
+      meterReplaced: audit.meterReplaced || false,
+      notes: audit.notes || null,
+      oldMeterFinal: audit.oldMeterFinal || null,
+      newMeterStart: audit.newMeterStart || null
     };
     this.data.runningHoursAudits.push(newAudit);
     this.persistData();
@@ -441,25 +548,25 @@ export class PersistentFileStorage implements IStorage {
   async getRunningHoursAudits(componentId: string, limit: number = 10): Promise<RunningHoursAudit[]> {
     return this.data.runningHoursAudits
       .filter(a => a.componentId === componentId)
-      .sort((a, b) => new Date(b.readingDate).getTime() - new Date(a.readingDate).getTime())
+      .sort((a, b) => b.enteredAtUTC.getTime() - a.enteredAtUTC.getTime())
       .slice(0, limit);
   }
 
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]> {
     return this.data.runningHoursAudits
       .filter(a => {
-        const auditDate = new Date(a.readingDate);
+        const auditDate = a.enteredAtUTC;
         return a.componentId === componentId &&
                auditDate >= startDate &&
                auditDate <= endDate;
       })
-      .sort((a, b) => new Date(a.readingDate).getTime() - new Date(b.readingDate).getTime());
+      .sort((a, b) => a.enteredAtUTC.getTime() - b.enteredAtUTC.getTime());
   }
 
   // Spares methods
   async getSpares(vesselId: string): Promise<Spare[]> {
     return Object.values(this.data.spares)
-      .filter(s => s.vesselId === vesselId && !s.archived);
+      .filter(s => s.vesselId === vesselId && !s.deleted);
   }
 
   async getSpare(id: number): Promise<Spare | undefined> {
@@ -468,7 +575,17 @@ export class PersistentFileStorage implements IStorage {
 
   async createSpare(spare: InsertSpare): Promise<Spare> {
     const id = this.data.counters.spareId++;
-    const newSpare: Spare = { ...spare, id };
+    const newSpare: Spare = { 
+      ...spare, 
+      id,
+      deleted: false,
+      componentCode: spare.componentCode || null,
+      location: spare.location || null,
+      componentSpareCode: spare.componentSpareCode || null,
+      vesselId: spare.vesselId || "V001",
+      rob: spare.rob || 0,
+      min: spare.min || 0
+    };
     this.data.spares[id] = newSpare;
     this.persistData();
     return newSpare;
@@ -496,24 +613,28 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Spare ${id} not found`);
     }
     
-    spare.consumed = (spare.consumed || 0) + quantity;
-    spare.rob = (spare.rob || 0) - quantity;
+    spare.rob = spare.rob - quantity;
     
     const history: SpareHistory = {
       id: this.data.counters.historyId++,
-      spareId: id,
+      timestampUTC: new Date(),
       vesselId: spare.vesselId,
-      type: 'CONSUMED',
+      spareId: id,
       partCode: spare.partCode,
       partName: spare.partName,
-      quantity,
-      remainingBalance: spare.rob,
+      componentId: spare.componentId,
+      componentCode: spare.componentCode || null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode || null,
+      eventType: 'CONSUME',
+      qtyChange: -quantity,
+      robAfter: spare.rob,
       userId,
-      remarks,
-      place,
-      dateLocal,
-      tz,
-      createdAt: new Date().toISOString()
+      remarks: remarks || null,
+      reference: null,
+      dateLocal: dateLocal || null,
+      tz: tz || null,
+      place: place || null
     };
     
     this.data.sparesHistory.push(history);
@@ -527,25 +648,28 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Spare ${id} not found`);
     }
     
-    spare.received = (spare.received || 0) + quantity;
-    spare.rob = (spare.rob || 0) + quantity;
+    spare.rob = spare.rob + quantity;
     
     const history: SpareHistory = {
       id: this.data.counters.historyId++,
-      spareId: id,
+      timestampUTC: new Date(),
       vesselId: spare.vesselId,
-      type: 'RECEIVED',
+      spareId: id,
       partCode: spare.partCode,
       partName: spare.partName,
-      quantity,
-      remainingBalance: spare.rob,
+      componentId: spare.componentId,
+      componentCode: spare.componentCode || null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode || null,
+      eventType: 'RECEIVE',
+      qtyChange: quantity,
+      robAfter: spare.rob,
       userId,
-      remarks,
-      supplierPO,
-      place,
-      dateLocal,
-      tz,
-      createdAt: new Date().toISOString()
+      remarks: remarks || null,
+      reference: supplierPO || null,
+      dateLocal: dateLocal || null,
+      tz: tz || null,
+      place: place || null
     };
     
     this.data.sparesHistory.push(history);
@@ -561,13 +685,57 @@ export class PersistentFileStorage implements IStorage {
       if (!spare) continue;
       
       if (update.consumed !== undefined) {
-        spare.consumed = (spare.consumed || 0) + update.consumed;
-        spare.rob = (spare.rob || 0) - update.consumed;
+        spare.rob = spare.rob - update.consumed;
+        
+        const history: SpareHistory = {
+          id: this.data.counters.historyId++,
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId,
+          spareId: update.id,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: spare.componentId,
+          componentCode: spare.componentCode || null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode || null,
+          eventType: 'CONSUME',
+          qtyChange: -update.consumed,
+          robAfter: spare.rob,
+          userId,
+          remarks: remarks || null,
+          reference: null,
+          dateLocal: update.receivedDate || null,
+          tz: null,
+          place: update.receivedPlace || null
+        };
+        this.data.sparesHistory.push(history);
       }
       
       if (update.received !== undefined) {
-        spare.received = (spare.received || 0) + update.received;
-        spare.rob = (spare.rob || 0) + update.received;
+        spare.rob = spare.rob + update.received;
+        
+        const history: SpareHistory = {
+          id: this.data.counters.historyId++,
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId,
+          spareId: update.id,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: spare.componentId,
+          componentCode: spare.componentCode || null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode || null,
+          eventType: 'RECEIVE',
+          qtyChange: update.received,
+          robAfter: spare.rob,
+          userId,
+          remarks: remarks || null,
+          reference: null,
+          dateLocal: update.receivedDate || null,
+          tz: null,
+          place: update.receivedPlace || null
+        };
+        this.data.sparesHistory.push(history);
       }
       
       updatedSpares.push(spare);
@@ -581,13 +749,13 @@ export class PersistentFileStorage implements IStorage {
   async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
     return this.data.sparesHistory
       .filter(h => h.vesselId === vesselId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => b.timestampUTC.getTime() - a.timestampUTC.getTime());
   }
 
   async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
     return this.data.sparesHistory
       .filter(h => h.spareId === spareId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => b.timestampUTC.getTime() - a.timestampUTC.getTime());
   }
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
@@ -595,7 +763,7 @@ export class PersistentFileStorage implements IStorage {
     const newHistory: SpareHistory = {
       ...history,
       id,
-      createdAt: new Date().toISOString()
+      timestampUTC: history.timestampUTC || new Date()
     };
     this.data.sparesHistory.push(newHistory);
     this.persistData();
@@ -617,7 +785,31 @@ export class PersistentFileStorage implements IStorage {
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
     const id = String(this.data.counters.workOrderId++);
-    const newWorkOrder: WorkOrder = { ...workOrder, id };
+    const newWorkOrder: WorkOrder = { 
+      ...workOrder, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      componentCode: workOrder.componentCode || null,
+      templateCode: workOrder.templateCode || null,
+      executionId: workOrder.executionId || null,
+      dateCompleted: workOrder.dateCompleted || null,
+      submittedDate: workOrder.submittedDate || null,
+      formData: workOrder.formData || null,
+      taskType: workOrder.taskType || null,
+      maintenanceBasis: workOrder.maintenanceBasis || null,
+      frequencyValue: workOrder.frequencyValue || null,
+      frequencyUnit: workOrder.frequencyUnit || null,
+      approverRemarks: workOrder.approverRemarks || null,
+      templateId: workOrder.templateId || null,
+      approver: workOrder.approver || null,
+      approvalDate: workOrder.approvalDate || null,
+      rejectionDate: workOrder.rejectionDate || null,
+      nextDueDate: workOrder.nextDueDate || null,
+      nextDueReading: workOrder.nextDueReading || null,
+      currentReading: workOrder.currentReading || null,
+      vesselId: workOrder.vesselId || "V001"
+    };
     this.data.workOrders[id] = newWorkOrder;
     this.persistData();
     return newWorkOrder;
@@ -635,7 +827,19 @@ export class PersistentFileStorage implements IStorage {
   }
 
   // Defect methods
-  async getDefects(filters?: { statusView?: string; vesselId?: string; status?: string; includeClosed?: boolean }): Promise<Defect[]> {
+  async getDefects(filters?: { 
+    vesselId?: string; 
+    status?: string; 
+    statusView?: 'active' | 'resolved';
+    category?: string; 
+    critical?: boolean; 
+    includeClosedDefects?: boolean;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<Defect[]> {
     let defects = Object.values(this.data.defects);
     
     if (filters) {
@@ -657,7 +861,23 @@ export class PersistentFileStorage implements IStorage {
         defects = defects.filter(d => d.status === filters.status);
       }
       
-      if (!filters.includeClosed) {
+      if (filters.category) {
+        defects = defects.filter(d => d.category === filters.category);
+      }
+      
+      if (filters.critical !== undefined) {
+        defects = defects.filter(d => d.critical === filters.critical);
+      }
+      
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        defects = defects.filter(d => 
+          d.description.toLowerCase().includes(searchLower) ||
+          d.vesselName.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      if (!filters.includeClosedDefects) {
         defects = defects.filter(d => !['Closed', 'Cancelled'].includes(d.status));
       }
     }
@@ -665,24 +885,59 @@ export class PersistentFileStorage implements IStorage {
     return defects;
   }
 
-  async getDefect(id: number): Promise<Defect | undefined> {
+  async getDefect(id: string): Promise<Defect | undefined> {
     return this.data.defects[id];
   }
 
   async createDefect(defect: InsertDefect): Promise<Defect> {
-    const id = this.data.counters.defectId++;
+    const id = String(this.data.counters.defectId++);
     const newDefect: Defect = { 
       ...defect, 
       id,
       immediateCause: normalizeImmediateCause(defect.immediateCause),
-      rootCause: normalizeRootCause(defect.rootCause)
+      rootCause: normalizeRootCause(defect.rootCause),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      critical: defect.critical ?? false,
+      // Ensure all nullable fields are properly handled
+      componentId: defect.componentId || null,
+      source: defect.source || null,
+      priority: defect.priority || null,
+      severity: defect.severity || null,
+      equipmentType: defect.equipmentType || null,
+      equipmentMake: defect.equipmentMake || null,
+      equipmentModel: defect.equipmentModel || null,
+      equipmentSerialNo: defect.equipmentSerialNo || null,
+      equipmentLocation: defect.equipmentLocation || null,
+      equipmentSystem: defect.equipmentSystem || null,
+      actionTakenRequested: defect.actionTakenRequested || null,
+      targetDate: defect.targetDate || null,
+      dateCompleted: defect.dateCompleted || null,
+      purchaseOrderRef: defect.purchaseOrderRef || null,
+      responsibleDept: defect.responsibleDept || null,
+      verifiedDate: defect.verifiedDate || null,
+      defectCategory: defect.defectCategory || null,
+      viqVersion: defect.viqVersion || null,
+      viqRef: defect.viqRef || null,
+      sfiCodeRef: defect.sfiCodeRef || null,
+      immediateCauseExplanation: defect.immediateCauseExplanation || null,
+      rootCauseExplanation: defect.rootCauseExplanation || null,
+      holdReason: defect.holdReason || null,
+      nextReviewDate: defect.nextReviewDate || null,
+      defermentReason: defect.defermentReason || null,
+      reportedTo: defect.reportedTo || null,
+      operatingState: defect.operatingState || null,
+      routineBreakdown: defect.routineBreakdown || null,
+      raisedByUserId: defect.raisedByUserId || null,
+      assignedTo: defect.assignedTo || null,
+      reviewedBy: defect.reviewedBy || null
     };
     this.data.defects[id] = newDefect;
     this.persistData();
     return newDefect;
   }
 
-  async updateDefect(id: number, data: Partial<Defect>): Promise<Defect> {
+  async updateDefect(id: string, data: Partial<InsertDefect>): Promise<Defect> {
     const defect = this.data.defects[id];
     if (!defect) {
       throw new Error(`Defect ${id} not found`);
@@ -692,7 +947,8 @@ export class PersistentFileStorage implements IStorage {
       ...defect, 
       ...data,
       immediateCause: data.immediateCause !== undefined ? normalizeImmediateCause(data.immediateCause) : defect.immediateCause,
-      rootCause: data.rootCause !== undefined ? normalizeRootCause(data.rootCause) : defect.rootCause
+      rootCause: data.rootCause !== undefined ? normalizeRootCause(data.rootCause) : defect.rootCause,
+      updatedAt: new Date()
     };
     
     this.data.defects[id] = updated;
@@ -700,21 +956,217 @@ export class PersistentFileStorage implements IStorage {
     return updated;
   }
 
-  async deleteDefect(id: number): Promise<void> {
+  async deleteDefect(id: string): Promise<void> {
     delete this.data.defects[id];
     this.persistData();
   }
 
-  async getDefectsCount(filters?: { statusView?: string; vesselId?: string }): Promise<number> {
+  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string }): Promise<number> {
     const defects = await this.getDefects(filters);
     return defects.length;
   }
 
-  // Placeholder implementations for remaining methods
-  // These will need to be fully implemented based on requirements
+  // Bulk Import methods
+  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
+    const created: Component[] = [];
+    for (const comp of components) {
+      const newComp: Component = {
+        ...comp,
+        id: comp.id || `C${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        vesselId: comp.vesselId || "V001",
+        currentCumulativeRH: comp.currentCumulativeRH || "0",
+        lastUpdated: comp.lastUpdated || new Date().toISOString(),
+        componentCode: comp.componentCode || null,
+        parentId: comp.parentId || null,
+        maker: comp.maker || null,
+        model: comp.model || null,
+        serialNo: comp.serialNo || null,
+        deptCategory: comp.deptCategory || null,
+        componentCategory: comp.componentCategory || null,
+        location: comp.location || null,
+        commissionedDate: comp.commissionedDate || null,
+        critical: comp.critical ?? false,
+        classItem: comp.classItem ?? false
+      };
+      this.data.components[newComp.id] = newComp;
+      created.push(newComp);
+    }
+    this.persistData();
+    return created;
+  }
 
-  async getChangeRequests(filters?: any): Promise<ChangeRequest[]> {
-    return Object.values(this.data.changeRequests);
+  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+    const updated: Component[] = [];
+    for (const { id, data } of components) {
+      const component = this.data.components[id];
+      if (component) {
+        const updatedComponent = { ...component, ...data };
+        this.data.components[id] = updatedComponent;
+        updated.push(updatedComponent);
+      }
+    }
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const comp of components) {
+      const id = comp.id || `C${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      if (this.data.components[id]) {
+        this.data.components[id] = { ...this.data.components[id], ...comp };
+        updated++;
+      } else {
+        const newComp: Component = {
+          ...comp,
+          id,
+          vesselId: comp.vesselId || "V001",
+          currentCumulativeRH: comp.currentCumulativeRH || "0",
+          lastUpdated: comp.lastUpdated || new Date().toISOString(),
+          componentCode: comp.componentCode || null,
+          parentId: comp.parentId || null,
+          maker: comp.maker || null,
+          model: comp.model || null,
+          serialNo: comp.serialNo || null,
+          deptCategory: comp.deptCategory || null,
+          componentCategory: comp.componentCategory || null,
+          location: comp.location || null,
+          commissionedDate: comp.commissionedDate || null,
+          critical: comp.critical ?? false,
+          classItem: comp.classItem ?? false
+        };
+        this.data.components[id] = newComp;
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
+
+  async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
+    const created: Spare[] = [];
+    for (const spare of spares) {
+      const id = this.data.counters.spareId++;
+      const newSpare: Spare = { 
+        ...spare, 
+        id,
+        deleted: false,
+        componentCode: spare.componentCode || null,
+        location: spare.location || null,
+        componentSpareCode: spare.componentSpareCode || null,
+        vesselId: spare.vesselId || "V001",
+        rob: spare.rob || 0,
+        min: spare.min || 0
+      };
+      this.data.spares[id] = newSpare;
+      created.push(newSpare);
+    }
+    this.persistData();
+    return created;
+  }
+
+  async bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    const updated: Spare[] = [];
+    // Note: robId might be a string representation of the spare ID
+    for (const { robId, data } of spares) {
+      const spareId = parseInt(robId);
+      if (!isNaN(spareId) && this.data.spares[spareId]) {
+        const spare = this.data.spares[spareId];
+        const updatedSpare = { ...spare, ...data };
+        this.data.spares[spareId] = updatedSpare;
+        updated.push(updatedSpare);
+      }
+    }
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const spare of spares) {
+      // Try to find existing spare by partCode and vesselId
+      const existing = Object.values(this.data.spares).find(
+        s => s.partCode === spare.partCode && s.vesselId === spare.vesselId
+      );
+      
+      if (existing) {
+        Object.assign(existing, spare);
+        updated++;
+      } else {
+        const id = this.data.counters.spareId++;
+        const newSpare: Spare = { 
+          ...spare, 
+          id,
+          deleted: false,
+          componentCode: spare.componentCode || null,
+          location: spare.location || null,
+          componentSpareCode: spare.componentSpareCode || null,
+          vesselId: spare.vesselId || "V001",
+          rob: spare.rob || 0,
+          min: spare.min || 0
+        };
+        this.data.spares[id] = newSpare;
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
+
+  async archiveComponentsByIds(ids: string[]): Promise<number> {
+    let archived = 0;
+    for (const id of ids) {
+      if (this.data.components[id]) {
+        delete this.data.components[id];
+        archived++;
+      }
+    }
+    this.persistData();
+    return archived;
+  }
+
+  async archiveSparesByIds(ids: number[]): Promise<number> {
+    let archived = 0;
+    for (const id of ids) {
+      if (this.data.spares[id]) {
+        this.data.spares[id].deleted = true;
+        archived++;
+      }
+    }
+    this.persistData();
+    return archived;
+  }
+
+  // Change Request methods
+  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+    let requests = Object.values(this.data.changeRequests);
+    
+    if (filters) {
+      if (filters.category) {
+        requests = requests.filter(r => r.category === filters.category);
+      }
+      if (filters.status) {
+        requests = requests.filter(r => r.status === filters.status);
+      }
+      if (filters.vesselId) {
+        requests = requests.filter(r => r.vesselId === filters.vesselId);
+      }
+      if (filters.q) {
+        const searchLower = filters.q.toLowerCase();
+        requests = requests.filter(r => 
+          r.title.toLowerCase().includes(searchLower) ||
+          r.description?.toLowerCase().includes(searchLower)
+        );
+      }
+    }
+    
+    return requests;
   }
 
   async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
@@ -723,7 +1175,20 @@ export class PersistentFileStorage implements IStorage {
 
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
     const id = this.data.counters.changeRequestId++;
-    const newRequest: ChangeRequest = { ...request, id };
+    const newRequest: ChangeRequest = { 
+      ...request, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      targetType: request.targetType || null,
+      targetId: request.targetId || null,
+      snapshotBeforeJson: request.snapshotBeforeJson || null,
+      proposedChangesJson: request.proposedChangesJson || null,
+      movePreviewJson: request.movePreviewJson || null,
+      submittedAt: request.submittedAt || null,
+      reviewedByUserId: request.reviewedByUserId || null,
+      reviewedAt: request.reviewedAt || null
+    };
     this.data.changeRequests[id] = newRequest;
     this.persistData();
     return newRequest;
@@ -752,19 +1217,19 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { status: 'Submitted', submittedBy: userId, submittedDate: new Date().toISOString() });
+    return this.updateChangeRequest(id, { status: 'submitted', submittedAt: new Date(), requestedByUserId: userId });
   }
 
   async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { status: 'Approved', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+    return this.updateChangeRequest(id, { status: 'approved', reviewedByUserId: reviewerId, reviewedAt: new Date() });
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { status: 'Rejected', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+    return this.updateChangeRequest(id, { status: 'rejected', reviewedByUserId: reviewerId, reviewedAt: new Date() });
   }
 
   async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { status: 'Returned', reviewedBy: reviewerId, reviewedDate: new Date().toISOString(), reviewComment: comment });
+    return this.updateChangeRequest(id, { status: 'returned', reviewedByUserId: reviewerId, reviewedAt: new Date() });
   }
 
   async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
@@ -773,7 +1238,11 @@ export class PersistentFileStorage implements IStorage {
 
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
     const id = this.data.counters.attachmentId++;
-    const newAttachment: ChangeRequestAttachment = { ...attachment, id };
+    const newAttachment: ChangeRequestAttachment = { 
+      ...attachment, 
+      id,
+      uploadedAt: new Date()
+    };
     this.data.changeRequestAttachments.push(newAttachment);
     this.persistData();
     return newAttachment;
@@ -785,124 +1254,12 @@ export class PersistentFileStorage implements IStorage {
 
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
     const id = this.data.counters.commentId++;
-    const newComment: ChangeRequestComment = { ...comment, id, createdAt: new Date().toISOString() };
+    const newComment: ChangeRequestComment = { ...comment, id, createdAt: new Date() };
     this.data.changeRequestComments.push(newComment);
     this.persistData();
     return newComment;
   }
 
-  // Bulk operations
-  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
-    const created: Component[] = [];
-    for (const comp of components) {
-      const newComp: Component = { ...comp };
-      this.data.components[comp.id] = newComp;
-      created.push(newComp);
-    }
-    this.persistData();
-    return created;
-  }
-
-  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
-    const updated: Component[] = [];
-    for (const { id, data } of components) {
-      const comp = this.data.components[id];
-      if (comp) {
-        const updatedComp = { ...comp, ...data };
-        this.data.components[id] = updatedComp;
-        updated.push(updatedComp);
-      }
-    }
-    this.persistData();
-    return updated;
-  }
-
-  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
-    let created = 0;
-    let updated = 0;
-    
-    for (const comp of components) {
-      if (this.data.components[comp.id]) {
-        this.data.components[comp.id] = { ...this.data.components[comp.id], ...comp };
-        updated++;
-      } else {
-        this.data.components[comp.id] = { ...comp };
-        created++;
-      }
-    }
-    
-    this.persistData();
-    return { created, updated };
-  }
-
-  async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
-    const created: Spare[] = [];
-    for (const spare of spares) {
-      const id = this.data.counters.spareId++;
-      const newSpare: Spare = { ...spare, id };
-      this.data.spares[id] = newSpare;
-      created.push(newSpare);
-    }
-    this.persistData();
-    return created;
-  }
-
-  async bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
-    const updated: Spare[] = [];
-    for (const { robId, data } of spares) {
-      const spare = Object.values(this.data.spares).find(s => s.robId === robId);
-      if (spare) {
-        Object.assign(spare, data);
-        updated.push(spare);
-      }
-    }
-    this.persistData();
-    return updated;
-  }
-
-  async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
-    let created = 0;
-    let updated = 0;
-    
-    for (const spare of spares) {
-      const existing = Object.values(this.data.spares).find(s => s.robId === spare.robId);
-      if (existing) {
-        Object.assign(existing, spare);
-        updated++;
-      } else {
-        const id = this.data.counters.spareId++;
-        this.data.spares[id] = { ...spare, id };
-        created++;
-      }
-    }
-    
-    this.persistData();
-    return { created, updated };
-  }
-
-  async archiveComponentsByIds(ids: string[]): Promise<number> {
-    let archived = 0;
-    for (const id of ids) {
-      if (this.data.components[id]) {
-        this.data.components[id].archived = true;
-        archived++;
-      }
-    }
-    this.persistData();
-    return archived;
-  }
-
-  async archiveSparesByIds(ids: number[]): Promise<number> {
-    let archived = 0;
-    for (const id of ids) {
-      if (this.data.spares[id]) {
-        this.data.spares[id].archived = true;
-        archived++;
-      }
-    }
-    this.persistData();
-    return archived;
-  }
 
   // Alert methods - placeholder implementations
   async getAlertPolicies(): Promise<AlertPolicy[]> {
@@ -1117,28 +1474,70 @@ export class PersistentFileStorage implements IStorage {
     this.persistData();
   }
 
-  async getDefectActions(defectId: number): Promise<DefectAction[]> {
+  async getDefectActions(defectId: string): Promise<DefectAction[]> {
     return this.data.defectActions.filter(a => a.defectId === defectId);
   }
 
   async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
     const id = this.data.counters.defectActionId++;
-    const newAction: DefectAction = { ...action, id, createdAt: new Date().toISOString() };
+    const newAction: DefectAction = { 
+      ...action, 
+      id,
+      takenAt: action.takenAt || new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     this.data.defectActions.push(newAction);
     this.persistData();
     return newAction;
   }
 
-  async getDefectAttachments(defectId: number): Promise<DefectAttachment[]> {
+  async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    const actionIndex = this.data.defectActions.findIndex(a => a.id === id);
+    if (actionIndex === -1) {
+      throw new Error(`DefectAction ${id} not found`);
+    }
+    const updated = { 
+      ...this.data.defectActions[actionIndex], 
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.data.defectActions[actionIndex] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteDefectAction(id: number): Promise<void> {
+    const index = this.data.defectActions.findIndex(a => a.id === id);
+    if (index !== -1) {
+      this.data.defectActions.splice(index, 1);
+      this.persistData();
+    }
+  }
+
+  async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
     return this.data.defectAttachments.filter(a => a.defectId === defectId);
   }
 
   async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
     const id = this.data.counters.defectAttachmentId++;
-    const newAttachment: DefectAttachment = { ...attachment, id, uploadedAt: new Date().toISOString() };
+    const newAttachment: DefectAttachment = { 
+      ...attachment, 
+      id,
+      uploadedAt: attachment.uploadedAt || new Date(),
+      uploadedBy: attachment.uploadedBy || "system"
+    };
     this.data.defectAttachments.push(newAttachment);
     this.persistData();
     return newAttachment;
+  }
+
+  async deleteDefectAttachment(id: number): Promise<void> {
+    const index = this.data.defectAttachments.findIndex(a => a.id === id);
+    if (index !== -1) {
+      this.data.defectAttachments.splice(index, 1);
+      this.persistData();
+    }
   }
 
   async getDefectsReportData(reportKey: string, filters: any): Promise<any> {
