@@ -174,7 +174,7 @@ const Spares: React.FC = () => {
   // Create spare mutation
   const createSpareMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('/api/spares', 'POST', data);
+      return apiRequest('POST', '/api/spares', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
