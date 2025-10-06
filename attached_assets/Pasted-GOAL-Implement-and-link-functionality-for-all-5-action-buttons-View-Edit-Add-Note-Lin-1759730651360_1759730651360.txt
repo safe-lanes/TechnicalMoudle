@@ -1,0 +1,156 @@
+GOAL:
+Implement and link functionality for all 5 action buttons (View 👁️, Edit ✏️, Add Note 📎, Link 🔗, Close/Complete ✅) in the Defects Log table.
+Each button must work independently, without breaking layout, spacing, icons, or backend connections.
+
+-----------------------------------
+1️⃣ VIEW (👁️)
+-----------------------------------
+• On click:
+  - Open full defect report form (in view-only mode).
+  - Disable all input fields, dropdowns, and checkboxes.
+  - Show existing data for all sections: Basic, Equipment/Hardware, Dates, Description, Cause Analysis (Immediate & Root Cause), Actions, Closure.
+  - All “Select” buttons disabled.
+  - Show attached files as clickable thumbnails or links.
+  - At bottom, show closure comment & attachments (if defect is closed).
+• Header: Show “Viewing Defect Report” in blue.
+• Close button: Returns to Defects Log without refresh.
+• Must not modify data in view mode.
+
+-----------------------------------
+2️⃣ EDIT (✏️)
+-----------------------------------
+• On click:
+  - Open defect form in full editable mode (same as "New Defect" form but pre-filled).
+  - All fields editable except:
+      • ID
+      • Created By
+      • Created On
+  - Allow adding or removing actions, notes, or attachments.
+  - Save button updates record via PATCH /api/defects/:id.
+  - Validate before saving: all required fields (vessel, description, category, type, defect type, severity, target date).
+  - Toast “Defect updated successfully.”
+• On Cancel, revert changes (do not auto-save).
+
+-----------------------------------
+3️⃣ ADD NOTE (📎)
+-----------------------------------
+• On click:
+  - Open modal “Add Note to Defect [ID]”.
+  - Fields:
+      • Note Text (required, min 10 chars)
+      • Attachments (optional; multiple allowed)
+         - Accepted: .jpg, .jpeg, .png, .pdf, .docx
+         - Show thumbnails/icons
+         - Max size 25MB per file
+  - Buttons: Cancel | Save Note
+• On Save:
+  - Append entry to defect.notes[]:
+      {
+        noteId, noteText, attachments[], createdBy, createdOn
+      }
+  - Update audit trail with {action:"ADD_NOTE"}
+  - Toast: “Note added successfully.”
+• Show all notes in defect “View” mode under a new collapsible “Notes” section.
+
+-----------------------------------
+4️⃣ LINK (🔗)
+-----------------------------------
+• Purpose:
+  - Allow linking related defects (e.g., similar equipment, repeated issue, or CoC entry).
+• On click:
+  - Open modal “Link Related Defects”
+  - Search field: autocomplete by Defect ID / Description
+  - Allow multiple selections
+  - Linked defects show as tags under “Linked Defects” section
+• Backend:
+  - PATCH /api/defects/:id/link {linkedDefects:[IDs]}
+  - Add reciprocal link to all selected IDs.
+• In View mode:
+  - Show “Linked Defects” section listing related IDs (clickable to open).
+• Tooltip on icon: “Link Related Defect”
+
+-----------------------------------
+5️⃣ CLOSE / COMPLETE (✅)
+-----------------------------------
+• On click:
+  - Open modal “Close Defect”
+  - Sections:
+      • Summary (Defect ID, Vessel, Description, Target Date)
+      • Closure Comment (required, textarea)
+      • Attach Files (optional; multiple)
+          - Accept .jpg/.jpeg/.png/.pdf/.docx (max 10 files, 25MB each)
+          - Show thumbnails/icons and remove option
+      • Closed By (auto-filled from logged-in user)
+      • Closed On (current date/time)
+  - Buttons: Cancel | Mark as Closed
+• Validation:
+  - Comment mandatory before submitting
+  - File upload optional
+• On Submit:
+  - Update defect:
+    status="Closed"
+    closedBy=userId
+    closedOn=Date.now()
+    closureComment=text
+    closureFiles=[]
+  - Append closure audit entry
+  - Move defect from Active view → Resolved view
+  - Toast: “Defect closed successfully.”
+• View Page:
+  - Display “Closure” block with comment, attachments, Closed By, Closed On
+
+-----------------------------------
+GENERAL RULES
+-----------------------------------
+✅ All modals must match app theme (font, color, padding, radius).
+✅ Each modal must have cancel button to safely exit.
+✅ No layout shift in table.
+✅ No duplicate modals or overlapping popups.
+✅ Each action must record timestamp & user in audit history.
+✅ All toasts styled consistently: green for success, red for error.
+
+-----------------------------------
+PERMISSIONS
+-----------------------------------
+- View: All users
+- Edit: Master / Chief Engineer / Superintendent / Admin
+- Add Note: All users (Audit logs name & date)
+- Link: Chief Engineer / Superintendent / Admin
+- Close: Chief Engineer / Master / Superintendent / Admin
+
+-----------------------------------
+API ENDPOINTS (Example)
+-----------------------------------
+GET    /api/defects/:id
+PATCH  /api/defects/:id
+PATCH  /api/defects/:id/close
+PATCH  /api/defects/:id/link
+POST   /api/defects/:id/notes
+
+-----------------------------------
+VALIDATION & ERROR HANDLING
+-----------------------------------
+❌ If API fails: show toast “Failed to update defect. Please retry.”
+❌ If required field empty: show inline validation below field.
+✅ On success: defect log updates immediately (no manual refresh).
+✅ Audit log captures all 5 actions (VIEW, EDIT, ADD_NOTE, LINK, CLOSE).
+
+-----------------------------------
+UI INTEGRATION
+-----------------------------------
+- All icons retain same order: 👁️ | ✏️ | 📎 | 🔗 | ✅
+- Tooltips: "View", "Edit", "Add Note", "Link", "Close"
+- Hover effect: subtle blue background, no icon shift.
+- Actions column width fixed (no overflow).
+
+-----------------------------------
+QA TEST CASES
+-----------------------------------
+1. Clicking 👁️ opens read-only form ✅
+2. Clicking ✏️ enables editing, saving works ✅
+3. 📎 adds note with attachment ✅
+4. 🔗 links two defects, appears reciprocally ✅
+5. ✅ closes defect with comment + files ✅
+6. All role-based restrictions enforced ✅
+7. Refresh retains updates ✅
+8. Table icons remain aligned ✅
