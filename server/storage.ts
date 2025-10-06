@@ -2348,6 +2348,28 @@ export class MemStorage implements IStorage {
       operatingState: defectData.operatingState || null,
       routineBreakdown: defectData.routineBreakdown || null,
       raisedByUserId: defectData.raisedByUserId || null,
+      // Closure fields
+      closedBy: defectData.closedBy || null,
+      closedOn: defectData.closedOn || null,
+      closureComment: defectData.closureComment || null,
+      closureFiles: defectData.closureFiles || null,
+      // Linked defects
+      linkedDefects: defectData.linkedDefects || null,
+      // Notes and audit
+      notes: (defectData.notes || []) as Array<{
+        noteId: string;
+        noteText: string;
+        attachments: string[];
+        createdBy: string;
+        createdOn: string;
+      }>,
+      auditTrail: (defectData.auditTrail || []) as Array<{
+        action: string;
+        userId: string;
+        userName: string;
+        timestamp: string;
+        details?: any;
+      }>,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -2374,6 +2396,20 @@ export class MemStorage implements IStorage {
     const updated: Defect = {
       ...existing,
       ...normalizedUpdates,
+      notes: normalizedUpdates.notes ? (normalizedUpdates.notes as Array<{
+        noteId: string;
+        noteText: string;
+        attachments: string[];
+        createdBy: string;
+        createdOn: string;
+      }>) : existing.notes,
+      auditTrail: normalizedUpdates.auditTrail ? (normalizedUpdates.auditTrail as Array<{
+        action: string;
+        userId: string;
+        userName: string;
+        timestamp: string;
+        details?: any;
+      }>) : existing.auditTrail,
       updatedAt: new Date()
     };
     
@@ -2510,7 +2546,7 @@ export class MemStorage implements IStorage {
 
     // Update main defect
     const currentLinks = defect.linkedDefects || [];
-    const newLinks = [...new Set([...currentLinks, ...linkedDefectIds])];
+    const newLinks = Array.from(new Set([...currentLinks, ...linkedDefectIds]));
     
     // Add audit entry
     const auditTrail = defect.auditTrail || [];

@@ -451,7 +451,7 @@ export default function DefectsLog() {
                                 "h-6 w-6 p-0",
                                 canLink() ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"
                               )}
-                              onClick={() => handleLink(defect.id, defect.linkedDefects)}
+                              onClick={() => handleLink(defect.id, defect.linkedDefects || undefined)}
                               disabled={!canLink()}
                               data-testid={`button-link-${defect.id}`}
                             >
