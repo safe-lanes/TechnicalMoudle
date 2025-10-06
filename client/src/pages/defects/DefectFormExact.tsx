@@ -108,7 +108,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       equipmentSerialNo: "",
       equipmentLocation: "",
       equipmentSystem: "",
-      targetDate: "",
+      targetCloseDate: "",
       dateCompleted: "",
       verifiedDate: "",
       responsibleDept: "",
@@ -121,6 +121,25 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       rootCause: "",
       rootCauseExplanation: "",
       reportedBy: "System User",
+      // New fields
+      raisedById: "",
+      raisedByName: "System User",
+      raisedByRank: "Master",
+      operatingCondition: "SAILING",
+      locationText: "",
+      occurrenceType: "ROUTINE",
+      responsibleRole: "",
+      responsibleRoleId: "",
+      isDeferred: false,
+      deferReason: "",
+      deferNewTargetDate: "",
+      deferApprovalRequired: true,
+      reportToThirdParty: false,
+      classReport: false,
+      flagReport: false,
+      portReport: false,
+      reportReferenceNo: "",
+      reportDate: "",
     },
   });
 
@@ -325,6 +344,169 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   <div className="border-b pb-1" style={{borderColor: '#16569e'}}>
                     <h3 className="font-semibold text-sm" style={{color: '#16569e'}}>Basic</h3>
                   </div>
+                  
+                  {/* Raised By Field - Auto-filled with current user but editable */}
+                  <FormField
+                    control={form.control}
+                    name="raisedByName"
+                    render={({ field }) => (
+                      <FormItem>
+                        {isViewMode ? (
+                          renderReadOnlyField("RAISED BY", `${form.watch("raisedByRank")} - ${field.value}`)
+                        ) : (
+                          <Select 
+                            onValueChange={(value) => {
+                              const [rank, ...nameParts] = value.split(" - ");
+                              const name = nameParts.join(" - ");
+                              field.onChange(name);
+                              form.setValue("raisedByRank", rank);
+                              form.setValue("raisedById", value);
+                            }} 
+                            defaultValue={`${form.watch("raisedByRank")} - ${field.value}`}
+                          >
+                            <FormControl>
+                              <SelectTrigger 
+                                data-testid="select-raised-by"
+                                title="Auto-selected from login. Change if reporting on behalf of another crew member."
+                              >
+                                <SelectValue placeholder="Select reporting crew member" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Master - System User">Master - System User</SelectItem>
+                              <SelectItem value="Chief Engineer - John Mathews">Chief Engineer - John Mathews</SelectItem>
+                              <SelectItem value="2nd Officer - Rahul Verma">2nd Officer - Rahul Verma</SelectItem>
+                              <SelectItem value="AB - Suresh Kumar">AB - Suresh Kumar</SelectItem>
+                              <SelectItem value="Chief Officer - Mike Anderson">Chief Officer - Mike Anderson</SelectItem>
+                              <SelectItem value="2E - David Smith">2E - David Smith</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {/* Operating Condition / Location Field */}
+                  <div className="space-y-2">
+                    <FormField
+                      control={form.control}
+                      name="operatingCondition"
+                      render={({ field }) => (
+                        <FormItem>
+                          {isViewMode ? (
+                            renderReadOnlyField("OPERATING CONDITION", field.value || "")
+                          ) : (
+                            <div className="space-y-2">
+                              <label 
+                                className="text-xs font-medium text-gray-700"
+                                title="Select vessel condition during occurrence and specify port/position if applicable."
+                              >
+                                OPERATION CONDITION / LOCATION
+                              </label>
+                              <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    value="SAILING"
+                                    checked={field.value === "SAILING"}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    className="text-blue-600"
+                                  />
+                                  <span className="text-sm">Sailing 🚢</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    value="PORT"
+                                    checked={field.value === "PORT"}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    className="text-blue-600"
+                                  />
+                                  <span className="text-sm">Port 🏗️</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    value="ANCHOR"
+                                    checked={field.value === "ANCHOR"}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    className="text-blue-600"
+                                  />
+                                  <span className="text-sm">At Anchor ⚓</span>
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {(form.watch("operatingCondition") === "PORT" || form.watch("operatingCondition") === "ANCHOR") && (
+                      <FormField
+                        control={form.control}
+                        name="locationText"
+                        render={({ field }) => (
+                          <FormItem>
+                            {!isViewMode && (
+                              <FormControl>
+                                <Input
+                                  placeholder="Enter port or position (e.g. Mumbai Anchorage or Lat/Long)"
+                                  {...field}
+                                  className="text-xs"
+                                  required={form.watch("operatingCondition") === "PORT" || form.watch("operatingCondition") === "ANCHOR"}
+                                  data-testid="input-location-text"
+                                />
+                              </FormControl>
+                            )}
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+                  
+                  {/* Occurrence Type (Routine / Breakdown) */}
+                  <FormField
+                    control={form.control}
+                    name="occurrenceType"
+                    render={({ field }) => (
+                      <FormItem>
+                        {isViewMode ? (
+                          renderReadOnlyField("OCCURRENCE TYPE", field.value || "")
+                        ) : (
+                          <div className="space-y-2">
+                            <label 
+                              className="text-xs font-medium text-gray-700"
+                              title="Mark as Breakdown for unplanned equipment failures."
+                            >
+                              OCCURRENCE TYPE
+                            </label>
+                            <div className="flex gap-4">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="ROUTINE"
+                                  checked={field.value === "ROUTINE"}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                  className="text-blue-600"
+                                />
+                                <span className="text-sm">Routine</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="BREAKDOWN"
+                                  checked={field.value === "BREAKDOWN"}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                  className="text-blue-600"
+                                />
+                                <span className="text-sm">Breakdown</span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </FormItem>
+                    )}
+                  />
                   
                   <FormField
                     control={form.control}
@@ -587,17 +769,17 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
                   <FormField
                     control={form.control}
-                    name="targetDate"
+                    name="targetCloseDate"
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
                           {isViewMode ? (
-                            renderReadOnlyField("TARGET DATE", field.value || "")
+                            renderReadOnlyField("TARGET DATE FOR CLOSURE", field.value || "")
                           ) : (
                             <label className="relative block cursor-pointer">
                               <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
                                 <span className="text-gray-400 text-sm">
-                                  TARGET DATE
+                                  TARGET DATE FOR CLOSURE
                                 </span>
                                 <span className="flex items-center gap-2">
                                   {field.value && <span className="text-black">{field.value}</span>}
@@ -614,6 +796,45 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                             </label>
                           )}
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {/* Responsible Role Field */}
+                  <FormField
+                    control={form.control}
+                    name="responsibleRole"
+                    render={({ field }) => (
+                      <FormItem>
+                        {isViewMode ? (
+                          renderReadOnlyField("RESPONSIBLE ROLE", field.value || "")
+                        ) : (
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue("responsibleRoleId", value);
+                            }} 
+                            defaultValue={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger 
+                                data-testid="select-responsible-role"
+                                title="Select the main role accountable for closing this defect."
+                              >
+                                <SelectValue placeholder="RESPONSIBLE ROLE" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Master">Master</SelectItem>
+                              <SelectItem value="Chief Engineer">Chief Engineer</SelectItem>
+                              <SelectItem value="Chief Officer">Chief Officer</SelectItem>
+                              <SelectItem value="2E">2E</SelectItem>
+                              <SelectItem value="ETO">ETO</SelectItem>
+                              <SelectItem value="Tech Superintendent">Tech Superintendent</SelectItem>
+                              <SelectItem value="HSEQ Superintendent">HSEQ Superintendent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -1007,6 +1228,326 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Deferment Procedure Section */}
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Deferment Procedure</h2>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="isDeferred"
+                render={({ field }) => (
+                  <FormItem className="flex items-center space-x-2">
+                    {isViewMode ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-sm">Deferment Needed: </span>
+                        <span className="text-sm">{field.value ? "Yes" : "No"}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-deferment"
+                          />
+                        </FormControl>
+                        <FormLabel>Deferment Needed? (Yes/No)</FormLabel>
+                      </>
+                    )}
+                  </FormItem>
+                )}
+              />
+              
+              {form.watch("isDeferred") && (
+                <div className="grid grid-cols-3 gap-4 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="deferReason"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          {isViewMode ? (
+                            renderReadOnlyField("DEFERMENT REASON", field.value || "")
+                          ) : (
+                            <Textarea
+                              {...field}
+                              placeholder="Deferment Reason (required)"
+                              rows={2}
+                              required={form.watch("isDeferred")}
+                              className="bg-white"
+                              data-testid="textarea-defer-reason"
+                            />
+                          )}
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="deferNewTargetDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          {isViewMode ? (
+                            renderReadOnlyField("PROPOSED NEW TARGET DATE", field.value || "")
+                          ) : (
+                            <label className="relative block cursor-pointer">
+                              <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                                <span className="text-gray-400 text-sm">
+                                  Proposed New Target Date
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  {field.value && <span className="text-black">{field.value}</span>}
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                </span>
+                              </div>
+                              <input
+                                type="date"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value)}
+                                required={form.watch("isDeferred")}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                data-testid="input-defer-new-target"
+                              />
+                            </label>
+                          )}
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="deferApprovalRequired"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2">
+                        {isViewMode ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-semibold text-sm">Approval Required: </span>
+                            <span className="text-sm">{renderCheckboxValue(field.value || false)}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-defer-approval"
+                              />
+                            </FormControl>
+                            <FormLabel>Approval Required</FormLabel>
+                          </>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Third-Party Reporting Section */}
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Third-Party Reporting</h2>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="reportToThirdParty"
+                render={({ field }) => (
+                  <FormItem className="flex items-center space-x-2">
+                    {isViewMode ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-sm">Reported to Third Party: </span>
+                        <span className="text-sm">{field.value ? "Yes" : "No"}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-third-party"
+                          />
+                        </FormControl>
+                        <FormLabel>Reported to Third Party?</FormLabel>
+                      </>
+                    )}
+                  </FormItem>
+                )}
+              />
+              
+              {form.watch("reportToThirdParty") && (
+                <div className="space-y-4 pl-6">
+                  <div className="flex gap-6">
+                    <FormField
+                      control={form.control}
+                      name="classReport"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          {!isViewMode && (
+                            <>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-class-report"
+                                />
+                              </FormControl>
+                              <FormLabel>Class</FormLabel>
+                            </>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="flagReport"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          {!isViewMode && (
+                            <>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-flag-report"
+                                />
+                              </FormControl>
+                              <FormLabel>Flag</FormLabel>
+                            </>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="portReport"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          {!isViewMode && (
+                            <>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-port-report"
+                                />
+                              </FormControl>
+                              <FormLabel>Port State</FormLabel>
+                            </>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="reportReferenceNo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            {isViewMode ? (
+                              renderReadOnlyField("REFERENCE NO", field.value || "")
+                            ) : (
+                              <Input
+                                {...field}
+                                placeholder="Reference No (optional)"
+                                data-testid="input-report-ref"
+                              />
+                            )}
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="reportDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            {isViewMode ? (
+                              renderReadOnlyField("DATE REPORTED", field.value || "")
+                            ) : (
+                              <label className="relative block cursor-pointer">
+                                <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-white">
+                                  <span className="text-gray-400 text-sm">
+                                    Date Reported
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    {field.value && <span className="text-black">{field.value}</span>}
+                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                  </span>
+                                </div>
+                                <input
+                                  type="date"
+                                  value={field.value || ""}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  data-testid="input-report-date"
+                                />
+                              </label>
+                            )}
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        className="flex items-center gap-2"
+                        data-testid="button-upload-report"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload Report File
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cross-reference with Drydock Spec (Placeholder - Phase 3) */}
+          <div className="bg-gray-50 p-6">
+            <div className="pb-4">
+              <div className="border-b pb-2" style={{borderColor: '#16569e'}}>
+                <h2 className="font-semibold text-base" style={{color: '#16569e'}}>Drydock Specification</h2>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-4">
+                <Select disabled>
+                  <SelectTrigger className="w-full opacity-50" data-testid="select-drydock-disabled">
+                    <SelectValue placeholder="Link to Drydock Specification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Feature coming soon</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-500 italic" title="This will link defect to upcoming drydock work items.">
+                  Feature coming soon - This will link defect to upcoming drydock work items.
+                </p>
               </div>
             </div>
           </div>

@@ -509,7 +509,8 @@ export const defects = pgTable("defects", {
   defectType: text("defect_type"), // 'Routine' | 'Corrective' | 'Emergency'
   description: text("description").notNull(),
   actionTakenRequested: text("action_taken_requested"),
-  targetDate: text("target_date"), // DD-MM-YYYY format
+  // Renamed from targetDate to targetCloseDate
+  targetCloseDate: text("target_close_date"), // DD-MM-YYYY format
   dateCompleted: text("date_completed"), // DD-MM-YYYY format
   status: text("status").notNull().default("Open"), // 'Open' | 'Pending' | 'In-Progress' | 'Awaiting Parts' | 'Deferred' | 'Closed' | 'Cancelled'
   priority: text("priority").default("Medium"), // 'Low' | 'Medium' | 'High'
@@ -537,12 +538,40 @@ export const defects = pgTable("defects", {
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
   holdReason: text("hold_reason"), // For On Hold status
   nextReviewDate: text("next_review_date"), // For On Hold items
-  defermentFlag: boolean("deferment_flag").notNull().default(false),
-  defermentReason: text("deferment_reason"),
-  reportedTo: text("reported_to"), // 'Class' | 'Flag' | 'Port' | 'None'
-  operatingState: text("operating_state"), // 'Sailing' | 'Port' | 'Anchor'
-  routineBreakdown: text("routine_breakdown"), // 'Routine' | 'Breakdown'
-  raisedByUserId: text("raised_by_user_id"),
+  
+  // NEW FIELDS FOR DEFECT MODULE ENHANCEMENTS
+  
+  // 1. Raised By (Who Raised the Defect)
+  raisedById: text("raised_by_id"),
+  raisedByName: text("raised_by_name"),
+  raisedByRank: text("raised_by_rank"),
+  
+  // 2. Operating Condition / Location
+  operatingCondition: text("operating_condition"), // 'SAILING' | 'PORT' | 'ANCHOR'
+  locationText: text("location_text"),
+  
+  // 3. Routine / Breakdown
+  occurrenceType: text("occurrence_type"), // 'ROUTINE' | 'BREAKDOWN'
+  
+  // 4. Responsible Role
+  responsibleRole: text("responsible_role"),
+  responsibleRoleId: text("responsible_role_id"),
+  
+  // 6. Deferment Procedure
+  isDeferred: boolean("is_deferred").notNull().default(false),
+  deferReason: text("defer_reason"),
+  deferNewTargetDate: text("defer_new_target_date"),
+  deferApprovalRequired: boolean("defer_approval_required").default(true),
+  
+  // 7. Third-Party Reporting
+  reportToThirdParty: boolean("report_to_third_party").notNull().default(false),
+  classReport: boolean("class_report").notNull().default(false),
+  flagReport: boolean("flag_report").notNull().default(false),
+  portReport: boolean("port_report").notNull().default(false),
+  reportReferenceNo: text("report_reference_no"),
+  reportDate: text("report_date"),
+  
+  // Legacy fields (kept for backward compatibility)
   reportedBy: text("reported_by").notNull(),
   assignedTo: text("assigned_to"),
   reviewedBy: text("reviewed_by"),

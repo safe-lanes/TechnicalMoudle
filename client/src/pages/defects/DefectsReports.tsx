@@ -321,6 +321,35 @@ export default function DefectsReports() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              <div>
+                <Label className="text-xs">Operating Condition</Label>
+                <Select value={filters.portAtSea} onValueChange={(value) => handleFilterChange('portAtSea', value)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All Conditions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Conditions</SelectItem>
+                    <SelectItem value="SAILING">Sailing</SelectItem>
+                    <SelectItem value="PORT">Port</SelectItem>
+                    <SelectItem value="ANCHOR">At Anchor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label className="text-xs">Occurrence Type</Label>
+                <Select value={filters.routineBreakdown} onValueChange={(value) => handleFilterChange('routineBreakdown', value)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="ROUTINE">Routine</SelectItem>
+                    <SelectItem value="BREAKDOWN">Breakdown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div>
                 <Label className="text-xs">Reported To</Label>
