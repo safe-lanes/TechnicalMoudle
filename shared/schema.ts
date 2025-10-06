@@ -546,6 +546,29 @@ export const defects = pgTable("defects", {
   reportedBy: text("reported_by").notNull(),
   assignedTo: text("assigned_to"),
   reviewedBy: text("reviewed_by"),
+  // Closure fields
+  closedBy: text("closed_by"),
+  closedOn: text("closed_on"), // DD-MM-YYYY HH:MM format
+  closureComment: text("closure_comment"),
+  closureFiles: text("closure_files").array(), // Array of file URLs
+  // Linked defects
+  linkedDefects: text("linked_defects").array(), // Array of defect IDs
+  // Notes
+  notes: json("notes").$type<Array<{
+    noteId: string;
+    noteText: string;
+    attachments: string[];
+    createdBy: string;
+    createdOn: string;
+  }>>().default([]),
+  // Audit trail
+  auditTrail: json("audit_trail").$type<Array<{
+    action: string;
+    userId: string;
+    userName: string;
+    timestamp: string;
+    details?: any;
+  }>>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({

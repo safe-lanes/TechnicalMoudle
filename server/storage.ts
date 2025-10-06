@@ -206,6 +206,15 @@ export interface IStorage {
   getDefectAttachments(defectId: string): Promise<DefectAttachment[]>;
   createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment>;
   deleteDefectAttachment(id: number): Promise<void>;
+  
+  // Defect Notes methods
+  addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string; }): Promise<Defect>;
+  
+  // Defect Linking methods
+  linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect>;
+  
+  // Defect Closure methods
+  closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -2450,6 +2459,136 @@ export class MemStorage implements IStorage {
       throw new Error(`DefectAttachment with id ${id} not found`);
     }
     this.defectAttachments.delete(id);
+  }
+
+  // Add note to defect
+  async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string; }): Promise<Defect> {
+    const defect = await this.getDefect(defectId);
+    if (!defect) {
+      throw new Error(`Defect with id ${defectId} not found`);
+    }
+
+    const noteId = `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newNote = {
+      noteId,
+      noteText: note.noteText,
+      attachments: note.attachments,
+      createdBy: note.createdBy,
+      createdOn: new Date().toISOString()
+    };
+
+    const notes = defect.notes || [];
+    notes.push(newNote);
+
+    // Add audit entry
+    const auditTrail = defect.auditTrail || [];
+    auditTrail.push({
+      action: 'ADD_NOTE',
+      userId: note.createdBy,
+      userName: note.createdBy,
+      timestamp: new Date().toISOString(),
+      details: { noteId }
+    });
+
+    const updatedDefect = {
+      ...defect,
+      notes,
+      auditTrail,
+      updatedAt: new Date()
+    };
+
+    this.defects.set(defectId, updatedDefect);
+    return updatedDefect;
+  }
+
+  // Link related defects
+  async linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect> {
+    const defect = await this.getDefect(defectId);
+    if (!defect) {
+      throw new Error(`Defect with id ${defectId} not found`);
+    }
+
+    // Update main defect
+    const currentLinks = defect.linkedDefects || [];
+    const newLinks = [...new Set([...currentLinks, ...linkedDefectIds])];
+    
+    // Add audit entry
+    const auditTrail = defect.auditTrail || [];
+    auditTrail.push({
+      action: 'LINK',
+      userId: 'system',
+      userName: 'System',
+      timestamp: new Date().toISOString(),
+      details: { linkedDefects: linkedDefectIds }
+    });
+
+    const updatedDefect = {
+      ...defect,
+      linkedDefects: newLinks,
+      auditTrail,
+      updatedAt: new Date()
+    };
+
+    this.defects.set(defectId, updatedDefect);
+
+    // Add reciprocal links to all linked defects
+    for (const linkedId of linkedDefectIds) {
+      const linkedDefect = await this.getDefect(linkedId);
+      if (linkedDefect && linkedId !== defectId) {
+        const linkedDefectLinks = linkedDefect.linkedDefects || [];
+        if (!linkedDefectLinks.includes(defectId)) {
+          linkedDefectLinks.push(defectId);
+          const linkedAuditTrail = linkedDefect.auditTrail || [];
+          linkedAuditTrail.push({
+            action: 'LINK',
+            userId: 'system',
+            userName: 'System',
+            timestamp: new Date().toISOString(),
+            details: { linkedFrom: defectId }
+          });
+          this.defects.set(linkedId, {
+            ...linkedDefect,
+            linkedDefects: linkedDefectLinks,
+            auditTrail: linkedAuditTrail,
+            updatedAt: new Date()
+          });
+        }
+      }
+    }
+
+    return updatedDefect;
+  }
+
+  // Close defect
+  async closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect> {
+    const defect = await this.getDefect(defectId);
+    if (!defect) {
+      throw new Error(`Defect with id ${defectId} not found`);
+    }
+
+    // Add audit entry
+    const auditTrail = defect.auditTrail || [];
+    auditTrail.push({
+      action: 'CLOSE',
+      userId: closure.closedBy,
+      userName: closure.closedBy,
+      timestamp: new Date().toISOString(),
+      details: { comment: closure.closureComment }
+    });
+
+    const updatedDefect = {
+      ...defect,
+      status: 'Closed',
+      closedBy: closure.closedBy,
+      closedOn: new Date().toISOString(),
+      closureComment: closure.closureComment,
+      closureFiles: closure.closureFiles || [],
+      auditTrail,
+      updatedAt: new Date()
+    };
+
+    this.defects.set(defectId, updatedDefect);
+    return updatedDefect;
   }
 }
 

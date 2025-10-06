@@ -7,9 +7,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, Search, Plus } from "lucide-react";
+import { 
+  AlertTriangle, 
+  CheckCircle, 
+  Clock, 
+  Eye, 
+  Edit, 
+  Paperclip, 
+  Link, 
+  Check, 
+  Search, 
+  Plus 
+} from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import DefectFormExact from "./DefectFormExact";
+import ViewDefectModal from "./ViewDefectModal";
+import EditDefectModal from "./EditDefectModal";
+import AddNoteModal from "./AddNoteModal";
+import LinkDefectsModal from "./LinkDefectsModal";
+import CloseDefectModal from "./CloseDefectModal";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -24,11 +46,37 @@ interface DefectsFilters {
   includeClosedDefects?: boolean;
 }
 
+// Mock user role for permissions - in a real app, get from auth context
+const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
+
 export default function DefectsLog() {
   const [filters, setFilters] = useState<DefectsFilters>({
     includeClosedDefects: false,
   });
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
+  
+  // Modal states
+  const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
+  const [editModal, setEditModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
+  const [noteModal, setNoteModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
+  const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ 
+    open: false, 
+    defectId: null,
+    linkedDefects: []
+  });
+  const [closeModal, setCloseModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
 
   const { data: defects = [], isLoading } = useQuery({
     queryKey: ['/api/defects', filters],
@@ -70,6 +118,53 @@ export default function DefectsLog() {
 
   const handleClearFilters = () => {
     setFilters({ includeClosedDefects: false });
+  };
+  
+  // Permission checking functions
+  const canView = () => true; // All users can view
+  
+  const canEdit = () => {
+    return ["Master", "Chief Engineer", "Superintendent", "Admin"].includes(CURRENT_USER_ROLE);
+  };
+  
+  const canAddNote = () => true; // All users can add notes
+  
+  const canLink = () => {
+    return ["Chief Engineer", "Superintendent", "Admin"].includes(CURRENT_USER_ROLE);
+  };
+  
+  const canClose = () => {
+    return ["Chief Engineer", "Master", "Superintendent", "Admin"].includes(CURRENT_USER_ROLE);
+  };
+  
+  // Action handlers
+  const handleView = (defectId: string) => {
+    setViewModal({ open: true, defectId });
+  };
+  
+  const handleEdit = (defectId: string) => {
+    if (!canEdit()) {
+      return; // Could show a toast here for insufficient permissions
+    }
+    setEditModal({ open: true, defectId });
+  };
+  
+  const handleAddNote = (defectId: string) => {
+    setNoteModal({ open: true, defectId });
+  };
+  
+  const handleLink = (defectId: string, linkedDefects: string[] = []) => {
+    if (!canLink()) {
+      return; // Could show a toast here for insufficient permissions
+    }
+    setLinkModal({ open: true, defectId, linkedDefects });
+  };
+  
+  const handleClose = (defectId: string) => {
+    if (!canClose()) {
+      return; // Could show a toast here for insufficient permissions
+    }
+    setCloseModal({ open: true, defectId });
   };
 
   return (
@@ -291,21 +386,115 @@ export default function DefectsLog() {
                       {getStatusBadge(defect.status, defect.critical)}
                     </div>
                     <div className="col-span-1 flex items-center gap-1">
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                        <Eye className="h-3 w-3 text-gray-500" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                        <Edit className="h-3 w-3 text-gray-500" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                        <Paperclip className="h-3 w-3 text-gray-500" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                        <Link className="h-3 w-3 text-gray-500" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                        <Trash2 className="h-3 w-3 text-gray-500" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0 hover:bg-blue-50"
+                              onClick={() => handleView(defect.id)}
+                              data-testid={`button-view-${defect.id}`}
+                            >
+                              <Eye className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className={cn(
+                                "h-6 w-6 p-0",
+                                canEdit() ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"
+                              )}
+                              onClick={() => handleEdit(defect.id)}
+                              disabled={!canEdit()}
+                              data-testid={`button-edit-${defect.id}`}
+                            >
+                              <Edit className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{canEdit() ? "Edit" : "Edit (No Permission)"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0 hover:bg-blue-50"
+                              onClick={() => handleAddNote(defect.id)}
+                              data-testid={`button-add-note-${defect.id}`}
+                            >
+                              <Paperclip className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add Note</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className={cn(
+                                "h-6 w-6 p-0",
+                                canLink() ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"
+                              )}
+                              onClick={() => handleLink(defect.id, defect.linkedDefects)}
+                              disabled={!canLink()}
+                              data-testid={`button-link-${defect.id}`}
+                            >
+                              <Link className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{canLink() ? "Link" : "Link (No Permission)"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className={cn(
+                                "h-6 w-6 p-0",
+                                canClose() && defect.status !== 'Closed' 
+                                  ? "hover:bg-green-50" 
+                                  : "opacity-50 cursor-not-allowed"
+                              )}
+                              onClick={() => handleClose(defect.id)}
+                              disabled={!canClose() || defect.status === 'Closed'}
+                              data-testid={`button-close-${defect.id}`}
+                            >
+                              <Check className={cn(
+                                "h-3 w-3",
+                                defect.status === 'Closed' ? "text-green-600" : "text-gray-500"
+                              )} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              {defect.status === 'Closed' 
+                                ? "Already Closed" 
+                                : canClose() 
+                                  ? "Close" 
+                                  : "Close (No Permission)"}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     <div className="col-span-1">
                       <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
@@ -330,6 +519,48 @@ export default function DefectsLog() {
           </div>
         </div>
       </div>
+      
+      {/* Modals */}
+      {viewModal.defectId && (
+        <ViewDefectModal
+          open={viewModal.open}
+          onClose={() => setViewModal({ open: false, defectId: null })}
+          defectId={viewModal.defectId}
+        />
+      )}
+      
+      {editModal.defectId && (
+        <EditDefectModal
+          open={editModal.open}
+          onClose={() => setEditModal({ open: false, defectId: null })}
+          defectId={editModal.defectId}
+        />
+      )}
+      
+      {noteModal.defectId && (
+        <AddNoteModal
+          open={noteModal.open}
+          onClose={() => setNoteModal({ open: false, defectId: null })}
+          defectId={noteModal.defectId}
+        />
+      )}
+      
+      {linkModal.defectId && (
+        <LinkDefectsModal
+          open={linkModal.open}
+          onClose={() => setLinkModal({ open: false, defectId: null, linkedDefects: [] })}
+          defectId={linkModal.defectId}
+          currentLinkedDefects={linkModal.linkedDefects}
+        />
+      )}
+      
+      {closeModal.defectId && (
+        <CloseDefectModal
+          open={closeModal.open}
+          onClose={() => setCloseModal({ open: false, defectId: null })}
+          defectId={closeModal.defectId}
+        />
+      )}
     </div>
   );
 }

@@ -289,6 +289,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Add note to defect
+  app.post("/api/defects/:id/notes", async (req, res) => {
+    try {
+      const { noteText, attachments, createdBy } = req.body;
+      
+      if (!noteText || noteText.length < 10) {
+        return res.status(400).json({ error: "Note text must be at least 10 characters" });
+      }
+      
+      const defect = await storage.addDefectNote(req.params.id, {
+        noteText,
+        attachments: attachments || [],
+        createdBy
+      });
+      
+      res.json(defect);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to add note to defect" });
+    }
+  });
+  
+  // Link related defects
+  app.patch("/api/defects/:id/link", async (req, res) => {
+    try {
+      const { linkedDefects } = req.body;
+      
+      if (!linkedDefects || !Array.isArray(linkedDefects) || linkedDefects.length === 0) {
+        return res.status(400).json({ error: "linkedDefects must be a non-empty array" });
+      }
+      
+      const defect = await storage.linkDefects(req.params.id, linkedDefects);
+      res.json(defect);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to link defects" });
+    }
+  });
+  
+  // Close defect
+  app.patch("/api/defects/:id/close", async (req, res) => {
+    try {
+      const { closedBy, closureComment, closureFiles } = req.body;
+      
+      if (!closureComment || closureComment.trim().length === 0) {
+        return res.status(400).json({ error: "Closure comment is required" });
+      }
+      
+      const defect = await storage.closeDefect(req.params.id, {
+        closedBy,
+        closureComment,
+        closureFiles
+      });
+      
+      res.json(defect);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to close defect" });
+    }
+  });
+  
   // Defects Reports API
   app.post("/api/defects/reports/:reportKey", async (req, res) => {
     try {
