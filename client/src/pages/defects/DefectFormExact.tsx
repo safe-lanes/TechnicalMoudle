@@ -57,12 +57,14 @@ interface Action {
 
 interface DefectFormExactProps {
   onClose: () => void;
+  defect?: Defect | null;
+  mode?: 'view' | 'edit' | 'new';
 }
 
-export default function DefectFormExact({ onClose }: DefectFormExactProps) {
+export default function DefectFormExact({ onClose, defect, mode = 'new' }: DefectFormExactProps) {
   const { toast } = useToast();
-  const [defectRef] = useState(generateDefectRef());
-  const [isViewMode, setIsViewMode] = useState(false);
+  const [defectRef] = useState(defect?.id || generateDefectRef());
+  const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   const [actions, setActions] = useState<Action[]>([
@@ -88,18 +90,70 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
 
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
-    defaultValues: {
+    defaultValues: defect ? {
+      id: defect.id,
+      vesselId: defect.vesselId || "V001",
+      vesselName: defect.vesselName || "MV SEAFARER",
+      issueDate: defect.issueDate || "",
+      category: defect.category || "Defect",
+      defectType: defect.defectType || "",
+      description: defect.description || "",
+      status: defect.status || "Open",
+      priority: defect.priority || "Medium",
+      critical: defect.critical || false,
+      severity: defect.severity || 2,
+      source: defect.source || "",
+      equipmentCategory: defect.equipmentCategory || "",
+      equipmentType: defect.equipmentType || "",
+      equipmentMake: defect.equipmentMake || "",
+      equipmentModel: defect.equipmentModel || "",
+      equipmentSerialNo: defect.equipmentSerialNo || "",
+      equipmentLocation: defect.equipmentLocation || "",
+      equipmentSystem: defect.equipmentSystem || "",
+      targetCloseDate: defect.targetCloseDate || "",
+      dateCompleted: defect.dateCompleted || "",
+      verifiedDate: defect.verifiedDate || "",
+      responsibleDept: defect.responsibleDept || "",
+      purchaseOrderRef: defect.purchaseOrderRef || "",
+      viqVersion: defect.viqVersion || "",
+      viqRef: defect.viqRef || "",
+      sfiCodeRef: defect.sfiCodeRef || "",
+      immediateCause: defect.immediateCause || "",
+      immediateCauseExplanation: defect.immediateCauseExplanation || "",
+      rootCause: defect.rootCause || "",
+      rootCauseExplanation: defect.rootCauseExplanation || "",
+      reportedBy: defect.reportedBy || "System User",
+      // New fields
+      raisedById: defect.raisedById || "",
+      raisedByName: defect.raisedByName || "System User",
+      raisedByRank: defect.raisedByRank || "Master",
+      operatingCondition: defect.operatingCondition || "SAILING",
+      locationText: defect.locationText || "",
+      occurrenceType: defect.occurrenceType || "ROUTINE",
+      responsibleRole: defect.responsibleRole || "",
+      responsibleRoleId: defect.responsibleRoleId || "",
+      isDeferred: defect.isDeferred || false,
+      deferReason: defect.deferReason || "",
+      deferNewTargetDate: defect.deferNewTargetDate || "",
+      deferApprovalRequired: defect.deferApprovalRequired || true,
+      reportToThirdParty: defect.reportToThirdParty || false,
+      classReport: defect.classReport || false,
+      flagReport: defect.flagReport || false,
+      portReport: defect.portReport || false,
+      reportReferenceNo: defect.reportReferenceNo || "",
+      reportDate: defect.reportDate || "",
+    } : {
       id: defectRef,
       vesselId: "V001",
       vesselName: "MV SEAFARER",
       issueDate: "",
-      category: "Defect", // Default category
+      category: "Defect",
       defectType: "",
       description: "",
       status: "Open",
       priority: "Medium",
       critical: false,
-      severity: 2, // Minor
+      severity: 2,
       source: "",
       equipmentCategory: "",
       equipmentType: "",
@@ -143,19 +197,26 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
     },
   });
 
-  const createDefectMutation = useMutation({
+  const saveDefectMutation = useMutation({
     mutationFn: async (data: DefectFormData) => {
-      return apiRequest("POST", "/api/defects", data);
+      if (mode === 'edit' && defect) {
+        return apiRequest("PATCH", `/api/defects/${defect.id}`, data);
+      } else {
+        return apiRequest("POST", "/api/defects", data);
+      }
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Defect created successfully" });
+      toast({ 
+        title: "Success", 
+        description: mode === 'edit' ? "Defect updated successfully" : "Defect created successfully" 
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
       onClose();
     },
     onError: (error: any) => {
       toast({ 
         title: "Error", 
-        description: error?.message || "Failed to create defect",
+        description: error?.message || `Failed to ${mode === 'edit' ? 'update' : 'create'} defect`,
         variant: "destructive" 
       });
     },
@@ -258,7 +319,7 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
       });
     }
 
-    createDefectMutation.mutate(data);
+    saveDefectMutation.mutate(data);
   };
 
   const addAction = () => {
@@ -320,10 +381,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
             style={{backgroundColor: '#16569e'}} 
             size="sm" 
             onClick={() => form.handleSubmit(handleSubmit)()}
-            disabled={createDefectMutation.isPending || isViewMode}
+            disabled={saveDefectMutation.isPending || isViewMode}
             data-testid="button-save-header"
           >
-            {createDefectMutation.isPending ? "SAVING..." : "SAVE"}
+            {saveDefectMutation.isPending ? "SAVING..." : "SAVE"}
           </Button>
         </div>
       </div>
@@ -1055,10 +1116,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
                   type="submit"
                   className="hover:opacity-90"
                   style={{backgroundColor: '#16569e'}} 
-                  disabled={createDefectMutation.isPending || isViewMode}
+                  disabled={saveDefectMutation.isPending || isViewMode}
                   data-testid="button-save-description"
                 >
-                  {createDefectMutation.isPending ? "SAVING..." : "SAVE"}
+                  {saveDefectMutation.isPending ? "SAVING..." : "SAVE"}
                 </Button>
               </div>
             </div>
@@ -1648,10 +1709,10 @@ export default function DefectFormExact({ onClose }: DefectFormExactProps) {
               type="submit" 
               className="hover:opacity-90 px-8"
               style={{backgroundColor: '#16569e'}}
-              disabled={createDefectMutation.isPending || isViewMode}
+              disabled={saveDefectMutation.isPending || isViewMode}
               data-testid="button-submit"
             >
-              {createDefectMutation.isPending ? "SUBMITTING..." : "SUBMIT"}
+              {saveDefectMutation.isPending ? "SUBMITTING..." : "SUBMIT"}
             </Button>
           </div>
         </form>

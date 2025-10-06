@@ -25,6 +25,8 @@ interface DefectsFilters {
 export default function DefectsActive() {
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
+  const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
+  const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
 
   // Get active defects count for badge
   const { data: activeCount = 0 } = useQuery({
@@ -92,6 +94,42 @@ export default function DefectsActive() {
     setFilters({});
   };
 
+  const handleViewDefect = (defect: Defect) => {
+    setSelectedDefect(defect);
+    setDefectFormMode('view');
+    setShowNewDefectForm(true);
+  };
+
+  const handleEditDefect = (defect: Defect) => {
+    setSelectedDefect(defect);
+    setDefectFormMode('edit');
+    setShowNewDefectForm(true);
+  };
+
+  const handleNewDefect = () => {
+    setSelectedDefect(null);
+    setDefectFormMode('new');
+    setShowNewDefectForm(true);
+  };
+
+  const handleCloseDefect = async (defectId: string) => {
+    if (confirm('Are you sure you want to close this defect?')) {
+      try {
+        const response = await fetch(`/api/defects/${defectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Closed', dateCompleted: new Date().toISOString().split('T')[0] })
+        });
+        if (response.ok) {
+          // Refetch data
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Failed to close defect:', error);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with Active Badge */}
@@ -124,14 +162,24 @@ export default function DefectsActive() {
             </Button>
             <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
               <DialogTrigger asChild>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" data-testid="button-new-defect">
+                <Button 
+                  className="bg-green-600 hover:bg-green-700 text-white" 
+                  size="sm" 
+                  data-testid="button-new-defect"
+                  onClick={handleNewDefect}
+                >
                   <Plus className="h-4 w-4 mr-1" />
                   New Defect
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
                 <DefectFormExact 
-                  onClose={() => setShowNewDefectForm(false)}
+                  onClose={() => {
+                    setShowNewDefectForm(false);
+                    setSelectedDefect(null);
+                  }}
+                  defect={selectedDefect}
+                  mode={defectFormMode}
                 />
               </DialogContent>
             </Dialog>
@@ -285,7 +333,7 @@ export default function DefectsActive() {
               </TableHeader>
               <TableBody>
                 {defects.map((defect: Defect) => {
-                  const daysOverdue = getDaysOverdue(defect.targetDate);
+                  const daysOverdue = getDaysOverdue(defect.targetCloseDate);
                   const isOverdue = daysOverdue !== null && daysOverdue > 0;
                   
                   return (
@@ -303,7 +351,7 @@ export default function DefectsActive() {
                       <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
                       <TableCell className="text-xs">
                         <div className="flex items-center gap-1">
-                          {defect.targetDate}
+                          {defect.targetCloseDate}
                           {isOverdue && (
                             <span className="text-red-600 text-xs" title={`Overdue by ${daysOverdue} days`}>
                               <Clock className="h-3 w-3" />
@@ -319,6 +367,8 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="View"
+                            onClick={() => handleViewDefect(defect)}
+                            data-testid={`button-view-${defect.id}`}
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
@@ -327,6 +377,8 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="Edit"
+                            onClick={() => handleEditDefect(defect)}
+                            data-testid={`button-edit-${defect.id}`}
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -335,6 +387,8 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="Add Note"
+                            onClick={() => alert('Add Note feature coming soon')}
+                            data-testid={`button-note-${defect.id}`}
                           >
                             <Paperclip className="h-3 w-3" />
                           </Button>
@@ -343,6 +397,8 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="Link"
+                            onClick={() => alert('Link feature coming soon')}
+                            data-testid={`button-link-${defect.id}`}
                           >
                             <Link className="h-3 w-3" />
                           </Button>
@@ -351,6 +407,8 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0 text-green-600"
                             title="Close/Complete"
+                            onClick={() => handleCloseDefect(defect.id)}
+                            data-testid={`button-close-${defect.id}`}
                           >
                             <CheckCircle className="h-3 w-3" />
                           </Button>
