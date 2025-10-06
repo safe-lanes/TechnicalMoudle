@@ -27,6 +27,7 @@ export default function DefectsActive() {
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
+  const [activeTab, setActiveTab] = useState("Active");
 
   // Get active defects count for badge
   const { data: activeCount = 0 } = useQuery({
