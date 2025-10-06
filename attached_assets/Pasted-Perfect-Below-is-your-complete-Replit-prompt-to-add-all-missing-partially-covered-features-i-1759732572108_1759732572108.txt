@@ -1,0 +1,333 @@
+Perfect ✅ Below is your **complete Replit prompt** to add all missing / partially covered features in the **Defect Reporting Module**, written in **developer-ready format** — precise, structured, and safe (no UI or color changes).
+
+---
+
+# 🧩 REPLIT PROMPT — Add Missing / Partially Covered Fields in Defect Module
+
+> ⚠️ IMPORTANT:
+> Do **not** alter existing colors, spacing, typography, or layout of the Defect Report Form.
+> Only **add** the specified new fields and connect them to the backend exactly as described.
+
+---
+
+## 🎯 PURPOSE:
+
+To capture complete operational and accountability details for each defect, we need to add the following new fields and rename one existing label. These updates improve traceability, Root Cause Analysis (RCA), and reporting accuracy.
+
+---
+
+## 1️⃣ FIELD: **Raised By (Who Raised the Defect)**
+
+### Function:
+
+Identify which crew member officially logged/reported the defect.
+
+### UI Placement:
+
+* Add this field in the **top Basic section**, below or beside “Defect ID”.
+* Label: `Raised By`
+* Type: Dropdown
+* Placeholder: `Select reporting crew member`
+* Auto-fill with **current logged-in user**, but allow override.
+* Dropdown List Format: `Rank - Name`
+  Example:
+
+  * Chief Engineer – John Mathews
+  * 2nd Officer – Rahul Verma
+  * AB – Suresh Kumar
+* Tooltip: “Auto-selected from login. Change if reporting on behalf of another crew member.”
+* Validation: Required field (must not be blank).
+
+### Data Source:
+
+Fetch list dynamically from ship’s **Crew Directory** table or crew API.
+
+### Backend Mapping:
+
+```json
+{
+  "raisedById": "uuid",
+  "raisedByName": "John Mathews",
+  "raisedByRank": "Chief Engineer"
+}
+```
+
+---
+
+## 2️⃣ FIELD: **Operating Condition / Location**
+
+### Function:
+
+Capture where the vessel was when the defect occurred (important for cause analysis).
+
+### UI Placement:
+
+* Add directly below “Raised By” field in the **Basic Details** section.
+
+### Layout:
+
+**Label:** `Operation Condition / Location`
+
+* Radio Buttons (horizontal layout):
+
+  * Sailing 🚢
+  * Port 🏗️
+  * At Anchor ⚓
+* Next to radio group, add **textbox** labeled `Location / Port Name`
+
+  * Placeholder: `Enter port or position (e.g. Mumbai Anchorage or Lat/Long)`
+  * Required only if “Port” or “Anchor” is selected
+
+### Validation:
+
+* Must select one of the three options.
+* Textbox optional for “Sailing” but required for “Port” or “Anchor”.
+
+### Tooltip:
+
+“Select vessel condition during occurrence and specify port/position if applicable.”
+
+### Backend Mapping:
+
+```json
+{
+  "operatingCondition": "PORT",     // Values: SAILING | PORT | ANCHOR
+  "locationText": "Singapore Anchorage"
+}
+```
+
+---
+
+## 3️⃣ FIELD: **Routine / Breakdown**
+
+### Function:
+
+Differentiate between planned/routine issues and unexpected failures.
+
+### UI Placement:
+
+Below “Operation Condition” in Basic section.
+
+* Label: `Occurrence Type`
+* Type: Toggle or radio buttons
+
+  * Routine
+  * Breakdown
+* Default Value: Routine
+* Validation: Required
+* Tooltip: “Mark as Breakdown for unplanned equipment failures.”
+
+### Backend Mapping:
+
+```json
+{ "occurrenceType": "BREAKDOWN" }
+```
+
+---
+
+## 4️⃣ FIELD: **Responsible Role**
+
+### Function:
+
+Track primary accountability for follow-up and closure.
+
+### UI Placement:
+
+Place under “Actions” section header or near Target Date.
+
+* Label: `Responsible Role`
+* Type: Dropdown
+* Options Source: Role list (Master, Chief Engineer, Chief Officer, 2E, ETO, Tech Superintendent, HSEQ Superintendent)
+* Tooltip: “Select the main role accountable for closing this defect.”
+* Required: Yes
+
+### Backend Mapping:
+
+```json
+{
+  "responsibleRole": "Chief Engineer",
+  "responsibleRoleId": "uuid"
+}
+```
+
+---
+
+## 5️⃣ FIELD: **Target Date for Closure** (Label Rename)
+
+### Change:
+
+Rename all occurrences of **“Target Date”** to:
+
+> “Target Date for Closure”
+
+### UI Behavior:
+
+* Field remains date picker
+* Validation unchanged
+* Required for all new defects
+
+### Backend:
+
+Map to existing target_date or targetCloseDate column (no new field needed).
+
+---
+
+## 6️⃣ FIELD: **Deferment Procedure**
+
+### Function:
+
+Allow user to defer defect rectification with proper reason.
+
+### UI Placement:
+
+Below Target Date for Closure.
+
+* Toggle: `Deferment Needed? (Yes/No)`
+* If “Yes” is selected → Show:
+
+  * Textbox: “Deferment Reason” (required)
+  * Date Picker: “Proposed New Target Date” (required)
+  * Checkbox: “Approval Required” (default checked)
+* Add a yellow “Deferred” badge in the log table row once approved.
+
+### Validation:
+
+* Deferment Reason & New Date required if toggle = Yes.
+
+### Backend Mapping:
+
+```json
+{
+  "isDeferred": true,
+  "deferReason": "Awaiting spare part delivery",
+  "deferNewTargetDate": "2025-12-10",
+  "deferApprovalRequired": true
+}
+```
+
+---
+
+## 7️⃣ FIELD: **Third-Party Reporting (Class / Flag / Port)**
+
+### Function:
+
+Record if defect is reported to regulatory authorities.
+
+### UI Placement:
+
+At bottom of form (after Root Cause Analysis).
+
+* Toggle: `Reported to Third Party?`
+* If ON, show three checkboxes:
+
+  * Class
+  * Flag
+  * Port State
+* Add optional fields:
+
+  * Reference No (text)
+  * Date Reported (date)
+  * Upload Report File (file upload)
+
+### Backend Mapping:
+
+```json
+{
+  "reportToThirdParty": true,
+  "classReport": true,
+  "flagReport": false,
+  "portReport": false,
+  "reportReferenceNo": "CL/ENG/2025/0031",
+  "reportDate": "2025-10-06",
+  "attachments": [/* file objects */]
+}
+```
+
+---
+
+## 8️⃣ PLACEHOLDER: **Cross-reference with Drydock Spec (Phase 3)**
+
+### UI Placement:
+
+At bottom of form
+
+* Disabled Select field
+* Label: `Link to Drydock Specification`
+* Helper Text: “Feature coming soon”
+* Tooltip: “This will link defect to upcoming drydock work items.”
+
+### Backend: none yet
+
+---
+
+## 9️⃣ REPORTING & KPI IMPACT (Backend Only)
+
+### Update Reports Module to capture:
+
+* `Days to Close = ClosedOn - CreatedOn`
+* `% Closed On Time`
+* Breakdown vs Routine ratio
+* Defects by Condition (Sailing/Port/Anchor)
+* Average closure days by Responsible Role
+* Deferred defects list with reasons
+
+---
+
+## 🔒 VALIDATION SUMMARY
+
+| Field                   | Required | Notes                    |
+| ----------------------- | -------- | ------------------------ |
+| Raised By               | ✅        | Auto-filled; editable    |
+| Operation Condition     | ✅        | One selection required   |
+| Location Text           | ⚠️       | Mandatory if Port/Anchor |
+| Routine/Breakdown       | ✅        | Toggle                   |
+| Responsible Role        | ✅        | Dropdown                 |
+| Target Date for Closure | ✅        | Date picker              |
+| Deferment               | ⚠️       | If Yes → Reason + Date   |
+| Third-Party Reporting   | ⚠️       | If ON → Ref No + Date    |
+| Files                   | Optional | Validation max 25MB each |
+
+---
+
+## 🧠 BACKEND FIELDS (Final Schema Additions)
+
+```json
+{
+  "raisedById": "uuid",
+  "raisedByRank": "string",
+  "operatingCondition": "SAILING|PORT|ANCHOR",
+  "locationText": "string",
+  "occurrenceType": "ROUTINE|BREAKDOWN",
+  "responsibleRole": "string",
+  "targetCloseDate": "date",
+  "isDeferred": "boolean",
+  "deferReason": "string",
+  "deferNewTargetDate": "date",
+  "deferApprovalRequired": "boolean",
+  "reportToThirdParty": "boolean",
+  "classReport": "boolean",
+  "flagReport": "boolean",
+  "portReport": "boolean",
+  "reportReferenceNo": "string",
+  "reportDate": "date"
+}
+```
+
+---
+
+## ✅ ACCEPTANCE CHECKLIST
+
+* [ ] “Raised By” dropdown auto-selects current user ✅
+* [ ] Operation condition radios + location text functional ✅
+* [ ] Routine/Breakdown toggle saves correctly ✅
+* [ ] Responsible Role dropdown stores and shows ✅
+* [ ] Target Date label renamed everywhere ✅
+* [ ] Deferment toggle reveals Reason + Date ✅
+* [ ] Third-party toggle + subfields work ✅
+* [ ] Cross-reference field shown as disabled placeholder ✅
+* [ ] No layout or color changes anywhere ✅
+* [ ] All new data persists in database ✅
+
+---
+
+Would you like me to now write a **separate prompt** for updating the **Reports Module** to use these new fields (e.g., filter by condition, breakdowns, deferred, etc.)?
