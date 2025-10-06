@@ -49,11 +49,8 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
 
   const linkDefectsMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/defects/${defectId}/link`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          linkedDefects: selectedDefects
-        }),
+      return apiRequest('PATCH', `/api/defects/${defectId}/link`, {
+        linkedDefects: selectedDefects
       });
     },
     onSuccess: () => {

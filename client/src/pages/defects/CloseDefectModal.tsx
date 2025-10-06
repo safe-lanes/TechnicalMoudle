@@ -40,13 +40,10 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
       // In a real implementation, you'd upload files to storage first
       const fileNames = closureFiles.map(file => file.name);
       
-      return apiRequest(`/api/defects/${defectId}/close`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          closedBy: 'Current User', // In real app, get from auth context
-          closureComment,
-          closureFiles: fileNames
-        }),
+      return apiRequest('PATCH', `/api/defects/${defectId}/close`, {
+        closedBy: 'Current User', // In real app, get from auth context
+        closureComment,
+        closureFiles: fileNames
       });
     },
     onSuccess: () => {

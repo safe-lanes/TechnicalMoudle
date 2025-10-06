@@ -26,13 +26,10 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
       // In a real implementation, you'd upload files to storage first
       const attachmentNames = attachments.map(file => file.name);
       
-      return apiRequest(`/api/defects/${defectId}/notes`, {
-        method: 'POST',
-        body: JSON.stringify({
-          noteText,
-          attachments: attachmentNames,
-          createdBy: 'Current User' // In real app, get from auth context
-        }),
+      return apiRequest('POST', `/api/defects/${defectId}/notes`, {
+        noteText,
+        attachments: attachmentNames,
+        createdBy: 'Current User' // In real app, get from auth context
       });
     },
     onSuccess: () => {

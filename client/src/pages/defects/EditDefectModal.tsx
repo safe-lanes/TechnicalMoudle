@@ -50,10 +50,7 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<Defect>) => {
-      return apiRequest(`/api/defects/${defectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('PATCH', `/api/defects/${defectId}`, data);
     },
     onSuccess: () => {
       toast({
