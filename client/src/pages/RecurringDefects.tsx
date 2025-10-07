@@ -41,6 +41,39 @@ export default function RecurringDefects() {
   const [selectedRecurring, setSelectedRecurring] = useState<RecurringDefectWithDetails | null>(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
 
+  // Export data functionality
+  const exportData = (filename: string, data: RecurringDefect[]) => {
+    const csvContent = [
+      // Headers
+      'Equipment Key,Equipment Type,Make,Model,Serial,Location,System,Occurrences,Vessels Affected,Last Occurrence,COC Flag',
+      // Data rows
+      ...data.map(rd => {
+        const parts = rd.equipment_key.split('|');
+        return [
+          rd.equipment_key,
+          parts[0] || '',
+          parts[1] || '',
+          parts[2] || '',
+          parts[3] || '',
+          parts[4] || '',
+          parts[5] || '',
+          rd.occurrence_count.toString(),
+          rd.vessels_affected.toString(),
+          rd.last_occurrence_date ? new Date(rd.last_occurrence_date).toLocaleDateString() : '',
+          rd.has_coc ? 'Yes' : 'No'
+        ].map(cell => `"${cell}"`).join(',');
+      })
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Fetch recurring defects
   const { data: recurringDefects = [], isLoading } = useQuery<RecurringDefect[]>({
     queryKey: ["/api/recurring-defects", { windowMonths: Number(windowMonths), minOccurrences: Number(minOccurrences), hasCoc: cocOnly || undefined }],
