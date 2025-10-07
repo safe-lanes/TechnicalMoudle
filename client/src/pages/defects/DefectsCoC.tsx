@@ -144,7 +144,19 @@ export default function DefectsCoC() {
       return response.json();
     },
     onSuccess: (data, defectId) => {
+      // Invalidate both the general defects query and the CoC-specific query
       queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      // Also invalidate the query with is_coc filter to ensure CoC page updates
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && 
+                 queryKey[0] === '/api/defects' && 
+                 queryKey[1] && 
+                 typeof queryKey[1] === 'object' && 
+                 'is_coc' in queryKey[1];
+        }
+      });
       
       toast({
         title: "CoC Defect Closed Successfully",
@@ -215,7 +227,18 @@ export default function DefectsCoC() {
                     onClose={() => {
                       setShowNewDefectForm(false);
                       setSelectedDefect(null);
+                      // Invalidate both general and CoC-specific queries
                       queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+                      queryClient.invalidateQueries({ 
+                        predicate: (query) => {
+                          const queryKey = query.queryKey;
+                          return Array.isArray(queryKey) && 
+                                 queryKey[0] === '/api/defects' && 
+                                 queryKey[1] && 
+                                 typeof queryKey[1] === 'object' && 
+                                 'is_coc' in queryKey[1];
+                        }
+                      });
                     }}
                     defect={selectedDefect}
                     mode={defectFormMode}
