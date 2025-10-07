@@ -613,7 +613,7 @@ export default function DefectsLogWithTabs() {
       {viewModal.defectId && (
         <ViewDefectModal
           open={viewModal.open}
-          onOpenChange={(open) => setViewModal({ open, defectId: null })}
+          onClose={() => setViewModal({ open: false, defectId: null })}
           defectId={viewModal.defectId}
         />
       )}
@@ -621,43 +621,45 @@ export default function DefectsLogWithTabs() {
       {editModal.defectId && (
         <EditDefectModal
           open={editModal.open}
-          onOpenChange={(open) => setEditModal({ open, defectId: null })}
-          defectId={editModal.defectId}
-          onSuccess={() => {
+          onClose={() => {
+            setEditModal({ open: false, defectId: null });
             queryClient.invalidateQueries({ queryKey: ['defects'] });
           }}
+          defectId={editModal.defectId}
         />
       )}
       
       {noteModal.defectId && (
         <AddNoteModal
           open={noteModal.open}
-          onOpenChange={(open) => setNoteModal({ open, defectId: null })}
-          defectId={noteModal.defectId}
-          onSuccess={() => {
+          onClose={() => {
+            setNoteModal({ open: false, defectId: null });
             queryClient.invalidateQueries({ queryKey: ['defects'] });
           }}
+          defectId={noteModal.defectId}
         />
       )}
       
       {linkModal.defectId && (
         <LinkDefectsModal
           open={linkModal.open}
-          onOpenChange={(open) => setLinkModal({ open, defectId: null, linkedDefects: [] })}
-          defectId={linkModal.defectId}
-          linkedDefects={linkModal.linkedDefects}
-          onSuccess={() => {
+          onClose={() => {
+            setLinkModal({ open: false, defectId: null, linkedDefects: [] });
             queryClient.invalidateQueries({ queryKey: ['defects'] });
           }}
+          defectId={linkModal.defectId}
+          linkedDefects={linkModal.linkedDefects}
         />
       )}
       
       {closeModal.defectId && (
         <CloseDefectModal
           open={closeModal.open}
-          onOpenChange={(open) => setCloseModal({ open, defectId: null })}
+          onClose={() => {
+            setCloseModal({ open: false, defectId: null });
+            handleDefectClosed();
+          }}
           defectId={closeModal.defectId}
-          onSuccess={handleDefectClosed}
         />
       )}
     </div>
