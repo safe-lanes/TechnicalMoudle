@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,24 +30,11 @@ export default function DefectsActive() {
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
   const [activeTab, setActiveTab] = useState("Active");
 
-  // Get active defects count for badge
-  const { data: activeCount = 0 } = useQuery({
-    queryKey: ['/api/defects/count', 'active'],
+  // Get all defects to calculate counts and filter
+  const { data: allDefects = [], isLoading } = useQuery({
+    queryKey: ['/api/defects', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('statusView', 'active');
-      const response = await fetch(`/api/defects/count?${params}`);
-      if (!response.ok) return 0;
-      const data = await response.json();
-      return data.count;
-    },
-  });
-
-  const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['/api/defects', { ...filters, statusView: 'active' }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append('statusView', 'active'); // Force active filter
       
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.type) params.append('category', filters.type);
@@ -61,6 +49,19 @@ export default function DefectsActive() {
       return response.json();
     },
   });
+
+  // Filter defects based on active tab
+  const defects = allDefects.filter((defect: Defect) => {
+    if (activeTab === "Active") {
+      return defect.status === "Open" || defect.status === "Pending";
+    } else {
+      return defect.status === "Closed" || defect.status === "Resolved";
+    }
+  });
+
+  // Calculate counts for tabs
+  const activeCount = allDefects.filter((d: Defect) => d.status === "Open" || d.status === "Pending").length;
+  const resolvedCount = allDefects.filter((d: Defect) => d.status === "Closed" || d.status === "Resolved").length;
 
   const getStatusBadge = (status: string, critical: boolean) => {
     const statusColors: Record<string, string> = {
@@ -113,78 +114,115 @@ export default function DefectsActive() {
     setShowNewDefectForm(true);
   };
 
-  const handleCloseDefect = async (defectId: string) => {
+  // Mutation for closing defects
+  const closeDefectMutation = useMutation({
+    mutationFn: async (defectId: string) => {
+      const response = await fetch(`/api/defects/${defectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Closed', dateCompleted: new Date().toISOString().split('T')[0] })
+      });
+      if (!response.ok) throw new Error('Failed to close defect');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+    }
+  });
+
+  const handleCloseDefect = (defectId: string) => {
     if (confirm('Are you sure you want to close this defect?')) {
-      try {
-        const response = await fetch(`/api/defects/${defectId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'Closed', dateCompleted: new Date().toISOString().split('T')[0] })
-        });
-        if (response.ok) {
-          // Refetch data
-          window.location.reload();
-        }
-      } catch (error) {
-        console.error('Failed to close defect:', error);
-      }
+      closeDefectMutation.mutate(defectId);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with Active Badge */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              Active Defects
-              {activeCount > 0 && (
-                <Badge className="ml-2 bg-red-500 text-white">
-                  {activeCount > 99 ? '99+' : activeCount}
-                </Badge>
-              )}
-            </h1>
-          </div>
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                Active Defects
+              </h1>
+            </div>
 
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" className="text-gray-600">
-              All Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
-              My Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 border border-gray-400"></div>
-                Filters
-              </div>
-            </Button>
-            <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
-              <DialogTrigger asChild>
-                <Button 
-                  className="bg-green-600 hover:bg-green-700 text-white" 
-                  size="sm" 
-                  data-testid="button-new-defect"
-                  onClick={handleNewDefect}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Defect
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-                <DefectFormExact 
-                  onClose={() => {
-                    setShowNewDefectForm(false);
-                    setSelectedDefect(null);
-                  }}
-                  defect={selectedDefect}
-                  mode={defectFormMode}
-                />
-              </DialogContent>
-            </Dialog>
+            <div className="flex items-center space-x-3">
+              <Button variant="outline" size="sm" className="text-gray-600">
+                All Vessel
+              </Button>
+              <Button variant="outline" size="sm" className="text-gray-600">
+                My Vessel
+              </Button>
+              <Button variant="outline" size="sm" className="text-gray-600">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 border border-gray-400"></div>
+                  Filters
+                </div>
+              </Button>
+              <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 text-white" 
+                    size="sm" 
+                    data-testid="button-new-defect"
+                    onClick={handleNewDefect}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Defect
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+                  <DefectFormExact 
+                    onClose={() => {
+                      setShowNewDefectForm(false);
+                      setSelectedDefect(null);
+                    }}
+                    defect={selectedDefect}
+                    mode={defectFormMode}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
+        </div>
+        
+        {/* Status Tabs */}
+        <div className="flex items-center gap-1 px-6 pb-2">
+          <button
+            onClick={() => setActiveTab("Active")}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              activeTab === "Active"
+                ? "bg-[#52baf3] text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+            data-testid="tab-active-defects"
+          >
+            Active Defects
+            {activeCount > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-xs">
+                {activeCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("Resolved")}
+            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              activeTab === "Resolved"
+                ? "bg-[#52baf3] text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+            }`}
+            data-testid="tab-resolved-defects"
+          >
+            Resolved Defects
+            {resolvedCount > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-xs">
+                {resolvedCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
