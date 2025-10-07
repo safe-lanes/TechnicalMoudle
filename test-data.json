@@ -1168,6 +1168,82 @@
       "nextReviewDate": null,
       "assignedTo": null,
       "reviewedBy": null
+    },
+    "17": {
+      "id": "17",
+      "vesselId": "V001",
+      "vesselName": "MV SEAFARER",
+      "issueDate": "2025-10-01",
+      "category": "Defect",
+      "defectType": "Emergency",
+      "description": "test",
+      "targetCloseDate": "2025-10-15",
+      "dateCompleted": "2025-10-07",
+      "status": "Closed",
+      "priority": "Medium",
+      "critical": false,
+      "is_coc": true,
+      "severity": 2,
+      "source": "PSC",
+      "equipmentCategory": "Navigation",
+      "equipmentType": "Valve",
+      "equipmentMake": "MAN",
+      "equipmentModel": "3508",
+      "equipmentSerialNo": null,
+      "equipmentLocation": null,
+      "equipmentSystem": null,
+      "purchaseOrderRef": null,
+      "responsibleDept": null,
+      "verifiedDate": null,
+      "defectCategory": "Major",
+      "viqVersion": null,
+      "viqRef": null,
+      "sfiCodeRef": null,
+      "immediateCause": {
+        "unsafeAct": [
+          "Unsafe lifting / carrying"
+        ],
+        "unsafeCondition": [
+          "Temperature Extremes"
+        ]
+      },
+      "immediateCauseExplanation": null,
+      "rootCause": {
+        "individualFactor": [
+          "Lack of Motivation / Incentive (Safety precedence over commercial factors)"
+        ],
+        "systemFactor": [
+          "Inadequate Management of change"
+        ]
+      },
+      "rootCauseExplanation": null,
+      "raisedById": null,
+      "raisedByName": "System User",
+      "raisedByRank": "Master",
+      "operatingCondition": "SAILING",
+      "locationText": null,
+      "occurrenceType": "ROUTINE",
+      "responsibleRole": null,
+      "responsibleRoleId": null,
+      "isDeferred": false,
+      "deferReason": null,
+      "deferNewTargetDate": null,
+      "deferApprovalRequired": true,
+      "reportToThirdParty": false,
+      "classReport": false,
+      "flagReport": false,
+      "portReport": false,
+      "reportReferenceNo": null,
+      "reportDate": null,
+      "reportedBy": "System User",
+      "createdAt": "2025-10-07T10:18:36.061Z",
+      "updatedAt": "2025-10-07T10:19:06.534Z",
+      "componentId": null,
+      "actionTakenRequested": null,
+      "holdReason": null,
+      "nextReviewDate": null,
+      "assignedTo": null,
+      "reviewedBy": null
     }
   },
   "defectActions": [],
@@ -1187,7 +1263,7 @@
     "formDefinitionId": 1,
     "formVersionId": 1,
     "workOrderId": 3,
-    "defectId": 17,
+    "defectId": 18,
     "defectActionId": 1,
     "defectAttachmentId": 1
   }

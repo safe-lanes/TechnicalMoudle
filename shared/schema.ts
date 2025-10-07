@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -542,6 +542,9 @@ export const defects = pgTable("defects", {
   
   // NEW FIELDS FOR DEFECT MODULE ENHANCEMENTS
   
+  // Recurring Defects tracking
+  equipment_key: text("equipment_key"), // Normalized key for tracking same equipment
+  
   // 1. Raised By (Who Raised the Defect)
   raisedById: text("raised_by_id"),
   raisedByName: text("raised_by_name"),
@@ -670,3 +673,43 @@ export const insertDefectAttachmentSchema = createInsertSchema(defectAttachments
 
 export type InsertDefectAttachment = z.infer<typeof insertDefectAttachmentSchema>;
 export type DefectAttachment = typeof defectAttachments.$inferSelect;
+
+// Recurring Defects Tables
+export const recurringDefects = pgTable("recurring_defects", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  equipmentKey: text("equipment_key").notNull(),
+  windowMonths: integer("window_months").notNull().default(12),
+  occurrenceCount: integer("occurrence_count").notNull(),
+  openCount: integer("open_count").notNull(),
+  vesselsAffected: integer("vessels_affected").notNull(),
+  lastOccurrenceDate: text("last_occurrence_date").notNull(), // DD-MM-YYYY format
+  hasCoc: boolean("has_coc").notNull().default(false),
+  mtbfDays: numeric("mtbf_days"), // Average days between occurrences
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
+}, (table) => ({
+  equipmentKeyWindowIdx: index("idx_recurring_key_window").on(table.equipmentKey, table.windowMonths),
+  updatedAtIdx: index("idx_recurring_updated").on(table.updatedAt),
+}));
+
+export const insertRecurringDefectSchema = createInsertSchema(recurringDefects).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertRecurringDefect = z.infer<typeof insertRecurringDefectSchema>;
+export type RecurringDefect = typeof recurringDefects.$inferSelect;
+
+// Recurring Defect Links - links recurring groups to individual defects
+export const recurringDefectLinks = pgTable("recurring_defect_links", {
+  recurringId: integer("recurring_id").notNull().references(() => recurringDefects.id, { onDelete: "cascade" }),
+  defectId: text("defect_id").notNull().references(() => defects.id, { onDelete: "cascade" }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.recurringId, table.defectId] }),
+  recurringIdx: index("idx_link_recurring").on(table.recurringId),
+  defectIdx: index("idx_link_defect").on(table.defectId),
+}));
+
+export const insertRecurringDefectLinkSchema = createInsertSchema(recurringDefectLinks);
+
+export type InsertRecurringDefectLink = z.infer<typeof insertRecurringDefectLinkSchema>;
+export type RecurringDefectLink = typeof recurringDefectLinks.$inferSelect;

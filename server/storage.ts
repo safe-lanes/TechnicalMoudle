@@ -56,7 +56,13 @@ import {
   type InsertDefectAction,
   defectAttachments,
   type DefectAttachment,
-  type InsertDefectAttachment
+  type InsertDefectAttachment,
+  recurringDefects,
+  type RecurringDefect,
+  type InsertRecurringDefect,
+  recurringDefectLinks,
+  type RecurringDefectLink,
+  type InsertRecurringDefectLink
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -215,6 +221,13 @@ export interface IStorage {
   
   // Defect Closure methods
   closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect>;
+  
+  // Recurring Defects methods
+  getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]>;
+  getRecurringDefect(id: number): Promise<RecurringDefect | undefined>;
+  calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null>;
+  getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]>;
+  getDefectsForRecurring(recurringId: number): Promise<Defect[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure
