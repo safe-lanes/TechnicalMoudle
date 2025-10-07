@@ -126,7 +126,7 @@ export default function DefectsLogWithTabs() {
   const { data: activeCount = 0 } = useQuery({
     queryKey: ['defects', 'count', 'active'],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count?statusView=active');
+      const response = await fetch('/api/defects/count?statusScope=active');
       if (!response.ok) throw new Error('Failed to fetch active count');
       const data = await response.json();
       return data.count;
@@ -136,7 +136,7 @@ export default function DefectsLogWithTabs() {
   const { data: resolvedCount = 0 } = useQuery({
     queryKey: ['defects', 'count', 'resolved'],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count?statusView=resolved');
+      const response = await fetch('/api/defects/count?statusScope=resolved');
       if (!response.ok) throw new Error('Failed to fetch resolved count');
       const data = await response.json();
       return data.count;

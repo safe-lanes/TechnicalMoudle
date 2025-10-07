@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/defects/count", async (req, res) => {
     try {
       const filters = {
-        statusView: req.query.statusView as 'active' | 'resolved' | undefined,
+        statusScope: req.query.statusScope as 'active' | 'resolved' | undefined,
         vesselId: req.query.vesselId as string,
         status: req.query.status as string,
         category: req.query.category as string,

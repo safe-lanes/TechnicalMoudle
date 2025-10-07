@@ -11,6 +11,7 @@ import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
 import ReportsModule from "./reports/ReportsModule";
+import DefectsLogWithTabs from "./defects/DefectsLogWithTabs";
 import DefectsActive from "./defects/DefectsActive";
 import DefectsResolved from "./defects/DefectsResolved";
 import DefectsReports from "./defects/DefectsReports";
@@ -130,9 +131,9 @@ export const TechnicalModule: React.FC = () => {
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
           ) : selectedSubModule === "defects" && selectedMenuItem === "dashboard" ? (
-            <DefectsActive />
+            <DefectsLogWithTabs />
           ) : selectedSubModule === "defects" && selectedMenuItem === "defect-log" ? (
-            <DefectsActive />
+            <DefectsLogWithTabs />
           ) : selectedSubModule === "defects" && selectedMenuItem === "coc" ? (
             <DefectsCoC />
           ) : selectedSubModule === "defects" && selectedMenuItem === "recurring" ? (
