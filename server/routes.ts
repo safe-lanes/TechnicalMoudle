@@ -102,6 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         category: req.query.category as string,
         critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
+        is_coc: req.query.is_coc === 'true' ? true : req.query.is_coc === 'false' ? false : undefined,
         includeClosedDefects: req.query.includeClosedDefects === 'true',
         search: req.query.search as string,
         period: req.query.period as string,

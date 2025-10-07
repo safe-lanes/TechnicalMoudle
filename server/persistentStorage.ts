@@ -833,6 +833,7 @@ export class PersistentFileStorage implements IStorage {
     statusView?: 'active' | 'resolved';
     category?: string; 
     critical?: boolean; 
+    is_coc?: boolean;
     includeClosedDefects?: boolean;
     search?: string;
     period?: string;
@@ -869,6 +870,10 @@ export class PersistentFileStorage implements IStorage {
         defects = defects.filter(d => d.critical === filters.critical);
       }
       
+      if (filters.is_coc !== undefined) {
+        defects = defects.filter(d => d.is_coc === filters.is_coc);
+      }
+      
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         defects = defects.filter(d => 
@@ -902,6 +907,7 @@ export class PersistentFileStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
       critical: defect.critical ?? false,
+      is_coc: defect.is_coc ?? false,
       isDeferred: defect.isDeferred ?? false,
       reportToThirdParty: defect.reportToThirdParty ?? false,
       classReport: defect.classReport ?? false,
