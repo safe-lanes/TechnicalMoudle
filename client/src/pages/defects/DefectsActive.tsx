@@ -415,7 +415,16 @@ export default function DefectsActive() {
                       </TableCell>
                       <TableCell className="text-xs">{defect.vesselName}</TableCell>
                       <TableCell className="text-xs">{defect.issueDate}</TableCell>
-                      <TableCell className="text-xs">{defect.category}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex items-center gap-2">
+                          {defect.category}
+                          {defect.is_coc && (
+                            <Badge className="bg-blue-100 text-blue-700 text-xs py-0 px-1">
+                              CoC
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs max-w-xs truncate">{defect.description}</TableCell>
                       <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
                       <TableCell className="text-xs">
