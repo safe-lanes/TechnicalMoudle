@@ -372,13 +372,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'open-defects':
           const activeDefects = defects.filter(d => ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status));
           const today = new Date();
-          const overdue = activeDefects.filter(d => d.targetDate && new Date(d.targetDate) < today);
+          const overdue = activeDefects.filter(d => d.targetCloseDate && new Date(d.targetCloseDate) < today);
           reportData = {
             kpis: {
               totalOpen: activeDefects.length,
               dueThisMonth: activeDefects.filter(d => {
-                if (!d.targetDate) return false;
-                const target = new Date(d.targetDate);
+                if (!d.targetCloseDate) return false;
+                const target = new Date(d.targetCloseDate);
                 return target.getMonth() === today.getMonth() && target.getFullYear() === today.getFullYear();
               }).length,
               overdue: overdue.length,
@@ -396,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const closureMetrics = closedDefects.map(d => {
             if (!d.dateCompleted || !d.issueDate) return null;
             const days = Math.floor((new Date(d.dateCompleted).getTime() - new Date(d.issueDate).getTime()) / (1000 * 60 * 60 * 24));
-            const onTime = d.targetDate && new Date(d.dateCompleted) <= new Date(d.targetDate);
+            const onTime = d.targetCloseDate && new Date(d.dateCompleted) <= new Date(d.targetCloseDate);
             return { days, onTime };
           }).filter((m): m is { days: number; onTime: boolean } => m !== null);
           

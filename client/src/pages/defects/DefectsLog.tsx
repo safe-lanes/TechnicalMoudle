@@ -380,7 +380,7 @@ export default function DefectsLog() {
                     <div className="col-span-2 text-gray-700 truncate" title={defect.actionTakenRequested || ""}>
                       {defect.actionTakenRequested}
                     </div>
-                    <div className="col-span-1 text-gray-700">{defect.targetDate}</div>
+                    <div className="col-span-1 text-gray-700">{defect.targetCloseDate}</div>
                     <div className="col-span-1 text-gray-700">{defect.dateCompleted}</div>
                     <div className="col-span-1 flex items-center gap-1">
                       {getStatusBadge(defect.status, defect.critical)}
