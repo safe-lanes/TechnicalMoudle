@@ -271,11 +271,11 @@ export default function DefectsResolved() {
                     </TableCell>
                     <TableCell className="text-xs max-w-xs truncate">{defect.description}</TableCell>
                     <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
-                    <TableCell className="text-xs">{defect.targetDate}</TableCell>
+                    <TableCell className="text-xs">{defect.targetCloseDate}</TableCell>
                     <TableCell className="text-xs">
                       <div className="flex flex-col">
                         <span>{defect.dateCompleted}</span>
-                        {getCompletionStatus(defect.targetDate, defect.dateCompleted)}
+                        {getCompletionStatus(defect.targetCloseDate, defect.dateCompleted)}
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(defect.status)}</TableCell>

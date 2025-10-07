@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Eye, Upload, Plus, Edit, Trash2, Calendar } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { insertDefectSchema, type InsertDefect } from "@shared/schema";
+import { insertDefectSchema, type InsertDefect, type Defect } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
@@ -623,6 +623,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                                 <Input
                                   placeholder="Enter port or position (e.g. Mumbai Anchorage or Lat/Long)"
                                   {...field}
+                                  value={field.value || ''}
                                   className="text-xs"
                                   required={form.watch("operatingCondition") === "PORT" || form.watch("operatingCondition") === "ANCHOR"}
                                   data-testid="input-location-text"
@@ -1373,6 +1374,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                           ) : (
                             <Textarea
                               {...field}
+                              value={field.value || ''}
                               placeholder="Deferment Reason (required)"
                               rows={2}
                               required={form.watch("isDeferred")}
@@ -1433,7 +1435,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                           <>
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
+                                checked={field.value || false}
                                 onCheckedChange={field.onChange}
                                 data-testid="checkbox-defer-approval"
                               />
@@ -1562,6 +1564,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                             ) : (
                               <Input
                                 {...field}
+                                value={field.value || ''}
                                 placeholder="Reference No (optional)"
                                 data-testid="input-report-ref"
                               />

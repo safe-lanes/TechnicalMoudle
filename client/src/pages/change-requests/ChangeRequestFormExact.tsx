@@ -97,7 +97,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
       };
       return apiRequest('POST', '/api/change-requests', requestData);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `Change request CR-${String(data.id).padStart(4, '0')} created successfully`,
@@ -123,7 +123,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
       };
       return apiRequest('PATCH', `/api/change-requests/${changeRequest?.id}`, requestData);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `Change request CR-${String(data.id).padStart(4, '0')} updated successfully`,
@@ -490,6 +490,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
                                 <FormControl>
                                   <Input 
                                     {...field}
+                                    value={field.value || ''}
                                     placeholder="Enter the ID of the target item"
                                     disabled={isViewMode}
                                     data-testid="input-target-id"
