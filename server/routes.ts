@@ -98,7 +98,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters = {
         vesselId: req.query.vesselId as string,
         status: req.query.status as string,
-        statusView: req.query.statusView as 'active' | 'resolved' | undefined,
+        statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
+                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         category: req.query.category as string,
         critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
         includeClosedDefects: req.query.includeClosedDefects === 'true',
@@ -108,8 +109,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         group: req.query.group as string,
         dueOverdue: req.query.dueOverdue as string
       };
+      
       const defects = await storage.getDefects(filters);
-      res.json(defects);
+      
+      // Support pagination if requested
+      const page = parseInt(req.query.page as string || '1');
+      const pageSize = parseInt(req.query.pageSize as string || '20');
+      
+      if (req.query.paginate === 'true') {
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedDefects = defects.slice(startIndex, endIndex);
+        
+        res.json({
+          rows: paginatedDefects,
+          total: defects.length,
+          page,
+          pageSize
+        });
+      } else {
+        // Return unpaginated for backward compatibility
+        res.json(defects);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch defects" });
     }
