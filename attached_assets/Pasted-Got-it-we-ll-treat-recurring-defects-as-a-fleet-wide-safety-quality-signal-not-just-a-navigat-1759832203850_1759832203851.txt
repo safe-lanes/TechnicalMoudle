@@ -1,0 +1,211 @@
+Got it — we’ll treat **recurring defects** as a fleet-wide safety/quality signal, not just a navigation thing. Below is a clear, complete spec the devs can ship.
+
+---
+
+# Recurring Defects — Product + Dev Spec
+
+## 1) What “recurring” means
+
+A defect is considered **recurring** when the **same equipment** (as identified by the Equipment/Hardware fields on the Defect form) is reported **more than once** within a chosen time window (default 12 months).
+
+* **Default rule:** count ≥ 2 in the last 12 months ⇒ recurring
+* Time window is configurable (6/12/24 months)
+* Counts can be per-vessel and across the **entire fleet**
+
+## 2) How we uniquely identify “the same equipment”
+
+Build an **equipment key** from normalized fields in the “Equipment / Hardware” section of the form:
+
+```
+equipment_key = normalize(`${category}|${type}|${make}|${model}`)
+```
+
+Normalization rules:
+
+* Trim, uppercase, collapse double spaces, strip punctuation, map known synonyms (e.g., “DG #1” ↔ “Diesel Generator 1”).
+* If we later add Component Code/Serial, include them when present:
+
+  * Prefer `component_code` or `serial_no` if available:
+    `equipment_key = `${component_code}`||`${category}|${type}|${make}|${model}``
+
+Store `equipment_key` on every defect at save time.
+
+## 3) When to mark an item as “recurring”
+
+* **On save/close of a defect**, run a count of defects with the same `equipment_key` within the window.
+* If count ≥ threshold (default 2), write/update a row in `recurring_defects` (see schema) and show it in the **Recurring Defects** sidebar screen.
+
+### De-duplication guard
+
+To avoid double-counting the *same incident*:
+
+* If two defects have the same `equipment_key`, same vessel, and are created within **24 hours** with **>90% similar descriptions**, treat as **one occurrence** (store link but don’t increment count).
+
+## 4) UI/UX — Sidebar: “Recurring Defects”
+
+Left sidebar item opens a page with tabs:
+
+* **Active (default)** — items with **at least one open defect** among the occurrences
+* **All** — all recurring items (open + closed)
+* **By Equipment** — grouped by `equipment_key`
+* **By Vessel** — grouped by vessel → equipment
+* Optional quick filters:
+
+  * Time window (6/12/24 months)
+  * CoC only (uses `is_coc`)
+  * Department (Deck/Engine/Radio etc.)
+  * Status (open/closed mix)
+  * Min occurrences (2/3/5)
+
+### Table columns (By Equipment)
+
+* Equipment (Category › Type › Make › Model)
+* **Occurrences** (count)
+* **Vessels affected** (distinct count, chip list on hover)
+* **Open defects** (count)
+* **Last occurrence** (date)
+* **Avg days between occurrences** (MTBF proxy)
+* **CoC** badge if any occurrence was CoC
+* **Actions**:
+
+  * **Drill-down** (open a details panel showing the list of underlying defects)
+  * **Create CAPA** (opens an action/corrective plan form)
+  * **Notify fleet** (opens message template to circulate lesson learned)
+  * **Export** (CSV/XLS)
+
+### Details panel (drill-down)
+
+* List of linked defects: ID, vessel, issued date, status, description (first 140 chars), links (view, attachments), whether CoC.
+* Quick filters inside the panel (vessel, period, status).
+* Button: “Link Work Orders/PM tasks” (optional: opens cross-ref dialog).
+
+## 5) Data model changes
+
+```sql
+-- Add to defects table
+ALTER TABLE defects
+  ADD COLUMN equipment_key TEXT NOT NULL,
+  ADD COLUMN is_coc BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- New table to track recurring groups (aggregates)
+CREATE TABLE recurring_defects (
+  id SERIAL PRIMARY KEY,
+  equipment_key TEXT NOT NULL,
+  window_months INT NOT NULL DEFAULT 12,
+  occurrence_count INT NOT NULL,
+  open_count INT NOT NULL,
+  vessels_affected INT NOT NULL,
+  last_occurrence_date DATE NOT NULL,
+  has_coc BOOLEAN NOT NULL DEFAULT FALSE,
+  mtbf_days NUMERIC NULL,               -- Avg days between occurrences
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- Optional: link table from recurring group to its defects
+CREATE TABLE recurring_defect_links (
+  recurring_id INT REFERENCES recurring_defects(id) ON DELETE CASCADE,
+  defect_id INT REFERENCES defects(id) ON DELETE CASCADE,
+  PRIMARY KEY (recurring_id, defect_id)
+);
+
+CREATE INDEX idx_defects_equipment_key ON defects(equipment_key);
+CREATE INDEX idx_recurring_key_window ON recurring_defects(equipment_key, window_months);
+```
+
+## 6) Backend logic (plain language + pseudo)
+
+* **On defect save (create/update):**
+
+  1. Build and persist `equipment_key`.
+  2. Recalculate recurrence:
+
+```sql
+WITH base AS (
+  SELECT id, vessel_id, issued_date, status, is_coc
+  FROM defects
+  WHERE equipment_key = :key
+    AND issued_date >= (CURRENT_DATE - INTERVAL ':window months')
+),
+dedup AS (
+  -- example: coarse dedup by day + vessel, refined by text similarity in app layer
+  SELECT DISTINCT ON (vessel_id, DATE(issued_date)) *
+  FROM base
+  ORDER BY vessel_id, DATE(issued_date), id
+)
+SELECT
+  COUNT(*)                           AS occurrences,
+  COUNT(*) FILTER (WHERE status='open') AS open_count,
+  COUNT(DISTINCT vessel_id)          AS vessels_affected,
+  MAX(issued_date)                   AS last_occurrence_date,
+  BOOL_OR(is_coc)                    AS has_coc
+FROM dedup;
+```
+
+3. If occurrences ≥ threshold:
+
+   * Upsert into `recurring_defects` and rebuild `recurring_defect_links`.
+   * Compute `mtbf_days` as average gap between sorted dedup dates.
+4. If occurrences < threshold:
+
+   * Remove any existing `recurring_defects` row for that `equipment_key` and window.
+
+* **Nightly job (idempotent):**
+
+  * Rebuild **all** `recurring_defects` for 6/12/24 month windows to keep metrics fresh and catch past data corrections.
+
+## 7) Alerts (optional but useful)
+
+* **New recurring detected** (first time an equipment_key crosses the threshold) → email + in-app alert to Tech Superintendent / Fleet Manager.
+* **MTBF deteriorates by >30%** compared to last month → alert.
+* **CoC present** within a recurring group → high priority alert.
+
+## 8) Reports
+
+Add 2 canned reports under Defects → Reports:
+
+1. **Recurring Defects by Equipment (Last 12 months)**
+   Columns above + sparkline of occurrences by month
+2. **Fleet Impact of Recurring Defects**
+   Vessels affected, estimated downtime (if we add it), CAPA status
+
+## 9) UI copy (so everyone understands)
+
+* On the page header:
+  “**Recurring Defects = two or more defects for the same equipment within the selected period.**”
+* Tooltips for “Occurrences”, “MTBF”, “CoC”.
+
+## 10) Edge cases
+
+* **Missing Equipment fields:** If any of Category/Type is missing, prompt user; do **not** calculate recurring (show banner: “Equipment details required to track recurrence”).
+* **Renamed taxonomy:** Use normalization + synonym map; admin can maintain a small mapping table.
+* **Bulk imports:** After import, run the nightly job to backfill `recurring_defects`.
+
+## 11) QA checklist
+
+* Create 2+ defects with same Equipment/Hardware → appears in Recurring within the chosen window.
+* Change time window to 6 months → list updates.
+* One open, one closed → Open count = 1, Active tab shows it.
+* Mark one as CoC → “CoC” badge appears; “CoC only” filter hides non-CoC.
+* Dedup: two submissions on same day with same vessel & similar text count as one occurrence.
+* Export yields correct rows.
+
+---
+
+## Replit “build it” prompt (drop-in)
+
+> **Add a “Recurring Defects” feature:**
+>
+> 1. On the Defect form save, generate and persist `equipment_key` from Category|Type|Make|Model (normalized). If `component_code` or `serial_no` later exists, prefer them.
+> 2. Create tables `recurring_defects` and `recurring_defect_links` (see schema above).
+> 3. After every defect save/update, recalc occurrences for the last 12 months, with a 24-hour same-vessel text-similarity dedup (≥0.9). If occurrences ≥ 2, upsert a row in `recurring_defects` with counts, last occurrence, has_coc, and mtbf_days; refresh `recurring_defect_links`. If < 2, delete any existing row for that key/window.
+> 4. Add a left-sidebar page “Recurring Defects” with tabs **Active / All / By Equipment / By Vessel**. Default: By Equipment + 12-month window. Show columns: Equipment, Occurrences, Vessels affected, Open defects, Last occurrence, MTBF (days), CoC badge, Actions (Drill-down / Create CAPA / Notify fleet / Export).
+> 5. Drill-down panel lists underlying defects with quick filters and links (view, attachments).
+> 6. Add filters: time window (6/12/24 mo), CoC only, department, min occurrences.
+> 7. Add an idempotent nightly job to rebuild all `recurring_defects` for 6/12/24 months.
+> 8. Do not change existing UI styles; reuse table styles, badges, chips, and spacing.
+> 9. Ensure pagination, export, and role permissions match the Defects log.
+> 10. Add unit tests for key generation, dedup, thresholds, and mtbf calculation.
+
+---
+
+This gives you a clean, auditable way to **spot repeat offenders** across the fleet, satisfy **regulatory expectations**, and drive **CAPA** decisions for sister ships and newbuilds.
