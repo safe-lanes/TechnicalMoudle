@@ -11,6 +11,7 @@ import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, 
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import DefectFormExact from "./DefectFormExact";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
 
 interface DefectsFilters {
@@ -24,6 +25,7 @@ interface DefectsFilters {
 }
 
 export default function DefectsActive() {
+  const { toast } = useToast();
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
@@ -131,8 +133,30 @@ export default function DefectsActive() {
       if (!response.ok) throw new Error('Failed to close defect');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, defectId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      
+      // Show success toast with action to view in Resolved tab
+      toast({
+        title: "Defect Closed Successfully",
+        description: `Defect ${defectId} has been closed and moved to the Resolved tab.`,
+        action: (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setActiveTab("Resolved")}
+          >
+            View in Resolved
+          </Button>
+        ),
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to close the defect. Please try again.",
+        variant: "destructive",
+      });
     }
   });
 
