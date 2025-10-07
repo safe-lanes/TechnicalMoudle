@@ -53,15 +53,19 @@ export default function DefectsActive() {
   // Filter defects based on active tab
   const defects = allDefects.filter((defect: Defect) => {
     if (activeTab === "Active") {
-      return defect.status === "Open" || defect.status === "Pending";
+      return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
     } else {
-      return defect.status === "Closed" || defect.status === "Resolved";
+      return ['Closed', 'Cancelled'].includes(defect.status);
     }
   });
 
   // Calculate counts for tabs
-  const activeCount = allDefects.filter((d: Defect) => d.status === "Open" || d.status === "Pending").length;
-  const resolvedCount = allDefects.filter((d: Defect) => d.status === "Closed" || d.status === "Resolved").length;
+  const activeCount = allDefects.filter((d: Defect) => 
+    ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
+  ).length;
+  const resolvedCount = allDefects.filter((d: Defect) => 
+    ['Closed', 'Cancelled'].includes(d.status)
+  ).length;
 
   const getStatusBadge = (status: string, critical: boolean) => {
     const statusColors: Record<string, string> = {
@@ -70,6 +74,8 @@ export default function DefectsActive() {
       'In-Progress': 'bg-blue-100 text-blue-700',
       'Awaiting Parts': 'bg-orange-100 text-orange-700',
       'Deferred': 'bg-gray-100 text-gray-700',
+      'Closed': 'bg-green-100 text-green-700',
+      'Cancelled': 'bg-gray-100 text-gray-700',
     };
     
     return (
