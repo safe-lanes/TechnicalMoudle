@@ -902,35 +902,6 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                     )}
                   />
 
-                  {/* Condition of Class (CoC) Checkbox */}
-                  <FormField
-                    control={form.control}
-                    name="is_coc"
-                    render={({ field }) => (
-                      <FormItem>
-                        {isViewMode ? (
-                          renderReadOnlyField("Condition of Class (CoC)", field.value ? "Yes" : "No")
-                        ) : (
-                          <div className="border rounded-md p-3 bg-gray-50">
-                            <div className="flex items-center space-x-2">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  data-testid="checkbox-coc"
-                                />
-                              </FormControl>
-                              <div className="space-y-1">
-                                <FormLabel className="font-semibold text-sm">Condition of Class (CoC)</FormLabel>
-                                <p className="text-xs text-gray-600">Tick if this defect is a Class Condition.</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </FormItem>
-                    )}
-                  />
-
                   <FormField
                     control={form.control}
                     name="dateCompleted"
@@ -964,6 +935,37 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                     )}
                   />
                 </div>
+              </div>
+
+              {/* Condition of Class (CoC) Checkbox - Separated from Date fields */}
+              <div className="mt-4">
+                <FormField
+                  control={form.control}
+                  name="is_coc"
+                  render={({ field }) => (
+                    <FormItem>
+                      {isViewMode ? (
+                        renderReadOnlyField("Condition of Class (CoC)", field.value ? "Yes" : "No")
+                      ) : (
+                        <div className="border rounded-md p-3 bg-gray-50">
+                          <div className="flex items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-coc"
+                              />
+                            </FormControl>
+                            <div className="space-y-1">
+                              <FormLabel className="font-semibold text-sm">Condition of Class (CoC)</FormLabel>
+                              <p className="text-xs text-gray-600">Tick if this defect is a Class Condition.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* Purchase Order Section */}
