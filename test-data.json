@@ -203,7 +203,8 @@
       "verifiedBy": null,
       "remarks": null,
       "createdAt": "2025-10-03T09:11:59.896Z",
-      "updatedAt": "2025-10-06T08:07:35.628Z"
+      "updatedAt": "2025-10-06T08:07:35.628Z",
+      "is_coc": false
     },
     "2": {
       "id": "2",
@@ -272,7 +273,8 @@
       "flagReport": false,
       "portReport": false,
       "reportReferenceNo": "",
-      "reportDate": ""
+      "reportDate": "",
+      "is_coc": true
     },
     "3": {
       "id": "3",
@@ -320,7 +322,8 @@
       "routineBreakdown": null,
       "raisedByUserId": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "4": {
       "id": "4",
@@ -383,7 +386,8 @@
             "comment": "test"
           }
         }
-      ]
+      ],
+      "is_coc": false
     },
     "5": {
       "id": "5",
@@ -431,7 +435,8 @@
       "routineBreakdown": null,
       "raisedByUserId": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "6": {
       "id": "6",
@@ -492,7 +497,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "7": {
       "id": "7",
@@ -571,7 +577,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "8": {
       "id": "8",
@@ -632,7 +639,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "9": {
       "id": "9",
@@ -693,7 +701,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "10": {
       "id": "10",
@@ -754,7 +763,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "11": {
       "id": "11",
@@ -815,7 +825,8 @@
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "is_coc": false
     },
     "12": {
       "id": "12",
@@ -889,7 +900,8 @@
             "comment": "Test closure comment"
           }
         }
-      ]
+      ],
+      "is_coc": false
     },
     "13": {
       "id": "13",
@@ -904,7 +916,7 @@
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
-      "is_coc": true,
+      "is_coc": false,
       "severity": 2,
       "source": null,
       "equipmentCategory": "",
@@ -966,7 +978,7 @@
       "status": "Open",
       "priority": "Medium",
       "critical": false,
-      "is_coc": true,
+      "is_coc": false,
       "severity": 2,
       "source": null,
       "equipmentCategory": "",
@@ -1028,7 +1040,7 @@
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
-      "is_coc": true,
+      "is_coc": false,
       "severity": 2,
       "source": "PSC",
       "equipmentCategory": "Navigation",
@@ -1108,7 +1120,7 @@
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
-      "is_coc": true,
+      "is_coc": false,
       "severity": 2,
       "source": null,
       "equipmentCategory": "",
