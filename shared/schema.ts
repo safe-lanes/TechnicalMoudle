@@ -515,6 +515,7 @@ export const defects = pgTable("defects", {
   status: text("status").notNull().default("Open"), // 'Open' | 'Pending' | 'In-Progress' | 'Awaiting Parts' | 'Deferred' | 'Closed' | 'Cancelled'
   priority: text("priority").default("Medium"), // 'Low' | 'Medium' | 'High'
   critical: boolean("critical").notNull().default(false),
+  is_coc: boolean("is_coc").notNull().default(false), // Condition of Class flag
   severity: integer("severity").default(1), // 1-Minor, 2-Moderate, 3-Major
   source: text("source"), // 'SIRE' | 'PSC' | 'Internal' | 'Class'
   equipmentCategory: text("equipment_category"), // 'Deck' | 'Navigation' | 'Machinery' | etc.
