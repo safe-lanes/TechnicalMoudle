@@ -101,6 +101,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
       status: defect.status || "Open",
       priority: defect.priority || "Medium",
       critical: defect.critical || false,
+      is_coc: defect.is_coc || false,
       severity: defect.severity || 2,
       source: defect.source || "",
       equipmentCategory: defect.equipmentCategory || "",
@@ -153,6 +154,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
       status: "Open",
       priority: "Medium",
       critical: false,
+      is_coc: false,
       severity: 2,
       source: "",
       equipmentCategory: "",
@@ -895,6 +897,35 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                               <SelectItem value="HSEQ Superintendent">HSEQ Superintendent</SelectItem>
                             </SelectContent>
                           </Select>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Condition of Class (CoC) Checkbox */}
+                  <FormField
+                    control={form.control}
+                    name="is_coc"
+                    render={({ field }) => (
+                      <FormItem>
+                        {isViewMode ? (
+                          renderReadOnlyField("Condition of Class (CoC)", field.value ? "Yes" : "No")
+                        ) : (
+                          <div className="border rounded-md p-3 bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-coc"
+                                />
+                              </FormControl>
+                              <div className="space-y-1">
+                                <FormLabel className="font-semibold text-sm">Condition of Class (CoC)</FormLabel>
+                                <p className="text-xs text-gray-600">Tick if this defect is a Class Condition.</p>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </FormItem>
                     )}
