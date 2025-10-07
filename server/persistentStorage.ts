@@ -62,6 +62,8 @@ interface PersistentData {
   defects: Record<string, Defect>;
   defectActions: DefectAction[];
   defectAttachments: DefectAttachment[];
+  recurringDefects: Record<number, RecurringDefect>;
+  recurringDefectLinks: RecurringDefectLink[];
   
   // Counter state
   counters: {
@@ -82,7 +84,46 @@ interface PersistentData {
     defectId: number;
     defectActionId: number;
     defectAttachmentId: number;
+    recurringDefectId: number;
   };
+}
+
+// Helper function to generate equipment_key for recurring defect tracking
+function generateEquipmentKey(defect: Partial<InsertDefect>): string | null {
+  const category = defect.equipmentCategory || '';
+  const type = defect.equipmentType || '';
+  const make = defect.equipmentMake || '';
+  const model = defect.equipmentModel || '';
+  
+  // If we have component code or serial number, prefer those
+  if (defect.equipmentSerialNo) {
+    return normalizeEquipmentString(defect.equipmentSerialNo);
+  }
+  
+  // Otherwise build key from category|type|make|model
+  if (!category && !type) {
+    return null; // Need at least category or type to generate a meaningful key
+  }
+  
+  const key = `${category}|${type}|${make}|${model}`;
+  return normalizeEquipmentString(key);
+}
+
+// Helper function to normalize strings for equipment_key
+function normalizeEquipmentString(str: string): string {
+  return str
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .replace(/[^\w\s|]/g, '') // Remove punctuation except pipe
+    .replace(/DG\s*#?1/i, 'DIESEL GENERATOR 1')
+    .replace(/DG\s*#?2/i, 'DIESEL GENERATOR 2')
+    .replace(/DG\s*#?3/i, 'DIESEL GENERATOR 3')
+    .replace(/AE\s*#?1/i, 'AUXILIARY ENGINE 1')
+    .replace(/AE\s*#?2/i, 'AUXILIARY ENGINE 2')
+    .replace(/AE\s*#?3/i, 'AUXILIARY ENGINE 3')
+    .replace(/ME\b/i, 'MAIN ENGINE')
+    .replace(/M\/E\b/i, 'MAIN ENGINE');
 }
 
 // Helper function to normalize immediateCause structure
@@ -162,6 +203,8 @@ export class PersistentFileStorage implements IStorage {
           defects: loadedData.defects || {},
           defectActions: loadedData.defectActions || [],
           defectAttachments: loadedData.defectAttachments || [],
+          recurringDefects: loadedData.recurringDefects || {},
+          recurringDefectLinks: loadedData.recurringDefectLinks || [],
           counters: loadedData.counters || {
             userId: 1,
             auditId: 1,
@@ -179,7 +222,8 @@ export class PersistentFileStorage implements IStorage {
             workOrderId: 1,
             defectId: 1,
             defectActionId: 1,
-            defectAttachmentId: 1
+            defectAttachmentId: 1,
+            recurringDefectId: 1
           }
         };
       } else {
@@ -214,6 +258,8 @@ export class PersistentFileStorage implements IStorage {
       defects: {},
       defectActions: [],
       defectAttachments: [],
+      recurringDefects: {},
+      recurringDefectLinks: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -231,7 +277,8 @@ export class PersistentFileStorage implements IStorage {
         workOrderId: 1,
         defectId: 1,
         defectActionId: 1,
-        defectAttachmentId: 1
+        defectAttachmentId: 1,
+        recurringDefectId: 1
       }
     };
     
@@ -953,10 +1000,18 @@ export class PersistentFileStorage implements IStorage {
       reportReferenceNo: defect.reportReferenceNo || null,
       reportDate: defect.reportDate || null,
       assignedTo: defect.assignedTo || null,
-      reviewedBy: defect.reviewedBy || null
+      reviewedBy: defect.reviewedBy || null,
+      // Generate equipment_key for recurring defect tracking
+      equipment_key: generateEquipmentKey(defect)
     };
     this.data.defects[id] = newDefect;
     this.persistData();
+    
+    // Calculate recurring defects if equipment_key was generated
+    if (newDefect.equipment_key) {
+      await this.calculateAndUpdateRecurringDefects(newDefect.equipment_key);
+    }
+    
     return newDefect;
   }
 
@@ -966,6 +1021,14 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Defect ${id} not found`);
     }
     
+    // Check if equipment fields changed
+    const equipmentFieldsChanged = 
+      data.equipmentCategory !== undefined ||
+      data.equipmentType !== undefined ||
+      data.equipmentMake !== undefined ||
+      data.equipmentModel !== undefined ||
+      data.equipmentSerialNo !== undefined;
+    
     const updated = { 
       ...defect, 
       ...data,
@@ -974,8 +1037,19 @@ export class PersistentFileStorage implements IStorage {
       updatedAt: new Date()
     };
     
+    // Regenerate equipment_key if equipment fields changed
+    if (equipmentFieldsChanged) {
+      updated.equipment_key = generateEquipmentKey(updated);
+    }
+    
     this.data.defects[id] = updated;
     this.persistData();
+    
+    // Recalculate recurring defects if equipment_key was changed or generated
+    if (updated.equipment_key && (equipmentFieldsChanged || !defect.equipment_key)) {
+      await this.calculateAndUpdateRecurringDefects(updated.equipment_key);
+    }
+    
     return updated;
   }
 
@@ -1720,5 +1794,172 @@ export class PersistentFileStorage implements IStorage {
     };
     
     return mockData[reportKey as keyof typeof mockData] || { kpis: {}, data: [] };
+  }
+
+  // Recurring Defects methods
+  async getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]> {
+    let recurringDefects = Object.values(this.data.recurringDefects);
+    
+    if (filters) {
+      if (filters.windowMonths !== undefined) {
+        recurringDefects = recurringDefects.filter(r => r.windowMonths === filters.windowMonths);
+      }
+      if (filters.minOccurrences !== undefined) {
+        recurringDefects = recurringDefects.filter(r => r.occurrenceCount >= filters.minOccurrences);
+      }
+      if (filters.hasCoc !== undefined) {
+        recurringDefects = recurringDefects.filter(r => r.hasCoc === filters.hasCoc);
+      }
+      if (filters.equipmentKey) {
+        recurringDefects = recurringDefects.filter(r => r.equipmentKey === filters.equipmentKey);
+      }
+    }
+    
+    return recurringDefects;
+  }
+
+  async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    return this.data.recurringDefects[id];
+  }
+
+  async calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths: number = 12): Promise<RecurringDefect | null> {
+    // Get all defects with this equipment key within the time window
+    const currentDate = new Date();
+    const windowStartDate = new Date();
+    windowStartDate.setMonth(currentDate.getMonth() - windowMonths);
+    
+    const defectsWithKey = Object.values(this.data.defects).filter(d => 
+      d.equipment_key === equipmentKey &&
+      new Date(d.issueDate) >= windowStartDate
+    );
+    
+    // Perform deduplication: if same vessel and created within 24 hours with similar description
+    const deduplicated: Defect[] = [];
+    const seen = new Set<string>();
+    
+    for (const defect of defectsWithKey) {
+      const dayKey = `${defect.vesselId}_${defect.issueDate}`;
+      
+      // Check if we've already seen a defect from same vessel on same day
+      const isDuplicate = Array.from(seen).some(key => {
+        if (!key.startsWith(`${defect.vesselId}_`)) return false;
+        
+        // Check if within 24 hours
+        const existingDefect = deduplicated.find(d => 
+          `${d.vesselId}_${d.issueDate}` === key
+        );
+        if (!existingDefect) return false;
+        
+        // Check description similarity (simple check for now)
+        const similarity = this.calculateTextSimilarity(defect.description, existingDefect.description);
+        return similarity > 0.9;
+      });
+      
+      if (!isDuplicate) {
+        deduplicated.push(defect);
+        seen.add(dayKey);
+      }
+    }
+    
+    const occurrenceCount = deduplicated.length;
+    
+    // If less than 2 occurrences, remove any existing recurring defect record
+    if (occurrenceCount < 2) {
+      const existingId = Object.keys(this.data.recurringDefects).find(id =>
+        this.data.recurringDefects[Number(id)].equipmentKey === equipmentKey &&
+        this.data.recurringDefects[Number(id)].windowMonths === windowMonths
+      );
+      
+      if (existingId) {
+        delete this.data.recurringDefects[Number(existingId)];
+        // Remove links
+        this.data.recurringDefectLinks = this.data.recurringDefectLinks.filter(
+          link => link.recurringId !== Number(existingId)
+        );
+        this.persistData();
+      }
+      
+      return null;
+    }
+    
+    // Calculate metrics
+    const openCount = deduplicated.filter(d => !['Closed', 'Cancelled'].includes(d.status)).length;
+    const vesselsAffected = new Set(deduplicated.map(d => d.vesselId)).size;
+    const hasCoc = deduplicated.some(d => d.is_coc);
+    const lastOccurrenceDate = deduplicated
+      .map(d => d.issueDate)
+      .sort()
+      .pop() || '';
+    
+    // Calculate MTBF (Mean Time Between Failures)
+    let mtbfDays: number | null = null;
+    if (deduplicated.length > 1) {
+      const sortedDates = deduplicated
+        .map(d => new Date(d.issueDate))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      let totalDays = 0;
+      for (let i = 1; i < sortedDates.length; i++) {
+        totalDays += Math.floor((sortedDates[i].getTime() - sortedDates[i-1].getTime()) / (1000 * 60 * 60 * 24));
+      }
+      mtbfDays = Math.floor(totalDays / (sortedDates.length - 1));
+    }
+    
+    // Find or create recurring defect record
+    let existingId = Object.keys(this.data.recurringDefects).find(id =>
+      this.data.recurringDefects[Number(id)].equipmentKey === equipmentKey &&
+      this.data.recurringDefects[Number(id)].windowMonths === windowMonths
+    );
+    
+    const recurringDefect: RecurringDefect = {
+      id: existingId ? Number(existingId) : this.data.counters.recurringDefectId++,
+      equipmentKey,
+      windowMonths,
+      occurrenceCount,
+      openCount,
+      vesselsAffected,
+      lastOccurrenceDate,
+      hasCoc,
+      mtbfDays: mtbfDays !== null ? String(mtbfDays) : null,
+      updatedAt: new Date()
+    };
+    
+    this.data.recurringDefects[recurringDefect.id] = recurringDefect;
+    
+    // Update links
+    this.data.recurringDefectLinks = this.data.recurringDefectLinks.filter(
+      link => link.recurringId !== recurringDefect.id
+    );
+    
+    for (const defect of deduplicated) {
+      this.data.recurringDefectLinks.push({
+        recurringId: recurringDefect.id,
+        defectId: defect.id
+      });
+    }
+    
+    this.persistData();
+    return recurringDefect;
+  }
+
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    // Simple Jaccard similarity for now
+    const words1 = new Set(text1.toLowerCase().split(/\s+/));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size === 0 ? 0 : intersection.size / union.size;
+  }
+
+  async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    return this.data.recurringDefectLinks.filter(link => link.recurringId === recurringId);
+  }
+
+  async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
+    const links = await this.getRecurringDefectLinks(recurringId);
+    const defectIds = links.map(link => link.defectId);
+    return defectIds.map(id => this.data.defects[id]).filter(d => d !== undefined);
   }
 }
