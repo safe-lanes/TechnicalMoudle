@@ -1095,6 +1095,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recurring Defects Routes
+  
+  // Get all recurring defects with filters
+  app.get("/api/recurring-defects", async (req, res) => {
+    try {
+      const filters = {
+        windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : undefined,
+        minOccurrences: req.query.minOccurrences ? parseInt(req.query.minOccurrences as string) : undefined,
+        hasCoc: req.query.hasCoc === 'true' ? true : req.query.hasCoc === 'false' ? false : undefined,
+        equipmentKey: req.query.equipmentKey as string
+      };
+      
+      const recurringDefects = await storage.getRecurringDefects(filters);
+      res.json(recurringDefects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recurring defects" });
+    }
+  });
+  
+  // Get specific recurring defect
+  app.get("/api/recurring-defects/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recurringDefect = await storage.getRecurringDefect(id);
+      if (!recurringDefect) {
+        return res.status(404).json({ error: "Recurring defect not found" });
+      }
+      res.json(recurringDefect);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recurring defect" });
+    }
+  });
+  
+  // Get defects linked to a recurring defect
+  app.get("/api/recurring-defects/:id/defects", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const defects = await storage.getDefectsForRecurring(id);
+      res.json(defects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch defects for recurring defect" });
+    }
+  });
+  
+  // Manually trigger recalculation for an equipment key
+  app.post("/api/recurring-defects/recalculate", async (req, res) => {
+    try {
+      const { equipmentKey, windowMonths } = req.body;
+      if (!equipmentKey) {
+        return res.status(400).json({ error: "equipmentKey is required" });
+      }
+      
+      const recurringDefect = await storage.calculateAndUpdateRecurringDefects(
+        equipmentKey,
+        windowMonths || 12
+      );
+      res.json(recurringDefect);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to recalculate recurring defect" });
+    }
+  });
+
   // Register bulk import routes
   app.use("/api/bulk", bulkRoutes);
   app.use("/api/alerts", alertRoutes);

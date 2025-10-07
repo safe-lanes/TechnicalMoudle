@@ -16,7 +16,7 @@ import DefectsActive from "./defects/DefectsActive";
 import DefectsResolved from "./defects/DefectsResolved";
 import DefectsReports from "./defects/DefectsReports";
 import DefectsCoC from "./defects/DefectsCoC";
-import DefectsRecurring from "./defects/DefectsRecurring";
+import RecurringDefects from "./RecurringDefects";
 import { useLocation, useParams } from "wouter";
 
 export const TechnicalModule: React.FC = () => {
@@ -137,7 +137,7 @@ export const TechnicalModule: React.FC = () => {
           ) : selectedSubModule === "defects" && selectedMenuItem === "coc" ? (
             <DefectsCoC />
           ) : selectedSubModule === "defects" && selectedMenuItem === "recurring" ? (
-            <DefectsRecurring />
+            <RecurringDefects />
           ) : selectedSubModule === "defects" && selectedMenuItem === "resolved" ? (
             <DefectsResolved />
           ) : selectedSubModule === "defects" && selectedMenuItem === "reports" ? (
