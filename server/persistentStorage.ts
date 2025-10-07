@@ -877,7 +877,10 @@ export class PersistentFileStorage implements IStorage {
         );
       }
       
-      if (!filters.includeClosedDefects) {
+      // Only filter out closed/cancelled defects if:
+      // 1. includeClosedDefects is explicitly false, AND
+      // 2. statusView is not 'resolved' (as resolved explicitly asks for closed/cancelled)
+      if (!filters.includeClosedDefects && filters.statusView !== 'resolved') {
         defects = defects.filter(d => !['Closed', 'Cancelled'].includes(d.status));
       }
     }
