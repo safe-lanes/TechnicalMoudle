@@ -332,7 +332,7 @@
       "description": "Persistence test defect P_jSqaeX",
       "targetDate": null,
       "dateCompleted": null,
-      "status": "Open",
+      "status": "Closed",
       "priority": "Medium",
       "critical": false,
       "severity": 2,
@@ -356,7 +356,7 @@
       "rootCauseExplanation": null,
       "reportedBy": "System User",
       "createdAt": "2025-10-03T12:10:55.092Z",
-      "updatedAt": "2025-10-03T12:10:55.092Z",
+      "updatedAt": "2025-10-07T07:48:03.285Z",
       "componentId": null,
       "actionTakenRequested": null,
       "defectCategory": null,
@@ -368,7 +368,22 @@
       "routineBreakdown": null,
       "raisedByUserId": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closedBy": "Current User",
+      "closedOn": "2025-10-07T07:48:03.285Z",
+      "closureComment": "test",
+      "closureFiles": [],
+      "auditTrail": [
+        {
+          "action": "CLOSE",
+          "userId": "Current User",
+          "userName": "Current User",
+          "timestamp": "2025-10-07T07:48:03.285Z",
+          "details": {
+            "comment": "test"
+          }
+        }
+      ]
     },
     "5": {
       "id": "5",
