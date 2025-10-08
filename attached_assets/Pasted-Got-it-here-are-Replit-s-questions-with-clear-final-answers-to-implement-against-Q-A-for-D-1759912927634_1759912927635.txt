@@ -1,0 +1,143 @@
+Got it—here are Replit’s questions with clear, final answers to implement against.
+
+---
+
+# Q&A for Defects Seeding + Normalization
+
+### 1) **Vessel mapping**
+
+**Q:** The seed uses `vesselName` (e.g., “MV SEAFARER”), but the defects table uses `vesselId`. Should we map names to IDs or create new vessels?
+
+**A (do both safely via upsert-by-name):**
+
+* Treat **vessel name as the unique business key** during seeding.
+* On import:
+
+  1. **Lookup** vessel by `name` in the `vessels` table.
+  2. If missing, **create** it (upsert) and generate a stable `vesselId` (e.g., slug/UUID like `V001` or `mv-seafarer`).
+  3. Use the returned/created `vesselId` in the defects row.
+* Maintain a small in-memory map during the seed run to avoid repeated lookups.
+* This works whether vessels already exist or not—no hardcoded list is required.
+
+---
+
+### 2) **Date format**
+
+**Q:** Seed dates are `YYYY-MM-DD`, but the UI typically shows `DD-MM-YYYY`. Convert?
+
+**A (yes):**
+
+* **Store** dates in the DB as ISO (`DATE` / `YYYY-MM-DD`) or full ISO datetime (`YYYY-MM-DDTHH:mm:ssZ`)—**do not store** `DD-MM-YYYY`.
+* **Convert only for display** in the UI to `DD-MM-YYYY`.
+* During import, **parse flexibly** (`YYYY-MM-DD` → `DATE`) and normalize to ISO before insert.
+
+---
+
+### 3) **Equipment category vs defect category**
+
+**Q:** Seed has `equipment.category = "Pumps & Valves"`, while our schema has both `equipmentCategory` and `category`. How to map?
+
+**A:**
+
+* **Map seed `equipment.category` → `equipmentCategory`**.
+* Keep **defect `category`** for the defect classification (“Defect”, “COC”, etc.). If the seed’s `category` field is missing, default to `"Defect"`.
+* For **recurring detection**, generate `equipment_key` from:
+
+  ```
+  equipment_key = normalize(`${equipmentCategory}|${equipmentType}|${make}|${model}`)
+  ```
+
+  where `normalize` trims, lowercases, collapses whitespace and punctuation consistently.
+
+---
+
+### 4) **Status values**
+
+**Q:** Seed has `open`/`closed` lowercase. Should we normalize to title-case?
+
+**A (canonical lowercase in DB):**
+
+* **DB canonical**: store as lowercase `'open' | 'closed'`.
+* **UI mapping**: render as “Open” / “Closed”.
+* This avoids case-drift in queries and simplifies indexing/filters.
+
+---
+
+### 5) **Missing fields (severity, priority, vesselType, etc.)**
+
+**Q:** Use defaults or leave null?
+
+**A (use sensible defaults, all configurable):**
+
+* `severity`: default `"2 - Minor"`
+* `priority`: default `"Medium"`
+* `vesselType`: `null` (unknown from seed)
+* `targetDateForClosure`: `null` unless provided
+* `responsibleRole`: `null` unless provided
+* `occurrenceType`: default `"Routine"`
+* `operationCondition`: default `"Sailing"`
+* `isCoC`: default `false`
+* `activityLog`: empty array
+* Make these defaults a **single constants object** so they’re easy to adjust.
+
+---
+
+### 6) **Idempotency (seed tracking)**
+
+**Q:** Add a `seedId` field to defects, or a separate tracking file/table?
+
+**A (add `seedId` column + unique index):**
+
+* Add `seedId` (string) to `defects`, with a **unique index**.
+* During seeding, use **upsert by `seedId`**:
+
+  * If `seedId` exists → **update** record (keep `id` stable).
+  * If not → **insert** new record.
+* This is the cleanest, self-contained, and most reliable approach.
+* (Optional) Also keep `seedRun` metadata if you plan multiple seed batches.
+
+---
+
+## Small implementation notes (to make this painless)
+
+* **Normalization helpers**:
+
+  ```ts
+  const norm = (s='') => s.toLowerCase().trim().replace(/\s+/g,' ').replace(/[|]/g,'/');
+  const equipmentKey = (cat, type, make, model) => 
+    [cat, type, make, model].map(norm).join('|');
+  ```
+
+* **Status enum** (DB-level):
+
+  ```ts
+  type DefectStatus = 'open' | 'closed';
+  ```
+
+* **Date parsing**:
+
+  ```ts
+  // Accept 'YYYY-MM-DD' → store as ISO date string
+  const toISODate = (s) => new Date(s + 'T00:00:00Z').toISOString().slice(0,10);
+  ```
+
+* **Upsert by name (vessels)**:
+
+  * `findByName(name)` → if not found, `insert({ name, slug })` → return `id`.
+
+* **Defaults object**:
+
+  ```ts
+  const DEFAULTS = {
+    severity: '2 - Minor',
+    priority: 'Medium',
+    vesselType: null,
+    targetDateForClosure: null,
+    responsibleRole: null,
+    occurrenceType: 'Routine',
+    operationCondition: 'Sailing',
+    isCoC: false,
+  };
+  ```
+
+**With these answers, you can proceed safely:** seed won’t duplicate, DB will stay normalized, UI can format dates and statuses nicely, recurring logic will work off a stable `equipment_key`, and we won’t block on missing optional fields.
