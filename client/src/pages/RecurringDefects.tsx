@@ -48,19 +48,19 @@ export default function RecurringDefects() {
       'Equipment Key,Equipment Type,Make,Model,Serial,Location,System,Occurrences,Vessels Affected,Last Occurrence,COC Flag',
       // Data rows
       ...data.map(rd => {
-        const parts = rd.equipment_key.split('|');
+        const parts = rd.equipmentKey.split('|');
         return [
-          rd.equipment_key,
+          rd.equipmentKey,
           parts[0] || '',
           parts[1] || '',
           parts[2] || '',
           parts[3] || '',
           parts[4] || '',
           parts[5] || '',
-          rd.occurrence_count.toString(),
-          rd.vessels_affected.toString(),
-          rd.last_occurrence_date ? new Date(rd.last_occurrence_date).toLocaleDateString() : '',
-          rd.has_coc ? 'Yes' : 'No'
+          rd.occurrenceCount.toString(),
+          rd.vesselsAffected.toString(),
+          rd.lastOccurrenceDate ? new Date(rd.lastOccurrenceDate).toLocaleDateString() : '',
+          rd.hasCoc ? 'Yes' : 'No'
         ].map(cell => `"${cell}"`).join(',');
       })
     ].join('\n');
@@ -74,20 +74,19 @@ export default function RecurringDefects() {
     URL.revokeObjectURL(url);
   };
 
+  // Build query params for recurring defects
+  const queryParams = new URLSearchParams();
+  queryParams.set("windowMonths", windowMonths);
+  queryParams.set("minOccurrences", minOccurrences);
+  if (cocOnly) queryParams.set("hasCoc", "true");
+  
   // Fetch recurring defects
   const { data: recurringDefects = [], isLoading } = useQuery<RecurringDefect[]>({
-    queryKey: ["/api/recurring-defects", { windowMonths: Number(windowMonths), minOccurrences: Number(minOccurrences), hasCoc: cocOnly || undefined }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("windowMonths", windowMonths);
-      params.set("minOccurrences", minOccurrences);
-      if (cocOnly) params.set("hasCoc", "true");
-      return apiRequest("GET", `/api/recurring-defects?${params.toString()}`);
-    }
+    queryKey: [`/api/recurring-defects?${queryParams.toString()}`]
   });
 
   // Filter recurring defects based on active tab
-  const filteredDefects = recurringDefects.filter(rd => {
+  const filteredDefects = (recurringDefects || []).filter(rd => {
     if (activeTab === "active") {
       return rd.openCount > 0;
     }
@@ -120,7 +119,7 @@ export default function RecurringDefects() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Recurring</p>
-              <p className="text-2xl font-bold">{recurringDefects.length}</p>
+              <p className="text-2xl font-bold">{(recurringDefects || []).length}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-orange-500" />
           </div>
@@ -131,7 +130,7 @@ export default function RecurringDefects() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">With Open Defects</p>
-              <p className="text-2xl font-bold">{recurringDefects.filter(r => r.openCount > 0).length}</p>
+              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.openCount > 0).length}</p>
             </div>
             <Clock className="h-8 w-8 text-blue-500" />
           </div>
@@ -142,7 +141,7 @@ export default function RecurringDefects() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">CoC Related</p>
-              <p className="text-2xl font-bold">{recurringDefects.filter(r => r.hasCoc).length}</p>
+              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.hasCoc).length}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
@@ -153,7 +152,7 @@ export default function RecurringDefects() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Multi-Vessel</p>
-              <p className="text-2xl font-bold">{recurringDefects.filter(r => r.vesselsAffected > 1).length}</p>
+              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.vesselsAffected > 1).length}</p>
             </div>
             <Users className="h-8 w-8 text-green-500" />
           </div>
