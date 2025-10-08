@@ -427,28 +427,58 @@ export default function RecurringDefects() {
       {renderFilters()}
 
       <Card>
-        <CardHeader>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+          <CardHeader>
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="active">Active</TabsTrigger>
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="by-equipment">By Equipment</TabsTrigger>
               <TabsTrigger value="by-vessel">By Vessel</TabsTrigger>
             </TabsList>
-          </Tabs>
-        </CardHeader>
-        <CardContent>
-          <TabsContent value={activeTab} className="mt-0">
-            {filteredDefects.length === 0 ? (
-              <div className="text-center py-12">
-                <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No recurring defects found with current filters</p>
-              </div>
-            ) : (
-              renderEquipmentTable()
-            )}
-          </TabsContent>
-        </CardContent>
+          </CardHeader>
+          <CardContent>
+            <TabsContent value="active" className="mt-0">
+              {filteredDefects.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No recurring defects found with current filters</p>
+                </div>
+              ) : (
+                renderEquipmentTable()
+              )}
+            </TabsContent>
+            <TabsContent value="all" className="mt-0">
+              {filteredDefects.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No recurring defects found with current filters</p>
+                </div>
+              ) : (
+                renderEquipmentTable()
+              )}
+            </TabsContent>
+            <TabsContent value="by-equipment" className="mt-0">
+              {filteredDefects.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No recurring defects found with current filters</p>
+                </div>
+              ) : (
+                renderEquipmentTable()
+              )}
+            </TabsContent>
+            <TabsContent value="by-vessel" className="mt-0">
+              {filteredDefects.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No recurring defects found with current filters</p>
+                </div>
+              ) : (
+                renderEquipmentTable()
+              )}
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
 
       {renderDrillDownPanel()}
