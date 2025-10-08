@@ -99,41 +99,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vesselId: req.query.vesselId as string,
         status: req.query.status as string,
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
-                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
-        category: req.query.category as string,
-        critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
-        is_coc: req.query.is_coc === 'true' ? true : req.query.is_coc === 'false' ? false : undefined,
-        includeClosedDefects: req.query.includeClosedDefects === 'true',
+                   req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
+        priority: req.query.priority as string,
+        critical: req.query.critical === 'true',
+        isCoC: req.query.isCoC === 'true',
+        dateFrom: req.query.dateFrom as string,
+        dateTo: req.query.dateTo as string,
         search: req.query.search as string,
-        period: req.query.period as string,
-        fleet: req.query.fleet as string,
-        group: req.query.group as string,
-        dueOverdue: req.query.dueOverdue as string
       };
       
       const defects = await storage.getDefects(filters);
-      
-      // Support pagination if requested
-      const page = parseInt(req.query.page as string || '1');
-      const pageSize = parseInt(req.query.pageSize as string || '20');
-      
-      if (req.query.paginate === 'true') {
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const paginatedDefects = defects.slice(startIndex, endIndex);
-        
-        res.json({
-          rows: paginatedDefects,
-          total: defects.length,
-          page,
-          pageSize
-        });
-      } else {
-        // Return unpaginated for backward compatibility
-        res.json(defects);
-      }
+      res.json(defects);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch defects" });
+    }
+  });
+  
+  // CoC-specific defects endpoint
+  app.get("/api/defects/coc", async (req, res) => {
+    try {
+      const filters = {
+        vesselId: req.query.vesselId as string,
+        status: req.query.status as string,
+        statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
+                   req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
+        priority: req.query.priority as string,
+        isCoC: true, // Always filter for CoC
+        dateFrom: req.query.dateFrom as string,
+        dateTo: req.query.dateTo as string,
+        search: req.query.search as string,
+      };
+      
+      const defects = await storage.getDefects(filters);
+      res.json(defects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch CoC defects" });
     }
   });
   
@@ -144,11 +144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         vesselId: req.query.vesselId as string,
-        status: req.query.status as string,
-        category: req.query.category as string,
       };
-      const defects = await storage.getDefects(filters);
-      res.json({ count: defects.length });
+      
+      const count = await storage.getDefectsCount(filters);
+      res.json({ count });
     } catch (error) {
       res.status(500).json({ error: "Failed to get defects count" });
     }
@@ -241,11 +240,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update defect action
-  app.patch("/api/defect-actions/:id", async (req, res) => {
+  app.patch("/api/defects/actions/:actionId", async (req, res) => {
     try {
       const partialActionSchema = insertDefectActionSchema.partial();
       const validatedData = partialActionSchema.parse(req.body);
-      const action = await storage.updateDefectAction(parseInt(req.params.id), validatedData);
+      const action = await storage.updateDefectAction(parseInt(req.params.actionId), validatedData);
       res.json(action);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -259,9 +258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete defect action
-  app.delete("/api/defect-actions/:id", async (req, res) => {
+  app.delete("/api/defects/actions/:actionId", async (req, res) => {
     try {
-      await storage.deleteDefectAction(parseInt(req.params.id));
+      await storage.deleteDefectAction(parseInt(req.params.actionId));
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {
@@ -300,9 +299,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete defect attachment
-  app.delete("/api/defect-attachments/:id", async (req, res) => {
+  app.delete("/api/defects/attachments/:attachmentId", async (req, res) => {
     try {
-      await storage.deleteDefectAttachment(parseInt(req.params.id));
+      await storage.deleteDefectAttachment(parseInt(req.params.attachmentId));
       res.json({ success: true });
     } catch (error: any) {
       if (error.message?.includes('not found')) {
@@ -321,18 +320,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Note text must be at least 10 characters" });
       }
       
-      const defect = await storage.addDefectNote(req.params.id, {
+      const note = {
+        noteId: Date.now().toString(),
         noteText,
         attachments: attachments || [],
-        createdBy
-      });
+        createdBy: createdBy || 'Anonymous',
+        createdOn: new Date().toISOString()
+      };
       
-      res.json(defect);
+      const updatedDefect = await storage.addDefectNote(req.params.id, note);
+      res.json(updatedDefect);
     } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to add note to defect" });
+      res.status(500).json({ error: error.message || "Failed to add note" });
     }
   });
   
@@ -345,13 +344,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "linkedDefects must be a non-empty array" });
       }
       
-      const defect = await storage.linkDefects(req.params.id, linkedDefects);
-      res.json(defect);
+      const updatedDefect = await storage.linkDefects(req.params.id, linkedDefects);
+      res.json(updatedDefect);
     } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to link defects" });
+      res.status(500).json({ error: error.message || "Failed to link defects" });
     }
   });
   
@@ -365,17 +361,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const defect = await storage.closeDefect(req.params.id, {
-        closedBy,
+        closedBy: closedBy || 'System',
+        closedOn: new Date().toISOString().replace('T', ' ').substring(0, 16),
         closureComment,
-        closureFiles
+        closureFiles: closureFiles || [],
+        status: 'Closed'
       });
       
       res.json(defect);
     } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to close defect" });
+      res.status(500).json({ error: error.message || "Failed to close defect" });
     }
   });
   
@@ -388,206 +383,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get defects based on filters
       const defects = await storage.getDefects(filters);
       
-      // Generate report data based on report type
-      let reportData: any = {};
+      // Generate report based on report key
+      let reportData: any = {
+        title: '',
+        generatedAt: new Date().toISOString(),
+        filters,
+        data: []
+      };
       
-      switch (reportKey) {
-        case 'open-defects':
-          const activeDefects = defects.filter(d => ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status));
-          const today = new Date();
-          const overdue = activeDefects.filter(d => d.targetCloseDate && new Date(d.targetCloseDate) < today);
-          reportData = {
-            kpis: {
-              totalOpen: activeDefects.length,
-              dueThisMonth: activeDefects.filter(d => {
-                if (!d.targetCloseDate) return false;
-                const target = new Date(d.targetCloseDate);
-                return target.getMonth() === today.getMonth() && target.getFullYear() === today.getFullYear();
-              }).length,
-              overdue: overdue.length,
-              avgAge: activeDefects.reduce((sum, d) => {
-                const age = Math.floor((today.getTime() - new Date(d.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-                return sum + age;
-              }, 0) / (activeDefects.length || 1)
-            },
-            table: activeDefects
-          };
+      switch(reportKey) {
+        case 'status-summary':
+          reportData.title = 'Defects Status Summary';
+          // Group defects by status
+          const statusGroups = defects.reduce((acc: any, defect) => {
+            if (!acc[defect.status]) {
+              acc[defect.status] = { count: 0, defects: [] };
+            }
+            acc[defect.status].count++;
+            acc[defect.status].defects.push(defect);
+            return acc;
+          }, {});
+          reportData.data = Object.entries(statusGroups).map(([status, data]: [string, any]) => ({
+            status,
+            count: data.count,
+            percentage: ((data.count / defects.length) * 100).toFixed(1) + '%'
+          }));
           break;
           
-        case 'closure-performance':
-          const closedDefects = defects.filter(d => d.status === 'Closed');
-          const closureMetrics = closedDefects.map(d => {
-            if (!d.dateCompleted || !d.issueDate) return null;
-            const days = Math.floor((new Date(d.dateCompleted).getTime() - new Date(d.issueDate).getTime()) / (1000 * 60 * 60 * 24));
-            const onTime = d.targetCloseDate && new Date(d.dateCompleted) <= new Date(d.targetCloseDate);
-            return { days, onTime };
-          }).filter((m): m is { days: number; onTime: boolean } => m !== null);
-          
-          reportData = {
-            kpis: {
-              medianDaysToClose: closureMetrics.length > 0 ? 
-                closureMetrics.sort((a, b) => a.days - b.days)[Math.floor(closureMetrics.length / 2)].days : 0,
-              percentOnTime: closureMetrics.length > 0 ?
-                (closureMetrics.filter(m => m.onTime).length / closureMetrics.length) * 100 : 0,
-              totalClosed: closedDefects.length
-            },
-            table: closedDefects
-          };
+        case 'overdue':
+          reportData.title = 'Overdue Defects';
+          const today = new Date().toISOString().split('T')[0];
+          reportData.data = defects.filter((d: any) => 
+            d.status === 'Open' && 
+            d.targetCloseDate && 
+            new Date(d.targetCloseDate.split('-').reverse().join('-')) < new Date(today)
+          );
           break;
           
-        case 'root-cause':
-        case 'deferments':
-        case 'regulatory':
-        case 'aging':
-        case 'viq-sfi':
-          // Placeholder for other report types
-          reportData = {
-            kpis: { total: defects.length },
-            table: defects
-          };
+        case 'critical':
+          reportData.title = 'Critical Defects';
+          reportData.data = defects.filter((d: any) => d.critical || d.is_coc);
+          break;
+          
+        case 'by-vessel':
+          reportData.title = 'Defects by Vessel';
+          const vesselGroups = defects.reduce((acc: any, defect) => {
+            if (!acc[defect.vesselName]) {
+              acc[defect.vesselName] = { count: 0, open: 0, closed: 0 };
+            }
+            acc[defect.vesselName].count++;
+            if (defect.status === 'Open') {
+              acc[defect.vesselName].open++;
+            } else if (defect.status === 'Closed') {
+              acc[defect.vesselName].closed++;
+            }
+            return acc;
+          }, {});
+          reportData.data = Object.entries(vesselGroups).map(([vessel, stats]: [string, any]) => ({
+            vessel,
+            total: stats.count,
+            open: stats.open,
+            closed: stats.closed
+          }));
+          break;
+          
+        case 'by-equipment':
+          reportData.title = 'Defects by Equipment';
+          const equipmentGroups = defects.reduce((acc: any, defect) => {
+            const equipment = defect.equipmentCategory || 'Not Specified';
+            if (!acc[equipment]) {
+              acc[equipment] = { count: 0, defects: [] };
+            }
+            acc[equipment].count++;
+            acc[equipment].defects.push(defect);
+            return acc;
+          }, {});
+          reportData.data = Object.entries(equipmentGroups).map(([equipment, data]: [string, any]) => ({
+            equipment,
+            count: data.count,
+            percentage: ((data.count / defects.length) * 100).toFixed(1) + '%'
+          }));
+          break;
+          
+        case 'monthly-trend':
+          reportData.title = 'Monthly Trend';
+          // Group by month
+          const monthGroups = defects.reduce((acc: any, defect) => {
+            const dateStr = defect.issueDate; // DD-MM-YYYY
+            if (!dateStr) return acc;
+            const [day, month, year] = dateStr.split('-');
+            const monthKey = `${year}-${month}`;
+            if (!acc[monthKey]) {
+              acc[monthKey] = { created: 0, closed: 0 };
+            }
+            acc[monthKey].created++;
+            if (defect.status === 'Closed' && defect.dateCompleted) {
+              const [cDay, cMonth, cYear] = defect.dateCompleted.split('-');
+              const closedMonthKey = `${cYear}-${cMonth}`;
+              if (!acc[closedMonthKey]) {
+                acc[closedMonthKey] = { created: 0, closed: 0 };
+              }
+              acc[closedMonthKey].closed++;
+            }
+            return acc;
+          }, {});
+          reportData.data = Object.entries(monthGroups).map(([month, stats]: [string, any]) => ({
+            month,
+            created: stats.created,
+            closed: stats.closed,
+            net: stats.created - stats.closed
+          })).sort((a, b) => a.month.localeCompare(b.month));
           break;
           
         default:
-          return res.status(400).json({ error: "Invalid report key" });
+          reportData.title = 'Defects Report';
+          reportData.data = defects;
       }
       
       res.json(reportData);
     } catch (error) {
-      console.error('Report generation error:', error);
       res.status(500).json({ error: "Failed to generate report" });
     }
   });
   
-  // Running Hours API routes
+  // Running hours routes...
   
-  // Get components for a vessel
-  app.get("/api/running-hours/components/:vesselId", async (req, res) => {
+  // Get all running hours audits
+  app.get("/api/running-hours", async (req, res) => {
     try {
-      const components = await storage.getComponents(req.params.vesselId);
+      const audits = await storage.getRunningHoursAudits();
+      res.json(audits);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch running hours audits" });
+    }
+  });
+  
+  // Create a new running hours audit
+  app.post("/api/running-hours", async (req, res) => {
+    try {
+      const validatedData = insertRunningHoursAuditSchema.parse(req.body);
+      const audit = await storage.createRunningHoursAudit(validatedData);
+      res.status(201).json(audit);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid audit data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create audit" });
+    }
+  });
+  
+  // Update existing audit by ID
+  app.patch("/api/running-hours/:id", async (req, res) => {
+    try {
+      const partialAuditSchema = insertRunningHoursAuditSchema.partial();
+      const validatedData = partialAuditSchema.parse(req.body);
+      const audit = await storage.updateRunningHoursAudit(parseInt(req.params.id), validatedData);
+      res.json(audit);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid audit data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update audit" });
+    }
+  });
+  
+  // Delete audit by ID
+  app.delete("/api/running-hours/:id", async (req, res) => {
+    try {
+      await storage.deleteRunningHoursAudit(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete audit" });
+    }
+  });
+
+  // Components routes...
+  app.post("/api/components", async (req, res) => {
+    try {
+      const component = await storage.createComponent(req.body);
+      res.status(201).json(component);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to create component" });
+    }
+  });
+  
+  app.get("/api/components", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string;
+      const components = await storage.getComponents(vesselId);
       res.json(components);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch components" });
     }
   });
 
-  // Update component running hours
-  app.post("/api/running-hours/update/:componentId", async (req, res) => {
+  app.get("/api/components/:id", async (req, res) => {
     try {
-      const { componentId } = req.params;
-      const updateData = req.body;
-      
-      // Create audit entry
-      const audit = await storage.createRunningHoursAudit(updateData.audit);
-      
-      // Update component
-      const component = await storage.updateComponent(componentId, {
-        currentCumulativeRH: updateData.cumulativeRH.toString(),
-        lastUpdated: updateData.dateUpdatedLocal
-      });
-      
-      res.json({ component, audit });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update running hours" });
-    }
-  });
-
-  // Bulk update running hours
-  app.post("/api/running-hours/bulk-update", async (req, res) => {
-    try {
-      const updates = req.body.updates;
-      const results = [];
-      
-      for (const update of updates) {
-        const audit = await storage.createRunningHoursAudit(update.audit);
-        const component = await storage.updateComponent(update.componentId, {
-          currentCumulativeRH: update.cumulativeRH.toString(),
-          lastUpdated: update.dateUpdatedLocal
-        });
-        results.push({ component, audit });
+      const component = await storage.getComponent(req.params.id);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
       }
-      
-      res.json({ results });
+      res.json(component);
     } catch (error) {
-      res.status(500).json({ error: "Failed to perform bulk update" });
+      res.status(500).json({ error: "Failed to fetch component" });
     }
   });
-
-  // Get running hours audits for a component
-  app.get("/api/running-hours/audits/:componentId", async (req, res) => {
-    try {
-      const { componentId } = req.params;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const audits = await storage.getRunningHoursAudits(componentId, limit);
-      res.json(audits);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch audits" });
-    }
-  });
-
-  // Get utilization rate for components
-  app.post("/api/running-hours/utilization-rates", async (req, res) => {
-    try {
-      const { componentIds } = req.body;
-      const rates: Record<string, number | null> = {};
-      
-      const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      for (const componentId of componentIds) {
-        const audits = await storage.getRunningHoursAuditsInDateRange(
-          componentId,
-          thirtyDaysAgo,
-          today
-        );
-        
-        // Get anchor point (most recent before window)
-        const allAudits = await storage.getRunningHoursAudits(componentId);
-        const anchorAudit = allAudits.find(a => new Date(a.dateUpdatedLocal) < thirtyDaysAgo);
-        
-        const windowAudits = anchorAudit ? [anchorAudit, ...audits] : audits;
-        
-        if (windowAudits.length < 2) {
-          rates[componentId] = null;
-        } else {
-          const start = windowAudits[0];
-          const end = windowAudits[windowAudits.length - 1];
-          
-          const deltaHours = parseFloat(end.cumulativeRH) - parseFloat(start.cumulativeRH);
-          const startDate = new Date(start.dateUpdatedLocal);
-          const endDate = new Date(end.dateUpdatedLocal);
-          const deltaDays = Math.max((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24), 1);
-          
-          const utilization = Math.max(deltaHours / deltaDays, 0);
-          rates[componentId] = Math.round(utilization * 10) / 10;
-        }
-      }
-      
-      res.json(rates);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to calculate utilization rates" });
-    }
-  });
-
-  // Spares API routes
   
-  // Get all spares for a vessel
+  app.patch("/api/components/:id", async (req, res) => {
+    try {
+      const component = await storage.updateComponent(req.params.id, req.body);
+      res.json(component);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update component" });
+    }
+  });
+  
+  app.delete("/api/components/:id", async (req, res) => {
+    try {
+      await storage.deleteComponent(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to delete component" });
+    }
+  });
+  
+  // Spares routes...
+  
+  // Get spares for a vessel
   app.get("/api/spares/:vesselId", async (req, res) => {
     try {
       const spares = await storage.getSpares(req.params.vesselId);
-      // Calculate stock status server-side
-      const sparesWithStatus = spares.map(spare => ({
-        ...spare,
-        stockStatus: spare.rob < spare.min ? 'Low' : spare.rob === spare.min ? 'Minimum' : 'OK'
-      }));
-      res.json(sparesWithStatus);
+      res.json(spares);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch spares" });
     }
   });
-
-  // Get single spare
-  app.get("/api/spares/item/:id", async (req, res) => {
+  
+  // Get spare by ID (optional - useful for detail views)
+  app.get("/api/spares/:vesselId/:id", async (req, res) => {
     try {
       const spare = await storage.getSpare(parseInt(req.params.id));
       if (!spare) {
@@ -598,504 +643,329 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch spare" });
     }
   });
-
-  // Create new spare
-  app.post("/api/spares", async (req, res) => {
+  
+  // Create a new spare
+  app.post("/api/spares/:vesselId", async (req, res) => {
     try {
-      const spare = await storage.createSpare(req.body);
-      res.json(spare);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create spare" });
+      const spare = await storage.createSpare({
+        ...req.body,
+        vesselId: req.params.vesselId
+      });
+      res.status(201).json(spare);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to create spare" });
     }
   });
-
+  
   // Update spare
-  app.put("/api/spares/:id", async (req, res) => {
+  app.patch("/api/spares/:vesselId/:id", async (req, res) => {
     try {
       const spare = await storage.updateSpare(parseInt(req.params.id), req.body);
       res.json(spare);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
       res.status(500).json({ error: "Failed to update spare" });
     }
   });
-
+  
   // Delete spare
-  app.delete("/api/spares/:id", async (req, res) => {
+  app.delete("/api/spares/:vesselId/:id", async (req, res) => {
     try {
       await storage.deleteSpare(parseInt(req.params.id));
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
       res.status(500).json({ error: "Failed to delete spare" });
     }
   });
-
-  // Consume spare
-  app.post("/api/spares/:id/consume", async (req, res) => {
+  
+  // Inventory history endpoints
+  app.get("/api/spares/:vesselId/history", async (req, res) => {
     try {
-      const { vesselId, qty, dateLocal, tz, place, remarks, userId } = req.body;
+      const { vesselId } = req.params;
+      const { spareId, transactionType, dateFrom, dateTo, search } = req.query;
       
-      // Validation
-      if (!qty || qty < 1) {
-        return res.status(400).json({ error: "Quantity must be at least 1" });
-      }
-      
-      // Check if date is not in future
-      const today = new Date();
-      const inputDate = new Date(dateLocal);
-      if (inputDate > today) {
-        return res.status(400).json({ error: "Date cannot be in the future" });
-      }
-      
-      const spare = await storage.consumeSpare(
-        parseInt(req.params.id),
-        qty,
-        userId || 'user',
-        remarks,
-        place,
-        dateLocal,
-        tz || 'UTC'
-      );
-      
-      // Calculate stock status for response
-      const spareWithStatus = {
-        ...spare,
-        stockStatus: spare.rob < spare.min ? 'Low' : spare.rob === spare.min ? 'Minimum' : 'OK'
+      const filters = {
+        vesselId,
+        spareId: spareId ? parseInt(spareId as string) : undefined,
+        transactionType: transactionType as string,
+        dateFrom: dateFrom as string,
+        dateTo: dateTo as string,
+        search: search as string
       };
       
-      res.json(spareWithStatus);
-    } catch (error: any) {
-      if (error.message === 'Insufficient stock') {
-        res.status(400).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Failed to consume spare" });
-      }
-    }
-  });
-
-  // Receive spare
-  app.post("/api/spares/:id/receive", async (req, res) => {
-    try {
-      const { vesselId, qty, dateLocal, tz, place, supplierPO, remarks, userId } = req.body;
-      
-      // Validation
-      if (!qty || qty < 1) {
-        return res.status(400).json({ error: "Quantity must be at least 1" });
-      }
-      
-      // Check if date is not in future
-      const today = new Date();
-      const inputDate = new Date(dateLocal);
-      if (inputDate > today) {
-        return res.status(400).json({ error: "Date cannot be in the future" });
-      }
-      
-      const spare = await storage.receiveSpare(
-        parseInt(req.params.id),
-        qty,
-        userId || 'user',
-        remarks,
-        supplierPO,
-        place,
-        dateLocal,
-        tz || 'UTC'
-      );
-      
-      // Calculate stock status for response
-      const spareWithStatus = {
-        ...spare,
-        stockStatus: spare.rob < spare.min ? 'Low' : spare.rob === spare.min ? 'Minimum' : 'OK'
-      };
-      
-      res.json(spareWithStatus);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to receive spare" });
-    }
-  });
-
-  // Bulk update spares
-  app.post("/api/spares/bulk-update", async (req, res) => {
-    try {
-      const { vesselId, tz, rows } = req.body;
-      
-      // Process each row and collect results
-      const results = [];
-      
-      for (const row of rows) {
-        // Skip rows where both consumed and received are 0
-        if (row.consumed === 0 && row.received === 0) {
-          results.push({
-            componentSpareId: row.componentSpareId,
-            success: false,
-            message: null // Skipped
-          });
-          continue;
-        }
-        
-        try {
-          const spare = await storage.getSpare(row.componentSpareId);
-          if (!spare) {
-            results.push({
-              componentSpareId: row.componentSpareId,
-              success: false,
-              message: "Spare not found"
-            });
-            continue;
-          }
-          
-          // Validate insufficient stock
-          if (row.consumed > 0 && spare.rob < row.consumed) {
-            results.push({
-              componentSpareId: row.componentSpareId,
-              success: false,
-              message: "Insufficient stock"
-            });
-            continue;
-          }
-          
-          // Process consume
-          if (row.consumed > 0) {
-            await storage.consumeSpare(
-              row.componentSpareId,
-              row.consumed,
-              row.userId || 'user',
-              row.remarks,
-              undefined,
-              row.dateLocal || new Date().toISOString().split('T')[0],
-              tz || 'UTC'
-            );
-          }
-          
-          // Process receive
-          if (row.received > 0) {
-            await storage.receiveSpare(
-              row.componentSpareId,
-              row.received,
-              row.userId || 'user',
-              row.remarks,
-              undefined,
-              row.receivedPlace,
-              row.receivedDate,
-              tz || 'UTC'
-            );
-          }
-          
-          // Get updated spare
-          const updatedSpare = await storage.getSpare(row.componentSpareId);
-          results.push({
-            componentSpareId: row.componentSpareId,
-            success: true,
-            robAfter: updatedSpare?.rob || 0
-          });
-          
-        } catch (error: any) {
-          results.push({
-            componentSpareId: row.componentSpareId,
-            success: false,
-            message: error.message || "Failed to update"
-          });
-        }
-      }
-      
-      res.json(results);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to perform bulk update" });
-    }
-  });
-
-  // Get spares history
-  app.get("/api/spares/history/:vesselId", async (req, res) => {
-    try {
-      const history = await storage.getSpareHistory(req.params.vesselId);
+      const history = await storage.getSpareHistory(filters);
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch history" });
     }
   });
-
-  // Get history for specific spare
-  app.get("/api/spares/history/spare/:spareId", async (req, res) => {
+  
+  // Get low stock spares (below minimum quantity)
+  app.get("/api/spares/:vesselId/low-stock", async (req, res) => {
     try {
-      const history = await storage.getSpareHistoryBySpareId(parseInt(req.params.spareId));
-      res.json(history);
+      const spares = await storage.getSpares(req.params.vesselId);
+      const lowStockSpares = spares.filter(spare => spare.stockQuantity <= spare.minimumQuantity);
+      res.json(lowStockSpares);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch spare history" });
+      res.status(500).json({ error: "Failed to fetch low stock spares" });
     }
   });
-
-  // Change Request API routes
   
-  // Get change requests with filters
-  app.get("/api/modify-pms/requests", async (req, res) => {
+  // Batch consume spares (for work order consumption)
+  app.post("/api/spares/:vesselId/batch-consume", async (req, res) => {
     try {
+      const { items, workOrderId, consumedBy } = req.body;
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required" });
+      }
+      
+      const results = [];
+      for (const item of items) {
+        const result = await storage.consumeSpare(
+          item.spareId,
+          item.quantity,
+          workOrderId,
+          consumedBy || 'System',
+          item.notes
+        );
+        results.push(result);
+      }
+      
+      res.json({ success: true, results });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to consume spares" });
+    }
+  });
+  
+  // Batch receive spares (for purchase order receiving)
+  app.post("/api/spares/:vesselId/batch-receive", async (req, res) => {
+    try {
+      const { items, purchaseOrderRef, receivedBy } = req.body;
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required" });
+      }
+      
+      const results = [];
+      for (const item of items) {
+        const result = await storage.receiveSpare(
+          item.spareId,
+          item.quantity,
+          item.unitCost,
+          purchaseOrderRef,
+          receivedBy || 'System',
+          item.notes
+        );
+        results.push(result);
+      }
+      
+      res.json({ success: true, results });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to receive spares" });
+    }
+  });
+  
+  // Stores endpoints (mirroring spares structure)
+  app.get("/api/stores/:vesselId", async (req, res) => {
+    try {
+      const stores = await storage.getSpares(req.params.vesselId, 'Store');
+      res.json(stores);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stores" });
+    }
+  });
+  
+  app.get("/api/stores/:vesselId/history", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { spareId, transactionType, dateFrom, dateTo, search } = req.query;
+      
       const filters = {
-        category: req.query.category as string,
-        status: req.query.status as string,
-        q: req.query.q as string,
-        vesselId: req.query.vesselId as string
+        vesselId,
+        spareId: spareId ? parseInt(spareId as string) : undefined,
+        transactionType: transactionType as string,
+        dateFrom: dateFrom as string,
+        dateTo: dateTo as string,
+        search: search as string,
+        itemType: 'Store'
       };
       
-      const requests = await storage.getChangeRequests(filters);
-      res.json(requests);
+      const history = await storage.getSpareHistory(filters);
+      res.json(history);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch change requests" });
+      res.status(500).json({ error: "Failed to fetch stores history" });
     }
   });
   
-  // Get single change request
-  app.get("/api/modify-pms/requests/:id", async (req, res) => {
+  // Batch consume stores
+  app.post("/api/stores/:vesselId/batch-consume", async (req, res) => {
     try {
-      const request = await storage.getChangeRequest(parseInt(req.params.id));
-      if (!request) {
-        return res.status(404).json({ error: "Change request not found" });
+      const { items, consumedBy } = req.body;
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required" });
       }
       
-      // Get attachments and comments
-      const attachments = await storage.getChangeRequestAttachments(request.id);
-      const comments = await storage.getChangeRequestComments(request.id);
-      
-      res.json({ ...request, attachments, comments });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch change request" });
-    }
-  });
-  
-  // Create change request (draft)
-  app.post("/api/modify-pms/requests", async (req, res) => {
-    try {
-      const { vesselId, category, title, reason } = req.body;
-      
-      // Validation for draft - only title required
-      if (!title) {
-        return res.status(400).json({ error: "Title is required" });
+      const results = [];
+      for (const item of items) {
+        const result = await storage.consumeSpare(
+          item.spareId,
+          item.quantity,
+          undefined, // No work order for stores
+          consumedBy || 'System',
+          item.notes
+        );
+        results.push(result);
       }
       
-      const request = await storage.createChangeRequest({
-        vesselId: vesselId || '',
-        category: category || 'components',
-        title: title.substring(0, 120), // Enforce max length
-        reason: reason || '',
-        status: 'draft',
-        requestedByUserId: req.body.userId || 'current_user'
-      });
-      
-      res.json(request);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create change request" });
-    }
-  });
-  
-  // Update change request (draft/returned only)
-  app.put("/api/modify-pms/requests/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existing = await storage.getChangeRequest(id);
-      
-      if (!existing) {
-        return res.status(404).json({ error: "Change request not found" });
-      }
-      
-      if (existing.status !== 'draft' && existing.status !== 'returned') {
-        return res.status(400).json({ error: "Can only edit draft or returned requests" });
-      }
-      
-      const { vesselId, category, title, reason } = req.body;
-      
-      const updated = await storage.updateChangeRequest(id, {
-        vesselId,
-        category,
-        title: title?.substring(0, 120),
-        reason
-      });
-      
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update change request" });
-    }
-  });
-  
-  // Update change request target (draft/returned only)
-  app.put("/api/modify-pms/requests/:id/target", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { targetType, targetId, snapshotBeforeJson } = req.body;
-      
-      const updated = await storage.updateChangeRequestTarget(id, targetType, targetId, snapshotBeforeJson);
-      res.json(updated);
+      res.json({ success: true, results });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to update target" });
+      res.status(500).json({ error: error.message || "Failed to consume stores" });
     }
   });
   
-  // Update proposed changes (draft/returned only)
-  app.put("/api/modify-pms/requests/:id/proposed", async (req, res) => {
+  // Batch receive stores
+  app.post("/api/stores/:vesselId/batch-receive", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const { proposedChangesJson, movePreviewJson } = req.body;
+      const { items, purchaseOrderRef, receivedBy } = req.body;
       
-      const updated = await storage.updateChangeRequestProposed(id, proposedChangesJson, movePreviewJson);
-      res.json(updated);
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required" });
+      }
+      
+      const results = [];
+      for (const item of items) {
+        const result = await storage.receiveSpare(
+          item.spareId,
+          item.quantity,
+          item.unitCost,
+          purchaseOrderRef,
+          receivedBy || 'System',
+          item.notes
+        );
+        results.push(result);
+      }
+      
+      res.json({ success: true, results });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to update proposed changes" });
+      res.status(500).json({ error: error.message || "Failed to receive stores" });
     }
   });
   
-  // Submit change request
-  app.put("/api/modify-pms/requests/:id/submit", async (req, res) => {
+  // Reports endpoint
+  app.get("/api/reports/:reportType", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const existing = await storage.getChangeRequest(id);
+      const { reportType } = req.params;
+      const { vesselId, dateFrom, dateTo, format } = req.query;
       
-      if (!existing) {
-        return res.status(404).json({ error: "Change request not found" });
+      // Mock data for now - replace with actual report generation
+      const reportData = {
+        title: `${reportType.toUpperCase()} Report`,
+        vessel: vesselId || 'All Vessels',
+        period: `${dateFrom || 'Start'} to ${dateTo || 'End'}`,
+        generatedAt: new Date().toISOString(),
+        data: []
+      };
+      
+      // Generate specific report data based on type
+      switch(reportType) {
+        case 'inventory':
+          const spares = await storage.getSpares(vesselId as string);
+          reportData.data = spares.map(spare => ({
+            partCode: spare.partCode,
+            partName: spare.partName,
+            stockQuantity: spare.stockQuantity,
+            minimumQuantity: spare.minimumQuantity,
+            status: spare.stockQuantity <= spare.minimumQuantity ? 'Low Stock' : 'OK'
+          }));
+          break;
+        case 'consumption':
+          const history = await storage.getSpareHistory({
+            vesselId: vesselId as string,
+            transactionType: 'CONSUME',
+            dateFrom: dateFrom as string,
+            dateTo: dateTo as string
+          });
+          reportData.data = history;
+          break;
+        // Add more report types as needed
       }
       
-      if (existing.status !== 'draft' && existing.status !== 'returned') {
-        return res.status(400).json({ error: "Can only submit draft or returned requests" });
+      // If format is CSV, convert and send as file
+      if (format === 'csv') {
+        const csv = convertToCSV(reportData);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.csv"`);
+        return res.send(csv);
       }
       
-      // Validate required fields for submission - now including target and proposed changes
-      if (!existing.title || !existing.category || !existing.vesselId || !existing.reason || 
-          !existing.targetType || !existing.targetId || !existing.snapshotBeforeJson) {
-        return res.status(400).json({ 
-          error: "Title, Category, Vessel, Reason, and Target selection are required for submission" 
-        });
-      }
-      
-      // Check if proposed changes exist and are non-empty
-      if (!existing.proposedChangesJson || 
-          (Array.isArray(existing.proposedChangesJson) && existing.proposedChangesJson.length === 0)) {
-        return res.status(400).json({ 
-          error: "Please propose at least one change before submitting" 
-        });
-      }
-      
-      const updated = await storage.submitChangeRequest(id, req.body.userId || 'current_user');
-      res.json(updated);
+      res.json(reportData);
     } catch (error) {
-      res.status(500).json({ error: "Failed to submit change request" });
+      res.status(500).json({ error: "Failed to generate report" });
     }
   });
   
-  // Approve change request (office only)
-  app.put("/api/modify-pms/requests/:id/approve", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { comment, reviewerId } = req.body;
-      
-      if (!comment) {
-        return res.status(400).json({ error: "Comment is required for approval" });
-      }
-      
-      const updated = await storage.approveChangeRequest(
-        id, 
-        reviewerId || 'reviewer', 
-        comment
-      );
-      res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to approve change request" });
-    }
+  // User routes
+  app.get("/api/me", async (req, res) => {
+    res.json({ 
+      user: { 
+        id: 1, 
+        name: "Admin User",
+        role: "admin",
+        email: "admin@pms.com"
+      } 
+    });
   });
   
-  // Reject change request (office only)
-  app.put("/api/modify-pms/requests/:id/reject", async (req, res) => {
+  app.get("/api/users", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const { comment, reviewerId } = req.body;
-      
-      if (!comment) {
-        return res.status(400).json({ error: "Comment is required for rejection" });
-      }
-      
-      const updated = await storage.rejectChangeRequest(
-        id, 
-        reviewerId || 'reviewer', 
-        comment
-      );
-      res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to reject change request" });
-    }
-  });
-  
-  // Return change request for clarification (office only)
-  app.put("/api/modify-pms/requests/:id/return", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { comment, reviewerId } = req.body;
-      
-      if (!comment) {
-        return res.status(400).json({ error: "Comment is required for return" });
-      }
-      
-      const updated = await storage.returnChangeRequest(
-        id, 
-        reviewerId || 'reviewer', 
-        comment
-      );
-      res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to return change request" });
-    }
-  });
-  
-  // Delete change request (draft only)
-  app.delete("/api/modify-pms/requests/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      await storage.deleteChangeRequest(id);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to delete change request" });
-    }
-  });
-  
-  // Create attachment
-  app.post("/api/modify-pms/requests/:id/attachments", async (req, res) => {
-    try {
-      const changeRequestId = parseInt(req.params.id);
-      const { filename, url, uploadedByUserId } = req.body;
-      
-      if (!filename || !url) {
-        return res.status(400).json({ error: "Filename and URL are required" });
-      }
-      
-      const attachment = await storage.createChangeRequestAttachment({
-        changeRequestId,
-        filename,
-        url,
-        uploadedByUserId: uploadedByUserId || 'current_user'
-      });
-      
-      res.json(attachment);
+      const users = await storage.getUsers();
+      res.json(users);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create attachment" });
-    }
-  });
-  
-  // Create comment
-  app.post("/api/modify-pms/requests/:id/comments", async (req, res) => {
-    try {
-      const changeRequestId = parseInt(req.params.id);
-      const { message, userId } = req.body;
-      
-      if (!message) {
-        return res.status(400).json({ error: "Message is required" });
-      }
-      
-      const comment = await storage.createChangeRequestComment({
-        changeRequestId,
-        userId: userId || 'current_user',
-        message
-      });
-      
-      res.json(comment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create comment" });
+      res.status(500).json({ error: "Failed to fetch users" });
     }
   });
 
-  // Recurring Defects Routes
+  // Register bulk routes
+  bulkRoutes(app);
+  
+  // Register alert routes
+  alertRoutes(app);
+  
+  // Register form routes
+  formRoutes(app);
+  
+  // Mount the Change Requests router  
+  const changeRequestsRouter = createChangeRequestsRouter(storage);
+  app.use("/api/change-requests", changeRequestsRouter);
+  
+  // Template builder endpoints
+  app.get("/api/template-builder/:templateType", async (req, res) => {
+    try {
+      const { templateType } = req.params;
+      
+      // Mock response for template builder
+      const template = {
+        id: templateType,
+        name: `${templateType} Template`,
+        description: `Template for ${templateType}`,
+        fields: [],
+        lastModified: new Date().toISOString()
+      };
+      
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+  
+  // Recurring Defects API routes
   
   // Get all recurring defects with filters
   app.get("/api/recurring-defects", async (req, res) => {
@@ -1153,281 +1023,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(recurringDefect);
     } catch (error) {
-      res.status(500).json({ error: "Failed to recalculate recurring defect" });
+      res.status(500).json({ error: "Failed to recalculate recurring defects" });
     }
   });
-
-  // Register bulk import routes
-  app.use("/api/bulk", bulkRoutes);
-  app.use("/api/alerts", alertRoutes);
-  app.use("/api", formRoutes);
-  app.use("/api/change-requests", createChangeRequestsRouter(storage));
-
-  // IHM (Inventory of Hazardous Materials) Routes
-  // Only active when FEATURE_IHM is enabled
   
-  // Get IHM item for a component
-  app.get("/api/ihm/component/:componentId", async (req, res) => {
-    try {
-      const item = await storage.getIhmItem(req.params.componentId, 'component');
-      res.json(item || null);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch IHM item" });
-    }
-  });
-
-  // Get IHM item for a spare
-  app.get("/api/ihm/spare/:spareId", async (req, res) => {
-    try {
-      const item = await storage.getIhmItem(req.params.spareId, 'spare');
-      res.json(item || null);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch IHM item" });
-    }
-  });
-
-  // Create or update IHM item
-  app.post("/api/ihm", async (req, res) => {
-    try {
-      const item = await storage.upsertIhmItem(req.body);
-      res.json(item);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to save IHM item" });
-    }
-  });
-
-  // Get IHM maintenance log
-  app.get("/api/ihm/maintenance-log", async (req, res) => {
-    try {
-      const { vesselId = 'V001', from, to, action, component, spare } = req.query;
-      const log = await storage.getIhmMaintenanceLog({
-        vesselId: vesselId as string,
-        from: from as string,
-        to: to as string,
-        action: action as string,
-        component: component as string,
-        spare: spare as string,
-      });
-      res.json(log);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch IHM maintenance log" });
-    }
-  });
-
-  // Create IHM maintenance log entry
-  app.post("/api/ihm/maintenance-log", async (req, res) => {
-    try {
-      const entry = await storage.createIhmMaintenanceLogEntry(req.body);
-      res.json(entry);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create IHM log entry" });
-    }
-  });
-
-  // Get IHM status report by component
-  app.get("/api/ihm/status-report", async (req, res) => {
-    try {
-      const { vesselId = 'V001' } = req.query;
-      const report = await storage.getIhmStatusReport(vesselId as string);
-      res.json(report);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch IHM status report" });
-    }
-  });
-
-  // Report generation endpoints
-  app.post('/api/reports/generate', async (req, res) => {
-    try {
-      const { reportId, format, data, template } = req.body;
-      
-      // Validate input
-      if (!reportId || !format || !data) {
-        return res.status(400).json({ error: 'Missing required fields' });
+  // Dev-only seed endpoint for recurring defects testing
+  if (process.env.NODE_ENV === 'development') {
+    // Seed recurring defects test data
+    app.post("/dev/seed/recurring-defects", async (req, res) => {
+      try {
+        const seedData = getSeedDefectsData();
+        let created = 0;
+        let updated = 0;
+        
+        for (const seedDefect of seedData) {
+          // Check if vessel exists, create if not
+          let vesselId = await storage.getVesselIdByName(seedDefect.vesselName);
+          if (!vesselId) {
+            // Create vessel with a simple ID
+            vesselId = seedDefect.vesselName.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+            await storage.createVessel({
+              id: vesselId,
+              name: seedDefect.vesselName,
+              type: 'Container'
+            });
+          }
+          
+          // Convert dates from YYYY-MM-DD to DD-MM-YYYY for storage
+          const convertDate = (dateStr: string) => {
+            const [year, month, day] = dateStr.split('-');
+            return `${day}-${month}-${year}`;
+          };
+          
+          // Map seed data to our defect schema
+          const defectData = {
+            vesselId,
+            vesselName: seedDefect.vesselName,
+            issueDate: convertDate(seedDefect.issuedDate),
+            targetCloseDate: convertDate(seedDefect.targetDate),
+            status: seedDefect.status === 'open' ? 'Open' : 'Closed',
+            is_coc: seedDefect.isCoC,
+            source: seedDefect.source || 'Ship',
+            category: 'Defect',
+            defectCategory: seedDefect.defectCategory,
+            defectType: seedDefect.defectType,
+            responsibleRole: seedDefect.responsibleRole,
+            equipmentCategory: seedDefect.equipment.category,
+            equipmentType: seedDefect.equipment.type,
+            equipmentMake: seedDefect.equipment.make,
+            equipmentModel: seedDefect.equipment.model,
+            description: seedDefect.description,
+            actionTakenRequested: seedDefect.actionRequested,
+            seedId: seedDefect.seedId,
+            // Defaults
+            priority: 'Medium',
+            severity: 2,
+            critical: false,
+            occurrenceType: 'Routine',
+            operatingCondition: 'Sailing',
+            reportedBy: 'System',
+          };
+          
+          // Check if defect with this seedId exists
+          const existing = await storage.getDefectBySeedId(seedDefect.seedId);
+          if (existing) {
+            await storage.updateDefect(existing.id, defectData);
+            updated++;
+          } else {
+            await storage.createDefect(defectData);
+            created++;
+          }
+        }
+        
+        res.json({ 
+          message: "Seed data loaded successfully",
+          created,
+          updated,
+          total: seedData.length
+        });
+      } catch (error: any) {
+        console.error("Seed error:", error);
+        res.status(500).json({ error: "Failed to seed data", details: error.message });
       }
-
-      if (!['PDF', 'Excel', 'CSV'].includes(format)) {
-        return res.status(400).json({ error: 'Invalid format' });
+    });
+    
+    // Delete seeded defects
+    app.delete("/dev/seed/recurring-defects", async (req, res) => {
+      try {
+        const seedIds = [
+          'RD-001', 'RD-002', 'RD-003', 'RD-004', 'RD-005',
+          'RD-006', 'RD-007', 'RD-008', 'RD-009', 'RD-010'
+        ];
+        
+        let deleted = 0;
+        for (const seedId of seedIds) {
+          const defect = await storage.getDefectBySeedId(seedId);
+          if (defect) {
+            await storage.deleteDefect(defect.id);
+            deleted++;
+          }
+        }
+        
+        res.json({ 
+          message: "Seed data deleted successfully",
+          deleted
+        });
+      } catch (error: any) {
+        console.error("Delete seed error:", error);
+        res.status(500).json({ error: "Failed to delete seed data", details: error.message });
       }
-
-      // For now, we'll generate mock reports
-      // In a real implementation, this would use a proper report generation library
-      const mockReportContent = generateMockReport(reportId, format, data, template);
-      
-      // Set appropriate headers for file download
-      const formatMetadata = getFormatMetadata(format);
-      const filename = `${reportId}_${new Date().toISOString().split('T')[0]}.${formatMetadata.extension}`;
-      
-      res.setHeader('Content-Type', formatMetadata.mimeType);
-      
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(mockReportContent);
-      
-    } catch (error) {
-      console.error('Report generation error:', error);
-      res.status(500).json({ error: 'Failed to generate report' });
-    }
-  });
-
+    });
+  }
+  
   const httpServer = createServer(app);
-
+  
   return httpServer;
 }
 
-// Format metadata mapping function
-function getFormatMetadata(format: string): { extension: string; mimeType: string } {
-  const formatMap: Record<string, { extension: string; mimeType: string }> = {
-    'PDF': { extension: 'pdf', mimeType: 'application/pdf' },
-    'Excel': { extension: 'csv', mimeType: 'text/csv' }, // Fixed: CSV format for Excel compatibility
-    'CSV': { extension: 'csv', mimeType: 'text/csv' }
-  };
-  return formatMap[format] || { extension: format.toLowerCase(), mimeType: 'application/octet-stream' };
-}
-
-// Report generation function with proper formatting
-function generateMockReport(reportId: string, format: string, data: any, template?: any): Buffer {
-  switch (format) {
-    case 'PDF':
-      return generatePDFContent(reportId, data, template);
-    case 'Excel':
-      return generateExcelContent(reportId, data, template);
-    case 'CSV':
-      return generateCSVContent(reportId, data, template);
-    default:
-      throw new Error(`Unsupported format: ${format}`);
+// Helper function to convert report data to CSV
+function convertToCSV(reportData: any): string {
+  if (!reportData.data || reportData.data.length === 0) {
+    return 'No data available';
   }
+  
+  // Get headers from first row
+  const headers = Object.keys(reportData.data[0]);
+  let csv = headers.join(',') + '\n';
+  
+  // Add data rows
+  reportData.data.forEach((row: any) => {
+    const values = headers.map(header => {
+      const val = row[header];
+      // Escape values that contain commas or quotes
+      if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    });
+    csv += values.join(',') + '\n';
+  });
+  
+  return csv;
 }
 
-// Generate simple PDF-like content (for demo purposes)
-function generatePDFContent(reportId: string, data: any, template?: any): Buffer {
-  // For a proper implementation, use libraries like PDFKit or Puppeteer
-  // This generates a minimal PDF structure with exact stream length calculation
-  
-  const streamContent = `BT
-/F1 12 Tf
-50 750 Td
-(MARITIME PMS REPORT) Tj
-0 -20 Td
-(Report: ${data.title || reportId}) Tj
-0 -20 Td
-(Generated: ${new Date().toLocaleDateString()}) Tj
-0 -20 Td
-(Vessel: ${data.vessel || 'MV Atlantic Star'}) Tj
-0 -20 Td
-(Records: ${data.metadata?.totalRecords || 0}) Tj
-ET`;
-
-  // Calculate exact stream length (without surrounding whitespace)
-  const streamLength = streamContent.length;
-  
-  const pdfContent = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
-/Resources <<
-/Font <<
-/F1 5 0 R
->>
->>
->>
-endobj
-
-4 0 obj
-<<
-/Length ${streamLength}
->>
-stream
-${streamContent}endstream
-endobj
-
-5 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000010 00000 n 
-0000000079 00000 n 
-0000000173 00000 n 
-0000000301 00000 n 
-0000000380 00000 n 
-trailer
-<<
-/Size 6
-/Root 1 0 R
->>
-startxref
-449
-%%EOF`;
-  
-  return Buffer.from(pdfContent);
-}
-
-// Generate Excel-compatible CSV content (for demo purposes)
-function generateExcelContent(reportId: string, data: any, template?: any): Buffer {
-  // For a proper implementation, use libraries like ExcelJS
-  // This generates CSV that Excel can open
-  let csvContent = `MARITIME PMS REPORT\n`;
-  csvContent += `Report,${data.title || reportId}\n`;
-  csvContent += `Generated,${new Date().toLocaleDateString()}\n`;
-  csvContent += `Vessel,${data.vessel || 'MV Atlantic Star'}\n`;
-  csvContent += `Category,${data.category || 'Unknown'}\n`;
-  csvContent += `Total Records,${data.metadata?.totalRecords || 0}\n\n`;
-  
-  // Add data headers if available
-  if (data.data && data.data.length > 0 && template?.columns) {
-    csvContent += template.columns.map((col: any) => col.header).join(',') + '\n';
-    
-    // Add data rows
-    data.data.forEach((row: any) => {
-      const rowData = template.columns.map((col: any) => {
-        const value = row[col.field] || '';
-        // Escape commas and quotes for CSV
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      });
-      csvContent += rowData.join(',') + '\n';
-    });
-  } else if (data.data && data.data.length > 0) {
-    // Generic data output
-    const headers = Object.keys(data.data[0]);
-    csvContent += headers.join(',') + '\n';
-    
-    data.data.forEach((row: any) => {
-      const rowData = headers.map(header => {
-        const value = row[header] || '';
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      });
-      csvContent += rowData.join(',') + '\n';
-    });
+// Function to generate CSV for spares export
+function generateSparesCSV(spares: any[]): Buffer {
+  if (!spares.length) {
+    return Buffer.from('No data available');
   }
+  
+  // Define headers
+  const headers = [
+    'Part Code', 'Part Name', 'Category', 'Stock Quantity', 
+    'Minimum Quantity', 'Unit', 'Unit Cost', 'Location',
+    'Equipment', 'System', 'Status', 'Notes'
+  ];
+  
+  let csvContent = '# MARITIME PMS - INVENTORY EXPORT\n';
+  csvContent += `# Generated: ${new Date().toLocaleDateString()}\n`;
+  csvContent += `# Total Records: ${spares.length}\n\n`;
+  csvContent += headers.join(',') + '\n';
+  
+  // Add data rows
+  spares.forEach(spare => {
+    const status = spare.stockQuantity <= 0 ? 'Out of Stock' : 
+                  spare.stockQuantity <= spare.minimumQuantity ? 'Low Stock' : 'OK';
+    
+    const rowData = [
+      spare.partCode,
+      spare.partName,
+      spare.category || '',
+      spare.stockQuantity,
+      spare.minimumQuantity,
+      spare.unit || '',
+      spare.unitCost || '',
+      spare.location || '',
+      spare.equipment || '',
+      spare.system || '',
+      status,
+      spare.notes || ''
+    ];
+    
+    // Escape values that contain commas or quotes
+    const escapedRow = rowData.map(value => {
+      if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    });
+    csvContent += escapedRow.join(',') + '\n';
+  });
+  
+  // Add summary at the end
+  const totalValue = spares.reduce((sum, s) => sum + (s.stockQuantity * (s.unitCost || 0)), 0);
+  const lowStockCount = spares.filter(s => s.stockQuantity <= s.minimumQuantity).length;
+  
+  csvContent += '\n\n# SUMMARY\n';
+  csvContent += `# Total Items: ${spares.length}\n`;
+  csvContent += `# Total Value: $${totalValue.toFixed(2)}\n`;
+  csvContent += `# Low Stock Items: ${lowStockCount}\n`;
+  
+  return Buffer.from(csvContent, 'utf-8');
+}
+
+// Function to generate CSV for history export
+function generateHistoryCSV(history: any[]): Buffer {
+  if (!history.length) {
+    return Buffer.from('No transaction history available');
+  }
+  
+  // Define headers
+  const headers = [
+    'Date', 'Type', 'Part Code', 'Part Name', 
+    'Quantity', 'Unit Cost', 'Total Cost', 
+    'Balance After', 'User', 'Reference', 'Notes'
+  ];
+  
+  let csvContent = '# MARITIME PMS - TRANSACTION HISTORY\n';
+  csvContent += `# Generated: ${new Date().toLocaleDateString()}\n`;
+  csvContent += `# Total Transactions: ${history.length}\n\n`;
+  csvContent += headers.join(',') + '\n';
+  
+  // Add data rows
+  history.forEach(transaction => {
+    const rowData = [
+      new Date(transaction.date).toLocaleDateString(),
+      transaction.transactionType,
+      transaction.partCode || '',
+      transaction.partName || '',
+      transaction.quantity,
+      transaction.unitCost || '',
+      transaction.totalCost || '',
+      transaction.balanceAfter,
+      transaction.user || '',
+      transaction.reference || '',
+      transaction.notes || ''
+    ];
+    
+    // Escape values that contain commas or quotes
+    const escapedRow = rowData.map(value => {
+      if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    });
+    csvContent += escapedRow.join(',') + '\n';
+  });
   
   return Buffer.from(csvContent, 'utf-8');
 }
@@ -1471,4 +1312,160 @@ function generateCSVContent(reportId: string, data: any, template?: any): Buffer
   }
   
   return Buffer.from(csvContent, 'utf-8');
+}
+
+// Helper function to get seed defects data
+function getSeedDefectsData() {
+  return [
+    {
+      seedId: "RD-001",
+      vesselName: "MV SEAFARER",
+      issuedDate: "2025-09-15",
+      targetDate: "2025-12-31",
+      status: "open",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Pumps & Valves", type: "Sea Water Pump", make: "DESMI", model: "NSL 200-265" },
+      description: "Sea water pump discharge pressure low on startup.",
+      actionRequested: "Inspect impeller clearance and strainer."
+    },
+    {
+      seedId: "RD-002",
+      vesselName: "MV VOYAGER",
+      issuedDate: "2025-09-28",
+      targetDate: "2025-12-15",
+      status: "open",
+      isCoC: true,
+      source: "SIRE",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Pumps & Valves", type: "Sea Water Pump", make: "DESMI", model: "NSL 200-265" },
+      description: "SW pump vibration noted; suspected bearing wear (CoC).",
+      actionRequested: "Bearing inspection and alignment check."
+    },
+    {
+      seedId: "RD-003",
+      vesselName: "MV OCEANIC",
+      issuedDate: "2025-08-19",
+      targetDate: "2025-10-30",
+      status: "closed",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "2nd Engineer",
+      equipment: { category: "Pumps & Valves", type: "Sea Water Pump", make: "DESMI", model: "NSL 200-265" },
+      description: "Mechanical seal weeping at gland; replaced cartridge.",
+      actionRequested: "Replace seal and run test."
+    },
+    {
+      seedId: "RD-004",
+      vesselName: "MV ATLANTIS",
+      issuedDate: "2025-07-05",
+      targetDate: "2025-09-01",
+      status: "closed",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Pumps & Valves", type: "Sea Water Pump", make: "DESMI", model: "NSL 200-265" },
+      description: "Frequent priming required; suction foot valve suspected.",
+      actionRequested: "Check suction piping and foot valve."
+    },
+    {
+      seedId: "RD-005",
+      vesselName: "MV SEAFARER",
+      issuedDate: "2025-09-15",
+      targetDate: "2025-12-31",
+      status: "open",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Pumps & Valves", type: "Sea Water Pump", make: "DESMI", model: "NSL 200-265" },
+      description: "Sea water pump pressure low during startup.",
+      actionRequested: "Re-check impeller/strainer."
+    },
+    {
+      seedId: "RD-006",
+      vesselName: "MV SEAFARER",
+      issuedDate: "2025-10-01",
+      targetDate: "2025-10-20",
+      status: "open",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Electrical",
+      responsibleRole: "ETO",
+      equipment: { category: "Radar Plant", type: "X-Band", make: "FURUNO", model: "SCNIN-45678X" },
+      description: "X-band radar screen occasionally flickers.",
+      actionRequested: "Inspect power supply and connections."
+    },
+    {
+      seedId: "RD-007",
+      vesselName: "MV VOYAGER",
+      issuedDate: "2025-08-03",
+      targetDate: "2025-09-03",
+      status: "closed",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Generators", type: "Diesel Gen 1", make: "CATERPILLAR", model: "3516C" },
+      description: "DG #1 lube oil cooler leaking; gasket renewed.",
+      actionRequested: "Replace gasket and pressure test."
+    },
+    {
+      seedId: "RD-008",
+      vesselName: "MV OCEANIC",
+      issuedDate: "2025-06-22",
+      targetDate: "2025-07-05",
+      status: "closed",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "2nd Engineer",
+      equipment: { category: "Compressors", type: "Air Compressor", make: "SPERRE", model: "HL2/150" },
+      description: "Compressor auto-drain sticking; replaced valve.",
+      actionRequested: "Replace drain valve and test."
+    },
+    {
+      seedId: "RD-009",
+      vesselName: "MV ATLANTIS",
+      issuedDate: "2025-07-28",
+      targetDate: "2025-08-20",
+      status: "closed",
+      isCoC: false,
+      source: "PSC",
+      defectCategory: "Defect",
+      defectType: "Mechanical",
+      responsibleRole: "Chief Officer",
+      equipment: { category: "Life Saving", type: "Lifeboat Davit", make: "NORSAFE", model: "MB-8" },
+      description: "Port lifeboat davit slewing tight; greased and adjusted.",
+      actionRequested: "Service slewing bearings."
+    },
+    {
+      seedId: "RD-010",
+      vesselName: "MV SEAFARER",
+      issuedDate: "2025-05-30",
+      targetDate: "2025-06-15",
+      status: "closed",
+      isCoC: false,
+      source: "Ship",
+      defectCategory: "Defect",
+      defectType: "Hydraulic",
+      responsibleRole: "Chief Engineer",
+      equipment: { category: "Steering Gear", type: "Rudder Actuator", make: "TENFJORD", model: "TG-XX" },
+      description: "Minor hydraulic seepage at actuator manifold; o-rings renewed.",
+      actionRequested: "Replace O-rings and pressure test."
+    }
+  ];
 }

@@ -228,6 +228,11 @@ export interface IStorage {
   calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null>;
   getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]>;
   getDefectsForRecurring(recurringId: number): Promise<Defect[]>;
+  
+  // Seed helper methods
+  getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
+  getVesselIdByName(vesselName: string): Promise<string | undefined>;
+  createVessel(vessel: { id: string; name: string; type: string }): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure

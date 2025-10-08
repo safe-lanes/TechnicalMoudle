@@ -1962,4 +1962,29 @@ export class PersistentFileStorage implements IStorage {
     const defectIds = links.map(link => link.defectId);
     return defectIds.map(id => this.data.defects[id]).filter(d => d !== undefined);
   }
+
+  // Seed helper methods
+  async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
+    return Object.values(this.data.defects).find(d => d.seedId === seedId);
+  }
+
+  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+    // For now, we just check if vessel exists in defects and work orders
+    // In production, this would check a vessels table
+    const existingDefect = Object.values(this.data.defects).find(d => d.vesselName === vesselName);
+    if (existingDefect) return existingDefect.vesselId;
+    
+    const existingWorkOrder = Object.values(this.data.workOrders).find(wo => wo.vesselId === vesselName);
+    if (existingWorkOrder) return existingWorkOrder.vesselId;
+    
+    return undefined;
+  }
+
+  async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
+    // For now, vessels are implicit in our data model
+    // We just ensure the vessel exists by creating a placeholder spare entry
+    // In production, this would add to a vessels table
+    // Nothing to do for now - vessel will be created implicitly when first defect is added
+    return;
+  }
 }

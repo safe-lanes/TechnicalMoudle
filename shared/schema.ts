@@ -542,6 +542,9 @@ export const defects = pgTable("defects", {
   
   // NEW FIELDS FOR DEFECT MODULE ENHANCEMENTS
   
+  // Seed tracking for dev/test data
+  seedId: text("seed_id"), // For idempotent seeding of test data
+  
   // Recurring Defects tracking
   equipment_key: text("equipment_key"), // Normalized key for tracking same equipment
   
