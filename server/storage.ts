@@ -72,6 +72,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getUsers(): Promise<User[]>;
   
   // Running Hours methods
   getComponents(vesselId: string): Promise<Component[]>;

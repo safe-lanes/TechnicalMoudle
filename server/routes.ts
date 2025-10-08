@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from "@shared/schema";
 import { z } from "zod";
-import bulkRoutes from "./routes/bulk";
-import alertRoutes from "./routes/alerts";
-import formRoutes from "./routes/forms";
+import bulkRouter from "./routes/bulk";
+import alertRouter from "./routes/alerts";
+import formRouter from "./routes/forms";
 import createChangeRequestsRouter from "./routes/changeRequests";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -933,13 +933,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Register bulk routes
-  bulkRoutes(app);
+  app.use("/api/bulk", bulkRouter);
   
   // Register alert routes
-  alertRoutes(app);
+  app.use("/api/alerts", alertRouter);
   
   // Register form routes
-  formRoutes(app);
+  app.use("/api/forms", formRouter);
   
   // Mount the Change Requests router  
   const changeRequestsRouter = createChangeRequestsRouter(storage);

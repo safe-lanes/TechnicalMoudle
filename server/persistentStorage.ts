@@ -546,6 +546,10 @@ export class PersistentFileStorage implements IStorage {
     return Object.values(this.data.users).find(user => user.username === username);
   }
 
+  async getUsers(): Promise<User[]> {
+    return Object.values(this.data.users);
+  }
+
   async createUser(user: InsertUser): Promise<User> {
     const id = this.data.counters.userId++;
     const newUser: User = { ...user, id };
