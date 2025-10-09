@@ -1,0 +1,141 @@
+Here’s a clean, self-contained prompt you can paste to Replit to seed **10 defects** that exercise the **Recurring Defects** feature (same equipment across mixed vessels), while keeping everything **persisted** and visible in the UI.
+
+---
+
+## 🚀 Task: Seed 10 defects to validate **Recurring Defects** (with persistence)
+
+### Objectives
+
+1. **Create 10 defects** in the defects table using persistent storage.
+2. Ensure **at least 5 defects share the same equipment key** (same `equipmentCategory + type + make + model`) so they appear under **Recurring Defects**.
+3. Mix of:
+
+   * Same equipment across **different vessels** and **same vessel**.
+   * Open/Closed statuses.
+   * A couple with **CoC = true** to validate the CoC filter.
+4. Confirm they render under:
+
+   * **Defects › Active** (open)
+   * **Defects › Resolved** (closed)
+   * **Sidebar › Recurring Defects** (grouped by equipment key)
+   * **Sidebar › CoC** (only CoC=true)
+5. Use **idempotent seeding** (upsert by `seedId`) so re-running does not duplicate.
+
+### Data model rules to follow (same as earlier Q&A)
+
+* Vessels: upsert by **name**; create if not found, return `vesselId`.
+* Dates: store **ISO (`YYYY-MM-DD`)**; UI can format to `DD-MM-YYYY`.
+* Status: store lowercase `'open' | 'closed'`; UI can title-case.
+* Equipment key (for recurring):
+  `equipment_key = normalize(category|type|make|model)` (lowercase, trimmed, collapse spaces).
+* Defaults if missing:
+  `severity="2 - Minor"`, `priority="Medium"`, `occurrenceType="Routine"`, `operationCondition="Sailing"`, `isCoC=false`.
+* Add `seedId` (unique) to each seeded defect and **upsert on seedId**.
+
+### Seed dataset (10 items)
+
+> Use these as the source; map `vesselName`→`vesselId` via upsert-by-name.
+
+**Recurring group A (5 items):** *category=“Pumps & Valves”, type=“Sea Water Pump”, make=“KSB”, model=“SWP-200”*
+These five must collapse to the **same equipment_key** and show as **Recurring**.
+
+1. `seedId: RD-A-001`
+   vesselName: `MV SEAFARER`
+   issueDate: `2025-09-15`
+   targetDateForClosure: `2025-10-15`
+   status: `open`
+   description: `Sea water pump vibration observed on ME cooling line.`
+   equipment: {category: `Pumps & Valves`, type: `Sea Water Pump`, make: `KSB`, model: `SWP-200`}
+   isCoC: `false`
+
+2. `RD-A-002` – vessel: `MV SEAFARER` (same vessel)
+   issueDate: `2025-09-28` • status: `closed` • dateCompleted: `2025-10-01`
+   description: `SWP-200 mechanical seal leakage.`
+   same equipment; isCoC: `false`
+
+3. `RD-A-003` – vessel: `MV VOYAGER` (different vessel)
+   issueDate: `2025-10-03` • status: `open`
+   description: `High bearing temperature on SWP-200.`
+   same equipment; isCoC: `true`
+
+4. `RD-A-004` – vessel: `MV OCEANIC`
+   issueDate: `2025-10-05` • status: `open`
+   description: `Abnormal noise from SWP-200 casing.`
+   same equipment; isCoC: `false`
+
+5. `RD-A-005` – vessel: `MV SEAFARER`
+   issueDate: `2025-10-06` • status: `closed` • dateCompleted: `2025-10-07`
+   description: `SWP-200 coupling misalignment.`
+   same equipment; isCoC: `false`
+
+**Non-recurring (5 items):** different equipment keys
+
+6. `RD-B-001`
+   vesselName: `MV SEAFARER`
+   equipment: {category: `Navigation`, type: `Radar`, make: `Furuno`, model: `FR-2137S`}
+   issueDate: `2025-09-20` • status: `open`
+   description: `X-band radar intermittent blanking.`
+   isCoC: `true`
+
+7. `RD-C-001`
+   vesselName: `MV VOYAGER`
+   equipment: {category: `Electrical`, type: `Generator AVR`, make: `Stamford`, model: `SX460`}
+   issueDate: `2025-09-22` • status: `closed` • dateCompleted: `2025-09-25`
+   description: `DG AVR trip during load step.`
+
+8. `RD-D-001`
+   vesselName: `MV OCEANIC`
+   equipment: {category: `Machinery`, type: `Air Compressor`, make: `Atlas Copco`, model: `GA-30`}
+   issueDate: `2025-10-01` • status: `open`
+   description: `Compressor fails to reach cut-out pressure.`
+
+9. `RD-E-001`
+   vesselName: `MV SEAFARER`
+   equipment: {category: `Deck Equipment`, type: `Windlass`, make: `MacGregor`, model: `WL-90`}
+   issueDate: `2025-10-02` • status: `open`
+   description: `Port windlass brake slipping at test load.`
+
+10. `RD-F-001`
+    vesselName: `MV VOYAGER`
+    equipment: {category: `Steering`, type: `Steering Gear`, make: `Kawasaki`, model: `KS-45`}
+    issueDate: `2025-10-03` • status: `closed` • dateCompleted: `2025-10-04`
+    description: `Hydraulic leak at return manifold.`
+
+### What to build/check
+
+1. **Seeder**
+
+   * Upsert vessels by name; get `vesselId`.
+   * Build `equipment_key` for each item.
+   * Upsert defects by `seedId` (unique).
+   * Persist to the project’s database (not in-memory).
+     If using SQLite: `db/defects.sqlite` with tables `vessels`, `defects` and necessary indices:
+
+     * `UNIQUE(seedId)` on `defects`
+     * `INDEX(equipment_key, status)` for fast recurring queries.
+
+2. **UI verification**
+
+   * **Defects › Active** shows items with `status='open'`.
+   * **Defects › Resolved** shows items with `status='closed'`.
+   * **Sidebar › CoC** shows items with `isCoC=true` (e.g., `RD-A-003`, `RD-B-001`).
+   * **Sidebar › Recurring Defects** groups by `equipment_key` and lists at least one **group** with **count ≥ 2**:
+
+     * Expect “Pumps & Valves / Sea Water Pump / KSB / SWP-200” group with **5 records** (`RD-A-001 … RD-A-005`).
+   * Each list row’s **action buttons** (View, Edit, Add Note, Link, Close) must operate on these seeded records and persist changes.
+
+3. **Acceptance checks**
+
+   * Re-run seeder → **no duplicates** (idempotent via `seedId`).
+   * Closing an open record moves it from **Active** to **Resolved** immediately after refresh.
+   * **Recurring** page still shows the SWP-200 group with updated counts.
+   * **CoC** page shows only those with `isCoC=true`.
+
+### Notes
+
+* Use the existing form/view components—this task is just to **seed** and **verify** persistence and the **recurring detection** behavior.
+* If any schema fields are required but absent above, apply sensible defaults as previously agreed (`severity`, `priority`, etc.).
+
+---
+
+If you need me to tweak equipment names, add more CoC samples, or change status mixes, tell me and I’ll adjust the seed set.
