@@ -972,13 +972,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recurring-defects", async (req, res) => {
     try {
       const filters = {
-        windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : undefined,
-        minOccurrences: req.query.minOccurrences ? parseInt(req.query.minOccurrences as string) : undefined,
+        windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : 12,
+        minOccurrences: req.query.minOccurrences ? parseInt(req.query.minOccurrences as string) : 2,
         hasCoc: req.query.hasCoc === 'true' ? true : req.query.hasCoc === 'false' ? false : undefined,
         equipmentKey: req.query.equipmentKey as string
       };
       
-      const recurringDefects = await storage.getRecurringDefects(filters);
+      // First check if we have any recurring defects calculated
+      let recurringDefects = await storage.getRecurringDefects(filters);
+      
+      // If no recurring defects exist, calculate them from the defects data
+      if (recurringDefects.length === 0) {
+        // Get all unique equipment keys from defects
+        const allDefects = await storage.getDefects({ includeClosedDefects: true });
+        const equipmentKeys = new Set<string>();
+        
+        for (const defect of allDefects) {
+          if (defect.equipment_key) {
+            equipmentKeys.add(defect.equipment_key);
+          }
+        }
+        
+        // Calculate recurring defects for each unique equipment key
+        for (const equipmentKey of equipmentKeys) {
+          await storage.calculateAndUpdateRecurringDefects(equipmentKey, filters.windowMonths);
+        }
+        
+        // Now fetch the calculated recurring defects
+        recurringDefects = await storage.getRecurringDefects(filters);
+      }
+      
       res.json(recurringDefects);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch recurring defects" });
