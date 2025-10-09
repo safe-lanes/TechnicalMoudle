@@ -106,6 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFrom: req.query.dateFrom as string,
         dateTo: req.query.dateTo as string,
         search: req.query.search as string,
+        includeClosedDefects: req.query.includeClosedDefects === 'true',
       };
       
       const defects = await storage.getDefects(filters);
@@ -1056,7 +1057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           
           // Map seed data to our defect schema
-          const defectData = {
+          const defectData: any = {
             vesselId,
             vesselName: seedDefect.vesselName,
             issueDate: convertDate(seedDefect.issuedDate),
@@ -1083,6 +1084,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operatingCondition: 'Sailing',
             reportedBy: 'System',
           };
+          
+          // Add dateCompleted for closed defects
+          if (seedDefect.status === 'closed' && seedDefect.dateCompleted) {
+            defectData.dateCompleted = convertDate(seedDefect.dateCompleted);
+          }
           
           // Check if defect with this seedId exists
           const existing = await storage.getDefectBySeedId(seedDefect.seedId);

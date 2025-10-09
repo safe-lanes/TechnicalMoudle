@@ -617,6 +617,7 @@ export const defects = pgTable("defects", {
 }));
 
 export const insertDefectSchema = createInsertSchema(defects).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });
