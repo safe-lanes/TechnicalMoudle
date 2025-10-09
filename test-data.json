@@ -2917,8 +2917,20 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "1": {
-      "id": 1,
+    "2": {
+      "id": 2,
+      "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "windowMonths": 6,
+      "occurrenceCount": 2,
+      "openCount": 1,
+      "vesselsAffected": 2,
+      "lastOccurrenceDate": "06-10-2025",
+      "hasCoc": false,
+      "mtbfDays": "31",
+      "updatedAt": "2025-10-09T08:53:03.653Z"
+    },
+    "3": {
+      "id": 3,
       "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
       "windowMonths": 12,
       "occurrenceCount": 3,
@@ -2927,7 +2939,55 @@
       "lastOccurrenceDate": "06-10-2025",
       "hasCoc": true,
       "mtbfDays": "46",
-      "updatedAt": "2025-10-09T07:23:07.106Z"
+      "updatedAt": "2025-10-09T08:53:03.656Z"
+    },
+    "4": {
+      "id": 4,
+      "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "windowMonths": 24,
+      "occurrenceCount": 3,
+      "openCount": 2,
+      "vesselsAffected": 3,
+      "lastOccurrenceDate": "06-10-2025",
+      "hasCoc": true,
+      "mtbfDays": "46",
+      "updatedAt": "2025-10-09T08:53:03.658Z"
+    },
+    "5": {
+      "id": 5,
+      "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "windowMonths": 36,
+      "occurrenceCount": 3,
+      "openCount": 2,
+      "vesselsAffected": 3,
+      "lastOccurrenceDate": "06-10-2025",
+      "hasCoc": true,
+      "mtbfDays": "46",
+      "updatedAt": "2025-10-09T08:53:03.660Z"
+    },
+    "6": {
+      "id": 6,
+      "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "windowMonths": 48,
+      "occurrenceCount": 3,
+      "openCount": 2,
+      "vesselsAffected": 3,
+      "lastOccurrenceDate": "06-10-2025",
+      "hasCoc": true,
+      "mtbfDays": "46",
+      "updatedAt": "2025-10-09T08:53:03.662Z"
+    },
+    "7": {
+      "id": 7,
+      "equipmentKey": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "windowMonths": 60,
+      "occurrenceCount": 3,
+      "openCount": 2,
+      "vesselsAffected": 3,
+      "lastOccurrenceDate": "06-10-2025",
+      "hasCoc": true,
+      "mtbfDays": "46",
+      "updatedAt": "2025-10-09T08:53:03.665Z"
     }
   },
   "recurringDefectLinks": [
@@ -3022,6 +3082,74 @@
     {
       "recurringId": 1,
       "defectId": "76"
+    },
+    {
+      "recurringId": 2,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 2,
+      "defectId": "76"
+    },
+    {
+      "recurringId": 3,
+      "defectId": "74"
+    },
+    {
+      "recurringId": 3,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 3,
+      "defectId": "76"
+    },
+    {
+      "recurringId": 4,
+      "defectId": "74"
+    },
+    {
+      "recurringId": 4,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 4,
+      "defectId": "76"
+    },
+    {
+      "recurringId": 5,
+      "defectId": "74"
+    },
+    {
+      "recurringId": 5,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 5,
+      "defectId": "76"
+    },
+    {
+      "recurringId": 6,
+      "defectId": "74"
+    },
+    {
+      "recurringId": 6,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 6,
+      "defectId": "76"
+    },
+    {
+      "recurringId": 7,
+      "defectId": "74"
+    },
+    {
+      "recurringId": 7,
+      "defectId": "75"
+    },
+    {
+      "recurringId": 7,
+      "defectId": "76"
     }
   ],
   "counters": {
@@ -3042,6 +3170,6 @@
     "defectId": 94,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 2
+    "recurringDefectId": 8
   }
 }
