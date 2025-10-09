@@ -1806,7 +1806,9 @@ export class PersistentFileStorage implements IStorage {
     
     if (filters) {
       if (filters.windowMonths !== undefined) {
-        recurringDefects = recurringDefects.filter(r => r.windowMonths === filters.windowMonths);
+        // Show recurring defects calculated for the requested window or smaller windows
+        // (a defect recurring in 12 months also recurs in 24 months)
+        recurringDefects = recurringDefects.filter(r => r.windowMonths <= filters.windowMonths);
       }
       if (filters.minOccurrences !== undefined) {
         recurringDefects = recurringDefects.filter(r => r.occurrenceCount >= filters.minOccurrences);
