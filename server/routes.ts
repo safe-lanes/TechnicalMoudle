@@ -978,11 +978,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         equipmentKey: req.query.equipmentKey as string
       };
       
-      // First check if we have any recurring defects calculated
-      let recurringDefects = await storage.getRecurringDefects(filters);
+      // Check if ANY recurring defects exist at all (without filters)
+      const allRecurringDefects = await storage.getRecurringDefects();
       
-      // If no recurring defects exist, calculate them from the defects data
-      if (recurringDefects.length === 0) {
+      // If no recurring defects have been calculated yet, calculate them for all time windows
+      if (allRecurringDefects.length === 0) {
         // Get all unique equipment keys from defects
         const allDefects = await storage.getDefects({ includeClosedDefects: true });
         const equipmentKeys = new Set<string>();
@@ -993,15 +993,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Calculate recurring defects for each unique equipment key
-        for (const equipmentKey of equipmentKeys) {
-          await storage.calculateAndUpdateRecurringDefects(equipmentKey, filters.windowMonths);
-        }
+        // Calculate recurring defects for multiple time windows
+        const timeWindows = [6, 12, 24, 36, 48, 60]; // 6 months to 5 years
         
-        // Now fetch the calculated recurring defects
-        recurringDefects = await storage.getRecurringDefects(filters);
+        for (const equipmentKey of equipmentKeys) {
+          for (const windowMonths of timeWindows) {
+            await storage.calculateAndUpdateRecurringDefects(equipmentKey, windowMonths);
+          }
+        }
       }
       
+      // Now fetch the recurring defects with the requested filters
+      const recurringDefects = await storage.getRecurringDefects(filters);
       res.json(recurringDefects);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch recurring defects" });
