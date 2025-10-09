@@ -98,11 +98,22 @@ export default function RecurringDefects() {
 
   // Load defects for selected recurring defect
   const loadDefectsForRecurring = async (recurringId: number) => {
-    const defects = await apiRequest("GET", `/api/recurring-defects/${recurringId}/defects`);
-    const recurring = recurringDefects.find(r => r.id === recurringId);
-    if (recurring) {
-      setSelectedRecurring({ ...recurring, defects });
-      setShowDrillDown(true);
+    try {
+      const response = await apiRequest("GET", `/api/recurring-defects/${recurringId}/defects`);
+      const defects = await response.json();
+      const recurring = recurringDefects.find(r => r.id === recurringId);
+      if (recurring) {
+        setSelectedRecurring({ ...recurring, defects: Array.isArray(defects) ? defects : [] });
+        setShowDrillDown(true);
+      }
+    } catch (error) {
+      console.error("Failed to load defects for recurring pattern:", error);
+      // Show the drill down panel without detailed defects
+      const recurring = recurringDefects.find(r => r.id === recurringId);
+      if (recurring) {
+        setSelectedRecurring({ ...recurring, defects: [] });
+        setShowDrillDown(true);
+      }
     }
   };
 
