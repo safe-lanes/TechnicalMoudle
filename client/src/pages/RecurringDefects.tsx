@@ -180,7 +180,10 @@ export default function RecurringDefects() {
               <SelectContent>
                 <SelectItem value="6">6 Months</SelectItem>
                 <SelectItem value="12">12 Months</SelectItem>
-                <SelectItem value="24">24 Months</SelectItem>
+                <SelectItem value="24">2 Years</SelectItem>
+                <SelectItem value="36">3 Years</SelectItem>
+                <SelectItem value="48">4 Years</SelectItem>
+                <SelectItem value="60">5 Years</SelectItem>
               </SelectContent>
             </Select>
           </div>
