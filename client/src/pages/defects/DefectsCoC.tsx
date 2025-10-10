@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Plus, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import DefectFormExact from "./DefectFormExact";
+import CloseDefectModal from "./CloseDefectModal";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
@@ -28,6 +29,10 @@ export default function DefectsCoC() {
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
   const [activeTab, setActiveTab] = useState("Active");
+  const [closeModal, setCloseModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
 
   // Get CoC defects only
   const { data: allDefects = [], isLoading } = useQuery({
@@ -132,59 +137,8 @@ export default function DefectsCoC() {
     setShowNewDefectForm(true);
   };
 
-  // Mutation for closing defects
-  const closeDefectMutation = useMutation({
-    mutationFn: async (defectId: string) => {
-      const response = await fetch(`/api/defects/${defectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Closed', dateCompleted: new Date().toISOString().split('T')[0] })
-      });
-      if (!response.ok) throw new Error('Failed to close CoC defect');
-      return response.json();
-    },
-    onSuccess: (data, defectId) => {
-      // Invalidate both the general defects query and the CoC-specific query
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
-      // Also invalidate the query with is_coc filter to ensure CoC page updates
-      queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const queryKey = query.queryKey;
-          return Array.isArray(queryKey) && 
-                 queryKey[0] === '/api/defects' && 
-                 queryKey[1] && 
-                 typeof queryKey[1] === 'object' && 
-                 'is_coc' in queryKey[1];
-        }
-      });
-      
-      toast({
-        title: "CoC Defect Closed Successfully",
-        description: `CoC defect ${defectId} has been closed and moved to the Resolved tab.`,
-        action: (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setActiveTab("Resolved")}
-          >
-            View in Resolved
-          </Button>
-        ),
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to close the CoC defect. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
   const handleCloseDefect = (defectId: string) => {
-    if (confirm('Are you sure you want to close this CoC defect?')) {
-      closeDefectMutation.mutate(defectId);
-    }
+    setCloseModal({ open: true, defectId });
   };
 
   return (
@@ -528,6 +482,42 @@ export default function DefectsCoC() {
           </div>
         )}
       </div>
+      
+      {/* Close Defect Modal */}
+      {closeModal.defectId && (
+        <CloseDefectModal
+          open={closeModal.open}
+          onClose={() => {
+            setCloseModal({ open: false, defectId: null });
+            // Refresh the CoC defects after successful closure
+            queryClient.invalidateQueries({ 
+              predicate: (query) => {
+                const queryKey = query.queryKey;
+                return Array.isArray(queryKey) && 
+                       queryKey[0] === '/api/defects' && 
+                       queryKey[1] && 
+                       typeof queryKey[1] === 'object' && 
+                       'is_coc' in queryKey[1];
+              }
+            });
+            // Show success notification and switch to resolved tab
+            toast({
+              title: "CoC Defect Closed Successfully",
+              description: `CoC defect has been closed and moved to the Resolved tab.`,
+              action: (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setActiveTab("Resolved")}
+                >
+                  View in Resolved
+                </Button>
+              ),
+            });
+          }}
+          defectId={closeModal.defectId}
+        />
+      )}
     </div>
   );
 }
