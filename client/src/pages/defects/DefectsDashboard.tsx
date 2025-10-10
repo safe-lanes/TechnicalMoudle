@@ -97,15 +97,23 @@ export default function DefectsDashboard() {
     totalActive: defects.filter(d => d.status === 'Open').length,
     resolvedThisMonth: defects.filter(d => {
       if (d.status !== 'Closed' || !d.dateCompleted) return false;
-      const completedDate = parseISO(d.dateCompleted);
-      const monthStart = startOfMonth(new Date());
-      const monthEnd = endOfMonth(new Date());
-      return completedDate >= monthStart && completedDate <= monthEnd;
+      try {
+        const completedDate = parseISO(d.dateCompleted);
+        const monthStart = startOfMonth(new Date());
+        const monthEnd = endOfMonth(new Date());
+        return completedDate >= monthStart && completedDate <= monthEnd;
+      } catch {
+        return false;
+      }
     }).length,
     conditionOfClass: defects.filter(d => d.is_coc && d.status === 'Open').length,
     overdueDefects: defects.filter(d => {
       if (d.status !== 'Open' || !d.targetCloseDate) return false;
-      return isAfter(new Date(), parseISO(d.targetCloseDate));
+      try {
+        return isAfter(new Date(), parseISO(d.targetCloseDate));
+      } catch {
+        return false;
+      }
     }).length
   };
 
@@ -413,13 +421,29 @@ export default function DefectsDashboard() {
                         <span>{defect.description}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{defect.issueDate ? format(parseISO(defect.issueDate), 'dd-MM-yyyy') : '-'}</TableCell>
                     <TableCell>
-                      {defect.targetCloseDate ? (
-                        <span className={isAfter(new Date(), parseISO(defect.targetCloseDate)) ? 'text-red-600' : ''}>
-                          {format(parseISO(defect.targetCloseDate), 'dd-MM-yyyy')}
-                        </span>
-                      ) : '-'}
+                      {(() => {
+                        try {
+                          return defect.issueDate ? format(parseISO(defect.issueDate), 'dd-MM-yyyy') : '-';
+                        } catch {
+                          return '-';
+                        }
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        try {
+                          if (!defect.targetCloseDate) return '-';
+                          const targetDate = parseISO(defect.targetCloseDate);
+                          return (
+                            <span className={isAfter(new Date(), targetDate) ? 'text-red-600' : ''}>
+                              {format(targetDate, 'dd-MM-yyyy')}
+                            </span>
+                          );
+                        } catch {
+                          return '-';
+                        }
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant={defect.status === 'Open' ? 'destructive' : 'secondary'}>
