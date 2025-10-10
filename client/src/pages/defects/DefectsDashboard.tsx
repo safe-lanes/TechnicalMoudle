@@ -20,7 +20,7 @@ import {
   WrenchIcon,
   XCircle
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, isAfter, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval } from "date-fns";
 import type { Defect } from "@shared/schema";
 import {
   PieChart,
@@ -92,10 +92,49 @@ export default function DefectsDashboard() {
     queryKey: ['/api/defects'],
   });
 
-  // Calculate KPIs
+  // Apply date range filter
+  const getDateRangeStart = () => {
+    const now = new Date();
+    switch (dateRange) {
+      case 'last7days':
+        return subDays(now, 7);
+      case 'last30days':
+        return subDays(now, 30);
+      case 'last90days':
+        return subDays(now, 90);
+      case 'thisyear':
+        return startOfYear(now);
+      default:
+        return subDays(now, 30); // Default to last 30 days
+    }
+  };
+
+  // Filter defects by vessel and date range
+  const filteredDefects = defects.filter(d => {
+    // Vessel filter
+    if (selectedVessel !== 'all' && d.vesselId !== selectedVessel) {
+      return false;
+    }
+    
+    // Date range filter (based on issue date)
+    if (d.issueDate) {
+      try {
+        const issueDate = parseISO(d.issueDate);
+        const rangeStart = getDateRangeStart();
+        const rangeEnd = new Date();
+        return isWithinInterval(issueDate, { start: rangeStart, end: rangeEnd });
+      } catch {
+        return true; // Include if date parsing fails
+      }
+    }
+    
+    return true; // Include defects without issue date
+  });
+
+  // Calculate KPIs based on filtered defects
   const kpis = {
-    totalActive: defects.filter(d => d.status === 'Open').length,
-    resolvedThisMonth: defects.filter(d => {
+    totalActive: filteredDefects.filter(d => d.status === 'Open').length,
+    resolvedThisMonth: filteredDefects.filter(d => {
       if (d.status !== 'Closed' || !d.dateCompleted) return false;
       try {
         const completedDate = parseISO(d.dateCompleted);
@@ -106,8 +145,8 @@ export default function DefectsDashboard() {
         return false;
       }
     }).length,
-    conditionOfClass: defects.filter(d => d.is_coc && d.status === 'Open').length,
-    overdueDefects: defects.filter(d => {
+    conditionOfClass: filteredDefects.filter(d => d.is_coc && d.status === 'Open').length,
+    overdueDefects: filteredDefects.filter(d => {
       if (d.status !== 'Open' || !d.targetCloseDate) return false;
       try {
         return isAfter(new Date(), parseISO(d.targetCloseDate));
@@ -116,11 +155,6 @@ export default function DefectsDashboard() {
       }
     }).length
   };
-
-  // Filter defects by vessel
-  const filteredDefects = defects.filter(d => 
-    selectedVessel === 'all' || d.vesselId === selectedVessel
-  );
 
   // Get unique vessels
   const vessels = Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean);
@@ -134,12 +168,12 @@ export default function DefectsDashboard() {
 
   const vesselData = vessels.map(vessel => ({
     vessel,
-    open: defects.filter(d => d.vesselId === vessel && d.status === 'Open').length,
-    closed: defects.filter(d => d.vesselId === vessel && d.status === 'Closed').length
+    open: filteredDefects.filter(d => d.vesselId === vessel && d.status === 'Open').length,
+    closed: filteredDefects.filter(d => d.vesselId === vessel && d.status === 'Closed').length
   }));
 
-  // Recent defects (last 5)
-  const recentDefects = [...defects]
+  // Recent defects (last 5) from filtered data
+  const recentDefects = [...filteredDefects]
     .filter(d => d.status === 'Open')
     .sort((a, b) => {
       if (!a.issueDate || !b.issueDate) return 0;
@@ -153,7 +187,17 @@ export default function DefectsDashboard() {
   };
 
   const navigateToDefectLog = (filter?: string) => {
-    window.location.href = `/defects/log${filter ? `?filter=${filter}` : ''}`;
+    // Pass current vessel and date range filters along with specific filter
+    const params = new URLSearchParams();
+    if (selectedVessel !== 'all') {
+      params.append('vessel', selectedVessel);
+    }
+    params.append('dateRange', dateRange);
+    if (filter) {
+      params.append('filter', filter);
+    }
+    const queryString = params.toString();
+    window.location.href = `/defects/defect-log${queryString ? `?${queryString}` : ''}`;
   };
 
   return (
@@ -183,38 +227,55 @@ export default function DefectsDashboard() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Ship className="h-4 w-4 text-gray-500" />
-            <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vessels</SelectItem>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel} value={vessel}>
-                    {vessel}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Ship className="h-4 w-4 text-gray-500" />
+              <Select value={selectedVessel} onValueChange={setSelectedVessel}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select vessel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vessels</SelectItem>
+                  {vessels.map(vessel => (
+                    <SelectItem key={vessel} value={vessel}>
+                      {vessel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last7days">Last 7 Days</SelectItem>
+                  <SelectItem value="last30days">Last 30 Days</SelectItem>
+                  <SelectItem value="last90days">Last 90 Days</SelectItem>
+                  <SelectItem value="thisyear">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="last7days">Last 7 Days</SelectItem>
-                <SelectItem value="last30days">Last 30 Days</SelectItem>
-                <SelectItem value="last90days">Last 90 Days</SelectItem>
-                <SelectItem value="thisyear">This Year</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {(selectedVessel !== 'all' || dateRange !== 'last30days') && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedVessel('all');
+                setDateRange('last30days');
+              }}
+              className="flex items-center space-x-2"
+            >
+              <XCircle className="h-4 w-4" />
+              <span>Clear Filters</span>
+            </Button>
+          )}
         </div>
       </div>
 
