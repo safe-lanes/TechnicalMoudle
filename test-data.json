@@ -204,7 +204,9 @@
       "remarks": null,
       "createdAt": "2025-10-03T09:11:59.896Z",
       "updatedAt": "2025-10-06T08:07:35.628Z",
-      "is_coc": false
+      "is_coc": false,
+      "targetCloseDate": "08-09-2019",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "2": {
       "id": "2",
@@ -214,7 +216,7 @@
       "category": "COC",
       "defectType": "Routine",
       "description": "Port anchor windlass brake issue - EDITED",
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Repaired electrical connections and replaced damaged wiring",
       "targetDate": null,
       "dateCompleted": "2025-10-07",
       "status": "Closed",
@@ -274,7 +276,8 @@
       "portReport": false,
       "reportReferenceNo": "",
       "reportDate": "",
-      "is_coc": true
+      "is_coc": true,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "3": {
       "id": "3",
@@ -313,7 +316,7 @@
       "createdAt": "2025-10-03T09:29:26.154Z",
       "updatedAt": "2025-10-07T05:56:48.522Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Cleaned and overhauled the system, replaced worn seals and gaskets",
       "holdReason": null,
       "nextReviewDate": null,
       "defermentReason": null,
@@ -323,7 +326,9 @@
       "raisedByUserId": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "is_coc": false
+      "is_coc": false,
+      "targetCloseDate": "10-10-2025",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "4": {
       "id": "4",
@@ -334,7 +339,7 @@
       "defectType": "",
       "description": "Persistence test defect P_jSqaeX",
       "targetDate": null,
-      "dateCompleted": null,
+      "dateCompleted": "07-10-2025",
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
@@ -361,7 +366,7 @@
       "createdAt": "2025-10-03T12:10:55.092Z",
       "updatedAt": "2025-10-07T07:48:03.285Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Performed complete maintenance and calibration as per manufacturer specifications",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
@@ -387,7 +392,8 @@
           }
         }
       ],
-      "is_coc": false
+      "is_coc": false,
+      "targetCloseDate": "10-10-2025"
     },
     "5": {
       "id": "5",
@@ -398,7 +404,7 @@
       "defectType": "",
       "description": "PERSIST-TEST-aIKpKDc3",
       "targetDate": null,
-      "dateCompleted": null,
+      "dateCompleted": "09-10-2025",
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
@@ -425,7 +431,7 @@
       "createdAt": "2025-10-03T12:45:53.326Z",
       "updatedAt": "2025-10-09T05:48:03.683Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Performed alignment check and corrected misalignment issues",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
@@ -451,7 +457,8 @@
             "comment": "test"
           }
         }
-      ]
+      ],
+      "targetCloseDate": "10-10-2025"
     },
     "6": {
       "id": "6",
@@ -461,7 +468,7 @@
       "category": "Defect",
       "defectType": "",
       "description": "Test defect created by automated test",
-      "targetCloseDate": null,
+      "targetCloseDate": "NaN-NaN-NaN",
       "dateCompleted": "2025-10-09",
       "status": "Closed",
       "priority": "Medium",
@@ -507,13 +514,14 @@
       "createdAt": "2025-10-06T06:56:55.804Z",
       "updatedAt": "2025-10-09T05:52:33.891Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "is_coc": false
+      "is_coc": false,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "7": {
       "id": "7",
@@ -588,12 +596,13 @@
       "createdAt": "2025-10-06T07:41:27.991Z",
       "updatedAt": "2025-10-07T06:03:10.677Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "is_coc": false
+      "is_coc": false,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "8": {
       "id": "8",
@@ -603,8 +612,8 @@
       "category": "Defect",
       "defectType": "",
       "description": "test",
-      "targetCloseDate": null,
-      "dateCompleted": null,
+      "targetCloseDate": "NaN-NaN-NaN",
+      "dateCompleted": "09-10-2025",
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
@@ -649,7 +658,7 @@
       "createdAt": "2025-10-06T07:41:52.093Z",
       "updatedAt": "2025-10-09T05:50:09.615Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
@@ -789,12 +798,13 @@
       "createdAt": "2025-10-07T05:23:10.989Z",
       "updatedAt": "2025-10-07T05:24:31.231Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Applied temporary repair pending permanent solution during next dry dock",
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "is_coc": false
+      "is_coc": false,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "11": {
       "id": "11",
@@ -804,8 +814,8 @@
       "category": "Defect",
       "defectType": "",
       "description": "Test Defect oMNdH9",
-      "targetCloseDate": null,
-      "dateCompleted": null,
+      "targetCloseDate": "NaN-NaN-NaN",
+      "dateCompleted": "NaN-NaN-NaN",
       "status": "Closed",
       "priority": "Medium",
       "critical": false,
@@ -850,13 +860,14 @@
       "createdAt": "2025-10-07T05:37:21.547Z",
       "updatedAt": "2025-10-07T05:40:55.716Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Replaced faulty component with new spare part from inventory",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "is_coc": false
+      "is_coc": false,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "12": {
       "id": "12",
@@ -889,7 +900,7 @@
       "equipmentSerialNo": null,
       "equipmentLocation": null,
       "equipmentSystem": null,
-      "dateCompleted": null,
+      "dateCompleted": "07-10-2025",
       "purchaseOrderRef": null,
       "responsibleDept": null,
       "verifiedDate": null,
@@ -941,7 +952,7 @@
       "category": "Defect",
       "defectType": "",
       "description": "Test CoC Defect",
-      "targetCloseDate": null,
+      "targetCloseDate": "NaN-NaN-NaN",
       "dateCompleted": "2025-10-07",
       "status": "Closed",
       "priority": "Medium",
@@ -988,12 +999,13 @@
       "createdAt": "2025-10-07T08:36:45.993Z",
       "updatedAt": "2025-10-07T09:36:30.926Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Cleaned and overhauled the system, replaced worn seals and gaskets",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "14": {
       "id": "14",
@@ -1131,11 +1143,12 @@
       "createdAt": "2025-10-07T09:14:03.308Z",
       "updatedAt": "2025-10-07T09:14:40.832Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "16": {
       "id": "16",
@@ -1145,7 +1158,7 @@
       "category": "Defect",
       "defectType": "",
       "description": "Test CoC Movement",
-      "targetCloseDate": null,
+      "targetCloseDate": "NaN-NaN-NaN",
       "dateCompleted": "2025-10-07",
       "status": "Closed",
       "priority": "Medium",
@@ -1192,12 +1205,13 @@
       "createdAt": "2025-10-07T09:20:03.624Z",
       "updatedAt": "2025-10-07T09:21:33.286Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "17": {
       "id": "17",
@@ -1269,11 +1283,12 @@
       "createdAt": "2025-10-07T10:18:36.061Z",
       "updatedAt": "2025-10-07T10:19:06.534Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Welded crack and performed NDT inspection to verify repair integrity",
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "18": {
       "id": "18",
@@ -1512,7 +1527,7 @@
       "equipmentSerialNo": null,
       "equipmentLocation": null,
       "equipmentSystem": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Replaced bearing assembly and performed vibration analysis",
       "purchaseOrderRef": null,
       "responsibleDept": null,
       "verifiedDate": null,
@@ -1539,7 +1554,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": null
+      "equipment_key": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "72": {
       "vesselId": "V001",
@@ -1667,7 +1683,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200"
+      "equipment_key": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "74": {
       "vesselId": "mvvoyager",
@@ -1859,7 +1876,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200"
+      "equipment_key": "PUMPS  VALVES|SEA WATER PUMP|KSB|SWP200",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "77": {
       "vesselId": "V001",
@@ -1987,7 +2005,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": "ELECTRICAL|GENERATOR AVR|STAMFORD|SX460"
+      "equipment_key": "ELECTRICAL|GENERATOR AVR|STAMFORD|SX460",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "79": {
       "vesselId": "mvoceanic",
@@ -2179,7 +2198,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": "STEERING|STEERING GEAR|KAWASAKI|KS45"
+      "equipment_key": "STEERING|STEERING GEAR|KAWASAKI|KS45",
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "82": {
       "vesselId": "V001",
@@ -2272,9 +2292,9 @@
       "equipmentSerialNo": null,
       "equipmentLocation": null,
       "equipmentSystem": null,
-      "actionTakenRequested": null,
-      "targetCloseDate": null,
-      "dateCompleted": null,
+      "actionTakenRequested": "Adjusted settings and parameters to restore normal operation",
+      "targetCloseDate": "NaN-NaN-NaN",
+      "dateCompleted": "NaN-NaN-NaN",
       "purchaseOrderRef": null,
       "responsibleDept": null,
       "verifiedDate": null,
@@ -2301,7 +2321,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": null
+      "equipment_key": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "84": {
       "vesselId": "V003",
@@ -2455,9 +2476,9 @@
       "equipmentSerialNo": null,
       "equipmentLocation": null,
       "equipmentSystem": null,
-      "actionTakenRequested": null,
-      "targetCloseDate": null,
-      "dateCompleted": null,
+      "actionTakenRequested": "Replaced faulty component with new spare part from inventory",
+      "targetCloseDate": "NaN-NaN-NaN",
+      "dateCompleted": "NaN-NaN-NaN",
       "purchaseOrderRef": null,
       "responsibleDept": null,
       "verifiedDate": null,
@@ -2484,7 +2505,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": null
+      "equipment_key": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "87": {
       "vesselId": "V002",
@@ -2638,9 +2660,9 @@
       "equipmentSerialNo": null,
       "equipmentLocation": null,
       "equipmentSystem": null,
-      "actionTakenRequested": null,
-      "targetCloseDate": null,
-      "dateCompleted": null,
+      "actionTakenRequested": "Repaired electrical connections and replaced damaged wiring",
+      "targetCloseDate": "NaN-NaN-NaN",
+      "dateCompleted": "NaN-NaN-NaN",
       "purchaseOrderRef": null,
       "responsibleDept": null,
       "verifiedDate": null,
@@ -2667,7 +2689,8 @@
       "reportDate": null,
       "assignedTo": null,
       "reviewedBy": null,
-      "equipment_key": null
+      "equipment_key": null,
+      "closureComment": "Work completed as per maintenance procedure. System tested and verified operational."
     },
     "90": {
       "vesselId": "V004",
