@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Upload, X, Calendar, AlertTriangle } from "lucide-react";
+import { CheckCircle, Upload, X, Calendar, AlertTriangle, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { Defect } from "@shared/schema";
 
 interface CloseDefectModalProps {
@@ -22,6 +26,9 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
   const { toast } = useToast();
   const [closureComment, setClosureComment] = useState("");
   const [closureFiles, setClosureFiles] = useState<File[]>([]);
+  const [actionTaken, setActionTaken] = useState("");
+  const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
+  const [completionDate, setCompletionDate] = useState<Date | undefined>(new Date());
 
   // Fetch defect details
   const { data: defect, isLoading } = useQuery<Defect>({
@@ -43,7 +50,10 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
       return apiRequest('PATCH', `/api/defects/${defectId}/close`, {
         closedBy: 'Current User', // In real app, get from auth context
         closureComment,
-        closureFiles: fileNames
+        closureFiles: fileNames,
+        actionTakenRequested: actionTaken,
+        targetCloseDate: targetDate ? format(targetDate, 'dd-MM-yyyy') : null,
+        dateCompleted: completionDate ? format(completionDate, 'dd-MM-yyyy') : null
       });
     },
     onSuccess: () => {
@@ -67,6 +77,9 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
   const handleClose = () => {
     setClosureComment("");
     setClosureFiles([]);
+    setActionTaken("");
+    setTargetDate(undefined);
+    setCompletionDate(new Date());
     onClose();
   };
 
@@ -114,10 +127,38 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
   };
 
   const handleSubmit = () => {
+    // Validate required fields
     if (!closureComment || closureComment.trim().length === 0) {
       toast({
         title: "Validation Error",
         description: "Closure comment is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!actionTaken || actionTaken.trim().length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Action taken is required to close the defect",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!targetDate) {
+      toast({
+        title: "Validation Error",
+        description: "Target date is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!completionDate) {
+      toast({
+        title: "Validation Error", 
+        description: "Completion date is required",
         variant: "destructive",
       });
       return;
@@ -205,6 +246,80 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
 
           {/* Closure Details */}
           <div className="space-y-4">
+            {/* Action Taken Field */}
+            <div>
+              <Label htmlFor="action-taken">
+                Action Taken / Requested <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="action-taken"
+                value={actionTaken}
+                onChange={(e) => setActionTaken(e.target.value)}
+                placeholder="Describe the actions taken to resolve this defect..."
+                className="min-h-[100px] mt-2"
+              />
+            </div>
+
+            {/* Date Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="target-date">
+                  Target Date <span className="text-red-500">*</span>
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-2",
+                        !targetDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {targetDate ? format(targetDate, "dd-MM-yyyy") : "Select target date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={targetDate}
+                      onSelect={setTargetDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <Label htmlFor="completion-date">
+                  Date Completed <span className="text-red-500">*</span>
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-2",
+                        !completionDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {completionDate ? format(completionDate, "dd-MM-yyyy") : "Select completion date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={completionDate}
+                      onSelect={setCompletionDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Closure Comment */}
             <div>
               <Label htmlFor="closure-comment">
                 Closure Comment <span className="text-red-500">*</span>
@@ -214,7 +329,7 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
                 value={closureComment}
                 onChange={(e) => setClosureComment(e.target.value)}
                 placeholder="Provide details about how the defect was resolved..."
-                className="min-h-[120px] mt-2"
+                className="min-h-[100px] mt-2"
               />
             </div>
 

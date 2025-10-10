@@ -1742,7 +1742,14 @@ export class PersistentFileStorage implements IStorage {
   }
 
   // Close defect
-  async closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect> {
+  async closeDefect(defectId: string, closure: { 
+    closedBy: string; 
+    closureComment: string; 
+    closureFiles?: string[];
+    actionTakenRequested?: string;
+    targetCloseDate?: string;
+    dateCompleted?: string;
+  }): Promise<Defect> {
     const defect = this.data.defects[defectId];
     if (!defect) {
       throw new Error(`Defect with id ${defectId} not found`);
@@ -1755,7 +1762,12 @@ export class PersistentFileStorage implements IStorage {
       userId: closure.closedBy,
       userName: closure.closedBy,
       timestamp: new Date().toISOString(),
-      details: { comment: closure.closureComment }
+      details: { 
+        comment: closure.closureComment,
+        actionTaken: closure.actionTakenRequested,
+        targetDate: closure.targetCloseDate,
+        completedDate: closure.dateCompleted
+      }
     });
 
     const updatedDefect = {
@@ -1765,6 +1777,9 @@ export class PersistentFileStorage implements IStorage {
       closedOn: new Date().toISOString(),
       closureComment: closure.closureComment,
       closureFiles: closure.closureFiles || [],
+      actionTakenRequested: closure.actionTakenRequested || defect.actionTakenRequested,
+      targetCloseDate: closure.targetCloseDate || defect.targetCloseDate,
+      dateCompleted: closure.dateCompleted || defect.dateCompleted,
       auditTrail,
       updatedAt: new Date()
     };

@@ -355,10 +355,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Close defect
   app.patch("/api/defects/:id/close", async (req, res) => {
     try {
-      const { closedBy, closureComment, closureFiles } = req.body;
+      const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = req.body;
       
+      // Validate all required fields
       if (!closureComment || closureComment.trim().length === 0) {
         return res.status(400).json({ error: "Closure comment is required" });
+      }
+      
+      if (!actionTakenRequested || actionTakenRequested.trim().length === 0) {
+        return res.status(400).json({ error: "Action taken is required to close the defect" });
+      }
+      
+      if (!targetCloseDate) {
+        return res.status(400).json({ error: "Target date is required" });
+      }
+      
+      if (!dateCompleted) {
+        return res.status(400).json({ error: "Completion date is required" });
       }
       
       const defect = await storage.closeDefect(req.params.id, {
@@ -366,7 +379,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closedOn: new Date().toISOString().replace('T', ' ').substring(0, 16),
         closureComment,
         closureFiles: closureFiles || [],
-        status: 'Closed'
+        status: 'Closed',
+        actionTakenRequested,
+        targetCloseDate,
+        dateCompleted
       });
       
       res.json(defect);
