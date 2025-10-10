@@ -6,14 +6,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Upload, X, Calendar, AlertTriangle, CalendarIcon } from "lucide-react";
+import { CheckCircle, Upload, X, Calendar, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import type { Defect } from "@shared/schema";
 
 interface CloseDefectModalProps {
@@ -266,56 +264,28 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
                 <Label htmlFor="target-date">
                   Target Date <span className="text-red-500">*</span>
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal mt-2",
-                        !targetDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {targetDate ? format(targetDate, "dd-MM-yyyy") : "Select target date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarPicker
-                      mode="single"
-                      selected={targetDate}
-                      onSelect={setTargetDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  type="date"
+                  id="target-date"
+                  className="mt-2"
+                  value={targetDate ? format(targetDate, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setTargetDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  required
+                />
               </div>
 
               <div>
                 <Label htmlFor="completion-date">
                   Date Completed <span className="text-red-500">*</span>
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal mt-2",
-                        !completionDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {completionDate ? format(completionDate, "dd-MM-yyyy") : "Select completion date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarPicker
-                      mode="single"
-                      selected={completionDate}
-                      onSelect={setCompletionDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  type="date"
+                  id="completion-date"
+                  className="mt-2"
+                  value={completionDate ? format(completionDate, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setCompletionDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  required
+                />
               </div>
             </div>
 
@@ -418,7 +388,7 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={closeDefectMutation.isPending || !closureComment.trim()}
+            disabled={closeDefectMutation.isPending}
             className="bg-green-600 hover:bg-green-700"
           >
             <CheckCircle className="h-4 w-4 mr-2" />
