@@ -259,6 +259,94 @@ export default function RecurringDefects() {
     </Card>
   );
 
+  const renderVesselTable = () => {
+    // Group recurring defects by vessel
+    const vesselGroups = filteredDefects.reduce((groups, recurring) => {
+      const vessels = recurring.vesselNames?.split(',') || [];
+      vessels.forEach(vessel => {
+        const vesselName = vessel.trim();
+        if (!groups[vesselName]) {
+          groups[vesselName] = [];
+        }
+        groups[vesselName].push(recurring);
+      });
+      return groups;
+    }, {} as Record<string, RecurringDefect[]>);
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">Vessel</TableHead>
+            <TableHead className="text-center">Total Patterns</TableHead>
+            <TableHead className="text-center">Critical (CoC)</TableHead>
+            <TableHead>Top Equipment</TableHead>
+            <TableHead>Latest Issue</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Object.entries(vesselGroups).map(([vessel, patterns]) => {
+            const cocCount = patterns.filter(p => p.hasCoc).length;
+            const latestPattern = patterns.reduce((latest, p) => 
+              !latest || (p.lastOccurrenceDate && p.lastOccurrenceDate > latest.lastOccurrenceDate) ? p : latest
+            , patterns[0]);
+            const topEquipment = patterns[0]; // Could be improved to find most frequent
+            
+            return (
+              <TableRow key={vessel}>
+                <TableCell className="font-medium">
+                  <Badge variant="secondary">{vessel}</Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge variant="outline">{patterns.length}</Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  {cocCount > 0 && (
+                    <Badge className="bg-blue-100 text-blue-700">{cocCount}</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm">{formatEquipmentKey(topEquipment.equipmentKey)}</span>
+                </TableCell>
+                <TableCell>
+                  {latestPattern.lastOccurrenceDate ? 
+                    new Date(latestPattern.lastOccurrenceDate).toLocaleDateString() : "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex gap-1 justify-end">
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      title="View Patterns"
+                      onClick={() => {
+                        // Could expand to show all patterns for this vessel
+                        const firstPattern = patterns[0];
+                        loadDefectsForRecurring(firstPattern.id);
+                      }}
+                      data-testid={`button-vessel-view-${vessel}`}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      title="Export"
+                      onClick={() => exportData(`recurring_defects_${vessel}`, patterns)}
+                      data-testid={`button-vessel-export-${vessel}`}
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
+
   const renderEquipmentTable = () => (
     <Table>
       <TableHeader>
@@ -333,6 +421,7 @@ export default function RecurringDefects() {
                   variant="ghost"
                   title="Export"
                   data-testid={`button-export-${recurring.id}`}
+                  onClick={() => exportData(`recurring_defect_${recurring.equipmentKey}`, [recurring])}
                 >
                   <FileDown className="h-4 w-4" />
                 </Button>
@@ -431,7 +520,11 @@ export default function RecurringDefects() {
             Two or more defects for the same equipment within the selected period
           </p>
         </div>
-        <Button variant="outline" data-testid="button-export-all">
+        <Button 
+          variant="outline" 
+          data-testid="button-export-all"
+          onClick={() => exportData('recurring_defects_all', recurringDefects)}
+        >
           <FileDown className="h-4 w-4 mr-2" />
           Export All
         </Button>
@@ -488,7 +581,7 @@ export default function RecurringDefects() {
                   <p className="text-muted-foreground">No recurring defects found with current filters</p>
                 </div>
               ) : (
-                renderEquipmentTable()
+                renderVesselTable()
               )}
             </TabsContent>
           </CardContent>
