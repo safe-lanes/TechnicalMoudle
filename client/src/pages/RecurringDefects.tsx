@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,6 +50,13 @@ export default function RecurringDefects() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRecurring, setSelectedRecurring] = useState<RecurringDefectWithDetails | null>(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
+  const [showCapaDialog, setShowCapaDialog] = useState(false);
+  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
+  const [selectedForCapa, setSelectedForCapa] = useState<RecurringDefect | null>(null);
+  const [selectedForNotify, setSelectedForNotify] = useState<RecurringDefect | null>(null);
+  const [capaDescription, setCapaDescription] = useState("");
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const { toast } = useToast();
 
   // Export data functionality
   const exportData = (filename: string, data: RecurringDefect[]) => {
@@ -121,6 +138,44 @@ export default function RecurringDefects() {
     const parts = key.split("|").filter(p => p);
     if (parts.length === 1) return parts[0];
     return parts.join(" › ");
+  };
+
+  // CAPA creation handler
+  const handleCreateCapa = (recurring: RecurringDefect) => {
+    setSelectedForCapa(recurring);
+    setCapaDescription(`Corrective Action for Recurring Pattern: ${formatEquipmentKey(recurring.equipmentKey)}\n\nProblem Statement:\nRecurring defects identified for ${formatEquipmentKey(recurring.equipmentKey)} with ${recurring.occurrenceCount} occurrences across ${recurring.vesselsAffected} vessel(s).\n\nRoot Cause Analysis:\n[To be completed]\n\nCorrective Actions:\n1. \n2. \n3. \n\nPreventive Actions:\n1. \n2. \n\nImplementation Timeline:\n- Immediate actions: \n- Long-term actions: \n\nResponsible Person: [Name/Department]\nTarget Completion Date: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`);
+    setShowCapaDialog(true);
+  };
+
+  const handleSubmitCapa = () => {
+    if (selectedForCapa) {
+      toast({
+        title: "CAPA Created",
+        description: `Corrective action plan created for ${formatEquipmentKey(selectedForCapa.equipmentKey)}`,
+      });
+      setShowCapaDialog(false);
+      setCapaDescription("");
+      setSelectedForCapa(null);
+    }
+  };
+
+  // Fleet notification handler
+  const handleNotifyFleet = (recurring: RecurringDefect) => {
+    setSelectedForNotify(recurring);
+    setNotifyMessage(`FLEET ADVISORY: Recurring Equipment Issue\n\nEquipment: ${formatEquipmentKey(recurring.equipmentKey)}\n\nSummary:\nWe have identified a recurring defect pattern affecting ${recurring.vesselsAffected} vessel(s) with ${recurring.occurrenceCount} total occurrences.\n\nAffected Vessels:\n${recurring.vesselNames}\n\nLast Occurrence: ${recurring.lastOccurrenceDate ? new Date(recurring.lastOccurrenceDate).toLocaleDateString() : 'N/A'}\n\nRecommended Actions:\n1. Inspect similar equipment on your vessel\n2. Review maintenance procedures\n3. Report any similar issues immediately\n4. Implement preventive maintenance as advised\n\n${recurring.hasCoc ? '⚠️ CRITICAL: This is a Condition of Class (CoC) issue requiring immediate attention.' : ''}\n\nFor technical support, contact: [Department/Contact]\n\nThis is an automated notification from the PMS Recurring Defects System.`);
+    setShowNotifyDialog(true);
+  };
+
+  const handleSendNotification = () => {
+    if (selectedForNotify) {
+      toast({
+        title: "Fleet Notification Sent",
+        description: `Alert sent to all vessels regarding ${formatEquipmentKey(selectedForNotify.equipmentKey)}`,
+      });
+      setShowNotifyDialog(false);
+      setNotifyMessage("");
+      setSelectedForNotify(null);
+    }
   };
 
   const renderStatsCards = () => (
@@ -405,6 +460,7 @@ export default function RecurringDefects() {
                   variant="ghost"
                   title="Create CAPA"
                   data-testid={`button-capa-${recurring.id}`}
+                  onClick={() => handleCreateCapa(recurring)}
                 >
                   <Wrench className="h-4 w-4" />
                 </Button>
@@ -413,6 +469,7 @@ export default function RecurringDefects() {
                   variant="ghost"
                   title="Notify Fleet"
                   data-testid={`button-notify-${recurring.id}`}
+                  onClick={() => handleNotifyFleet(recurring)}
                 >
                   <Bell className="h-4 w-4" />
                 </Button>
@@ -589,6 +646,67 @@ export default function RecurringDefects() {
       </Card>
 
       {renderDrillDownPanel()}
+
+      {/* CAPA Creation Dialog */}
+      <Dialog open={showCapaDialog} onOpenChange={setShowCapaDialog}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Create Corrective Action Plan (CAPA)</DialogTitle>
+            <DialogDescription>
+              {selectedForCapa && (
+                <>Create a corrective action plan for: {formatEquipmentKey(selectedForCapa.equipmentKey)}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              value={capaDescription}
+              onChange={(e) => setCapaDescription(e.target.value)}
+              placeholder="Enter CAPA details..."
+              className="h-96 font-mono text-sm"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCapaDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitCapa} disabled={!capaDescription.trim()}>
+              Create CAPA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fleet Notification Dialog */}
+      <Dialog open={showNotifyDialog} onOpenChange={setShowNotifyDialog}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Fleet-Wide Notification</DialogTitle>
+            <DialogDescription>
+              {selectedForNotify && (
+                <>Send advisory to all vessels regarding: {formatEquipmentKey(selectedForNotify.equipmentKey)}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+              placeholder="Enter notification message..."
+              className="h-96 font-mono text-sm"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNotifyDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendNotification} disabled={!notifyMessage.trim()}>
+              <Bell className="h-4 w-4 mr-2" />
+              Send Notification
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
