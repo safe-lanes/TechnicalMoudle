@@ -1015,9 +1015,9 @@
       "category": "Defect",
       "defectType": "",
       "description": "Test CoC Layout",
-      "targetCloseDate": null,
-      "dateCompleted": null,
-      "status": "Open",
+      "targetCloseDate": "09-10-2025",
+      "dateCompleted": "10-10-2025",
+      "status": "Closed",
       "priority": "Medium",
       "critical": false,
       "is_coc": false,
@@ -1060,14 +1060,32 @@
       "reportDate": null,
       "reportedBy": "System User",
       "createdAt": "2025-10-07T09:06:54.412Z",
-      "updatedAt": "2025-10-07T09:06:54.412Z",
+      "updatedAt": "2025-10-10T12:10:46.343Z",
       "componentId": null,
-      "actionTakenRequested": null,
+      "actionTakenRequested": "Replaced faulty component and tested system",
       "defectCategory": null,
       "holdReason": null,
       "nextReviewDate": null,
       "assignedTo": null,
-      "reviewedBy": null
+      "reviewedBy": null,
+      "closedBy": "Current User",
+      "closedOn": "2025-10-10T12:10:46.343Z",
+      "closureComment": "Component replaced successfully, system operational",
+      "closureFiles": [],
+      "auditTrail": [
+        {
+          "action": "CLOSE",
+          "userId": "Current User",
+          "userName": "Current User",
+          "timestamp": "2025-10-10T12:10:46.343Z",
+          "details": {
+            "comment": "Component replaced successfully, system operational",
+            "actionTaken": "Replaced faulty component and tested system",
+            "targetDate": "09-10-2025",
+            "completedDate": "10-10-2025"
+          }
+        }
+      ]
     },
     "15": {
       "id": "15",

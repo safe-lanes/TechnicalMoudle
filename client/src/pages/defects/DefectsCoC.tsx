@@ -489,7 +489,8 @@ export default function DefectsCoC() {
           open={closeModal.open}
           onClose={() => {
             setCloseModal({ open: false, defectId: null });
-            // Refresh the CoC defects after successful closure
+            // The CloseDefectModal already invalidates queries and shows success toast
+            // Just refresh the CoC-specific query to ensure the page updates
             queryClient.invalidateQueries({ 
               predicate: (query) => {
                 const queryKey = query.queryKey;
@@ -499,20 +500,6 @@ export default function DefectsCoC() {
                        typeof queryKey[1] === 'object' && 
                        'is_coc' in queryKey[1];
               }
-            });
-            // Show success notification and switch to resolved tab
-            toast({
-              title: "CoC Defect Closed Successfully",
-              description: `CoC defect has been closed and moved to the Resolved tab.`,
-              action: (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setActiveTab("Resolved")}
-                >
-                  View in Resolved
-                </Button>
-              ),
             });
           }}
           defectId={closeModal.defectId}
