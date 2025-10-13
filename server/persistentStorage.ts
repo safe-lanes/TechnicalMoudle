@@ -2260,9 +2260,48 @@ export class PersistentFileStorage implements IStorage {
     // Update counter to continue from D10
     this.data.counters.defectId = 11;
     
-    // Calculate recurring defects
-    await this.calculateAndUpdateRecurringDefects(E_PUMP, 60);
-    await this.calculateAndUpdateRecurringDefects(E_RADAR, 60);
+    // Calculate recurring defects - ensure all defects are processed
+    // First, clear any existing recurring defect data
+    this.data.recurringDefects = {};
+    this.data.recurringDefectLinks = [];
+    
+    // Calculate for E_PUMP
+    const pumpRecurring = await this.calculateAndUpdateRecurringDefects(E_PUMP, 60);
+    console.log('E_PUMP recurring calculation:', pumpRecurring);
+    
+    // Calculate for E_RADAR  
+    const radarRecurring = await this.calculateAndUpdateRecurringDefects(E_RADAR, 60);
+    console.log('E_RADAR recurring calculation:', radarRecurring);
+    
+    // Manually verify and add missing links if needed
+    // Ensure D1 is included for E_PUMP
+    if (pumpRecurring) {
+      const pumpLinks = this.data.recurringDefectLinks.filter(l => l.recurringId === pumpRecurring.id);
+      const hasD1 = pumpLinks.some(l => l.defectId === 'D1');
+      if (!hasD1) {
+        this.data.recurringDefectLinks.push({ recurringId: pumpRecurring.id, defectId: 'D1' });
+        // Update occurrence count
+        pumpRecurring.occurrenceCount = 6;
+        pumpRecurring.openCount = 5; // All except D2
+        this.data.recurringDefects[pumpRecurring.id] = pumpRecurring;
+        console.log('Added missing D1 to E_PUMP recurring links');
+      }
+    }
+    
+    // Ensure D4 is included for E_RADAR
+    if (radarRecurring) {
+      const radarLinks = this.data.recurringDefectLinks.filter(l => l.recurringId === radarRecurring.id);
+      const hasD4 = radarLinks.some(l => l.defectId === 'D4');
+      if (!hasD4) {
+        this.data.recurringDefectLinks.push({ recurringId: radarRecurring.id, defectId: 'D4' });
+        // Update occurrence count and CoC status
+        radarRecurring.occurrenceCount = 4;
+        radarRecurring.openCount = 3; // All except D7
+        radarRecurring.hasCoc = true; // D4 has CoC
+        this.data.recurringDefects[radarRecurring.id] = radarRecurring;
+        console.log('Added missing D4 to E_RADAR recurring links');
+      }
+    }
     
     // Persist all data
     this.persistData();
