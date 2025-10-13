@@ -1005,6 +1005,9 @@ export class PersistentFileStorage implements IStorage {
       reportDate: defect.reportDate || null,
       assignedTo: defect.assignedTo || null,
       reviewedBy: defect.reviewedBy || null,
+      // Rich text fields
+      descriptionHtml: defect.descriptionHtml || null,
+      descriptionText: defect.descriptionText || null,
       // Generate equipment_key for recurring defect tracking
       equipment_key: generateEquipmentKey(defect)
     };
