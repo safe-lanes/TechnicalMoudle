@@ -211,6 +211,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete defect" });
     }
   });
+
+  // Clear all defects data endpoint - preserves schema and storage logic
+  app.delete("/api/defects-clear-all", async (req, res) => {
+    try {
+      await storage.clearAllDefectsData();
+      res.json({ 
+        success: true, 
+        message: "All defects data has been cleared successfully. IDs will start from 1 for new entries." 
+      });
+    } catch (error: any) {
+      console.error("Error clearing defects data:", error);
+      res.status(500).json({ error: "Failed to clear defects data" });
+    }
+  });
   
   // Get defect actions for a specific defect
   app.get("/api/defects/:defectId/actions", async (req, res) => {
