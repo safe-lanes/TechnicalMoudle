@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         priority: req.query.priority as string,
         critical: req.query.critical === 'true',
-        isCoC: req.query.isCoC === 'true',
+        is_coc: req.query.is_coc === 'true' || req.query.isCoC === 'true', // Support both is_coc and isCoC
         dateFrom: req.query.dateFrom as string,
         dateTo: req.query.dateTo as string,
         search: req.query.search as string,
@@ -238,6 +238,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error seeding E2E test data:", error);
       res.status(500).json({ error: "Failed to seed E2E test data" });
+    }
+  });
+
+  // Get defects count endpoint (returns active and resolved counts)
+  app.get("/api/defects-count", async (req, res) => {
+    try {
+      const activeCount = await storage.getDefectsCount({ statusView: 'active' });
+      const resolvedCount = await storage.getDefectsCount({ statusView: 'resolved' });
+      res.json({ 
+        active: activeCount, 
+        resolved: resolvedCount 
+      });
+    } catch (error: any) {
+      console.error("Error getting defects count:", error);
+      res.status(500).json({ error: "Failed to get defects count" });
     }
   });
   
