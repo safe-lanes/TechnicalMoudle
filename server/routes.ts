@@ -225,6 +225,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to clear defects data" });
     }
   });
+
+  // Seed E2E test data endpoint
+  app.post("/api/defects-seed-e2e-test", async (req, res) => {
+    try {
+      const testReport = await storage.seedE2ETestData();
+      res.json({ 
+        success: true, 
+        message: "E2E test data seeded successfully", 
+        testReport 
+      });
+    } catch (error: any) {
+      console.error("Error seeding E2E test data:", error);
+      res.status(500).json({ error: "Failed to seed E2E test data" });
+    }
+  });
   
   // Get defect actions for a specific defect
   app.get("/api/defects/:defectId/actions", async (req, res) => {

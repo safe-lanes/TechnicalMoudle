@@ -1,0 +1,158 @@
+**PROMPT FOR REPLIT: E2E TEST WITH DUMMY DATA — CoC, RECURRING DEFECTS, DEFECT CLOSURE**
+
+> Goal: Seed a small, controlled dataset and run end-to-end tests to prove (1) CoC listing, (2) Recurring Defects detection, and (3) Close/Resolve workflow — with persistence.
+
+---
+
+### 0) Preconditions
+
+* Start from a **clean database** (no defects).
+* Do **not** change schema or UI layout.
+
+---
+
+### 1) Seed reference data
+
+Create (or ensure) these reference rows exist:
+
+**Vessels**
+
+* `V001` = “MV SEAFARER”
+* `V002` = “MV OCEANIC”
+
+**Equipment key rule (must match app logic):**
+`equipment_key = UPPER(category + '|' + type + '|' + make + '|' + model)`
+Store this on each defect row.
+
+**Two equipment definitions to exercise “recurring”:**
+
+* **E_PUMP**
+
+  * category: `Pumps & Valves`
+  * type: `Sea Water Pump`
+  * make: `KSB`
+  * model: `SWP200`
+* **E_RADAR**
+
+  * category: `Navigation`
+  * type: `X-Band Radar`
+  * make: `Furuno`
+  * model: `FR-2127`
+
+---
+
+### 2) Seed 10 defects (mix of CoC / non-CoC, repeated equipment, multi-vessel)
+
+Insert with correct field mapping (IDs you generate). Use `DD-MM-YYYY` for UI; convert internally if needed.
+
+| ID  | Vessel | Equip   | Category(on list) | Description                           | Action Requested                  | Issue Date | Target Close | CoC   | Status                    |
+| --- | ------ | ------- | ----------------- | ------------------------------------- | --------------------------------- | ---------- | ------------ | ----- | ------------------------- |
+| D1  | V001   | E_PUMP  | Defect            | “Sea water pump vibration observed.”  | “Inspect bearings and alignment.” | 15-09-2025 | 15-10-2025   | true  | Open                      |
+| D2  | V002   | E_PUMP  | Defect            | “Pump cut-out pressure not reached.”  | “Check pressure switch.”          | 01-10-2025 | 20-10-2025   | false | **Closed** (test closure) |
+| D3  | V001   | E_PUMP  | Defect            | “High pump bearing temp.”             | “Lubrication check.”              | 03-10-2025 | 20-10-2025   | false | Open                      |
+| D4  | V001   | E_RADAR | Defect            | “X-band radar intermittent blanking.” | “Check scanner supply.”           | 20-09-2025 | 10-10-2025   | true  | Open                      |
+| D5  | V002   | E_RADAR | Defect            | “Scanner noise alarm observed.”       | “Investigate and rectify.”        | 05-10-2025 | 25-10-2025   | false | Open                      |
+| D6  | V001   | E_PUMP  | Defect            | “Pump mechanical seal weeping.”       | “Replace seal kit.”               | 02-10-2025 | 18-10-2025   | false | Open                      |
+| D7  | V001   | E_RADAR | Defect            | “Video breakup on sweeps.”            | “Check waveguide drying.”         | 06-10-2025 | 22-10-2025   | false | **Closed** (test closure) |
+| D8  | V002   | E_PUMP  | Defect            | “Pump cavitation noise.”              | “Check suction strainers.”        | 06-10-2025 | 22-10-2025   | false | Open                      |
+| D9  | V001   | E_RADAR | Defect            | “Antenna gearbox noise.”              | “Inspect gear oil.”               | 07-10-2025 | 24-10-2025   | false | Open                      |
+| D10 | V002   | E_PUMP  | Defect            | “Motor overheating warning.”          | “Check cooling fan.”              | 08-10-2025 | 24-10-2025   | false | Open                      |
+
+Additional fields (use sensible defaults if required):
+
+* severity = `2 - Minor`
+* raisedBy = “Master – System User”
+* operationCondition = `Sailing`
+* occurrenceType = `Routine`
+* responsibleRole = “Chief Engineer”
+* stock fields blank / null
+* `equipment_key` computed as per rule
+
+Persist every insert.
+
+---
+
+### 3) Test: **Close / Complete** workflow
+
+Programmatically **close** D2 and D7 through the same service used by the UI:
+
+* Set `status = Closed`
+* Set `dateCompleted = today()`
+* Add a **closure comment** (e.g., “Work completed and verified.”)
+* Attach a **dummy file** record (e.g., `closure_note.txt`, 1–2 KB) via the app’s attachments API/storage
+* Write an **audit log** entry (who, when, action = “Closed”)
+
+Verify in UI:
+
+* **Active** tab count decreased accordingly.
+* **Resolved** tab lists D2 and D7 with closure date, comment chip, and paperclip icon.
+* Opening **View** shows closure notes and attachment link.
+
+Persist and reload page to confirm state survives refresh.
+
+---
+
+### 4) Test: **CoC** listing
+
+* CoC flag is **true** for D1 and D4.
+* The **CoC sidebar** view must show **copies** of these two defects (not move them), with their native IDs and current status.
+* Toggling CoC filter (if present) should only show D1 and D4.
+
+---
+
+### 5) Test: **Recurring Defects**
+
+* Recurring logic uses `equipment_key` + time window.
+* With the above seed:
+
+  * **E_PUMP** occurs **5 times** (D1, D2, D3, D6, D8, D10 → 6 if you count all; use your final insert count) across **multiple vessels**.
+  * **E_RADAR** occurs **3 times** (D4, D5, D7, D9 → 4 if you count all; use your final insert count).
+* In **Recurring Defects**:
+
+  * “Total Recurring” ≥ 2 rows.
+  * Each row shows **Occurrences**, **Vessels Affected**, **Open Defects** (reflecting D2/D7 closed), **Last Occurrence**, **CoC badge** where any member is CoC (E_RADAR or E_PUMP should show CoC if any defect in the group has CoC=true).
+  * Tabs **By Equipment / By Vessel** list correct groupings.
+  * Clicking a row drills down to the exact member defects.
+
+Persist and reload; the recurring summary must recompute identically.
+
+---
+
+### 6) Assertions / Acceptance checks (log to console and also show on a small in-app toast)
+
+* Defects created: **10**
+* Active tab count = `10 − closed(2) = 8`
+* Resolved tab count = `2`
+* CoC list count = `2` (D1, D4)
+* Recurring groups: at least **2** (E_PUMP and E_RADAR) with correct occurrence counts.
+* After browser refresh: counts and lists remain identical.
+
+---
+
+### 7) Output
+
+At the end of the script/test routine:
+
+* Print a compact **Test Report** object to console, e.g.:
+
+```json
+{
+  "created": 10,
+  "active": 8,
+  "resolved": 2,
+  "coc": 2,
+  "recurringGroups": [
+    {"equipment": "PUMPS & VALVES|SEA WATER PUMP|KSB|SWP200", "occurrences": 6, "open": 4, "vessels": 2},
+    {"equipment": "NAVIGATION|X-BAND RADAR|FURUNO|FR-2127", "occurrences": 4, "open": 2, "vessels": 2}
+  ],
+  "persistenceVerified": true
+}
+```
+
+* Also render a small green toast in the app: **“Defect E2E test passed — data persisted.”**
+
+---
+
+### 8) Do not leave test junk
+
+Leave the seeded data in place (so I can manually review in the UI). Do not generate additional random records.

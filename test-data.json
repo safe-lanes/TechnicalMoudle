@@ -154,7 +154,105 @@
       "updatedAt": "2025-10-03T09:11:59.896Z"
     }
   },
-  "defects": {},
+  "defects": {
+    "1": {
+      "vesselId": "V001",
+      "vesselName": "MV SEAFARER",
+      "issueDate": "2025-10-01",
+      "category": "Defect",
+      "defectType": "Corrective",
+      "description": "test",
+      "descriptionHtml": "<p>test</p>",
+      "descriptionText": "test",
+      "targetCloseDate": "08-10-2025",
+      "dateCompleted": "13-10-2025",
+      "status": "Closed",
+      "priority": "Medium",
+      "critical": false,
+      "is_coc": false,
+      "severity": 2,
+      "source": "PSC",
+      "equipmentCategory": "Navigation",
+      "equipmentType": "Valve",
+      "equipmentMake": "MAN",
+      "equipmentModel": "3508",
+      "equipmentSerialNo": null,
+      "equipmentLocation": null,
+      "equipmentSystem": null,
+      "purchaseOrderRef": null,
+      "responsibleDept": null,
+      "verifiedDate": null,
+      "defectCategory": "Major",
+      "viqVersion": null,
+      "viqRef": null,
+      "sfiCodeRef": null,
+      "immediateCause": {
+        "unsafeAct": [
+          "Non conformance to Legislative rules or regulations"
+        ],
+        "unsafeCondition": [
+          "Inadequate Warning Systems"
+        ]
+      },
+      "immediateCauseExplanation": null,
+      "rootCause": {
+        "individualFactor": [
+          "Lack of Skill / Experience"
+        ],
+        "systemFactor": [
+          "Inadequate Management of change"
+        ]
+      },
+      "rootCauseExplanation": null,
+      "raisedById": null,
+      "raisedByName": "System User",
+      "raisedByRank": "Master",
+      "operatingCondition": "SAILING",
+      "locationText": null,
+      "occurrenceType": "ROUTINE",
+      "responsibleRole": "Chief Engineer",
+      "responsibleRoleId": "Chief Engineer",
+      "isDeferred": false,
+      "deferReason": null,
+      "deferNewTargetDate": null,
+      "deferApprovalRequired": true,
+      "reportToThirdParty": false,
+      "classReport": false,
+      "flagReport": false,
+      "portReport": false,
+      "reportReferenceNo": null,
+      "reportDate": null,
+      "reportedBy": "System User",
+      "id": "1",
+      "createdAt": "2025-10-13T08:09:59.316Z",
+      "updatedAt": "2025-10-13T08:10:20.224Z",
+      "componentId": null,
+      "actionTakenRequested": "test",
+      "holdReason": null,
+      "nextReviewDate": null,
+      "assignedTo": null,
+      "reviewedBy": null,
+      "equipment_key": "NAVIGATION|VALVE|MAN|3508",
+      "closedBy": "Current User",
+      "closedOn": "2025-10-13T08:10:20.224Z",
+      "closureComment": "test",
+      "closureFiles": [],
+      "auditTrail": [
+        {
+          "action": "CLOSE",
+          "userId": "Current User",
+          "userName": "Current User",
+          "timestamp": "2025-10-13T08:10:20.224Z",
+          "details": {
+            "comment": "test",
+            "actionTaken": "test",
+            "targetDate": "08-10-2025",
+            "completedDate": "13-10-2025"
+          }
+        }
+      ]
+    }
+  },
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {},
@@ -174,7 +272,7 @@
     "formDefinitionId": 1,
     "formVersionId": 1,
     "workOrderId": 3,
-    "defectId": 1,
+    "defectId": 2,
     "defectActionId": 1,
     "defectAttachmentId": 1,
     "recurringDefectId": 8
