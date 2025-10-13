@@ -99,7 +99,7 @@ export default function RichTextEditor({
     return textContent.trim().length > 0;
   };
 
-  // Add custom styles for the editor
+  // Add custom styles for the editor and fix toolbar button behavior
   useEffect(() => {
     if (quillRef.current) {
       const editor = quillRef.current.getEditor();
@@ -110,6 +110,19 @@ export default function RichTextEditor({
         editorContainer.style.minHeight = height;
         editorContainer.style.maxHeight = '400px';
         editorContainer.style.overflowY = 'auto';
+      }
+      
+      // Prevent toolbar buttons from submitting forms
+      const toolbar = editorContainer.previousSibling as HTMLElement;
+      if (toolbar && toolbar.classList.contains('ql-toolbar')) {
+        const buttons = toolbar.querySelectorAll('button');
+        buttons.forEach(button => {
+          button.type = 'button';
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+        });
       }
     }
   }, [height]);

@@ -1175,11 +1175,12 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                 </div>
                 
                 <Button 
-                  type="submit"
+                  type="button"
                   className="hover:opacity-90"
                   style={{backgroundColor: '#16569e'}} 
                   disabled={saveDefectMutation.isPending || isViewMode}
                   data-testid="button-save-description"
+                  onClick={() => form.handleSubmit(handleSubmit)()}
                 >
                   {saveDefectMutation.isPending ? "SAVING..." : "SAVE"}
                 </Button>
