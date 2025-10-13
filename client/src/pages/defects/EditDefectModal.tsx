@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Edit, Save, X } from "lucide-react";
+import RichTextEditor from "@/components/RichTextEditor";
 import type { Defect } from "@shared/schema";
 
 interface EditDefectModalProps {
@@ -24,6 +25,8 @@ interface EditDefectModalProps {
 export default function EditDefectModal({ open, onClose, defectId }: EditDefectModalProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<Partial<Defect>>({});
+  const [descriptionHtml, setDescriptionHtml] = useState("");
+  const [descriptionText, setDescriptionText] = useState("");
 
   const { data: defect, isLoading } = useQuery<Defect>({
     queryKey: ['/api/defects', defectId],
@@ -45,6 +48,9 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
         updatedAt: undefined,
         reportedBy: undefined,
       });
+      // Initialize rich text fields
+      setDescriptionHtml(defect.descriptionHtml || defect.description || "");
+      setDescriptionText(defect.descriptionText || defect.description || "");
     }
   }, [defect]);
 
@@ -72,7 +78,7 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
 
   const handleSubmit = () => {
     // Validate required fields
-    if (!formData.vesselName || !formData.description || !formData.category) {
+    if (!formData.vesselName || !descriptionText || !formData.category) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -81,7 +87,15 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
       return;
     }
 
-    updateMutation.mutate(formData);
+    // Include rich text fields in the update
+    const dataToSubmit = {
+      ...formData,
+      description: descriptionText,
+      descriptionHtml: descriptionHtml,
+      descriptionText: descriptionText
+    };
+
+    updateMutation.mutate(dataToSubmit);
   };
 
   const handleInputChange = (field: string, value: any) => {
@@ -370,11 +384,15 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
                 <div className="space-y-4">
                   <div>
                     <Label>Defect Description *</Label>
-                    <Textarea 
-                      value={formData.description || ''} 
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      className="min-h-[100px]"
+                    <RichTextEditor
+                      value={descriptionHtml}
+                      onChange={(html, text) => {
+                        setDescriptionHtml(html);
+                        setDescriptionText(text);
+                      }}
                       placeholder="Enter detailed description of the defect..."
+                      required={true}
+                      height="150px"
                     />
                   </div>
                   <div>
