@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 
 // Vessel mapping for proper vesselName updates
 const vesselMap: Record<string, string> = {
@@ -88,6 +89,9 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
     }
   ]);
 
+  const [descriptionHtml, setDescriptionHtml] = useState(defect?.descriptionHtml || defect?.description || "");
+  const [descriptionText, setDescriptionText] = useState(defect?.descriptionText || defect?.description || "");
+
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
     defaultValues: defect ? {
@@ -98,6 +102,8 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
       category: defect.category || "Defect",
       defectType: defect.defectType || "",
       description: defect.description || "",
+      descriptionHtml: defect.descriptionHtml || defect.description || "",
+      descriptionText: defect.descriptionText || defect.description || "",
       status: defect.status || "Open",
       priority: defect.priority || "Medium",
       critical: defect.critical || false,
@@ -151,6 +157,8 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
       category: "Defect",
       defectType: "",
       description: "",
+      descriptionHtml: "",
+      descriptionText: "",
       status: "Open",
       priority: "Medium",
       critical: false,
@@ -1034,22 +1042,42 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
               </div>
             </div>
             <div>
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Textarea 
-                        {...field}
-                        rows={4}
-                        placeholder="DESCRIPTION"
-                        data-testid="textarea-description"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+              {/* Display formatted HTML in view mode */}
+              {isViewMode ? (
+                <div className="bg-white p-3 rounded-md border min-h-[150px]">
+                  {defect?.descriptionHtml ? (
+                    <RichTextDisplay html={defect.descriptionHtml} />
+                  ) : (
+                    <p className="text-gray-700 whitespace-pre-wrap">{defect?.description || 'No description provided'}</p>
+                  )}
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <RichTextEditor
+                          value={descriptionHtml}
+                          onChange={(html, text) => {
+                            setDescriptionHtml(html);
+                            setDescriptionText(text);
+                            // Keep the plain text in description field for backward compatibility
+                            field.onChange(text);
+                            form.setValue('descriptionHtml', html);
+                            form.setValue('descriptionText', text);
+                          }}
+                          placeholder="Enter defect description..."
+                          required={true}
+                          disabled={isViewMode}
+                          height="200px"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Bottom Row with Severity and VIQ Fields */}
               <div className="flex items-center justify-between mt-4">
