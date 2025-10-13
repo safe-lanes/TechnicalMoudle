@@ -1987,6 +1987,26 @@ export class PersistentFileStorage implements IStorage {
     return defectIds.map(id => this.data.defects[id]).filter(d => d !== undefined);
   }
 
+  // Clear all defects data - preserves schema and storage logic
+  async clearAllDefectsData(): Promise<void> {
+    // Clear all defects-related data
+    this.data.defects = {};
+    this.data.defectActions = [];
+    this.data.defectAttachments = [];
+    this.data.recurringDefects = {};
+    this.data.recurringDefectLinks = [];
+    
+    // Reset counters to start from 1
+    this.data.counters.defectId = 1;
+    this.data.counters.defectActionId = 1;
+    this.data.counters.defectAttachmentId = 1;
+    
+    // Persist the changes
+    this.persistData();
+    
+    console.log('All defects data has been cleared successfully');
+  }
+
   // Seed helper methods
   async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
     return Object.values(this.data.defects).find(d => d.seedId === seedId);
