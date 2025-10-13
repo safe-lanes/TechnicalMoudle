@@ -508,6 +508,8 @@ export const defects = pgTable("defects", {
   category: text("category").notNull(), // 'Defect' | 'COC' | 'Observation' | 'NCR'
   defectType: text("defect_type"), // 'Routine' | 'Corrective' | 'Emergency'
   description: text("description").notNull(),
+  descriptionHtml: text("description_html"), // Rich text HTML version
+  descriptionText: text("description_text"), // Plain text version for search
   actionTakenRequested: text("action_taken_requested"),
   // Renamed from targetDate to targetCloseDate
   targetCloseDate: text("target_close_date"), // DD-MM-YYYY format
