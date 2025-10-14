@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Clock, Eye, FileDown, Search } from "lucide-react";
+import { formatForDisplay } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 
 interface DefectsFilters {
@@ -258,7 +259,7 @@ export default function DefectsResolved() {
                   <TableRow key={defect.id}>
                     <TableCell className="font-medium text-xs">{defect.id}</TableCell>
                     <TableCell className="text-xs">{defect.vesselName}</TableCell>
-                    <TableCell className="text-xs">{defect.issueDate}</TableCell>
+                    <TableCell className="text-xs">{formatForDisplay(defect.issueDate)}</TableCell>
                     <TableCell className="text-xs">
                       <div className="flex items-center gap-2">
                         {defect.category}
@@ -271,10 +272,10 @@ export default function DefectsResolved() {
                     </TableCell>
                     <TableCell className="text-xs max-w-xs truncate">{defect.description}</TableCell>
                     <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
-                    <TableCell className="text-xs">{defect.targetCloseDate}</TableCell>
+                    <TableCell className="text-xs">{formatForDisplay(defect.targetCloseDate)}</TableCell>
                     <TableCell className="text-xs">
                       <div className="flex flex-col">
-                        <span>{defect.dateCompleted}</span>
+                        <span>{formatForDisplay(defect.dateCompleted)}</span>
                         {getCompletionStatus(defect.targetCloseDate, defect.dateCompleted)}
                       </div>
                     </TableCell>
