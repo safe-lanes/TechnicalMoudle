@@ -101,8 +101,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         priority: req.query.priority as string,
-        critical: req.query.critical === 'true',
-        is_coc: req.query.is_coc === 'true' || req.query.isCoC === 'true', // Support both is_coc and isCoC
+        critical: req.query.critical === 'true' ? true : req.query.critical === 'false' ? false : undefined,
+        is_coc: req.query.is_coc === 'true' || req.query.isCoC === 'true' ? true : 
+                req.query.is_coc === 'false' || req.query.isCoC === 'false' ? false : undefined, // Only apply filter when explicitly set
         dateFrom: req.query.dateFrom as string,
         dateTo: req.query.dateTo as string,
         search: req.query.search as string,
