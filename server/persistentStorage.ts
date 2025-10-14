@@ -935,8 +935,24 @@ export class PersistentFileStorage implements IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]> {
+    console.log(`[DEBUG getDefects] Total defects in memory: ${Object.keys(this.data.defects).length}`);
+    console.log(`[DEBUG getDefects] Defect IDs in memory: ${Object.keys(this.data.defects).join(', ')}`);
+    
+    // Check if D1 and D4 exist in memory at this point
+    if (this.data.defects['D1']) {
+      console.log(`[DEBUG getDefects] D1 exists in memory, issueDate: ${this.data.defects['D1'].issueDate}`);
+    } else {
+      console.log(`[DEBUG getDefects] D1 does NOT exist in memory`);
+    }
+    
+    if (this.data.defects['D4']) {
+      console.log(`[DEBUG getDefects] D4 exists in memory, issueDate: ${this.data.defects['D4'].issueDate}`);
+    } else {
+      console.log(`[DEBUG getDefects] D4 does NOT exist in memory`);
+    }
+    
     let defects = Object.values(this.data.defects);
-    console.log(`[getDefects] Initial defects count: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
+    console.log(`[getDefects] After Object.values - defects count: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
     
     if (filters) {
       if (filters.vesselId) {
