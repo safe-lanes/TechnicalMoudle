@@ -504,7 +504,7 @@ export const defects = pgTable("defects", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id").notNull(),
   vesselName: text("vessel_name").notNull(),
-  issueDate: text("issue_date").notNull(), // DD-MM-YYYY format
+  issueDate: text("issue_date").notNull(), // ISO format YYYY-MM-DD
   category: text("category").notNull(), // 'Defect' | 'COC' | 'Observation' | 'NCR'
   defectType: text("defect_type"), // 'Routine' | 'Corrective' | 'Emergency'
   description: text("description").notNull(),
@@ -512,8 +512,8 @@ export const defects = pgTable("defects", {
   descriptionText: text("description_text"), // Plain text version for search
   actionTakenRequested: text("action_taken_requested"),
   // Renamed from targetDate to targetCloseDate
-  targetCloseDate: text("target_close_date"), // DD-MM-YYYY format
-  dateCompleted: text("date_completed"), // DD-MM-YYYY format
+  targetCloseDate: text("target_close_date"), // ISO format YYYY-MM-DD
+  dateCompleted: text("date_completed"), // ISO format YYYY-MM-DD
   status: text("status").notNull().default("Open"), // 'Open' | 'Pending' | 'In-Progress' | 'Awaiting Parts' | 'Deferred' | 'Closed' | 'Cancelled'
   priority: text("priority").default("Medium"), // 'Low' | 'Medium' | 'High'
   critical: boolean("critical").notNull().default(false),
@@ -530,7 +530,7 @@ export const defects = pgTable("defects", {
   componentId: text("component_id"), // Link to PMS component
   purchaseOrderRef: text("purchase_order_ref"),
   responsibleDept: text("responsible_dept"), // Responsible Dept from screenshot
-  verifiedDate: text("verified_date"), // Verified Date from screenshot
+  verifiedDate: text("verified_date"), // ISO format YYYY-MM-DD
   defectCategory: text("defect_category"), // Additional defect category field
   viqVersion: text("viq_version"), // VIQ VER
   viqRef: text("viq_ref"), // VIQ REF
@@ -540,7 +540,7 @@ export const defects = pgTable("defects", {
   rootCause: json("root_cause"), // Structured root cause with individual and system factors
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
   holdReason: text("hold_reason"), // For On Hold status
-  nextReviewDate: text("next_review_date"), // For On Hold items
+  nextReviewDate: text("next_review_date"), // ISO format YYYY-MM-DD
   
   // NEW FIELDS FOR DEFECT MODULE ENHANCEMENTS
   
@@ -569,7 +569,7 @@ export const defects = pgTable("defects", {
   // 6. Deferment Procedure
   isDeferred: boolean("is_deferred").notNull().default(false),
   deferReason: text("defer_reason"),
-  deferNewTargetDate: text("defer_new_target_date"),
+  deferNewTargetDate: text("defer_new_target_date"), // ISO format YYYY-MM-DD
   deferApprovalRequired: boolean("defer_approval_required").default(true),
   
   // 7. Third-Party Reporting
@@ -578,7 +578,7 @@ export const defects = pgTable("defects", {
   flagReport: boolean("flag_report").notNull().default(false),
   portReport: boolean("port_report").notNull().default(false),
   reportReferenceNo: text("report_reference_no"),
-  reportDate: text("report_date"),
+  reportDate: text("report_date"), // ISO format YYYY-MM-DD
   
   // Legacy fields (kept for backward compatibility)
   reportedBy: text("reported_by").notNull(),
@@ -586,7 +586,7 @@ export const defects = pgTable("defects", {
   reviewedBy: text("reviewed_by"),
   // Closure fields
   closedBy: text("closed_by"),
-  closedOn: text("closed_on"), // DD-MM-YYYY HH:MM format
+  closedOn: text("closed_on"), // ISO format YYYY-MM-DD HH:MM:SS
   closureComment: text("closure_comment"),
   closureFiles: text("closure_files").array(), // Array of file URLs
   // Linked defects
