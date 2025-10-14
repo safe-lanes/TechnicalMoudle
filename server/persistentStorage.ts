@@ -173,21 +173,6 @@ export class PersistentFileStorage implements IStorage {
     
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
     console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
-    console.log(`[DEBUG] Constructor - defects count: ${Object.keys(this.data.defects).length}`);
-    console.log(`[DEBUG] Constructor - defect IDs: ${Object.keys(this.data.defects).join(', ')}`);
-    
-    // Verify D1 and D4 are in memory after assignment
-    if (this.data.defects['D1']) {
-      console.log(`[DEBUG] Constructor - D1 is in memory, issue date: ${this.data.defects['D1'].issueDate}`);
-    } else {
-      console.log(`[DEBUG] Constructor - D1 is NOT in memory`);
-    }
-    
-    if (this.data.defects['D4']) {
-      console.log(`[DEBUG] Constructor - D4 is in memory, issue date: ${this.data.defects['D4'].issueDate}`);
-    } else {
-      console.log(`[DEBUG] Constructor - D4 is NOT in memory`);
-    }
   }
 
   private loadData(): PersistentData {
@@ -196,28 +181,6 @@ export class PersistentFileStorage implements IStorage {
         const fileContent = fs.readFileSync(this.dataFile, 'utf-8');
         const loadedData = JSON.parse(fileContent) as Partial<PersistentData>;
         console.log(`📂 Loading existing data from ${this.dataFile}`);
-        
-        // Debug logging for defects
-        if (loadedData.defects) {
-          const defectKeys = Object.keys(loadedData.defects);
-          console.log(`[DEBUG] Defects in file: ${defectKeys.length} defects`);
-          console.log(`[DEBUG] Defect IDs in file: ${defectKeys.join(', ')}`);
-          
-          // Check specific defects D1 and D4
-          if (loadedData.defects['D1']) {
-            console.log(`[DEBUG] D1 found in file with issue date: ${loadedData.defects['D1'].issueDate}`);
-          } else {
-            console.log(`[DEBUG] D1 NOT found in file`);
-          }
-          
-          if (loadedData.defects['D4']) {
-            console.log(`[DEBUG] D4 found in file with issue date: ${loadedData.defects['D4'].issueDate}`);
-          } else {
-            console.log(`[DEBUG] D4 NOT found in file`);
-          }
-        } else {
-          console.log(`[DEBUG] No defects object in loaded data`);
-        }
         
         // Ensure all required fields exist with proper defaults
         const result = {
@@ -263,10 +226,6 @@ export class PersistentFileStorage implements IStorage {
             recurringDefectId: 1
           }
         };
-        
-        // Verify what's actually in the result
-        console.log(`[DEBUG] After loading, defects count: ${Object.keys(result.defects).length}`);
-        console.log(`[DEBUG] After loading, defect IDs: ${Object.keys(result.defects).join(', ')}`);
         
         return result;
       } else {
@@ -935,97 +894,54 @@ export class PersistentFileStorage implements IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]> {
-    console.log(`[DEBUG getDefects] Total defects in memory: ${Object.keys(this.data.defects).length}`);
-    console.log(`[DEBUG getDefects] Defect IDs in memory: ${Object.keys(this.data.defects).join(', ')}`);
-    
-    // Check if D1 and D4 exist in memory at this point
-    if (this.data.defects['D1']) {
-      console.log(`[DEBUG getDefects] D1 exists in memory, issueDate: ${this.data.defects['D1'].issueDate}`);
-    } else {
-      console.log(`[DEBUG getDefects] D1 does NOT exist in memory`);
-    }
-    
-    if (this.data.defects['D4']) {
-      console.log(`[DEBUG getDefects] D4 exists in memory, issueDate: ${this.data.defects['D4'].issueDate}`);
-    } else {
-      console.log(`[DEBUG getDefects] D4 does NOT exist in memory`);
-    }
-    
     let defects = Object.values(this.data.defects);
-    console.log(`[getDefects] After Object.values - defects count: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
-    
-    console.log(`[DEBUG] Filters passed to getDefects:`, JSON.stringify(filters, null, 2));
     
     if (filters) {
       if (filters.vesselId) {
-        const before = defects.length;
         defects = defects.filter(d => d.vesselId === filters.vesselId);
-        console.log(`[DEBUG] After vesselId filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.statusView === 'active') {
-        const before = defects.length;
         defects = defects.filter(d => 
           ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
         );
-        console.log(`[DEBUG] After statusView=active filter: ${before} -> ${defects.length} defects`);
       } else if (filters.statusView === 'resolved') {
-        const before = defects.length;
         defects = defects.filter(d => 
           ['Closed', 'Cancelled'].includes(d.status)
         );
-        console.log(`[DEBUG] After statusView=resolved filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.status) {
-        const before = defects.length;
         defects = defects.filter(d => d.status === filters.status);
-        console.log(`[DEBUG] After status filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.category) {
-        const before = defects.length;
         defects = defects.filter(d => d.category === filters.category);
-        console.log(`[DEBUG] After category filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.critical !== undefined) {
-        const before = defects.length;
         defects = defects.filter(d => d.critical === filters.critical);
-        console.log(`[DEBUG] After critical filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.is_coc !== undefined) {
-        const before = defects.length;
         defects = defects.filter(d => d.is_coc === filters.is_coc);
-        console.log(`[DEBUG] After is_coc filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.search) {
-        const before = defects.length;
         const searchLower = filters.search.toLowerCase();
         defects = defects.filter(d => 
           d.description.toLowerCase().includes(searchLower) ||
           d.vesselName.toLowerCase().includes(searchLower)
         );
-        console.log(`[DEBUG] After search filter: ${before} -> ${defects.length} defects`);
       }
       
       // Only filter out closed/cancelled defects if:
       // 1. includeClosedDefects is explicitly false, AND
       // 2. statusView is not 'resolved' (as resolved explicitly asks for closed/cancelled)
       if (!filters.includeClosedDefects && filters.statusView !== 'resolved') {
-        const before = defects.length;
-        const beforeFiltering = defects.map(d => ({ id: d.id, status: d.status }));
-        console.log(`[DEBUG] Before closed/cancelled filter - defects:`, beforeFiltering);
         defects = defects.filter(d => !['Closed', 'Cancelled'].includes(d.status));
-        const filtered = beforeFiltering.filter(d => ['Closed', 'Cancelled'].includes(d.status));
-        console.log(`[DEBUG] Filtered out by closed/cancelled:`, filtered);
-        console.log(`[DEBUG] After closed/cancelled filter: ${before} -> ${defects.length} defects`);
       }
     }
-    
-    console.log(`[DEBUG] Final defects being returned: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
     
     return defects;
   }
