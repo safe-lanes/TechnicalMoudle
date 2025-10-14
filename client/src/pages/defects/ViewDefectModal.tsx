@@ -213,15 +213,15 @@ export default function ViewDefectModal({ open, onClose, defectId }: ViewDefectM
                 <CardContent className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Issue Date</Label>
-                    <Input value={defect.issueDate} disabled />
+                    <Input value={formatDate(defect.issueDate)} disabled />
                   </div>
                   <div>
                     <Label>Target Date</Label>
-                    <Input value={defect.targetDate || '-'} disabled />
+                    <Input value={formatDate(defect.targetCloseDate)} disabled />
                   </div>
                   <div>
                     <Label>Date Completed</Label>
-                    <Input value={defect.dateCompleted || '-'} disabled />
+                    <Input value={formatDate(defect.dateCompleted)} disabled />
                   </div>
                   <div>
                     <Label>Created On</Label>
@@ -233,7 +233,7 @@ export default function ViewDefectModal({ open, onClose, defectId }: ViewDefectM
                   </div>
                   <div>
                     <Label>Verified Date</Label>
-                    <Input value={defect.verifiedDate || '-'} disabled />
+                    <Input value={formatDate(defect.verifiedDate)} disabled />
                   </div>
                 </CardContent>
               )}

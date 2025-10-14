@@ -20,7 +20,7 @@ import {
   WrenchIcon,
   XCircle
 } from "lucide-react";
-import { startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
 import { formatForDisplay, parseDate } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 import {
