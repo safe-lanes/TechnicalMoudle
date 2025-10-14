@@ -183,8 +183,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D2": {
       "id": "D2",
@@ -216,14 +216,14 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z",
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z",
       "auditTrail": [
         {
           "action": "CLOSE",
           "userId": "System User",
           "userName": "System User",
-          "timestamp": "2025-10-14T05:09:00.890Z",
+          "timestamp": "2025-10-14T06:29:20.987Z",
           "details": {
             "comment": "Work completed and verified."
           }
@@ -258,8 +258,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D4": {
       "id": "D4",
@@ -289,8 +289,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D5": {
       "id": "D5",
@@ -320,8 +320,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D6": {
       "id": "D6",
@@ -351,8 +351,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D7": {
       "id": "D7",
@@ -384,14 +384,14 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z",
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z",
       "auditTrail": [
         {
           "action": "CLOSE",
           "userId": "System User",
           "userName": "System User",
-          "timestamp": "2025-10-14T05:09:00.890Z",
+          "timestamp": "2025-10-14T06:29:20.987Z",
           "details": {
             "comment": "Work completed and verified."
           }
@@ -426,8 +426,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D9": {
       "id": "D9",
@@ -457,8 +457,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     },
     "D10": {
       "id": "D10",
@@ -488,8 +488,8 @@
       "responsibleRole": "Chief Engineer",
       "responsibleRoleId": "Chief Engineer",
       "defectType": "Corrective",
-      "createdAt": "2025-10-14T05:09:00.890Z",
-      "updatedAt": "2025-10-14T05:09:00.890Z"
+      "createdAt": "2025-10-14T06:29:20.987Z",
+      "updatedAt": "2025-10-14T06:29:20.987Z"
     }
   },
   "defectActions": [],
@@ -501,7 +501,7 @@
       "filepath": "/uploads/closure_note_D2.txt",
       "filesize": 1024,
       "mimetype": "text/plain",
-      "uploadedAt": "2025-10-14T05:09:00.890Z",
+      "uploadedAt": "2025-10-14T06:29:20.987Z",
       "uploadedBy": "System User"
     },
     {
@@ -511,13 +511,13 @@
       "filepath": "/uploads/closure_note_D7.txt",
       "filesize": 1024,
       "mimetype": "text/plain",
-      "uploadedAt": "2025-10-14T05:09:00.890Z",
+      "uploadedAt": "2025-10-14T06:29:20.987Z",
       "uploadedBy": "System User"
     }
   ],
   "recurringDefects": {
-    "14": {
-      "id": 14,
+    "16": {
+      "id": 16,
       "equipmentKey": "PUMPS & VALVES|SEA WATER PUMP|KSB|SWP200",
       "windowMonths": 60,
       "occurrenceCount": 6,
@@ -526,10 +526,10 @@
       "lastOccurrenceDate": "08-10-2025",
       "hasCoc": false,
       "mtbfDays": "53",
-      "updatedAt": "2025-10-14T05:09:00.896Z"
+      "updatedAt": "2025-10-14T06:29:20.988Z"
     },
-    "15": {
-      "id": 15,
+    "17": {
+      "id": 17,
       "equipmentKey": "NAVIGATION|X-BAND RADAR|FURUNO|FR-2127",
       "windowMonths": 60,
       "occurrenceCount": 4,
@@ -538,48 +538,48 @@
       "lastOccurrenceDate": "07-10-2025",
       "hasCoc": true,
       "mtbfDays": "30",
-      "updatedAt": "2025-10-14T05:09:00.904Z"
+      "updatedAt": "2025-10-14T06:29:20.993Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D2"
     },
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D3"
     },
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D6"
     },
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D8"
     },
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D10"
     },
     {
-      "recurringId": 15,
+      "recurringId": 17,
       "defectId": "D5"
     },
     {
-      "recurringId": 15,
+      "recurringId": 17,
       "defectId": "D7"
     },
     {
-      "recurringId": 15,
+      "recurringId": 17,
       "defectId": "D9"
     },
     {
-      "recurringId": 14,
+      "recurringId": 16,
       "defectId": "D1"
     },
     {
-      "recurringId": 15,
+      "recurringId": 17,
       "defectId": "D4"
     }
   ],
@@ -601,6 +601,6 @@
     "defectId": 11,
     "defectActionId": 1,
     "defectAttachmentId": 3,
-    "recurringDefectId": 16
+    "recurringDefectId": 18
   }
 }
