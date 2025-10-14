@@ -954,52 +954,78 @@ export class PersistentFileStorage implements IStorage {
     let defects = Object.values(this.data.defects);
     console.log(`[getDefects] After Object.values - defects count: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
     
+    console.log(`[DEBUG] Filters passed to getDefects:`, JSON.stringify(filters, null, 2));
+    
     if (filters) {
       if (filters.vesselId) {
+        const before = defects.length;
         defects = defects.filter(d => d.vesselId === filters.vesselId);
+        console.log(`[DEBUG] After vesselId filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.statusView === 'active') {
+        const before = defects.length;
         defects = defects.filter(d => 
           ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
         );
+        console.log(`[DEBUG] After statusView=active filter: ${before} -> ${defects.length} defects`);
       } else if (filters.statusView === 'resolved') {
+        const before = defects.length;
         defects = defects.filter(d => 
           ['Closed', 'Cancelled'].includes(d.status)
         );
+        console.log(`[DEBUG] After statusView=resolved filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.status) {
+        const before = defects.length;
         defects = defects.filter(d => d.status === filters.status);
+        console.log(`[DEBUG] After status filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.category) {
+        const before = defects.length;
         defects = defects.filter(d => d.category === filters.category);
+        console.log(`[DEBUG] After category filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.critical !== undefined) {
+        const before = defects.length;
         defects = defects.filter(d => d.critical === filters.critical);
+        console.log(`[DEBUG] After critical filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.is_coc !== undefined) {
+        const before = defects.length;
         defects = defects.filter(d => d.is_coc === filters.is_coc);
+        console.log(`[DEBUG] After is_coc filter: ${before} -> ${defects.length} defects`);
       }
       
       if (filters.search) {
+        const before = defects.length;
         const searchLower = filters.search.toLowerCase();
         defects = defects.filter(d => 
           d.description.toLowerCase().includes(searchLower) ||
           d.vesselName.toLowerCase().includes(searchLower)
         );
+        console.log(`[DEBUG] After search filter: ${before} -> ${defects.length} defects`);
       }
       
       // Only filter out closed/cancelled defects if:
       // 1. includeClosedDefects is explicitly false, AND
       // 2. statusView is not 'resolved' (as resolved explicitly asks for closed/cancelled)
       if (!filters.includeClosedDefects && filters.statusView !== 'resolved') {
+        const before = defects.length;
+        const beforeFiltering = defects.map(d => ({ id: d.id, status: d.status }));
+        console.log(`[DEBUG] Before closed/cancelled filter - defects:`, beforeFiltering);
         defects = defects.filter(d => !['Closed', 'Cancelled'].includes(d.status));
+        const filtered = beforeFiltering.filter(d => ['Closed', 'Cancelled'].includes(d.status));
+        console.log(`[DEBUG] Filtered out by closed/cancelled:`, filtered);
+        console.log(`[DEBUG] After closed/cancelled filter: ${before} -> ${defects.length} defects`);
       }
     }
+    
+    console.log(`[DEBUG] Final defects being returned: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
     
     return defects;
   }
