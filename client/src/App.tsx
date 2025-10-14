@@ -7,6 +7,7 @@ import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
+import TestE2E from "./pages/TestE2E";
 
 import NotFound from "./pages/not-found";
 
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/defects/:subpage" component={TechnicalModule} />
                 <Route path="/admin" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
+                <Route path="/test-e2e" component={TestE2E} />
                 <Route component={NotFound} />
               </Switch>
             </div>

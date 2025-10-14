@@ -893,6 +893,7 @@ export class PersistentFileStorage implements IStorage {
     dueOverdue?: string;
   }): Promise<Defect[]> {
     let defects = Object.values(this.data.defects);
+    console.log(`[getDefects] Initial defects count: ${defects.length}, IDs: ${defects.map(d => d.id).join(', ')}`);
     
     if (filters) {
       if (filters.vesselId) {
