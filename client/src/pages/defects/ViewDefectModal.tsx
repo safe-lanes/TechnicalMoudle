@@ -20,6 +20,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useState } from "react";
+import { formatForDisplay } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 
 interface ViewDefectModalProps {
@@ -56,8 +57,7 @@ export default function ViewDefectModal({ open, onClose, defectId }: ViewDefectM
   };
 
   const formatDate = (date: string | null | undefined) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString();
+    return formatForDisplay(date);
   };
 
   if (isLoading || !defect) {

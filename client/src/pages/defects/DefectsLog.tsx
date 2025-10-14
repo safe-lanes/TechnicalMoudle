@@ -33,6 +33,7 @@ import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import CloseDefectModal from "./CloseDefectModal";
 import { cn } from "@/lib/utils";
+import { formatForDisplay } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 
 interface DefectsFilters {
@@ -368,7 +369,7 @@ export default function DefectsLog() {
                   >
                     <div className="col-span-1 font-mono text-blue-600">{defect.id}</div>
                     <div className="col-span-1 text-gray-700">{defect.vesselName}</div>
-                    <div className="col-span-1 text-gray-700">{defect.issueDate}</div>
+                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.issueDate)}</div>
                     <div className="col-span-1">
                       <Badge variant={defect.category === 'COC' ? 'destructive' : 'secondary'} className="text-xs">
                         {defect.category}
@@ -380,8 +381,8 @@ export default function DefectsLog() {
                     <div className="col-span-2 text-gray-700 truncate" title={defect.actionTakenRequested || ""}>
                       {defect.actionTakenRequested}
                     </div>
-                    <div className="col-span-1 text-gray-700">{defect.targetCloseDate}</div>
-                    <div className="col-span-1 text-gray-700">{defect.dateCompleted}</div>
+                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.targetCloseDate)}</div>
+                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.dateCompleted)}</div>
                     <div className="col-span-1 flex items-center gap-1">
                       {getStatusBadge(defect.status, defect.critical)}
                     </div>

@@ -20,7 +20,8 @@ import {
   WrenchIcon,
   XCircle
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval } from "date-fns";
+import { formatForDisplay, parseDate } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 import {
   PieChart,
@@ -483,27 +484,18 @@ export default function DefectsDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        try {
-                          return defect.issueDate ? format(parseISO(defect.issueDate), 'dd-MM-yyyy') : '-';
-                        } catch {
-                          return '-';
-                        }
-                      })()}
+                      {formatForDisplay(defect.issueDate)}
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        try {
-                          if (!defect.targetCloseDate) return '-';
-                          const targetDate = parseISO(defect.targetCloseDate);
-                          return (
-                            <span className={isAfter(new Date(), targetDate) ? 'text-red-600' : ''}>
-                              {format(targetDate, 'dd-MM-yyyy')}
-                            </span>
-                          );
-                        } catch {
-                          return '-';
-                        }
+                        const targetDate = parseDate(defect.targetCloseDate);
+                        if (!targetDate) return '-';
+                        const isOverdue = isAfter(new Date(), targetDate);
+                        return (
+                          <span className={isOverdue ? 'text-red-600' : ''}>
+                            {formatForDisplay(targetDate)}
+                          </span>
+                        );
                       })()}
                     </TableCell>
                     <TableCell>
