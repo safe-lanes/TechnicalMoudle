@@ -1,14 +1,23 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import bulkRouter from "./routes/bulk";
 import alertRouter from "./routes/alerts";
 import formRouter from "./routes/forms";
 import createChangeRequestsRouter from "./routes/changeRequests";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up multer for file uploads
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  });
+
   // Components API routes (for Target Picker)
   app.get("/api/components/:vesselId", async (req, res) => {
     try {
@@ -16,6 +25,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(components);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch components" });
+    }
+  });
+
+  // Component Upload Route
+  app.post("/api/components/upload", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const file = req.file;
+      const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.'));
+      
+      let parsedData: any[] = [];
+      
+      // Parse based on file type
+      if (fileExtension === '.csv') {
+        const csvContent = file.buffer.toString('utf-8');
+        const parseResult = Papa.parse(csvContent, {
+          header: true,
+          skipEmptyLines: true,
+          dynamicTyping: true
+        });
+        parsedData = parseResult.data;
+      } else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+        const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        parsedData = XLSX.utils.sheet_to_json(worksheet);
+      } else {
+        return res.status(400).json({ error: "Unsupported file format. Please upload CSV, XLS, or XLSX file." });
+      }
+
+      // Field mapping from file headers to database fields
+      const fieldMapping: { [key: string]: string } = {
+        'Component ID': 'id',
+        'Component Name': 'name',
+        'Component Code': 'componentCode',
+        'Parent ID': 'parentId',
+        'Category': 'category',
+        'Vessel ID': 'vesselId',
+        'Current Cumulative RH': 'currentCumulativeRH',
+        'Last Updated': 'lastUpdated',
+        'Maker': 'maker',
+        'Model': 'model',
+        'Serial No': 'serialNo',
+        'Department Category': 'deptCategory',
+        'Component Category': 'componentCategory',
+        'Location': 'location',
+        'Commissioned Date': 'commissionedDate',
+        'Critical': 'critical',
+        'Class Item': 'classItem'
+      };
+
+      // Process and validate data
+      const errors: any[] = [];
+      const processedComponents: any[] = [];
+      
+      for (let i = 0; i < parsedData.length; i++) {
+        const row = parsedData[i];
+        const rowNum = i + 2; // Account for header row
+        
+        // Map fields
+        const component: any = {};
+        for (const [fileHeader, dbField] of Object.entries(fieldMapping)) {
+          if (row[fileHeader] !== undefined && row[fileHeader] !== null && row[fileHeader] !== '') {
+            let value = row[fileHeader];
+            
+            // Convert boolean fields
+            if (dbField === 'critical' || dbField === 'classItem') {
+              if (typeof value === 'string') {
+                value = value.toLowerCase() === 'true' || value.toLowerCase() === 'yes' || value === '1';
+              }
+            }
+            
+            // Convert decimal fields
+            if (dbField === 'currentCumulativeRH' && value !== '') {
+              value = parseFloat(value).toString();
+            }
+            
+            component[dbField] = value;
+          }
+        }
+
+        // Validate required fields
+        if (!component.id) {
+          errors.push({
+            row: rowNum,
+            field: 'Component ID',
+            message: 'Component ID is required',
+            data: row
+          });
+          continue;
+        }
+        if (!component.name) {
+          errors.push({
+            row: rowNum,
+            field: 'Component Name',
+            message: 'Component Name is required',
+            data: row
+          });
+          continue;
+        }
+        if (!component.category) {
+          errors.push({
+            row: rowNum,
+            field: 'Category',
+            message: 'Category is required',
+            data: row
+          });
+          continue;
+        }
+        if (!component.vesselId) {
+          errors.push({
+            row: rowNum,
+            field: 'Vessel ID',
+            message: 'Vessel ID is required',
+            data: row
+          });
+          continue;
+        }
+
+        // Set defaults for optional fields
+        component.currentCumulativeRH = component.currentCumulativeRH || '0';
+        component.critical = component.critical ?? false;
+        component.classItem = component.classItem ?? false;
+
+        processedComponents.push(component);
+      }
+
+      // If there are no valid components, return error
+      if (processedComponents.length === 0 && errors.length > 0) {
+        return res.json({
+          success: false,
+          created: 0,
+          updated: 0,
+          failed: errors.length,
+          errors: errors
+        });
+      }
+
+      // Perform bulk upsert
+      const result = await storage.bulkUpsertComponents(processedComponents);
+      
+      res.json({
+        success: errors.length === 0,
+        created: result.created,
+        updated: result.updated,
+        failed: errors.length,
+        errors: errors,
+        preview: processedComponents.slice(0, 5) // Show first 5 records as preview
+      });
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      res.status(500).json({ error: "Failed to process upload: " + error.message });
     }
   });
   

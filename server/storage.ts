@@ -77,7 +77,9 @@ export interface IStorage {
   // Running Hours methods
   getComponents(vesselId: string): Promise<Component[]>;
   getComponent(id: string): Promise<Component | undefined>;
+  createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
+  deleteComponent(id: string): Promise<void>;
   createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit>;
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;

@@ -67,6 +67,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "alerts", label: "Alerts", icon: AlertTriangle },
     { id: "users", label: "Users", icon: Users },
     { id: "permissions", label: "Permissions", icon: Shield },
+    { id: "machinery-upload", label: "Machinery Upload", icon: FileSpreadsheet },
   ],
 };
 

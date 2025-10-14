@@ -581,6 +581,127 @@ export class PersistentFileStorage implements IStorage {
     return updated;
   }
 
+  async createComponent(component: InsertComponent): Promise<Component> {
+    const id = component.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newComponent: Component = {
+      ...component,
+      id,
+      vesselId: component.vesselId || "V001",
+      currentCumulativeRH: component.currentCumulativeRH || "0",
+      lastUpdated: component.lastUpdated || new Date().toISOString().split('T')[0],
+      componentCode: component.componentCode || null,
+      parentId: component.parentId || null,
+      maker: component.maker || null,
+      model: component.model || null,
+      serialNo: component.serialNo || null,
+      deptCategory: component.deptCategory || null,
+      componentCategory: component.componentCategory || null,
+      location: component.location || null,
+      commissionedDate: component.commissionedDate || null,
+      critical: component.critical ?? false,
+      classItem: component.classItem ?? false
+    };
+    this.data.components[id] = newComponent;
+    this.persistData();
+    return newComponent;
+  }
+
+  async deleteComponent(id: string): Promise<void> {
+    if (!this.data.components[id]) {
+      throw new Error(`Component ${id} not found`);
+    }
+    delete this.data.components[id];
+    this.persistData();
+  }
+
+  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
+    const createdComponents: Component[] = [];
+    for (const component of components) {
+      const id = component.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newComponent: Component = {
+        ...component,
+        id,
+        vesselId: component.vesselId || "V001",
+        currentCumulativeRH: component.currentCumulativeRH || "0",
+        lastUpdated: component.lastUpdated || new Date().toISOString().split('T')[0],
+        componentCode: component.componentCode || null,
+        parentId: component.parentId || null,
+        maker: component.maker || null,
+        model: component.model || null,
+        serialNo: component.serialNo || null,
+        deptCategory: component.deptCategory || null,
+        componentCategory: component.componentCategory || null,
+        location: component.location || null,
+        commissionedDate: component.commissionedDate || null,
+        critical: component.critical ?? false,
+        classItem: component.classItem ?? false
+      };
+      this.data.components[id] = newComponent;
+      createdComponents.push(newComponent);
+    }
+    this.persistData();
+    return createdComponents;
+  }
+
+  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+    const updatedComponents: Component[] = [];
+    for (const { id, data } of components) {
+      const component = this.data.components[id];
+      if (component) {
+        const updated = { ...component, ...data };
+        this.data.components[id] = updated;
+        updatedComponents.push(updated);
+      }
+    }
+    this.persistData();
+    return updatedComponents;
+  }
+
+  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const component of components) {
+      const key = component.id || component.componentCode;
+      if (key && this.data.components[key]) {
+        // Update existing component
+        const existing = this.data.components[key];
+        this.data.components[key] = {
+          ...existing,
+          ...component,
+          id: existing.id // Preserve the original ID
+        };
+        updated++;
+      } else {
+        // Create new component
+        const id = component.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const newComponent: Component = {
+          ...component,
+          id,
+          vesselId: component.vesselId || "V001",
+          currentCumulativeRH: component.currentCumulativeRH || "0",
+          lastUpdated: component.lastUpdated || new Date().toISOString().split('T')[0],
+          componentCode: component.componentCode || null,
+          parentId: component.parentId || null,
+          maker: component.maker || null,
+          model: component.model || null,
+          serialNo: component.serialNo || null,
+          deptCategory: component.deptCategory || null,
+          componentCategory: component.componentCategory || null,
+          location: component.location || null,
+          commissionedDate: component.commissionedDate || null,
+          critical: component.critical ?? false,
+          classItem: component.classItem ?? false
+        };
+        this.data.components[id] = newComponent;
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
+
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const id = this.data.counters.auditId++;
     const newAudit: RunningHoursAudit = {

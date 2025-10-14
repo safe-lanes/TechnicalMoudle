@@ -10,6 +10,7 @@ import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
 import Alerts from "./admin/Alerts";
+import AdminMachineryUpload from "./pms/AdminMachineryUpload";
 import ReportsModule from "./reports/ReportsModule";
 import DefectsLogWithTabs from "./defects/DefectsLogWithTabs";
 import DefectsDashboard from "./defects/DefectsDashboard";
@@ -27,7 +28,7 @@ export const TechnicalModule: React.FC = () => {
   // Derive state from URL
   const getStateFromUrl = () => {
     if (location === "/admin") {
-      return { subModule: "admin", menuItem: "forms" }; // Default to forms when accessing /admin
+      return { subModule: "admin", menuItem: "alerts" }; // Default to alerts when accessing /admin
     } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
@@ -127,6 +128,8 @@ export const TechnicalModule: React.FC = () => {
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
             <AdminPanel />
+          ) : selectedSubModule === "admin" && selectedMenuItem === "machinery-upload" ? (
+            <AdminMachineryUpload />
           ) : selectedSubModule === "admin" ? (
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
