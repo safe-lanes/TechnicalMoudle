@@ -50,8 +50,8 @@ export default function CloseDefectModal({ open, onClose, defectId }: CloseDefec
         closureComment,
         closureFiles: fileNames,
         actionTakenRequested: actionTaken,
-        targetCloseDate: targetDate ? format(targetDate, 'dd-MM-yyyy') : null,
-        dateCompleted: completionDate ? format(completionDate, 'dd-MM-yyyy') : null
+        targetCloseDate: targetDate ? format(targetDate, 'yyyy-MM-dd') : null,
+        dateCompleted: completionDate ? format(completionDate, 'yyyy-MM-dd') : null
       });
     },
     onSuccess: () => {

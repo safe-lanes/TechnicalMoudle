@@ -343,10 +343,9 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
                   <Label>Issue Date</Label>
                   <Input 
                     type="date"
-                    value={formData.issueDate ? formData.issueDate.split('-').reverse().join('-') : ''} 
+                    value={formData.issueDate || ''} 
                     onChange={(e) => {
-                      const date = e.target.value ? e.target.value.split('-').reverse().join('-') : '';
-                      handleInputChange('issueDate', date);
+                      handleInputChange('issueDate', e.target.value);
                     }}
                   />
                 </div>
@@ -354,10 +353,9 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
                   <Label>Target Date *</Label>
                   <Input 
                     type="date"
-                    value={formData.targetDate ? formData.targetDate.split('-').reverse().join('-') : ''} 
+                    value={formData.targetCloseDate || ''} 
                     onChange={(e) => {
-                      const date = e.target.value ? e.target.value.split('-').reverse().join('-') : '';
-                      handleInputChange('targetDate', date);
+                      handleInputChange('targetCloseDate', e.target.value);
                     }}
                   />
                 </div>
@@ -365,10 +363,9 @@ export default function EditDefectModal({ open, onClose, defectId }: EditDefectM
                   <Label>Date Completed</Label>
                   <Input 
                     type="date"
-                    value={formData.dateCompleted ? formData.dateCompleted.split('-').reverse().join('-') : ''} 
+                    value={formData.dateCompleted || ''} 
                     onChange={(e) => {
-                      const date = e.target.value ? e.target.value.split('-').reverse().join('-') : '';
-                      handleInputChange('dateCompleted', date);
+                      handleInputChange('dateCompleted', e.target.value);
                     }}
                   />
                 </div>
