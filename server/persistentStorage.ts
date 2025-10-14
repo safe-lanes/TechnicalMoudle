@@ -173,6 +173,21 @@ export class PersistentFileStorage implements IStorage {
     
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
     console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
+    console.log(`[DEBUG] Constructor - defects count: ${Object.keys(this.data.defects).length}`);
+    console.log(`[DEBUG] Constructor - defect IDs: ${Object.keys(this.data.defects).join(', ')}`);
+    
+    // Verify D1 and D4 are in memory after assignment
+    if (this.data.defects['D1']) {
+      console.log(`[DEBUG] Constructor - D1 is in memory, issue date: ${this.data.defects['D1'].issueDate}`);
+    } else {
+      console.log(`[DEBUG] Constructor - D1 is NOT in memory`);
+    }
+    
+    if (this.data.defects['D4']) {
+      console.log(`[DEBUG] Constructor - D4 is in memory, issue date: ${this.data.defects['D4'].issueDate}`);
+    } else {
+      console.log(`[DEBUG] Constructor - D4 is NOT in memory`);
+    }
   }
 
   private loadData(): PersistentData {
@@ -182,8 +197,30 @@ export class PersistentFileStorage implements IStorage {
         const loadedData = JSON.parse(fileContent) as Partial<PersistentData>;
         console.log(`📂 Loading existing data from ${this.dataFile}`);
         
+        // Debug logging for defects
+        if (loadedData.defects) {
+          const defectKeys = Object.keys(loadedData.defects);
+          console.log(`[DEBUG] Defects in file: ${defectKeys.length} defects`);
+          console.log(`[DEBUG] Defect IDs in file: ${defectKeys.join(', ')}`);
+          
+          // Check specific defects D1 and D4
+          if (loadedData.defects['D1']) {
+            console.log(`[DEBUG] D1 found in file with issue date: ${loadedData.defects['D1'].issueDate}`);
+          } else {
+            console.log(`[DEBUG] D1 NOT found in file`);
+          }
+          
+          if (loadedData.defects['D4']) {
+            console.log(`[DEBUG] D4 found in file with issue date: ${loadedData.defects['D4'].issueDate}`);
+          } else {
+            console.log(`[DEBUG] D4 NOT found in file`);
+          }
+        } else {
+          console.log(`[DEBUG] No defects object in loaded data`);
+        }
+        
         // Ensure all required fields exist with proper defaults
-        return {
+        const result = {
           users: loadedData.users || {},
           components: loadedData.components || {},
           runningHoursAudits: loadedData.runningHoursAudits || [],
@@ -226,6 +263,12 @@ export class PersistentFileStorage implements IStorage {
             recurringDefectId: 1
           }
         };
+        
+        // Verify what's actually in the result
+        console.log(`[DEBUG] After loading, defects count: ${Object.keys(result.defects).length}`);
+        console.log(`[DEBUG] After loading, defect IDs: ${Object.keys(result.defects).join(', ')}`);
+        
+        return result;
       } else {
         console.log(`📝 Creating new data file at ${this.dataFile}`);
         return this.initializeEmptyData();
