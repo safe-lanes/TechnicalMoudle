@@ -50,7 +50,7 @@ export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
       id: generateReference(),
       vesselId: "V001",
       vesselName: "MV SEAFARER",
-      issueDate: new Date().toLocaleDateString('en-GB'),
+      issueDate: new Date().toISOString().split('T')[0],
       category: "",
       status: "Open",
       priority: "Medium",
