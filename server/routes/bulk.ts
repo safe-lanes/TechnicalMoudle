@@ -435,13 +435,13 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       if (!row['Part Name']) {
         errors.push(`Row ${rowNum}: Part Name is required`);
       } else {
-        normalized['Part Name'] = row['Part Name'].trim();
+        normalized['Part Name'] = String(row['Part Name']).trim();
       }
 
       if (!row['Component Code']) {
         errors.push(`Row ${rowNum}: Component Code is required`);
       } else {
-        normalized['Component Code'] = row['Component Code'].trim();
+        normalized['Component Code'] = String(row['Component Code']).trim();
         // TODO: Check if component exists
       }
 
@@ -484,13 +484,13 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       if (!row['Item Code']) {
         errors.push(`Row ${rowNum}: Item Code is required`);
       } else {
-        normalized['Item Code'] = row['Item Code'].trim();
+        normalized['Item Code'] = String(row['Item Code']).trim();
       }
 
       if (!row['Item Name']) {
         errors.push(`Row ${rowNum}: Item Name is required`);
       } else {
-        normalized['Item Name'] = row['Item Name'].trim();
+        normalized['Item Name'] = String(row['Item Name']).trim();
       }
 
       if (row['Type'] && !['Stores', 'Lubes', 'Chemicals', 'Others'].includes(row['Type'])) {
