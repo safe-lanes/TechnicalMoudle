@@ -10,6 +10,7 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download, X, Eye, Da
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import * as XLSX from "xlsx";
 
 interface UploadResult {
   success: boolean;
@@ -147,25 +148,65 @@ export default function AdminMachineryUpload() {
   };
 
   const downloadTemplate = () => {
-    // Create CSV content
-    const headers = FIELD_MAPPINGS.map(m => m.fileHeader).join(',');
-    const exampleRow = FIELD_MAPPINGS.map(m => m.example).join(',');
-    const csvContent = `${headers}\n${exampleRow}`;
-    
-    // Create blob and download
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'machinery_components_template.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Define all column headers
+    const headers = [
+      "Component ID", "Component Name", "Component Code", "Parent ID", "Category", "Vessel ID",
+      "Current Cumulative RH", "Last Updated", "Maker", "Model", "Serial No",
+      "Department Category", "Component Category", "Location", "Commissioned Date",
+      "Critical", "Class Item"
+    ];
+
+    // Sample data showing proper hierarchy and relationships
+    const sampleData = [
+      // Main Engine hierarchy examples (Category 6)
+      ["6.1", "Main Engine", "ME-001", "6", "ENGINE", "V001", "45230.5", "2025-10-15", "MAN B&W", "6S60MC-C", "SN123456", "Engineering", "Main Propulsion", "Engine Room", "2020-01-15", "Yes", "Yes"],
+      ["6.1.1", "Cylinder Head", "CH-001", "6.1", "ENGINE_PART", "V001", "45230.5", "2025-10-15", "MAN B&W", "", "", "Engineering", "Engine Parts", "Engine Room", "2020-01-15", "Yes", "No"],
+      ["6.1.1.1", "Valve Seats", "VS-001", "6.1.1", "COMPONENT", "V001", "", "", "", "", "", "Engineering", "", "", "", "No", "No"],
+      ["6.1.1.2", "Injector Sleeve", "IS-001", "6.1.1", "COMPONENT", "V001", "", "", "", "", "", "Engineering", "", "", "", "No", "No"],
+      ["6.1.2", "Main Bearings", "MB-001", "6.1", "ENGINE_PART", "V001", "", "", "", "", "", "Engineering", "Engine Parts", "", "", "Yes", "No"],
+      ["6.2", "Diesel Generator #1", "DG1-001", "6", "ENGINE", "V001", "22100.0", "2025-10-15", "Caterpillar", "3512B", "DG123", "Engineering", "Auxiliary Power", "Generator Room", "2020-03-20", "Yes", "Yes"],
+      
+      // Ship General hierarchy examples (Category 1)
+      ["1.1", "Fresh Water System", "FWS-001", "1", "SYSTEM", "V001", "", "", "", "", "", "Deck", "Water Systems", "Engine Room", "2020-01-10", "No", "No"],
+      ["1.1.1", "Hydrophore Unit", "HU-001", "1.1", "EQUIPMENT", "V001", "18500.0", "2025-10-15", "Grundfos", "CR 10-4", "HU456", "Deck", "Pumps", "Pump Room", "2020-01-10", "Yes", "No"],
+      ["1.1.1.1", "Pressure Vessel", "PV-001", "1.1.1", "COMPONENT", "V001", "", "", "", "", "", "Deck", "", "", "", "No", "No"],
+      ["1.1.1.2", "Feed Pump", "FP-001", "1.1.1", "COMPONENT", "V001", "", "", "", "", "", "Deck", "", "", "", "No", "No"],
+    ];
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+
+    // Set column widths for better readability
+    ws['!cols'] = [
+      { wch: 15 }, // Component ID
+      { wch: 30 }, // Component Name
+      { wch: 15 }, // Component Code
+      { wch: 12 }, // Parent ID
+      { wch: 18 }, // Category
+      { wch: 10 }, // Vessel ID
+      { wch: 20 }, // Current Cumulative RH
+      { wch: 15 }, // Last Updated
+      { wch: 20 }, // Maker
+      { wch: 20 }, // Model
+      { wch: 15 }, // Serial No
+      { wch: 20 }, // Department Category
+      { wch: 20 }, // Component Category
+      { wch: 20 }, // Location
+      { wch: 18 }, // Commissioned Date
+      { wch: 10 }, // Critical
+      { wch: 12 }, // Class Item
+    ];
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Component Template");
+
+    // Generate Excel file and download
+    XLSX.writeFile(wb, "component_import_template.xlsx");
     
     toast({
       title: "Template Downloaded",
-      description: "Use this template to prepare your data for upload",
+      description: "Excel template with sample data has been downloaded. Check the examples to understand the hierarchy.",
     });
   };
 
