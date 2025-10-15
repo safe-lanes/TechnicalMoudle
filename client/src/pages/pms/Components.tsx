@@ -727,33 +727,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     return `WO-${componentCode}-${taskCode}${freqTag}`.toUpperCase();
   };
   
-  const workOrders = [
-    {
-      templateCode: generateTemplateCode(componentCode, "Overhaul", "Calendar", 6, "Months"),
-      jobTitle: "Main Engine Overhaul - Replace Main Bearings",
-      assignedTo: "Chief Engineer",
-      dueDate: "02-Jun-2025",
-      status: "Due",
-      dateCompleted: "",
-      // Store template data for editing
-      taskType: "Overhaul",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "6",
-      frequencyUnit: "Months"
-    },
-    {
-      templateCode: generateTemplateCode(componentCode, "Overhaul", "Calendar", 6, "Months"),
-      jobTitle: "Main Engine Overhaul - Replace Main Bearings",
-      assignedTo: "Chief Engineer",
-      dueDate: "02-Jun-2025",
-      status: "Due (Grace P)",
-      dateCompleted: "",
-      taskType: "Overhaul",
-      maintenanceBasis: "Calendar",
-      frequencyValue: "6",
-      frequencyUnit: "Months"
-    }
-  ];
+  // Empty until populated from database - work orders are linked to components
+  const workOrders: any[] = [];
 
   const handleAddWorkOrder = () => {
     setSelectedWorkOrder(null);
