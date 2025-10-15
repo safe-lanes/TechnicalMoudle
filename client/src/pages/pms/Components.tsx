@@ -39,270 +39,6 @@ interface ComponentNode {
   isExpanded?: boolean;
 }
 
-const dummyComponents: ComponentNode[] = [
-  {
-    id: "1",
-    code: "1",
-    name: "Ship General",
-    children: [
-      {
-        id: "1.1",
-        code: "1.1",
-        name: "Fresh Water System",
-        children: [
-          {
-            id: "1.1.1",
-            code: "1.1.1",
-            name: "Hydrophore Unit",
-            children: [
-              {
-                id: "1.1.1.1",
-                code: "1.1.1.1",
-                name: "Pressure Vessel"
-              },
-              {
-                id: "1.1.1.2",
-                code: "1.1.1.2",
-                name: "Feed Pump"
-              },
-              {
-                id: "1.1.1.3",
-                code: "1.1.1.3",
-                name: "Pressure Switch"
-              }
-            ]
-          },
-          {
-            id: "1.1.2",
-            code: "1.1.2",
-            name: "Potable Water Maker",
-            children: []
-          },
-          {
-            id: "1.1.3",
-            code: "1.1.3",
-            name: "UV Sterilizer",
-            children: []
-          }
-        ]
-      },
-      {
-        id: "1.2",
-        code: "1.2",
-        name: "Sewage Treatment System",
-        children: []
-      },
-      {
-        id: "1.3",
-        code: "1.3",
-        name: "HVAC – Accommodation",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "2", 
-    code: "2",
-    name: "Hull",
-    children: [
-      {
-        id: "2.1",
-        code: "2.1",
-        name: "Ballast Tanks",
-        children: []
-      },
-      {
-        id: "2.2",
-        code: "2.2",
-        name: "Cathodic Protection",
-        children: []
-      },
-      {
-        id: "2.3",
-        code: "2.3",
-        name: "Hull Openings – Hatches",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "3",
-    code: "3", 
-    name: "Equipment for Cargo",
-    children: [
-      {
-        id: "3.1",
-        code: "3.1",
-        name: "Cargo Cranes",
-        children: []
-      },
-      {
-        id: "3.2",
-        code: "3.2",
-        name: "Hatch Cover Hydraulics",
-        children: []
-      },
-      {
-        id: "3.3",
-        code: "3.3",
-        name: "Cargo Hold Ventilation",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "4",
-    code: "4",
-    name: "Ship's Equipment",
-    children: [
-      {
-        id: "4.1",
-        code: "4.1",
-        name: "Mooring System",
-        children: []
-      },
-      {
-        id: "4.2",
-        code: "4.2",
-        name: "Windlass",
-        children: []
-      },
-      {
-        id: "4.3",
-        code: "4.3",
-        name: "Steering Gear",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "5",
-    code: "5",
-    name: "Equipment for Crew & Passengers",
-    children: [
-      {
-        id: "5.1",
-        code: "5.1",
-        name: "Lifeboat System",
-        children: []
-      },
-      {
-        id: "5.2",
-        code: "5.2",
-        name: "Fire Main System",
-        children: []
-      },
-      {
-        id: "5.3",
-        code: "5.3",
-        name: "Emergency Lighting",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "6",
-    code: "6",
-    name: "Machinery Main Components",
-    isExpanded: true,
-    children: [
-      {
-        id: "6.1",
-        code: "6.1",
-        name: "Main Engine",
-        isExpanded: true,
-        children: [
-          {
-            id: "6.1.1",
-            code: "6.1.1",
-            name: "Cylinder Head",
-            isExpanded: true,
-            children: [
-              {
-                id: "6.1.1.1",
-                code: "6.1.1.1",
-                name: "Valve Seats"
-              },
-              {
-                id: "6.1.1.2",
-                code: "6.1.1.2",
-                name: "Injector Sleeve"
-              },
-              {
-                id: "6.1.1.3",
-                code: "6.1.1.3",
-                name: "Rocker Arm"
-              }
-            ]
-          },
-          {
-            id: "6.1.2",
-            code: "6.1.2",
-            name: "Main Bearings",
-            children: []
-          },
-          {
-            id: "6.1.3",
-            code: "6.1.3",
-            name: "Cylinder Liners",
-            children: []
-          }
-        ]
-      },
-      {
-        id: "6.2",
-        code: "6.2",
-        name: "Diesel Generators",
-        children: [
-          {
-            id: "6.2.1",
-            code: "6.2.1",
-            name: "DG #1",
-            children: []
-          },
-          {
-            id: "6.2.2",
-            code: "6.2.2",
-            name: "DG #2",
-            children: []
-          },
-          {
-            id: "6.2.3",
-            code: "6.2.3",
-            name: "DG #3",
-            children: []
-          }
-        ]
-      },
-      {
-        id: "6.3",
-        code: "6.3",
-        name: "Auxiliary Boiler",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "7",
-    code: "7",
-    name: "Systems for Machinery Main Components",
-    children: [
-      {
-        id: "7.1",
-        code: "7.1",
-        name: "Fuel Oil System",
-        children: []
-      }
-    ]
-  },
-  {
-    id: "8",
-    code: "8",
-    name: "Ship Common Systems",
-    children: []
-  }
-];
-
 // Function to get mock data for a component based on its code
 const getComponentMockData = (code: string) => {
   // Generate realistic mock data based on component code and type
@@ -1725,6 +1461,68 @@ const Components: React.FC = () => {
   const { isChangeMode, changeRequestTitle, changeRequestCategory, setOriginalSnapshot, collectDiff, getDiffs, reset } = useChangeMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Fetch components from API and build tree
+  const vesselId = "V001"; // Default vessel ID
+  const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
+    queryKey: ['/api/components', vesselId],
+  });
+  
+  // Build component tree from fetched data
+  const componentTreeData = React.useMemo(() => {
+    // Start with the 8 hardcoded main categories
+    const mainCategories: ComponentNode[] = [
+      { id: "1", code: "1", name: "Ship General", children: [] },
+      { id: "2", code: "2", name: "Hull", children: [] },
+      { id: "3", code: "3", name: "Equipment for Cargo", children: [] },
+      { id: "4", code: "4", name: "Ship's Equipment", children: [] },
+      { id: "5", code: "5", name: "Equipment for Crew & Passengers", children: [] },
+      { id: "6", code: "6", name: "Machinery Main Components", children: [] },
+      { id: "7", code: "7", name: "Systems for Machinery Main Components", children: [] },
+      { id: "8", code: "8", name: "Ship Common Systems", children: [] }
+    ];
+    
+    if (!fetchedComponents || fetchedComponents.length === 0) {
+      return mainCategories;
+    }
+    
+    // Build a map for quick lookup
+    const componentMap = new Map<string, ComponentNode>();
+    
+    // First, add all main categories to the map
+    mainCategories.forEach(cat => {
+      componentMap.set(cat.code, cat);
+    });
+    
+    // Convert fetched components to ComponentNode format and add to map
+    fetchedComponents.forEach((comp: any) => {
+      const node: ComponentNode = {
+        id: comp.componentCode || comp.id,
+        code: comp.componentCode || comp.id,
+        name: comp.name,
+        children: []
+      };
+      componentMap.set(node.code, node);
+    });
+    
+    // Build parent-child relationships
+    fetchedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      const node = componentMap.get(code);
+      
+      if (node && comp.parentId) {
+        const parent = componentMap.get(comp.parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+        }
+      }
+    });
+    
+    return mainCategories;
+  }, [fetchedComponents]);
 
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
@@ -1740,7 +1538,7 @@ const Components: React.FC = () => {
       }
       return null;
     };
-    return searchInTree(dummyComponents);
+    return searchInTree(componentTreeData);
   };
   
   // Check for modify mode from URL parameter
@@ -1861,7 +1659,7 @@ const Components: React.FC = () => {
         return null;
       };
       
-      const targetComponent = findComponent(dummyComponents);
+      const targetComponent = findComponent(componentTreeData);
       if (targetComponent) {
         setSelectedComponent(targetComponent);
         // Expand parent nodes to show the selected component
@@ -2206,7 +2004,7 @@ const Components: React.FC = () => {
                 COMPONENTS
               </div>
               <div>
-                {renderComponentTree(dummyComponents)}
+                {renderComponentTree(componentTreeData)}
               </div>
             </div>
           </div>
