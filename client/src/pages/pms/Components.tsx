@@ -39,148 +39,6 @@ interface ComponentNode {
   isExpanded?: boolean;
 }
 
-// Function to get mock data for a component based on its code
-const getComponentMockData = (code: string) => {
-  // Generate realistic mock data based on component code and type
-  const getComponentDetails = (code: string, name?: string) => {
-    // Parse component hierarchy from code
-    const levels = code.split('.');
-    const topLevel = levels[0];
-    
-    // Department mapping based on top-level code
-    const departmentMap: { [key: string]: string } = {
-      "1": "Hull & Deck",
-      "2": "Deck Machinery",
-      "3": "Accommodation",
-      "4": "Ship's Equipment",
-      "5": "Safety Equipment",
-      "6": "Engine Department",
-      "7": "Engine Systems",
-      "8": "Common Systems"
-    };
-    
-    // Location mapping
-    const locationMap: { [key: string]: string } = {
-      "1": "Main Deck",
-      "2": "Fore Deck",
-      "3": "Accommodation Block",
-      "4": "Main Deck",
-      "5": "Bridge/Safety Station",
-      "6": "Engine Room",
-      "7": "Engine Room",
-      "8": "Various"
-    };
-    
-    // Criticality based on component level and type
-    const isCritical = topLevel === "6" || topLevel === "7" || (topLevel === "1" && levels.length > 2);
-    
-    // Generate appropriate maker based on component type
-    const getMaker = () => {
-      if (topLevel === "6") return ["MAN B&W", "Wärtsilä", "Caterpillar", "Yanmar"][Math.floor(Math.random() * 4)];
-      if (topLevel === "1") return ["Hyundai", "Samsung", "Daewoo"][Math.floor(Math.random() * 3)];
-      if (topLevel === "2") return ["MacGregor", "TTS Marine", "Rolls-Royce"][Math.floor(Math.random() * 3)];
-      if (topLevel === "3") return ["Marine Air Systems", "Novenco", "Heinen & Hopman"][Math.floor(Math.random() * 3)];
-      if (topLevel === "4") return ["Kongsberg", "Furuno", "JRC"][Math.floor(Math.random() * 3)];
-      if (topLevel === "5") return ["Viking", "Survitec", "LALIZAS"][Math.floor(Math.random() * 3)];
-      return "OEM Manufacturer";
-    };
-    
-    // Generate model based on code
-    const model = `${getMaker().split(' ')[0].toUpperCase()}-${code.replace(/\./g, '')}-${levels.length > 2 ? 'ADV' : 'STD'}`;
-    
-    // Generate serial number
-    const serialNo = `SN-${new Date().getFullYear()}-${code.replace(/\./g, '')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
-    
-    // Rating based on component type
-    const getRating = () => {
-      if (topLevel === "6" && levels.length === 3) return "7,200 kW";
-      if (topLevel === "6" && levels.length === 4) return "High Performance";
-      if (topLevel === "2") return "SWL 25 MT";
-      if (topLevel === "7") return "Medium Pressure";
-      return "Standard";
-    };
-    
-    return {
-      maker: getMaker(),
-      model: model,
-      serialNo: serialNo,
-      department: departmentMap[topLevel] || "General",
-      critical: isCritical ? "Yes" : "No",
-      classItem: isCritical ? "Yes" : "No",
-      location: locationMap[topLevel] || "Ship",
-      commissionedDate: "2020-01-15",
-      installationDate: "2019-12-20",
-      rating: getRating(),
-      conditionBased: levels.length > 2 ? "Yes" : "No",
-      noOfUnits: levels.length === 4 ? "6" : levels.length === 3 ? "2" : "1",
-      eqptSystemDept: departmentMap[topLevel] || "General",
-      parentComponent: levels.length > 1 ? `Level ${levels.slice(0, -1).join('.')}` : "Ship Structure",
-      dimensionsSize: levels.length === 4 ? "0.5m x 0.3m" : levels.length === 3 ? "2m x 1m" : "5m x 3m",
-      notes: `Component ${code} - ${isCritical ? 'Critical for vessel operations' : 'Standard equipment'}`
-    };
-  };
-  
-  // Special cases for specific well-known components
-  const specialCases: { [key: string]: any } = {
-    "6.1.1": {
-      maker: "MAN Energy Solutions",
-      model: "6S60MC-C",
-      serialNo: "ME-2020-001",
-      department: "Engine Department",
-      critical: "Yes",
-      classItem: "Yes",
-      location: "Engine Room",
-      commissionedDate: "2020-02-01",
-      installationDate: "2020-01-15",
-      rating: "7,200 kW @ 105 RPM",
-      conditionBased: "Yes",
-      noOfUnits: "1",
-      eqptSystemDept: "Engine Department",
-      parentComponent: "6.1 Main Engine",
-      dimensionsSize: "15m x 3m x 4m",
-      notes: "Main propulsion engine - 6 cylinder, 2-stroke diesel"
-    },
-    "1.1": {
-      maker: "Hyundai Heavy Industries",
-      model: "HHI-HULL-2020",
-      serialNo: "HULL-001",
-      department: "Hull & Deck",
-      critical: "Yes",
-      classItem: "Yes",
-      location: "Ship Structure",
-      commissionedDate: "2020-01-01",
-      installationDate: "2019-06-01",
-      rating: "Double Hull",
-      conditionBased: "Yes",
-      noOfUnits: "1",
-      eqptSystemDept: "Hull & Structure",
-      parentComponent: "1. Ship's Structure",
-      dimensionsSize: "180m x 32m x 18m",
-      notes: "Main hull structure - double bottom design"
-    },
-    "2.1": {
-      maker: "MacGregor",
-      model: "MG-CRANE-45T",
-      serialNo: "CR-2020-001",
-      department: "Deck Machinery",
-      critical: "Yes",
-      classItem: "Yes",
-      location: "Main Deck Port",
-      commissionedDate: "2020-01-15",
-      installationDate: "2019-12-01",
-      rating: "SWL 45 MT",
-      conditionBased: "Yes",
-      noOfUnits: "1",
-      eqptSystemDept: "Deck Department",
-      parentComponent: "2. Deck Machinery",
-      dimensionsSize: "25m boom length",
-      notes: "Main cargo crane - hydraulic operation"
-    }
-  };
-  
-  // Return special case if exists, otherwise generate based on pattern
-  return specialCases[code] || getComponentDetails(code);
-};
 
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
@@ -237,12 +95,26 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   // Update component data when selected component changes
   useEffect(() => {
     if (selectedComponent) {
-      // Get mock data based on component code
-      const mockData = getComponentMockData(selectedComponent.code);
+      // Use empty values - will be populated from database after Excel upload
       const newData = {
-        ...mockData,
+        maker: "",
+        model: "",
+        serialNo: "",
+        department: "",
+        componentCategory: getComponentCategory(selectedComponent.id),
         componentCode: selectedComponent.code,
-        componentCategory: getComponentCategory(selectedComponent.id)
+        critical: "No",
+        classItem: "No",
+        location: "",
+        commissionedDate: "",
+        installationDate: "",
+        rating: "",
+        conditionBased: "No",
+        noOfUnits: "",
+        eqptSystemDept: "",
+        parentComponent: "",
+        dimensionsSize: "",
+        notes: ""
       };
       setComponentData(newData);
       
@@ -1820,9 +1692,6 @@ const Components: React.FC = () => {
       return;
     }
 
-    // Get component details for the snapshot
-    const componentDetails = getComponentMockData(selectedComponent.code);
-    
     // Build the proposed changes from actual modifications
     const proposedChanges = buildProposedChanges();
     
@@ -1836,6 +1705,7 @@ const Components: React.FC = () => {
     }
 
     // Create proper change request structure matching the schema
+    // Use actual database values (currently empty) - will be populated from Excel upload
     const changeRequest = {
       vesselId: 'V001',  // Required field
       category: 'components',  // Required field
@@ -1852,22 +1722,22 @@ const Components: React.FC = () => {
           id: selectedComponent.id,
           code: selectedComponent.code,
           name: selectedComponent.name,
-          maker: componentDetails.maker,
-          model: componentDetails.model,
-          serialNo: componentDetails.serialNo,
-          department: componentDetails.department,
-          location: componentDetails.location,
-          critical: componentDetails.critical,
-          classItem: componentDetails.classItem,
-          commissionedDate: componentDetails.commissionedDate,
-          installationDate: componentDetails.installationDate,
-          rating: componentDetails.rating,
-          conditionBased: componentDetails.conditionBased,
-          noOfUnits: componentDetails.noOfUnits,
-          eqptSystemDept: componentDetails.eqptSystemDept,
-          parentComponent: componentDetails.parentComponent,
-          dimensionsSize: componentDetails.dimensionsSize,
-          notes: componentDetails.notes
+          maker: "",
+          model: "",
+          serialNo: "",
+          department: "",
+          location: "",
+          critical: "No",
+          classItem: "No",
+          commissionedDate: "",
+          installationDate: "",
+          rating: "",
+          conditionBased: "No",
+          noOfUnits: "",
+          eqptSystemDept: "",
+          parentComponent: "",
+          dimensionsSize: "",
+          notes: ""
         }
       },
       proposedChangesJson: proposedChanges,  // Now populated with actual changes
