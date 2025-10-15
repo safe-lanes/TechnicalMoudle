@@ -383,7 +383,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       if (!row['Component Code']) {
         errors.push(`Row ${rowNum}: Component Code is required`);
       } else {
-        normalized['Component Code'] = row['Component Code'].trim();
+        normalized['Component Code'] = String(row['Component Code']).trim();
       }
 
       if (!row['Component Category']) {
