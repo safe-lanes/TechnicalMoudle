@@ -72,10 +72,16 @@ export default function AdminMachineryUpload() {
       // Simulate upload progress
       setUploadProgress(30);
       
-      return apiRequest('/api/components/upload', {
+      const response = await fetch('/api/components/upload', {
         method: 'POST',
         body: formData
       });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      return await response.json() as UploadResult;
     },
     onSuccess: (data: UploadResult) => {
       setUploadResult(data);
