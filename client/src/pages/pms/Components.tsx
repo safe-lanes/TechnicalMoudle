@@ -67,7 +67,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   // Derive Component Category from the component's tree position
   const componentCategory = selectedComponent ? getComponentCategory(selectedComponent.id) : '';
 
-  // Component data - uses selected component code or defaults
+  // Component data - uses selected component code or defaults (empty until populated from Excel)
   const [componentData, setComponentData] = useState({
     maker: "",
     model: "",
@@ -75,13 +75,13 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     department: "",
     componentCategory: "",
     componentCode: "",
-    critical: "No",
-    classItem: "No",
+    critical: "",
+    classItem: "",
     location: "",
     commissionedDate: "",
     installationDate: "",
     rating: "",
-    conditionBased: "No",
+    conditionBased: "",
     noOfUnits: "",
     eqptSystemDept: "",
     parentComponent: "",
@@ -103,13 +103,13 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         department: "",
         componentCategory: getComponentCategory(selectedComponent.id),
         componentCode: selectedComponent.code,
-        critical: "No",
-        classItem: "No",
+        critical: "",
+        classItem: "",
         location: "",
         commissionedDate: "",
         installationDate: "",
         rating: "",
-        conditionBased: "No",
+        conditionBased: "",
         noOfUnits: "",
         eqptSystemDept: "",
         parentComponent: "",
@@ -529,13 +529,13 @@ const RunningHoursConditionSection: React.FC = () => {
   const { isChangeRequestMode } = useChangeRequest();
   const { isModifyMode } = useModifyMode();
   
-  // State for running hours data
+  // State for running hours data - empty until populated from database
   const [runningHoursData, setRunningHoursData] = useState({
-    currentHours: "12580 hours",
-    updatedDate: "12-Jun-2025",
-    vibration: 40,
-    temperature: 60,
-    pressure: 80
+    currentHours: "",
+    updatedDate: "",
+    vibration: 0,
+    temperature: 0,
+    pressure: 0
   });
   
   const [originalData] = useState(runningHoursData);
@@ -835,22 +835,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
 };
 
 const MaintenanceHistorySection: React.FC = () => {
-  const maintenanceHistory = [
-    {
-      title: "Main Engine Overhaul - Replace Main bearings",
-      workOrderNo: "WO-2025-001",
-      assignedTo: "2nd Eng",
-      status: "Completed",
-      dateCompleted: "02-Jun-2025"
-    },
-    {
-      title: "Main Engine - Replace Piston Rings",
-      workOrderNo: "WO-2024-013",
-      assignedTo: "2nd Eng",
-      status: "Completed",
-      dateCompleted: "02-Feb-2025"
-    }
-  ];
+  // Empty until populated from database
+  const maintenanceHistory: any[] = [];
 
   return (
     <div className="overflow-x-auto">
@@ -887,26 +873,8 @@ const MaintenanceHistorySection: React.FC = () => {
 const SparesSection: React.FC = () => {
   const { isModifyMode } = useModifyMode();
   
-  const [spares, setSpares] = useState([
-    {
-      partCode: "SP-ME-001",
-      partName: "Fuel Injector",
-      critical: "Critical",
-      rob: "2",
-      min: "1",
-      stock: "OK",
-      location: "Store Room A"
-    },
-    {
-      partCode: "SP-ME-002",
-      partName: "Cylinder Head Gasket",
-      critical: "",
-      rob: "2",
-      min: "1",
-      stock: "OK",
-      location: "Store Room B"
-    }
-  ]);
+  // Empty until populated from database
+  const [spares, setSpares] = useState<any[]>([]);
   
   const [originalSpares] = useState(JSON.parse(JSON.stringify(spares)));
   
@@ -1091,12 +1059,8 @@ const SparesSection: React.FC = () => {
 };
 
 const DrawingsAndManualsSection: React.FC = () => {
-  const documents = [
-    { name: "Equipment Drawing", icon: FileText },
-    { name: "Installation Guide", icon: FileText },
-    { name: "Maintenance Manual", icon: FileText },
-    { name: "Trouble shooting Guide", icon: FileText }
-  ];
+  // Empty until populated from database
+  const documents: any[] = [];
 
   return (
     <div className="grid grid-cols-2 gap-4">
@@ -1117,11 +1081,12 @@ const ClassificationRegulatorySection: React.FC = () => {
   const { isChangeRequestMode } = useChangeRequest();
   const { isModifyMode } = useModifyMode();
   
+  // Empty until populated from database
   const [classData, setClassData] = useState({
-    classificationSociety: "DNV",
-    certificateNo: "CERT-ME-2025-01",
-    lastClassSurvey: "15-Mar-2023",
-    nextClassSurvey: "15-Mar-2025"
+    classificationSociety: "",
+    certificateNo: "",
+    lastClassSurvey: "",
+    nextClassSurvey: ""
   });
   
   const [originalClassData] = useState(classData);
@@ -1223,23 +1188,23 @@ const ClassificationRegulatorySection: React.FC = () => {
         </div>
       </div>
 
-      {/* Second row */}
+      {/* Second row - empty until populated from database */}
       <div className="grid grid-cols-4 gap-4">
         <div>
           <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1">Survey Type</label>
-          <div className="text-sm text-gray-900">Annual</div>
+          <div className="text-sm text-gray-900"></div>
         </div>
         <div>
           <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1">Class Requirements</label>
-          <div className="text-sm text-gray-900">SOLAS, MARPOL, MLC</div>
+          <div className="text-sm text-gray-900"></div>
         </div>
         <div>
           <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1">Class Code</label>
-          <div className="text-sm text-gray-900">DNV-ME-001</div>
+          <div className="text-sm text-gray-900"></div>
         </div>
         <div>
           <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1">Information</label>
-          <div className="text-sm text-gray-900">Details</div>
+          <div className="text-sm text-gray-900"></div>
         </div>
       </div>
     </div>
@@ -1247,32 +1212,8 @@ const ClassificationRegulatorySection: React.FC = () => {
 };
 
 const RequisitionsSection: React.FC = () => {
-  const requisitions = [
-    {
-      reqId: "RQ-ME-001",
-      reqDate: "15-May-2025",
-      titleDescription: "Main Engine Cylinder Head Gasket - Urgent Replacement",
-      requestedDate: "20-May-2025",
-      status: "Approved",
-      remarks: "High priority - main engine showing compression loss"
-    },
-    {
-      reqId: "RQ-ME-002",
-      reqDate: "10-May-2025",
-      titleDescription: "Fuel Injection Pump Service Kit",
-      requestedDate: "25-May-2025",
-      status: "Ordered",
-      remarks: "Preventive maintenance - scheduled overhaul"
-    },
-    {
-      reqId: "RQ-ME-003",
-      reqDate: "08-May-2025",
-      titleDescription: "Turbocharger Bearing Set",
-      requestedDate: "30-May-2025",
-      status: "Open",
-      remarks: "Vibration monitoring shows wear indication"
-    }
-  ];
+  // Empty until populated from database
+  const requisitions: any[] = [];
 
   return (
     <div className="overflow-x-auto">
@@ -1727,12 +1668,12 @@ const Components: React.FC = () => {
           serialNo: "",
           department: "",
           location: "",
-          critical: "No",
-          classItem: "No",
+          critical: "",
+          classItem: "",
           commissionedDate: "",
           installationDate: "",
           rating: "",
-          conditionBased: "No",
+          conditionBased: "",
           noOfUnits: "",
           eqptSystemDept: "",
           parentComponent: "",
