@@ -1202,11 +1202,11 @@ const SparesSection: React.FC = () => {
                 <td className="py-3 px-3 text-center">
                   {/* Mock IHM status - in real implementation, fetch from API */}
                   {spare.partCode === 'SP-ME-001' ? (
-                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" title="IHM Present" />
+                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" />
                   ) : spare.partCode === 'SP-ME-002' ? (
-                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" title="IHM Not Present" />
+                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
                   ) : (
-                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" title="IHM Unknown" />
+                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" />
                   )}
                 </td>
               )}
@@ -1510,13 +1510,27 @@ const Components: React.FC = () => {
       const code = comp.componentCode || comp.id;
       const node = componentMap.get(code);
       
-      if (node && comp.parentId) {
+      if (!node) return;
+      
+      if (comp.parentId) {
+        // Has explicit parent ID - use it
         const parent = componentMap.get(comp.parentId);
         if (parent) {
           if (!parent.children) {
             parent.children = [];
           }
           parent.children.push(node);
+        }
+      } else {
+        // No parent ID - determine category from code prefix (first digit)
+        const categoryCode = code.split('.')[0];
+        const category = componentMap.get(categoryCode);
+        if (category && categoryCode !== code) {
+          // Only add if it's not the category itself
+          if (!category.children) {
+            category.children = [];
+          }
+          category.children.push(node);
         }
       }
     });
