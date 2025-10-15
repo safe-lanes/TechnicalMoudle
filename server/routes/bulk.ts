@@ -564,32 +564,99 @@ async function performImport(
     archived: 0
   };
 
-  // TODO: Implement actual database operations
-  // This is a placeholder that simulates the import
-  for (const row of data) {
-    if (mode === 'add') {
-      // Check if exists, if yes skip, else create
-      result.created++;
-    } else if (mode === 'update') {
-      // Check if exists, if yes update, else skip
-      result.updated++;
-    } else if (mode === 'upsert') {
-      // Create or update
-      const exists = Math.random() > 0.5; // Simulated check
-      if (exists) {
-        result.updated++;
-      } else {
-        result.created++;
+  if (type === 'components') {
+    for (const row of data) {
+      const componentCode = String(row['Component Code']).trim();
+      const existing = await storage.getComponent(componentCode);
+
+      if (mode === 'add') {
+        if (existing) {
+          result.skipped++;
+        } else {
+          await createComponentFromRow(row, vesselId);
+          result.created++;
+        }
+      } else if (mode === 'update') {
+        if (existing) {
+          await updateComponentFromRow(componentCode, row);
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existing) {
+          await updateComponentFromRow(componentCode, row);
+          result.updated++;
+        } else {
+          await createComponentFromRow(row, vesselId);
+          result.created++;
+        }
       }
+    }
+  } else if (type === 'spares') {
+    // TODO: Implement spares import
+    for (const row of data) {
+      result.created++;
+    }
+  } else if (type === 'stores') {
+    // TODO: Implement stores import
+    for (const row of data) {
+      result.created++;
     }
   }
 
   if (archiveMissing) {
     // Archive records not in the file
-    result.archived = Math.floor(Math.random() * 5); // Simulated
+    // TODO: Implement archiving logic
+    result.archived = 0;
   }
 
   return result;
+}
+
+// Helper function to create component from Excel row
+async function createComponentFromRow(row: any, vesselId?: string) {
+  const componentCode = String(row['Component Code']).trim();
+  const componentData = {
+    id: componentCode,
+    componentCode: componentCode,
+    name: row['Component Name'] || '',
+    category: row['Component Category'] || '',
+    parentId: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
+    vesselId: vesselId || row['Vessel ID'] || 'V001',
+    maker: row['Maker'] || null,
+    model: row['Model'] || null,
+    serialNo: row['Serial No'] || null,
+    location: row['Location'] || null,
+    deptCategory: row['Eqpt / System Department'] || null,
+    componentCategory: row['Component Category'] || null,
+    commissionedDate: row['Commissioned Date'] || null,
+    critical: row['Critical (Yes/No)'] === 'Yes',
+    classItem: row['Condition Based (Yes/No)'] === 'Yes',
+    currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0'
+  };
+
+  return await storage.createComponent(componentData);
+}
+
+// Helper function to update component from Excel row
+async function updateComponentFromRow(componentCode: string, row: any) {
+  const updateData: any = {};
+  
+  if (row['Component Name']) updateData.name = row['Component Name'];
+  if (row['Component Category']) updateData.category = row['Component Category'];
+  if (row['Parent Component Code']) updateData.parentId = String(row['Parent Component Code']).trim();
+  if (row['Maker']) updateData.maker = row['Maker'];
+  if (row['Model']) updateData.model = row['Model'];
+  if (row['Serial No']) updateData.serialNo = row['Serial No'];
+  if (row['Location']) updateData.location = row['Location'];
+  if (row['Eqpt / System Department']) updateData.deptCategory = row['Eqpt / System Department'];
+  if (row['Commissioned Date']) updateData.commissionedDate = row['Commissioned Date'];
+  if (row['Critical (Yes/No)']) updateData.critical = row['Critical (Yes/No)'] === 'Yes';
+  if (row['Condition Based (Yes/No)']) updateData.classItem = row['Condition Based (Yes/No)'] === 'Yes';
+  if (row['Running Hours']) updateData.currentCumulativeRH = String(row['Running Hours']);
+
+  return await storage.updateComponent(componentCode, updateData);
 }
 
 // Store import history

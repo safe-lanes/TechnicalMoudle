@@ -640,6 +640,19 @@ export class MemStorage implements IStorage {
     return this.components.get(id);
   }
 
+  async createComponent(insertComponent: InsertComponent): Promise<Component> {
+    const component: Component = {
+      ...insertComponent,
+      id: insertComponent.componentCode || insertComponent.id,
+      currentCumulativeRH: insertComponent.currentCumulativeRH || "0",
+      lastUpdated: new Date().toISOString(),
+      critical: insertComponent.critical ?? false,
+      classItem: insertComponent.classItem ?? false
+    };
+    this.components.set(component.id, component);
+    return component;
+  }
+
   async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
     const component = this.components.get(id);
     if (!component) {
@@ -648,6 +661,10 @@ export class MemStorage implements IStorage {
     const updated = { ...component, ...data };
     this.components.set(id, updated);
     return updated;
+  }
+
+  async deleteComponent(id: string): Promise<void> {
+    this.components.delete(id);
   }
 
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
