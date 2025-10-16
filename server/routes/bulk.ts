@@ -16,16 +16,16 @@ const upload = multer({
 // Store dry-run results temporarily (in production, use Redis or similar)
 const dryRunCache = new Map<string, any>();
 
-// Component categories from existing system
+// Component categories from existing system (8 main categories)
 const COMPONENT_CATEGORIES = [
-  "Ship's Structure",
-  "Deck Machinery", 
-  "Engine Department",
-  "Safety Equipment",
-  "Accommodation",
+  "Ship General",
   "Hull",
   "Equipment for Cargo",
-  "Ship General"
+  "Ship's Equipment",
+  "Equipment for Crew & Passengers",
+  "Machinery Main Components",
+  "Systems for Machinery Main Components",
+  "Ship Common Systems"
 ];
 
 // UOM list
