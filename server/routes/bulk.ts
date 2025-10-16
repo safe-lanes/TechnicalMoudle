@@ -56,69 +56,35 @@ router.get('/template', (req, res) => {
   switch (type) {
     case 'components':
       headers = [
-        // Section A
+        // Section A - Core Fields
         'Component Code', 'Component Name', 'Component Category',
         'Maker', 'Model', 'Serial No', 'Drawing No', 'Location',
         'Critical (Yes/No)', 'Condition Based (Yes/No)',
         'Installation Date', 'Commissioned Date', 'Rating', 'No of Units',
         'Eqpt / System Department', 'Parent Component Code',
         'Dimensions/Size', 'Notes',
-        // Section B
-        'Running Hours', 'Date Updated',
-        // Metrics (up to 5)
-        ...Array.from({ length: 5 }, (_, i) => [
-          `Metric${i + 1} Name`,
-          `Metric${i + 1} Value`,
-          `Metric${i + 1} Unit`
-        ]).flat(),
-        // Work Orders (up to 10)
-        ...Array.from({ length: 10 }, (_, i) => [
-          `WO${i + 1} Title`,
-          `WO${i + 1} Frequency Type (Calendar/Running Hours)`,
-          `WO${i + 1} Frequency Value`,
-          `WO${i + 1} Initial Next Due (Date)`,
-          `WO${i + 1} Assigned To (Rank)`
-        ]).flat(),
-        // Spares (up to 10)
-        ...Array.from({ length: 10 }, (_, i) => [
-          `SP${i + 1} Part Code`,
-          `SP${i + 1} Part Name`,
-          `SP${i + 1} Min`,
-          `SP${i + 1} Critical (Yes/No)`,
-          `SP${i + 1} Location`
-        ]).flat()
+        // Section B - Running Hours
+        'Running Hours', 'Date Updated'
       ];
 
       validValues = [
-        'Required, Unique', 'Text', COMPONENT_CATEGORIES.join('|'),
+        'Required, Unique', 'Required', COMPONENT_CATEGORIES.join('|'),
         'Text', 'Text', 'Text', 'Text', 'Text',
         'Yes/No', 'Yes/No',
         'DD-MM-YYYY', 'DD-MM-YYYY', 'Text', 'Number >= 0',
         'Text', 'Existing Code or blank',
         'Text', 'Text',
-        'Number >= 0', 'DD-MM-YYYY',
-        ...Array.from({ length: 5 }, () => ['Text', 'Number', 'Text']).flat(),
-        ...Array.from({ length: 10 }, () => [
-          'Text', 'Calendar/Running Hours', 'Number > 0', 'DD-MM-YYYY', 'Text'
-        ]).flat(),
-        ...Array.from({ length: 10 }, () => [
-          'Text', 'Text', 'Number >= 0', 'Yes/No', 'Text'
-        ]).flat()
+        'Number >= 0', 'DD-MM-YYYY'
       ];
 
       example = [
-        '1.1.1', 'Main Engine', 'Machinery Main Components',
+        '6.1', 'Main Engine', 'Machinery Main Components',
         'MAN B&W', 'S60MC-C', '12345', 'DRW-001', 'Engine Room',
         'Yes', 'Yes',
         '01-01-2020', '15-03-2020', '15000 kW', '1',
         'Engineering', '',
         '10m x 5m x 8m', 'Main propulsion engine',
-        '25000', '15-01-2024',
-        ...Array.from({ length: 5 }, () => ['', '', '']).flat(),
-        'Cylinder Head Overhaul', 'Running Hours', '8000', '01-06-2024', 'Chief Engineer',
-        ...Array.from({ length: 9 }, () => ['', '', '', '', '']).flat(),
-        'SP-001', 'Cylinder Head Gasket', '2', 'Yes', 'Store Room A',
-        ...Array.from({ length: 9 }, () => ['', '', '', '', '']).flat()
+        '25000', '15-01-2024'
       ];
       break;
 
@@ -166,13 +132,137 @@ router.get('/template', (req, res) => {
 
   // Create main sheet
   const mainSheet = XLSX.utils.aoa_to_sheet([headers, validValues, example]);
+
+  // Add data validation for components
+  if (type === 'components') {
+    if (!mainSheet['!dataValidation']) {
+      mainSheet['!dataValidation'] = [];
+    }
+
+    // Component Category dropdown (Column C, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'C4:C1000',
+      formulas: [`"${COMPONENT_CATEGORIES.join(',')}"`],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Category',
+      error: `Please select from: ${COMPONENT_CATEGORIES.join(', ')}`
+    });
+
+    // Critical (Yes/No) dropdown (Column I, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'I4:I1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Condition Based (Yes/No) dropdown (Column J, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'J4:J1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+  }
+
+  // Add data validation for spares
+  if (type === 'spares') {
+    if (!mainSheet['!dataValidation']) {
+      mainSheet['!dataValidation'] = [];
+    }
+
+    // UOM dropdown (Column D, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'D4:D1000',
+      formulas: [`"${UOM_LIST.join(',')}"`],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid UOM',
+      error: `Please select from: ${UOM_LIST.join(', ')}`
+    });
+
+    // Critical (Yes/No) dropdown (Column F, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'F4:F1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+  }
+
+  // Add data validation for stores
+  if (type === 'stores') {
+    if (!mainSheet['!dataValidation']) {
+      mainSheet['!dataValidation'] = [];
+    }
+
+    // Type dropdown (Column C, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'C4:C1000',
+      formulas: ['"Stores,Lubes,Chemicals,Others"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Type',
+      error: 'Please select from: Stores, Lubes, Chemicals, Others'
+    });
+
+    // Stores Category dropdown (Column D, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'D4:D1000',
+      formulas: [`"${STORES_CATEGORIES.join(',')}"`],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Category',
+      error: `Please select from: ${STORES_CATEGORIES.join(', ')}`
+    });
+
+    // UOM dropdown (Column E, starting from row 4)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'E4:E1000',
+      formulas: [`"${UOM_LIST.join(',')}"`],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid UOM',
+      error: `Please select from: ${UOM_LIST.join(', ')}`
+    });
+  }
+
   XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
 
-  // Create meta sheet
+  // Create meta sheet with instructions
   const metaData = [
     ['Template Type', type],
-    ['Template Version', '1.0'],
+    ['Template Version', '2.0'],
     ['Generated At', new Date().toISOString()],
+    [''],
+    ['Instructions:'],
+    ['1. Fill in your data starting from Row 4 (Row 1 = Headers, Row 2 = Valid Values, Row 3 = Example)'],
+    ['2. Use the dropdown menus for category and Yes/No fields'],
+    ['3. Required fields are marked in Row 2'],
+    ['4. Save and upload this file when complete'],
     [''],
     ['Component Categories', ...COMPONENT_CATEGORIES],
     ['UOM List', ...UOM_LIST],
