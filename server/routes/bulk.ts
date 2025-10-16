@@ -107,7 +107,7 @@ router.get('/template', (req, res) => {
       ];
 
       example = [
-        '1.1.1', 'Main Engine', 'Engine Department',
+        '1.1.1', 'Main Engine', 'Machinery Main Components',
         'MAN B&W', 'S60MC-C', '12345', 'DRW-001', 'Engine Room',
         'Yes', 'Yes',
         '01-01-2020', '15-03-2020', '15000 kW', '1',
