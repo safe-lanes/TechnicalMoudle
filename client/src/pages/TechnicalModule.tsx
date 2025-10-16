@@ -127,8 +127,6 @@ export const TechnicalModule: React.FC = () => {
           ) : selectedSubModule === "pms" && selectedMenuItem === "modify-pms" ? (
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
-            <AdminPanel />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "machinery-upload" ? (
             <AdminMachineryUpload />
           ) : selectedSubModule === "admin" ? (
             <AdminPanel />
