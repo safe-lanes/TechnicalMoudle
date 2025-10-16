@@ -270,9 +270,9 @@ export default function AdminMachineryUpload() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="add">Add New Only</SelectItem>
-                        <SelectItem value="update">Update Existing Only</SelectItem>
-                        <SelectItem value="upsert">Upsert (Add or Update)</SelectItem>
+                        <SelectItem value="add">Create Only (Skip Existing)</SelectItem>
+                        <SelectItem value="update">Update Only (Skip New)</SelectItem>
+                        <SelectItem value="upsert">Create & Update (Recommended)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

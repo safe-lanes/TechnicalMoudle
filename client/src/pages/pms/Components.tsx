@@ -95,26 +95,35 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   // Update component data when selected component changes
   useEffect(() => {
     if (selectedComponent) {
-      // Use empty values - will be populated from database after Excel upload
+      // Populate from selectedComponent data (now includes all fields from spread operator)
+      const comp = selectedComponent as any;
+      
+      // Helper to normalize boolean/string to "Yes"/"No"/""
+      const toBoolString = (val: any) => {
+        if (val === true || (typeof val === 'string' && val.toLowerCase() === 'yes')) return "Yes";
+        if (val === false || (typeof val === 'string' && val.toLowerCase() === 'no')) return "No";
+        return "";
+      };
+      
       const newData = {
-        maker: "",
-        model: "",
-        serialNo: "",
-        department: "",
+        maker: comp.maker || "",
+        model: comp.model || "",
+        serialNo: comp.serialNo || "",
+        department: comp.deptCategory || "",
         componentCategory: getComponentCategory(selectedComponent.id),
         componentCode: selectedComponent.code,
-        critical: "",
-        classItem: "",
-        location: "",
-        commissionedDate: "",
-        installationDate: "",
-        rating: "",
-        conditionBased: "",
-        noOfUnits: "",
-        eqptSystemDept: "",
-        parentComponent: "",
-        dimensionsSize: "",
-        notes: ""
+        critical: toBoolString(comp.critical),
+        classItem: toBoolString(comp.classItem),
+        location: comp.location || "",
+        commissionedDate: comp.commissionedDate || "",
+        installationDate: comp.installationDate || "",
+        rating: comp.rating || "",
+        conditionBased: toBoolString(comp.conditionBased),
+        noOfUnits: comp.noOfUnits || "",
+        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || "",
+        parentComponent: comp.parentId || "",
+        dimensionsSize: comp.dimensionsSize || "",
+        notes: comp.notes || ""
       };
       setComponentData(newData);
       
@@ -1288,6 +1297,7 @@ const Components: React.FC = () => {
         id: comp.componentCode || comp.id,
         code: comp.componentCode || comp.id,
         name: comp.name,
+        ...comp,  // Include all component data
         children: []
       };
       componentMap.set(node.code, node);
