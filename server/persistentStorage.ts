@@ -38,7 +38,11 @@ import {
   type DefectAction,
   type InsertDefectAction,
   type DefectAttachment,
-  type InsertDefectAttachment
+  type InsertDefectAttachment,
+  type ImportHistory,
+  type InsertImportHistory,
+  type RecurringDefect,
+  type RecurringDefectLink
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -64,6 +68,7 @@ interface PersistentData {
   defectAttachments: DefectAttachment[];
   recurringDefects: Record<number, RecurringDefect>;
   recurringDefectLinks: RecurringDefectLink[];
+  importHistory: ImportHistory[];
   
   // Counter state
   counters: {
@@ -205,6 +210,7 @@ export class PersistentFileStorage implements IStorage {
           defectAttachments: loadedData.defectAttachments || [],
           recurringDefects: loadedData.recurringDefects || {},
           recurringDefectLinks: loadedData.recurringDefectLinks || [],
+          importHistory: loadedData.importHistory || [],
           counters: loadedData.counters || {
             userId: 1,
             auditId: 1,
@@ -262,6 +268,7 @@ export class PersistentFileStorage implements IStorage {
       defectAttachments: [],
       recurringDefects: {},
       recurringDefectLinks: [],
+      importHistory: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -2486,5 +2493,49 @@ export class PersistentFileStorage implements IStorage {
     // In production, this would add to a vessels table
     // Nothing to do for now - vessel will be created implicitly when first defect is added
     return;
+  }
+
+  // Import History methods
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    const newHistory: ImportHistory = {
+      ...history,
+      startedAt: history.startedAt || new Date(),
+      finishedAt: history.finishedAt || null,
+      created: history.created || 0,
+      updated: history.updated || 0,
+      skipped: history.skipped || 0,
+      archived: history.archived || 0,
+      vesselId: history.vesselId || null,
+      originalName: history.originalName || null,
+      archiveMissing: history.archiveMissing || false
+    };
+    this.data.importHistory.push(newHistory);
+    this.persistData();
+    return newHistory;
+  }
+
+  async getImportHistory(type?: string, limit: number = 20, offset: number = 0): Promise<{ items: ImportHistory[]; total: number }> {
+    let filtered = [...this.data.importHistory];
+    
+    // Filter by type if provided
+    if (type) {
+      filtered = filtered.filter(h => h.type === type);
+    }
+    
+    // Sort by startedAt descending (newest first)
+    filtered.sort((a, b) => {
+      const dateA = a.startedAt instanceof Date ? a.startedAt : new Date(a.startedAt);
+      const dateB = b.startedAt instanceof Date ? b.startedAt : new Date(b.startedAt);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    const total = filtered.length;
+    const items = filtered.slice(offset, offset + limit);
+    
+    return { items, total };
+  }
+
+  async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    return this.data.importHistory.find(h => h.id === id);
   }
 }

@@ -661,61 +661,46 @@ async function updateComponentFromRow(componentCode: string, row: any) {
 
 // Store import history
 async function storeImportHistory(data: any) {
-  // TODO: Store in database
-  // For now, using in-memory storage
-  if (!global.importHistory) {
-    global.importHistory = [];
-  }
-  global.importHistory.push(data);
+  await storage.createImportHistory(data);
 }
 
 // Get import history
 async function getImportHistory(type: string | undefined, limit: number, offset: number) {
-  // TODO: Fetch from database
-  const history = global.importHistory || [];
+  const result = await storage.getImportHistory(type, limit, offset);
   
-  let filtered = history;
-  if (type) {
-    filtered = history.filter((h: any) => h.type === type);
-  }
-
   return {
-    items: filtered.slice(offset, offset + limit).map((h: any) => ({
+    items: result.items.map((h: any) => ({
       id: h.id,
       date: h.startedAt,
       user: h.userId,
       mode: h.mode,
+      type: h.type,
       created: h.created,
       updated: h.updated,
       skipped: h.skipped,
-      archived: h.archived
+      archived: h.archived,
+      status: h.status,
+      originalName: h.originalName
     })),
-    total: filtered.length
+    total: result.total
   };
 }
 
 // Get history file
 async function getHistoryFile(id: string, fileType: string) {
-  // TODO: Fetch from file storage
-  const history = (global.importHistory || []).find((h: any) => h.id === id);
+  const history = await storage.getImportHistoryById(id);
   
   if (!history) return null;
 
   if (fileType === 'file') {
-    return {
-      data: history.originalFile,
-      mimeType: 'application/octet-stream',
-      name: history.originalName
-    };
+    // Note: originalFile buffer is not stored in database schema
+    // This would need to be stored in object storage or file system
+    // For now, return null as file storage is not implemented
+    return null;
   }
 
   // Generate error report or result map as needed
   return null;
-}
-
-// Declare global for TypeScript
-declare global {
-  var importHistory: any[];
 }
 
 export default router;

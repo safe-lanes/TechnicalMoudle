@@ -1,219 +1,235 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download, X, Eye, Database } from "lucide-react";
+import { 
+  Upload, 
+  Download, 
+  AlertCircle, 
+  CheckCircle, 
+  AlertTriangle,
+  FileSpreadsheet,
+  Clock
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import * as XLSX from "xlsx";
+import { useQuery } from "@tanstack/react-query";
+import { Label } from "@/components/ui/label";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { queryClient } from "@/lib/queryClient";
 
-interface UploadResult {
-  success: boolean;
+interface DryRunResult {
+  fileToken: string;
+  columns: string[];
+  summary: {
+    ok: number;
+    warnings: number;
+    errors: number;
+  };
+  rows: Array<{
+    row: number;
+    status: 'ok' | 'warning' | 'error';
+    errors: string[];
+    normalized: Record<string, any>;
+  }>;
+  errorReportUrl?: string;
+}
+
+interface ImportHistory {
+  id: string;
+  type: string;
+  mode: string;
   created: number;
   updated: number;
-  failed: number;
-  errors: Array<{
-    row: number;
-    field: string;
-    message: string;
-    data?: any;
-  }>;
-  preview?: Array<any>;
+  skipped: number;
+  archived: number;
+  startedAt: string;
+  status: string;
+  userId: string;
 }
 
-interface FieldMapping {
-  fileHeader: string;
-  dbField: string;
-  required: boolean;
-  dataType: string;
-  example: string;
-}
-
-const FIELD_MAPPINGS: FieldMapping[] = [
-  { fileHeader: "Component ID", dbField: "id", required: true, dataType: "text", example: "ME001" },
-  { fileHeader: "Component Name", dbField: "name", required: true, dataType: "text", example: "Main Engine" },
-  { fileHeader: "Component Code", dbField: "componentCode", required: false, dataType: "text", example: "ME001" },
-  { fileHeader: "Parent ID", dbField: "parentId", required: false, dataType: "text", example: "null" },
-  { fileHeader: "Category", dbField: "category", required: true, dataType: "text", example: "ENGINE" },
-  { fileHeader: "Vessel ID", dbField: "vesselId", required: true, dataType: "text", example: "V001" },
-  { fileHeader: "Current Cumulative RH", dbField: "currentCumulativeRH", required: false, dataType: "decimal", example: "45230.5" },
-  { fileHeader: "Last Updated", dbField: "lastUpdated", required: false, dataType: "date", example: "2025-10-03" },
-  { fileHeader: "Maker", dbField: "maker", required: false, dataType: "text", example: "MAN B&W" },
-  { fileHeader: "Model", dbField: "model", required: false, dataType: "text", example: "6S60MC-C" },
-  { fileHeader: "Serial No", dbField: "serialNo", required: false, dataType: "text", example: "SN123456" },
-  { fileHeader: "Department Category", dbField: "deptCategory", required: false, dataType: "text", example: "Engineering" },
-  { fileHeader: "Component Category", dbField: "componentCategory", required: false, dataType: "text", example: "Main Propulsion" },
-  { fileHeader: "Location", dbField: "location", required: false, dataType: "text", example: "Engine Room" },
-  { fileHeader: "Commissioned Date", dbField: "commissionedDate", required: false, dataType: "date", example: "2020-01-15" },
-  { fileHeader: "Critical", dbField: "critical", required: false, dataType: "boolean", example: "false" },
-  { fileHeader: "Class Item", dbField: "classItem", required: false, dataType: "boolean", example: "false" }
+const FIELD_MAPPINGS = [
+  { field: "Component Code", required: true, description: "Unique identifier (e.g., 1.1.1)" },
+  { field: "Component Name", required: true, description: "Component name" },
+  { field: "Component Category", required: true, description: "One of the 8 main categories" },
+  { field: "Parent Component Code", required: false, description: "Parent component code" },
+  { field: "Maker", required: false, description: "Manufacturer name" },
+  { field: "Model", required: false, description: "Model number" },
+  { field: "Serial No", required: false, description: "Serial number" },
+  { field: "Location", required: false, description: "Physical location" },
+  { field: "Critical (Yes/No)", required: false, description: "Yes or No" },
+  { field: "Condition Based (Yes/No)", required: false, description: "Yes or No" },
+  { field: "Running Hours", required: false, description: "Numeric value" },
 ];
 
 export default function AdminMachineryUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [showMappingGuide, setShowMappingGuide] = useState(false);
+  const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Simulate upload progress
-      setUploadProgress(30);
-      
-      const response = await fetch('/api/components/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-      
-      return await response.json() as UploadResult;
-    },
-    onSuccess: (data: UploadResult) => {
-      setUploadResult(data);
-      setUploadProgress(100);
-      
-      if (data.success) {
-        toast({
-          title: "Upload Successful",
-          description: `Created: ${data.created}, Updated: ${data.updated}, Failed: ${data.failed}`,
-        });
-        
-        // Invalidate components cache to refresh the Components page
-        queryClient.invalidateQueries({ queryKey: ['/api/components'] });
-      } else {
-        toast({
-          title: "Upload Completed with Errors",
-          description: `Check the error report for details. Failed rows: ${data.failed}`,
-          variant: "destructive"
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Upload Failed",
-        description: error.message || "An error occurred during upload",
-        variant: "destructive"
-      });
-      setUploadProgress(0);
-    },
-    onSettled: () => {
-      setIsProcessing(false);
+  // Fetch import history
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ['/api/bulk/history', 'components'],
+    queryFn: async () => {
+      const response = await fetch('/api/bulk/history?type=components&limit=50');
+      if (!response.ok) throw new Error('Failed to fetch history');
+      return response.json();
     }
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const validTypes = ['.csv', '.xls', '.xlsx'];
-      const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+  // Download template
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/bulk/template?type=components');
+      if (!response.ok) throw new Error('Failed to download template');
       
-      if (!validTypes.includes(fileExtension)) {
-        toast({
-          title: "Invalid File Type",
-          description: "Please upload a CSV, XLS, or XLSX file",
-          variant: "destructive"
-        });
-        return;
-      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'components_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       
-      setSelectedFile(file);
-      setUploadResult(null);
-      setUploadProgress(0);
+      toast({
+        title: 'Template Downloaded',
+        description: 'Excel template has been downloaded.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Failed to download template.',
+        variant: 'destructive'
+      });
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
+  // Handle file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['.csv', '.xls', '.xlsx'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+    
+    if (!validTypes.includes(fileExtension)) {
       toast({
-        title: "No File Selected",
-        description: "Please select a file to upload",
-        variant: "destructive"
+        title: 'Invalid File',
+        description: 'Please upload a .xlsx, .xls, or .csv file',
+        variant: 'destructive'
       });
       return;
     }
 
-    setIsProcessing(true);
-    setUploadProgress(10);
-    uploadMutation.mutate(selectedFile);
+    setSelectedFile(file);
+    await handleDryRun(file);
   };
 
-  const downloadTemplate = () => {
-    // Define all column headers
-    const headers = [
-      "Component ID", "Component Name", "Component Code", "Parent ID", "Category", "Vessel ID",
-      "Current Cumulative RH", "Last Updated", "Maker", "Model", "Serial No",
-      "Department Category", "Component Category", "Location", "Commissioned Date",
-      "Critical", "Class Item"
-    ];
+  // Dry run validation
+  const handleDryRun = async (file: File) => {
+    setIsUploading(true);
+    setDryRunResult(null);
 
-    // Sample data showing proper hierarchy and relationships
-    const sampleData = [
-      // Main Engine hierarchy examples (Category 6)
-      ["6.1", "Main Engine", "ME-001", "6", "ENGINE", "V001", "45230.5", "2025-10-15", "MAN B&W", "6S60MC-C", "SN123456", "Engineering", "Main Propulsion", "Engine Room", "2020-01-15", "Yes", "Yes"],
-      ["6.1.1", "Cylinder Head", "CH-001", "6.1", "ENGINE_PART", "V001", "45230.5", "2025-10-15", "MAN B&W", "", "", "Engineering", "Engine Parts", "Engine Room", "2020-01-15", "Yes", "No"],
-      ["6.1.1.1", "Valve Seats", "VS-001", "6.1.1", "COMPONENT", "V001", "", "", "", "", "", "Engineering", "", "", "", "No", "No"],
-      ["6.1.1.2", "Injector Sleeve", "IS-001", "6.1.1", "COMPONENT", "V001", "", "", "", "", "", "Engineering", "", "", "", "No", "No"],
-      ["6.1.2", "Main Bearings", "MB-001", "6.1", "ENGINE_PART", "V001", "", "", "", "", "", "Engineering", "Engine Parts", "", "", "Yes", "No"],
-      ["6.2", "Diesel Generator #1", "DG1-001", "6", "ENGINE", "V001", "22100.0", "2025-10-15", "Caterpillar", "3512B", "DG123", "Engineering", "Auxiliary Power", "Generator Room", "2020-03-20", "Yes", "Yes"],
-      
-      // Ship General hierarchy examples (Category 1)
-      ["1.1", "Fresh Water System", "FWS-001", "1", "SYSTEM", "V001", "", "", "", "", "", "Deck", "Water Systems", "Engine Room", "2020-01-10", "No", "No"],
-      ["1.1.1", "Hydrophore Unit", "HU-001", "1.1", "EQUIPMENT", "V001", "18500.0", "2025-10-15", "Grundfos", "CR 10-4", "HU456", "Deck", "Pumps", "Pump Room", "2020-01-10", "Yes", "No"],
-      ["1.1.1.1", "Pressure Vessel", "PV-001", "1.1.1", "COMPONENT", "V001", "", "", "", "", "", "Deck", "", "", "", "No", "No"],
-      ["1.1.1.2", "Feed Pump", "FP-001", "1.1.1", "COMPONENT", "V001", "", "", "", "", "", "Deck", "", "", "", "No", "No"],
-    ];
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'components');
+    formData.append('mode', importMode);
+    formData.append('archiveMissing', 'false');
 
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+    try {
+      const response = await fetch('/api/bulk/dry-run', {
+        method: 'POST',
+        body: formData
+      });
 
-    // Set column widths for better readability
-    ws['!cols'] = [
-      { wch: 15 }, // Component ID
-      { wch: 30 }, // Component Name
-      { wch: 15 }, // Component Code
-      { wch: 12 }, // Parent ID
-      { wch: 18 }, // Category
-      { wch: 10 }, // Vessel ID
-      { wch: 20 }, // Current Cumulative RH
-      { wch: 15 }, // Last Updated
-      { wch: 20 }, // Maker
-      { wch: 20 }, // Model
-      { wch: 15 }, // Serial No
-      { wch: 20 }, // Department Category
-      { wch: 20 }, // Component Category
-      { wch: 20 }, // Location
-      { wch: 18 }, // Commissioned Date
-      { wch: 10 }, // Critical
-      { wch: 12 }, // Class Item
-    ];
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Validation failed');
+      }
 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, "Component Template");
+      const result = await response.json();
+      setDryRunResult(result);
 
-    // Generate Excel file and download
-    XLSX.writeFile(wb, "component_import_template.xlsx");
-    
-    toast({
-      title: "Template Downloaded",
-      description: "Excel template with sample data has been downloaded. Check the examples to understand the hierarchy.",
-    });
+      if (result.summary.errors > 0) {
+        toast({
+          title: 'Validation Complete',
+          description: `Found ${result.summary.errors} error(s). Please fix them before importing.`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Validation Complete',
+          description: 'File is valid and ready to import.'
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Validation Failed',
+        description: error.message || 'Failed to validate file',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Perform import
+  const handleImport = async () => {
+    if (!dryRunResult) return;
+
+    setIsImporting(true);
+
+    try {
+      const response = await fetch('/api/bulk/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileToken: dryRunResult.fileToken,
+          type: 'components',
+          mode: importMode,
+          archiveMissing: false,
+          vesselId: 'V001'
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Import failed');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: 'Import Successful',
+        description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
+      });
+
+      // Clear state and refresh
+      setSelectedFile(null);
+      setDryRunResult(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/bulk/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+    } catch (error: any) {
+      toast({
+        title: 'Import Failed',
+        description: error.message || 'Failed to import data',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -223,7 +239,7 @@ export default function AdminMachineryUpload() {
           <h1 className="text-3xl font-bold">Machinery Component Upload</h1>
           <p className="text-gray-600 mt-2">Bulk import machinery components via CSV or Excel files</p>
         </div>
-        <Button variant="outline" onClick={downloadTemplate}>
+        <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
           <Download className="h-4 w-4 mr-2" />
           Download Template
         </Button>
@@ -237,8 +253,7 @@ export default function AdminMachineryUpload() {
         </TabsList>
 
         <TabsContent value="upload">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Upload Section */}
+          <div className="grid grid-cols-1 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>File Upload</CardTitle>
@@ -247,14 +262,31 @@ export default function AdminMachineryUpload() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <Label>Import Mode</Label>
+                    <Select value={importMode} onValueChange={(v: any) => setImportMode(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="add">Add New Only</SelectItem>
+                        <SelectItem value="update">Update Existing Only</SelectItem>
+                        <SelectItem value="upsert">Upsert (Add or Update)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                   <input
                     type="file"
                     accept=".csv,.xls,.xlsx"
                     onChange={handleFileSelect}
                     className="hidden"
                     id="file-upload"
-                    disabled={isProcessing}
+                    disabled={isUploading || isImporting}
+                    data-testid="input-file-upload"
                   />
                   <label
                     htmlFor="file-upload"
@@ -265,123 +297,90 @@ export default function AdminMachineryUpload() {
                       Click to upload or drag and drop
                     </span>
                     <span className="text-xs text-gray-500 mt-1">
-                      CSV, XLS, or XLSX (max 10MB)
+                      CSV, XLS, or XLSX (max 20MB)
                     </span>
                   </label>
+                  {selectedFile && (
+                    <p className="mt-4 text-sm font-medium" data-testid="text-selected-file">
+                      {selectedFile.name}
+                    </p>
+                  )}
                 </div>
 
-                {selectedFile && (
-                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded">
-                    <div className="flex items-center">
-                      <FileSpreadsheet className="h-5 w-5 text-blue-500 mr-2" />
-                      <span className="text-sm font-medium">{selectedFile.name}</span>
-                      <Badge variant="outline" className="ml-2">
-                        {(selectedFile.size / 1024).toFixed(2)} KB
+                {isUploading && (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600">Validating file...</p>
+                  </div>
+                )}
+
+                {dryRunResult && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Validation Results</h3>
+                    
+                    <div className="flex gap-4">
+                      <Badge variant="outline" className="px-3 py-1">
+                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                        OK: {dryRunResult.summary.ok}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        <AlertTriangle className="h-4 w-4 mr-1 text-yellow-600" />
+                        Warnings: {dryRunResult.summary.warnings}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        <AlertCircle className="h-4 w-4 mr-1 text-red-600" />
+                        Errors: {dryRunResult.summary.errors}
                       </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setUploadResult(null);
-                        setUploadProgress(0);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
 
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Processing...</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <Progress value={uploadProgress} />
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleUpload}
-                  disabled={!selectedFile || isProcessing}
-                  className="w-full"
-                >
-                  {isProcessing ? (
-                    <>Processing...</>
-                  ) : (
-                    <>
-                      <Database className="h-4 w-4 mr-2" />
-                      Upload and Import
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Results Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Results</CardTitle>
-                <CardDescription>
-                  Summary of the last upload operation
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {uploadResult ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {uploadResult.created}
-                        </div>
-                        <div className="text-sm text-gray-600">Created</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {uploadResult.updated}
-                        </div>
-                        <div className="text-sm text-gray-600">Updated</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
-                          {uploadResult.failed}
-                        </div>
-                        <div className="text-sm text-gray-600">Failed</div>
-                      </div>
-                    </div>
-
-                    {uploadResult.errors.length > 0 && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          <div className="font-medium mb-2">Import Errors:</div>
-                          <div className="max-h-40 overflow-y-auto space-y-1">
-                            {uploadResult.errors.map((error, idx) => (
-                              <div key={idx} className="text-xs">
-                                Row {error.row}: {error.field} - {error.message}
-                              </div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-16">Row</TableHead>
+                            <TableHead className="w-24">Status</TableHead>
+                            {dryRunResult.columns.slice(0, 3).map(col => (
+                              <TableHead key={col}>{col}</TableHead>
                             ))}
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                            <TableHead>Errors</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {dryRunResult.rows.slice(0, 20).map((row) => (
+                            <TableRow key={row.row}>
+                              <TableCell>{row.row}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={row.status === 'ok' ? 'default' : 'destructive'}
+                                  className={row.status === 'ok' ? 'bg-green-100 text-green-800' : ''}
+                                >
+                                  {row.status.toUpperCase()}
+                                </Badge>
+                              </TableCell>
+                              {dryRunResult.columns.slice(0, 3).map(col => (
+                                <TableCell key={col} className="max-w-xs truncate">
+                                  {row.normalized[col] || '-'}
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-sm text-red-600">
+                                {row.errors.join('; ')}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
 
-                    {uploadResult.success && (
-                      <Alert>
-                        <CheckCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          Import completed successfully. Data has been added to the Components module.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileSpreadsheet className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>No upload results yet</p>
-                    <p className="text-sm mt-1">Upload a file to see results here</p>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleImport}
+                        disabled={dryRunResult.summary.errors > 0 || isImporting}
+                        className="bg-blue-600 hover:bg-blue-700"
+                        data-testid="button-import"
+                      >
+                        {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Components`}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -392,56 +391,50 @@ export default function AdminMachineryUpload() {
         <TabsContent value="mapping">
           <Card>
             <CardHeader>
-              <CardTitle>Field Mapping Reference</CardTitle>
+              <CardTitle>Field Mapping Guide</CardTitle>
               <CardDescription>
-                Ensure your file headers match these field names exactly
+                Required and optional fields for component import
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>File Header</TableHead>
-                    <TableHead>Database Field</TableHead>
-                    <TableHead>Data Type</TableHead>
+                    <TableHead>Field Name</TableHead>
                     <TableHead>Required</TableHead>
-                    <TableHead>Example Value</TableHead>
+                    <TableHead>Description</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {FIELD_MAPPINGS.map((mapping, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{mapping.fileHeader}</TableCell>
-                      <TableCell className="font-mono text-sm">{mapping.dbField}</TableCell>
+                  {FIELD_MAPPINGS.map((field) => (
+                    <TableRow key={field.field}>
+                      <TableCell className="font-medium">{field.field}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{mapping.dataType}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {mapping.required ? (
+                        {field.required ? (
                           <Badge variant="destructive">Required</Badge>
                         ) : (
-                          <Badge variant="secondary">Optional</Badge>
+                          <Badge variant="outline">Optional</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-600">{mapping.example}</TableCell>
+                      <TableCell>{field.description}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
 
-              <Alert className="mt-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Important Notes:</strong>
-                  <ul className="list-disc ml-5 mt-2 space-y-1">
-                    <li>Date fields should be in YYYY-MM-DD format</li>
-                    <li>Boolean fields accept: true/false, yes/no, 1/0</li>
-                    <li>Decimal fields accept numbers with up to 2 decimal places</li>
-                    <li>Parent ID should reference existing component IDs or be empty</li>
-                    <li>Vessel ID must match existing vessel codes (e.g., V001, V002)</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-2">Component Categories (8 Main Categories)</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Ship General</li>
+                  <li>• Hull</li>
+                  <li>• Equipment for Cargo</li>
+                  <li>• Ship's Equipment</li>
+                  <li>• Equipment for Crew & Passengers</li>
+                  <li>• Machinery Main Components</li>
+                  <li>• Systems for Machinery Main Components</li>
+                  <li>• Ship Common Systems</li>
+                </ul>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -451,15 +444,60 @@ export default function AdminMachineryUpload() {
             <CardHeader>
               <CardTitle>Upload History</CardTitle>
               <CardDescription>
-                Recent file upload operations and their results
+                Previous component import operations
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Database className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>Upload history will be displayed here</p>
-                <p className="text-sm mt-1">Previous uploads and their status will appear in this section</p>
-              </div>
+              {historyLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                </div>
+              ) : history?.items?.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead>Skipped</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.items.map((item: ImportHistory) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-gray-400" />
+                            {new Date(item.startedAt).toLocaleString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{item.mode.toUpperCase()}</Badge>
+                        </TableCell>
+                        <TableCell>{item.created}</TableCell>
+                        <TableCell>{item.updated}</TableCell>
+                        <TableCell>{item.skipped}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={item.status === 'success' ? 'default' : 'destructive'}
+                            className={item.status === 'success' ? 'bg-green-100 text-green-800' : ''}
+                          >
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No upload history yet</p>
+                  <p className="text-sm mt-1">Upload your first file to see it here</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

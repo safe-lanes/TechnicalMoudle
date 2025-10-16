@@ -62,7 +62,10 @@ import {
   type InsertRecurringDefect,
   recurringDefectLinks,
   type RecurringDefectLink,
-  type InsertRecurringDefectLink
+  type InsertRecurringDefectLink,
+  importHistory,
+  type ImportHistory,
+  type InsertImportHistory
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -236,6 +239,11 @@ export interface IStorage {
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
   getVesselIdByName(vesselName: string): Promise<string | undefined>;
   createVessel(vessel: { id: string; name: string; type: string }): Promise<void>;
+  
+  // Import History methods
+  createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
+  getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }>;
+  getImportHistoryById(id: string): Promise<ImportHistory | undefined>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -312,6 +320,7 @@ export class MemStorage implements IStorage {
   private currentDefectActionId: number;
   private defectAttachments: Map<number, DefectAttachment>;
   private currentDefectAttachmentId: number;
+  private importHistory: ImportHistory[];
 
   constructor() {
     this.users = new Map();
@@ -351,6 +360,7 @@ export class MemStorage implements IStorage {
     this.currentDefectActionId = 1;
     this.defectAttachments = new Map();
     this.currentDefectAttachmentId = 1;
+    this.importHistory = [];
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -2663,6 +2673,83 @@ export class MemStorage implements IStorage {
 
     this.defects.set(defectId, updatedDefect);
     return updatedDefect;
+  }
+
+  // Recurring Defects methods (stub implementations)
+  async getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]> {
+    return [];
+  }
+
+  async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    return undefined;
+  }
+
+  async calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null> {
+    return null;
+  }
+
+  async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    return [];
+  }
+
+  async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
+    return [];
+  }
+
+  // Seed helper methods (stub implementations)
+  async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
+    return undefined;
+  }
+
+  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+    return undefined;
+  }
+
+  async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
+    // Stub implementation
+  }
+
+  // Import History methods
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    const newHistory: ImportHistory = {
+      ...history,
+      startedAt: history.startedAt || new Date(),
+      finishedAt: history.finishedAt || null,
+      created: history.created || 0,
+      updated: history.updated || 0,
+      skipped: history.skipped || 0,
+      archived: history.archived || 0,
+      vesselId: history.vesselId || null,
+      originalName: history.originalName || null,
+      archiveMissing: history.archiveMissing || false
+    };
+    this.importHistory.push(newHistory);
+    return newHistory;
+  }
+
+  async getImportHistory(type?: string, limit: number = 20, offset: number = 0): Promise<{ items: ImportHistory[]; total: number }> {
+    let filtered = [...this.importHistory];
+    
+    // Filter by type if provided
+    if (type) {
+      filtered = filtered.filter(h => h.type === type);
+    }
+    
+    // Sort by startedAt descending (newest first)
+    filtered.sort((a, b) => {
+      const dateA = a.startedAt instanceof Date ? a.startedAt : new Date(a.startedAt);
+      const dateB = b.startedAt instanceof Date ? b.startedAt : new Date(b.startedAt);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    const total = filtered.length;
+    const items = filtered.slice(offset, offset + limit);
+    
+    return { items, total };
+  }
+
+  async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    return this.importHistory.find(h => h.id === id);
   }
 }
 

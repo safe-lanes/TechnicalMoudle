@@ -719,3 +719,31 @@ export const insertRecurringDefectLinkSchema = createInsertSchema(recurringDefec
 
 export type InsertRecurringDefectLink = z.infer<typeof insertRecurringDefectLinkSchema>;
 export type RecurringDefectLink = typeof recurringDefectLinks.$inferSelect;
+
+// Import History Table
+export const importHistory = pgTable("import_history", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(), // 'components' | 'spares' | 'stores'
+  mode: text("mode").notNull(), // 'add' | 'update' | 'upsert'
+  archiveMissing: boolean("archive_missing").notNull().default(false),
+  userId: text("user_id").notNull(),
+  vesselId: text("vessel_id"),
+  created: integer("created").notNull().default(0),
+  updated: integer("updated").notNull().default(0),
+  skipped: integer("skipped").notNull().default(0),
+  archived: integer("archived").notNull().default(0),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull(), // 'success' | 'failed'
+  originalName: text("original_name"),
+}, (table) => ({
+  typeIdx: index("idx_import_history_type").on(table.type),
+  startedAtIdx: index("idx_import_history_started").on(table.startedAt),
+}));
+
+export const insertImportHistorySchema = createInsertSchema(importHistory).omit({
+  startedAt: true,
+});
+
+export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
+export type ImportHistory = typeof importHistory.$inferSelect;
