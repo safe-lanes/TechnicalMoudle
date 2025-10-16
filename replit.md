@@ -42,7 +42,7 @@ The application uses a modern full-stack architecture with a React frontend (Typ
 - **Modify PMS - Change Requests Module (Phase 2.0)**: Cross-module change request system with unified modal workflow, field-level tracking, and modify mode components
 - **Defects Module - Condition of Class (CoC) Feature**: Complete CoC tracking with checkbox in defect form (positioned below date fields for clean layout), blue CoC badges in lists, and dedicated CoC filtered view at /defects/coc with Active/Resolved tabs
 - **Defects Module - Recurring Defects Feature**: Complete pattern detection for equipment failures (2+ occurrences across vessels), with time window filtering (6 months to 5 years), minimum occurrence filtering, CoC filtering, and comprehensive test data demonstrating KSB pump patterns across multiple vessels (Fixed deduplication for same-day/same-vessel defects)
-- **PMS Admin Module - Machinery Component Upload**: Bulk import system supporting CSV/Excel files with field mapping, validation, and error reporting. Accessible via Admin → Machinery Upload. Supports create/update operations with comprehensive field validation for component data
+- **PMS Admin Module - Machinery Component Upload**: Complete bulk import system for CSV/Excel files with dry-run validation, three import modes (Create Only/Update Only/Create & Update), upload history tracking, and full component data persistence. Components imported via bulk upload properly display all fields (maker, model, category, etc.) when selected in the component tree. Accessible via PMS → Admin in left sidebar
 
 ### Architecture Features:
 - Shared component tree structure used across PMS modules for consistency
