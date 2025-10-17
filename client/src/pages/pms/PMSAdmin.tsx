@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
-import Forms from "../admin/Forms";
+import Forms from "@/components/admin/Forms";
 
 export default function PMSAdmin() {
   const [activeTab, setActiveTab] = useState("bulk-data-imp");
