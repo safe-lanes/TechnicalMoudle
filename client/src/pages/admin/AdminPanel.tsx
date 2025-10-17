@@ -1,74 +1,76 @@
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import BulkDataImport from "./BulkDataImport";
-import Alerts from "./Alerts";
-import Forms from "./Forms";
+import { Settings, Users, Database, Shield } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState("bulk-data-imp");
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Bulk Data Import</h1>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">System Administration</h1>
+          <p className="text-gray-600 mt-2">Manage system-wide settings and configurations</p>
         </div>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start px-6 py-0 h-12 bg-transparent border-b rounded-none">
-            <TabsTrigger 
-              value="bulk-data-imp" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-bulk-data-imp"
-            >
-              Bulk Data Imp
-            </TabsTrigger>
-            <TabsTrigger 
-              value="alerts" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-alerts"
-            >
-              Alerts
-            </TabsTrigger>
-            <TabsTrigger 
-              value="forms" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-forms"
-            >
-              Forms
-            </TabsTrigger>
-            <TabsTrigger 
-              value="admin-4" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-admin-4"
-            >
-              Admin 4
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="bulk-data-imp" className="m-0">
-            <BulkDataImport />
-          </TabsContent>
-
-          <TabsContent value="alerts" className="m-0">
-            <Alerts />
-          </TabsContent>
-
-          <TabsContent value="forms" className="m-0">
-            <Forms />
-          </TabsContent>
-
-          <TabsContent value="admin-4" className="m-0">
-            <div className="p-6">
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Admin 4</h2>
-                <p className="text-gray-500">
-                  Reserved for future administrative functionality.
-                </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle>User Management</CardTitle>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+              <CardDescription>Manage system users and permissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Configure user access, roles, and permissions across the platform.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <Settings className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle>System Settings</CardTitle>
+              </div>
+              <CardDescription>Configure global system preferences</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Adjust system-wide settings, notifications, and general configurations.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Database className="h-6 w-6 text-purple-600" />
+                </div>
+                <CardTitle>Data Management</CardTitle>
+              </div>
+              <CardDescription>Backup and maintenance tools</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Database backup, restore, and system maintenance utilities.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Shield className="h-6 w-6 text-orange-600" />
+                </div>
+                <CardTitle>Security</CardTitle>
+              </div>
+              <CardDescription>Security and audit settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">Configure security policies, audit logs, and compliance settings.</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
