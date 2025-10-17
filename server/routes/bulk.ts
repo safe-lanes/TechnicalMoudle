@@ -130,8 +130,8 @@ router.get('/template', (req, res) => {
       break;
   }
 
-  // Create main sheet
-  const mainSheet = XLSX.utils.aoa_to_sheet([headers, validValues, example]);
+  // Create main sheet - Just headers and example, NO description row
+  const mainSheet = XLSX.utils.aoa_to_sheet([headers, example]);
 
   // Add data validation for components
   if (type === 'components') {
@@ -139,11 +139,11 @@ router.get('/template', (req, res) => {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Component Category dropdown (Column C, starting from row 4)
+    // Component Category dropdown (Column C, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'C4:C1000',
+      sqref: 'C2:C1000',
       formulas: [`"${COMPONENT_CATEGORIES.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -151,11 +151,11 @@ router.get('/template', (req, res) => {
       error: `Please select from: ${COMPONENT_CATEGORIES.join(', ')}`
     });
 
-    // Critical (Yes/No) dropdown (Column I, starting from row 4)
+    // Critical (Yes/No) dropdown (Column I, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'I4:I1000',
+      sqref: 'I2:I1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -163,11 +163,11 @@ router.get('/template', (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Condition Based (Yes/No) dropdown (Column J, starting from row 4)
+    // Condition Based (Yes/No) dropdown (Column J, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'J4:J1000',
+      sqref: 'J2:J1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -182,11 +182,11 @@ router.get('/template', (req, res) => {
       mainSheet['!dataValidation'] = [];
     }
 
-    // UOM dropdown (Column D, starting from row 4)
+    // UOM dropdown (Column D, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'D4:D1000',
+      sqref: 'D2:D1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -194,11 +194,11 @@ router.get('/template', (req, res) => {
       error: `Please select from: ${UOM_LIST.join(', ')}`
     });
 
-    // Critical (Yes/No) dropdown (Column F, starting from row 4)
+    // Critical (Yes/No) dropdown (Column F, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'F4:F1000',
+      sqref: 'F2:F1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -213,11 +213,11 @@ router.get('/template', (req, res) => {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Type dropdown (Column C, starting from row 4)
+    // Type dropdown (Column C, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'C4:C1000',
+      sqref: 'C2:C1000',
       formulas: ['"Stores,Lubes,Chemicals,Others"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -225,11 +225,11 @@ router.get('/template', (req, res) => {
       error: 'Please select from: Stores, Lubes, Chemicals, Others'
     });
 
-    // Stores Category dropdown (Column D, starting from row 4)
+    // Stores Category dropdown (Column D, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'D4:D1000',
+      sqref: 'D2:D1000',
       formulas: [`"${STORES_CATEGORIES.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -237,11 +237,11 @@ router.get('/template', (req, res) => {
       error: `Please select from: ${STORES_CATEGORIES.join(', ')}`
     });
 
-    // UOM dropdown (Column E, starting from row 4)
+    // UOM dropdown (Column E, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'E4:E1000',
+      sqref: 'E2:E1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -255,18 +255,24 @@ router.get('/template', (req, res) => {
   // Create meta sheet with instructions
   const metaData = [
     ['Template Type', type],
-    ['Template Version', '2.0'],
+    ['Template Version', '3.0'],
     ['Generated At', new Date().toISOString()],
     [''],
-    ['Instructions:'],
-    ['1. Fill in your data starting from Row 4 (Row 1 = Headers, Row 2 = Valid Values, Row 3 = Example)'],
-    ['2. Use the dropdown menus for category and Yes/No fields'],
-    ['3. Required fields are marked in Row 2'],
-    ['4. Save and upload this file when complete'],
+    ['INSTRUCTIONS:'],
+    ['1. Row 1 contains the column headers'],
+    ['2. Row 2 contains example data (you can delete or replace it)'],
+    ['3. Add your data starting from Row 2 or Row 3 onwards'],
+    ['4. Use the dropdown menus in cells for category and Yes/No fields'],
+    ['5. Save and upload this file when complete'],
     [''],
+    ['FIELD REQUIREMENTS:'],
+    ...validValues.map((val, idx) => [headers[idx], val]),
+    [''],
+    ['VALID VALUES:'],
     ['Component Categories', ...COMPONENT_CATEGORIES],
-    ['UOM List', ...UOM_LIST],
-    ['Stores Categories', ...STORES_CATEGORIES]
+    ['UOM Options', ...UOM_LIST],
+    ['Stores Categories', ...STORES_CATEGORIES],
+    ['Type Options', 'Stores, Lubes, Chemicals, Others']
   ];
   const metaSheet = XLSX.utils.aoa_to_sheet(metaData);
   XLSX.utils.book_append_sheet(workbook, metaSheet, 'Meta');
