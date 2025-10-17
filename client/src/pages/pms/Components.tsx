@@ -1262,7 +1262,7 @@ const Components: React.FC = () => {
   // Fetch components from API and build tree
   const vesselId = "V001"; // Default vessel ID
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: ['/api/components', vesselId],
+    queryKey: [`/api/components/${vesselId}`],
   });
   
   // Build component tree from fetched data
