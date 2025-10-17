@@ -9,8 +9,7 @@ import { ModifyPMS } from "@/components/modifyPms/ModifyPMS";
 import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
 import AdminPanel from "./admin/AdminPanel";
-import Alerts from "./admin/Alerts";
-import AdminMachineryUpload from "./pms/AdminMachineryUpload";
+import PMSAdmin from "./pms/PMSAdmin";
 import ReportsModule from "./reports/ReportsModule";
 import DefectsLogWithTabs from "./defects/DefectsLogWithTabs";
 import DefectsDashboard from "./defects/DefectsDashboard";
@@ -127,7 +126,7 @@ export const TechnicalModule: React.FC = () => {
           ) : selectedSubModule === "pms" && selectedMenuItem === "modify-pms" ? (
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
-            <AdminMachineryUpload />
+            <PMSAdmin />
           ) : selectedSubModule === "admin" ? (
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
