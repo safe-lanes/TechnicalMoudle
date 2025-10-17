@@ -480,6 +480,9 @@ export const workOrders = pgTable("work_orders", {
   nextDueDate: text("next_due_date"),
   nextDueReading: text("next_due_reading"),
   currentReading: text("current_reading"),
+  classRelated: text("class_related"), // 'Yes' | 'No'
+  jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
+  briefWorkDescription: text("brief_work_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

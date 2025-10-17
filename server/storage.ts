@@ -188,6 +188,9 @@ export interface IStorage {
   createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;
   deleteWorkOrder(id: string): Promise<void>;
+  bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]>;
+  bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]>;
+  bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
   
   // Defects methods
   getDefects(filters?: { 
@@ -2186,6 +2189,52 @@ export class MemStorage implements IStorage {
       throw new Error(`WorkOrder with id ${id} not found`);
     }
     this.workOrders.delete(id);
+  }
+
+  async bulkCreateWorkOrders(workOrdersData: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    const createdWorkOrders: WorkOrder[] = [];
+    
+    for (const woData of workOrdersData) {
+      const workOrder = await this.createWorkOrder(woData);
+      createdWorkOrders.push(workOrder);
+    }
+    
+    return createdWorkOrders;
+  }
+
+  async bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    const updatedWorkOrders: WorkOrder[] = [];
+    
+    for (const { templateCode, data } of workOrders) {
+      const existing = Array.from(this.workOrders.values()).find(wo => wo.templateCode === templateCode);
+      if (existing) {
+        const updated = await this.updateWorkOrder(existing.id, data);
+        updatedWorkOrders.push(updated);
+      }
+    }
+    
+    return updatedWorkOrders;
+  }
+
+  async bulkUpsertWorkOrders(workOrdersData: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    
+    for (const woData of workOrdersData) {
+      const existing = Array.from(this.workOrders.values()).find(
+        wo => wo.templateCode === woData.templateCode && wo.vesselId === woData.vesselId
+      );
+      
+      if (existing) {
+        await this.updateWorkOrder(existing.id, woData);
+        updated++;
+      } else {
+        await this.createWorkOrder(woData);
+        created++;
+      }
+    }
+    
+    return { created, updated };
   }
 
   private initializeDefects() {

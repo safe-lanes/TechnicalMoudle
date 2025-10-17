@@ -44,7 +44,7 @@ const STORES_CATEGORIES = [
 router.get('/template', (req, res) => {
   const { type } = req.query;
   
-  if (!['components', 'spares', 'stores'].includes(type as string)) {
+  if (!['components', 'spares', 'stores', 'work-orders'].includes(type as string)) {
     return res.status(400).json({ error: 'Invalid template type' });
   }
 
@@ -126,6 +126,26 @@ router.get('/template', (req, res) => {
         'ST-001', 'Welding Electrodes', 'Stores',
         'General Stores', 'kg', '50', '20', 'Workshop Store',
         'Deck & Engine', 'AWS E6013 specification'
+      ];
+      break;
+
+    case 'work-orders':
+      headers = [
+        'Component Code', 'WO Title', 'Maintenance Basis', 'Task Type',
+        'Assigned To', 'Approver', 'Class Related', 'Job Priority',
+        'Brief Work Description'
+      ];
+
+      validValues = [
+        'Required, Must exist', 'Required', 'Calendar|Running Hours|Condition Based',
+        'Inspection|Overhaul|Repair|Replacement|Service|Testing', 'Required',
+        'Required', 'Yes|No', 'Low|Medium|High|Critical', 'Text'
+      ];
+
+      example = [
+        '6.1', 'Main Engine Bearing Inspection', 'Calendar',
+        'Inspection', 'Chief Engineer', 'Fleet Superintendent',
+        'Yes', 'High', 'Inspect main engine bearings for wear and damage'
       ];
       break;
   }
@@ -250,6 +270,61 @@ router.get('/template', (req, res) => {
     });
   }
 
+  // Add data validation for work orders
+  if (type === 'work-orders') {
+    if (!mainSheet['!dataValidation']) {
+      mainSheet['!dataValidation'] = [];
+    }
+
+    // Maintenance Basis dropdown (Column C, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'C2:C1000',
+      formulas: ['"Calendar,Running Hours,Condition Based"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Maintenance Basis',
+      error: 'Please select from: Calendar, Running Hours, Condition Based'
+    });
+
+    // Task Type dropdown (Column D, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'D2:D1000',
+      formulas: ['"Inspection,Overhaul,Repair,Replacement,Service,Testing"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Task Type',
+      error: 'Please select from: Inspection, Overhaul, Repair, Replacement, Service, Testing'
+    });
+
+    // Class Related dropdown (Column G, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'G2:G1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Job Priority dropdown (Column H, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'H2:H1000',
+      formulas: ['"Low,Medium,High,Critical"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Priority',
+      error: 'Please select from: Low, Medium, High, Critical'
+    });
+  }
+
   XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
 
   // Create meta sheet with instructions
@@ -294,7 +369,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    if (!['components', 'spares', 'stores'].includes(type)) {
+    if (!['components', 'spares', 'stores', 'work-orders'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
 
@@ -619,6 +694,74 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized[key] = row[key];
         }
       });
+    } else if (type === 'work-orders') {
+      // Validate work orders
+      if (!row['Component Code']) {
+        errors.push(`Row ${rowNum}: Component Code is required`);
+      } else {
+        normalized['Component Code'] = String(row['Component Code']).trim();
+        // TODO: Check if component exists
+      }
+
+      if (!row['WO Title']) {
+        errors.push(`Row ${rowNum}: WO Title is required`);
+      } else {
+        normalized['WO Title'] = String(row['WO Title']).trim();
+      }
+
+      // Validate Maintenance Basis
+      const validMaintenanceBasis = ['Calendar', 'Running Hours', 'Condition Based'];
+      if (row['Maintenance Basis'] && !validMaintenanceBasis.includes(row['Maintenance Basis'])) {
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis. Allowed: ${validMaintenanceBasis.join(', ')}`);
+      } else if (row['Maintenance Basis']) {
+        normalized['Maintenance Basis'] = row['Maintenance Basis'];
+      }
+
+      // Validate Task Type
+      const validTaskTypes = ['Inspection', 'Overhaul', 'Repair', 'Replacement', 'Service', 'Testing'];
+      if (row['Task Type'] && !validTaskTypes.includes(row['Task Type'])) {
+        errors.push(`Row ${rowNum}: Invalid Task Type. Allowed: ${validTaskTypes.join(', ')}`);
+      } else if (row['Task Type']) {
+        normalized['Task Type'] = row['Task Type'];
+      }
+
+      // Validate Class Related
+      if (row['Class Related']) {
+        const value = row['Class Related'].toString();
+        if (!['Yes', 'No'].includes(value)) {
+          errors.push(`Row ${rowNum}: Class Related must be Yes or No`);
+        } else {
+          normalized['Class Related'] = value;
+        }
+      }
+
+      // Validate Job Priority
+      const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
+      if (row['Job Priority'] && !validPriorities.includes(row['Job Priority'])) {
+        errors.push(`Row ${rowNum}: Invalid Job Priority. Allowed: ${validPriorities.join(', ')}`);
+      } else if (row['Job Priority']) {
+        normalized['Job Priority'] = row['Job Priority'];
+      }
+
+      // Validate required fields
+      if (!row['Assigned To']) {
+        errors.push(`Row ${rowNum}: Assigned To is required`);
+      } else {
+        normalized['Assigned To'] = String(row['Assigned To']).trim();
+      }
+
+      if (!row['Approver']) {
+        errors.push(`Row ${rowNum}: Approver is required`);
+      } else {
+        normalized['Approver'] = String(row['Approver']).trim();
+      }
+
+      // Copy other fields
+      Object.keys(row).forEach(key => {
+        if (!normalized[key]) {
+          normalized[key] = row[key];
+        }
+      });
     }
 
     // Determine status
@@ -699,6 +842,62 @@ async function performImport(
     for (const row of data) {
       result.created++;
     }
+  } else if (type === 'work-orders') {
+    // Generate WO code sequence counter for each component
+    const woSequenceMap = new Map<string, number>();
+    
+    for (const row of data) {
+      const componentCode = String(row['Component Code']).trim();
+      
+      // Get or initialize sequence number for this component
+      if (!woSequenceMap.has(componentCode)) {
+        // Check existing WOs for this component to determine next sequence
+        const existingWOs = await storage.getWorkOrders(vesselId);
+        const componentWOs = existingWOs.filter(wo => 
+          wo.templateCode?.startsWith(`WO-${componentCode}-`)
+        );
+        const maxSeq = componentWOs.length > 0 
+          ? Math.max(...componentWOs.map(wo => {
+              const match = wo.templateCode?.match(/-(\d+)$/);
+              return match ? parseInt(match[1]) : 0;
+            }))
+          : 0;
+        woSequenceMap.set(componentCode, maxSeq + 1);
+      }
+
+      const sequence = woSequenceMap.get(componentCode)!;
+      const templateCode = `WO-${componentCode}-${String(sequence).padStart(3, '0')}`;
+      
+      const existing = Array.from((await storage.getWorkOrders(vesselId))).find(
+        wo => wo.templateCode === templateCode
+      );
+
+      if (mode === 'add') {
+        if (existing) {
+          result.skipped++;
+        } else {
+          await createWorkOrderFromRow(row, templateCode, vesselId);
+          result.created++;
+          woSequenceMap.set(componentCode, sequence + 1);
+        }
+      } else if (mode === 'update') {
+        if (existing) {
+          await updateWorkOrderFromRow(existing.id, row);
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existing) {
+          await updateWorkOrderFromRow(existing.id, row);
+          result.updated++;
+        } else {
+          await createWorkOrderFromRow(row, templateCode, vesselId);
+          result.created++;
+          woSequenceMap.set(componentCode, sequence + 1);
+        }
+      }
+    }
   }
 
   if (archiveMissing) {
@@ -753,6 +952,48 @@ async function updateComponentFromRow(componentCode: string, row: any) {
   if (row['Running Hours']) updateData.currentCumulativeRH = String(row['Running Hours']);
 
   return await storage.updateComponent(componentCode, updateData);
+}
+
+// Helper function to create work order from Excel row
+async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?: string) {
+  const componentCode = String(row['Component Code']).trim();
+  const component = await storage.getComponent(componentCode);
+  
+  const workOrderData = {
+    vesselId: vesselId || 'V001',
+    component: component?.name || row['Component Code'],
+    componentCode: componentCode,
+    workOrderNo: `WO-${Date.now()}`, // Temporary WO number
+    templateCode: templateCode,
+    jobTitle: row['WO Title'] || '',
+    assignedTo: row['Assigned To'] || '',
+    approver: row['Approver'] || null,
+    dueDate: new Date().toISOString(),
+    status: 'Due' as const,
+    taskType: row['Task Type'] || null,
+    maintenanceBasis: row['Maintenance Basis'] || null,
+    classRelated: row['Class Related'] || null,
+    jobPriority: row['Job Priority'] || null,
+    briefWorkDescription: row['Brief Work Description'] || null
+  };
+
+  return await storage.createWorkOrder(workOrderData);
+}
+
+// Helper function to update work order from Excel row
+async function updateWorkOrderFromRow(workOrderId: string, row: any) {
+  const updateData: any = {};
+  
+  if (row['WO Title']) updateData.jobTitle = row['WO Title'];
+  if (row['Maintenance Basis']) updateData.maintenanceBasis = row['Maintenance Basis'];
+  if (row['Task Type']) updateData.taskType = row['Task Type'];
+  if (row['Assigned To']) updateData.assignedTo = row['Assigned To'];
+  if (row['Approver']) updateData.approver = row['Approver'];
+  if (row['Class Related']) updateData.classRelated = row['Class Related'];
+  if (row['Job Priority']) updateData.jobPriority = row['Job Priority'];
+  if (row['Brief Work Description']) updateData.briefWorkDescription = row['Brief Work Description'];
+
+  return await storage.updateWorkOrder(workOrderId, updateData);
 }
 
 // Store import history
