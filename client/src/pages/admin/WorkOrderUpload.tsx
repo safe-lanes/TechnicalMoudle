@@ -59,6 +59,8 @@ const FIELD_MAPPINGS = [
   { field: "Component Code", required: true, description: "Must match existing component" },
   { field: "WO Title", required: true, description: "Work order title" },
   { field: "Maintenance Basis", required: false, description: "Calendar, Running Hours, or Condition Based" },
+  { field: "Frequency Value", required: false, description: "Required for Calendar/Running Hours (e.g., 6, 500)" },
+  { field: "Frequency Unit", required: false, description: "Required for Calendar only (Days, Weeks, Months, Years)" },
   { field: "Task Type", required: false, description: "Inspection, Overhaul, Repair, etc." },
   { field: "Assigned To", required: true, description: "Person assigned" },
   { field: "Approver", required: true, description: "Person to approve" },
