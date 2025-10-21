@@ -730,6 +730,47 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }
 
+      // Validate Frequency Value and Unit based on Maintenance Basis
+      const maintenanceBasis = row['Maintenance Basis'];
+      if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Running Hours') {
+        // Frequency Value is required for Calendar and Running Hours
+        if (!row['Frequency Value']) {
+          errors.push(`Row ${rowNum}: Frequency Value is required for ${maintenanceBasis} maintenance`);
+        } else {
+          const freqVal = parseFloat(row['Frequency Value']);
+          if (isNaN(freqVal) || freqVal <= 0) {
+            errors.push(`Row ${rowNum}: Frequency Value must be a positive number`);
+          } else {
+            normalized['Frequency Value'] = String(freqVal);
+          }
+        }
+
+        // Frequency Unit is required only for Calendar basis
+        if (maintenanceBasis === 'Calendar') {
+          const validFreqUnits = ['Days', 'Weeks', 'Months', 'Years'];
+          if (!row['Frequency Unit']) {
+            errors.push(`Row ${rowNum}: Frequency Unit is required for Calendar maintenance`);
+          } else if (!validFreqUnits.includes(row['Frequency Unit'])) {
+            errors.push(`Row ${rowNum}: Invalid Frequency Unit. Allowed: ${validFreqUnits.join(', ')}`);
+          } else {
+            normalized['Frequency Unit'] = row['Frequency Unit'];
+          }
+        } else {
+          // Running Hours - Frequency Unit should not be provided
+          if (row['Frequency Unit']) {
+            warnings.push(`Row ${rowNum}: Frequency Unit is not used for Running Hours maintenance (will be ignored)`);
+          }
+        }
+      } else if (maintenanceBasis === 'Condition Based') {
+        // For Condition Based, frequency fields are optional/not required
+        if (row['Frequency Value']) {
+          warnings.push(`Row ${rowNum}: Frequency Value is not used for Condition Based maintenance (will be ignored)`);
+        }
+        if (row['Frequency Unit']) {
+          warnings.push(`Row ${rowNum}: Frequency Unit is not used for Condition Based maintenance (will be ignored)`);
+        }
+      }
+
       // Validate Task Type
       const validTaskTypes = ['Inspection', 'Overhaul', 'Repair', 'Replacement', 'Service', 'Testing'];
       if (row['Task Type'] && !validTaskTypes.includes(row['Task Type'])) {
@@ -985,6 +1026,8 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
     status: 'Due' as const,
     taskType: row['Task Type'] || null,
     maintenanceBasis: row['Maintenance Basis'] || null,
+    frequencyValue: row['Frequency Value'] ? parseInt(row['Frequency Value']) : null,
+    frequencyUnit: row['Frequency Unit'] || null,
     classRelated: row['Class Related'] || null,
     jobPriority: row['Job Priority'] || null,
     briefWorkDescription: row['Brief Work Description'] || null
@@ -999,6 +1042,8 @@ async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   
   if (row['WO Title']) updateData.jobTitle = row['WO Title'];
   if (row['Maintenance Basis']) updateData.maintenanceBasis = row['Maintenance Basis'];
+  if (row['Frequency Value']) updateData.frequencyValue = parseInt(row['Frequency Value']);
+  if (row['Frequency Unit']) updateData.frequencyUnit = row['Frequency Unit'];
   if (row['Task Type']) updateData.taskType = row['Task Type'];
   if (row['Assigned To']) updateData.assignedTo = row['Assigned To'];
   if (row['Approver']) updateData.approver = row['Approver'];
