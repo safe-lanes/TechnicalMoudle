@@ -131,19 +131,20 @@ router.get('/template', (req, res) => {
 
     case 'work-orders':
       headers = [
-        'Component Code', 'WO Title', 'Maintenance Basis', 'Task Type',
-        'Assigned To', 'Approver', 'Class Related', 'Job Priority',
+        'Component Code', 'WO Title', 'Maintenance Basis', 'Frequency Value', 'Frequency Unit',
+        'Task Type', 'Assigned To', 'Approver', 'Class Related', 'Job Priority',
         'Brief Work Description'
       ];
 
       validValues = [
         'Required, Must exist', 'Required', 'Calendar|Running Hours|Condition Based',
+        'Number (e.g., 500 for hours, 6 for months)', 'Days|Weeks|Months|Years (for Calendar only)',
         'Inspection|Overhaul|Repair|Replacement|Service|Testing', 'Required',
         'Required', 'Yes|No', 'Low|Medium|High|Critical', 'Text'
       ];
 
       example = [
-        '6.1', 'Main Engine Bearing Inspection', 'Calendar',
+        '6.1', 'Main Engine Bearing Inspection', 'Calendar', '6', 'Months',
         'Inspection', 'Chief Engineer', 'Fleet Superintendent',
         'Yes', 'High', 'Inspect main engine bearings for wear and damage'
       ];
@@ -288,11 +289,23 @@ router.get('/template', (req, res) => {
       error: 'Please select from: Calendar, Running Hours, Condition Based'
     });
 
-    // Task Type dropdown (Column D, starting from row 2)
+    // Frequency Unit dropdown (Column E, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'D2:D1000',
+      sqref: 'E2:E1000',
+      formulas: ['"Days,Weeks,Months,Years"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Frequency Unit',
+      error: 'Please select from: Days, Weeks, Months, Years (for Calendar basis)'
+    });
+
+    // Task Type dropdown (Column F, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'F2:F1000',
       formulas: ['"Inspection,Overhaul,Repair,Replacement,Service,Testing"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -300,11 +313,11 @@ router.get('/template', (req, res) => {
       error: 'Please select from: Inspection, Overhaul, Repair, Replacement, Service, Testing'
     });
 
-    // Class Related dropdown (Column G, starting from row 2)
+    // Class Related dropdown (Column I, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'G2:G1000',
+      sqref: 'I2:I1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -312,11 +325,11 @@ router.get('/template', (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Job Priority dropdown (Column H, starting from row 2)
+    // Job Priority dropdown (Column J, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'H2:H1000',
+      sqref: 'J2:J1000',
       formulas: ['"Low,Medium,High,Critical"'],
       allowBlank: true,
       showErrorMessage: true,
