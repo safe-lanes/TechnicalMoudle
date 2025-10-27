@@ -914,7 +914,17 @@ async function performImport(
   };
 
   if (type === 'components') {
-    for (const row of data) {
+    // Sort components by SFI hierarchy depth (parents before children)
+    // e.g., "6" before "61" before "612.005"
+    const sortedData = [...data].sort((a, b) => {
+      const aCode = String(a['Component Code'] || '').trim();
+      const bCode = String(b['Component Code'] || '').trim();
+      const aDepth = (aCode.match(/\./g) || []).length;
+      const bDepth = (bCode.match(/\./g) || []).length;
+      return aDepth - bDepth; // Lower depth (parents) first
+    });
+
+    for (const row of sortedData) {
       const componentCode = String(row['Component Code']).trim();
       const existing = await storage.getComponent(componentCode);
 
