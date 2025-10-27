@@ -36,14 +36,57 @@ function getComponentCategory(mainGroupCode: number): string | null {
   return null;
 }
 
+// Helper function to extract Sub Group Code (first 2 digits) from SFI code
+// Examples: 711.001 → 71, 612.005 → 61, 7 → null, 71 → 71
+function getSubGroupCode(sfiCode: string): string | null {
+  const baseCode = sfiCode.split('.')[0]; // Get part before decimal
+  if (baseCode.length >= 2) {
+    return baseCode.substring(0, 2);
+  }
+  return null; // Single digit codes don't have a sub-group
+}
+
+// Helper function to map Sub Group Code to Sub Group Name
+// This is a simplified mapping - in production, this would come from a complete SFI reference database
+function getSubGroupName(subGroupCode: string): string {
+  const subGroupNames: { [key: string]: string } = {
+    // Group 7 - Systems for Machinery Main Components
+    '71': 'LUBE OIL SYSTEMS',
+    '72': 'COOLING SYSTEMS',
+    '73': 'FUEL OIL SYSTEMS',
+    '74': 'COMPRESSED AIR SYSTEMS',
+    '75': 'HYDRAULIC SYSTEMS',
+    // Group 6 - Machinery Main Components
+    '61': 'DIESEL ENGINES',
+    '62': 'STEAM TURBINES',
+    '63': 'GAS TURBINES',
+    // Group 2 - Hull
+    '21': 'SHELL PLATING',
+    '22': 'HULL',
+    '23': 'SHELL DOORS',
+    // Add more mappings as needed
+  };
+  return subGroupNames[subGroupCode] || 'UNKNOWN SUB GROUP';
+}
+
 // Helper function to extract parent SFI code
 function getParentSFICode(sfiCode: string): string | null {
   const parts = sfiCode.split('.');
   if (parts.length > 1) {
+    // Has decimal parts (e.g., 711.001 → parent is 711)
     parts.pop(); // Remove last part
     return parts.join('.');
   }
-  return null; // No parent (this is a top-level code)
+  // No decimal, check if it's a multi-digit code
+  const baseCode = sfiCode;
+  if (baseCode.length > 2) {
+    // 3+ digit code (e.g., 711 → parent is 71)
+    return baseCode.substring(0, 2);
+  } else if (baseCode.length === 2) {
+    // 2-digit code (e.g., 71 → parent is 7)
+    return baseCode.charAt(0);
+  }
+  return null; // Single-digit codes have no parent
 }
 
 // Validate SFI code format
@@ -603,10 +646,23 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized['Component Code'] = sfiCodeStr; // Use SFI code as component code
           normalized['Generated Code'] = sfiCodeStr; // Same as SFI code
           
-          // Auto-calculate Parent Code (parent SFI code)
+          // Auto-calculate Sub Group Code (first 2 digits)
+          const subGroupCode = getSubGroupCode(sfiCodeStr);
+          if (subGroupCode && !row['Sub Group Code']) {
+            normalized['Sub Group Code'] = subGroupCode;
+          }
+          
+          // Auto-populate Sub Group Name if not provided (regardless of whether code was auto-generated)
+          const finalSubGroupCode = row['Sub Group Code'] || normalized['Sub Group Code'];
+          if (finalSubGroupCode && !row['Sub Group Name']) {
+            normalized['Sub Group Name'] = getSubGroupName(finalSubGroupCode);
+          }
+          
+          // Auto-calculate Parent Code
           const parentCode = getParentSFICode(sfiCodeStr);
-          normalized['Parent Code'] = parentCode || '';
-          normalized['Sub Group Code'] = parentCode || '';
+          if (parentCode && !row['Parent Code']) {
+            normalized['Parent Code'] = parentCode;
+          }
         }
       }
 
@@ -625,7 +681,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           const category = getComponentCategory(mainGroupNum);
           if (category) {
             normalized['Component Category'] = category;
-            normalized['Main Group Name'] = category;
+            if (!row['Main Group Name']) {
+              normalized['Main Group Name'] = category;
+            }
           }
           
           // Validate that Main Group Code matches first digit of SFI code
