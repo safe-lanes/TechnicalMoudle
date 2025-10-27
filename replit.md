@@ -44,9 +44,15 @@ The application uses a modern full-stack architecture with a React frontend (Typ
 - **Defects Module - Recurring Defects Feature**: Complete pattern detection for equipment failures (2+ occurrences across vessels), with time window filtering (6 months to 5 years), minimum occurrence filtering, CoC filtering, and comprehensive test data demonstrating KSB pump patterns across multiple vessels (Fixed deduplication for same-day/same-vessel defects)
 - **Admin Module - 4-Tab Interface** (Oct 2024): Complete admin workspace with tabbed navigation:
   - **Bulk Data Imp Tab**: Left sidebar with template selection (Machinery Components, Stores, Spares, Work Orders), right panel for bulk upload operations
-    - **Machinery Component Upload**: Complete bulk import system for CSV/Excel files with dry-run validation, three import modes (Create Only/Update Only/Create & Update), upload history tracking, and full component data persistence
-    - **Work Order Upload (Template 4)**: Bulk import system for work orders with auto-generated WO codes (WO-{ComponentCode}-{Sequence}), component code validation, Excel dropdowns for Maintenance Basis (Calendar/Running Hours/Condition Based), Task Type (Inspection/Overhaul/Repair/Replacement/Service/Testing), Class Related (Yes/No), and Job Priority (Low/Medium/High/Critical)
-    - **Template Version 3.0**: Simplified Excel template structure - Row 1 contains headers, Row 2 contains example data (users can delete/replace), Row 3+ for user data. Excel dropdowns for validated fields starting from Row 2
+    - **Machinery Component Upload (SFI Standard)**: Complete bulk import system for CSV/Excel files with:
+      - **SFI Code Support**: International maritime classification standard (SFI) with hierarchical component codes (e.g., 6, 61, 612, 612.005, 612.005.001)
+      - **Auto-Hierarchy Building**: Component tree automatically constructed from SFI codes - parent-child relationships derived from code structure (612.005 → parent: 612)
+      - **Main Group Codes (1-8)**: User selects number 1-8, auto-maps to full category name (6 → "6 Machinery Main Components")
+      - **8 SFI Categories**: 1 Ship General, 2 Hull, 3 Equipment for Cargo, 4 Ship Equipment, 5 Equipment for Crew and Passengers, 6 Machinery Main Components, 7 Systems for Machinery Main Components, 8 Ship Common Systems
+      - **Smart Validation**: SFI code format validation, Main Group Code must match first digit of SFI code, hierarchy depth sorting ensures parents created before children
+      - **Import Modes**: Create Only/Update Only/Create & Update with dry-run validation
+      - **Template Structure**: Row 1 headers, Row 2 example data, Row 3+ user data with Excel dropdowns for Main Group Code (1-8)
+    - **Work Order Upload (Template 4)**: Bulk import system for work orders with auto-generated WO codes (WO-{ComponentCode}-{Sequence}), component code validation, Excel dropdowns for Maintenance Basis (Calendar/Running Hours/Condition Based), Frequency Value/Unit, Task Type, Class Related, and Job Priority
   - **Alerts Tab**: Alert policy management and configuration system
   - **Forms Tab**: Form configuration and template management with FormConfigurationModal integration
   - **Admin 4 Tab**: Reserved for future administrative functionality
