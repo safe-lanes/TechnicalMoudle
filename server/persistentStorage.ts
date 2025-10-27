@@ -570,7 +570,7 @@ export class PersistentFileStorage implements IStorage {
   // Component methods
   async getComponents(vesselId: string): Promise<Component[]> {
     return Object.values(this.data.components)
-      .filter(c => c.vesselId === vesselId);
+      .filter(c => c !== null && c !== undefined && c.vesselId === vesselId);
   }
 
   async getComponent(id: string): Promise<Component | undefined> {

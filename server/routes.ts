@@ -24,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const components = await storage.getComponents(req.params.vesselId);
       res.json(components);
     } catch (error) {
+      console.error("Error fetching components:", error);
       res.status(500).json({ error: "Failed to fetch components" });
     }
   });
