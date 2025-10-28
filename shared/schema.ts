@@ -61,12 +61,21 @@ export const components = pgTable("components", {
   maker: text("maker"),
   model: text("model"),
   serialNo: text("serial_no"),
+  department: text("department"),
   deptCategory: text("dept_category"),
   componentCategory: text("component_category"),
   location: text("location"),
   commissionedDate: text("commissioned_date"),
+  installationDate: text("installation_date"),
   critical: boolean("critical").default(false),
   classItem: boolean("class_item").default(false),
+  rating: text("rating"),
+  conditionBased: text("condition_based"),
+  noOfUnits: text("no_of_units"),
+  eqptSystemDept: text("eqpt_system_dept"),
+  parentComponent: text("parent_component"),
+  dimensionsSize: text("dimensions_size"),
+  notes: text("notes"),
 });
 
 export const insertComponentSchema = createInsertSchema(components).omit({});
