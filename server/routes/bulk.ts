@@ -984,6 +984,8 @@ async function performImport(
   };
 
   if (type === 'components') {
+    console.log(`🚀 Starting component import: ${data.length} rows, mode: ${mode}`);
+    
     // Sort components by SFI hierarchy depth (parents before children)
     // e.g., "6" before "61" before "612.005"
     const sortedData = [...data].sort((a, b) => {
@@ -1014,6 +1016,7 @@ async function performImport(
         }
       } else if (mode === 'upsert') {
         if (existing) {
+          console.log(`🔄 Updating existing component: ${componentCode}`);
           await updateComponentFromRow(componentCode, row);
           result.updated++;
         } else {
@@ -1022,6 +1025,8 @@ async function performImport(
         }
       }
     }
+    
+    console.log(`✅ Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'spares') {
     // TODO: Implement spares import
     for (const row of data) {
@@ -1122,7 +1127,10 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0'
   };
 
-  return await storage.createComponent(componentData);
+  console.log(`📦 Creating component: ${componentCode} - ${componentData.name}`);
+  const result = await storage.createComponent(componentData);
+  console.log(`✅ Component created: ${componentCode}`);
+  return result;
 }
 
 // Helper function to update component from Excel row
