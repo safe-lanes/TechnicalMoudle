@@ -40,7 +40,9 @@ function getComponentCategory(mainGroupCode: number): string | null {
 // Helper function to extract Sub Group Code (first 2 digits) from SFI code
 // Examples: 711.001 → 71, 612.005 → 61, 7 → null, 71 → 71
 function getSubGroupCode(sfiCode: string): string | null {
-  const baseCode = sfiCode.split('.')[0]; // Get part before decimal
+  // Strip any suffix before processing
+  const cleanCode = stripSFISuffix(sfiCode);
+  const baseCode = cleanCode.split('.')[0]; // Get part before decimal
   if (baseCode.length >= 2) {
     return baseCode.substring(0, 2);
   }
@@ -71,15 +73,24 @@ function getSubGroupName(subGroupCode: string): string {
 }
 
 // Helper function to extract parent SFI code
+// Strip suffixes like (1), (2), etc. from SFI codes
+function stripSFISuffix(sfiCode: string): string {
+  // Remove anything in parentheses at the end: "226.065(1)" → "226.065"
+  return sfiCode.replace(/\([^)]*\)$/, '').trim();
+}
+
 function getParentSFICode(sfiCode: string): string | null {
-  const parts = sfiCode.split('.');
+  // Strip any suffix like (1), (2) before calculating parent
+  const cleanCode = stripSFISuffix(sfiCode);
+  
+  const parts = cleanCode.split('.');
   if (parts.length > 1) {
     // Has decimal parts (e.g., 711.001 → parent is 711)
     parts.pop(); // Remove last part
     return parts.join('.');
   }
   // No decimal, check if it's a multi-digit code
-  const baseCode = sfiCode;
+  const baseCode = cleanCode;
   if (baseCode.length > 2) {
     // 3+ digit code (e.g., 711 → parent is 71)
     return baseCode.substring(0, 2);
@@ -93,8 +104,11 @@ function getParentSFICode(sfiCode: string): string | null {
 // Validate SFI code format
 function validateSFICode(sfiCode: string): boolean {
   // SFI codes can be: 6, 61, 612, 612.005, 612.005.001
+  // Also accept codes with suffixes like 226.065(1), 230(2), etc.
+  // Strip the suffix before validation
+  const cleanCode = stripSFISuffix(sfiCode);
   const pattern = /^\d{1,3}(\.\d{1,3})*$/;
-  return pattern.test(sfiCode);
+  return pattern.test(cleanCode);
 }
 
 // UOM list
@@ -659,7 +673,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         if (!validateSFICode(sfiCodeStr)) {
           errors.push(`Row ${rowNum}: Invalid SFI code format. Expected format: 6, 61, 612, 612.005, etc.`);
         } else {
-          normalized['Original SFI Code'] = sfiCodeStr;
+          // Strip any suffix from Original SFI Code - suffixes belong in Generated Code
+          const cleanSFICode = stripSFISuffix(sfiCodeStr);
+          normalized['Original SFI Code'] = cleanSFICode;
           
           // Use Generated Code if provided (for unique IDs with suffixes like 230(1), 230(2)),
           // otherwise fall back to Original SFI Code
