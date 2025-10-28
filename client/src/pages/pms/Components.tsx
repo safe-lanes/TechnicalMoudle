@@ -1292,10 +1292,16 @@ const Components: React.FC = () => {
     });
     
     // Convert fetched components to ComponentNode format and add to map
+    // Skip main categories (1-8) as they're already in the map from hardcoded mainCategories
     fetchedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      // Skip if this is a main category (single digit 1-8) - already in map
+      if (code.match(/^[1-8]$/)) {
+        return;
+      }
       const node: ComponentNode = {
-        id: comp.componentCode || comp.id,
-        code: comp.componentCode || comp.id,
+        id: code,
+        code: code,
         name: comp.name,
         ...comp,  // Include all component data
         children: []
