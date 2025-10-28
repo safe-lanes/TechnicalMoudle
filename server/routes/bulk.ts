@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { storage } from '../storage';
+import { getSFIName } from '../utils/sfiLookup';
 
 const router = Router();
 const upload = multer({ 
@@ -1042,18 +1043,21 @@ async function performImport(
       const parentMainGroup = parseInt(parentCode.charAt(0));
       const parentSubGroup = getSubGroupCode(parentCode);
       
-      // Determine appropriate name based on code depth/length
-      let parentName: string;
-      if (parentCode.length === 1) {
-        // Single digit: use main group name without number prefix
-        const category = getComponentCategory(parentMainGroup);
-        parentName = category ? category.replace(/^\d+\s+/, '') : `SFI ${parentCode}`;
-      } else if (parentCode.length === 2) {
-        // Two digits: use sub group name
-        parentName = getSubGroupName(parentCode);
-      } else {
-        // Three or more digits (e.g., 711, 612): use descriptive fallback
-        parentName = `SFI ${parentCode}`;
+      // Use SFI lookup to get proper name from component tree CSV
+      // Falls back to existing logic if not found in lookup
+      let parentName: string = getSFIName(parentCode);
+      
+      // If getSFIName returned the fallback (generic "SFI {code}"), try existing logic
+      if (parentName === `SFI ${parentCode}`) {
+        if (parentCode.length === 1) {
+          // Single digit: use main group name without number prefix
+          const category = getComponentCategory(parentMainGroup);
+          parentName = category ? category.replace(/^\d+\s+/, '') : `SFI ${parentCode}`;
+        } else if (parentCode.length === 2) {
+          // Two digits: use sub group name
+          parentName = getSubGroupName(parentCode);
+        }
+        // else: keep the getSFIName fallback for three or more digits
       }
       
       await storage.createComponent({
@@ -1200,15 +1204,26 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     // Use Parent Code (auto-calculated from SFI)
     parentId: row['Parent Code'] ? String(row['Parent Code']).trim() : null,
     vesselId: vesselId || row['Vessel ID'] || 'V001',
+    // Section A - Component Information
     maker: row['Maker'] || null,
     model: row['Model'] || null,
     serialNo: row['Serial No'] || null,
-    location: row['Location'] || null,
+    department: row['Eqpt / System Department'] || null,
     deptCategory: row['Eqpt / System Department'] || null,
     componentCategory: row['Component Category'] || row['Main Group Name'] || null,
+    location: row['Location'] || null,
     commissionedDate: row['Commissioned Date'] || null,
+    installationDate: row['Installation Date'] || null,
     critical: row['Critical (Yes/No)'] === 'Yes',
-    classItem: row['Condition Based (Yes/No)'] === 'Yes',
+    classItem: false, // Not in template, defaulting to false
+    rating: row['Rating'] || null,
+    conditionBased: row['Condition Based (Yes/No)'] || null,
+    noOfUnits: row['No of Units'] || null,
+    eqptSystemDept: row['Eqpt / System Department'] || null,
+    parentComponent: row['Parent Code'] ? String(row['Parent Code']).trim() : null,
+    dimensionsSize: row['Dimensions/Size'] || null,
+    notes: row['Notes'] || null,
+    // Section B - Running Hours
     currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0'
   };
 
@@ -1230,14 +1245,29 @@ async function updateComponentFromRow(componentCode: string, row: any) {
   if (row['Parent Code']) {
     updateData.parentId = String(row['Parent Code']).trim();
   }
+  // Section A - Component Information
   if (row['Maker']) updateData.maker = row['Maker'];
   if (row['Model']) updateData.model = row['Model'];
   if (row['Serial No']) updateData.serialNo = row['Serial No'];
+  if (row['Eqpt / System Department']) {
+    updateData.department = row['Eqpt / System Department'];
+    updateData.deptCategory = row['Eqpt / System Department'];
+    updateData.eqptSystemDept = row['Eqpt / System Department'];
+  }
+  if (row['Component Category'] || row['Main Group Name']) {
+    updateData.componentCategory = row['Component Category'] || row['Main Group Name'];
+  }
   if (row['Location']) updateData.location = row['Location'];
-  if (row['Eqpt / System Department']) updateData.deptCategory = row['Eqpt / System Department'];
   if (row['Commissioned Date']) updateData.commissionedDate = row['Commissioned Date'];
+  if (row['Installation Date']) updateData.installationDate = row['Installation Date'];
   if (row['Critical (Yes/No)']) updateData.critical = row['Critical (Yes/No)'] === 'Yes';
-  if (row['Condition Based (Yes/No)']) updateData.classItem = row['Condition Based (Yes/No)'] === 'Yes';
+  if (row['Rating']) updateData.rating = row['Rating'];
+  if (row['Condition Based (Yes/No)']) updateData.conditionBased = row['Condition Based (Yes/No)'];
+  if (row['No of Units']) updateData.noOfUnits = row['No of Units'];
+  if (row['Parent Code']) updateData.parentComponent = String(row['Parent Code']).trim();
+  if (row['Dimensions/Size']) updateData.dimensionsSize = row['Dimensions/Size'];
+  if (row['Notes']) updateData.notes = row['Notes'];
+  // Section B - Running Hours
   if (row['Running Hours']) updateData.currentCumulativeRH = String(row['Running Hours']);
 
   return await storage.updateComponent(componentCode, updateData);
