@@ -624,6 +624,21 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   // Get columns from first row
   results.columns = Object.keys(data[0]);
 
+  // Track duplicate SFI codes for components
+  const sfiCodeOccurrences = new Map<string, number[]>();
+  if (type === 'components') {
+    data.forEach((row, index) => {
+      const sfiCode = row['Original SFI Code'];
+      if (sfiCode) {
+        const code = String(sfiCode).trim();
+        if (!sfiCodeOccurrences.has(code)) {
+          sfiCodeOccurrences.set(code, []);
+        }
+        sfiCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+      }
+    });
+  }
+  
   // Validate each row based on type
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -645,6 +660,13 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized['Original SFI Code'] = sfiCodeStr;
           normalized['Component Code'] = sfiCodeStr; // Use SFI code as component code
           normalized['Generated Code'] = sfiCodeStr; // Same as SFI code
+          
+          // Check for duplicate SFI codes
+          const occurrences = sfiCodeOccurrences.get(sfiCodeStr);
+          if (occurrences && occurrences.length > 1) {
+            const otherRows = occurrences.filter(r => r !== rowNum);
+            warnings.push(`Row ${rowNum}: Duplicate SFI Code '${sfiCodeStr}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
+          }
           
           // Auto-calculate Sub Group Code (first 2 digits)
           const subGroupCode = getSubGroupCode(sfiCodeStr);
@@ -985,6 +1007,69 @@ async function performImport(
 
   if (type === 'components') {
     console.log(`🚀 Starting component import: ${data.length} rows, mode: ${mode}`);
+    
+    // First, ensure all intermediate parent nodes exist
+    // For each component, create parent hierarchy if missing
+    const parentsToCreate = new Set<string>();
+    
+    for (const row of data) {
+      const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
+      
+      // Walk up the hierarchy by iteratively trimming the SFI code itself
+      // This ensures ALL intermediate nodes are considered, not just those in Parent Code chain
+      // Example: 711.001 → 711 → 71 → 7
+      let currentCode = getParentSFICode(componentCode);
+      
+      while (currentCode && currentCode.length > 0) {
+        const parentExists = await storage.getComponent(currentCode);
+        if (!parentExists) {
+          parentsToCreate.add(currentCode);
+        }
+        // Move up one level by trimming the current code
+        currentCode = getParentSFICode(currentCode);
+      }
+    }
+    
+    // Create missing parent nodes (sorted by depth, shallowest first)
+    const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
+      const aDepth = (a.match(/\./g) || []).length;
+      const bDepth = (b.match(/\./g) || []).length;
+      return aDepth - bDepth;
+    });
+    
+    console.log(`📁 Creating ${sortedParents.length} intermediate parent nodes...`);
+    for (const parentCode of sortedParents) {
+      const parentMainGroup = parseInt(parentCode.charAt(0));
+      const parentSubGroup = getSubGroupCode(parentCode);
+      
+      // Determine appropriate name based on code depth/length
+      let parentName: string;
+      if (parentCode.length === 1) {
+        // Single digit: use main group name without number prefix
+        const category = getComponentCategory(parentMainGroup);
+        parentName = category ? category.replace(/^\d+\s+/, '') : `SFI ${parentCode}`;
+      } else if (parentCode.length === 2) {
+        // Two digits: use sub group name
+        parentName = getSubGroupName(parentCode);
+      } else {
+        // Three or more digits (e.g., 711, 612): use descriptive fallback
+        parentName = `SFI ${parentCode}`;
+      }
+      
+      await storage.createComponent({
+        id: parentCode,
+        componentCode: parentCode,
+        name: parentName,
+        category: getComponentCategory(parentMainGroup) || '',
+        parentId: getParentSFICode(parentCode),
+        vesselId: vesselId || 'V001',
+        currentCumulativeRH: '0',
+        critical: false,
+        classItem: false
+      });
+      console.log(`📁 Created parent node: ${parentCode} (${parentName})`);
+      result.created++;
+    }
     
     // Sort components by SFI hierarchy depth (parents before children)
     // e.g., "6" before "61" before "612.005"

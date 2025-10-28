@@ -47,6 +47,8 @@ The application uses a modern full-stack architecture with a React frontend (Typ
     - **Machinery Component Upload (SFI Standard)**: Complete bulk import system for CSV/Excel files with:
       - **SFI Code Support**: International maritime classification standard (SFI) with hierarchical component codes (e.g., 6, 61, 612, 612.005, 612.005.001)
       - **Auto-Hierarchy Building**: Component tree automatically constructed from SFI codes - parent-child relationships derived from code structure (612.005 → parent: 612)
+      - **Automatic Intermediate Node Creation** (Oct 28, 2024): System automatically creates ALL missing parent nodes in hierarchy by iteratively trimming SFI codes (e.g., importing 612.005.001 auto-creates 612.005 → 612 → 61 → 6), ensuring complete tree structure with intelligent naming (1-digit: main group name, 2-digit: sub group name, 3+ digit: "SFI {code}")
+      - **Duplicate Detection** (Oct 28, 2024): Dry-run validation detects duplicate SFI codes and warns users that only the last occurrence will be kept, preventing silent data overwrites
       - **Main Group Codes (1-8)**: User selects number 1-8, auto-maps to full category name (6 → "6 Machinery Main Components")
       - **8 SFI Categories**: 1 Ship General, 2 Hull, 3 Equipment for Cargo, 4 Ship Equipment, 5 Equipment for Crew and Passengers, 6 Machinery Main Components, 7 Systems for Machinery Main Components, 8 Ship Common Systems
       - **Smart Validation**: SFI code format validation, Main Group Code must match first digit of SFI code, hierarchy depth sorting ensures parents created before children
