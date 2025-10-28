@@ -220,7 +220,7 @@ export default function AdminMachineryUpload() {
       setSelectedFile(null);
       setDryRunResult(null);
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/components/V001'] });
     } catch (error: any) {
       toast({
         title: 'Import Failed',
