@@ -625,17 +625,18 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   // Get columns from first row
   results.columns = Object.keys(data[0]);
 
-  // Track duplicate SFI codes for components
-  const sfiCodeOccurrences = new Map<string, number[]>();
+  // Track duplicate Generated Codes for components (actual duplicates to warn about)
+  const generatedCodeOccurrences = new Map<string, number[]>();
   if (type === 'components') {
     data.forEach((row, index) => {
-      const sfiCode = row['Original SFI Code'];
-      if (sfiCode) {
-        const code = String(sfiCode).trim();
-        if (!sfiCodeOccurrences.has(code)) {
-          sfiCodeOccurrences.set(code, []);
+      // Use Generated Code if available, otherwise fall back to Original SFI Code
+      const generatedCode = row['Generated Code'] || row['Original SFI Code'];
+      if (generatedCode) {
+        const code = String(generatedCode).trim();
+        if (!generatedCodeOccurrences.has(code)) {
+          generatedCodeOccurrences.set(code, []);
         }
-        sfiCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+        generatedCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
       }
     });
   }
@@ -666,11 +667,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized['Generated Code'] = generatedCode;
           normalized['Component Code'] = generatedCode; // Use Generated Code for component ID
           
-          // Check for duplicate SFI codes
-          const occurrences = sfiCodeOccurrences.get(sfiCodeStr);
+          // Check for duplicate Generated Codes (actual duplicates that need warnings)
+          const occurrences = generatedCodeOccurrences.get(generatedCode);
           if (occurrences && occurrences.length > 1) {
             const otherRows = occurrences.filter(r => r !== rowNum);
-            warnings.push(`Row ${rowNum}: Duplicate SFI Code '${sfiCodeStr}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
+            warnings.push(`Row ${rowNum}: Duplicate Generated Code '${generatedCode}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
           }
           
           // Auto-calculate Sub Group Code (first 2 digits)
