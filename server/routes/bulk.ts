@@ -686,9 +686,10 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
             normalized['Sub Group Name'] = getSubGroupName(finalSubGroupCode);
           }
           
-          // Auto-calculate Parent Code
+          // Auto-calculate Parent Code from Original SFI Code
+          // ALWAYS recalculate - don't trust Excel values as they may be incorrect
           const parentCode = getParentSFICode(sfiCodeStr);
-          if (parentCode && !row['Parent Code']) {
+          if (parentCode) {
             normalized['Parent Code'] = parentCode;
           }
         }

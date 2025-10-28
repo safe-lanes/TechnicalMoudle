@@ -96,8 +96,8 @@ export function getSFIName(code: string): string {
   
   const entry = sfiMap.get(code);
   if (entry) {
-    // Use SubGroup name if available (most specific), otherwise use name
-    return entry.subGroup || entry.name;
+    // Use the specific name for this code (not SubGroup which is too generic)
+    return entry.name || entry.subGroup;
   }
   
   // Fallback for codes not in the CSV
