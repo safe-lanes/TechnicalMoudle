@@ -659,8 +659,12 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           errors.push(`Row ${rowNum}: Invalid SFI code format. Expected format: 6, 61, 612, 612.005, etc.`);
         } else {
           normalized['Original SFI Code'] = sfiCodeStr;
-          normalized['Component Code'] = sfiCodeStr; // Use SFI code as component code
-          normalized['Generated Code'] = sfiCodeStr; // Same as SFI code
+          
+          // Use Generated Code if provided (for unique IDs with suffixes like 230(1), 230(2)),
+          // otherwise fall back to Original SFI Code
+          const generatedCode = row['Generated Code'] ? String(row['Generated Code']).trim() : sfiCodeStr;
+          normalized['Generated Code'] = generatedCode;
+          normalized['Component Code'] = generatedCode; // Use Generated Code for component ID
           
           // Check for duplicate SFI codes
           const occurrences = sfiCodeOccurrences.get(sfiCodeStr);
@@ -1016,10 +1020,14 @@ async function performImport(
     for (const row of data) {
       const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
       
+      // For hierarchy building, use the Original SFI Code (without suffixes like (1), (2), etc.)
+      // Generated Code may have suffixes for uniqueness, but hierarchy is based on the base SFI code
+      const originalSFICode = String(row['Original SFI Code'] || row['Component Code'] || row['Generated Code']).trim();
+      
       // Walk up the hierarchy by iteratively trimming the SFI code itself
       // This ensures ALL intermediate nodes are considered, not just those in Parent Code chain
       // Example: 711.001 → 711 → 71 → 7
-      let currentCode = getParentSFICode(componentCode);
+      let currentCode = getParentSFICode(originalSFICode);
       
       while (currentCode && currentCode.length > 0) {
         const parentExists = await storage.getComponent(currentCode);
@@ -1078,15 +1086,15 @@ async function performImport(
     // Sort components by SFI hierarchy depth (parents before children)
     // e.g., "6" before "61" before "612.005"
     const sortedData = [...data].sort((a, b) => {
-      const aCode = String(a['Component Code'] || '').trim();
-      const bCode = String(b['Component Code'] || '').trim();
+      const aCode = String(a['Component Code'] || a['Generated Code'] || a['Original SFI Code'] || '').trim();
+      const bCode = String(b['Component Code'] || b['Generated Code'] || b['Original SFI Code'] || '').trim();
       const aDepth = (aCode.match(/\./g) || []).length;
       const bDepth = (bCode.match(/\./g) || []).length;
       return aDepth - bDepth; // Lower depth (parents) first
     });
 
     for (const row of sortedData) {
-      const componentCode = String(row['Component Code']).trim();
+      const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
       const existing = await storage.getComponent(componentCode);
 
       if (mode === 'add') {
