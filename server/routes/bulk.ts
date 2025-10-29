@@ -1409,7 +1409,7 @@ async function getImportHistory(type: string | undefined, limit: number, offset:
 }
 
 // Get history file
-async function getHistoryFile(id: string, fileType: string) {
+async function getHistoryFile(id: string, fileType: string): Promise<{ mimeType: string; name: string; data: Buffer } | null> {
   const history = await storage.getImportHistoryById(id);
   
   if (!history) return null;
