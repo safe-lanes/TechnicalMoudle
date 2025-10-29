@@ -75,6 +75,9 @@ export default function AdminMachineryUpload() {
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>('');
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const { toast } = useToast();
 
   // Fetch import history
@@ -116,6 +119,43 @@ export default function AdminMachineryUpload() {
     }
   };
 
+  // Load sheet names from Excel file
+  const loadSheets = async (file: File) => {
+    setIsLoadingSheets(true);
+    setAvailableSheets([]);
+    setSelectedSheet('');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/bulk/sheets', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load sheets');
+      }
+
+      const result = await response.json();
+      setAvailableSheets(result.sheets || []);
+      
+      // Auto-select first sheet
+      if (result.sheets && result.sheets.length > 0) {
+        setSelectedSheet(result.sheets[0]);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to read file sheets.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoadingSheets(false);
+    }
+  };
+
   // Handle file selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -134,11 +174,19 @@ export default function AdminMachineryUpload() {
     }
 
     setSelectedFile(file);
-    await handleDryRun(file);
+    setDryRunResult(null);
+    
+    // Load sheets if Excel file
+    if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+      await loadSheets(file);
+    } else {
+      // CSV files don't have sheets - run dry-run immediately
+      await handleDryRun(file, '');
+    }
   };
 
   // Dry run validation
-  const handleDryRun = async (file: File) => {
+  const handleDryRun = async (file: File, sheetName?: string) => {
     setIsUploading(true);
     setDryRunResult(null);
 
@@ -147,6 +195,11 @@ export default function AdminMachineryUpload() {
     formData.append('type', 'components');
     formData.append('mode', importMode);
     formData.append('archiveMissing', 'false');
+    
+    // Add sheet name if provided
+    if (sheetName) {
+      formData.append('sheetName', sheetName);
+    }
 
     try {
       const response = await fetch('/api/bulk/dry-run', {
@@ -306,6 +359,59 @@ export default function AdminMachineryUpload() {
                     </p>
                   )}
                 </div>
+
+                {/* Sheet Selection for Excel files */}
+                {availableSheets.length > 0 && selectedFile && (
+                  <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label htmlFor="sheet-select" className="text-sm font-medium">
+                          Select Sheet to Import
+                        </Label>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          This Excel file contains multiple sheets. Choose which one to import.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Select 
+                          value={selectedSheet} 
+                          onValueChange={setSelectedSheet}
+                          disabled={isLoadingSheets || isUploading}
+                        >
+                          <SelectTrigger id="sheet-select" data-testid="select-sheet">
+                            <SelectValue placeholder="Select a sheet" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSheets.map((sheet) => (
+                              <SelectItem key={sheet} value={sheet}>
+                                {sheet}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Button 
+                          onClick={() => selectedFile && handleDryRun(selectedFile, selectedSheet)} 
+                          disabled={!selectedSheet || isUploading || isLoadingSheets}
+                          className="w-full"
+                          data-testid="button-validate-sheet"
+                        >
+                          {isUploading ? 'Validating...' : 'Validate Selected Sheet'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isLoadingSheets && (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Reading file sheets...</p>
+                  </div>
+                )}
 
                 {isUploading && (
                   <div className="text-center py-4">

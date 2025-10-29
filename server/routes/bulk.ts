@@ -456,10 +456,36 @@ router.get('/template', (req, res) => {
   res.send(buffer);
 });
 
+// Get sheet names from Excel file
+router.post('/sheets', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (ext === '.csv') {
+      // CSV files don't have sheets
+      return res.json({ sheets: ['Sheet1'] });
+    } else if (['.xlsx', '.xls'].includes(ext)) {
+      const workbook = XLSX.read(file.buffer);
+      return res.json({ sheets: workbook.SheetNames });
+    } else {
+      return res.status(400).json({ error: 'Unsupported file format' });
+    }
+  } catch (error) {
+    console.error('Error reading sheets:', error);
+    res.status(500).json({ error: 'Failed to read file sheets' });
+  }
+});
+
 // Dry-run validation
 router.post('/dry-run', upload.single('file'), async (req, res) => {
   try {
-    const { type, mode, archiveMissing, vesselId } = req.body;
+    const { type, mode, archiveMissing, vesselId, sheetName } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -484,8 +510,18 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       data = parsed.data;
     } else if (['.xlsx', '.xls'].includes(ext)) {
       const workbook = XLSX.read(file.buffer);
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      data = XLSX.utils.sheet_to_json(firstSheet);
+      
+      // Use specified sheet name or default to first sheet
+      const targetSheetName = sheetName || workbook.SheetNames[0];
+      const targetSheet = workbook.Sheets[targetSheetName];
+      
+      if (!targetSheet) {
+        return res.status(400).json({ 
+          error: `Sheet "${targetSheetName}" not found. Available sheets: ${workbook.SheetNames.join(', ')}` 
+        });
+      }
+      
+      data = XLSX.utils.sheet_to_json(targetSheet);
     } else {
       return res.status(400).json({ error: 'Unsupported file format' });
     }
