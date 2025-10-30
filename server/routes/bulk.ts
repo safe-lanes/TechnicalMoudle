@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
@@ -123,6 +124,144 @@ const STORES_CATEGORIES = [
   'Consumables'
 ];
 
+// Helper function to generate work-orders template using ExcelJS (supports data validations)
+async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  // Create main "wo" sheet
+  const woSheet = workbook.addWorksheet('wo');
+  
+  // Add headers
+  woSheet.columns = [
+    { header: 'Generated_Component_Code', key: 'componentCode', width: 25 },
+    { header: 'Component_Name', key: 'componentName', width: 30 },
+    { header: 'Job_Code', key: 'jobCode', width: 15 },
+    { header: 'Job_Title', key: 'jobTitle', width: 35 },
+    { header: 'Job_Description', key: 'jobDescription', width: 50 },
+    { header: 'Department', key: 'department', width: 15 },
+    { header: 'Responsible_Rank', key: 'responsibleRank', width: 20 },
+    { header: 'Schedule_Type', key: 'scheduleType', width: 18 },
+    { header: 'Interval', key: 'interval', width: 12 },
+    { header: 'Interval_Unit', key: 'intervalUnit', width: 15 },
+    { header: 'Criticality', key: 'criticality', width: 12 },
+    { header: 'Estimated_Hours', key: 'estimatedHours', width: 18 },
+    { header: 'Spares_Required', key: 'sparesRequired', width: 35 },
+    { header: 'Safety_Permit_Required', key: 'safetyPermit', width: 30 }
+  ];
+  
+  // Add example data row
+  woSheet.addRow({
+    componentCode: '601(1)',
+    componentName: 'DIESEL ENGINES 1',
+    jobCode: 'ME-001',
+    jobTitle: 'Check Turbocharger Bearings',
+    jobDescription: 'Inspect for wear, check lube oil supply, and clean intake side.',
+    department: 'Engine',
+    responsibleRank: '2nd Engineer',
+    scheduleType: 'Running Hours',
+    interval: 500,
+    intervalUnit: 'Hours',
+    criticality: 'yes',
+    estimatedHours: 4,
+    sparesRequired: 'Bearing Set P/N 12345',
+    safetyPermit: 'Hot Work'
+  });
+  
+  // Create "Lists" sheet
+  const listsSheet = workbook.addWorksheet('Lists');
+  listsSheet.columns = [
+    { header: 'Schedule_Type', key: 'scheduleType', width: 18 },
+    { header: 'Interval_Unit', key: 'intervalUnit', width: 15 },
+    { header: 'Department', key: 'department', width: 15 },
+    { header: 'Responsible_Rank', key: 'responsibleRank', width: 20 },
+    { header: 'Safety_Permit', key: 'safetyPermit', width: 25 },
+    { header: 'Criticality', key: 'criticality', width: 12 }
+  ];
+  
+  // Add dropdown values
+  const listValues = [
+    { scheduleType: 'Running Hours', intervalUnit: 'Hours', department: 'Engine', responsibleRank: 'Chief Engineer', safetyPermit: 'Hot Work', criticality: 'yes' },
+    { scheduleType: 'Calendar', intervalUnit: 'Days', department: 'Deck', responsibleRank: '2nd Engineer', safetyPermit: 'Enclosed Space Entry', criticality: 'no' },
+    { scheduleType: '', intervalUnit: 'Weeks', department: 'Electrical', responsibleRank: '3rd Engineer', safetyPermit: 'Lockout-Tagout', criticality: '' },
+    { scheduleType: '', intervalUnit: 'Months', department: '', responsibleRank: '4th Engineer', safetyPermit: 'Working Aloft', criticality: '' },
+    { scheduleType: '', intervalUnit: 'Years', department: '', responsibleRank: 'Chief Officer', safetyPermit: '', criticality: '' },
+    { scheduleType: '', intervalUnit: '', department: '', responsibleRank: 'Electrician', safetyPermit: '', criticality: '' }
+  ];
+  
+  listValues.forEach(row => listsSheet.addRow(row));
+  
+  // Add data validations to wo sheet
+  // Column F (Department) - row 2 onwards
+  woSheet.getColumn(6).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$C$2:$C$4']
+      };
+    }
+  });
+  
+  // Column G (Responsible_Rank)
+  woSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$D$2:$D$7']
+      };
+    }
+  });
+  
+  // Column H (Schedule_Type)
+  woSheet.getColumn(8).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$A$2:$A$3']
+      };
+    }
+  });
+  
+  // Column J (Interval_Unit)
+  woSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$B$2:$B$6']
+      };
+    }
+  });
+  
+  // Column K (Criticality)
+  woSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$F$2:$F$3']
+      };
+    }
+  });
+  
+  // Column N (Safety_Permit_Required)
+  woSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$E$2:$E$5']
+      };
+    }
+  });
+  
+  // Write to buffer and return
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 // Generate template based on type
 router.get('/template', async (req, res) => {
   const { type, vesselId } = req.query;
@@ -218,22 +357,23 @@ router.get('/template', async (req, res) => {
 
     case 'work-orders':
       headers = [
-        'Component Code', 'WO Title', 'Maintenance Basis', 'Frequency Value', 'Frequency Unit',
-        'Task Type', 'Assigned To', 'Approver', 'Class Related', 'Job Priority',
-        'Brief Work Description'
+        'Generated_Component_Code', 'Component_Name', 'Job_Code', 'Job_Title', 
+        'Job_Description', 'Department', 'Responsible_Rank', 'Schedule_Type',
+        'Interval', 'Interval_Unit', 'Criticality', 'Estimated_Hours', 
+        'Spares_Required', 'Safety_Permit_Required'
       ];
 
       validValues = [
-        'Required, Must exist', 'Required', 'Calendar|Running Hours|Condition Based',
-        'Number (e.g., 500 for hours, 6 for months)', 'Days|Weeks|Months|Years (for Calendar only)',
-        'Inspection|Overhaul|Repair|Replacement|Service|Testing', 'Required',
-        'Required', 'Yes|No', 'Low|Medium|High|Critical', 'Text'
+        'Required (from system)', 'Auto-filled from component', 'Optional (e.g., ME-001)', 'Required',
+        'Optional task description', 'Engine|Deck|Electrical', 'Chief Engineer|2nd Engineer|3rd Engineer|4th Engineer|Chief Officer|Electrician',
+        'Running Hours|Calendar', 'Number (e.g., 500, 6)', 'Hours|Days|Weeks|Months|Years',
+        'yes|no', 'Number of hours', 'Optional spare parts required', 'Hot Work|Enclosed Space Entry|Lockout-Tagout|Working Aloft'
       ];
 
       example = [
-        '6.1', 'Main Engine Bearing Inspection', 'Calendar', '6', 'Months',
-        'Inspection', 'Chief Engineer', 'Fleet Superintendent',
-        'Yes', 'High', 'Inspect main engine bearings for wear and damage'
+        '601(1)', 'DIESEL ENGINES 1', 'ME-001', 'Check Turbocharger Bearings',
+        'Inspect for wear, check lube oil supply, and clean intake side.', 'Engine', '2nd Engineer',
+        'Running Hours', '500', 'Hours', 'yes', '4', 'Bearing Set P/N 12345', 'Hot Work'
       ];
       break;
   }
@@ -372,106 +512,117 @@ router.get('/template', async (req, res) => {
     const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '');
     console.log(`✅ ${validComponents.length} components have valid codes`);
     
-    // Only add Component Code dropdown if components exist
-    // This prevents Excel errors when validComponents is empty
-    if (validComponents.length > 0) {
-      // Component Code dropdown (Column A, starting from row 2) - Reference Components sheet
-      // Note: Excel data validation syntax for referencing another sheet is: =SheetName!$A$2:$A$n
-      mainSheet['!dataValidation'].push({
-        type: 'list',
-        operator: 'equal',
-        sqref: 'A2:A1000',
-        formulas: [`=Components!$A$2:$A$${validComponents.length + 1}`],
-        allowBlank: true,
-        showErrorMessage: true,
-        errorTitle: 'Invalid Component Code',
-        error: 'Please select a component code from the dropdown'
-      });
-    }
-
-    // Maintenance Basis dropdown (Column C, starting from row 2)
-    mainSheet['!dataValidation'].push({
-      type: 'list',
-      operator: 'equal',
-      sqref: 'C2:C1000',
-      formulas: ['"Calendar,Running Hours,Condition Based"'],
-      allowBlank: true,
-      showErrorMessage: true,
-      errorTitle: 'Invalid Maintenance Basis',
-      error: 'Please select from: Calendar, Running Hours, Condition Based'
-    });
-
-    // Frequency Unit dropdown (Column E, starting from row 2)
-    mainSheet['!dataValidation'].push({
-      type: 'list',
-      operator: 'equal',
-      sqref: 'E2:E1000',
-      formulas: ['"Days,Weeks,Months,Years"'],
-      allowBlank: true,
-      showErrorMessage: true,
-      errorTitle: 'Invalid Frequency Unit',
-      error: 'Please select from: Days, Weeks, Months, Years (for Calendar basis)'
-    });
-
-    // Task Type dropdown (Column F, starting from row 2)
+    // Create Lists sheet with dropdown values
+    const listsData = [
+      ['Schedule_Type', 'Interval_Unit', 'Department', 'Responsible_Rank', 'Safety_Permit', 'Criticality'],
+      ['Running Hours', 'Hours', 'Engine', 'Chief Engineer', 'Hot Work', 'yes'],
+      ['Calendar', 'Days', 'Deck', '2nd Engineer', 'Enclosed Space Entry', 'no'],
+      ['', 'Weeks', 'Electrical', '3rd Engineer', 'Lockout-Tagout', ''],
+      ['', 'Months', '', '4th Engineer', 'Working Aloft', ''],
+      ['', 'Years', '', 'Chief Officer', '', ''],
+      ['', '', '', 'Electrician', '', '']
+    ];
+    
+    const listsSheet = XLSX.utils.aoa_to_sheet(listsData);
+    
+    // Add dropdowns referencing Lists sheet
+    // Column F (Department) - References Lists!$C$2:$C$4
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
       sqref: 'F2:F1000',
-      formulas: ['"Inspection,Overhaul,Repair,Replacement,Service,Testing"'],
+      formulas: ['=Lists!$C$2:$C$4'],
       allowBlank: true,
       showErrorMessage: true,
-      errorTitle: 'Invalid Task Type',
-      error: 'Please select from: Inspection, Overhaul, Repair, Replacement, Service, Testing'
+      errorTitle: 'Invalid Department',
+      error: 'Please select from the dropdown'
     });
-
-    // Class Related dropdown (Column I, starting from row 2)
+    
+    // Column G (Responsible_Rank) - References Lists!$D$2:$D$7
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'I2:I1000',
-      formulas: ['"Yes,No"'],
+      sqref: 'G2:G1000',
+      formulas: ['=Lists!$D$2:$D$7'],
       allowBlank: true,
       showErrorMessage: true,
-      errorTitle: 'Invalid Value',
-      error: 'Please select Yes or No'
+      errorTitle: 'Invalid Rank',
+      error: 'Please select from the dropdown'
     });
-
-    // Job Priority dropdown (Column J, starting from row 2)
+    
+    // Column H (Schedule_Type) - References Lists!$A$2:$A$3
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'H2:H1000',
+      formulas: ['=Lists!$A$2:$A$3'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Schedule Type',
+      error: 'Please select from the dropdown'
+    });
+    
+    // Column J (Interval_Unit) - References Lists!$B$2:$B$6
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
       sqref: 'J2:J1000',
-      formulas: ['"Low,Medium,High,Critical"'],
+      formulas: ['=Lists!$B$2:$B$6'],
       allowBlank: true,
       showErrorMessage: true,
-      errorTitle: 'Invalid Priority',
-      error: 'Please select from: Low, Medium, High, Critical'
+      errorTitle: 'Invalid Interval Unit',
+      error: 'Please select from the dropdown'
     });
     
-    // Append main sheet first
-    XLSX.utils.book_append_sheet(workbook, mainSheet, 'Work Orders');
+    // Column K (Criticality) - References Lists!$F$2:$F$3
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'K2:K1000',
+      formulas: ['=Lists!$F$2:$F$3'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Criticality',
+      error: 'Please select from the dropdown'
+    });
     
-    // Create and append Components reference sheet
-    // Include helpful message if no components found
-    const componentsData = validComponents.length > 0 
-      ? [
-          ['Component Code', 'Component Name', 'Location'],
-          ...validComponents.map(c => [c.componentCode, c.name, c.location || ''])
-        ]
-      : [
-          ['Component Code', 'Component Name', 'Location'],
-          ['No components found', `Please add components to vessel ${defaultVesselId} first`, '']
-        ];
+    // Column N (Safety_Permit_Required) - References Lists!$E$2:$E$5
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'N2:N1000',
+      formulas: ['=Lists!$E$2:$E$5'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Safety Permit',
+      error: 'Please select from the dropdown'
+    });
     
-    const componentsSheet = XLSX.utils.aoa_to_sheet(componentsData);
-    XLSX.utils.book_append_sheet(workbook, componentsSheet, 'Components');
+    // Append main sheet with new name "wo"
+    XLSX.utils.book_append_sheet(workbook, mainSheet, 'wo');
+    
+    // Append Lists sheet
+    XLSX.utils.book_append_sheet(workbook, listsSheet, 'Lists');
   } else {
     // For non-work-orders, use standard "Data" sheet name
     XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
   }
 
-  // Create meta sheet with instructions
+  // For work-orders, use exceljs to generate template with proper data validations
+  if (type === 'work-orders') {
+    try {
+      const buffer = await generateWorkOrdersTemplate(defaultVesselId);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${type}_template.xlsx"`);
+      res.send(buffer);
+      return;
+    } catch (error) {
+      console.error('Error generating work-orders template:', error);
+      return res.status(500).json({ error: 'Failed to generate template' });
+    }
+  }
+
+  // Create meta sheet with instructions (for non-work-orders templates)
   const metaData = [
     ['Template Type', type],
     ['Template Version', '3.0'],
