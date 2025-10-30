@@ -128,6 +128,14 @@ const STORES_CATEGORIES = [
 async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
+  // Fetch all components from the system for this vessel
+  const allComponents = await storage.getComponents(vesselId);
+  console.log(`📋 Fetched ${allComponents.length} components for vessel ${vesselId}`);
+  
+  // Filter out components without valid codes
+  const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '');
+  console.log(`✅ ${validComponents.length} components have valid codes`);
+  
   // Create main "wo" sheet
   const woSheet = workbook.addWorksheet('wo');
   
@@ -190,7 +198,40 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
+  // Create "Components" sheet with all existing components
+  const componentsSheet = workbook.addWorksheet('Components');
+  componentsSheet.columns = [
+    { header: 'Component_Code', key: 'componentCode', width: 25 },
+    { header: 'Component_Name', key: 'componentName', width: 40 }
+  ];
+  
+  // Add all valid components to the sheet
+  validComponents.forEach(component => {
+    componentsSheet.addRow({
+      componentCode: component.componentCode,
+      componentName: component.name
+    });
+  });
+  
+  console.log(`📝 Added ${validComponents.length} components to Components sheet`);
+  
   // Add data validations to wo sheet
+  // Column A (Generated_Component_Code) - references Components sheet
+  if (validComponents.length > 0) {
+    woSheet.getColumn(1).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+      if (rowNumber > 1) {
+        cell.dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`=Components!$A$2:$A$${validComponents.length + 1}`]
+        };
+      }
+    });
+    console.log(`✅ Added component dropdown validation to column A (${validComponents.length} items)`);
+  } else {
+    console.log(`⚠️  No components found - skipping dropdown validation for column A`);
+  }
+  
   // Column F (Department) - row 2 onwards
   woSheet.getColumn(6).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
