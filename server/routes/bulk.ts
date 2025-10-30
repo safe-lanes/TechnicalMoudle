@@ -1113,106 +1113,127 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
     } else if (type === 'work-orders') {
-      // Validate work orders
-      if (!row['Component Code']) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
+      // Validate work orders (new column names)
+      if (!row['Generated_Component_Code']) {
+        errors.push(`Row ${rowNum}: Generated_Component_Code is required`);
       } else {
-        normalized['Component Code'] = String(row['Component Code']).trim();
+        normalized['Generated_Component_Code'] = String(row['Generated_Component_Code']).trim();
         // TODO: Check if component exists
       }
 
-      if (!row['WO Title']) {
-        errors.push(`Row ${rowNum}: WO Title is required`);
+      // Component_Name is often auto-filled, but validate if provided
+      if (row['Component_Name']) {
+        normalized['Component_Name'] = String(row['Component_Name']).trim();
+      }
+
+      // Job_Code is optional
+      if (row['Job_Code']) {
+        normalized['Job_Code'] = String(row['Job_Code']).trim();
+      }
+
+      // Job_Title is required
+      if (!row['Job_Title']) {
+        errors.push(`Row ${rowNum}: Job_Title is required`);
       } else {
-        normalized['WO Title'] = String(row['WO Title']).trim();
+        normalized['Job_Title'] = String(row['Job_Title']).trim();
       }
 
-      // Validate Maintenance Basis
-      const validMaintenanceBasis = ['Calendar', 'Running Hours', 'Condition Based'];
-      if (row['Maintenance Basis'] && !validMaintenanceBasis.includes(row['Maintenance Basis'])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis. Allowed: ${validMaintenanceBasis.join(', ')}`);
-      } else if (row['Maintenance Basis']) {
-        normalized['Maintenance Basis'] = row['Maintenance Basis'];
+      // Job_Description is optional
+      if (row['Job_Description']) {
+        normalized['Job_Description'] = String(row['Job_Description']).trim();
       }
 
-      // Validate Frequency Value and Unit based on Maintenance Basis
-      const maintenanceBasis = row['Maintenance Basis'];
-      if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Running Hours') {
-        // Frequency Value is required for Calendar and Running Hours
-        if (!row['Frequency Value']) {
-          errors.push(`Row ${rowNum}: Frequency Value is required for ${maintenanceBasis} maintenance`);
+      // Department is optional
+      const validDepartments = ['Engine', 'Deck', 'Electrical'];
+      if (row['Department'] && !validDepartments.includes(row['Department'])) {
+        errors.push(`Row ${rowNum}: Invalid Department. Allowed: ${validDepartments.join(', ')}`);
+      } else if (row['Department']) {
+        normalized['Department'] = row['Department'];
+      }
+
+      // Responsible_Rank is optional
+      const validRanks = ['Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Chief Officer', 'Electrician'];
+      if (row['Responsible_Rank'] && !validRanks.includes(row['Responsible_Rank'])) {
+        errors.push(`Row ${rowNum}: Invalid Responsible_Rank. Allowed: ${validRanks.join(', ')}`);
+      } else if (row['Responsible_Rank']) {
+        normalized['Responsible_Rank'] = row['Responsible_Rank'];
+      }
+
+      // Validate Schedule_Type (formerly Maintenance Basis)
+      const validScheduleTypes = ['Calendar', 'Running Hours'];
+      if (row['Schedule_Type'] && !validScheduleTypes.includes(row['Schedule_Type'])) {
+        errors.push(`Row ${rowNum}: Invalid Schedule_Type. Allowed: ${validScheduleTypes.join(', ')}`);
+      } else if (row['Schedule_Type']) {
+        normalized['Schedule_Type'] = row['Schedule_Type'];
+      }
+
+      // Validate Interval and Interval_Unit based on Schedule_Type
+      const scheduleType = row['Schedule_Type'];
+      if (scheduleType === 'Calendar' || scheduleType === 'Running Hours') {
+        // Interval is required for Calendar and Running Hours
+        if (!row['Interval']) {
+          errors.push(`Row ${rowNum}: Interval is required for ${scheduleType} schedule`);
         } else {
-          const freqVal = parseFloat(row['Frequency Value']);
-          if (isNaN(freqVal) || freqVal <= 0) {
-            errors.push(`Row ${rowNum}: Frequency Value must be a positive number`);
+          const interval = parseFloat(row['Interval']);
+          if (isNaN(interval) || interval <= 0) {
+            errors.push(`Row ${rowNum}: Interval must be a positive number`);
           } else {
-            normalized['Frequency Value'] = String(freqVal);
+            normalized['Interval'] = String(interval);
           }
         }
 
-        // Frequency Unit is required only for Calendar basis
-        if (maintenanceBasis === 'Calendar') {
-          const validFreqUnits = ['Days', 'Weeks', 'Months', 'Years'];
-          if (!row['Frequency Unit']) {
-            errors.push(`Row ${rowNum}: Frequency Unit is required for Calendar maintenance`);
-          } else if (!validFreqUnits.includes(row['Frequency Unit'])) {
-            errors.push(`Row ${rowNum}: Invalid Frequency Unit. Allowed: ${validFreqUnits.join(', ')}`);
+        // Interval_Unit is required only for Calendar basis
+        if (scheduleType === 'Calendar') {
+          const validIntervalUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
+          if (!row['Interval_Unit']) {
+            errors.push(`Row ${rowNum}: Interval_Unit is required for Calendar schedule`);
+          } else if (!validIntervalUnits.includes(row['Interval_Unit'])) {
+            errors.push(`Row ${rowNum}: Invalid Interval_Unit. Allowed: ${validIntervalUnits.join(', ')}`);
           } else {
-            normalized['Frequency Unit'] = row['Frequency Unit'];
+            normalized['Interval_Unit'] = row['Interval_Unit'];
           }
         } else {
-          // Running Hours - Frequency Unit should not be provided
-          if (row['Frequency Unit']) {
-            warnings.push(`Row ${rowNum}: Frequency Unit is not used for Running Hours maintenance (will be ignored)`);
+          // Running Hours - Interval_Unit defaults to Hours
+          if (row['Interval_Unit']) {
+            if (row['Interval_Unit'] !== 'Hours') {
+              warnings.push(`Row ${rowNum}: Interval_Unit for Running Hours should be 'Hours' (will be set to Hours)`);
+            }
           }
-        }
-      } else if (maintenanceBasis === 'Condition Based') {
-        // For Condition Based, frequency fields are optional/not required
-        if (row['Frequency Value']) {
-          warnings.push(`Row ${rowNum}: Frequency Value is not used for Condition Based maintenance (will be ignored)`);
-        }
-        if (row['Frequency Unit']) {
-          warnings.push(`Row ${rowNum}: Frequency Unit is not used for Condition Based maintenance (will be ignored)`);
+          normalized['Interval_Unit'] = 'Hours';
         }
       }
 
-      // Validate Task Type
-      const validTaskTypes = ['Inspection', 'Overhaul', 'Repair', 'Replacement', 'Service', 'Testing'];
-      if (row['Task Type'] && !validTaskTypes.includes(row['Task Type'])) {
-        errors.push(`Row ${rowNum}: Invalid Task Type. Allowed: ${validTaskTypes.join(', ')}`);
-      } else if (row['Task Type']) {
-        normalized['Task Type'] = row['Task Type'];
-      }
-
-      // Validate Class Related
-      if (row['Class Related']) {
-        const value = row['Class Related'].toString();
-        if (!['Yes', 'No'].includes(value)) {
-          errors.push(`Row ${rowNum}: Class Related must be Yes or No`);
+      // Criticality is optional (yes/no)
+      if (row['Criticality']) {
+        const value = row['Criticality'].toString().toLowerCase();
+        if (!['yes', 'no'].includes(value)) {
+          errors.push(`Row ${rowNum}: Criticality must be yes or no`);
         } else {
-          normalized['Class Related'] = value;
+          normalized['Criticality'] = value;
         }
       }
 
-      // Validate Job Priority
-      const validPriorities = ['Low', 'Medium', 'High', 'Critical'];
-      if (row['Job Priority'] && !validPriorities.includes(row['Job Priority'])) {
-        errors.push(`Row ${rowNum}: Invalid Job Priority. Allowed: ${validPriorities.join(', ')}`);
-      } else if (row['Job Priority']) {
-        normalized['Job Priority'] = row['Job Priority'];
+      // Estimated_Hours is optional
+      if (row['Estimated_Hours']) {
+        const hours = parseFloat(row['Estimated_Hours']);
+        if (isNaN(hours) || hours < 0) {
+          errors.push(`Row ${rowNum}: Estimated_Hours must be a non-negative number`);
+        } else {
+          normalized['Estimated_Hours'] = String(hours);
+        }
       }
 
-      // Validate required fields
-      if (!row['Assigned To']) {
-        errors.push(`Row ${rowNum}: Assigned To is required`);
-      } else {
-        normalized['Assigned To'] = String(row['Assigned To']).trim();
+      // Spares_Required is optional
+      if (row['Spares_Required']) {
+        normalized['Spares_Required'] = String(row['Spares_Required']).trim();
       }
 
-      if (!row['Approver']) {
-        errors.push(`Row ${rowNum}: Approver is required`);
-      } else {
-        normalized['Approver'] = String(row['Approver']).trim();
+      // Safety_Permit_Required is optional
+      const validSafetyPermits = ['Hot Work', 'Enclosed Space Entry', 'Lockout-Tagout', 'Working Aloft'];
+      if (row['Safety_Permit_Required'] && !validSafetyPermits.includes(row['Safety_Permit_Required'])) {
+        errors.push(`Row ${rowNum}: Invalid Safety_Permit_Required. Allowed: ${validSafetyPermits.join(', ')}`);
+      } else if (row['Safety_Permit_Required']) {
+        normalized['Safety_Permit_Required'] = row['Safety_Permit_Required'];
       }
 
       // Copy other fields
@@ -1393,7 +1414,7 @@ async function performImport(
     const woSequenceMap = new Map<string, number>();
     
     for (const row of data) {
-      const componentCode = String(row['Component Code']).trim();
+      const componentCode = String(row['Generated_Component_Code']).trim();
       const componentYearKey = `${componentCode}-${currentYear}`;
       
       // Get or initialize sequence number for this component-year combination
@@ -1539,27 +1560,27 @@ async function updateComponentFromRow(componentCode: string, row: any) {
 
 // Helper function to create work order from Excel row
 async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?: string) {
-  const componentCode = String(row['Component Code']).trim();
+  const componentCode = String(row['Generated_Component_Code']).trim();
   const component = await storage.getComponent(componentCode);
   
   const workOrderData = {
     vesselId: vesselId || 'V001',
-    component: component?.name || row['Component Code'],
+    component: component?.name || row['Component_Name'] || componentCode,
     componentCode: componentCode,
-    workOrderNo: `WO-${Date.now()}`, // Temporary WO number
+    workOrderNo: row['Job_Code'] || `WO-${Date.now()}`, // Use Job_Code if provided, else temporary
     templateCode: templateCode,
-    jobTitle: row['WO Title'] || '',
-    assignedTo: row['Assigned To'] || '',
-    approver: row['Approver'] || null,
+    jobTitle: row['Job_Title'] || '',
+    assignedTo: row['Responsible_Rank'] || '',
+    approver: null,
     dueDate: new Date().toISOString(),
     status: 'Due' as const,
-    taskType: row['Task Type'] || null,
-    maintenanceBasis: row['Maintenance Basis'] || null,
-    frequencyValue: row['Frequency Value'] ? String(row['Frequency Value']) : null,
-    frequencyUnit: row['Frequency Unit'] || null,
-    classRelated: row['Class Related'] || null,
-    jobPriority: row['Job Priority'] || null,
-    briefWorkDescription: row['Brief Work Description'] || null
+    taskType: null,
+    maintenanceBasis: row['Schedule_Type'] || null,
+    frequencyValue: row['Interval'] ? String(row['Interval']) : null,
+    frequencyUnit: row['Interval_Unit'] || null,
+    classRelated: row['Criticality'] || null,
+    jobPriority: null,
+    briefWorkDescription: row['Job_Description'] || null
   };
 
   return await storage.createWorkOrder(workOrderData);
@@ -1569,16 +1590,15 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
 async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   const updateData: any = {};
   
-  if (row['WO Title']) updateData.jobTitle = row['WO Title'];
-  if (row['Maintenance Basis']) updateData.maintenanceBasis = row['Maintenance Basis'];
-  if (row['Frequency Value']) updateData.frequencyValue = String(row['Frequency Value']);
-  if (row['Frequency Unit']) updateData.frequencyUnit = row['Frequency Unit'];
-  if (row['Task Type']) updateData.taskType = row['Task Type'];
-  if (row['Assigned To']) updateData.assignedTo = row['Assigned To'];
-  if (row['Approver']) updateData.approver = row['Approver'];
-  if (row['Class Related']) updateData.classRelated = row['Class Related'];
-  if (row['Job Priority']) updateData.jobPriority = row['Job Priority'];
-  if (row['Brief Work Description']) updateData.briefWorkDescription = row['Brief Work Description'];
+  if (row['Job_Title']) updateData.jobTitle = row['Job_Title'];
+  if (row['Schedule_Type']) updateData.maintenanceBasis = row['Schedule_Type'];
+  if (row['Interval']) updateData.frequencyValue = String(row['Interval']);
+  if (row['Interval_Unit']) updateData.frequencyUnit = row['Interval_Unit'];
+  if (row['Responsible_Rank']) updateData.assignedTo = row['Responsible_Rank'];
+  if (row['Criticality']) updateData.classRelated = row['Criticality'];
+  if (row['Job_Description']) updateData.briefWorkDescription = row['Job_Description'];
+  // Map new fields to existing schema where possible
+  if (row['Job_Code']) updateData.workOrderNo = row['Job_Code'];
 
   return await storage.updateWorkOrder(workOrderId, updateData);
 }
