@@ -157,23 +157,27 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Safety_Permit_Required', key: 'safetyPermit', width: 30 }
   ];
   
-  // Add example data row
-  woSheet.addRow({
-    componentCode: '601(1)',
-    componentName: 'DIESEL ENGINES 1',
-    jobCode: 'ME-001',
-    jobTitle: 'Check Turbocharger Bearings',
-    jobDescription: 'Inspect for wear, check lube oil supply, and clean intake side.',
-    department: 'Engine',
-    responsibleRank: '2nd Engineer',
-    scheduleType: 'Running Hours',
-    interval: 500,
-    intervalUnit: 'Hours',
-    criticality: 'yes',
-    estimatedHours: 4,
-    sparesRequired: 'Bearing Set P/N 12345',
-    safetyPermit: 'Hot Work'
+  // Pre-populate all existing components in the template
+  validComponents.forEach(component => {
+    woSheet.addRow({
+      componentCode: component.componentCode,
+      componentName: component.name,
+      jobCode: '',
+      jobTitle: '',
+      jobDescription: '',
+      department: '',
+      responsibleRank: '',
+      scheduleType: '',
+      interval: '',
+      intervalUnit: '',
+      criticality: '',
+      estimatedHours: '',
+      sparesRequired: '',
+      safetyPermit: ''
+    });
   });
+  
+  console.log(`📝 Pre-populated ${validComponents.length} components in template`);
   
   // Create "Lists" sheet
   const listsSheet = workbook.addWorksheet('Lists');
@@ -198,40 +202,7 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Create "Components" sheet with all existing components
-  const componentsSheet = workbook.addWorksheet('Components');
-  componentsSheet.columns = [
-    { header: 'Component_Code', key: 'componentCode', width: 25 },
-    { header: 'Component_Name', key: 'componentName', width: 40 }
-  ];
-  
-  // Add all valid components to the sheet
-  validComponents.forEach(component => {
-    componentsSheet.addRow({
-      componentCode: component.componentCode,
-      componentName: component.name
-    });
-  });
-  
-  console.log(`📝 Added ${validComponents.length} components to Components sheet`);
-  
   // Add data validations to wo sheet
-  // Column A (Generated_Component_Code) - references Components sheet
-  if (validComponents.length > 0) {
-    woSheet.getColumn(1).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-      if (rowNumber > 1) {
-        cell.dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [`=Components!$A$2:$A$${validComponents.length + 1}`]
-        };
-      }
-    });
-    console.log(`✅ Added component dropdown validation to column A (${validComponents.length} items)`);
-  } else {
-    console.log(`⚠️  No components found - skipping dropdown validation for column A`);
-  }
-  
   // Column F (Department) - row 2 onwards
   woSheet.getColumn(6).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
