@@ -214,10 +214,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new work order
   app.post("/api/work-orders", async (req, res) => {
     try {
-      const validatedData = insertWorkOrderSchema.parse(req.body);
-      const workOrder = await storage.createWorkOrder(validatedData);
+      let workOrderData = insertWorkOrderSchema.parse(req.body);
+      
+      // Auto-generate template code if not provided (format: WO-{ComponentCode}-{Year}-{Sequence})
+      if (!workOrderData.templateCode && workOrderData.componentCode) {
+        const currentYear = new Date().getFullYear().toString();
+        const vesselId = workOrderData.vesselId || 'V001';
+        
+        // Get existing WOs for this component in current year
+        const existingWOs = await storage.getWorkOrders(vesselId);
+        const componentYearWOs = existingWOs.filter(wo => 
+          wo.templateCode?.startsWith(`WO-${workOrderData.componentCode}-${currentYear}-`)
+        );
+        
+        // Calculate next sequence
+        const maxSeq = componentYearWOs.length > 0 
+          ? Math.max(...componentYearWOs.map(wo => {
+              const match = wo.templateCode?.match(/-(\d+)$/);
+              return match ? parseInt(match[1]) : 0;
+            }))
+          : 0;
+        
+        const nextSeq = maxSeq + 1;
+        const generatedTemplateCode = `WO-${workOrderData.componentCode}-${currentYear}-${String(nextSeq).padStart(2, '0')}`;
+        
+        // Create new object with generated template code
+        workOrderData = {
+          ...workOrderData,
+          templateCode: generatedTemplateCode
+        };
+      }
+      
+      const workOrder = await storage.createWorkOrder(workOrderData);
       res.status(201).json(workOrder);
     } catch (error: any) {
+      console.error('Work order creation error:', error);
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid work order data", details: error.errors });
       }

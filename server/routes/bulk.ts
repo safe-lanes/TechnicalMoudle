@@ -1189,30 +1189,34 @@ async function performImport(
       result.created++;
     }
   } else if (type === 'work-orders') {
-    // Generate WO code sequence counter for each component
+    // Generate WO code sequence counter for each component-year combination
+    // Format: WO-{ComponentCode}-{Year}-{Sequence}
+    const currentYear = new Date().getFullYear().toString();
     const woSequenceMap = new Map<string, number>();
     
     for (const row of data) {
       const componentCode = String(row['Component Code']).trim();
+      const componentYearKey = `${componentCode}-${currentYear}`;
       
-      // Get or initialize sequence number for this component
-      if (!woSequenceMap.has(componentCode)) {
-        // Check existing WOs for this component to determine next sequence
+      // Get or initialize sequence number for this component-year combination
+      if (!woSequenceMap.has(componentYearKey)) {
+        // Check existing WOs for this component in current year to determine next sequence
         const existingWOs = await storage.getWorkOrders(vesselId);
-        const componentWOs = existingWOs.filter(wo => 
-          wo.templateCode?.startsWith(`WO-${componentCode}-`)
+        const componentYearWOs = existingWOs.filter(wo => 
+          wo.templateCode?.startsWith(`WO-${componentCode}-${currentYear}-`)
         );
-        const maxSeq = componentWOs.length > 0 
-          ? Math.max(...componentWOs.map(wo => {
+        const maxSeq = componentYearWOs.length > 0 
+          ? Math.max(...componentYearWOs.map(wo => {
+              // Extract sequence from format: WO-{code}-{year}-{seq}
               const match = wo.templateCode?.match(/-(\d+)$/);
               return match ? parseInt(match[1]) : 0;
             }))
           : 0;
-        woSequenceMap.set(componentCode, maxSeq + 1);
+        woSequenceMap.set(componentYearKey, maxSeq + 1);
       }
 
-      const sequence = woSequenceMap.get(componentCode)!;
-      const templateCode = `WO-${componentCode}-${String(sequence).padStart(3, '0')}`;
+      const sequence = woSequenceMap.get(componentYearKey)!;
+      const templateCode = `WO-${componentCode}-${currentYear}-${String(sequence).padStart(2, '0')}`;
       
       const existing = Array.from((await storage.getWorkOrders(vesselId))).find(
         wo => wo.templateCode === templateCode
@@ -1224,7 +1228,7 @@ async function performImport(
         } else {
           await createWorkOrderFromRow(row, templateCode, vesselId);
           result.created++;
-          woSequenceMap.set(componentCode, sequence + 1);
+          woSequenceMap.set(componentYearKey, sequence + 1);
         }
       } else if (mode === 'update') {
         if (existing) {
@@ -1240,7 +1244,7 @@ async function performImport(
         } else {
           await createWorkOrderFromRow(row, templateCode, vesselId);
           result.created++;
-          woSequenceMap.set(componentCode, sequence + 1);
+          woSequenceMap.set(componentYearKey, sequence + 1);
         }
       }
     }

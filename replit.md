@@ -62,7 +62,8 @@ The application uses a modern full-stack architecture with a React frontend (Typ
       - **Smart Validation**: SFI code format validation, Main Group Code must match first digit of SFI code, hierarchy depth sorting ensures parents created before children
       - **Import Modes**: Create Only/Update Only/Create & Update with dry-run validation
       - **Template Structure**: Row 1 headers, Row 2 example data, Row 3+ user data with Excel dropdowns for Main Group Code (1-8)
-    - **Work Order Upload (Template 4)**: Bulk import system for work orders with auto-generated WO codes (WO-{ComponentCode}-{Sequence}), component code validation, Excel dropdowns for Maintenance Basis (Calendar/Running Hours/Condition Based), Frequency Value/Unit, Task Type, Class Related, and Job Priority
+    - **Work Order Upload (Template 4)**: Bulk import system for work orders with auto-generated WO codes following format **WO-{ComponentCode}-{Year}-{Sequence}** (Oct 30, 2024), component code validation, Excel dropdowns for Maintenance Basis (Calendar/Running Hours/Condition Based), Frequency Value/Unit, Task Type, Class Related, and Job Priority
+      - **Auto-Generated Template Codes** (Oct 30, 2024): Backend auto-generates template codes in format WO-{ComponentCode}-{Year}-{Sequence} when not provided. Sequences are per-component per-year with 2-digit padding (e.g., WO-711.003-2025-01, WO-711.003-2025-02). Frontend shows placeholder WO-{ComponentCode}-{Year}-XX for UX preview, backend assigns actual sequence on creation. Sequences reset annually for historical tracking.
   - **Alerts Tab**: Alert policy management and configuration system
   - **Forms Tab**: Form configuration and template management with FormConfigurationModal integration
   - **Admin 4 Tab**: Reserved for future administrative functionality

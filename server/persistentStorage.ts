@@ -955,9 +955,12 @@ export class PersistentFileStorage implements IStorage {
   // I'll continue with the most important ones for now
 
   // Work Order methods
-  async getWorkOrders(vesselId: string): Promise<WorkOrder[]> {
-    return Object.values(this.data.workOrders)
-      .filter(wo => wo.vesselId === vesselId);
+  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const allWorkOrders = Object.values(this.data.workOrders);
+    if (vesselId) {
+      return allWorkOrders.filter(wo => wo.vesselId === vesselId);
+    }
+    return allWorkOrders;
   }
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
