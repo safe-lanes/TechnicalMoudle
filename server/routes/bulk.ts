@@ -124,12 +124,15 @@ const STORES_CATEGORIES = [
 ];
 
 // Generate template based on type
-router.get('/template', (req, res) => {
-  const { type } = req.query;
+router.get('/template', async (req, res) => {
+  const { type, vesselId } = req.query;
   
   if (!['components', 'spares', 'stores', 'work-orders'].includes(type as string)) {
     return res.status(400).json({ error: 'Invalid template type' });
   }
+  
+  // Default to V001 if no vesselId provided
+  const defaultVesselId = (vesselId as string) || 'V001';
 
   const workbook = XLSX.utils.book_new();
   let headers: string[] = [];
@@ -361,6 +364,31 @@ router.get('/template', (req, res) => {
       mainSheet['!dataValidation'] = [];
     }
 
+    // Fetch all components from the system for this vessel
+    const allComponents = await storage.getComponents(defaultVesselId);
+    console.log(`📋 Fetched ${allComponents.length} components for vessel ${defaultVesselId}`);
+    
+    // Filter out components without valid codes
+    const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '');
+    console.log(`✅ ${validComponents.length} components have valid codes`);
+    
+    // Only add Component Code dropdown if components exist
+    // This prevents Excel errors when validComponents is empty
+    if (validComponents.length > 0) {
+      // Component Code dropdown (Column A, starting from row 2) - Reference Components sheet
+      // Note: Excel data validation syntax for referencing another sheet is: =SheetName!$A$2:$A$n
+      mainSheet['!dataValidation'].push({
+        type: 'list',
+        operator: 'equal',
+        sqref: 'A2:A1000',
+        formulas: [`=Components!$A$2:$A$${validComponents.length + 1}`],
+        allowBlank: true,
+        showErrorMessage: true,
+        errorTitle: 'Invalid Component Code',
+        error: 'Please select a component code from the dropdown'
+      });
+    }
+
     // Maintenance Basis dropdown (Column C, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
@@ -420,9 +448,28 @@ router.get('/template', (req, res) => {
       errorTitle: 'Invalid Priority',
       error: 'Please select from: Low, Medium, High, Critical'
     });
+    
+    // Append main sheet first
+    XLSX.utils.book_append_sheet(workbook, mainSheet, 'Work Orders');
+    
+    // Create and append Components reference sheet
+    // Include helpful message if no components found
+    const componentsData = validComponents.length > 0 
+      ? [
+          ['Component Code', 'Component Name', 'Location'],
+          ...validComponents.map(c => [c.componentCode, c.name, c.location || ''])
+        ]
+      : [
+          ['Component Code', 'Component Name', 'Location'],
+          ['No components found', `Please add components to vessel ${defaultVesselId} first`, '']
+        ];
+    
+    const componentsSheet = XLSX.utils.aoa_to_sheet(componentsData);
+    XLSX.utils.book_append_sheet(workbook, componentsSheet, 'Components');
+  } else {
+    // For non-work-orders, use standard "Data" sheet name
+    XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
   }
-
-  XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
 
   // Create meta sheet with instructions
   const metaData = [

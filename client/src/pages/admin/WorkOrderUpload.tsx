@@ -90,7 +90,8 @@ export default function WorkOrderUpload() {
   // Download template
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch('/api/bulk/template?type=work-orders');
+      // Include vesselId to populate Components sheet with all system components
+      const response = await fetch('/api/bulk/template?type=work-orders&vesselId=V001');
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -105,7 +106,7 @@ export default function WorkOrderUpload() {
       
       toast({
         title: 'Template Downloaded',
-        description: 'Excel template has been downloaded.'
+        description: 'Excel template with all system components has been downloaded.'
       });
     } catch (error) {
       toast({
@@ -241,7 +242,7 @@ export default function WorkOrderUpload() {
         <CardHeader>
           <CardTitle>Work Orders Bulk Upload</CardTitle>
           <CardDescription>
-            Upload work orders via Excel. WO codes will be auto-generated as WO-{'{ComponentCode}'}-{'{Sequence}'}.
+            Upload work orders via Excel. Download template to get dropdown of all system components. WO codes auto-generated as WO-{'{ComponentCode}'}-{'{Year}'}-{'{Sequence}'}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
