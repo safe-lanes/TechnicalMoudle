@@ -715,6 +715,12 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [isWorkOrderFormOpen, setIsWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
   
+  const { data: allWorkOrders = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/work-orders'],
+  });
+  
+  const workOrders = allWorkOrders.filter(wo => wo.componentCode === componentCode);
+  
   // Generate template code for existing data
   const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: number, unit?: string) => {
     const taskCodes: Record<string, string> = {
@@ -735,9 +741,6 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     const taskCode = taskCodes[taskType] || "";
     return `WO-${componentCode}-${taskCode}${freqTag}`.toUpperCase();
   };
-  
-  // Empty until populated from database - work orders are linked to components
-  const workOrders: any[] = [];
 
   const handleAddWorkOrder = () => {
     setSelectedWorkOrder(null);
@@ -780,28 +783,43 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
             </tr>
           </thead>
           <tbody>
-            {workOrders.map((order, index) => (
-              <tr 
-                key={index} 
-                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                onClick={() => handleRowClick(order)}
-              >
-                <td className="py-3 px-3 text-gray-900">{order.templateCode}</td>
-                <td className="py-3 px-3 text-gray-900">{order.jobTitle}</td>
-                <td className="py-3 px-3 text-gray-900">{order.assignedTo}</td>
-                <td className="py-3 px-3 text-gray-900">{order.dueDate}</td>
-                <td className="py-3 px-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    order.status === "Due" 
-                      ? "bg-yellow-100 text-yellow-800" 
-                      : "bg-yellow-100 text-yellow-800"
-                  }`}>
-                    {order.status}
-                  </span>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-gray-500">
+                  Loading work orders...
                 </td>
-                <td className="py-3 px-3 text-gray-900">{order.dateCompleted}</td>
               </tr>
-            ))}
+            ) : workOrders.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-gray-500">
+                  No work orders found for this component
+                </td>
+              </tr>
+            ) : (
+              workOrders.map((order, index) => (
+                <tr 
+                  key={index} 
+                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handleRowClick(order)}
+                  data-testid={`work-order-row-${order.templateCode}`}
+                >
+                  <td className="py-3 px-3 text-gray-900" data-testid={`wo-code-${order.templateCode}`}>{order.templateCode}</td>
+                  <td className="py-3 px-3 text-gray-900" data-testid={`wo-title-${order.templateCode}`}>{order.jobTitle}</td>
+                  <td className="py-3 px-3 text-gray-900">{order.assignedTo}</td>
+                  <td className="py-3 px-3 text-gray-900">{order.dueDate}</td>
+                  <td className="py-3 px-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      order.status === "Due" 
+                        ? "bg-yellow-100 text-yellow-800" 
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-gray-900">{order.dateCompleted || '-'}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
