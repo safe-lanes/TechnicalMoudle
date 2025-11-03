@@ -136,6 +136,50 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '');
   console.log(`✅ ${validComponents.length} components have valid codes`);
   
+  // Filter to include only leaf nodes (actual equipment, not parent categories)
+  // Strategy: Build a Set of all codes that appear as prefixes of other codes
+  // A component is a parent if its code (without suffix) is a prefix of another component's code
+  const allCodes = validComponents.map(c => c.componentCode);
+  const parentCodes = new Set<string>();
+  
+  allCodes.forEach(code1 => {
+    const cleanCode1 = stripSFISuffix(code1);
+    
+    allCodes.forEach(code2 => {
+      if (code1 === code2) return; // Skip self
+      
+      const cleanCode2 = stripSFISuffix(code2);
+      
+      // Check if code1 is a parent of code2
+      // Examples:
+      // - "220" is parent of "220.001" 
+      // - "71" is parent of "711"
+      // - "711" is parent of "711.003"
+      
+      // Method 1: code2 starts with code1 followed by a dot
+      if (cleanCode2.startsWith(cleanCode1 + '.')) {
+        parentCodes.add(code1);
+        return;
+      }
+      
+      // Method 2: code2 starts with code1 and has more digits (no dot needed)
+      // E.g., "71" is parent of "711", "220" is parent of "2201"
+      if (cleanCode2.startsWith(cleanCode1) && cleanCode2.length > cleanCode1.length && !cleanCode1.includes('.')) {
+        parentCodes.add(code1);
+        return;
+      }
+    });
+  });
+  
+  // Only include components that are NOT in the parent set (i.e., leaf nodes)
+  const leafComponents = validComponents.filter(c => !parentCodes.has(c.componentCode));
+  console.log(`🌿 Filtered to ${leafComponents.length} leaf node components (actual equipment)`);
+  console.log(`🚫 Excluded ${validComponents.length - leafComponents.length} parent components from template`);
+  
+  if (parentCodes.size > 0) {
+    console.log(`   Parent codes excluded: ${[...parentCodes].sort().join(', ')}`);
+  }
+  
   // Create main "wo" sheet
   const woSheet = workbook.addWorksheet('wo');
   
@@ -157,8 +201,8 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Safety_Permit_Required', key: 'safetyPermit', width: 30 }
   ];
   
-  // Pre-populate all existing components in the template
-  validComponents.forEach(component => {
+  // Pre-populate only leaf node components in the template
+  leafComponents.forEach(component => {
     woSheet.addRow({
       componentCode: component.componentCode,
       componentName: component.name,
@@ -177,7 +221,7 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
     });
   });
   
-  console.log(`📝 Pre-populated ${validComponents.length} components in template`);
+  console.log(`📝 Pre-populated ${leafComponents.length} leaf node components in template`);
   
   // Create "Lists" sheet
   const listsSheet = workbook.addWorksheet('Lists');
