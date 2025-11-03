@@ -62,7 +62,7 @@ interface PersistentData {
   formDefinitions: Record<number, FormDefinition>;
   formVersions: Record<number, FormVersion>;
   formVersionUsages: FormVersionUsage[];
-  workOrders: Record<string, WorkOrder>;
+  workOrders: WorkOrder[];
   defects: Record<string, Defect>;
   defectActions: DefectAction[];
   defectAttachments: DefectAttachment[];
@@ -204,7 +204,9 @@ export class PersistentFileStorage implements IStorage {
           formDefinitions: loadedData.formDefinitions || {},
           formVersions: loadedData.formVersions || {},
           formVersionUsages: loadedData.formVersionUsages || [],
-          workOrders: loadedData.workOrders || {},
+          workOrders: Array.isArray(loadedData.workOrders) 
+            ? loadedData.workOrders 
+            : Object.values(loadedData.workOrders || {}).filter(wo => wo !== null),
           defects: loadedData.defects || {},
           defectActions: loadedData.defectActions || [],
           defectAttachments: loadedData.defectAttachments || [],
@@ -262,7 +264,7 @@ export class PersistentFileStorage implements IStorage {
       formDefinitions: {},
       formVersions: {},
       formVersionUsages: [],
-      workOrders: {},
+      workOrders: [],
       defects: {},
       defectActions: [],
       defectAttachments: [],
@@ -421,7 +423,7 @@ export class PersistentFileStorage implements IStorage {
     ];
     
     seedWorkOrders.forEach(wo => {
-      data.workOrders[wo.id] = wo;
+      data.workOrders.push(wo);
     });
     data.counters.workOrderId = 3;
 

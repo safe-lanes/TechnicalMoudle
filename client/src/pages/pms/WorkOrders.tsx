@@ -205,7 +205,7 @@ const WorkOrders: React.FC = () => {
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.status === "Due" || wo.status.includes("Grace"))).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.isExecution && wo.status === "Pending Approval").length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.status === "Overdue").length },
-    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => (!wo.isExecution && wo.status === "Completed") || (wo.isExecution && wo.status === "Approved")).length }
+    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.isExecution && wo.status === "Approved").length }
   ];
 
   const getStatusBadgeColor = (status: string) => {
@@ -244,9 +244,9 @@ const WorkOrders: React.FC = () => {
       if (wo.isExecution) return false;
       if (wo.status !== "Overdue") return false;
     } else if (activeTab === "Completed") {
-      // Show both completed templates and approved executions
-      if (!wo.isExecution && wo.status !== "Completed") return false;
-      if (wo.isExecution && wo.status !== "Approved") return false;
+      // Show only approved executions (templates don't get completed)
+      if (!wo.isExecution) return false;
+      if (wo.status !== "Approved") return false;
     } else if (activeTab === "Pending Approval") {
       // Show only execution records with Pending Approval status
       if (!wo.isExecution || wo.status !== "Pending Approval") return false;
@@ -491,7 +491,7 @@ const WorkOrders: React.FC = () => {
             <tr>
               <th className="text-left py-3 px-4 font-medium">Component</th>
               <th className="text-left py-3 px-4 font-medium">
-                {activeTab === "Pending Approval" ? "WO Execution ID" : "Work Order No"}
+                {activeTab === "Pending Approval" || activeTab === "Completed" ? "WO Execution ID" : "Work Order No"}
               </th>
               {activeTab === "Pending Approval" && (
                 <th className="text-left py-3 px-4 font-medium">WO Template Code</th>
@@ -499,7 +499,7 @@ const WorkOrders: React.FC = () => {
               <th className="text-left py-3 px-4 font-medium">Job Title</th>
               <th className="text-left py-3 px-4 font-medium">Assigned to</th>
               <th className="text-left py-3 px-4 font-medium">
-                {activeTab === "Pending Approval" ? "Submitted Date" : "Due Date"}
+                {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
               </th>
               <th className="text-left py-3 px-4 font-medium">Status</th>
               {activeTab !== "Pending Approval" && (
@@ -517,7 +517,7 @@ const WorkOrders: React.FC = () => {
               >
                 <td className="py-3 px-4 text-gray-900">{workOrder.component}</td>
                 <td className="py-3 px-4 text-blue-600 hover:text-blue-800">
-                  {activeTab === "Pending Approval" && workOrder.executionId 
+                  {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
                     : workOrder.templateCode || workOrder.workOrderNo}
                 </td>
@@ -527,7 +527,7 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4 text-gray-900">{workOrder.jobTitle}</td>
                 <td className="py-3 px-4 text-gray-900">{workOrder.assignedTo}</td>
                 <td className="py-3 px-4 text-gray-900">
-                  {activeTab === "Pending Approval" && workOrder.submittedDate 
+                  {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
                     ? workOrder.submittedDate 
                     : workOrder.dueDate}
                 </td>
