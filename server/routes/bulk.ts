@@ -1126,6 +1126,15 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       });
     } else if (type === 'work-orders') {
       // Validate work orders (new column names)
+      // Skip rows that don't have Job_Title - user only fills in components they want work orders for
+      if (!row['Job_Title'] || String(row['Job_Title']).trim() === '') {
+        // Skip empty rows (component without work order) - don't add to results
+        continue;
+      }
+      
+      // If Job_Title is provided, then this is a real work order - validate it
+      normalized['Job_Title'] = String(row['Job_Title']).trim();
+      
       if (!row['Generated_Component_Code']) {
         errors.push(`Row ${rowNum}: Generated_Component_Code is required`);
       } else {
@@ -1141,13 +1150,6 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       // Job_Code is optional
       if (row['Job_Code']) {
         normalized['Job_Code'] = String(row['Job_Code']).trim();
-      }
-
-      // Job_Title is required
-      if (!row['Job_Title']) {
-        errors.push(`Row ${rowNum}: Job_Title is required`);
-      } else {
-        normalized['Job_Title'] = String(row['Job_Title']).trim();
       }
 
       // Job_Description is optional
