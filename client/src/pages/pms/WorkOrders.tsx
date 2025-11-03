@@ -127,7 +127,7 @@ const WorkOrders: React.FC = () => {
     
     // Auto-open work order form if navigating from "View Changes"
     if (previewChanges === '1' && targetType === 'workOrder' && previewTargetId) {
-      const targetWorkOrder = workOrdersList.find(wo => wo.id === previewTargetId);
+      const targetWorkOrder = safeWorkOrdersList.find(wo => wo.id === previewTargetId);
       if (targetWorkOrder) {
         setSelectedWorkOrder(targetWorkOrder);
         setWorkOrderFormOpen(true);
@@ -142,7 +142,7 @@ const WorkOrders: React.FC = () => {
       const templateCode = formData.data.templateCode || formData.data.woTemplateCode;
       
       // Find existing executions for this template to get the next sequence number
-      const existingExecutions = workOrdersList.filter(wo => 
+      const existingExecutions = safeWorkOrdersList.filter(wo => 
         wo.isExecution && wo.templateId === workOrderId && 
         wo.executionId?.startsWith(`${year}-${templateCode}`)
       );
@@ -198,12 +198,14 @@ const WorkOrders: React.FC = () => {
     }
   };
 
+  const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
+  
   const tabs = [
-    { id: "All W.O", label: "All W.O", count: workOrdersList.filter(wo => !wo.isExecution).length },
-    { id: "Due", label: "Due", count: workOrdersList.filter(wo => !wo.isExecution && (wo.status === "Due" || wo.status.includes("Grace"))).length },
-    { id: "Pending Approval", label: "Pending Approval", count: workOrdersList.filter(wo => wo.isExecution && wo.status === "Pending Approval").length },
-    { id: "Overdue", label: "Overdue", count: workOrdersList.filter(wo => !wo.isExecution && wo.status === "Overdue").length },
-    { id: "Completed", label: "Completed", count: workOrdersList.filter(wo => (!wo.isExecution && wo.status === "Completed") || (wo.isExecution && wo.status === "Approved")).length }
+    { id: "All W.O", label: "All W.O", count: safeWorkOrdersList.filter(wo => !wo.isExecution).length },
+    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.status === "Due" || wo.status.includes("Grace"))).length },
+    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.isExecution && wo.status === "Pending Approval").length },
+    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.status === "Overdue").length },
+    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => (!wo.isExecution && wo.status === "Completed") || (wo.isExecution && wo.status === "Approved")).length }
   ];
 
   const getStatusBadgeColor = (status: string) => {
@@ -231,7 +233,7 @@ const WorkOrders: React.FC = () => {
     }
   };
 
-  const filteredWorkOrders = workOrdersList.filter(wo => {
+  const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
     if (activeTab === "All W.O") {
       // Show templates and rejected executions
       if (wo.isExecution && wo.status !== "Rejected") return false;
@@ -289,7 +291,7 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleApprove = (workOrderId: string, approverRemarks?: string) => {
-    const workOrder = workOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
     if (!workOrder) return;
     
     // Calculate next due date/reading
@@ -323,10 +325,13 @@ const WorkOrders: React.FC = () => {
       nextDueReading
     };
     
-    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
+    updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
   };
 
   const handleReject = (workOrderId: string, rejectionComments: string) => {
+    const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
+    if (!workOrder) return;
+    
     const updateData = {
       status: "Rejected",
       approver: "Current User", // Replace with actual user
@@ -334,7 +339,7 @@ const WorkOrders: React.FC = () => {
       rejectionDate: new Date().toISOString()
     };
     
-    updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
+    updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
   };
 
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
