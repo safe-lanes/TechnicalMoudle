@@ -956,7 +956,7 @@ export class PersistentFileStorage implements IStorage {
 
   // Work Order methods
   async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
-    const allWorkOrders = Object.values(this.data.workOrders);
+    const allWorkOrders = this.data.workOrders.filter(wo => wo !== null);
     if (vesselId) {
       return allWorkOrders.filter(wo => wo.vesselId === vesselId);
     }
@@ -964,7 +964,7 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
-    return this.data.workOrders[id];
+    return this.data.workOrders.find(wo => wo && wo.id === id);
   }
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
@@ -994,18 +994,19 @@ export class PersistentFileStorage implements IStorage {
       currentReading: workOrder.currentReading || null,
       vesselId: workOrder.vesselId || "V001"
     };
-    this.data.workOrders[id] = newWorkOrder;
+    this.data.workOrders.push(newWorkOrder);
     this.persistData();
     return newWorkOrder;
   }
 
   async updateWorkOrder(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
-    const workOrder = this.data.workOrders[id];
-    if (!workOrder) {
+    const index = this.data.workOrders.findIndex(wo => wo && wo.id === id);
+    if (index === -1) {
       throw new Error(`Work order ${id} not found`);
     }
+    const workOrder = this.data.workOrders[index];
     const updated = { ...workOrder, ...data };
-    this.data.workOrders[id] = updated;
+    this.data.workOrders[index] = updated;
     this.persistData();
     return updated;
   }
