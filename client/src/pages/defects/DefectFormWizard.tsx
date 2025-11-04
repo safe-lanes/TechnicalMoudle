@@ -53,7 +53,7 @@ export default function DefectFormWizard() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [actions, setActions] = useState<Action[]>([]);
   
-  // Generate reference number (format: DN/007/21/1243/V)
+  // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -124,78 +124,82 @@ export default function DefectFormWizard() {
   };
 
   return (
-    <div className="flex h-screen bg-white">
-      {/* Left Sidebar - Step Navigation Only */}
-      <div className="w-48 bg-white border-r border-gray-200 flex flex-col py-8">
-        <div 
-          onClick={() => setCurrentStep(1)} 
-          className={`flex items-center gap-3 px-6 py-3 cursor-pointer ${currentStep === 1 ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-        >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium ${
-            currentStep === 1 
-              ? 'bg-blue-600 text-white' 
-              : 'border-2 border-gray-300 text-gray-500'
-          }`}>
-            1
+    <div className="flex h-screen bg-gray-50">
+      {/* Left Sidebar - Steps Only */}
+      <div className="w-52 bg-white flex flex-col">
+        {/* Step circles */}
+        <div className="flex-1 pt-6">
+          <div 
+            onClick={() => setCurrentStep(1)} 
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 1 ? 'bg-blue-50' : ''}`}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 1 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-400 text-gray-500 bg-white'
+            }`}>
+              1
+            </div>
+            <span className={`text-sm ${currentStep === 1 ? 'text-gray-900' : 'text-gray-600'}`}>
+              Reporting
+            </span>
           </div>
-          <span className={`text-sm ${currentStep === 1 ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-            Reporting
-          </span>
+
+          <div 
+            onClick={() => setCurrentStep(2)} 
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 2 ? 'bg-blue-50' : ''}`}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 2 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-400 text-gray-500 bg-white'
+            }`}>
+              2
+            </div>
+            <span className={`text-sm ${currentStep === 2 ? 'text-gray-900' : 'text-gray-600'}`}>
+              Actions
+            </span>
+          </div>
+
+          <div 
+            onClick={() => setCurrentStep(3)} 
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 3 ? 'bg-blue-50' : ''}`}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 3 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-400 text-gray-500 bg-white'
+            }`}>
+              3
+            </div>
+            <span className={`text-sm ${currentStep === 3 ? 'text-gray-900' : 'text-gray-600'}`}>
+              Closeout
+            </span>
+          </div>
         </div>
 
-        <div 
-          onClick={() => setCurrentStep(2)} 
-          className={`flex items-center gap-3 px-6 py-3 cursor-pointer ${currentStep === 2 ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-        >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium ${
-            currentStep === 2 
-              ? 'bg-blue-600 text-white' 
-              : 'border-2 border-gray-300 text-gray-500'
-          }`}>
-            2
-          </div>
-          <span className={`text-sm ${currentStep === 2 ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-            Actions
-          </span>
-        </div>
-
-        <div 
-          onClick={() => setCurrentStep(3)} 
-          className={`flex items-center gap-3 px-6 py-3 cursor-pointer ${currentStep === 3 ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-        >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium ${
-            currentStep === 3 
-              ? 'bg-blue-600 text-white' 
-              : 'border-2 border-gray-300 text-gray-500'
-          }`}>
-            3
-          </div>
-          <span className={`text-sm ${currentStep === 3 ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-            Closeout
-          </span>
+        {/* Back button at bottom of sidebar */}
+        <div className="p-4 border-t border-gray-200">
+          <Button
+            variant="ghost"
+            onClick={() => setLocation("/defects/active")}
+            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Action Bar */}
-        <div className="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/defects/active")}
-              className="text-gray-600 hover:text-gray-900"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-3">
+      <div className="flex-1 flex flex-col bg-white">
+        {/* Top Action Bar - Right aligned buttons only */}
+        <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-end bg-white">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              className="text-gray-700 border-gray-300"
+              className="text-gray-700 border-gray-300 h-9"
               data-testid="button-view"
             >
               <Eye className="h-4 w-4 mr-2" />
@@ -203,7 +207,7 @@ export default function DefectFormWizard() {
             </Button>
             <Button
               onClick={form.handleSubmit(onSubmit)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+              className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-6 font-medium"
               data-testid="button-save"
             >
               SAVE
@@ -212,33 +216,33 @@ export default function DefectFormWizard() {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="max-w-5xl mx-auto p-8 space-y-8">
-            {/* Report Header */}
-            <div className="flex justify-between items-start">
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className="p-8 space-y-6">
+            {/* Report Title - Left aligned with Report ID on right */}
+            <div className="flex justify-between items-center pb-4 border-b border-gray-200">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
-                <p className="text-sm text-gray-500 mt-1">{defectId}</p>
+                <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
+                <p className="text-xs text-gray-500 mt-0.5">{defectId}</p>
               </div>
-              <div className="text-right text-sm text-gray-600">
-                <span className="font-medium">Report ID : </span>
+              <div className="text-sm text-gray-600">
+                <span className="font-normal">Report ID :</span>
               </div>
             </div>
 
             {/* Step 1: Reporting */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+            <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-medium text-blue-600">Reporting</h2>
-                <p className="text-sm text-gray-500">Part A - Describe what happened</p>
+                <h2 className="text-base font-semibold text-[#1976d2]">Reporting</h2>
+                <p className="text-sm text-cyan-500">Part A - Describe what happened</p>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-4">Details</h3>
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-800">Details</h3>
                 
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                   {/* Row 1 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Vessel*</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
                     <Controller
                       name="vesselId"
                       control={form.control}
@@ -255,7 +259,7 @@ export default function DefectFormWizard() {
                           }} 
                           value={field.value}
                         >
-                          <SelectTrigger data-testid="select-vessel" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-vessel" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -269,13 +273,13 @@ export default function DefectFormWizard() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Category</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Category</Label>
                     <Controller
                       name="equipmentCategory"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-equipment-category" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-equipment-category" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -291,13 +295,13 @@ export default function DefectFormWizard() {
 
                   {/* Row 2 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Source</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Source</Label>
                     <Controller
                       name="source"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-source" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-source" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -313,24 +317,24 @@ export default function DefectFormWizard() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Date Issued*</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Date Issued*</Label>
                     <Input 
                       {...form.register("issueDate")} 
                       type="date"
                       data-testid="input-date-issued"
-                      className="h-9 text-sm"
+                      className="h-9 text-sm border-gray-300"
                     />
                   </div>
 
                   {/* Row 3 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Defect Category</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Defect Category</Label>
                     <Controller
                       name="defectCategory"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -344,13 +348,13 @@ export default function DefectFormWizard() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Type</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Type</Label>
                     <Controller
                       name="equipmentType"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-equipment-type" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-equipment-type" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -366,13 +370,13 @@ export default function DefectFormWizard() {
 
                   {/* Row 4 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Defect Type</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Defect Type</Label>
                     <Controller
                       name="defectType"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -386,24 +390,24 @@ export default function DefectFormWizard() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Target Date</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Target Date</Label>
                     <Input 
                       {...form.register("targetCloseDate")} 
                       type="date"
                       data-testid="input-target-date"
-                      className="h-9 text-sm"
+                      className="h-9 text-sm border-gray-300"
                     />
                   </div>
 
                   {/* Row 5 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Make</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Make</Label>
                     <Controller
                       name="equipmentMake"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-make" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-make" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -418,24 +422,24 @@ export default function DefectFormWizard() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Responsible Role</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Responsible Role</Label>
                     <Input 
                       {...form.register("responsibleDept")} 
                       data-testid="input-responsible-role"
-                      className="h-9 text-sm"
+                      className="h-9 text-sm border-gray-300"
                       placeholder="e.g., Chief Engineer"
                     />
                   </div>
 
                   {/* Row 6 */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-gray-600 uppercase">Model</Label>
+                    <Label className="text-xs text-gray-600 uppercase font-normal">Model</Label>
                     <Controller
                       name="equipmentModel"
                       control={form.control}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-model" className="h-9 text-sm">
+                          <SelectTrigger data-testid="select-model" className="h-9 text-sm border-gray-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -477,8 +481,8 @@ export default function DefectFormWizard() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-xs font-medium text-gray-600 uppercase">Description*</Label>
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-600 uppercase font-normal">Description*</Label>
                 <Controller
                   name="description"
                   control={form.control}
@@ -495,10 +499,10 @@ export default function DefectFormWizard() {
                 />
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step1"
                 >
                   SUBMIT
@@ -507,19 +511,19 @@ export default function DefectFormWizard() {
             </div>
 
             {/* Step 2: Actions */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+            <div className="space-y-6 pt-4">
               <div>
-                <h2 className="text-lg font-medium text-blue-600">Actions</h2>
-                <p className="text-sm text-gray-500">Part B - Corrective and Preventive Actions</p>
+                <h2 className="text-base font-semibold text-[#1976d2]">Actions</h2>
+                <p className="text-sm text-cyan-500">Part B - Corrective and Preventive Actions</p>
               </div>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-medium text-gray-700">Action Plan</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">Action Plan</h3>
                   <Button 
                     onClick={addAction}
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9"
                     data-testid="button-add-action"
                   >
                     <Plus className="h-4 w-4 mr-1" />
@@ -528,7 +532,7 @@ export default function DefectFormWizard() {
                 </div>
 
                 {actions.length > 0 ? (
-                  <div className="border rounded overflow-hidden">
+                  <div className="border border-gray-300 rounded overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50">
@@ -581,10 +585,10 @@ export default function DefectFormWizard() {
                 )}
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step2"
                 >
                   SUBMIT
@@ -593,36 +597,36 @@ export default function DefectFormWizard() {
             </div>
 
             {/* Step 3: Closeout */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+            <div className="space-y-6 pt-4">
               <div>
-                <h2 className="text-lg font-medium text-blue-600">Closeout</h2>
-                <p className="text-sm text-gray-500">Part C - Completion and Approval</p>
+                <h2 className="text-base font-semibold text-[#1976d2]">Closeout</h2>
+                <p className="text-sm text-cyan-500">Part C - Completion and Approval</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-600 uppercase">Date Completed</Label>
+                  <Label className="text-xs text-gray-600 uppercase font-normal">Date Completed</Label>
                   <Input 
                     {...form.register("dateCompleted")} 
                     type="date"
                     data-testid="input-date-completed"
-                    className="h-9 text-sm"
+                    className="h-9 text-sm border-gray-300"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-gray-600 uppercase">Verified Date</Label>
+                  <Label className="text-xs text-gray-600 uppercase font-normal">Verified Date</Label>
                   <Input 
                     {...form.register("verifiedDate")} 
                     type="date"
                     data-testid="input-verified-date"
-                    className="h-9 text-sm"
+                    className="h-9 text-sm border-gray-300"
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-700">Attachments</h3>
+                <h3 className="text-sm font-semibold text-gray-800">Attachments</h3>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                   <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-600 mb-1">Drop files here or click to upload</p>
@@ -630,6 +634,7 @@ export default function DefectFormWizard() {
                   <Button 
                     variant="outline" 
                     size="sm" 
+                    className="border-gray-300"
                     data-testid="button-upload-attachment"
                   >
                     <Upload className="h-4 w-4 mr-2" />
@@ -639,19 +644,19 @@ export default function DefectFormWizard() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-gray-600 uppercase">Closed By</Label>
+                <Label className="text-xs text-gray-600 uppercase font-normal">Closed By</Label>
                 <Input 
                   {...form.register("closedBy")} 
                   data-testid="input-closed-by"
-                  className="h-9 text-sm"
+                  className="h-9 text-sm border-gray-300"
                   placeholder="Name & Rank"
                 />
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step3"
                 >
                   SUBMIT
