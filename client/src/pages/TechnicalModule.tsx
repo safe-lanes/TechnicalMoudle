@@ -17,6 +17,7 @@ import DefectsActive from "./defects/DefectsActive";
 import DefectsResolved from "./defects/DefectsResolved";
 import DefectsReports from "./defects/DefectsReports";
 import DefectsCoC from "./defects/DefectsCoC";
+import DefectFormWizard from "./defects/DefectFormWizard";
 import RecurringDefects from "./RecurringDefects";
 import { useLocation, useParams } from "wouter";
 
@@ -31,6 +32,10 @@ export const TechnicalModule: React.FC = () => {
     } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
+    } else if (location === "/defects/new") {
+      return { subModule: "defects", menuItem: "new" };
+    } else if (location.match(/^\/defects\/edit\/[^/]+$/)) {
+      return { subModule: "defects", menuItem: "edit" };
     } else if (location === "/defects") {
       return { subModule: "defects", menuItem: "dashboard" }; // Default to dashboard when accessing /defects
     } else if (location === "/defects/active") {
@@ -131,6 +136,8 @@ export const TechnicalModule: React.FC = () => {
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
+          ) : selectedSubModule === "defects" && (selectedMenuItem === "new" || selectedMenuItem === "edit") ? (
+            <DefectFormWizard />
           ) : selectedSubModule === "defects" && selectedMenuItem === "dashboard" ? (
             <DefectsDashboard />
           ) : selectedSubModule === "defects" && selectedMenuItem === "defect-log" ? (

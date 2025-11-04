@@ -16,19 +16,18 @@ import {
   Eye, 
   Edit, 
   Paperclip, 
-  Link, 
+  Link as LinkIcon, 
   Check, 
   Search, 
   Plus 
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Link } from "wouter";
 import { 
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import DefectFormExact from "./DefectFormExact";
 import ViewDefectModal from "./ViewDefectModal";
 import EditDefectModal from "./EditDefectModal";
 import AddNoteModal from "./AddNoteModal";
@@ -54,7 +53,6 @@ export default function DefectsLogWithTabs() {
   const [activeTab, setActiveTab] = useState<'active' | 'resolved'>('active');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DefectsFilters>({});
-  const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   
   // Modal states
   const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
@@ -259,24 +257,12 @@ export default function DefectsLogWithTabs() {
                 Filters
               </div>
             </Button>
-            <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
-              <DialogTrigger asChild>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" data-testid="button-new-defect">
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Defect
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-                <DefectFormExact 
-                  onClose={() => {
-                    setShowNewDefectForm(false);
-                    // Refresh active defects after creating new one
-                    queryClient.invalidateQueries({ queryKey: ['defects', 'active'] });
-                    queryClient.invalidateQueries({ queryKey: ['defects', 'count', 'active'] });
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            <Link href="/defects/new">
+              <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" data-testid="button-new-defect">
+                <Plus className="h-4 w-4 mr-1" />
+                New Defect
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -530,7 +516,7 @@ export default function DefectsLogWithTabs() {
                                   disabled={!canLink()}
                                   data-testid={`button-link-${defect.id}`}
                                 >
-                                  <Link className="h-3 w-3 text-gray-500" />
+                                  <LinkIcon className="h-3 w-3 text-gray-500" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
