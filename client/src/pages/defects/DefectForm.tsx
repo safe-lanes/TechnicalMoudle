@@ -51,7 +51,7 @@ export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
       vesselId: "V001",
       vesselName: "MV SEAFARER",
       issueDate: new Date().toISOString().split('T')[0],
-      category: "",
+      category: "Defect",
       status: "Open",
       priority: "Medium",
       critical: false,
@@ -140,6 +140,29 @@ export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
                 <div className="space-y-4">
                   <h3 className="font-medium text-sm text-gray-700">Basic</h3>
                   
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs uppercase tracking-wide text-gray-500">CATEGORY</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-category">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Defect">Defect</SelectItem>
+                            <SelectItem value="COC">COC</SelectItem>
+                            <SelectItem value="Observation">Observation</SelectItem>
+                            <SelectItem value="NCR">NCR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="vesselId"
