@@ -7,6 +7,7 @@ import 'react-quill/dist/quill.snow.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +16,8 @@ import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useParams } from "wouter";
+import ImmediateCauseModal from "@/components/ImmediateCauseModal";
+import RootCauseModal from "@/components/RootCauseModal";
 
 // Form validation schema
 const defectFormSchema = insertDefectSchema.extend({
@@ -52,6 +55,8 @@ export default function DefectFormWizard() {
   const params = useParams();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [actions, setActions] = useState<Action[]>([]);
+  const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
+  const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
@@ -77,8 +82,67 @@ export default function DefectFormWizard() {
       severity: 1,
       reportedBy: "MASTER",
       description: "",
+      immediateCause: "",
+      immediateCauseExplanation: "",
+      rootCause: "",
+      rootCauseExplanation: "",
     },
   });
+
+  // Helper functions for Cause Analysis
+  const buildImmediateCauseText = (ic: { unsafeAct: string[]; unsafeCondition: string[] }): string => {
+    const sections: string[] = [];
+    if (ic?.unsafeAct?.length) {
+      sections.push(
+        "UNSAFE ACT",
+        ...ic.unsafeAct.map(item => `• ${item}`)
+      );
+    }
+    if (ic?.unsafeCondition?.length) {
+      if (sections.length) sections.push("");
+      sections.push(
+        "UNSAFE CONDITION",
+        ...ic.unsafeCondition.map(item => `• ${item}`)
+      );
+    }
+    return sections.join("\n");
+  };
+
+  const buildRootCauseText = (rc: { individualFactor: string[]; systemFactor: string[] }): string => {
+    const sections: string[] = [];
+    if (rc?.individualFactor?.length) {
+      sections.push(
+        "INDIVIDUAL FACTOR",
+        ...rc.individualFactor.map(item => `• ${item}`)
+      );
+    }
+    if (rc?.systemFactor?.length) {
+      if (sections.length) sections.push("");
+      sections.push(
+        "SYSTEM FACTOR",
+        ...rc.systemFactor.map(item => `• ${item}`)
+      );
+    }
+    return sections.join("\n");
+  };
+
+  const handleImmediateCauseSelect = () => {
+    setIsImmediateCauseModalOpen(true);
+  };
+
+  const handleImmediateCauseSubmit = (causeData: { unsafeAct: string[], unsafeCondition: string[] }) => {
+    form.setValue('immediateCause', causeData as any);
+    setIsImmediateCauseModalOpen(false);
+  };
+
+  const handleRootCauseSelect = () => {
+    setIsRootCauseModalOpen(true);
+  };
+
+  const handleRootCauseSubmit = (causeData: { individualFactor: string[], systemFactor: string[] }) => {
+    form.setValue('rootCause', causeData as any);
+    setIsRootCauseModalOpen(false);
+  };
 
   const onSubmit = async (data: DefectFormData) => {
     try {
@@ -502,6 +566,115 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
+            {/* Cause Analysis Section - White Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-[#1976d2]">Cause Analysis</h2>
+              </div>
+
+              <div className="space-y-6">
+                {/* Immediate Cause */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-[#1976d2]">Immediate Cause</h4>
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      className="hover:opacity-80" 
+                      style={{color: '#1976d2', borderColor: '#1976d2'}} 
+                      data-testid="button-select-immediate"
+                      onClick={handleImmediateCauseSelect}
+                    >
+                      Select
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Immediate Cause</Label>
+                      <Controller
+                        name="immediateCause"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Textarea 
+                            {...field}
+                            value={typeof field.value === 'string' ? field.value : 
+                                   field.value && typeof field.value === 'object' ? 
+                                   buildImmediateCauseText(field.value as { unsafeAct: string[], unsafeCondition: string[] }) : ""}
+                            rows={3}
+                            placeholder="IMMEDIATE CAUSE"
+                            className="bg-white text-sm border-gray-300"
+                            data-testid="textarea-immediate-cause"
+                            readOnly
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Further Explanation</Label>
+                      <Textarea 
+                        {...form.register("immediateCauseExplanation")}
+                        rows={3}
+                        placeholder="FURTHER EXPLANATION"
+                        className="bg-white text-sm border-gray-300"
+                        data-testid="textarea-immediate-explanation"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Root Cause */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-[#1976d2]">Root Cause</h4>
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      className="hover:opacity-80" 
+                      style={{color: '#1976d2', borderColor: '#1976d2'}} 
+                      data-testid="button-select-root"
+                      onClick={handleRootCauseSelect}
+                    >
+                      Select
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Root Cause</Label>
+                      <Controller
+                        name="rootCause"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Textarea 
+                            {...field}
+                            value={typeof field.value === 'object' && field.value ? 
+                              buildRootCauseText(field.value as { individualFactor: string[], systemFactor: string[] }) : 
+                              String(field.value || "")}
+                            rows={3}
+                            placeholder="ROOT CAUSE"
+                            className="bg-white text-sm border-gray-300"
+                            data-testid="textarea-root-cause"
+                            readOnly
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Further Explanation</Label>
+                      <Textarea 
+                        {...form.register("rootCauseExplanation")}
+                        rows={3}
+                        placeholder="FURTHER EXPLANATION"
+                        className="bg-white text-sm border-gray-300"
+                        data-testid="textarea-root-explanation"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Step 2: Actions - White Card */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
               <div>
@@ -658,6 +831,22 @@ export default function DefectFormWizard() {
           </div>
         </div>
       </div>
+
+      {/* Immediate Cause Modal */}
+      <ImmediateCauseModal
+        isOpen={isImmediateCauseModalOpen}
+        onClose={() => setIsImmediateCauseModalOpen(false)}
+        onSubmit={handleImmediateCauseSubmit}
+        initialData={typeof form.getValues('immediateCause') === 'object' ? form.getValues('immediateCause') as any : undefined}
+      />
+
+      {/* Root Cause Modal */}
+      <RootCauseModal
+        isOpen={isRootCauseModalOpen}
+        onClose={() => setIsRootCauseModalOpen(false)}
+        onSubmit={handleRootCauseSubmit}
+        initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
+      />
     </div>
   );
 }
