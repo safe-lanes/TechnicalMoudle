@@ -285,18 +285,18 @@ export default function DefectFormWizard() {
 
         {/* Scrollable Content with Gray Background */}
         <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
-          <div className="max-w-6xl mx-auto space-y-6">
+          <div className="max-w-6xl mx-auto space-y-4">
             {/* Step 1: Reporting - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
                 <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-800">Details</h3>
                 
-                <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                   {/* Row 1 */}
                   <div className="space-y-1.5">
                     <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
@@ -568,12 +568,12 @@ export default function DefectFormWizard() {
             </div>
 
             {/* Cause Analysis Section - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Cause Analysis</h2>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Immediate Cause */}
                 <div className="space-y-3">
                   <div className="space-y-2">
@@ -677,13 +677,13 @@ export default function DefectFormWizard() {
             </div>
 
             {/* Step 2: Actions - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Actions</h2>
                 <p className="text-sm text-cyan-600 mt-1">Part B - Corrective and Preventive Actions</p>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-gray-800">Action Plan</h3>
                   <Button 
@@ -763,13 +763,13 @@ export default function DefectFormWizard() {
             </div>
 
             {/* Step 3: Closeout - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Closeout</h2>
                 <p className="text-sm text-cyan-600 mt-1">Part C - Completion and Approval</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-gray-600 uppercase font-normal">Date Completed</Label>
                   <Input 
