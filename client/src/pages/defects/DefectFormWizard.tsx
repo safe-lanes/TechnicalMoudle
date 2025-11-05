@@ -190,9 +190,9 @@ export default function DefectFormWizard() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar - Steps Only */}
-      <div className="w-52 bg-white flex flex-col">
-        {/* Step circles */}
-        <div className="flex-1 pt-6">
+      <div className="w-52 bg-white flex flex-col border-r border-gray-200">
+        {/* Step circles - positioned lower to match Near Miss form */}
+        <div className="flex-1 pt-20">
           <div 
             onClick={() => setCurrentStep(1)} 
             className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 1 ? 'bg-blue-50' : ''}`}
@@ -241,29 +241,30 @@ export default function DefectFormWizard() {
             </span>
           </div>
         </div>
-
-        {/* Back button at bottom of sidebar */}
-        <div className="p-4 border-t border-gray-200">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/defects/active")}
-            className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col bg-gray-100">
-        {/* Top Action Bar with Page Title */}
+        {/* Top Action Bar with "Defect Report" Label and Buttons */}
         <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-between bg-white">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">Defect Report</h1>
+          {/* Left: Defect Report Label matching Near Miss style */}
+          <div className="flex items-center">
+            <div className="border-2 border-red-600 bg-white px-4 py-1.5 rounded">
+              <span className="text-sm font-semibold text-gray-900">Defect Report</span>
+            </div>
           </div>
+          
+          {/* Right: Three Functional Buttons */}
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/defects/active")}
+              className="text-gray-700 border-gray-300 h-9"
+              data-testid="button-back-top"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
             <Button
               variant="outline"
               className="text-gray-700 border-gray-300 h-9"
