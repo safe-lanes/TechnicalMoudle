@@ -193,9 +193,12 @@ export default function DefectFormWizard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col bg-white">
-        {/* Top Action Bar - Right aligned buttons only */}
-        <div className="h-14 border-b border-gray-200 px-6 flex items-center justify-end bg-white">
+      <div className="flex-1 flex flex-col bg-gray-100">
+        {/* Top Action Bar with Page Title */}
+        <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-between bg-white">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Defect Report</h1>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -215,31 +218,20 @@ export default function DefectFormWizard() {
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto bg-white">
-          <div className="p-8 space-y-6">
-            {/* Report Title - Left aligned with Report ID on right */}
-            <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+        {/* Scrollable Content with Gray Background */}
+        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+          <div className="max-w-6xl mx-auto space-y-6">
+            {/* Step 1: Reporting - White Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
-                <p className="text-xs text-gray-500 mt-0.5">{defectId}</p>
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-normal">Report ID :</span>
-              </div>
-            </div>
-
-            {/* Step 1: Reporting */}
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-base font-semibold text-[#1976d2]">Reporting</h2>
-                <p className="text-sm text-cyan-500">Part A - Describe what happened</p>
+                <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
+                <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <h3 className="text-sm font-semibold text-gray-800">Details</h3>
                 
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-5">
                   {/* Row 1 */}
                   <div className="space-y-1.5">
                     <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
@@ -510,14 +502,14 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
-            {/* Step 2: Actions */}
-            <div className="space-y-6 pt-4">
+            {/* Step 2: Actions - White Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
               <div>
-                <h2 className="text-base font-semibold text-[#1976d2]">Actions</h2>
-                <p className="text-sm text-cyan-500">Part B - Corrective and Preventive Actions</p>
+                <h2 className="text-lg font-bold text-[#1976d2]">Actions</h2>
+                <p className="text-sm text-cyan-600 mt-1">Part B - Corrective and Preventive Actions</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-gray-800">Action Plan</h3>
                   <Button 
@@ -596,14 +588,14 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
-            {/* Step 3: Closeout */}
-            <div className="space-y-6 pt-4">
+            {/* Step 3: Closeout - White Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 space-y-6">
               <div>
-                <h2 className="text-base font-semibold text-[#1976d2]">Closeout</h2>
-                <p className="text-sm text-cyan-500">Part C - Completion and Approval</p>
+                <h2 className="text-lg font-bold text-[#1976d2]">Closeout</h2>
+                <p className="text-sm text-cyan-600 mt-1">Part C - Completion and Approval</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-5">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-gray-600 uppercase font-normal">Date Completed</Label>
                   <Input 
