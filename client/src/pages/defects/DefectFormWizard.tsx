@@ -247,12 +247,8 @@ export default function DefectFormWizard() {
       <div className="flex-1 flex flex-col bg-gray-100">
         {/* Top Action Bar with "Defect Report" Label and Buttons */}
         <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-between bg-white">
-          {/* Left: Defect Report Label matching Near Miss style */}
-          <div className="flex items-center">
-            <div className="border-2 border-red-600 bg-white px-4 py-1.5 rounded">
-              <span className="text-sm font-semibold text-gray-900">Defect Report</span>
-            </div>
-          </div>
+          {/* Left: Defect Report Label - simple blue text matching Near Miss */}
+          <h1 className="text-base font-semibold text-[#1976d2]">Defect Report</h1>
           
           {/* Right: Three Functional Buttons */}
           <div className="flex items-center gap-2">
