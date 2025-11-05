@@ -398,9 +398,20 @@ export default function DefectFormWizard() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Minor">Minor</SelectItem>
-                              <SelectItem value="Major">Major</SelectItem>
-                              <SelectItem value="Catastrophic">Catastrophic</SelectItem>
+                              <SelectItem value="Hull / Structural Integrity">Hull / Structural Integrity</SelectItem>
+                              <SelectItem value="Machinery Failure (Main & Auxiliary)">Machinery Failure (Main & Auxiliary)</SelectItem>
+                              <SelectItem value="Electrical / Electronic Systems">Electrical / Electronic Systems</SelectItem>
+                              <SelectItem value="Navigation & Communication Equipment">Navigation & Communication Equipment</SelectItem>
+                              <SelectItem value="Safety & Emergency Systems (Fire, Lifesaving, Alarms)">Safety & Emergency Systems (Fire, Lifesaving, Alarms)</SelectItem>
+                              <SelectItem value="Ballast / Cargo / Tank Systems">Ballast / Cargo / Tank Systems</SelectItem>
+                              <SelectItem value="Environmental / Pollution Control (e.g., BWM, SOx, OWS)">Environmental / Pollution Control (e.g., BWM, SOx, OWS)</SelectItem>
+                              <SelectItem value="Steering / Rudder / Propulsion Systems">Steering / Rudder / Propulsion Systems</SelectItem>
+                              <SelectItem value="Deck Equipment & Mooring Systems">Deck Equipment & Mooring Systems</SelectItem>
+                              <SelectItem value="Condition of Class (CoC) Related">Condition of Class (CoC) Related</SelectItem>
+                              <SelectItem value="Survey / Certification Deficiencies">Survey / Certification Deficiencies</SelectItem>
+                              <SelectItem value="Wear & Tear / Corrosion / Fatigue">Wear & Tear / Corrosion / Fatigue</SelectItem>
+                              <SelectItem value="Human-/Operational Error (not equipment fault)">Human-/Operational Error (not equipment fault)</SelectItem>
+                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
