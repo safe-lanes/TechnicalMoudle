@@ -399,30 +399,26 @@ export default function DefectFormWizard() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Corrosion / Erosion">Corrosion / Erosion</SelectItem>
-                              <SelectItem value="Crack / Fracture / Structural Deformation">Crack / Fracture / Structural Deformation</SelectItem>
-                              <SelectItem value="Bearing / Shaft / Gear Failure">Bearing / Shaft / Gear Failure</SelectItem>
-                              <SelectItem value="Pump / Compressor / Turbine Malfunction">Pump / Compressor / Turbine Malfunction</SelectItem>
-                              <SelectItem value="Valve / Seal / Gasket Leak">Valve / Seal / Gasket Leak</SelectItem>
-                              <SelectItem value="Electrical Short / Open Circuit / Ground Fault">Electrical Short / Open Circuit / Ground Fault</SelectItem>
-                              <SelectItem value="Control System / Automation Failure">Control System / Automation Failure</SelectItem>
-                              <SelectItem value="Sensor / Instrumentation Fault">Sensor / Instrumentation Fault</SelectItem>
-                              <SelectItem value="Navigation / Communication System Fault">Navigation / Communication System Fault</SelectItem>
-                              <SelectItem value="Safety Equipment Deficiency (Fire / Lifeboat / Alarm)">Safety Equipment Deficiency (Fire / Lifeboat / Alarm)</SelectItem>
-                              <SelectItem value="Ballast / Cargo / Tank System Defect">Ballast / Cargo / Tank System Defect</SelectItem>
-                              <SelectItem value="Steering / Rudder / Propulsion System Defect">Steering / Rudder / Propulsion System Defect</SelectItem>
-                              <SelectItem value="Mooring / Deck Equipment Failure">Mooring / Deck Equipment Failure</SelectItem>
-                              <SelectItem value="Environmental Compliance Issue (BWM / SOx / OWS)">Environmental Compliance Issue (BWM / SOx / OWS)</SelectItem>
-                              <SelectItem value="Non-Conformity / Certification Lapse">Non-Conformity / Certification Lapse</SelectItem>
-                              <SelectItem value="Inspection / Test Failure">Inspection / Test Failure</SelectItem>
-                              <SelectItem value="Software / Firmware / Interface Error">Software / Firmware / Interface Error</SelectItem>
-                              <SelectItem value="Recurring Fault (same equipment/system)">Recurring Fault (same equipment/system)</SelectItem>
-                              <SelectItem value="Operational / Human Error Induced Defect">Operational / Human Error Induced Defect</SelectItem>
-                              <SelectItem value="Documentation / Record-Keeping Defect">Documentation / Record-Keeping Defect</SelectItem>
-                              <SelectItem value="Wear / Fatigue – Non-critical">Wear / Fatigue – Non-critical</SelectItem>
-                              <SelectItem value="Survey Condition of Class Item">Survey Condition of Class Item</SelectItem>
-                              <SelectItem value="Spare / Stock-Out / BOM Defect">Spare / Stock-Out / BOM Defect</SelectItem>
-                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
+                              <SelectItem value="Pump">Pump</SelectItem>
+                              <SelectItem value="Compressor">Compressor</SelectItem>
+                              <SelectItem value="Turbine">Turbine</SelectItem>
+                              <SelectItem value="Engine">Engine</SelectItem>
+                              <SelectItem value="Motor">Motor</SelectItem>
+                              <SelectItem value="Generator">Generator</SelectItem>
+                              <SelectItem value="Valve">Valve</SelectItem>
+                              <SelectItem value="Heat Exchanger">Heat Exchanger</SelectItem>
+                              <SelectItem value="Boiler">Boiler</SelectItem>
+                              <SelectItem value="Tank">Tank</SelectItem>
+                              <SelectItem value="Piping System">Piping System</SelectItem>
+                              <SelectItem value="Electrical Panel">Electrical Panel</SelectItem>
+                              <SelectItem value="Control System">Control System</SelectItem>
+                              <SelectItem value="Sensor">Sensor</SelectItem>
+                              <SelectItem value="Navigation Equipment">Navigation Equipment</SelectItem>
+                              <SelectItem value="Communication Equipment">Communication Equipment</SelectItem>
+                              <SelectItem value="Safety Equipment">Safety Equipment</SelectItem>
+                              <SelectItem value="Deck Equipment">Deck Equipment</SelectItem>
+                              <SelectItem value="Hull Structure">Hull Structure</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -514,9 +510,30 @@ export default function DefectFormWizard() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Routine">Routine</SelectItem>
-                              <SelectItem value="Corrective">Corrective</SelectItem>
-                              <SelectItem value="Emergency">Emergency</SelectItem>
+                              <SelectItem value="Corrosion / Erosion">Corrosion / Erosion</SelectItem>
+                              <SelectItem value="Crack / Fracture / Structural Deformation">Crack / Fracture / Structural Deformation</SelectItem>
+                              <SelectItem value="Bearing / Shaft / Gear Failure">Bearing / Shaft / Gear Failure</SelectItem>
+                              <SelectItem value="Pump / Compressor / Turbine Malfunction">Pump / Compressor / Turbine Malfunction</SelectItem>
+                              <SelectItem value="Valve / Seal / Gasket Leak">Valve / Seal / Gasket Leak</SelectItem>
+                              <SelectItem value="Electrical Short / Open Circuit / Ground Fault">Electrical Short / Open Circuit / Ground Fault</SelectItem>
+                              <SelectItem value="Control System / Automation Failure">Control System / Automation Failure</SelectItem>
+                              <SelectItem value="Sensor / Instrumentation Fault">Sensor / Instrumentation Fault</SelectItem>
+                              <SelectItem value="Navigation / Communication System Fault">Navigation / Communication System Fault</SelectItem>
+                              <SelectItem value="Safety Equipment Deficiency (Fire / Lifeboat / Alarm)">Safety Equipment Deficiency (Fire / Lifeboat / Alarm)</SelectItem>
+                              <SelectItem value="Ballast / Cargo / Tank System Defect">Ballast / Cargo / Tank System Defect</SelectItem>
+                              <SelectItem value="Steering / Rudder / Propulsion System Defect">Steering / Rudder / Propulsion System Defect</SelectItem>
+                              <SelectItem value="Mooring / Deck Equipment Failure">Mooring / Deck Equipment Failure</SelectItem>
+                              <SelectItem value="Environmental Compliance Issue (BWM / SOx / OWS)">Environmental Compliance Issue (BWM / SOx / OWS)</SelectItem>
+                              <SelectItem value="Non-Conformity / Certification Lapse">Non-Conformity / Certification Lapse</SelectItem>
+                              <SelectItem value="Inspection / Test Failure">Inspection / Test Failure</SelectItem>
+                              <SelectItem value="Software / Firmware / Interface Error">Software / Firmware / Interface Error</SelectItem>
+                              <SelectItem value="Recurring Fault (same equipment/system)">Recurring Fault (same equipment/system)</SelectItem>
+                              <SelectItem value="Operational / Human Error Induced Defect">Operational / Human Error Induced Defect</SelectItem>
+                              <SelectItem value="Documentation / Record-Keeping Defect">Documentation / Record-Keeping Defect</SelectItem>
+                              <SelectItem value="Wear / Fatigue – Non-critical">Wear / Fatigue – Non-critical</SelectItem>
+                              <SelectItem value="Survey Condition of Class Item">Survey Condition of Class Item</SelectItem>
+                              <SelectItem value="Spare / Stock-Out / BOM Defect">Spare / Stock-Out / BOM Defect</SelectItem>
+                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
