@@ -299,8 +299,8 @@ export default function DefectFormWizard() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-800 mb-4">Details</h3>
                   
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                    {/* Row 1 */}
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                    {/* Column 1: Basic */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
                       <Controller
@@ -332,6 +332,7 @@ export default function DefectFormWizard() {
                       />
                     </div>
 
+                    {/* Column 2: Equipment/Hardware */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Category</Label>
                       <Controller
@@ -353,6 +354,17 @@ export default function DefectFormWizard() {
                       />
                     </div>
 
+                    {/* Column 3: Date */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Date Issued*</Label>
+                      <Input 
+                        {...form.register("issueDate")} 
+                        type="date"
+                        data-testid="input-date-issued"
+                        className="h-9 text-sm border-gray-300"
+                      />
+                    </div>
+
                     {/* Row 2 */}
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Source</Label>
@@ -370,48 +382,6 @@ export default function DefectFormWizard() {
                               <SelectItem value="SIRE">SIRE</SelectItem>
                               <SelectItem value="PSC">PSC</SelectItem>
                               <SelectItem value="Class">Class</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-600 uppercase font-normal">Date Issued*</Label>
-                      <Input 
-                        {...form.register("issueDate")} 
-                        type="date"
-                        data-testid="input-date-issued"
-                        className="h-9 text-sm border-gray-300"
-                      />
-                    </div>
-
-                    {/* Row 3 */}
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Category</Label>
-                      <Controller
-                        name="defectCategory"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
-                            <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Hull / Structural Integrity">Hull / Structural Integrity</SelectItem>
-                              <SelectItem value="Machinery Failure (Main & Auxiliary)">Machinery Failure (Main & Auxiliary)</SelectItem>
-                              <SelectItem value="Electrical / Electronic Systems">Electrical / Electronic Systems</SelectItem>
-                              <SelectItem value="Navigation & Communication Equipment">Navigation & Communication Equipment</SelectItem>
-                              <SelectItem value="Safety & Emergency Systems (Fire, Lifesaving, Alarms)">Safety & Emergency Systems (Fire, Lifesaving, Alarms)</SelectItem>
-                              <SelectItem value="Ballast / Cargo / Tank Systems">Ballast / Cargo / Tank Systems</SelectItem>
-                              <SelectItem value="Environmental / Pollution Control (e.g., BWM, SOx, OWS)">Environmental / Pollution Control (e.g., BWM, SOx, OWS)</SelectItem>
-                              <SelectItem value="Steering / Rudder / Propulsion Systems">Steering / Rudder / Propulsion Systems</SelectItem>
-                              <SelectItem value="Deck Equipment & Mooring Systems">Deck Equipment & Mooring Systems</SelectItem>
-                              <SelectItem value="Condition of Class (CoC) Related">Condition of Class (CoC) Related</SelectItem>
-                              <SelectItem value="Survey / Certification Deficiencies">Survey / Certification Deficiencies</SelectItem>
-                              <SelectItem value="Wear & Tear / Corrosion / Fatigue">Wear & Tear / Corrosion / Fatigue</SelectItem>
-                              <SelectItem value="Human-/Operational Error (not equipment fault)">Human-/Operational Error (not equipment fault)</SelectItem>
-                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -459,27 +429,6 @@ export default function DefectFormWizard() {
                       />
                     </div>
 
-                    {/* Row 4 */}
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Type</Label>
-                      <Controller
-                        name="defectType"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
-                            <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Routine">Routine</SelectItem>
-                              <SelectItem value="Corrective">Corrective</SelectItem>
-                              <SelectItem value="Emergency">Emergency</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Target Date</Label>
                       <Input 
@@ -490,7 +439,38 @@ export default function DefectFormWizard() {
                       />
                     </div>
 
-                    {/* Row 5 */}
+                    {/* Row 3 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Category</Label>
+                      <Controller
+                        name="defectCategory"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Hull / Structural Integrity">Hull / Structural Integrity</SelectItem>
+                              <SelectItem value="Machinery Failure (Main & Auxiliary)">Machinery Failure (Main & Auxiliary)</SelectItem>
+                              <SelectItem value="Electrical / Electronic Systems">Electrical / Electronic Systems</SelectItem>
+                              <SelectItem value="Navigation & Communication Equipment">Navigation & Communication Equipment</SelectItem>
+                              <SelectItem value="Safety & Emergency Systems (Fire, Lifesaving, Alarms)">Safety & Emergency Systems (Fire, Lifesaving, Alarms)</SelectItem>
+                              <SelectItem value="Ballast / Cargo / Tank Systems">Ballast / Cargo / Tank Systems</SelectItem>
+                              <SelectItem value="Environmental / Pollution Control (e.g., BWM, SOx, OWS)">Environmental / Pollution Control (e.g., BWM, SOx, OWS)</SelectItem>
+                              <SelectItem value="Steering / Rudder / Propulsion Systems">Steering / Rudder / Propulsion Systems</SelectItem>
+                              <SelectItem value="Deck Equipment & Mooring Systems">Deck Equipment & Mooring Systems</SelectItem>
+                              <SelectItem value="Condition of Class (CoC) Related">Condition of Class (CoC) Related</SelectItem>
+                              <SelectItem value="Survey / Certification Deficiencies">Survey / Certification Deficiencies</SelectItem>
+                              <SelectItem value="Wear & Tear / Corrosion / Fatigue">Wear & Tear / Corrosion / Fatigue</SelectItem>
+                              <SelectItem value="Human-/Operational Error (not equipment fault)">Human-/Operational Error (not equipment fault)</SelectItem>
+                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Make</Label>
                       <Controller
@@ -522,7 +502,27 @@ export default function DefectFormWizard() {
                       />
                     </div>
 
-                    {/* Row 6 */}
+                    {/* Row 4 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Type</Label>
+                      <Controller
+                        name="defectType"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Routine">Routine</SelectItem>
+                              <SelectItem value="Corrective">Corrective</SelectItem>
+                              <SelectItem value="Emergency">Emergency</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Model</Label>
                       <Controller
