@@ -277,15 +277,15 @@ export default function DefectFormWizard() {
         </div>
 
         {/* Scrollable Content with Gray Background */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+        <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-6 py-6">
           {/* Page Title on Gray Background - Matching Near Miss */}
-          <div className="max-w-6xl mx-auto mb-6">
-            <h1 className="text-2xl font-semibold text-[#1976d2]">Defect Report</h1>
+          <div className="max-w-6xl mx-auto mb-4">
+            <h1 className="text-xl font-semibold text-[#1976d2]">Defect Report</h1>
           </div>
-          <div className="max-w-6xl mx-auto space-y-4">
+          <div className="max-w-6xl mx-auto space-y-6">
             {/* Step 1: Reporting - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-              <div className="flex items-start justify-between">
+            <div className="bg-white rounded shadow-md border border-gray-200" style={{padding: '24px'}}>
+              <div className="flex items-start justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
                   <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
@@ -295,250 +295,251 @@ export default function DefectFormWizard() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-800">Details</h3>
-                
-                <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                  {/* Row 1 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
-                    <Controller
-                      name="vesselId"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            const vesselNames: Record<string, string> = {
-                              "V001": "MV SEAFARER",
-                              "V002": "MV VOYAGER",
-                              "V003": "MV EXPLORER"
-                            };
-                            form.setValue("vesselName", vesselNames[value] || "");
-                          }} 
-                          value={field.value}
-                        >
-                          <SelectTrigger data-testid="select-vessel" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="V001">MV SEAFARER</SelectItem>
-                            <SelectItem value="V002">MV VOYAGER</SelectItem>
-                            <SelectItem value="V003">MV EXPLORER</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4">Details</h3>
+                  
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                    {/* Row 1 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Vessel*</Label>
+                      <Controller
+                        name="vesselId"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              const vesselNames: Record<string, string> = {
+                                "V001": "MV SEAFARER",
+                                "V002": "MV VOYAGER",
+                                "V003": "MV EXPLORER"
+                              };
+                              form.setValue("vesselName", vesselNames[value] || "");
+                            }} 
+                            value={field.value}
+                          >
+                            <SelectTrigger data-testid="select-vessel" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="V001">MV SEAFARER</SelectItem>
+                              <SelectItem value="V002">MV VOYAGER</SelectItem>
+                              <SelectItem value="V003">MV EXPLORER</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Category</Label>
-                    <Controller
-                      name="equipmentCategory"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-equipment-category" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Deck">Deck</SelectItem>
-                            <SelectItem value="Navigation">Navigation</SelectItem>
-                            <SelectItem value="Machinery">Machinery</SelectItem>
-                            <SelectItem value="Safety">Safety</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Category</Label>
+                      <Controller
+                        name="equipmentCategory"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-equipment-category" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Deck">Deck</SelectItem>
+                              <SelectItem value="Navigation">Navigation</SelectItem>
+                              <SelectItem value="Machinery">Machinery</SelectItem>
+                              <SelectItem value="Safety">Safety</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  {/* Row 2 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Source</Label>
-                    <Controller
-                      name="source"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-source" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Internal">Internal</SelectItem>
-                            <SelectItem value="External">External</SelectItem>
-                            <SelectItem value="SIRE">SIRE</SelectItem>
-                            <SelectItem value="PSC">PSC</SelectItem>
-                            <SelectItem value="Class">Class</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    {/* Row 2 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Source</Label>
+                      <Controller
+                        name="source"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-source" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Internal">Internal</SelectItem>
+                              <SelectItem value="External">External</SelectItem>
+                              <SelectItem value="SIRE">SIRE</SelectItem>
+                              <SelectItem value="PSC">PSC</SelectItem>
+                              <SelectItem value="Class">Class</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Date Issued*</Label>
-                    <Input 
-                      {...form.register("issueDate")} 
-                      type="date"
-                      data-testid="input-date-issued"
-                      className="h-9 text-sm border-gray-300"
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Date Issued*</Label>
+                      <Input 
+                        {...form.register("issueDate")} 
+                        type="date"
+                        data-testid="input-date-issued"
+                        className="h-9 text-sm border-gray-300"
+                      />
+                    </div>
 
-                  {/* Row 3 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Defect Category</Label>
-                    <Controller
-                      name="defectCategory"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Minor">Minor</SelectItem>
-                            <SelectItem value="Major">Major</SelectItem>
-                            <SelectItem value="Catastrophic">Catastrophic</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    {/* Row 3 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Category</Label>
+                      <Controller
+                        name="defectCategory"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Minor">Minor</SelectItem>
+                              <SelectItem value="Major">Major</SelectItem>
+                              <SelectItem value="Catastrophic">Catastrophic</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Type</Label>
-                    <Controller
-                      name="equipmentType"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-equipment-type" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pump">Pump</SelectItem>
-                            <SelectItem value="Engine">Engine</SelectItem>
-                            <SelectItem value="Valve">Valve</SelectItem>
-                            <SelectItem value="Sensor">Sensor</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Type</Label>
+                      <Controller
+                        name="equipmentType"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-equipment-type" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pump">Pump</SelectItem>
+                              <SelectItem value="Engine">Engine</SelectItem>
+                              <SelectItem value="Valve">Valve</SelectItem>
+                              <SelectItem value="Sensor">Sensor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  {/* Row 4 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Defect Type</Label>
-                    <Controller
-                      name="defectType"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Routine">Routine</SelectItem>
-                            <SelectItem value="Corrective">Corrective</SelectItem>
-                            <SelectItem value="Emergency">Emergency</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    {/* Row 4 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Defect Type</Label>
+                      <Controller
+                        name="defectType"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Routine">Routine</SelectItem>
+                              <SelectItem value="Corrective">Corrective</SelectItem>
+                              <SelectItem value="Emergency">Emergency</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Target Date</Label>
-                    <Input 
-                      {...form.register("targetCloseDate")} 
-                      type="date"
-                      data-testid="input-target-date"
-                      className="h-9 text-sm border-gray-300"
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Target Date</Label>
+                      <Input 
+                        {...form.register("targetCloseDate")} 
+                        type="date"
+                        data-testid="input-target-date"
+                        className="h-9 text-sm border-gray-300"
+                      />
+                    </div>
 
-                  {/* Row 5 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Make</Label>
-                    <Controller
-                      name="equipmentMake"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-make" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Caterpillar">Caterpillar</SelectItem>
-                            <SelectItem value="MAN">MAN</SelectItem>
-                            <SelectItem value="Wartsila">Wartsila</SelectItem>
-                            <SelectItem value="Kongsberg">Kongsberg</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    {/* Row 5 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Make</Label>
+                      <Controller
+                        name="equipmentMake"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-make" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Caterpillar">Caterpillar</SelectItem>
+                              <SelectItem value="MAN">MAN</SelectItem>
+                              <SelectItem value="Wartsila">Wartsila</SelectItem>
+                              <SelectItem value="Kongsberg">Kongsberg</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Responsible Role</Label>
-                    <Input 
-                      {...form.register("responsibleDept")} 
-                      data-testid="input-responsible-role"
-                      className="h-9 text-sm border-gray-300"
-                      placeholder="e.g., Chief Engineer"
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Responsible Role</Label>
+                      <Input 
+                        {...form.register("responsibleDept")} 
+                        data-testid="input-responsible-role"
+                        className="h-9 text-sm border-gray-300"
+                        placeholder="e.g., Chief Engineer"
+                      />
+                    </div>
 
-                  {/* Row 6 */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-600 uppercase font-normal">Model</Label>
-                    <Controller
-                      name="equipmentModel"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <SelectTrigger data-testid="select-model" className="h-9 text-sm border-gray-300">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="3516">3516</SelectItem>
-                            <SelectItem value="6L32">6L32</SelectItem>
-                            <SelectItem value="W32">W32</SelectItem>
-                            <SelectItem value="K-Chief">K-Chief</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                    {/* Row 6 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Model</Label>
+                      <Controller
+                        name="equipmentModel"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-model" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3516">3516</SelectItem>
+                              <SelectItem value="6L32">6L32</SelectItem>
+                              <SelectItem value="W32">W32</SelectItem>
+                              <SelectItem value="K-Chief">K-Chief</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
 
-                  <div className="pt-2">
-                    <Controller
-                      name="is_coc"
-                      control={form.control}
-                      render={({ field }) => (
-                        <div className="flex items-start gap-2">
-                          <Checkbox
-                            id="coc"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-coc"
-                            className="mt-0.5"
-                          />
-                          <div>
-                            <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
-                              Condition of Class (CoC)
-                            </Label>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              Only if the Defect is Class Related
-                            </p>
+                    <div className="pt-2">
+                      <Controller
+                        name="is_coc"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="flex items-start gap-2">
+                            <Checkbox
+                              id="coc"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-coc"
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
+                                Condition of Class (CoC)
+                              </Label>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Only if the Defect is Class Related
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    />
+                        )}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
               <div className="space-y-2">
                 <Label className="text-xs text-gray-600 uppercase font-normal">Description*</Label>
@@ -834,6 +835,7 @@ export default function DefectFormWizard() {
           </div>
         </div>
       </div>
+    </div>
 
       {/* Immediate Cause Modal */}
       <ImmediateCauseModal
