@@ -8,6 +8,7 @@ import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
+import DefectFormWizard from "./pages/defects/DefectFormWizard";
 
 import NotFound from "./pages/not-found";
 
@@ -24,8 +25,15 @@ function App() {
                 <Route path="/spares" component={TechnicalModule} />
                 <Route path="/stores" component={TechnicalModule} />
                 <Route path="/reports" component={TechnicalModule} />
+                
+                {/* Defect form routes - standalone, no TechnicalModule layout */}
+                <Route path="/defects/new" component={DefectFormWizard} />
+                <Route path="/defects/edit/:id" component={DefectFormWizard} />
+                
+                {/* Other defects routes - with TechnicalModule layout */}
                 <Route path="/defects" component={TechnicalModule} />
                 <Route path="/defects/:subpage" component={TechnicalModule} />
+                
                 <Route path="/admin" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 <Route path="/test-e2e" component={TestE2E} />
