@@ -724,6 +724,188 @@ export default function DefectFormWizard() {
                     </div>
                   </div>
                 </div>
+
+                {/* B4. VIQ Section */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-[#1976d2]">B4. VIQ</h4>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">VIQ 7</Label>
+                      <Controller
+                        name="viqVersion"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-viq-version" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="VIQ 7">VIQ 7</SelectItem>
+                              <SelectItem value="SIRE 2.0">SIRE 2.0</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">VIQ Reference</Label>
+                      <Controller
+                        name="viqRef"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-viq-ref" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              <SelectItem value="1.1">1.1</SelectItem>
+                              <SelectItem value="1.2">1.2</SelectItem>
+                              <SelectItem value="1.3">1.3</SelectItem>
+                              <SelectItem value="1.4">1.4</SelectItem>
+                              <SelectItem value="1.5">1.5</SelectItem>
+                              <SelectItem value="1.6">1.6</SelectItem>
+                              <SelectItem value="1.7">1.7</SelectItem>
+                              <SelectItem value="1.8">1.8</SelectItem>
+                              <SelectItem value="1.9">1.9</SelectItem>
+                              <SelectItem value="1.10">1.10</SelectItem>
+                              <SelectItem value="1.11">1.11</SelectItem>
+                              <SelectItem value="1.12">1.12</SelectItem>
+                              <SelectItem value="1.13">1.13</SelectItem>
+                              <SelectItem value="1.14">1.14</SelectItem>
+                              <SelectItem value="1.15">1.15</SelectItem>
+                              <SelectItem value="1.16">1.16</SelectItem>
+                              <SelectItem value="1.17">1.17</SelectItem>
+                              <SelectItem value="1.18">1.18</SelectItem>
+                              <SelectItem value="1.19">1.19</SelectItem>
+                              <SelectItem value="1.20">1.20</SelectItem>
+                              <SelectItem value="1.21">1.21</SelectItem>
+                              <SelectItem value="1.22">1.22</SelectItem>
+                              <SelectItem value="1.23">1.23</SelectItem>
+                              <SelectItem value="1.24">1.24</SelectItem>
+                              <SelectItem value="1.25">1.25</SelectItem>
+                              <SelectItem value="1.26">1.26</SelectItem>
+                              <SelectItem value="2.1">2.1</SelectItem>
+                              <SelectItem value="2.2">2.2</SelectItem>
+                              <SelectItem value="2.3">2.3</SelectItem>
+                              <SelectItem value="2.4">2.4</SelectItem>
+                              <SelectItem value="2.5">2.5</SelectItem>
+                              <SelectItem value="2.6">2.6</SelectItem>
+                              <SelectItem value="2.7">2.7</SelectItem>
+                              <SelectItem value="2.8">2.8</SelectItem>
+                              <SelectItem value="2.9">2.9</SelectItem>
+                              <SelectItem value="3.1">3.1</SelectItem>
+                              <SelectItem value="3.2">3.2</SelectItem>
+                              <SelectItem value="3.3">3.3</SelectItem>
+                              <SelectItem value="3.4">3.4</SelectItem>
+                              <SelectItem value="3.5">3.5</SelectItem>
+                              <SelectItem value="3.6">3.6</SelectItem>
+                              <SelectItem value="3.7">3.7</SelectItem>
+                              <SelectItem value="3.8">3.8</SelectItem>
+                              <SelectItem value="4.1">4.1</SelectItem>
+                              <SelectItem value="4.2">4.2</SelectItem>
+                              <SelectItem value="4.3">4.3</SelectItem>
+                              <SelectItem value="4.4">4.4</SelectItem>
+                              <SelectItem value="4.5">4.5</SelectItem>
+                              <SelectItem value="5.1">5.1</SelectItem>
+                              <SelectItem value="5.2">5.2</SelectItem>
+                              <SelectItem value="5.3">5.3</SelectItem>
+                              <SelectItem value="5.4">5.4</SelectItem>
+                              <SelectItem value="5.5">5.5</SelectItem>
+                              <SelectItem value="6.1">6.1</SelectItem>
+                              <SelectItem value="6.2">6.2</SelectItem>
+                              <SelectItem value="6.3">6.3</SelectItem>
+                              <SelectItem value="7.1">7.1</SelectItem>
+                              <SelectItem value="7.2">7.2</SelectItem>
+                              <SelectItem value="7.3">7.3</SelectItem>
+                              <SelectItem value="8.1">8.1</SelectItem>
+                              <SelectItem value="8.2">8.2</SelectItem>
+                              <SelectItem value="8.3">8.3</SelectItem>
+                              <SelectItem value="9.1">9.1</SelectItem>
+                              <SelectItem value="9.2">9.2</SelectItem>
+                              <SelectItem value="9.3">9.3</SelectItem>
+                              <SelectItem value="10.1">10.1</SelectItem>
+                              <SelectItem value="10.2">10.2</SelectItem>
+                              <SelectItem value="10.3">10.3</SelectItem>
+                              <SelectItem value="11.1">11.1</SelectItem>
+                              <SelectItem value="11.2">11.2</SelectItem>
+                              <SelectItem value="12.1">12.1</SelectItem>
+                              <SelectItem value="12.2">12.2</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">VIQ Chapter</Label>
+                      <Controller
+                        name="viqChapter"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-viq-chapter" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              <SelectItem value="General Information">General Information</SelectItem>
+                              <SelectItem value="Certification and Documentation">Certification and Documentation</SelectItem>
+                              <SelectItem value="Crew Management">Crew Management</SelectItem>
+                              <SelectItem value="Navigation and Communications">Navigation and Communications</SelectItem>
+                              <SelectItem value="Safety Management">Safety Management</SelectItem>
+                              <SelectItem value="Pollution Prevention">Pollution Prevention</SelectItem>
+                              <SelectItem value="Maritime Security">Maritime Security</SelectItem>
+                              <SelectItem value="Cargo and Ballast Systems">Cargo and Ballast Systems</SelectItem>
+                              <SelectItem value="Mooring and Anchoring">Mooring and Anchoring</SelectItem>
+                              <SelectItem value="Machinery Spaces">Machinery Spaces</SelectItem>
+                              <SelectItem value="General Appearance and Condition">General Appearance and Condition</SelectItem>
+                              <SelectItem value="Ice Operations">Ice Operations</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">VIQ Section</Label>
+                      <Controller
+                        name="viqSection"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <SelectTrigger data-testid="select-viq-section" className="h-9 text-sm border-gray-300">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              <SelectItem value="Certification">Certification</SelectItem>
+                              <SelectItem value="Safety management and the operator's procedures manuals">Safety management and the operator's procedures manuals</SelectItem>
+                              <SelectItem value="Survey and repair history">Survey and repair history</SelectItem>
+                              <SelectItem value="Crewing and Manning">Crewing and Manning</SelectItem>
+                              <SelectItem value="Bridge Navigation Systems">Bridge Navigation Systems</SelectItem>
+                              <SelectItem value="Communication Equipment">Communication Equipment</SelectItem>
+                              <SelectItem value="Fire Fighting and Life Saving">Fire Fighting and Life Saving</SelectItem>
+                              <SelectItem value="Emergency Equipment">Emergency Equipment</SelectItem>
+                              <SelectItem value="Drills and Training">Drills and Training</SelectItem>
+                              <SelectItem value="Enclosed Spaces">Enclosed Spaces</SelectItem>
+                              <SelectItem value="Environmental Protection">Environmental Protection</SelectItem>
+                              <SelectItem value="MARPOL Compliance">MARPOL Compliance</SelectItem>
+                              <SelectItem value="Security Procedures">Security Procedures</SelectItem>
+                              <SelectItem value="Cargo Handling Equipment">Cargo Handling Equipment</SelectItem>
+                              <SelectItem value="Ballast Systems">Ballast Systems</SelectItem>
+                              <SelectItem value="Mooring Equipment">Mooring Equipment</SelectItem>
+                              <SelectItem value="Engine Room Systems">Engine Room Systems</SelectItem>
+                              <SelectItem value="Steering Systems">Steering Systems</SelectItem>
+                              <SelectItem value="Hull and Structure">Hull and Structure</SelectItem>
+                              <SelectItem value="Deck Condition">Deck Condition</SelectItem>
+                              <SelectItem value="Accommodation">Accommodation</SelectItem>
+                              <SelectItem value="Ice Navigation Equipment">Ice Navigation Equipment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

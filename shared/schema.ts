@@ -544,8 +544,10 @@ export const defects = pgTable("defects", {
   responsibleDept: text("responsible_dept"), // Responsible Dept from screenshot
   verifiedDate: text("verified_date"), // ISO format YYYY-MM-DD
   defectCategory: text("defect_category"), // Additional defect category field
-  viqVersion: text("viq_version"), // VIQ VER
-  viqRef: text("viq_ref"), // VIQ REF
+  viqVersion: text("viq_version"), // VIQ VER (VIQ 7 or SIRE 2.0)
+  viqRef: text("viq_ref"), // VIQ REF (e.g., 1.1, 2.3, 5.12)
+  viqChapter: text("viq_chapter"), // VIQ Chapter (e.g., General Information, Safety Management)
+  viqSection: text("viq_section"), // VIQ Section (detailed section within chapter)
   sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
   immediateCause: json("immediate_cause"), // Structured immediate cause with unsafe acts and conditions
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation

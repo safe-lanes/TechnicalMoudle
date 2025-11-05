@@ -42,6 +42,13 @@ The application uses a modern full-stack architecture with a React frontend (Typ
 - **Modify PMS - Change Requests Module (Phase 2.0)**: Cross-module change request system with unified modal workflow, field-level tracking, and modify mode components
 - **Defects Module - Condition of Class (CoC) Feature**: Complete CoC tracking with checkbox in defect form (positioned below date fields for clean layout), blue CoC badges in lists, and dedicated CoC filtered view at /defects/coc with Active/Resolved tabs
 - **Defects Module - Recurring Defects Feature**: Complete pattern detection for equipment failures (2+ occurrences across vessels), with time window filtering (6 months to 5 years), minimum occurrence filtering, CoC filtering, and comprehensive test data demonstrating KSB pump patterns across multiple vessels (Fixed deduplication for same-day/same-vessel defects)
+- **Defects Module - VIQ Integration (Nov 5, 2024)**: Complete SIRE VIQ 7 reference tracking with B4. VIQ section in defect form
+  - **Four VIQ Dropdowns**: VIQ Version (VIQ 7/SIRE 2.0), VIQ Reference (1.1-12.2), VIQ Chapter (12 chapters), VIQ Section (subsections)
+  - **VIQ Reference Codes**: Comprehensive list from SIRE VIQ 7 PDF including all chapters (General Information, Certification and Documentation, Crew Management, Navigation and Communications, Safety Management, Pollution Prevention, Maritime Security, Cargo and Ballast Systems, Mooring and Anchoring, Machinery Spaces, General Appearance and Condition, Ice Operations)
+  - **VIQ Sections**: Detailed subsections including Certification, Safety management procedures, Survey and repair history, Bridge Navigation Systems, Fire Fighting and Life Saving, Environmental Protection, Cargo Handling Equipment, Engine Room Systems, and more
+  - **Schema Fields**: Added viqChapter and viqSection to defects table (alongside existing viqVersion and viqRef)
+  - **Positioning**: VIQ section positioned after Root Cause boxes, before Actions section
+  - **Styling**: Blue header "B4. VIQ", 4-column grid layout, consistent with SAIL design pattern
 - **Admin Module - 4-Tab Interface** (Oct 2024): Complete admin workspace with tabbed navigation:
   - **Bulk Data Imp Tab**: Left sidebar with template selection (Machinery Components, Stores, Spares, Work Orders), right panel for bulk upload operations
     - **Machinery Component Upload (SFI Standard)**: Complete bulk import system for CSV/Excel files with:
