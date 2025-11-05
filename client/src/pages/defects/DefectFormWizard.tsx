@@ -245,11 +245,8 @@ export default function DefectFormWizard() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col bg-gray-100">
-        {/* Top Action Bar with "Defect Report" Label and Buttons */}
-        <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-between bg-white">
-          {/* Left: Defect Report Label - simple blue text matching Near Miss */}
-          <h1 className="text-base font-semibold text-[#1976d2]">Defect Report</h1>
-          
+        {/* Top Action Buttons Bar - White background */}
+        <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-end bg-white">
           {/* Right: Three Functional Buttons */}
           <div className="flex items-center gap-2">
             <Button
@@ -281,12 +278,21 @@ export default function DefectFormWizard() {
 
         {/* Scrollable Content with Gray Background */}
         <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+          {/* Page Title on Gray Background - Matching Near Miss */}
+          <div className="max-w-6xl mx-auto mb-6">
+            <h1 className="text-2xl font-semibold text-[#1976d2]">Defect Report</h1>
+          </div>
           <div className="max-w-6xl mx-auto space-y-4">
             {/* Step 1: Reporting - White Card */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-              <div>
-                <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
-                <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
+                  <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
+                </div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-normal">Report ID :</span>
+                </div>
               </div>
 
               <div className="space-y-3">
