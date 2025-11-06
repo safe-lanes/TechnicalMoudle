@@ -64,7 +64,7 @@ export default function AddActionModal({ open, onOpenChange, onSave }: AddAction
         <div className="bg-[#1976d2] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
           <h2 className="text-xl font-semibold">Add Action</h2>
           <button
-            onClick={() => onOpenChange(false)}
+            onClick={handleDiscard}
             className="text-white hover:text-gray-200 transition-colors"
             data-testid="button-close-modal"
           >
