@@ -253,10 +253,9 @@ export default function DefectFormWizard() {
   };
 
   return (
-    <>
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen" style={{backgroundColor: '#f5f5f5'}}>
       {/* Left Sidebar - Steps Only - DARK BLUE BACKGROUND */}
-      <div className="w-52 bg-[#1976d2] flex flex-col">
+      <div className="w-52 flex flex-col !bg-[#1976d2]" style={{backgroundColor: '#1976d2'}}>
         {/* Step circles - positioned lower to match Near Miss form */}
         <div className="flex-1 pt-20">
           <div 
@@ -310,7 +309,7 @@ export default function DefectFormWizard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col bg-gray-100">
+      <div className="flex-1 flex flex-col" style={{backgroundColor: '#f5f5f5'}}>
         {/* Top Action Buttons Bar - White background */}
         <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-end bg-white">
           {/* Right: Three Functional Buttons */}
@@ -1364,30 +1363,27 @@ export default function DefectFormWizard() {
       </div>
     </div>
 
-    {/* Modals - Outside main container */}
-    {/* Immediate Cause Modal */}
-      <ImmediateCauseModal
-        isOpen={isImmediateCauseModalOpen}
-        onClose={() => setIsImmediateCauseModalOpen(false)}
-        onSubmit={handleImmediateCauseSubmit}
-        initialData={typeof form.getValues('immediateCause') === 'object' ? form.getValues('immediateCause') as any : undefined}
-      />
+    {/* Modals - Outside main content, inside main container */}
+    <ImmediateCauseModal
+      isOpen={isImmediateCauseModalOpen}
+      onClose={() => setIsImmediateCauseModalOpen(false)}
+      onSubmit={handleImmediateCauseSubmit}
+      initialData={typeof form.getValues('immediateCause') === 'object' ? form.getValues('immediateCause') as any : undefined}
+    />
 
-      {/* Root Cause Modal */}
-      <RootCauseModal
-        isOpen={isRootCauseModalOpen}
-        onClose={() => setIsRootCauseModalOpen(false)}
-        onSubmit={handleRootCauseSubmit}
-        initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
-      />
+    <RootCauseModal
+      isOpen={isRootCauseModalOpen}
+      onClose={() => setIsRootCauseModalOpen(false)}
+      onSubmit={handleRootCauseSubmit}
+      initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
+    />
 
-      {/* Add Action Modal */}
-      <AddActionModal
-        open={isAddActionModalOpen}
-        onOpenChange={setIsAddActionModalOpen}
-        onSave={handleSaveAction}
-        initialData={editingAction}
-      />
-    </>
+    <AddActionModal
+      open={isAddActionModalOpen}
+      onOpenChange={setIsAddActionModalOpen}
+      onSave={handleSaveAction}
+      initialData={editingAction}
+    />
+    </div>
   );
 }
