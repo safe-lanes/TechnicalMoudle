@@ -253,25 +253,59 @@ export default function DefectFormWizard() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f5f5f5]">
-      {/* Left Sidebar - Light Grey background matching Near Miss */}
-      <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col">
-        {/* Step circles - matching Near Miss style */}
-        <div className="flex-1 pt-20">
-          <div 
-            onClick={() => setCurrentStep(1)} 
-            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
+    <div className="flex flex-col h-screen bg-[#f5f5f5]">
+      {/* Top Bar - Buttons only on right - matching Near Miss */}
+      <div className="h-16 px-8 flex items-center justify-end bg-white border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/defects/active")}
+            className="text-gray-700 border-gray-300 h-9"
+            data-testid="button-back-top"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-              currentStep === 1 
-                ? 'bg-[#1976d2] text-white' 
-                : 'border-2 border-gray-300 text-gray-500 bg-white'
-            }`}>
-              1
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button
+            variant="outline"
+            onClick={toggleViewMode}
+            className="text-gray-700 border-gray-300 h-9"
+            data-testid="button-view"
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            {isViewMode ? 'Edit' : 'View'}
+          </Button>
+          <Button
+            onClick={form.handleSubmit(onSubmit)}
+            className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-6 font-medium"
+            data-testid="button-save"
+          >
+            SAVE
+          </Button>
+        </div>
+      </div>
+
+      {/* Main layout with sidebar and content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Light Grey background matching Near Miss */}
+        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col">
+          {/* Title and Step 1 aligned horizontally */}
+          <div className="pt-20 flex items-center">
+            <div 
+              onClick={() => setCurrentStep(1)} 
+              className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50 w-full"
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                currentStep === 1 
+                  ? 'bg-[#1976d2] text-white' 
+                  : 'border-2 border-gray-300 text-gray-500 bg-white'
+              }`}>
+                1
+              </div>
+              <span className={`text-sm font-medium ${currentStep === 1 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
+                Reporting
+              </span>
             </div>
-            <span className={`text-sm font-medium ${currentStep === 1 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
-              Reporting
-            </span>
           </div>
 
           <div 
@@ -306,51 +340,19 @@ export default function DefectFormWizard() {
             </span>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col bg-[#f5f5f5]">
-        {/* Top Bar - Buttons only on right - matching Near Miss */}
-        <div className="h-16 px-8 flex items-center justify-end bg-white border-b border-gray-200">
-          {/* Right: Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setLocation("/defects/active")}
-              className="text-gray-700 border-gray-300 h-9"
-              data-testid="button-back-top"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <Button
-              variant="outline"
-              onClick={toggleViewMode}
-              className="text-gray-700 border-gray-300 h-9"
-              data-testid="button-view"
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              {isViewMode ? 'Edit' : 'View'}
-            </Button>
-            <Button
-              onClick={form.handleSubmit(onSubmit)}
-              className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-6 font-medium"
-              data-testid="button-save"
-            >
-              SAVE
-            </Button>
-          </div>
-        </div>
-
-        {/* Scrollable Content with Gray Background */}
-        <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-8">
-          {/* Page Title - positioned to align with step 1 circle - matching Near Miss */}
-          <div className="pt-20 pb-6">
-            <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
-          </div>
-          <div className="max-w-6xl mx-auto">
-            {/* ONE BIG WHITE CONTAINER CARD - Matching Near Miss */}
-            <div className="bg-white rounded-lg shadow-md border border-gray-200" style={{padding: '24px'}}>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col bg-[#f5f5f5] overflow-hidden">
+          {/* Scrollable Content with Gray Background */}
+          <div className="flex-1 overflow-y-auto bg-[#f5f5f5]">
+            {/* Page Title - aligned with step 1 circle - matching Near Miss */}
+            <div className="pt-20 px-8 pb-6 flex items-center" style={{marginTop: '0px'}}>
+              <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
+            </div>
+            <div className="px-8">
+              <div className="max-w-6xl mx-auto">
+                {/* ONE BIG WHITE CONTAINER CARD - Matching Near Miss */}
+                <div className="bg-white rounded-lg shadow-md border border-gray-200" style={{padding: '24px'}}>
             
             {/* Step 1: Reporting */}
             <div>
@@ -1167,6 +1169,7 @@ export default function DefectFormWizard() {
                 </div>
               </div>
             </div>
+            </div>
 
             {/* Step 2: Actions */}
             <div className="mt-8 space-y-4">
@@ -1356,34 +1359,34 @@ export default function DefectFormWizard() {
                 </Button>
               </div>
             </div>
-            
-            </div> {/* Close BIG WHITE CONTAINER CARD */}
+
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Modals - Outside main content, inside main container */}
-    <ImmediateCauseModal
-      isOpen={isImmediateCauseModalOpen}
-      onClose={() => setIsImmediateCauseModalOpen(false)}
-      onSubmit={handleImmediateCauseSubmit}
-      initialData={typeof form.getValues('immediateCause') === 'object' ? form.getValues('immediateCause') as any : undefined}
-    />
+      <ImmediateCauseModal
+        isOpen={isImmediateCauseModalOpen}
+        onClose={() => setIsImmediateCauseModalOpen(false)}
+        onSubmit={handleImmediateCauseSubmit}
+        initialData={typeof form.getValues('immediateCause') === 'object' ? form.getValues('immediateCause') as any : undefined}
+      />
 
-    <RootCauseModal
-      isOpen={isRootCauseModalOpen}
-      onClose={() => setIsRootCauseModalOpen(false)}
-      onSubmit={handleRootCauseSubmit}
-      initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
-    />
+      <RootCauseModal
+        isOpen={isRootCauseModalOpen}
+        onClose={() => setIsRootCauseModalOpen(false)}
+        onSubmit={handleRootCauseSubmit}
+        initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
+      />
 
-    <AddActionModal
-      open={isAddActionModalOpen}
-      onOpenChange={setIsAddActionModalOpen}
-      onSave={handleSaveAction}
-      initialData={editingAction}
-    />
+      <AddActionModal
+        open={isAddActionModalOpen}
+        onOpenChange={setIsAddActionModalOpen}
+        onSave={handleSaveAction}
+        initialData={editingAction}
+      />
     </div>
   );
 }
