@@ -613,6 +613,24 @@ export const defects = pgTable("defects", {
     createdBy: string;
     createdOn: string;
   }>>().default([]),
+  // Actions (stored inline for form wizard)
+  actions: json("actions").$type<Array<{
+    id: string;
+    actionType: string;
+    proposedBy?: string;
+    actionDescription: string;
+    responsibility?: string;
+    email?: string;
+    dueDate?: string;
+    dateCompleted?: string;
+    status: string;
+  }>>(),
+  // Attachments (stored inline for form wizard)
+  attachments: json("attachments").$type<Array<{
+    name: string;
+    size: number;
+    type: string;
+  }>>(),
   // Audit trail
   auditTrail: json("audit_trail").$type<Array<{
     action: string;

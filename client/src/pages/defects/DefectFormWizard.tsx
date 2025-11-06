@@ -201,9 +201,11 @@ export default function DefectFormWizard() {
   };
 
   const handleSaveAction = (actionData: any) => {
+    let updatedActions;
     if (editingAction) {
       // Update existing action
-      setActions(actions.map(a => a.id === editingAction.id ? { ...editingAction, ...actionData } : a));
+      updatedActions = actions.map(a => a.id === editingAction.id ? { ...editingAction, ...actionData } : a);
+      setActions(updatedActions);
       toast({ title: "Action updated successfully" });
     } else {
       // Add new action
@@ -211,14 +213,19 @@ export default function DefectFormWizard() {
         id: Date.now().toString(),
         ...actionData,
       };
-      setActions([...actions, newAction]);
+      updatedActions = [...actions, newAction];
+      setActions(updatedActions);
       toast({ title: "Action added successfully" });
     }
+    // Sync to form
+    form.setValue('actions', updatedActions as any);
     setEditingAction(null);
   };
 
   const deleteAction = (id: string) => {
-    setActions(actions.filter(a => a.id !== id));
+    const updatedActions = actions.filter(a => a.id !== id);
+    setActions(updatedActions);
+    form.setValue('actions', updatedActions as any);
     toast({ title: "Action deleted" });
   };
 
@@ -226,7 +233,17 @@ export default function DefectFormWizard() {
     const files = event.target.files;
     if (files) {
       const newFiles = Array.from(files);
-      setAttachments([...attachments, ...newFiles]);
+      const updatedAttachments = [...attachments, ...newFiles];
+      setAttachments(updatedAttachments);
+      
+      // Sync to form as metadata
+      const attachmentMetadata = updatedAttachments.map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }));
+      form.setValue('attachments', attachmentMetadata as any);
+      
       toast({ title: `${newFiles.length} file(s) selected` });
     }
   };
@@ -367,6 +384,7 @@ export default function DefectFormWizard() {
                               form.setValue("vesselName", vesselNames[value] || "");
                             }} 
                             value={field.value}
+                            disabled={isViewMode}
                           >
                             <SelectTrigger data-testid="select-vessel" className="h-9 text-sm border-gray-300">
                               <SelectValue />
@@ -388,7 +406,7 @@ export default function DefectFormWizard() {
                         name="equipmentCategory"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-equipment-category" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -411,6 +429,7 @@ export default function DefectFormWizard() {
                         type="date"
                         data-testid="input-date-issued"
                         className="h-9 text-sm border-gray-300"
+                        disabled={isViewMode}
                       />
                     </div>
 
@@ -421,7 +440,7 @@ export default function DefectFormWizard() {
                         name="source"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-source" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -443,7 +462,7 @@ export default function DefectFormWizard() {
                         name="equipmentType"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-equipment-type" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -481,6 +500,7 @@ export default function DefectFormWizard() {
                         type="date"
                         data-testid="input-target-date"
                         className="h-9 text-sm border-gray-300"
+                        disabled={isViewMode}
                       />
                     </div>
 
@@ -491,7 +511,7 @@ export default function DefectFormWizard() {
                         name="defectCategory"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-category" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -522,7 +542,7 @@ export default function DefectFormWizard() {
                         name="equipmentMake"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-make" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -544,6 +564,7 @@ export default function DefectFormWizard() {
                         data-testid="input-responsible-role"
                         className="h-9 text-sm border-gray-300"
                         placeholder="e.g., Chief Engineer"
+                        disabled={isViewMode}
                       />
                     </div>
 
@@ -554,7 +575,7 @@ export default function DefectFormWizard() {
                         name="defectType"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-type" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -595,7 +616,7 @@ export default function DefectFormWizard() {
                         name="equipmentModel"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-model" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -622,6 +643,7 @@ export default function DefectFormWizard() {
                               onCheckedChange={field.onChange}
                               data-testid="checkbox-coc"
                               className="mt-0.5"
+                              disabled={isViewMode}
                             />
                             <div>
                               <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
@@ -651,6 +673,7 @@ export default function DefectFormWizard() {
                       modules={quillModules}
                       className="bg-white"
                       placeholder="Enter defect description..."
+                      readOnly={isViewMode}
                     />
                   )}
                 />
@@ -662,6 +685,7 @@ export default function DefectFormWizard() {
                   onClick={() => handleStepSubmit(1)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step1"
+                  disabled={isViewMode}
                 >
                   SUBMIT
                 </Button>
@@ -687,6 +711,7 @@ export default function DefectFormWizard() {
                       style={{color: '#1976d2', borderColor: '#1976d2'}} 
                       data-testid="button-select-immediate"
                       onClick={handleImmediateCauseSelect}
+                      disabled={isViewMode}
                     >
                       Select
                     </Button>
@@ -720,6 +745,7 @@ export default function DefectFormWizard() {
                         placeholder="FURTHER EXPLANATION"
                         className="bg-white text-sm border-gray-300"
                         data-testid="textarea-immediate-explanation"
+                        disabled={isViewMode}
                       />
                     </div>
                   </div>
@@ -737,6 +763,7 @@ export default function DefectFormWizard() {
                       style={{color: '#1976d2', borderColor: '#1976d2'}} 
                       data-testid="button-select-root"
                       onClick={handleRootCauseSelect}
+                      disabled={isViewMode}
                     >
                       Select
                     </Button>
@@ -770,6 +797,7 @@ export default function DefectFormWizard() {
                         placeholder="FURTHER EXPLANATION"
                         className="bg-white text-sm border-gray-300"
                         data-testid="textarea-root-explanation"
+                        disabled={isViewMode}
                       />
                     </div>
                   </div>
@@ -785,7 +813,7 @@ export default function DefectFormWizard() {
                         name="viqVersion"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-viq-version" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -804,7 +832,7 @@ export default function DefectFormWizard() {
                         name="viqRef"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-viq-ref" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -1071,7 +1099,7 @@ export default function DefectFormWizard() {
                         name="viqChapter"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-viq-chapter" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -1100,7 +1128,7 @@ export default function DefectFormWizard() {
                         name="viqSection"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-viq-section" className="h-9 text-sm border-gray-300">
                               <SelectValue />
                             </SelectTrigger>
@@ -1152,6 +1180,7 @@ export default function DefectFormWizard() {
                     size="sm"
                     className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9"
                     data-testid="button-add-action"
+                    disabled={isViewMode}
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Action
@@ -1193,6 +1222,7 @@ export default function DefectFormWizard() {
                                   className="h-7 w-7 p-0"
                                   onClick={() => openEditActionModal(action)}
                                   data-testid={`button-edit-action-${action.id}`}
+                                  disabled={isViewMode}
                                 >
                                   <Edit className="h-3 w-3" />
                                 </Button>
@@ -1202,6 +1232,7 @@ export default function DefectFormWizard() {
                                   className="h-7 w-7 p-0"
                                   onClick={() => deleteAction(action.id)}
                                   data-testid={`button-delete-action-${action.id}`}
+                                  disabled={isViewMode}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -1225,6 +1256,7 @@ export default function DefectFormWizard() {
                   onClick={() => handleStepSubmit(2)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step2"
+                  disabled={isViewMode}
                 >
                   SUBMIT
                 </Button>
@@ -1246,6 +1278,7 @@ export default function DefectFormWizard() {
                     type="date"
                     data-testid="input-date-completed"
                     className="h-9 text-sm border-gray-300"
+                    disabled={isViewMode}
                   />
                 </div>
 
@@ -1256,6 +1289,7 @@ export default function DefectFormWizard() {
                     type="date"
                     data-testid="input-verified-date"
                     className="h-9 text-sm border-gray-300"
+                    disabled={isViewMode}
                   />
                 </div>
               </div>
@@ -1280,6 +1314,7 @@ export default function DefectFormWizard() {
                     className="border-gray-300"
                     data-testid="button-upload-attachment"
                     onClick={() => document.getElementById('file-upload')?.click()}
+                    disabled={isViewMode}
                   >
                     <Upload className="h-4 w-4 mr-2" />
                     Browse Files
@@ -1302,6 +1337,7 @@ export default function DefectFormWizard() {
                   data-testid="input-closed-by"
                   className="h-9 text-sm border-gray-300"
                   placeholder="Name & Rank"
+                  disabled={isViewMode}
                 />
               </div>
 
@@ -1311,6 +1347,7 @@ export default function DefectFormWizard() {
                   onClick={form.handleSubmit(onSubmit)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step3"
+                  disabled={isViewMode}
                 >
                   SUBMIT
                 </Button>
