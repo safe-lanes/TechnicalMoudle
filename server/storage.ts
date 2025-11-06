@@ -206,6 +206,7 @@ export interface IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]>;
+  getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number>;
   getDefect(id: string): Promise<Defect | undefined>;
   createDefect(defect: InsertDefect): Promise<Defect>;
   updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect>;
@@ -237,6 +238,7 @@ export interface IStorage {
   calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null>;
   getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]>;
   getDefectsForRecurring(recurringId: number): Promise<Defect[]>;
+  recalculateAllRecurringDefects(): Promise<void>;
   
   // Seed helper methods
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
@@ -2400,6 +2402,17 @@ export class MemStorage implements IStorage {
     return defects.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
+  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number> {
+    let defects = await this.getDefects(filters);
+    
+    // Apply isCoC filter if specified
+    if (filters?.isCoC !== undefined) {
+      defects = defects.filter(d => d.is_coc === filters.isCoC);
+    }
+    
+    return defects.length;
+  }
+
   async getDefect(id: string): Promise<Defect | undefined> {
     return this.defects.get(id);
   }
@@ -2743,6 +2756,10 @@ export class MemStorage implements IStorage {
 
   async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
     return [];
+  }
+
+  async recalculateAllRecurringDefects(): Promise<void> {
+    // Stub implementation for MemStorage
   }
 
   // Seed helper methods (stub implementations)

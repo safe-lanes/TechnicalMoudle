@@ -50,7 +50,7 @@ interface DefectsFilters {
 const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
 
 export default function DefectsLogWithTabs() {
-  const [activeTab, setActiveTab] = useState<'active' | 'resolved'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'resolved' | 'coc' | 'recurring'>('active');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DefectsFilters>({});
   
@@ -120,6 +120,46 @@ export default function DefectsLogWithTabs() {
     enabled: activeTab === 'resolved'
   });
 
+  const { data: cocDefects = [], isLoading: isLoadingCoC } = useQuery({
+    queryKey: ['defects', 'coc', filters, page],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      
+      const response = await fetch(`/api/defects/coc?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch CoC defects');
+      return response.json();
+    },
+    enabled: activeTab === 'coc'
+  });
+
+  const { data: recurringDefects = [], isLoading: isLoadingRecurring } = useQuery({
+    queryKey: ['defects', 'recurring', filters, page],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      
+      const response = await fetch(`/api/defects/recurring?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch recurring defects');
+      return response.json();
+    },
+    enabled: activeTab === 'recurring'
+  });
+
   // Count queries for tab badges
   const { data: activeCount = 0 } = useQuery({
     queryKey: ['defects', 'count', 'active'],
@@ -141,8 +181,35 @@ export default function DefectsLogWithTabs() {
     }
   });
 
-  const defects = activeTab === 'active' ? activeDefects : resolvedDefects;
-  const isLoading = activeTab === 'active' ? isLoadingActive : isLoadingResolved;
+  const { data: cocCount = 0 } = useQuery({
+    queryKey: ['defects', 'count', 'coc'],
+    queryFn: async () => {
+      const response = await fetch('/api/defects/count?isCoC=true');
+      if (!response.ok) throw new Error('Failed to fetch CoC count');
+      const data = await response.json();
+      return data.count;
+    }
+  });
+
+  const { data: recurringCount = 0 } = useQuery({
+    queryKey: ['defects', 'count', 'recurring'],
+    queryFn: async () => {
+      const response = await fetch('/api/defects/count/recurring');
+      if (!response.ok) throw new Error('Failed to fetch recurring count');
+      const data = await response.json();
+      return data.count;
+    }
+  });
+
+  const defects = activeTab === 'active' ? activeDefects 
+    : activeTab === 'resolved' ? resolvedDefects 
+    : activeTab === 'coc' ? cocDefects 
+    : recurringDefects;
+  
+  const isLoading = activeTab === 'active' ? isLoadingActive 
+    : activeTab === 'resolved' ? isLoadingResolved 
+    : activeTab === 'coc' ? isLoadingCoC 
+    : isLoadingRecurring;
 
   const getStatusBadge = (status: string, critical: boolean) => {
     if (status === "Closed") {
@@ -169,7 +236,7 @@ export default function DefectsLogWithTabs() {
   };
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value as 'active' | 'resolved');
+    setActiveTab(value as 'active' | 'resolved' | 'coc' | 'recurring');
     setPage(1); // Reset to page 1 on tab change
     // Optionally clear search/filters on tab change
     // setFilters({});
@@ -389,6 +456,18 @@ export default function DefectsLogWithTabs() {
                 {resolvedCount}
               </Badge>
             </TabsTrigger>
+            <TabsTrigger value="coc" className="flex items-center gap-2">
+              CoC
+              <Badge variant="secondary" className="ml-1">
+                {cocCount}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="recurring" className="flex items-center gap-2">
+              Recurring
+              <Badge variant="secondary" className="ml-1">
+                {recurringCount}
+              </Badge>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab}>
@@ -416,7 +495,10 @@ export default function DefectsLogWithTabs() {
                     <div className="text-center py-8 text-gray-500">Loading defects...</div>
                   ) : defects.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      {activeTab === 'active' ? 'No active defects' : 'No resolved defects'}
+                      {activeTab === 'active' ? 'No active defects' 
+                        : activeTab === 'resolved' ? 'No resolved defects'
+                        : activeTab === 'coc' ? 'No CoC defects'
+                        : 'No recurring defects'}
                     </div>
                   ) : (
                     defects.map((defect: Defect, index: number) => (

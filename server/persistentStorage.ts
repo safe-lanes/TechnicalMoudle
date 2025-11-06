@@ -1028,7 +1028,7 @@ export class PersistentFileStorage implements IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]> {
-    let defects = Object.values(this.data.defects);
+    let defects = Object.values(this.data.defects).filter(d => d !== null && d !== undefined);
     
     if (filters) {
       if (filters.vesselId) {
@@ -1078,6 +1078,14 @@ export class PersistentFileStorage implements IStorage {
     }
     
     return defects;
+  }
+
+  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number> {
+    const defects = await this.getDefects({
+      ...filters,
+      is_coc: filters?.isCoC
+    });
+    return defects.length;
   }
 
   async getDefect(id: string): Promise<Defect | undefined> {
@@ -1199,11 +1207,6 @@ export class PersistentFileStorage implements IStorage {
   async deleteDefect(id: string): Promise<void> {
     delete this.data.defects[id];
     this.persistData();
-  }
-
-  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string }): Promise<number> {
-    const defects = await this.getDefects(filters);
-    return defects.length;
   }
 
   // Bulk Import methods
@@ -1989,6 +1992,7 @@ export class PersistentFileStorage implements IStorage {
     windowStartDate.setMonth(currentDate.getMonth() - windowMonths);
     
     const defectsWithKey = Object.values(this.data.defects).filter(d => 
+      d !== null && d !== undefined &&
       d.equipment_key === equipmentKey &&
       new Date(d.issueDate) >= windowStartDate
     );
@@ -2121,6 +2125,39 @@ export class PersistentFileStorage implements IStorage {
     const links = await this.getRecurringDefectLinks(recurringId);
     const defectIds = links.map(link => link.defectId);
     return defectIds.map(id => this.data.defects[id]).filter(d => d !== undefined);
+  }
+
+  async recalculateAllRecurringDefects(): Promise<void> {
+    console.log('🔄 Starting recalculation of all recurring defects...');
+    
+    // Get all unique equipment keys from all defects
+    const equipmentKeys = new Set<string>();
+    const allDefects = Object.values(this.data.defects).filter(d => d !== null && d !== undefined);
+    const totalDefects = allDefects.length;
+    console.log(`📊 Total defects to check: ${totalDefects}`);
+    
+    allDefects.forEach(defect => {
+      if (defect && defect.equipment_key) {
+        equipmentKeys.add(defect.equipment_key);
+      }
+    });
+
+    console.log(`🔧 Found ${equipmentKeys.size} unique equipment keys`);
+
+    // Clear existing recurring defects
+    this.data.recurringDefects = {};
+    this.data.recurringDefectLinks = [];
+
+    // Recalculate for each unique equipment key
+    for (const equipmentKey of equipmentKeys) {
+      const result = await this.calculateAndUpdateRecurringDefects(equipmentKey);
+      if (result) {
+        console.log(`✓ Created recurring defect for equipment: ${equipmentKey} (${result.occurrenceCount} occurrences)`);
+      }
+    }
+
+    const recurringCount = Object.keys(this.data.recurringDefects).length;
+    console.log(`✅ Recalculation complete: ${recurringCount} recurring defect groups created from ${equipmentKeys.size} equipment keys`);
   }
 
   // Clear all defects data - preserves schema and storage logic

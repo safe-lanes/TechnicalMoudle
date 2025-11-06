@@ -335,6 +335,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch CoC defects" });
     }
   });
+
+  // Recurring defects endpoint
+  app.get("/api/defects/recurring", async (req, res) => {
+    try {
+      const filters = {
+        windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : undefined,
+        minOccurrences: req.query.minOccurrences ? parseInt(req.query.minOccurrences as string) : undefined,
+        hasCoc: req.query.hasCoc ? req.query.hasCoc === 'true' : undefined,
+        equipmentKey: req.query.equipmentKey as string,
+      };
+      
+      const recurringDefects = await storage.getRecurringDefects(filters);
+      res.json(recurringDefects);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recurring defects" });
+    }
+  });
   
   // Get defects count
   app.get("/api/defects/count", async (req, res) => {
@@ -343,12 +360,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         vesselId: req.query.vesselId as string,
+        isCoC: req.query.isCoC === 'true',
       };
       
       const count = await storage.getDefectsCount(filters);
       res.json({ count });
     } catch (error) {
       res.status(500).json({ error: "Failed to get defects count" });
+    }
+  });
+
+  // Get recurring defects count
+  app.get("/api/defects/count/recurring", async (req, res) => {
+    try {
+      const recurringDefects = await storage.getRecurringDefects({});
+      res.json({ count: recurringDefects.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get recurring defects count" });
     }
   });
   
@@ -1430,6 +1458,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   
   const httpServer = createServer(app);
+  
+  // Recalculate recurring defects on startup (don't await - let it run in background)
+  storage.recalculateAllRecurringDefects().then(() => {
+    console.log('✅ Recurring defects recalculated successfully');
+  }).catch(err => {
+    console.error('⚠️ Error recalculating recurring defects:', err);
+  });
   
   return httpServer;
 }
