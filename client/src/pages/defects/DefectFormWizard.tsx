@@ -253,55 +253,56 @@ export default function DefectFormWizard() {
   };
 
   return (
+    <>
     <div className="flex h-screen bg-gray-50">
-      {/* Left Sidebar - Steps Only */}
-      <div className="w-52 bg-white flex flex-col border-r border-gray-200">
+      {/* Left Sidebar - Steps Only - DARK BLUE BACKGROUND */}
+      <div className="w-52 bg-[#1976d2] flex flex-col">
         {/* Step circles - positioned lower to match Near Miss form */}
         <div className="flex-1 pt-20">
           <div 
             onClick={() => setCurrentStep(1)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 1 ? 'bg-blue-50' : ''}`}
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 1 ? 'bg-[#1565c0]' : ''}`}
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 1 
-                ? 'bg-[#1976d2] text-white' 
-                : 'border-2 border-gray-400 text-gray-500 bg-white'
+                ? 'bg-white text-[#1976d2]' 
+                : 'border-2 border-white text-white bg-transparent'
             }`}>
               1
             </div>
-            <span className={`text-sm ${currentStep === 1 ? 'text-gray-900' : 'text-gray-600'}`}>
+            <span className="text-sm text-white font-medium">
               Reporting
             </span>
           </div>
 
           <div 
             onClick={() => setCurrentStep(2)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 2 ? 'bg-blue-50' : ''}`}
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 2 ? 'bg-[#1565c0]' : ''}`}
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 2 
-                ? 'bg-[#1976d2] text-white' 
-                : 'border-2 border-gray-400 text-gray-500 bg-white'
+                ? 'bg-white text-[#1976d2]' 
+                : 'border-2 border-white text-white bg-transparent'
             }`}>
               2
             </div>
-            <span className={`text-sm ${currentStep === 2 ? 'text-gray-900' : 'text-gray-600'}`}>
+            <span className="text-sm text-white font-medium">
               Actions
             </span>
           </div>
 
           <div 
             onClick={() => setCurrentStep(3)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 3 ? 'bg-blue-50' : ''}`}
+            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 3 ? 'bg-[#1565c0]' : ''}`}
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 3 
-                ? 'bg-[#1976d2] text-white' 
-                : 'border-2 border-gray-400 text-gray-500 bg-white'
+                ? 'bg-white text-[#1976d2]' 
+                : 'border-2 border-white text-white bg-transparent'
             }`}>
               3
             </div>
-            <span className={`text-sm ${currentStep === 3 ? 'text-gray-900' : 'text-gray-600'}`}>
+            <span className="text-sm text-white font-medium">
               Closeout
             </span>
           </div>
@@ -344,13 +345,16 @@ export default function DefectFormWizard() {
 
         {/* Scrollable Content with Gray Background */}
         <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-6 py-6">
-          {/* Page Title on Gray Background - Matching Near Miss */}
+          {/* Page Title on Gray Background - Left Aligned */}
           <div className="max-w-6xl mx-auto mb-4">
             <h1 className="text-xl font-semibold text-[#1976d2]">Defect Report</h1>
           </div>
-          <div className="max-w-6xl mx-auto space-y-6">
-            {/* Step 1: Reporting - White Card */}
-            <div className="bg-white rounded shadow-md border border-gray-200" style={{padding: '24px'}}>
+          <div className="max-w-6xl mx-auto">
+            {/* ONE BIG WHITE CONTAINER CARD - Matching Near Miss */}
+            <div className="bg-white rounded-lg shadow-md border border-gray-200" style={{padding: '24px'}}>
+            
+            {/* Step 1: Reporting */}
+            <div>
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
@@ -1165,8 +1169,8 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
-            {/* Step 2: Actions - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+            {/* Step 2: Actions */}
+            <div className="mt-8 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Actions</h2>
                 <p className="text-sm text-cyan-600 mt-1">Part B - Corrective and Preventive Actions</p>
@@ -1263,8 +1267,8 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
-            {/* Step 3: Closeout - White Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+            {/* Step 3: Closeout */}
+            <div className="mt-8 space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-[#1976d2]">Closeout</h2>
                 <p className="text-sm text-cyan-600 mt-1">Part C - Completion and Approval</p>
@@ -1353,12 +1357,15 @@ export default function DefectFormWizard() {
                 </Button>
               </div>
             </div>
+            
+            </div> {/* Close BIG WHITE CONTAINER CARD */}
           </div>
         </div>
       </div>
     </div>
 
-      {/* Immediate Cause Modal */}
+    {/* Modals - Outside main container */}
+    {/* Immediate Cause Modal */}
       <ImmediateCauseModal
         isOpen={isImmediateCauseModalOpen}
         onClose={() => setIsImmediateCauseModalOpen(false)}
@@ -1381,6 +1388,6 @@ export default function DefectFormWizard() {
         onSave={handleSaveAction}
         initialData={editingAction}
       />
-    </div>
+    </>
   );
 }
