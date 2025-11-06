@@ -286,67 +286,65 @@ export default function DefectFormWizard() {
       </div>
 
       {/* Main layout with sidebar and content */}
-      <div className="flex flex-1 overflow-hidden flex-col">
-        {/* First Row: Step 1 circle (sidebar) + Title (main content) - HORIZONTAL ALIGNMENT */}
-        <div className="flex items-center pt-20 bg-[#f5f5f5]">
-          <div className="w-52 border-r border-gray-200">
-            <div 
-              onClick={() => setCurrentStep(1)} 
-              className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50 w-full"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                currentStep === 1 
-                  ? 'bg-[#1976d2] text-white' 
-                  : 'border-2 border-gray-300 text-gray-500 bg-white'
-              }`}>
-                1
-              </div>
-              <span className={`text-sm font-medium ${currentStep === 1 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
-                Reporting
-              </span>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Title and all steps */}
+        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-8">
+          {/* Defect Report Title in Sidebar */}
+          <div className="px-6 py-4 mb-2">
+            <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
           </div>
-          <div className="flex-1 px-8 py-3 mb-1">
-            <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
+
+          {/* Step 1 */}
+          <div 
+            onClick={() => setCurrentStep(1)} 
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 1 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
+            }`}>
+              1
+            </div>
+            <span className={`text-sm font-medium ${currentStep === 1 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
+              Reporting
+            </span>
+          </div>
+
+          {/* Step 2 */}
+          <div 
+            onClick={() => setCurrentStep(2)} 
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 2 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
+            }`}>
+              2
+            </div>
+            <span className={`text-sm font-medium ${currentStep === 2 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
+              Actions
+            </span>
+          </div>
+
+          {/* Step 3 */}
+          <div 
+            onClick={() => setCurrentStep(3)} 
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+              currentStep === 3 
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
+            }`}>
+              3
+            </div>
+            <span className={`text-sm font-medium ${currentStep === 3 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
+              Closeout
+            </span>
           </div>
         </div>
-
-        {/* Second Row: Rest of sidebar + Main content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Steps 2 and 3 */}
-          <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col">
-            <div 
-              onClick={() => setCurrentStep(2)} 
-              className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                currentStep === 2 
-                  ? 'bg-[#1976d2] text-white' 
-                  : 'border-2 border-gray-300 text-gray-500 bg-white'
-              }`}>
-                2
-              </div>
-              <span className={`text-sm font-medium ${currentStep === 2 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
-                Actions
-              </span>
-            </div>
-
-            <div 
-              onClick={() => setCurrentStep(3)} 
-              className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                currentStep === 3 
-                  ? 'bg-[#1976d2] text-white' 
-                  : 'border-2 border-gray-300 text-gray-500 bg-white'
-              }`}>
-                3
-              </div>
-              <span className={`text-sm font-medium ${currentStep === 3 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
-                Closeout
-              </span>
-            </div>
-          </div>
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col bg-[#f5f5f5] overflow-hidden">
@@ -1362,15 +1360,15 @@ export default function DefectFormWizard() {
               </div>
             </div>
 
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      </div>
-      </div>
 
+      {/* Modals */}
       <ImmediateCauseModal
         isOpen={isImmediateCauseModalOpen}
         onClose={() => setIsImmediateCauseModalOpen(false)}
@@ -1394,3 +1392,5 @@ export default function DefectFormWizard() {
     </div>
   );
 }
+
+
