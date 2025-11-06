@@ -1787,6 +1787,88 @@
       "descriptionHtml": null,
       "descriptionText": null,
       "equipment_key": "MACHINERY|||"
+    },
+    "17": {
+      "vesselId": "V001",
+      "vesselName": "MV SEAFARER",
+      "issueDate": "2025-11-06",
+      "category": "Defect",
+      "defectType": "Mooring / Deck Equipment Failure",
+      "description": "<p>ew</p>",
+      "targetCloseDate": null,
+      "dateCompleted": null,
+      "status": "Open",
+      "priority": "Medium",
+      "critical": false,
+      "is_coc": false,
+      "severity": 1,
+      "source": "Internal",
+      "equipmentCategory": "Navigation",
+      "equipmentType": "Turbine",
+      "equipmentMake": "Wartsila",
+      "equipmentModel": "3516",
+      "responsibleDept": null,
+      "verifiedDate": null,
+      "defectCategory": "Condition of Class (CoC) Related",
+      "viqVersion": "SIRE 2.0",
+      "viqRef": "1.2",
+      "viqChapter": "Certification and Documentation",
+      "viqSection": "Survey and repair history",
+      "immediateCause": {
+        "unsafeAct": [
+          "Unsafe Work Practices"
+        ],
+        "unsafeCondition": [
+          "Poor Housekeeping"
+        ]
+      },
+      "immediateCauseExplanation": null,
+      "rootCause": {
+        "individualFactor": [
+          "Fatigue / Tiredness"
+        ],
+        "systemFactor": [
+          "Inadequate Management of change"
+        ]
+      },
+      "rootCauseExplanation": null,
+      "reportedBy": "MASTER",
+      "closedBy": "r",
+      "id": "17",
+      "createdAt": "2025-11-06T06:39:41.159Z",
+      "updatedAt": "2025-11-06T06:39:41.159Z",
+      "isDeferred": false,
+      "reportToThirdParty": false,
+      "classReport": false,
+      "flagReport": false,
+      "portReport": false,
+      "componentId": null,
+      "equipmentSerialNo": null,
+      "equipmentLocation": null,
+      "equipmentSystem": null,
+      "actionTakenRequested": null,
+      "purchaseOrderRef": null,
+      "sfiCodeRef": null,
+      "holdReason": null,
+      "nextReviewDate": null,
+      "raisedById": null,
+      "raisedByName": null,
+      "raisedByRank": null,
+      "operatingCondition": null,
+      "locationText": null,
+      "occurrenceType": null,
+      "responsibleRole": null,
+      "responsibleRoleId": null,
+      "deferReason": null,
+      "deferNewTargetDate": null,
+      "deferApprovalRequired": true,
+      "reportReferenceNo": null,
+      "reportDate": null,
+      "assignedTo": null,
+      "reviewedBy": null,
+      "descriptionHtml": null,
+      "descriptionText": null,
+      "equipment_key": "NAVIGATION|TURBINE|WARTSILA|3516"
     }
   },
   "defectActions": [],
@@ -308269,7 +308351,7 @@
     "formDefinitionId": 1,
     "formVersionId": 1,
     "workOrderId": 25,
-    "defectId": 17,
+    "defectId": 18,
     "defectActionId": 1,
     "defectAttachmentId": 1,
     "recurringDefectId": 1
