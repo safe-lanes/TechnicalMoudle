@@ -254,8 +254,8 @@ export default function DefectFormWizard() {
 
   return (
     <div className="flex h-screen bg-[#f5f5f5]">
-      {/* Left Sidebar - White/Light Grey background matching Near Miss */}
-      <div className="w-52 bg-white border-r border-gray-200 flex flex-col">
+      {/* Left Sidebar - Light Grey background matching Near Miss */}
+      <div className="w-52 bg-[#F5F7FA] border-r border-gray-200 flex flex-col">
         {/* Step circles - matching Near Miss style */}
         <div className="flex-1 pt-20">
           <div 
@@ -310,11 +310,8 @@ export default function DefectFormWizard() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col bg-[#f5f5f5]">
-        {/* Top Bar - Title on left, Buttons on right - matching Near Miss */}
-        <div className="h-16 px-8 flex items-center justify-between bg-white border-b border-gray-200">
-          {/* Left: Page Title */}
-          <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
-          
+        {/* Top Bar - Buttons only on right - matching Near Miss */}
+        <div className="h-16 px-8 flex items-center justify-end bg-white border-b border-gray-200">
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-2">
             <Button
@@ -347,6 +344,11 @@ export default function DefectFormWizard() {
 
         {/* Scrollable Content with Gray Background */}
         <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-8 py-6">
+          {/* Page Title - LEFT aligned above content card - matching Near Miss */}
+          <div className="max-w-6xl mx-auto mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
+          </div>
+          
           <div className="max-w-6xl mx-auto">
             {/* ONE BIG WHITE CONTAINER CARD - Matching Near Miss */}
             <div className="bg-white rounded-lg shadow-md border border-gray-200" style={{padding: '24px'}}>
