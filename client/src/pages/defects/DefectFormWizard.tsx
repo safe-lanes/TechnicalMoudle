@@ -253,55 +253,55 @@ export default function DefectFormWizard() {
   };
 
   return (
-    <div className="flex h-screen" style={{backgroundColor: '#f5f5f5'}}>
-      {/* Left Sidebar - Steps Only - DARK BLUE BACKGROUND */}
-      <div className="w-52 flex flex-col !bg-[#1976d2]" style={{backgroundColor: '#1976d2'}}>
-        {/* Step circles - positioned lower to match Near Miss form */}
+    <div className="flex h-screen bg-[#f5f5f5]">
+      {/* Left Sidebar - White/Light Grey background matching Near Miss */}
+      <div className="w-52 bg-white border-r border-gray-200 flex flex-col">
+        {/* Step circles - matching Near Miss style */}
         <div className="flex-1 pt-20">
           <div 
             onClick={() => setCurrentStep(1)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 1 ? 'bg-[#1565c0]' : ''}`}
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 1 
-                ? 'bg-white text-[#1976d2]' 
-                : 'border-2 border-white text-white bg-transparent'
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
             }`}>
               1
             </div>
-            <span className="text-sm text-white font-medium">
+            <span className={`text-sm font-medium ${currentStep === 1 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
               Reporting
             </span>
           </div>
 
           <div 
             onClick={() => setCurrentStep(2)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 2 ? 'bg-[#1565c0]' : ''}`}
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 2 
-                ? 'bg-white text-[#1976d2]' 
-                : 'border-2 border-white text-white bg-transparent'
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
             }`}>
               2
             </div>
-            <span className="text-sm text-white font-medium">
+            <span className={`text-sm font-medium ${currentStep === 2 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
               Actions
             </span>
           </div>
 
           <div 
             onClick={() => setCurrentStep(3)} 
-            className={`flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer ${currentStep === 3 ? 'bg-[#1565c0]' : ''}`}
+            className="flex items-center gap-3 px-6 py-3 mb-1 cursor-pointer hover:bg-gray-50"
           >
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
               currentStep === 3 
-                ? 'bg-white text-[#1976d2]' 
-                : 'border-2 border-white text-white bg-transparent'
+                ? 'bg-[#1976d2] text-white' 
+                : 'border-2 border-gray-300 text-gray-500 bg-white'
             }`}>
               3
             </div>
-            <span className="text-sm text-white font-medium">
+            <span className={`text-sm font-medium ${currentStep === 3 ? 'text-[#1976d2]' : 'text-gray-600'}`}>
               Closeout
             </span>
           </div>
@@ -309,10 +309,13 @@ export default function DefectFormWizard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col" style={{backgroundColor: '#f5f5f5'}}>
-        {/* Top Action Buttons Bar - White background */}
-        <div className="h-16 border-b border-gray-300 px-8 flex items-center justify-end bg-white">
-          {/* Right: Three Functional Buttons */}
+      <div className="flex-1 flex flex-col bg-[#f5f5f5]">
+        {/* Top Bar - Title on left, Buttons on right - matching Near Miss */}
+        <div className="h-16 px-8 flex items-center justify-between bg-white border-b border-gray-200">
+          {/* Left: Page Title */}
+          <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
+          
+          {/* Right: Action Buttons */}
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -343,11 +346,7 @@ export default function DefectFormWizard() {
         </div>
 
         {/* Scrollable Content with Gray Background */}
-        <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-6 py-6">
-          {/* Page Title on Gray Background - Left Aligned */}
-          <div className="max-w-6xl mx-auto mb-4">
-            <h1 className="text-xl font-semibold text-[#1976d2]">Defect Report</h1>
-          </div>
+        <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-8 py-6">
           <div className="max-w-6xl mx-auto">
             {/* ONE BIG WHITE CONTAINER CARD - Matching Near Miss */}
             <div className="bg-white rounded-lg shadow-md border border-gray-200" style={{padding: '24px'}}>
