@@ -1,6 +1,7 @@
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,9 +30,10 @@ interface AddActionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (action: ActionFormData) => void;
+  initialData?: ActionFormData | null;
 }
 
-export default function AddActionModal({ open, onOpenChange, onSave }: AddActionModalProps) {
+export default function AddActionModal({ open, onOpenChange, onSave, initialData }: AddActionModalProps) {
   const form = useForm<ActionFormData>({
     resolver: zodResolver(actionSchema),
     defaultValues: {
@@ -45,6 +47,24 @@ export default function AddActionModal({ open, onOpenChange, onSave }: AddAction
       status: "Open",
     },
   });
+
+  // Reset form when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    } else {
+      form.reset({
+        actionType: "",
+        proposedBy: "",
+        actionDescription: "",
+        responsibility: "",
+        email: "",
+        dueDate: "",
+        dateCompleted: "",
+        status: "Open",
+      });
+    }
+  }, [initialData, form]);
 
   const handleSave = (data: ActionFormData) => {
     onSave(data);
@@ -62,7 +82,7 @@ export default function AddActionModal({ open, onOpenChange, onSave }: AddAction
       <DialogContent className="max-w-[900px] p-0 gap-0">
         {/* Blue Header */}
         <div className="bg-[#1976d2] text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-          <h2 className="text-xl font-semibold">Add Action</h2>
+          <h2 className="text-xl font-semibold">{initialData ? 'Edit Action' : 'Add Action'}</h2>
           <button
             onClick={handleDiscard}
             className="text-white hover:text-gray-200 transition-colors"

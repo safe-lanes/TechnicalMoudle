@@ -59,6 +59,9 @@ export default function DefectFormWizard() {
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
+  const [editingAction, setEditingAction] = useState<Action | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
@@ -146,7 +149,7 @@ export default function DefectFormWizard() {
     setIsRootCauseModalOpen(false);
   };
 
-  const onSubmit = async (data: DefectFormData) => {
+  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false) => {
     try {
       const submitData = {
         ...data,
@@ -155,13 +158,16 @@ export default function DefectFormWizard() {
       
       if (params.id) {
         await apiRequest("PATCH", `/api/defects/${params.id}`, submitData);
-        toast({ title: "Defect updated successfully" });
+        if (showToast) toast({ title: "Defect saved successfully" });
       } else {
         await apiRequest("POST", "/api/defects", submitData);
-        toast({ title: "Defect created successfully" });
+        if (showToast) toast({ title: "Defect saved successfully" });
       }
       queryClient.invalidateQueries({ queryKey: ['defects'] });
-      setLocation("/defects/active");
+      
+      if (navigate) {
+        setLocation("/defects/active");
+      }
     } catch (error) {
       console.error("Defect save error:", error);
       toast({ 
@@ -172,21 +178,61 @@ export default function DefectFormWizard() {
     }
   };
 
+  const onSubmit = async (data: DefectFormData) => {
+    await saveDefect(data, true, true);
+  };
+
+  const handleStepSubmit = async (stepNumber: 1 | 2 | 3) => {
+    const data = form.getValues();
+    await saveDefect(data, true, false);
+    if (stepNumber < 3) {
+      toast({ title: `Step ${stepNumber} saved. You can continue to the next step.` });
+    }
+  };
+
   const openAddActionModal = () => {
+    setEditingAction(null);
+    setIsAddActionModalOpen(true);
+  };
+
+  const openEditActionModal = (action: Action) => {
+    setEditingAction(action);
     setIsAddActionModalOpen(true);
   };
 
   const handleSaveAction = (actionData: any) => {
-    const newAction: Action = {
-      id: Date.now().toString(),
-      ...actionData,
-    };
-    setActions([...actions, newAction]);
-    toast({ title: "Action added successfully" });
+    if (editingAction) {
+      // Update existing action
+      setActions(actions.map(a => a.id === editingAction.id ? { ...editingAction, ...actionData } : a));
+      toast({ title: "Action updated successfully" });
+    } else {
+      // Add new action
+      const newAction: Action = {
+        id: Date.now().toString(),
+        ...actionData,
+      };
+      setActions([...actions, newAction]);
+      toast({ title: "Action added successfully" });
+    }
+    setEditingAction(null);
   };
 
   const deleteAction = (id: string) => {
     setActions(actions.filter(a => a.id !== id));
+    toast({ title: "Action deleted" });
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setAttachments([...attachments, ...newFiles]);
+      toast({ title: `${newFiles.length} file(s) selected` });
+    }
+  };
+
+  const toggleViewMode = () => {
+    setIsViewMode(!isViewMode);
   };
 
   return (
@@ -262,11 +308,12 @@ export default function DefectFormWizard() {
             </Button>
             <Button
               variant="outline"
+              onClick={toggleViewMode}
               className="text-gray-700 border-gray-300 h-9"
               data-testid="button-view"
             >
               <Eye className="h-4 w-4 mr-2" />
-              View
+              {isViewMode ? 'Edit' : 'View'}
             </Button>
             <Button
               onClick={form.handleSubmit(onSubmit)}
@@ -612,6 +659,7 @@ export default function DefectFormWizard() {
               <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
+                  onClick={() => handleStepSubmit(1)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step1"
                 >
@@ -1139,7 +1187,13 @@ export default function DefectFormWizard() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => openEditActionModal(action)}
+                                  data-testid={`button-edit-action-${action.id}`}
+                                >
                                   <Edit className="h-3 w-3" />
                                 </Button>
                                 <Button 
@@ -1147,6 +1201,7 @@ export default function DefectFormWizard() {
                                   variant="ghost" 
                                   className="h-7 w-7 p-0"
                                   onClick={() => deleteAction(action.id)}
+                                  data-testid={`button-delete-action-${action.id}`}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -1167,6 +1222,7 @@ export default function DefectFormWizard() {
               <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
+                  onClick={() => handleStepSubmit(2)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step2"
                 >
@@ -1210,16 +1266,33 @@ export default function DefectFormWizard() {
                   <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-600 mb-1">Drop files here or click to upload</p>
                   <p className="text-xs text-gray-500 mb-3">PDF, JPG, PNG up to 10MB</p>
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                   <Button 
                     variant="outline" 
                     size="sm" 
                     className="border-gray-300"
                     data-testid="button-upload-attachment"
+                    onClick={() => document.getElementById('file-upload')?.click()}
                   >
                     <Upload className="h-4 w-4 mr-2" />
                     Browse Files
                   </Button>
                 </div>
+                {attachments.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-600">Selected files:</p>
+                    {attachments.map((file, index) => (
+                      <p key={index} className="text-xs text-gray-500">• {file.name}</p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -1235,6 +1308,7 @@ export default function DefectFormWizard() {
               <div className="flex justify-end pt-2">
                 <Button 
                   type="button"
+                  onClick={form.handleSubmit(onSubmit)}
                   className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-8 font-medium"
                   data-testid="button-submit-step3"
                 >
@@ -1268,6 +1342,7 @@ export default function DefectFormWizard() {
         open={isAddActionModalOpen}
         onOpenChange={setIsAddActionModalOpen}
         onSave={handleSaveAction}
+        initialData={editingAction}
       />
     </div>
   );
