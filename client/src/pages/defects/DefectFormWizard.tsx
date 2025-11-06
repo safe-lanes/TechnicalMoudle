@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, useParams } from "wouter";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
+import AddActionModal from "@/components/AddActionModal";
 
 // Form validation schema
 const defectFormSchema = insertDefectSchema.extend({
@@ -57,6 +58,7 @@ export default function DefectFormWizard() {
   const [actions, setActions] = useState<Action[]>([]);
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
+  const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
   
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
@@ -170,17 +172,17 @@ export default function DefectFormWizard() {
     }
   };
 
-  const addAction = () => {
+  const openAddActionModal = () => {
+    setIsAddActionModalOpen(true);
+  };
+
+  const handleSaveAction = (actionData: any) => {
     const newAction: Action = {
       id: Date.now().toString(),
-      actionType: "Corrective Action",
-      actionDescription: "",
-      proposedBy: form.getValues("reportedBy") || "MASTER",
-      responsibility: "Chief Engineer",
-      dueDate: new Date().toISOString().split('T')[0],
-      status: "Pending",
+      ...actionData,
     };
     setActions([...actions, newAction]);
+    toast({ title: "Action added successfully" });
   };
 
   const deleteAction = (id: string) => {
@@ -1098,7 +1100,7 @@ export default function DefectFormWizard() {
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-gray-800">Action Plan</h3>
                   <Button 
-                    onClick={addAction}
+                    onClick={openAddActionModal}
                     size="sm"
                     className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9"
                     data-testid="button-add-action"
@@ -1259,6 +1261,13 @@ export default function DefectFormWizard() {
         onClose={() => setIsRootCauseModalOpen(false)}
         onSubmit={handleRootCauseSubmit}
         initialData={typeof form.getValues('rootCause') === 'object' ? form.getValues('rootCause') as any : undefined}
+      />
+
+      {/* Add Action Modal */}
+      <AddActionModal
+        open={isAddActionModalOpen}
+        onOpenChange={setIsAddActionModalOpen}
+        onSave={handleSaveAction}
       />
     </div>
   );
