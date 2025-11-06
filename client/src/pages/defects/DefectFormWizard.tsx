@@ -306,7 +306,7 @@ export default function DefectFormWizard() {
               </span>
             </div>
           </div>
-          <div className="flex-1 px-8 pb-6">
+          <div className="flex-1 px-8 py-3 mb-1">
             <h1 className="text-2xl font-semibold text-gray-900">Defect Report</h1>
           </div>
         </div>
