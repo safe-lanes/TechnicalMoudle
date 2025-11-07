@@ -1115,10 +1115,26 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Maker Code</Label>
+                      <Input 
+                        value={componentData.makerCode}
+                        onChange={(e) => handleInputChange('makerCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <EditableLabel fieldKey="model" />
                       <Input 
                         value={componentData.model}
                         onChange={(e) => handleInputChange('model', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Model Number</Label>
+                      <Input 
+                        value={componentData.modelNumber}
+                        onChange={(e) => handleInputChange('modelNumber', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                       />
                     </div>
@@ -1236,6 +1252,54 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                       />
                     </DeletableField>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Code</Label>
+                      <Input 
+                        value={componentData.fleetEquipmentCode}
+                        onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Name</Label>
+                      <Input 
+                        value={componentData.fleetEquipmentName}
+                        onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Vessel Code</Label>
+                      <Input 
+                        value={componentData.vesselCode}
+                        onChange={(e) => handleInputChange('vesselCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">IS Active</Label>
+                      <Select 
+                        value={componentData.isActive}
+                        onValueChange={(value) => handleInputChange('isActive', value)}
+                      >
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 col-span-4">
+                      <EditableLabel fieldKey="notes" />
+                      <Textarea 
+                        value={componentData.notes}
+                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        rows={3}
+                      />
+                    </div>
                   </div>
                   
                   {/* IHM Row - Full width below No of Units */}

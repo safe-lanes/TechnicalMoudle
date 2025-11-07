@@ -2675,8 +2675,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "38": {
-      "id": 38,
+    "40": {
+      "id": 40,
       "equipmentKey": "DECK|PUMP|MAN|6L32",
       "windowMonths": 12,
       "occurrenceCount": 5,
@@ -2685,28 +2685,28 @@
       "lastOccurrenceDate": "2025-11-06",
       "hasCoc": true,
       "mtbfDays": "23",
-      "updatedAt": "2025-11-07T07:55:32.417Z"
+      "updatedAt": "2025-11-07T07:58:48.287Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 38,
+      "recurringId": 40,
       "defectId": "19"
     },
     {
-      "recurringId": 38,
+      "recurringId": 40,
       "defectId": "25"
     },
     {
-      "recurringId": 38,
+      "recurringId": 40,
       "defectId": "28"
     },
     {
-      "recurringId": 38,
+      "recurringId": 40,
       "defectId": "31"
     },
     {
-      "recurringId": 38,
+      "recurringId": 40,
       "defectId": "34"
     }
   ],
@@ -325701,6 +325701,6 @@
     "defectId": 40,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 39
+    "recurringDefectId": 41
   }
 }
