@@ -71,7 +71,9 @@ interface ComponentData {
   description: string;
   criticality: string;
   maker: string;
+  makerCode: string;
   model: string;
+  modelNumber: string;
   serialNo: string;
   drawingNo: string;
   componentCategory: string;
@@ -90,6 +92,10 @@ interface ComponentData {
   dateUpdated: string;
   utilizationRate: string;
   avgDailyUsage: string;
+  fleetEquipmentCode: string;
+  fleetEquipmentName: string;
+  vesselCode: string;
+  isActive: string;
   metrics: ConditionMetric[];
   workOrders: WorkOrder[];
   spares: Spare[];
@@ -181,7 +187,9 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     description: `${component.name} - Critical ship component for vessel operations`,
     criticality: "High",
     maker: isEngine ? "MAN B&W" : isDeck ? "MacGregor" : isHull ? "Hyundai Heavy Industries" : "Daikin Industries",
+    makerCode: isEngine ? "MAN-BW" : isDeck ? "MCG" : isHull ? "HHI" : "DKN",
     model: isEngine ? "6S60ME-C8.2" : isDeck ? "TTS-2400" : isHull ? "HHI-TANK-500" : "FXMQ-200",
+    modelNumber: isEngine ? "6S60ME" : isDeck ? "TTS2400" : isHull ? "TANK500" : "FXMQ200",
     serialNo: `SN-${component.code.replace(/\./g, "")}-2024-${Math.floor(Math.random() * 9000) + 1000}`,
     drawingNo: `DRW-${component.code.replace(/\./g, "")}-001`,
     componentCategory: getComponentCategory(component.id),
@@ -198,6 +206,10 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     notes: `Regular maintenance required. Last inspection completed successfully.`,
     runningHours: String(Math.floor(Math.random() * 50000) + 10000),
     dateUpdated: "2024-12-15",
+    fleetEquipmentCode: `FLEET-${component.code.split(".")[0]}`,
+    fleetEquipmentName: isEngine ? "Main Propulsion System" : isDeck ? "Cargo Handling System" : "Ship Structure",
+    vesselCode: "V001",
+    isActive: "Yes",
     utilizationRate: `${Math.floor(Math.random() * 30) + 70}%`,
     avgDailyUsage: `${Math.floor(Math.random() * 8) + 16} hrs`,
     metrics: [
@@ -894,11 +906,11 @@ export default function ComponentRegisterFormCR({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.model')}>Model</Label>
+                    <Label className={getLabelClass('A.makerCode')}>Maker Code</Label>
                     <Input 
-                      value={componentData.model}
-                      onChange={(e) => handleInputChange('model', e.target.value, 'A')}
-                      className={getFieldClass('A.model', "border-[#52baf3] border-2")}
+                      value={componentData.makerCode}
+                      onChange={(e) => handleInputChange('makerCode', e.target.value, 'A')}
+                      className={getFieldClass('A.makerCode', "border-[#52baf3] border-2")}
                     />
                   </div>
                   <div className="space-y-2">
@@ -913,6 +925,22 @@ export default function ComponentRegisterFormCR({
 
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-2">
+                    <Label className={getLabelClass('A.model')}>Model</Label>
+                    <Input 
+                      value={componentData.model}
+                      onChange={(e) => handleInputChange('model', e.target.value, 'A')}
+                      className={getFieldClass('A.model', "border-[#52baf3] border-2")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={getLabelClass('A.modelNumber')}>Model Number</Label>
+                    <Input 
+                      value={componentData.modelNumber}
+                      onChange={(e) => handleInputChange('modelNumber', e.target.value, 'A')}
+                      className={getFieldClass('A.modelNumber', "border-[#52baf3] border-2")}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label className={getLabelClass('A.drawingNo')}>Drawing No</Label>
                     <Input 
                       value={componentData.drawingNo}
@@ -920,6 +948,9 @@ export default function ComponentRegisterFormCR({
                       className={getFieldClass('A.drawingNo', "border-[#52baf3] border-2")}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <Label>Component Code</Label>
                     <Input 
@@ -1046,7 +1077,49 @@ export default function ComponentRegisterFormCR({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className={getLabelClass('A.fleetEquipmentCode')}>Fleet Equipment Code</Label>
+                    <Input 
+                      value={componentData.fleetEquipmentCode}
+                      onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value, 'A')}
+                      className={getFieldClass('A.fleetEquipmentCode', "border-[#52baf3] border-2")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={getLabelClass('A.fleetEquipmentName')}>Fleet Equipment Name</Label>
+                    <Input 
+                      value={componentData.fleetEquipmentName}
+                      onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value, 'A')}
+                      className={getFieldClass('A.fleetEquipmentName', "border-[#52baf3] border-2")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className={getLabelClass('A.vesselCode')}>Vessel Code</Label>
+                    <Input 
+                      value={componentData.vesselCode}
+                      onChange={(e) => handleInputChange('vesselCode', e.target.value, 'A')}
+                      className={getFieldClass('A.vesselCode', "border-[#52baf3] border-2")}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className={getLabelClass('A.isActive')}>IS Active</Label>
+                    <Select 
+                      value={componentData.isActive}
+                      onValueChange={(value) => handleInputChange('isActive', value, 'A')}
+                    >
+                      <SelectTrigger className={getFieldClass('A.isActive', "border-[#52baf3] border-2")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label className={getLabelClass('A.dimensionsSize')}>Dimensions / Size</Label>
                     <Input 
@@ -1055,6 +1128,10 @@ export default function ComponentRegisterFormCR({
                       className={getFieldClass('A.dimensionsSize', "border-[#52baf3] border-2")}
                     />
                   </div>
+                  <div className="col-span-1"></div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
                   <div className="space-y-2">
                     <Label className={getLabelClass('A.notes')}>Notes</Label>
                     <Textarea 
