@@ -862,7 +862,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/components", async (req, res) => {
     try {
-      const vesselId = req.query.vesselId as string;
+      const vesselId = req.query.vesselId as string | undefined;
+      // getComponents now handles optional vesselId - returns all if not provided
       const components = await storage.getComponents(vesselId);
       res.json(components);
     } catch (error) {

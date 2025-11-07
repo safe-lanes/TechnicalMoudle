@@ -49,7 +49,7 @@ interface ComponentRegisterFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit?: (componentData: any) => void;
-  parentComponent?: { code: string; name: string } | null;
+  parentComponent?: { code: string; id: string; name: string } | null;
 }
 
 // Use the same component tree data as Components screen
@@ -993,7 +993,12 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     }
 
     if (onSubmit) {
-      onSubmit(componentData);
+      // Include parentId if parentComponent prop is provided (for creating child components)
+      const submissionData = {
+        ...componentData,
+        ...(parentComponent && { parentId: parentComponent.id })
+      };
+      onSubmit(submissionData);
       onClose();
     }
   };

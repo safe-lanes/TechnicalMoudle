@@ -570,9 +570,13 @@ export class PersistentFileStorage implements IStorage {
   }
 
   // Component methods
-  async getComponents(vesselId: string): Promise<Component[]> {
-    return Object.values(this.data.components)
-      .filter(c => c !== null && c !== undefined && c.vesselId === vesselId);
+  async getComponents(vesselId?: string): Promise<Component[]> {
+    // Return all components if no vesselId, otherwise filter by vesselId
+    const allComponents = Object.values(this.data.components)
+      .filter(c => c !== null && c !== undefined);
+    return vesselId 
+      ? allComponents.filter(c => c.vesselId === vesselId)
+      : allComponents;
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
@@ -601,14 +605,29 @@ export class PersistentFileStorage implements IStorage {
       componentCode: component.componentCode || null,
       parentId: component.parentId || null,
       maker: component.maker || null,
+      makerCode: component.makerCode || null,
       model: component.model || null,
+      modelNumber: component.modelNumber || null,
       serialNo: component.serialNo || null,
+      drawingNo: component.drawingNo || null,
+      department: component.department || null,
       deptCategory: component.deptCategory || null,
       componentCategory: component.componentCategory || null,
+      eqptSystemDept: component.eqptSystemDept || null,
       location: component.location || null,
       commissionedDate: component.commissionedDate || null,
+      installationDate: component.installationDate || null,
+      rating: component.rating || null,
+      noOfUnits: component.noOfUnits || null,
+      dimensionsSize: component.dimensionsSize || null,
+      fleetEquipmentCode: component.fleetEquipmentCode || null,
+      fleetEquipmentName: component.fleetEquipmentName || null,
+      vesselCode: component.vesselCode || null,
+      notes: component.notes || null,
       critical: component.critical ?? false,
-      classItem: component.classItem ?? false
+      classItem: component.classItem ?? false,
+      conditionBased: component.conditionBased ?? false,
+      isActive: component.isActive ?? true
     };
     this.data.components[id] = newComponent;
     this.persistData();

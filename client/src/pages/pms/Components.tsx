@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { FEATURES } from '@/config/features';
 import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import {
@@ -119,7 +120,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         modelNumber: comp.modelNumber || "",
         serialNo: comp.serialNo || "",
         drawingNo: comp.drawingNo || "",
-        department: comp.deptCategory || "",
+        department: comp.department || comp.deptCategory || "",
         componentCategory: getComponentCategory(selectedComponent.id),
         componentCode: selectedComponent.code,
         critical: toBoolString(comp.critical),
@@ -2190,6 +2191,11 @@ const Components: React.FC = () => {
               setLocation("/pms/modify-pms");
             }
           }}
+          parentComponent={selectedComponent ? { 
+            code: selectedComponent.code, 
+            id: selectedComponent.id, 
+            name: selectedComponent.name 
+          } : undefined}
           onSubmit={async (componentData) => {
           console.log('Component data submitted:', componentData);
           
@@ -2269,14 +2275,19 @@ const Components: React.FC = () => {
                 return false;
               };
 
-              // Prepare component data with proper boolean conversion
+              // Prepare component data with proper boolean conversion and field name mapping
               const componentPayload = {
                 ...componentData,
+                // Map frontend field names to backend schema names
+                eqptSystemDept: (componentData as any).equipmentDepartment || componentData.eqptSystemDept || null,
                 critical: toBool(componentData.critical),
                 classItem: toBool(componentData.classItem),
                 conditionBased: toBool(componentData.conditionBased),
                 isActive: toBool(componentData.isActive),
               };
+              
+              // Remove the frontend-only field
+              delete (componentPayload as any).equipmentDepartment;
 
               // Determine if this is create or update
               const isEditing = selectedComponent && !isComponentFormOpen;
