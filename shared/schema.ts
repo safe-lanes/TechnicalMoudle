@@ -57,6 +57,7 @@ export const components = pgTable("components", {
   currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
   lastUpdated: text("last_updated"),
   vesselId: text("vessel_id").notNull().default("V001"),
+  vesselCode: text("vessel_code"), // Vessel identification code
   // Fleet Equipment fields (from Fleet_Component Sheet)
   fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment
   fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet

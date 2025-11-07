@@ -2260,12 +2260,63 @@ const Components: React.FC = () => {
               });
             }
           } else {
-            // Normal mode - just close the form
-            toast({
-              title: "Success",
-              description: "Component saved successfully"
-            });
-            setIsComponentFormOpen(false);
+            // Normal mode - submit component data to API
+            try {
+              // Helper function to convert "Yes"/"No" strings to boolean
+              const toBool = (val: any) => {
+                if (typeof val === 'boolean') return val;
+                if (typeof val === 'string') return val.toLowerCase() === 'yes';
+                return false;
+              };
+
+              // Prepare component data with proper boolean conversion
+              const componentPayload = {
+                ...componentData,
+                critical: toBool(componentData.critical),
+                classItem: toBool(componentData.classItem),
+                conditionBased: toBool(componentData.conditionBased),
+                isActive: toBool(componentData.isActive),
+              };
+
+              // Determine if this is create or update
+              const isEditing = selectedComponent && !isComponentFormOpen;
+              const url = isEditing 
+                ? `/api/components/${selectedComponent.id}` 
+                : '/api/components';
+              const method = isEditing ? 'PATCH' : 'POST';
+
+              const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(componentPayload)
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to save component');
+              }
+
+              const result = await response.json();
+
+              toast({
+                title: "Success",
+                description: isEditing 
+                  ? "Component updated successfully" 
+                  : "Component created successfully"
+              });
+              
+              // Invalidate components cache to refresh the tree
+              queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+              
+              setIsComponentFormOpen(false);
+            } catch (error: any) {
+              console.error('Error saving component:', error);
+              toast({
+                title: "Error",
+                description: error.message || "Failed to save component",
+                variant: "destructive"
+              });
+            }
           }
         }}
       />
