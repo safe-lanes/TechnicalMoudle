@@ -44,6 +44,7 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     makerCode: '',
     serialNo: '',
     installedDate: '',
+    commissionedDate: '',
     componentCode: '',
     type: '',
     blackoutComponent: '',
@@ -59,6 +60,9 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     fleetEquipmentName: '',
     vesselCode: '',
     isActive: 'Yes',
+    rating: '',
+    department: '',
+    notes: '',
     
     // Running Hours
     runningHours: '',
@@ -106,9 +110,54 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    console.log('Saving component:', formData);
-    onOpenChange(false);
+  const handleSave = async () => {
+    try {
+      // Prepare component data with all new fields
+      const componentData = {
+        name: formData.componentName || formData.component,
+        code: formData.componentCode,
+        category: formData.type,
+        maker: formData.maker,
+        makerCode: formData.makerCode,
+        model: formData.modelSpecification,
+        modelNumber: formData.modelNumber,
+        serialNo: formData.serialNo,
+        drawingNo: formData.drawingNo,
+        location: formData.location,
+        critical: formData.critical === 'Yes',
+        conditionBased: formData.conditionMonitoring === 'Yes',
+        installedDate: formData.installedDate || null,
+        commissionedDate: formData.commissionedDate || null,
+        rating: formData.rating || null,
+        department: formData.department || null,
+        notes: formData.notes || null,
+        runningHours: formData.runningHours ? parseFloat(formData.runningHours) : null,
+        isActive: formData.isActive === 'Yes',
+        vesselCode: formData.vesselCode,
+        fleetEquipmentCode: formData.fleetEquipmentCode,
+        fleetEquipmentName: formData.fleetEquipmentName,
+        vesselId: 'V001', // Default vessel
+        parentId: null, // Set this if you have parent component selection
+        ihmPresence: formData.ihmPresence,
+        ihmEvidenceType: formData.ihmEvidenceType
+      };
+
+      const response = await fetch('/api/components', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(componentData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save component');
+      }
+
+      console.log('Component saved successfully');
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving component:', error);
+      // You might want to show a toast notification here
+    }
   };
 
   return (
@@ -255,11 +304,32 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                   </div>
                   <div>
                     <Label htmlFor="installed-date" className="text-xs">Installed Date</Label>
-                    <Input id="installed-date" type="date" className="h-8 text-sm" />
+                    <Input 
+                      id="installed-date" 
+                      type="date" 
+                      className="h-8 text-sm"
+                      value={formData.installedDate}
+                      onChange={(e) => handleInputChange('installedDate', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="commissioned-date" className="text-xs">Commissioned Date</Label>
+                    <Input 
+                      id="commissioned-date" 
+                      type="date" 
+                      className="h-8 text-sm"
+                      value={formData.commissionedDate}
+                      onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="component-code" className="text-xs">Component Code</Label>
-                    <Input id="component-code" className="h-8 text-sm" />
+                    <Input 
+                      id="component-code" 
+                      className="h-8 text-sm"
+                      value={formData.componentCode}
+                      onChange={(e) => handleInputChange('componentCode', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="type" className="text-xs">Type</Label>
@@ -363,6 +433,35 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                         <SelectItem value="No">No</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="rating" className="text-xs">Rating</Label>
+                    <Input 
+                      id="rating" 
+                      className="h-8 text-sm"
+                      value={formData.rating}
+                      onChange={(e) => handleInputChange('rating', e.target.value)}
+                      placeholder="e.g., 440V, 50Hz"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="department" className="text-xs">Department</Label>
+                    <Input 
+                      id="department" 
+                      className="h-8 text-sm"
+                      value={formData.department}
+                      onChange={(e) => handleInputChange('department', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="notes" className="text-xs">Notes</Label>
+                    <Textarea 
+                      id="notes" 
+                      className="text-sm min-h-[60px]"
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange('notes', e.target.value)}
+                      placeholder="Additional notes or comments"
+                    />
                   </div>
                 </div>
               </div>
