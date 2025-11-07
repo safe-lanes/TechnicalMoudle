@@ -435,25 +435,13 @@ router.get('/template', async (req, res) => {
   // Create main sheet - Just headers and example, NO description row
   const mainSheet = XLSX.utils.aoa_to_sheet([headers, example]);
 
-  // Add data validation for components
+  // Add data validation for components (23-column format)
   if (type === 'components') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Main Group Code dropdown (Column A, starting from row 2) - Only 1-8
-    mainSheet['!dataValidation'].push({
-      type: 'list',
-      operator: 'equal',
-      sqref: 'A2:A1000',
-      formulas: ['"1,2,3,4,5,6,7,8"'],
-      allowBlank: true,
-      showErrorMessage: true,
-      errorTitle: 'Invalid Main Group Code',
-      error: 'Please select a number from 1-8'
-    });
-
-    // Critical (Yes/No) dropdown (Column N, starting from row 2)
+    // Column N: Critical (Yes/No) - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -465,11 +453,23 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Condition Based (Yes/No) dropdown (Column O, starting from row 2)
+    // Column O: Condition Based (Yes/No) - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
       sqref: 'O2:O1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Column V: IS Active (Yes/No) - row 2 onwards
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'V2:V1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -927,25 +927,50 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   // Get columns from first row
   results.columns = Object.keys(data[0]);
 
-  // Track duplicate Generated Codes for components (actual duplicates to warn about)
-  const generatedCodeOccurrences = new Map<string, number[]>();
+  // Filter out instruction/description rows (rows where Component Code contains descriptive text like "Required")
+  // Keep only rows with valid SFI codes or empty rows
+  const filteredData = data.filter((row, index) => {
+    const componentCode = row['Component Code'];
+    if (!componentCode) return false; // Skip empty rows
+    
+    const codeStr = String(componentCode).trim();
+    
+    // Skip instruction rows - they typically contain words like "Required", "Text", "Unique", etc.
+    // Valid SFI codes should match the pattern: digits with optional dots
+    if (type === 'components') {
+      // If it contains common instruction keywords, skip it
+      const instructionKeywords = ['required', 'unique', 'text', 'number', 'yes/no', 'dd-mm-yyyy', 'maximum', 'allowable'];
+      const lowerCode = codeStr.toLowerCase();
+      if (instructionKeywords.some(keyword => lowerCode.includes(keyword))) {
+        console.log(`Skipping instruction row ${index + 2}: ${codeStr}`);
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
+  console.log(`📋 Total rows in file: ${data.length}, Valid data rows after filtering: ${filteredData.length}`);
+
+  // Track duplicate Component Codes (actual duplicates to warn about)
+  const componentCodeOccurrences = new Map<string, number[]>();
   if (type === 'components') {
-    data.forEach((row, index) => {
-      // Use Generated Code if available, otherwise fall back to Original SFI Code
-      const generatedCode = row['Generated Code'] || row['Original SFI Code'];
-      if (generatedCode) {
-        const code = String(generatedCode).trim();
-        if (!generatedCodeOccurrences.has(code)) {
-          generatedCodeOccurrences.set(code, []);
+    filteredData.forEach((row, index) => {
+      // Use Component Code from the new template format
+      const componentCode = row['Component Code'];
+      if (componentCode) {
+        const code = String(componentCode).trim();
+        if (!componentCodeOccurrences.has(code)) {
+          componentCodeOccurrences.set(code, []);
         }
-        generatedCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
+        componentCodeOccurrences.get(code)!.push(index + 2); // Row number (Excel is 1-indexed + header)
       }
     });
   }
   
-  // Validate each row based on type
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
+  // Validate each row based on type (use filtered data)
+  for (let i = 0; i < filteredData.length; i++) {
+    const row = filteredData[i];
     const rowNum = i + 2; // Excel rows start at 1, plus header
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -964,7 +989,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized['Component Code'] = codeStr;
           
           // Check for duplicates
-          const occurrences = generatedCodeOccurrences.get(codeStr);
+          const occurrences = componentCodeOccurrences.get(codeStr);
           if (occurrences && occurrences.length > 1) {
             const otherRows = occurrences.filter(r => r !== rowNum);
             warnings.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
@@ -987,9 +1012,30 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Component Name is required
-      if (!row['Component Name']) {
-        errors.push(`Row ${rowNum}: Component Name is required`);
+      // Component Name - required, but auto-generate for parent nodes if missing
+      if (!row['Component Name'] || String(row['Component Name']).trim() === '') {
+        // Auto-generate name for parent nodes (codes without detailed hierarchy)
+        const sfiCode = normalized['Component Code'];
+        if (sfiCode) {
+          const firstDigit = parseInt(sfiCode.charAt(0));
+          
+          // Try to generate a sensible name based on the code structure
+          if (sfiCode.length === 1) {
+            // Single digit: use main group category
+            const category = getComponentCategory(firstDigit);
+            normalized['Component Name'] = category ? category.replace(/^\d+\s+/, '') : `SFI ${sfiCode}`;
+            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
+          } else if (sfiCode.length === 2) {
+            // Two digits: use sub group name
+            normalized['Component Name'] = getSubGroupName(sfiCode);
+            warnings.push(`Row ${rowNum}: Component Name auto-generated from SFI code: "${normalized['Component Name']}"`);
+          } else {
+            // More complex codes should have names - this is likely an error
+            errors.push(`Row ${rowNum}: Component Name is required for detailed component codes`);
+          }
+        } else {
+          errors.push(`Row ${rowNum}: Component Name is required`);
+        }
       } else {
         normalized['Component Name'] = String(row['Component Name']).trim();
       }
