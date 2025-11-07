@@ -41,17 +41,24 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
     createdOn: '',
     component: '',
     maker: '',
+    makerCode: '',
     serialNo: '',
     installedDate: '',
     componentCode: '',
     type: '',
     blackoutComponent: '',
     modelSpecification: '',
+    modelNumber: '',
+    drawingNo: '',
     warrantyInfo: '',
     warrantyDays: '',
     warrantyDate: '',
     lastUsed: '',
     supplier2: '',
+    fleetEquipmentCode: '',
+    fleetEquipmentName: '',
+    vesselCode: '',
+    isActive: 'Yes',
     
     // Running Hours
     runningHours: '',
@@ -221,11 +228,30 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                   </div>
                   <div>
                     <Label htmlFor="maker" className="text-xs">Maker / Maker Designator</Label>
-                    <Input id="maker" className="h-8 text-sm" />
+                    <Input 
+                      id="maker" 
+                      className="h-8 text-sm"
+                      value={formData.maker}
+                      onChange={(e) => handleInputChange('maker', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="maker-code" className="text-xs">Maker Code</Label>
+                    <Input 
+                      id="maker-code" 
+                      className="h-8 text-sm"
+                      value={formData.makerCode}
+                      onChange={(e) => handleInputChange('makerCode', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="serial-no" className="text-xs">Serial No</Label>
-                    <Input id="serial-no" className="h-8 text-sm" />
+                    <Input 
+                      id="serial-no" 
+                      className="h-8 text-sm"
+                      value={formData.serialNo}
+                      onChange={(e) => handleInputChange('serialNo', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="installed-date" className="text-xs">Installed Date</Label>
@@ -245,11 +271,39 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                   </div>
                   <div>
                     <Label htmlFor="model-spec" className="text-xs">Model Specification</Label>
-                    <Input id="model-spec" className="h-8 text-sm" />
+                    <Input 
+                      id="model-spec" 
+                      className="h-8 text-sm"
+                      value={formData.modelSpecification}
+                      onChange={(e) => handleInputChange('modelSpecification', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="model-number" className="text-xs">Model Number</Label>
+                    <Input 
+                      id="model-number" 
+                      className="h-8 text-sm"
+                      value={formData.modelNumber}
+                      onChange={(e) => handleInputChange('modelNumber', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="drawing-no" className="text-xs">Drawing No</Label>
+                    <Input 
+                      id="drawing-no" 
+                      className="h-8 text-sm"
+                      value={formData.drawingNo}
+                      onChange={(e) => handleInputChange('drawingNo', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="warranty-info" className="text-xs">Warranty Info</Label>
-                    <Input id="warranty-info" className="h-8 text-sm" />
+                    <Input 
+                      id="warranty-info" 
+                      className="h-8 text-sm"
+                      value={formData.warrantyInfo}
+                      onChange={(e) => handleInputChange('warrantyInfo', e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="warranty-days" className="text-xs">Warranty Days</Label>
@@ -261,7 +315,54 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
                   </div>
                   <div>
                     <Label htmlFor="last-used" className="text-xs">Last Used</Label>
-                    <Input id="last-used" className="h-8 text-sm" />
+                    <Input 
+                      id="last-used" 
+                      className="h-8 text-sm"
+                      value={formData.lastUsed}
+                      onChange={(e) => handleInputChange('lastUsed', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fleet-equipment-code" className="text-xs">Fleet Equipment Code</Label>
+                    <Input 
+                      id="fleet-equipment-code" 
+                      className="h-8 text-sm"
+                      value={formData.fleetEquipmentCode}
+                      onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fleet-equipment-name" className="text-xs">Fleet Equipment Name</Label>
+                    <Input 
+                      id="fleet-equipment-name" 
+                      className="h-8 text-sm"
+                      value={formData.fleetEquipmentName}
+                      onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="vessel-code" className="text-xs">Vessel Code</Label>
+                    <Input 
+                      id="vessel-code" 
+                      className="h-8 text-sm"
+                      value={formData.vesselCode}
+                      onChange={(e) => handleInputChange('vesselCode', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="is-active" className="text-xs">IS Active</Label>
+                    <Select 
+                      value={formData.isActive} 
+                      onValueChange={(value) => handleInputChange('isActive', value)}
+                    >
+                      <SelectTrigger className="h-8 text-sm" id="is-active">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Yes">Yes</SelectItem>
+                        <SelectItem value="No">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
