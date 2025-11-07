@@ -57,25 +57,41 @@ export const components = pgTable("components", {
   currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
   lastUpdated: text("last_updated"),
   vesselId: text("vessel_id").notNull().default("V001"),
-  // Additional fields for Component Information (Section A)
-  maker: text("maker"),
-  model: text("model"),
-  serialNo: text("serial_no"),
+  // Fleet Equipment fields (from Fleet_Component Sheet)
+  fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment
+  fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet
+  parentFleetEquipmentCode: text("parent_fleet_equipment_code"), // For fleet hierarchy
+  // Maker and Model fields
+  maker: text("maker"), // Manufacturer name from manual
+  makerCode: text("maker_code"), // Unique code for maker
+  model: text("model"), // Equipment model from manual
+  modelNumber: text("model_number"), // Model number (stored separately from model)
+  modelCode: text("model_code"), // Combination of Maker Code + Model
+  // Component specific fields
+  serialNo: text("serial_no"), // Serial number from manual
+  drawingNo: text("drawing_no"), // Drawing/diagram number
+  // Department and categorization
   department: text("department"),
   deptCategory: text("dept_category"),
   componentCategory: text("component_category"),
   location: text("location"),
-  commissionedDate: text("commissioned_date"),
-  installationDate: text("installation_date"),
-  critical: boolean("critical").default(false),
+  eqptSystemDept: text("eqpt_system_dept"), // Equipment/System Department
+  // Dates
+  commissionedDate: text("commissioned_date"), // DD-MM-YYYY format
+  installationDate: text("installation_date"), // DD-MM-YYYY format
+  // Status and classification
+  critical: boolean("critical").default(false), // Critical equipment (Yes/No)
   classItem: boolean("class_item").default(false),
-  rating: text("rating"),
-  conditionBased: text("condition_based"),
+  conditionBased: boolean("condition_based").default(false), // Condition Based maintenance (Yes/No)
+  isActive: boolean("is_active").default(true), // IS Active (Yes/No)
+  // Technical specifications
+  rating: text("rating"), // Capacity or rating from manual
   noOfUnits: text("no_of_units"),
-  eqptSystemDept: text("eqpt_system_dept"),
   parentComponent: text("parent_component"),
   dimensionsSize: text("dimensions_size"),
-  notes: text("notes"),
+  notes: text("notes"), // Specifications or additional information
+  // Running Hours (already has currentCumulativeRH)
+  runningHours: decimal("running_hours", { precision: 10, scale: 2 }), // For storing template running hours value
 });
 
 export const insertComponentSchema = createInsertSchema(components).omit({});
