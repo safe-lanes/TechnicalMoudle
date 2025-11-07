@@ -70,8 +70,11 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   // Component data - uses selected component code or defaults (empty until populated from Excel)
   const [componentData, setComponentData] = useState({
     maker: "",
+    makerCode: "",
     model: "",
+    modelNumber: "",
     serialNo: "",
+    drawingNo: "",
     department: "",
     componentCategory: "",
     componentCode: "",
@@ -86,6 +89,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     eqptSystemDept: "",
     parentComponent: "",
     dimensionsSize: "",
+    fleetEquipmentCode: "",
+    fleetEquipmentName: "",
+    vesselCode: "",
+    isActive: "",
     notes: ""
   });
   
@@ -107,8 +114,11 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       
       const newData = {
         maker: comp.maker || "",
+        makerCode: comp.makerCode || "",
         model: comp.model || "",
+        modelNumber: comp.modelNumber || "",
         serialNo: comp.serialNo || "",
+        drawingNo: comp.drawingNo || "",
         department: comp.deptCategory || "",
         componentCategory: getComponentCategory(selectedComponent.id),
         componentCode: selectedComponent.code,
@@ -123,6 +133,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || "",
         parentComponent: comp.parentId || "",
         dimensionsSize: comp.dimensionsSize || "",
+        fleetEquipmentCode: comp.fleetEquipmentCode || "",
+        fleetEquipmentName: comp.fleetEquipmentName || "",
+        vesselCode: comp.vesselCode || "",
+        isActive: toBoolString(comp.isActive),
         notes: comp.notes || ""
       };
       setComponentData(newData);
@@ -191,6 +205,24 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Maker Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.makerCode}
+              onChange={(e) => handleFieldChange('makerCode', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('makerCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="makerCode"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.makerCode}
+            </div>
+          )}
+        </div>
+        <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Model</label>
           {isChangeMode ? (
             <input
@@ -209,6 +241,26 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Model Number</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.modelNumber}
+              onChange={(e) => handleFieldChange('modelNumber', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('modelNumber') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="modelNumber"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.modelNumber}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-4">
+        <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Serial No</label>
           {isChangeMode ? (
             <input
@@ -223,6 +275,24 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           ) : (
             <div className="text-sm text-gray-900">
               {componentData.serialNo}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Drawing No</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.drawingNo}
+              onChange={(e) => handleFieldChange('drawingNo', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('drawingNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="drawingNo"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.drawingNo}
             </div>
           )}
         </div>
@@ -243,6 +313,12 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               {componentData.department}
             </div>
           )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>&nbsp;</label>
+          <div className="text-sm text-gray-900">
+            &nbsp;
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-4 gap-4">
@@ -328,10 +404,105 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           </div>
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>&nbsp;</label>
-          <div className="text-sm text-gray-900">
-            &nbsp;
-          </div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Rating</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.rating}
+              onChange={(e) => handleFieldChange('rating', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('rating') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="rating"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.rating}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>IS Active</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.isActive}
+              onChange={(e) => handleFieldChange('isActive', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('isActive') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="isActive"
+            >
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.isActive === "Yes" 
+                  ? "bg-green-100 text-green-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.isActive}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Fourth row - Fleet Equipment fields */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Fleet Equipment Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.fleetEquipmentCode}
+              onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('fleetEquipmentCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="fleetEquipmentCode"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.fleetEquipmentCode}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Fleet Equipment Name</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.fleetEquipmentName}
+              onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('fleetEquipmentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="fleetEquipmentName"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.fleetEquipmentName}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>Vessel Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.vesselCode}
+              onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('vesselCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-field-value="vesselCode"
+            />
+          ) : (
+            <div className="text-sm text-gray-900">
+              {componentData.vesselCode}
+            </div>
+          )}
         </div>
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-[#8798ad]'} block mb-1`}>&nbsp;</label>
