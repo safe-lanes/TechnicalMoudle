@@ -337,36 +337,34 @@ router.get('/template', async (req, res) => {
   switch (type) {
     case 'components':
       headers = [
-        // Initial 8 columns (as per user's Excel)
-        'Main Group Code', 'Sub Group Code', 'Original SFI Code', 'Generated Code',
-        'Component Name', 'Parent Code', 'Main Group Name', 'Sub Group Name',
-        // Section A - Component Information
-        'Maker', 'Model', 'Serial No', 'Drawing No', 'Location',
-        'Critical (Yes/No)', 'Condition Based (Yes/No)',
-        'Installation Date', 'Commissioned Date', 'Rating', 'No of Units',
-        'Eqpt / System Department', 'Dimensions/Size', 'Notes',
-        // Section B - Running Hours
-        'Running Hours', 'Date Updated'
+        // Vessel Component Sheet - 23 columns
+        'Fleet Equipment Code', 'Fleet Equipment Name', 'Parent Component Code',
+        'Component Code', 'Component Name', 'Component Category',
+        'Maker', 'Maker Code', 'Model', 'Model Number', 'Serial No', 'Drawing No',
+        'Location', 'Critical (Yes/No)', 'Condition Based (Yes/No)',
+        'Installation Date', 'Commissioned Date', 'Rating',
+        'Eqpt / System Department', 'Notes', 'Running Hours',
+        'IS Active', 'Vessel Code'
       ];
 
       validValues = [
-        '1-8', 'Auto-calculated', 'Required, SFI Format', 'Auto-calculated',
-        'Required', 'Auto-calculated', 'Auto-calculated', 'Auto-calculated',
-        'Text', 'Text', 'Text', 'Text', 'Text',
-        'Yes/No', 'Yes/No',
-        'DD-MM-YYYY', 'DD-MM-YYYY', 'Text', 'Number >= 0',
-        'Text', 'Text', 'Text',
-        'Number >= 0', 'DD-MM-YYYY'
+        'Text (Fleet ID)', 'Text (General name from SFI)', 'Text (Optional)',
+        'Required, SFI Format', 'Required', 'Auto-calculated from code',
+        'Text (Manufacturer)', 'Text (Unique maker ID)', 'Text', 'Text', 'Text', 'Text (Drawing #)',
+        'Text', 'Yes/No', 'Yes/No',
+        'DD-MM-YYYY', 'DD-MM-YYYY', 'Text (Capacity)',
+        'Text', 'Text (Specifications)', 'Number >= 0',
+        'Yes/No', 'Text (Vessel identifier)'
       ];
 
       example = [
-        '7', '71', '711.001', '711.001',
-        'LO transfer systems', '71', 'SYSTEMS FOR MACHINERY MAIN COMPONENTS', 'LUBE OIL SYSTEMS',
-        'ABC Marine', 'LO-2000', 'SN-12345', 'DRW-711-001', 'Engine Room',
-        'Yes', 'No',
-        '01-01-2020', '15-03-2020', '50 bar', '2',
-        'Engineering', '2m x 1m x 1.5m', 'Lube oil transfer and circulation system',
-        '5000', '15-01-2024'
+        'FE-711', 'LO Transfer System', '',
+        '711.001', 'LO transfer systems', '7 Systems for Machinery Main Components',
+        'ABC Marine', 'ABC-001', 'LO-2000', 'LO-2000-X', 'SN-12345', 'DRW-711-001',
+        'Engine Room', 'Yes', 'No',
+        '01-01-2020', '15-03-2020', '50 bar',
+        'Engineering', 'Lube oil transfer and circulation system', '5000',
+        'Yes', 'V001'
       ];
       break;
 
@@ -954,79 +952,36 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     const normalized: any = {};
 
     if (type === 'components') {
-      // Validate Original SFI Code
-      const sfiCode = row['Original SFI Code'];
-      if (!sfiCode) {
-        errors.push(`Row ${rowNum}: Original SFI Code is required`);
+      // Validate Component Code (required, SFI format)
+      const componentCode = row['Component Code'];
+      if (!componentCode) {
+        errors.push(`Row ${rowNum}: Component Code is required`);
       } else {
-        const sfiCodeStr = String(sfiCode).trim();
-        if (!validateSFICode(sfiCodeStr)) {
-          errors.push(`Row ${rowNum}: Invalid SFI code format. Expected format: 6, 61, 612, 612.005, etc.`);
+        const codeStr = String(componentCode).trim();
+        if (!validateSFICode(codeStr)) {
+          errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, etc.`);
         } else {
-          // Strip any suffix from Original SFI Code - suffixes belong in Generated Code
-          const cleanSFICode = stripSFISuffix(sfiCodeStr);
-          normalized['Original SFI Code'] = cleanSFICode;
+          normalized['Component Code'] = codeStr;
           
-          // Use Generated Code if provided (for unique IDs with suffixes like 230(1), 230(2)),
-          // otherwise fall back to Original SFI Code
-          const generatedCode = row['Generated Code'] ? String(row['Generated Code']).trim() : sfiCodeStr;
-          normalized['Generated Code'] = generatedCode;
-          normalized['Component Code'] = generatedCode; // Use Generated Code for component ID
-          
-          // Check for duplicate Generated Codes (actual duplicates that need warnings)
-          const occurrences = generatedCodeOccurrences.get(generatedCode);
+          // Check for duplicates
+          const occurrences = generatedCodeOccurrences.get(codeStr);
           if (occurrences && occurrences.length > 1) {
             const otherRows = occurrences.filter(r => r !== rowNum);
-            warnings.push(`Row ${rowNum}: Duplicate Generated Code '${generatedCode}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
+            warnings.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
           }
           
-          // Auto-calculate Sub Group Code (first 2 digits)
-          const subGroupCode = getSubGroupCode(sfiCodeStr);
-          if (subGroupCode && !row['Sub Group Code']) {
-            normalized['Sub Group Code'] = subGroupCode;
+          // Auto-calculate Parent Component Code from Component Code
+          const parentCode = getParentSFICode(codeStr);
+          if (parentCode && !row['Parent Component Code']) {
+            normalized['Parent Component Code'] = parentCode;
           }
           
-          // Auto-populate Sub Group Name if not provided (regardless of whether code was auto-generated)
-          const finalSubGroupCode = row['Sub Group Code'] || normalized['Sub Group Code'];
-          if (finalSubGroupCode && !row['Sub Group Name']) {
-            normalized['Sub Group Name'] = getSubGroupName(finalSubGroupCode);
-          }
-          
-          // Auto-calculate Parent Code from Original SFI Code
-          // ALWAYS recalculate - don't trust Excel values as they may be incorrect
-          const parentCode = getParentSFICode(sfiCodeStr);
-          if (parentCode) {
-            normalized['Parent Code'] = parentCode;
-          }
-        }
-      }
-
-      // Validate Main Group Code and map to category
-      const mainGroupCode = row['Main Group Code'];
-      if (!mainGroupCode) {
-        errors.push(`Row ${rowNum}: Main Group Code is required`);
-      } else {
-        const mainGroupNum = parseInt(mainGroupCode);
-        if (isNaN(mainGroupNum) || mainGroupNum < 1 || mainGroupNum > 8) {
-          errors.push(`Row ${rowNum}: Main Group Code must be a number from 1-8`);
-        } else {
-          normalized['Main Group Code'] = mainGroupNum;
-          
-          // Auto-map to Component Category and Main Group Name
-          const category = getComponentCategory(mainGroupNum);
-          if (category) {
-            normalized['Component Category'] = category;
-            if (!row['Main Group Name']) {
-              normalized['Main Group Name'] = category;
-            }
-          }
-          
-          // Validate that Main Group Code matches first digit of SFI code
-          const sfiCodeStr = normalized['Component Code'];
-          if (sfiCodeStr) {
-            const firstDigit = parseInt(sfiCodeStr.charAt(0));
-            if (!isNaN(firstDigit) && firstDigit !== mainGroupNum) {
-              errors.push(`Row ${rowNum}: Main Group Code (${mainGroupNum}) must match first digit of SFI code (${firstDigit})`);
+          // Auto-calculate Component Category from first digit
+          const firstDigit = parseInt(codeStr.charAt(0));
+          if (!isNaN(firstDigit) && firstDigit >= 1 && firstDigit <= 8) {
+            const category = getComponentCategory(firstDigit);
+            if (category && !row['Component Category']) {
+              normalized['Component Category'] = `${firstDigit} ${category}`;
             }
           }
         }
@@ -1039,36 +994,61 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Component Name'] = String(row['Component Name']).trim();
       }
 
-      // Validate Yes/No fields
-      ['Critical (Yes/No)', 'Condition Based (Yes/No)'].forEach(field => {
-        if (row[field]) {
-          const value = row[field].toString().toLowerCase();
-          if (!['yes', 'no'].includes(value)) {
+      // Validate Yes/No fields with support for IS Active
+      ['Critical (Yes/No)', 'Condition Based (Yes/No)', 'IS Active'].forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+          const value = String(row[field]).toLowerCase().trim();
+          if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
             errors.push(`Row ${rowNum}: ${field} must be Yes or No`);
           } else {
-            normalized[field] = value === 'yes' ? 'Yes' : 'No';
+            // Normalize to boolean-friendly format
+            normalized[field] = ['yes', 'y', 'true', '1'].includes(value);
           }
         }
       });
 
-      // Validate numbers
-      ['No of Units', 'Running Hours'].forEach(field => {
+      // Validate Running Hours
+      if (row['Running Hours'] !== undefined && row['Running Hours'] !== null && row['Running Hours'] !== '') {
+        const num = parseFloat(row['Running Hours']);
+        if (isNaN(num) || num < 0) {
+          errors.push(`Row ${rowNum}: Running Hours must be a non-negative number`);
+        } else {
+          normalized['Running Hours'] = num;
+        }
+      }
+
+      // Validate date fields (DD-MM-YYYY format)
+      ['Installation Date', 'Commissioned Date'].forEach(field => {
         if (row[field]) {
-          const num = parseFloat(row[field]);
-          if (isNaN(num) || num < 0) {
-            errors.push(`Row ${rowNum}: ${field} must be a non-negative number`);
-          } else {
-            normalized[field] = num;
-          }
+          const dateStr = String(row[field]).trim();
+          // Accept DD-MM-YYYY or Excel serial date format
+          // Basic validation - just ensure it's not empty
+          normalized[field] = dateStr;
         }
       });
 
-      // Copy other fields
-      Object.keys(row).forEach(key => {
-        if (!normalized[key]) {
-          normalized[key] = row[key];
+      // Copy text fields directly
+      const textFields = [
+        'Fleet Equipment Code', 'Fleet Equipment Name', 'Maker', 'Maker Code',
+        'Model', 'Model Number', 'Serial No', 'Drawing No', 'Location',
+        'Rating', 'Eqpt / System Department', 'Notes', 'Vessel Code'
+      ];
+      
+      textFields.forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+          normalized[field] = String(row[field]).trim();
         }
       });
+
+      // Copy Parent Component Code if provided
+      if (row['Parent Component Code'] && !normalized['Parent Component Code']) {
+        normalized['Parent Component Code'] = String(row['Parent Component Code']).trim();
+      }
+
+      // Copy Component Category if provided
+      if (row['Component Category'] && !normalized['Component Category']) {
+        normalized['Component Category'] = String(row['Component Category']).trim();
+      }
     } else if (type === 'spares') {
       // Validate spare
       if (!row['Part Code']) {
@@ -1544,29 +1524,44 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     componentCode: componentCode,
     name: row['Component Name'] || '',
     category: row['Component Category'] || row['Main Group Name'] || '',
-    // Use Parent Code (auto-calculated from SFI)
-    parentId: row['Parent Code'] ? String(row['Parent Code']).trim() : null,
-    vesselId: vesselId || row['Vessel ID'] || 'V001',
-    // Section A - Component Information
+    // Use Parent Component Code (auto-calculated from SFI)
+    parentId: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
+    vesselId: vesselId || row['Vessel Code'] || 'V001',
+    // Fleet Equipment fields
+    fleetEquipmentCode: row['Fleet Equipment Code'] || null,
+    fleetEquipmentName: row['Fleet Equipment Name'] || null,
+    parentFleetEquipmentCode: null, // Not in Excel template, can be added later
+    // Maker and Model fields
     maker: row['Maker'] || null,
+    makerCode: row['Maker Code'] || null,
     model: row['Model'] || null,
+    modelNumber: row['Model Number'] || null,
+    modelCode: null, // Can be computed from Maker Code + Model if needed
+    // Component specific fields
     serialNo: row['Serial No'] || null,
+    drawingNo: row['Drawing No'] || null,
+    // Department and categorization
     department: row['Eqpt / System Department'] || null,
     deptCategory: row['Eqpt / System Department'] || null,
     componentCategory: row['Component Category'] || row['Main Group Name'] || null,
     location: row['Location'] || null,
+    eqptSystemDept: row['Eqpt / System Department'] || null,
+    // Dates
     commissionedDate: row['Commissioned Date'] || null,
     installationDate: row['Installation Date'] || null,
-    critical: row['Critical (Yes/No)'] === 'Yes',
+    // Status and classification
+    critical: row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes',
     classItem: false, // Not in template, defaulting to false
+    conditionBased: row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes',
+    isActive: row['IS Active'] !== false && row['IS Active'] !== 'No', // Default to true
+    // Technical specifications
     rating: row['Rating'] || null,
-    conditionBased: row['Condition Based (Yes/No)'] || null,
-    noOfUnits: row['No of Units'] || null,
-    eqptSystemDept: row['Eqpt / System Department'] || null,
-    parentComponent: row['Parent Code'] ? String(row['Parent Code']).trim() : null,
-    dimensionsSize: row['Dimensions/Size'] || null,
+    noOfUnits: null, // Not in new template
+    parentComponent: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
+    dimensionsSize: null, // Not in new template
     notes: row['Notes'] || null,
-    // Section B - Running Hours
+    // Running Hours
+    runningHours: row['Running Hours'] ? String(row['Running Hours']) : null,
     currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0'
   };
 
@@ -1584,14 +1579,22 @@ async function updateComponentFromRow(componentCode: string, row: any) {
   if (row['Component Category'] || row['Main Group Name']) {
     updateData.category = row['Component Category'] || row['Main Group Name'];
   }
-  // Use Parent Code (auto-calculated from SFI)
-  if (row['Parent Code']) {
-    updateData.parentId = String(row['Parent Code']).trim();
+  // Use Parent Component Code (auto-calculated from SFI)
+  if (row['Parent Component Code']) {
+    updateData.parentId = String(row['Parent Component Code']).trim();
   }
-  // Section A - Component Information
+  // Fleet Equipment fields
+  if (row['Fleet Equipment Code']) updateData.fleetEquipmentCode = row['Fleet Equipment Code'];
+  if (row['Fleet Equipment Name']) updateData.fleetEquipmentName = row['Fleet Equipment Name'];
+  // Maker and Model fields
   if (row['Maker']) updateData.maker = row['Maker'];
+  if (row['Maker Code']) updateData.makerCode = row['Maker Code'];
   if (row['Model']) updateData.model = row['Model'];
+  if (row['Model Number']) updateData.modelNumber = row['Model Number'];
+  // Component specific fields
   if (row['Serial No']) updateData.serialNo = row['Serial No'];
+  if (row['Drawing No']) updateData.drawingNo = row['Drawing No'];
+  // Department and categorization
   if (row['Eqpt / System Department']) {
     updateData.department = row['Eqpt / System Department'];
     updateData.deptCategory = row['Eqpt / System Department'];
@@ -1601,17 +1604,30 @@ async function updateComponentFromRow(componentCode: string, row: any) {
     updateData.componentCategory = row['Component Category'] || row['Main Group Name'];
   }
   if (row['Location']) updateData.location = row['Location'];
+  // Dates
   if (row['Commissioned Date']) updateData.commissionedDate = row['Commissioned Date'];
   if (row['Installation Date']) updateData.installationDate = row['Installation Date'];
-  if (row['Critical (Yes/No)']) updateData.critical = row['Critical (Yes/No)'] === 'Yes';
+  // Status and classification
+  if (row['Critical (Yes/No)'] !== undefined) {
+    updateData.critical = row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes';
+  }
+  if (row['Condition Based (Yes/No)'] !== undefined) {
+    updateData.conditionBased = row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes';
+  }
+  if (row['IS Active'] !== undefined) {
+    updateData.isActive = row['IS Active'] !== false && row['IS Active'] !== 'No';
+  }
+  // Technical specifications
   if (row['Rating']) updateData.rating = row['Rating'];
-  if (row['Condition Based (Yes/No)']) updateData.conditionBased = row['Condition Based (Yes/No)'];
-  if (row['No of Units']) updateData.noOfUnits = row['No of Units'];
-  if (row['Parent Code']) updateData.parentComponent = String(row['Parent Code']).trim();
-  if (row['Dimensions/Size']) updateData.dimensionsSize = row['Dimensions/Size'];
+  if (row['Parent Component Code']) updateData.parentComponent = String(row['Parent Component Code']).trim();
   if (row['Notes']) updateData.notes = row['Notes'];
-  // Section B - Running Hours
-  if (row['Running Hours']) updateData.currentCumulativeRH = String(row['Running Hours']);
+  // Running Hours
+  if (row['Running Hours']) {
+    updateData.runningHours = String(row['Running Hours']);
+    updateData.currentCumulativeRH = String(row['Running Hours']);
+  }
+  // Vessel Code
+  if (row['Vessel Code']) updateData.vesselId = row['Vessel Code'];
 
   return await storage.updateComponent(componentCode, updateData);
 }
