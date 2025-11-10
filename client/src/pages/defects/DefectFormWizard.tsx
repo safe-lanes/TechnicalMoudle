@@ -63,6 +63,9 @@ export default function DefectFormWizard() {
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   
+  // Watch dateCompleted from Section 3 to display in Section 1
+  const dateCompleted = form.watch("dateCompleted");
+  
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
     const now = new Date();
@@ -440,6 +443,17 @@ export default function DefectFormWizard() {
                     </div>
 
                     {/* Row 2 */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-gray-600 uppercase font-normal">Date Closed</Label>
+                      <Input 
+                        value={dateCompleted || ''} 
+                        type="date"
+                        data-testid="input-date-closed"
+                        className="h-9 text-sm border-gray-300 bg-gray-50"
+                        disabled
+                        placeholder="Filled from Section 3 Closeout"
+                      />
+                    </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Source</Label>
                       <Controller
