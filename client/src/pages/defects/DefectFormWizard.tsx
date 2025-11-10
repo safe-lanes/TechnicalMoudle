@@ -16,6 +16,7 @@ import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
@@ -85,6 +86,20 @@ export default function DefectFormWizard({
 
   const [defectId] = useState(generateReference());
   
+  // Fetch defect data if we have an id in URL params
+  const { data: fetchedDefect, isLoading: isLoadingDefect, error: fetchError } = useQuery({
+    queryKey: ['defects', params.id],
+    enabled: !!params.id && !defect,
+    queryFn: async () => {
+      const response = await fetch(`/api/defects/${params.id}`);
+      if (!response.ok) throw new Error('Failed to fetch defect');
+      return response.json();
+    }
+  });
+  
+  // Use either prop defect or fetched defect
+  const currentDefect = defect || fetchedDefect;
+  
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
     defaultValues: {
@@ -109,24 +124,24 @@ export default function DefectFormWizard({
   // Watch dateCompleted from Section 3 to display in Section 1
   const dateCompletedValue = form.watch("dateCompleted");
 
-  // Load defect data when defect prop changes (for edit/closure mode)
+  // Load defect data when currentDefect changes (for edit/closure mode)
   useEffect(() => {
-    if (defect) {
+    if (currentDefect) {
       form.reset({
-        ...defect,
+        ...currentDefect,
         // Ensure dates are in correct format
-        issueDate: defect.issueDate || new Date().toISOString().split('T')[0],
-        dateCompleted: defect.dateCompleted || '',
-        targetCloseDate: defect.targetCloseDate || '',
-        verifiedDate: defect.verifiedDate || '',
+        issueDate: currentDefect.issueDate || new Date().toISOString().split('T')[0],
+        dateCompleted: currentDefect.dateCompleted || '',
+        targetCloseDate: currentDefect.targetCloseDate || '',
+        verifiedDate: currentDefect.verifiedDate || '',
       });
       
       // Load actions if they exist
-      if (defect.actions && Array.isArray(defect.actions)) {
-        setActions(defect.actions);
+      if (currentDefect.actions && Array.isArray(currentDefect.actions)) {
+        setActions(currentDefect.actions);
       }
     }
-  }, [defect]);
+  }, [currentDefect]);
 
   // Helper functions for Cause Analysis
   const buildImmediateCauseText = (ic: { unsafeAct: string[]; unsafeCondition: string[] }): string => {
@@ -187,7 +202,7 @@ export default function DefectFormWizard({
     try {
       const submitData: any = {
         ...data,
-        id: defect?.id || params.id || defectId,
+        id: currentDefect?.id || params.id || defectId,
       };
       
       // If dateCompleted is filled, set status to Closed (moves to Resolved tab)
@@ -195,7 +210,7 @@ export default function DefectFormWizard({
         submitData.status = 'Closed';
       }
       
-      const isUpdate = defect?.id || params.id;
+      const isUpdate = currentDefect?.id || params.id;
       
       if (isUpdate) {
         await apiRequest("PATCH", `/api/defects/${isUpdate}`, submitData);
@@ -304,6 +319,45 @@ export default function DefectFormWizard({
   const toggleViewMode = () => {
     setIsViewMode(!isViewMode);
   };
+  
+  // Show loading state while fetching defect data
+  if (isLoadingDefect) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#f5f5f5]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1976d2] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading defect...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show error state if defect fetch failed
+  if (fetchError) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#f5f5f5]">
+        <div className="text-center">
+          <div className="mb-4 text-red-500">
+            <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-gray-800 font-medium mb-2">Failed to load defect</p>
+          <p className="text-gray-600 mb-4">The defect could not be found or an error occurred.</p>
+          <Button onClick={() => setLocation("/defects/active")} className="bg-[#1976d2] hover:bg-[#1565c0]">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Defects
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Determine title based on current view mode state (reflects toggle changes)
+  const getTitle = () => {
+    if (!currentDefect) return 'New Defect Report';
+    return isViewMode ? 'View Defect Report' : 'Edit Defect Report';
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f5]">
@@ -319,22 +373,26 @@ export default function DefectFormWizard({
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button
-            variant="outline"
-            onClick={toggleViewMode}
-            className="text-gray-700 border-gray-300 h-9"
-            data-testid="button-view"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            {isViewMode ? 'Edit' : 'View'}
-          </Button>
-          <Button
-            onClick={form.handleSubmit(onSubmit)}
-            className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-6 font-medium"
-            data-testid="button-save"
-          >
-            SAVE
-          </Button>
+          {currentDefect && (
+            <Button
+              variant="outline"
+              onClick={toggleViewMode}
+              className="text-gray-700 border-gray-300 h-9"
+              data-testid="button-toggle-mode"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              {isViewMode ? 'Edit' : 'View'}
+            </Button>
+          )}
+          {!isViewMode && (
+            <Button
+              onClick={form.handleSubmit(onSubmit)}
+              className="bg-[#1976d2] hover:bg-[#1565c0] text-white h-9 px-6 font-medium"
+              data-testid="button-save"
+            >
+              SAVE
+            </Button>
+          )}
         </div>
       </div>
 
@@ -344,7 +402,7 @@ export default function DefectFormWizard({
         <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-8">
           {/* Defect Report Title in Sidebar */}
           <div className="px-6 py-4 mb-2">
-            <h1 className="text-xl font-semibold text-gray-900">Defect Report</h1>
+            <h1 className="text-xl font-semibold text-gray-900">{getTitle()}</h1>
           </div>
 
           {/* Step 1 */}

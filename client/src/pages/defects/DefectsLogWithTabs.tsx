@@ -28,8 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import ViewDefectModal from "./ViewDefectModal";
-import EditDefectModal from "./EditDefectModal";
+import { useLocation } from "wouter";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import DefectFormWizard from "./DefectFormWizard";
@@ -51,19 +50,12 @@ interface DefectsFilters {
 const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
 
 export default function DefectsLogWithTabs() {
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<'active' | 'resolved' | 'coc' | 'recurring'>('active');
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DefectsFilters>({});
   
   // Modal states
-  const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
-    open: false, 
-    defectId: null 
-  });
-  const [editModal, setEditModal] = useState<{ open: boolean; defectId: string | null }>({ 
-    open: false, 
-    defectId: null 
-  });
   const [noteModal, setNoteModal] = useState<{ open: boolean; defectId: string | null }>({ 
     open: false, 
     defectId: null 
@@ -302,14 +294,14 @@ export default function DefectsLogWithTabs() {
   
   // Action handlers
   const handleView = (defectId: string) => {
-    setViewModal({ open: true, defectId });
+    setLocation(`/defects/view/${defectId}`);
   };
   
   const handleEdit = (defectId: string) => {
     if (!canEdit()) {
       return; // Could show a toast here for insufficient permissions
     }
-    setEditModal({ open: true, defectId });
+    setLocation(`/defects/edit/${defectId}`);
   };
   
   const handleAddNote = (defectId: string) => {
@@ -724,25 +716,6 @@ export default function DefectsLogWithTabs() {
       </div>
       
       {/* Modals */}
-      {viewModal.defectId && (
-        <ViewDefectModal
-          open={viewModal.open}
-          onClose={() => setViewModal({ open: false, defectId: null })}
-          defectId={viewModal.defectId}
-        />
-      )}
-      
-      {editModal.defectId && (
-        <EditDefectModal
-          open={editModal.open}
-          onClose={() => {
-            setEditModal({ open: false, defectId: null });
-            queryClient.invalidateQueries({ queryKey: ['defects'] });
-          }}
-          defectId={editModal.defectId}
-        />
-      )}
-      
       {noteModal.defectId && (
         <AddNoteModal
           open={noteModal.open}
@@ -762,7 +735,7 @@ export default function DefectsLogWithTabs() {
             queryClient.invalidateQueries({ queryKey: ['defects'] });
           }}
           defectId={linkModal.defectId}
-          linkedDefects={linkModal.linkedDefects}
+          currentLinkedDefects={linkModal.linkedDefects}
         />
       )}
       

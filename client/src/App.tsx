@@ -27,8 +27,15 @@ function App() {
                 <Route path="/reports" component={TechnicalModule} />
                 
                 {/* Defect form routes - standalone, no TechnicalModule layout */}
-                <Route path="/defects/new" component={DefectFormWizard} />
-                <Route path="/defects/edit/:id" component={DefectFormWizard} />
+                <Route path="/defects/new">
+                  {() => <DefectFormWizard mode="new" />}
+                </Route>
+                <Route path="/defects/edit/:id">
+                  {() => <DefectFormWizard mode="edit" />}
+                </Route>
+                <Route path="/defects/view/:id">
+                  {() => <DefectFormWizard mode="view" />}
+                </Route>
                 
                 {/* Other defects routes - with TechnicalModule layout */}
                 <Route path="/defects" component={TechnicalModule} />
