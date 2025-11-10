@@ -97,7 +97,6 @@ export default function DefectsLogWithTabs() {
       if (!response.ok) throw new Error('Failed to fetch active defects');
       return response.json();
     },
-    enabled: activeTab === 'active'
   });
 
   const { data: resolvedDefects = [], isLoading: isLoadingResolved } = useQuery({
@@ -118,7 +117,6 @@ export default function DefectsLogWithTabs() {
       if (!response.ok) throw new Error('Failed to fetch resolved defects');
       return response.json();
     },
-    enabled: activeTab === 'resolved'
   });
 
   const { data: cocDefects = [], isLoading: isLoadingCoC } = useQuery({
@@ -138,7 +136,6 @@ export default function DefectsLogWithTabs() {
       if (!response.ok) throw new Error('Failed to fetch CoC defects');
       return response.json();
     },
-    enabled: activeTab === 'coc'
   });
 
   const { data: recurringDefects = [], isLoading: isLoadingRecurring } = useQuery({
@@ -158,7 +155,6 @@ export default function DefectsLogWithTabs() {
       if (!response.ok) throw new Error('Failed to fetch recurring defects');
       return response.json();
     },
-    enabled: activeTab === 'recurring'
   });
 
   // Count queries for tab badges
@@ -297,9 +293,10 @@ export default function DefectsLogWithTabs() {
   // Handle successful close - invalidate both queries
   const handleDefectClosed = () => {
     // Invalidate both active and resolved queries to update counts and lists
-    queryClient.invalidateQueries({ queryKey: ['defects', 'active'] });
-    queryClient.invalidateQueries({ queryKey: ['defects', 'resolved'] });
-    queryClient.invalidateQueries({ queryKey: ['defects', 'count'] });
+    // Use exact: false to enable prefix matching in TanStack Query v5
+    queryClient.invalidateQueries({ queryKey: ['defects', 'active'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['defects', 'resolved'], exact: false });
+    queryClient.invalidateQueries({ queryKey: ['defects', 'count'], exact: false });
   };
 
   return (

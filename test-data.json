@@ -1274,8 +1274,8 @@
       "category": "Defect",
       "description": "<p>Test defect for CoC workflow - Main engine fuel pump malfunction</p>",
       "targetCloseDate": "2025-11-13",
-      "dateCompleted": null,
-      "status": "Open",
+      "dateCompleted": "2025-11-10",
+      "status": "Closed",
       "priority": "Medium",
       "critical": false,
       "is_coc": true,
@@ -1285,7 +1285,7 @@
       "equipmentMake": "MAN",
       "equipmentModel": "6L32",
       "responsibleDept": "Chief Engineer",
-      "verifiedDate": null,
+      "verifiedDate": "",
       "immediateCause": null,
       "immediateCauseExplanation": null,
       "rootCause": null,
@@ -1307,7 +1307,7 @@
       ],
       "id": "20",
       "createdAt": "2025-11-06T10:53:48.780Z",
-      "updatedAt": "2025-11-06T10:53:48.780Z",
+      "updatedAt": "2025-11-10T04:46:37.076Z",
       "isDeferred": false,
       "reportToThirdParty": false,
       "classReport": false,
@@ -1352,8 +1352,8 @@
       "category": "Defect",
       "description": "<p>Test defect for CoC workflow - Main engine fuel pump malfunction</p>",
       "targetCloseDate": "2025-11-13",
-      "dateCompleted": "2025-11-06",
-      "status": "Open",
+      "dateCompleted": "2025-11-10",
+      "status": "Closed",
       "priority": "Medium",
       "critical": false,
       "is_coc": true,
@@ -1385,7 +1385,7 @@
       ],
       "id": "21",
       "createdAt": "2025-11-06T10:54:22.266Z",
-      "updatedAt": "2025-11-06T10:54:22.266Z",
+      "updatedAt": "2025-11-10T04:51:51.237Z",
       "isDeferred": false,
       "reportToThirdParty": false,
       "classReport": false,
@@ -1430,8 +1430,8 @@
       "category": "Defect",
       "description": "",
       "targetCloseDate": "2025-11-16",
-      "dateCompleted": null,
-      "status": "Open",
+      "dateCompleted": "2025-11-10",
+      "status": "Closed",
       "priority": "Medium",
       "critical": false,
       "is_coc": false,
@@ -1441,7 +1441,7 @@
       "equipmentMake": "MAN",
       "equipmentModel": "3516",
       "responsibleDept": "Chief Engineer",
-      "verifiedDate": null,
+      "verifiedDate": "",
       "immediateCause": null,
       "immediateCauseExplanation": null,
       "rootCause": null,
@@ -1450,7 +1450,7 @@
       "closedBy": "",
       "id": "22",
       "createdAt": "2025-11-06T11:00:13.330Z",
-      "updatedAt": "2025-11-06T11:00:13.330Z",
+      "updatedAt": "2025-11-10T05:13:53.184Z",
       "isDeferred": false,
       "reportToThirdParty": false,
       "classReport": false,
@@ -2675,8 +2675,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "72": {
-      "id": 72,
+    "86": {
+      "id": 86,
       "equipmentKey": "DECK|PUMP|MAN|6L32",
       "windowMonths": 12,
       "occurrenceCount": 5,
@@ -2685,28 +2685,28 @@
       "lastOccurrenceDate": "2025-11-06",
       "hasCoc": true,
       "mtbfDays": "23",
-      "updatedAt": "2025-11-10T04:38:14.065Z"
+      "updatedAt": "2025-11-10T05:17:21.615Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 72,
+      "recurringId": 86,
       "defectId": "19"
     },
     {
-      "recurringId": 72,
+      "recurringId": 86,
       "defectId": "25"
     },
     {
-      "recurringId": 72,
+      "recurringId": 86,
       "defectId": "28"
     },
     {
-      "recurringId": 72,
+      "recurringId": 86,
       "defectId": "31"
     },
     {
-      "recurringId": 72,
+      "recurringId": 86,
       "defectId": "34"
     }
   ],
@@ -325701,6 +325701,6 @@
     "defectId": 40,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 73
+    "recurringDefectId": 87
   }
 }

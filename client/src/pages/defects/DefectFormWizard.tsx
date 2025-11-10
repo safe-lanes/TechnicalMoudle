@@ -211,7 +211,8 @@ export default function DefectFormWizard({
       }
       
       // Invalidate queries to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['defects'] });
+      // Use exact: false to enable prefix matching in TanStack Query v5
+      queryClient.invalidateQueries({ queryKey: ['defects'], exact: false });
       
       // Call completion callback if provided (used when embedded in dialog)
       if (onCompleted) {

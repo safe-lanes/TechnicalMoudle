@@ -17,6 +17,8 @@ The application utilizes a modern full-stack architecture. The frontend is built
     -   **Recurring Defects**: Pattern detection across vessels with filtering.
     -   **VIQ Integration**: SIRE VIQ 7 reference tracking with detailed dropdowns for chapters and sections.
     -   **Form Wizard**: Multi-step defect reporting with persistent data, view/edit modes, and action management (add/edit/delete).
+    -   **Defect Closure Workflow**: Streamlined closure process where clicking the close button in Defect Log opens the 3-step DefectFormWizard at Section 3 (Closeout). User fills Date Completed, which auto-sets status to 'Closed' and moves defect to Resolved tab. DefectFormWizard supports both route-based and embedded (props-based) usage with initialStep parameter.
+    -   **Query Management**: TanStack Query v5 cache invalidation uses `exact: false` for prefix matching to ensure proper refetching of hierarchical query keys (active/resolved lists and badge counts).
 -   **Admin Module**:
     -   **Bulk Data Import**: Supports Machinery Components (CSV/Excel with SFI code hierarchy, auto-creation of intermediate nodes, multi-sheet support, smart validation, duplicate detection, and 24 field import), and Work Orders (auto-generated WO codes, pre-populated leaf node components, and Excel dropdowns with validations).
     -   **Alerts Tab**: Alert policy management.
