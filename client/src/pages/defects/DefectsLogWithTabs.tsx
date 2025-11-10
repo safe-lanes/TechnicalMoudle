@@ -31,8 +31,6 @@ import {
 import { useLocation } from "wouter";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
-import DefectFormWizard from "./DefectFormWizard";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -64,10 +62,6 @@ export default function DefectsLogWithTabs() {
     open: false, 
     defectId: null,
     linkedDefects: []
-  });
-  const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
-    open: false, 
-    defect: null 
   });
 
   // Query for defects
@@ -319,20 +313,7 @@ export default function DefectsLogWithTabs() {
     if (!canClose()) {
       return; // Could show a toast here for insufficient permissions
     }
-    // Find the defect in the current list
-    const defect = defects.find((d: Defect) => d.id === defectId);
-    if (defect) {
-      setCloseModal({ open: true, defect });
-    }
-  };
-
-  // Handle successful close - invalidate list queries (counts are derived from lists)
-  const handleDefectClosed = () => {
-    // Invalidate both active and resolved queries to update lists and derived counts
-    // Use exact: false to enable prefix matching in TanStack Query v5
-    queryClient.invalidateQueries({ queryKey: ['defects', 'active'], exact: false });
-    queryClient.invalidateQueries({ queryKey: ['defects', 'resolved'], exact: false });
-    // No need to invalidate count queries since counts are now derived from list data
+    setLocation(`/defects/close/${defectId}`);
   };
 
   return (
@@ -737,30 +718,6 @@ export default function DefectsLogWithTabs() {
           defectId={linkModal.defectId}
           currentLinkedDefects={linkModal.linkedDefects}
         />
-      )}
-      
-      {closeModal.defect && (
-        <Dialog 
-          open={closeModal.open} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setCloseModal({ open: false, defect: null });
-              handleDefectClosed();
-            }
-          }}
-        >
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-            <DefectFormWizard
-              defect={closeModal.defect}
-              mode="edit"
-              initialStep={3}
-              onCompleted={() => {
-                setCloseModal({ open: false, defect: null });
-                handleDefectClosed();
-              }}
-            />
-          </DialogContent>
-        </Dialog>
       )}
     </div>
   );

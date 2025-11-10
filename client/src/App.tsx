@@ -36,6 +36,9 @@ function App() {
                 <Route path="/defects/view/:id">
                   {() => <DefectFormWizard mode="view" />}
                 </Route>
+                <Route path="/defects/close/:id">
+                  {() => <DefectFormWizard mode="edit" initialStep={3} />}
+                </Route>
                 
                 {/* Other defects routes - with TechnicalModule layout */}
                 <Route path="/defects" component={TechnicalModule} />
