@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, Plus, Edit, Trash2, ArrowLeft, Eye } from "lucide-react";
 import { insertDefectSchema } from "@shared/schema";
@@ -785,6 +786,139 @@ export default function DefectFormWizard({
                         )}
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Vessel Location Section */}
+                <div className="space-y-4 bg-gray-50 p-4 rounded-md border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700">Vessel Location</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Select vessel location type</p>
+                    </div>
+                    <Controller
+                      name="vesselLocationType"
+                      control={form.control}
+                      render={({ field }) => (
+                        <div className="flex items-center gap-3">
+                          <span className={`text-sm font-medium ${field.value === 'atPort' ? 'text-[#1976d2]' : 'text-gray-500'}`}>
+                            At Port
+                          </span>
+                          <Switch
+                            checked={field.value === 'atSea'}
+                            onCheckedChange={(checked) => field.onChange(checked ? 'atSea' : 'atPort')}
+                            data-testid="switch-vessel-location"
+                            disabled={isViewMode}
+                            className="data-[state=checked]:bg-[#1976d2]"
+                          />
+                          <span className={`text-sm font-medium ${field.value === 'atSea' ? 'text-[#1976d2]' : 'text-gray-500'}`}>
+                            At Sea
+                          </span>
+                        </div>
+                      )}
+                    />
+                  </div>
+
+                  {/* Conditional Fields based on location type */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {form.watch('vesselLocationType') === 'atPort' ? (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-gray-600 uppercase font-normal">Port Name</Label>
+                          <Controller
+                            name="portName"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="Enter port name"
+                                className="h-9 text-sm border-gray-300"
+                                data-testid="input-port-name"
+                                disabled={isViewMode}
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-gray-600 uppercase font-normal">Vessel Location</Label>
+                          <Controller
+                            name="vesselLocationDetail"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                                <SelectTrigger data-testid="select-vessel-location" className="h-9 text-sm border-gray-300">
+                                  <SelectValue placeholder="Select location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Alongside">Alongside</SelectItem>
+                                  <SelectItem value="Anchorage">Anchorage</SelectItem>
+                                  <SelectItem value="Berth">Berth</SelectItem>
+                                  <SelectItem value="Dry Dock">Dry Dock</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-gray-600 uppercase font-normal">Latitude</Label>
+                          <Controller
+                            name="latitude"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="e.g., 12.9716° N"
+                                className="h-9 text-sm border-gray-300"
+                                data-testid="input-latitude"
+                                disabled={isViewMode}
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-gray-600 uppercase font-normal">Longitude</Label>
+                          <Controller
+                            name="longitude"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="e.g., 77.5946° E"
+                                className="h-9 text-sm border-gray-300"
+                                data-testid="input-longitude"
+                                disabled={isViewMode}
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-gray-600 uppercase font-normal">Vessel Location</Label>
+                          <Controller
+                            name="vesselLocationDetail"
+                            control={form.control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                                <SelectTrigger data-testid="select-vessel-location" className="h-9 text-sm border-gray-300">
+                                  <SelectValue placeholder="Select location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Open Sea">Open Sea</SelectItem>
+                                  <SelectItem value="Coastal Waters">Coastal Waters</SelectItem>
+                                  <SelectItem value="Territorial Waters">Territorial Waters</SelectItem>
+                                  <SelectItem value="International Waters">International Waters</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
