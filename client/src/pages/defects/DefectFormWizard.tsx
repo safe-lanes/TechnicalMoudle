@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -50,21 +50,33 @@ const quillModules = {
   ],
 };
 
-export default function DefectFormWizard() {
+interface DefectFormWizardProps {
+  defect?: any; // Existing defect data to load
+  mode?: 'view' | 'edit' | 'new'; // Form mode
+  initialStep?: 1 | 2 | 3; // Which step to start on
+  onCompleted?: () => void; // Callback when form is submitted successfully
+}
+
+export default function DefectFormWizard({ 
+  defect, 
+  mode = 'new', 
+  initialStep = 1,
+  onCompleted 
+}: DefectFormWizardProps = {}) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const params = useParams();
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialStep);
   const [actions, setActions] = useState<Action[]>([]);
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   
   // Watch dateCompleted from Section 3 to display in Section 1
-  const dateCompleted = form.watch("dateCompleted");
+  const dateCompletedValue = form.watch("dateCompleted");
   
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
@@ -96,6 +108,25 @@ export default function DefectFormWizard() {
       rootCauseExplanation: "",
     },
   });
+
+  // Load defect data when defect prop changes (for edit/closure mode)
+  useEffect(() => {
+    if (defect) {
+      form.reset({
+        ...defect,
+        // Ensure dates are in correct format
+        issueDate: defect.issueDate || new Date().toISOString().split('T')[0],
+        dateCompleted: defect.dateCompleted || '',
+        targetCloseDate: defect.targetCloseDate || '',
+        verifiedDate: defect.verifiedDate || '',
+      });
+      
+      // Load actions if they exist
+      if (defect.actions && Array.isArray(defect.actions)) {
+        setActions(defect.actions);
+      }
+    }
+  }, [defect]);
 
   // Helper functions for Cause Analysis
   const buildImmediateCauseText = (ic: { unsafeAct: string[]; unsafeCondition: string[] }): string => {
@@ -154,21 +185,39 @@ export default function DefectFormWizard() {
 
   const saveDefect = async (data: DefectFormData, showToast = true, navigate = false) => {
     try {
-      const submitData = {
+      const submitData: any = {
         ...data,
-        id: params.id || defectId,
+        id: defect?.id || params.id || defectId,
       };
       
-      if (params.id) {
-        await apiRequest("PATCH", `/api/defects/${params.id}`, submitData);
-        if (showToast) toast({ title: "Defect saved successfully" });
+      // If dateCompleted is filled, set status to Closed (moves to Resolved tab)
+      if (data.dateCompleted) {
+        submitData.status = 'Closed';
+      }
+      
+      const isUpdate = defect?.id || params.id;
+      
+      if (isUpdate) {
+        await apiRequest("PATCH", `/api/defects/${isUpdate}`, submitData);
+        if (showToast) {
+          const message = submitData.status === 'Closed' 
+            ? "Defect closed successfully" 
+            : "Defect updated successfully";
+          toast({ title: message });
+        }
       } else {
         await apiRequest("POST", "/api/defects", submitData);
-        if (showToast) toast({ title: "Defect saved successfully" });
+        if (showToast) toast({ title: "Defect created successfully" });
       }
-      queryClient.invalidateQueries({ queryKey: ['defects'] });
       
-      if (navigate) {
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      
+      // Call completion callback if provided (used when embedded in dialog)
+      if (onCompleted) {
+        onCompleted();
+      } else if (navigate) {
+        // Only navigate if not using callback
         setLocation("/defects/active");
       }
     } catch (error) {
@@ -446,7 +495,7 @@ export default function DefectFormWizard() {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-600 uppercase font-normal">Date Closed</Label>
                       <Input 
-                        value={dateCompleted || ''} 
+                        value={dateCompletedValue || ''} 
                         type="date"
                         data-testid="input-date-closed"
                         className="h-9 text-sm border-gray-300 bg-gray-50"
