@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +32,7 @@ import ViewDefectModal from "./ViewDefectModal";
 import EditDefectModal from "./EditDefectModal";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
-import CloseDefectModal from "./CloseDefectModal";
+import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { formatForDisplay } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
@@ -74,9 +75,9 @@ export default function DefectsLog() {
     defectId: null,
     linkedDefects: []
   });
-  const [closeModal, setCloseModal] = useState<{ open: boolean; defectId: string | null }>({ 
+  const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
     open: false, 
-    defectId: null 
+    defect: null 
   });
 
   const { data: defects = [], isLoading } = useQuery({
@@ -165,7 +166,11 @@ export default function DefectsLog() {
     if (!canClose()) {
       return; // Could show a toast here for insufficient permissions
     }
-    setCloseModal({ open: true, defectId });
+    // Find the defect in the current list
+    const defect = defects.find((d: Defect) => d.id === defectId);
+    if (defect) {
+      setCloseModal({ open: true, defect });
+    }
   };
 
   return (
@@ -555,12 +560,28 @@ export default function DefectsLog() {
         />
       )}
       
-      {closeModal.defectId && (
-        <CloseDefectModal
-          open={closeModal.open}
-          onClose={() => setCloseModal({ open: false, defectId: null })}
-          defectId={closeModal.defectId}
-        />
+      {closeModal.defect && (
+        <Dialog 
+          open={closeModal.open} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setCloseModal({ open: false, defect: null });
+            }
+          }}
+        >
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+            <DefectFormWizard
+              defect={closeModal.defect}
+              mode="edit"
+              initialStep={3}
+              onCompleted={() => {
+                setCloseModal({ open: false, defect: null });
+                // Invalidate queries to refresh the defects list
+                queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Plus, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import DefectFormExact from "./DefectFormExact";
-import CloseDefectModal from "./CloseDefectModal";
+import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
@@ -29,9 +29,9 @@ export default function DefectsCoC() {
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
   const [activeTab, setActiveTab] = useState("Active");
-  const [closeModal, setCloseModal] = useState<{ open: boolean; defectId: string | null }>({ 
+  const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
     open: false, 
-    defectId: null 
+    defect: null 
   });
 
   // Get CoC defects only
@@ -138,7 +138,11 @@ export default function DefectsCoC() {
   };
 
   const handleCloseDefect = (defectId: string) => {
-    setCloseModal({ open: true, defectId });
+    // Find the defect in the current list
+    const defect = defects.find((d: Defect) => d.id === defectId);
+    if (defect) {
+      setCloseModal({ open: true, defect });
+    }
   };
 
   return (
@@ -484,26 +488,48 @@ export default function DefectsCoC() {
       </div>
       
       {/* Close Defect Modal */}
-      {closeModal.defectId && (
-        <CloseDefectModal
-          open={closeModal.open}
-          onClose={() => {
-            setCloseModal({ open: false, defectId: null });
-            // The CloseDefectModal already invalidates queries and shows success toast
-            // Just refresh the CoC-specific query to ensure the page updates
-            queryClient.invalidateQueries({ 
-              predicate: (query) => {
-                const queryKey = query.queryKey;
-                return Array.isArray(queryKey) && 
-                       queryKey[0] === '/api/defects' && 
-                       queryKey[1] && 
-                       typeof queryKey[1] === 'object' && 
-                       'is_coc' in queryKey[1];
-              }
-            });
+      {closeModal.defect && (
+        <Dialog 
+          open={closeModal.open} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setCloseModal({ open: false, defect: null });
+              // Refresh the CoC-specific query to ensure the page updates
+              queryClient.invalidateQueries({ 
+                predicate: (query) => {
+                  const queryKey = query.queryKey;
+                  return Array.isArray(queryKey) && 
+                         queryKey[0] === '/api/defects' && 
+                         queryKey[1] && 
+                         typeof queryKey[1] === 'object' && 
+                         'is_coc' in queryKey[1];
+                }
+              });
+            }
           }}
-          defectId={closeModal.defectId}
-        />
+        >
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+            <DefectFormWizard
+              defect={closeModal.defect}
+              mode="edit"
+              initialStep={3}
+              onCompleted={() => {
+                setCloseModal({ open: false, defect: null });
+                // Refresh the CoC-specific query
+                queryClient.invalidateQueries({ 
+                  predicate: (query) => {
+                    const queryKey = query.queryKey;
+                    return Array.isArray(queryKey) && 
+                           queryKey[0] === '/api/defects' && 
+                           queryKey[1] && 
+                           typeof queryKey[1] === 'object' && 
+                           'is_coc' in queryKey[1];
+                  }
+                });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
