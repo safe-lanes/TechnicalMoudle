@@ -157,11 +157,23 @@ export default function DefectsLogWithTabs() {
     },
   });
 
-  // Count queries for tab badges
+  // Count queries for tab badges - aligned with list query filters
   const { data: activeCount = 0 } = useQuery({
-    queryKey: ['defects', 'count', 'active'],
+    queryKey: ['defects', 'count', 'active', filters],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count?statusScope=active');
+      const params = new URLSearchParams();
+      params.append('statusScope', 'active');
+      
+      // Include all the same filters as the list query
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      
+      const response = await fetch(`/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch active count');
       const data = await response.json();
       return data.count;
@@ -169,9 +181,20 @@ export default function DefectsLogWithTabs() {
   });
 
   const { data: resolvedCount = 0 } = useQuery({
-    queryKey: ['defects', 'count', 'resolved'],
+    queryKey: ['defects', 'count', 'resolved', filters],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count?statusScope=resolved');
+      const params = new URLSearchParams();
+      params.append('statusScope', 'resolved');
+      
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      // Don't apply dueOverdue filter for resolved defects (matches list query)
+      
+      const response = await fetch(`/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch resolved count');
       const data = await response.json();
       return data.count;
@@ -179,9 +202,20 @@ export default function DefectsLogWithTabs() {
   });
 
   const { data: cocCount = 0 } = useQuery({
-    queryKey: ['defects', 'count', 'coc'],
+    queryKey: ['defects', 'count', 'coc', filters],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count?isCoC=true');
+      const params = new URLSearchParams();
+      params.append('isCoC', 'true');
+      
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      
+      const response = await fetch(`/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch CoC count');
       const data = await response.json();
       return data.count;
@@ -189,9 +223,19 @@ export default function DefectsLogWithTabs() {
   });
 
   const { data: recurringCount = 0 } = useQuery({
-    queryKey: ['defects', 'count', 'recurring'],
+    queryKey: ['defects', 'count', 'recurring', filters],
     queryFn: async () => {
-      const response = await fetch('/api/defects/count/recurring');
+      const params = new URLSearchParams();
+      
+      if (filters.vesselId) params.append('vesselId', filters.vesselId);
+      if (filters.type) params.append('category', filters.type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.fleet) params.append('fleet', filters.fleet);
+      if (filters.addGroup) params.append('group', filters.addGroup);
+      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      
+      const response = await fetch(`/api/defects/count/recurring?${params}`);
       if (!response.ok) throw new Error('Failed to fetch recurring count');
       const data = await response.json();
       return data.count;
@@ -290,13 +334,13 @@ export default function DefectsLogWithTabs() {
     }
   };
 
-  // Handle successful close - invalidate both queries
+  // Handle successful close - invalidate list queries (counts are derived from lists)
   const handleDefectClosed = () => {
-    // Invalidate both active and resolved queries to update counts and lists
+    // Invalidate both active and resolved queries to update lists and derived counts
     // Use exact: false to enable prefix matching in TanStack Query v5
     queryClient.invalidateQueries({ queryKey: ['defects', 'active'], exact: false });
     queryClient.invalidateQueries({ queryKey: ['defects', 'resolved'], exact: false });
-    queryClient.invalidateQueries({ queryKey: ['defects', 'count'], exact: false });
+    // No need to invalidate count queries since counts are now derived from list data
   };
 
   return (

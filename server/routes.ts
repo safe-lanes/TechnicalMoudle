@@ -356,11 +356,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get defects count
   app.get("/api/defects/count", async (req, res) => {
     try {
-      const filters = {
+      const filters: any = {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         vesselId: req.query.vesselId as string,
         isCoC: req.query.isCoC === 'true',
+        // Include all filter parameters to match list query filters
+        category: req.query.category as string,
+        search: req.query.search as string,
+        period: req.query.period as string,
+        fleet: req.query.fleet as string,
+        group: req.query.group as string,
+        dueOverdue: req.query.dueOverdue as string,
       };
       
       const count = await storage.getDefectsCount(filters);

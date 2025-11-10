@@ -206,7 +206,17 @@ export interface IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]>;
-  getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number>;
+  getDefectsCount(filters?: { 
+    statusView?: 'active' | 'resolved'; 
+    vesselId?: string; 
+    isCoC?: boolean;
+    category?: string;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<number>;
   getDefect(id: string): Promise<Defect | undefined>;
   createDefect(defect: InsertDefect): Promise<Defect>;
   updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect>;
