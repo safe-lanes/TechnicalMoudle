@@ -75,9 +75,6 @@ export default function DefectFormWizard({
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
   
-  // Watch dateCompleted from Section 3 to display in Section 1
-  const dateCompletedValue = form.watch("dateCompleted");
-  
   // Generate reference number (format: DN/007/25/4329/V)
   const generateReference = () => {
     const now = new Date();
@@ -108,6 +105,9 @@ export default function DefectFormWizard({
       rootCauseExplanation: "",
     },
   });
+
+  // Watch dateCompleted from Section 3 to display in Section 1
+  const dateCompletedValue = form.watch("dateCompleted");
 
   // Load defect data when defect prop changes (for edit/closure mode)
   useEffect(() => {
@@ -211,7 +211,7 @@ export default function DefectFormWizard({
       }
       
       // Invalidate queries to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      queryClient.invalidateQueries({ queryKey: ['defects'] });
       
       // Call completion callback if provided (used when embedded in dialog)
       if (onCompleted) {
