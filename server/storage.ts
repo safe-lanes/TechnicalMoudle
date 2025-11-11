@@ -65,7 +65,13 @@ import {
   type InsertRecurringDefectLink,
   importHistory,
   type ImportHistory,
-  type InsertImportHistory
+  type InsertImportHistory,
+  makers,
+  type Maker,
+  type InsertMaker,
+  masterLists,
+  type MasterList,
+  type InsertMasterList
 } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -259,6 +265,20 @@ export interface IStorage {
   createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
   getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }>;
   getImportHistoryById(id: string): Promise<ImportHistory | undefined>;
+  
+  // Fleet Admin - Makers methods
+  getMakers(search?: string): Promise<Maker[]>;
+  getMakerById(id: number): Promise<Maker | undefined>;
+  createMaker(maker: InsertMaker): Promise<Maker>;
+  updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker>;
+  deleteMaker(id: number): Promise<void>;
+  
+  // Fleet Admin - Master Lists methods
+  getMasterLists(listType?: string): Promise<MasterList[]>;
+  getMasterListsByType(listType: string): Promise<MasterList[]>;
+  createMasterList(list: InsertMasterList): Promise<MasterList>;
+  updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList>;
+  deleteMasterList(id: number): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -336,6 +356,10 @@ export class MemStorage implements IStorage {
   private defectAttachments: Map<number, DefectAttachment>;
   private currentDefectAttachmentId: number;
   private importHistory: ImportHistory[];
+  private makers: Map<number, Maker>;
+  private currentMakerId: number;
+  private masterLists: Map<number, MasterList>;
+  private currentMasterListId: number;
 
   constructor() {
     this.users = new Map();
@@ -376,6 +400,10 @@ export class MemStorage implements IStorage {
     this.defectAttachments = new Map();
     this.currentDefectAttachmentId = 1;
     this.importHistory = [];
+    this.makers = new Map();
+    this.currentMakerId = 1;
+    this.masterLists = new Map();
+    this.currentMasterListId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -2826,6 +2854,116 @@ export class MemStorage implements IStorage {
 
   async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
     return this.importHistory.find(h => h.id === id);
+  }
+
+  // Fleet Admin - Makers methods
+  async getMakers(search?: string): Promise<Maker[]> {
+    let filtered = Array.from(this.makers.values());
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(m => 
+        m.makerName.toLowerCase().includes(searchLower) ||
+        m.makerCode.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered.sort((a, b) => a.makerName.localeCompare(b.makerName));
+  }
+
+  async getMakerById(id: number): Promise<Maker | undefined> {
+    return this.makers.get(id);
+  }
+
+  async createMaker(maker: InsertMaker): Promise<Maker> {
+    const id = this.currentMakerId++;
+    const makerCode = `MKR-${String(id).padStart(6, '0')}`;
+    
+    const newMaker: Maker = {
+      id,
+      makerCode,
+      ...maker,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    this.makers.set(id, newMaker);
+    return newMaker;
+  }
+
+  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    const existing = this.makers.get(id);
+    if (!existing) {
+      throw new Error(`Maker with id ${id} not found`);
+    }
+    
+    const updated: Maker = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    
+    this.makers.set(id, updated);
+    return updated;
+  }
+
+  async deleteMaker(id: number): Promise<void> {
+    this.makers.delete(id);
+  }
+
+  // Fleet Admin - Master Lists methods
+  async getMasterLists(listType?: string): Promise<MasterList[]> {
+    let filtered = Array.from(this.masterLists.values());
+    
+    if (listType) {
+      filtered = filtered.filter(m => m.listType === listType && m.isActive);
+    } else {
+      filtered = filtered.filter(m => m.isActive);
+    }
+    
+    return filtered.sort((a, b) => {
+      // First sort by listType, then by displayOrder
+      if (a.listType !== b.listType) {
+        return a.listType.localeCompare(b.listType);
+      }
+      return a.displayOrder - b.displayOrder;
+    });
+  }
+
+  async getMasterListsByType(listType: string): Promise<MasterList[]> {
+    return this.getMasterLists(listType);
+  }
+
+  async createMasterList(list: InsertMasterList): Promise<MasterList> {
+    const id = this.currentMasterListId++;
+    
+    const newList: MasterList = {
+      id,
+      ...list,
+      createdAt: new Date(),
+    };
+    
+    this.masterLists.set(id, newList);
+    return newList;
+  }
+
+  async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    const existing = this.masterLists.get(id);
+    if (!existing) {
+      throw new Error(`Master list with id ${id} not found`);
+    }
+    
+    const updated: MasterList = {
+      ...existing,
+      ...data,
+    };
+    
+    this.masterLists.set(id, updated);
+    return updated;
+  }
+
+  async deleteMasterList(id: number): Promise<void> {
+    this.masterLists.delete(id);
   }
 }
 

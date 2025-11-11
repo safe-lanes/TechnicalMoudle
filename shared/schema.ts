@@ -1,5 +1,5 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -803,3 +803,51 @@ export const insertImportHistorySchema = createInsertSchema(importHistory).omit(
 
 export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
 export type ImportHistory = typeof importHistory.$inferSelect;
+
+// Makers Table (Fleet Admin - Equipment Manufacturers)
+export const makers = pgTable("makers", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  makerCode: text("maker_code").notNull().unique(), // Auto-generated: MKR-000001
+  makerName: text("maker_name").notNull(),
+  address: text("address"),
+  contactPerson: text("contact_person"),
+  email: text("email"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  makerCodeIdx: index("idx_maker_code").on(table.makerCode),
+  makerNameIdx: index("idx_maker_name").on(table.makerName),
+}));
+
+export const insertMakerSchema = createInsertSchema(makers).omit({
+  id: true,
+  makerCode: true, // Auto-generated
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaker = z.infer<typeof insertMakerSchema>;
+export type Maker = typeof makers.$inferSelect;
+
+// Master Lists Table (Fleet Admin - Dropdown Options Management)
+export const masterLists = pgTable("master_lists", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  listType: text("list_type").notNull(), // 'department', 'rank', 'intervalUnit', etc.
+  listKey: text("list_key").notNull(), // Unique key for the value
+  listValue: text("list_value").notNull(), // Display value
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_master_list_type").on(table.listType),
+  unique("unique_list_type_key").on(table.listType, table.listKey),
+]);
+
+export const insertMasterListSchema = createInsertSchema(masterLists).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
+export type MasterList = typeof masterLists.$inferSelect;
