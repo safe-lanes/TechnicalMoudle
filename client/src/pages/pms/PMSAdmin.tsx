@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
 import Forms from "@/components/admin/Forms";
+import Admin4Dashboard from "../admin/Admin4Dashboard";
 
 export default function PMSAdmin() {
   const [activeTab, setActiveTab] = useState("bulk-data-imp");
@@ -59,14 +60,7 @@ export default function PMSAdmin() {
           </TabsContent>
 
           <TabsContent value="admin-4" className="m-0">
-            <div className="p-6">
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Admin 4</h2>
-                <p className="text-gray-500">
-                  Reserved for future administrative functionality.
-                </p>
-              </div>
-            </div>
+            <Admin4Dashboard />
           </TabsContent>
         </Tabs>
       </div>

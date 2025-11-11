@@ -324829,5 +324829,29 @@
     "defectActionId": 1,
     "defectAttachmentId": 1,
     "recurringDefectId": 87
-  }
+  },
+  "makers": [
+    {
+      "id": 1,
+      "makerCode": "MKR-000001",
+      "makerName": "Caterpillar Inc.",
+      "address": "100 NE Adams Street, Peoria, IL 61629, USA",
+      "contactPerson": "John Smith",
+      "email": "john.smith@cat.com",
+      "phone": "+1-309-675-1000",
+      "createdAt": "2025-11-11T04:41:47.527Z",
+      "updatedAt": "2025-11-11T04:41:47.527Z"
+    }
+  ],
+  "masterLists": [
+    {
+      "id": 1,
+      "listType": "department",
+      "listKey": "engineering",
+      "listValue": "Engineering",
+      "displayOrder": 1,
+      "isActive": true,
+      "createdAt": "2025-11-11T04:42:07.049Z"
+    }
+  ]
 }

@@ -275,6 +275,7 @@ export interface IStorage {
   
   // Fleet Admin - Master Lists methods
   getMasterLists(listType?: string): Promise<MasterList[]>;
+  getMasterListById(id: number): Promise<MasterList | undefined>;
   getMasterListsByType(listType: string): Promise<MasterList[]>;
   createMasterList(list: InsertMasterList): Promise<MasterList>;
   updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList>;
@@ -2928,6 +2929,10 @@ export class MemStorage implements IStorage {
       }
       return a.displayOrder - b.displayOrder;
     });
+  }
+
+  async getMasterListById(id: number): Promise<MasterList | undefined> {
+    return this.masterLists.get(id);
   }
 
   async getMasterListsByType(listType: string): Promise<MasterList[]> {

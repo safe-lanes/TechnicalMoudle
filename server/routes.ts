@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import Papa from "papaparse";
@@ -1464,6 +1464,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+  
+  // Fleet Admin - Makers Routes
+  
+  // Get all makers with optional search query param
+  app.get("/api/fleet/makers", async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const makers = await storage.getMakers(search);
+      res.json(makers);
+    } catch (error) {
+      console.error("Error fetching makers:", error);
+      res.status(500).json({ error: "Failed to fetch makers" });
+    }
+  });
+  
+  // Get maker by ID
+  app.get("/api/fleet/makers/:id", async (req, res) => {
+    try {
+      const maker = await storage.getMakerById(parseInt(req.params.id));
+      if (!maker) {
+        return res.status(404).json({ error: "Maker not found" });
+      }
+      res.json(maker);
+    } catch (error) {
+      console.error("Error fetching maker:", error);
+      res.status(500).json({ error: "Failed to fetch maker" });
+    }
+  });
+  
+  // Create new maker
+  app.post("/api/fleet/makers", async (req, res) => {
+    try {
+      const validatedData = insertMakerSchema.parse(req.body);
+      const maker = await storage.createMaker(validatedData);
+      res.status(201).json(maker);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid maker data", details: error.errors });
+      }
+      console.error("Error creating maker:", error);
+      res.status(500).json({ error: "Failed to create maker" });
+    }
+  });
+  
+  // Update existing maker
+  app.put("/api/fleet/makers/:id", async (req, res) => {
+    try {
+      const partialMakerSchema = insertMakerSchema.partial();
+      const validatedData = partialMakerSchema.parse(req.body);
+      const maker = await storage.updateMaker(parseInt(req.params.id), validatedData);
+      res.json(maker);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid maker data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Error updating maker:", error);
+      res.status(500).json({ error: "Failed to update maker" });
+    }
+  });
+  
+  // Delete maker
+  app.delete("/api/fleet/makers/:id", async (req, res) => {
+    try {
+      await storage.deleteMaker(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Error deleting maker:", error);
+      res.status(500).json({ error: "Failed to delete maker" });
+    }
+  });
+  
+  // Fleet Admin - Master Lists Routes
+  
+  // Get all master lists with optional listType query param
+  app.get("/api/fleet/master-lists", async (req, res) => {
+    try {
+      const listType = req.query.listType as string | undefined;
+      const masterLists = await storage.getMasterLists(listType);
+      res.json(masterLists);
+    } catch (error) {
+      console.error("Error fetching master lists:", error);
+      res.status(500).json({ error: "Failed to fetch master lists" });
+    }
+  });
+  
+  // Get master list by ID
+  app.get("/api/fleet/master-lists/:id", async (req, res) => {
+    try {
+      const masterList = await storage.getMasterListById(parseInt(req.params.id));
+      if (!masterList) {
+        return res.status(404).json({ error: "Master list not found" });
+      }
+      res.json(masterList);
+    } catch (error) {
+      console.error("Error fetching master list:", error);
+      res.status(500).json({ error: "Failed to fetch master list" });
+    }
+  });
+  
+  // Create new master list
+  app.post("/api/fleet/master-lists", async (req, res) => {
+    try {
+      const validatedData = insertMasterListSchema.parse(req.body);
+      const masterList = await storage.createMasterList(validatedData);
+      res.status(201).json(masterList);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid master list data", details: error.errors });
+      }
+      console.error("Error creating master list:", error);
+      res.status(500).json({ error: "Failed to create master list" });
+    }
+  });
+  
+  // Update existing master list
+  app.put("/api/fleet/master-lists/:id", async (req, res) => {
+    try {
+      const partialMasterListSchema = insertMasterListSchema.partial();
+      const validatedData = partialMasterListSchema.parse(req.body);
+      const masterList = await storage.updateMasterList(parseInt(req.params.id), validatedData);
+      res.json(masterList);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid master list data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Error updating master list:", error);
+      res.status(500).json({ error: "Failed to update master list" });
+    }
+  });
+  
+  // Delete master list
+  app.delete("/api/fleet/master-lists/:id", async (req, res) => {
+    try {
+      await storage.deleteMasterList(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Error deleting master list:", error);
+      res.status(500).json({ error: "Failed to delete master list" });
+    }
+  });
   
   const httpServer = createServer(app);
   
