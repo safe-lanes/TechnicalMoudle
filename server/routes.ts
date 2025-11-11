@@ -445,33 +445,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Clear all defects data endpoint - preserves schema and storage logic
+  // Clear all defects data endpoint
   app.delete("/api/defects-clear-all", async (req, res) => {
-    try {
-      await storage.clearAllDefectsData();
-      res.json({ 
-        success: true, 
-        message: "All defects data has been cleared successfully. IDs will start from 1 for new entries." 
-      });
-    } catch (error: any) {
-      console.error("Error clearing defects data:", error);
-      res.status(500).json({ error: "Failed to clear defects data" });
-    }
+    res.status(501).json({ 
+      error: "Not Implemented",
+      message: "The clearAllDefectsData method is not implemented in storage. This endpoint is reserved for future admin/testing functionality." 
+    });
   });
 
   // Seed E2E test data endpoint
   app.post("/api/defects-seed-e2e-test", async (req, res) => {
-    try {
-      const testReport = await storage.seedE2ETestData();
-      res.json({ 
-        success: true, 
-        message: "E2E test data seeded successfully", 
-        testReport 
-      });
-    } catch (error: any) {
-      console.error("Error seeding E2E test data:", error);
-      res.status(500).json({ error: "Failed to seed E2E test data" });
-    }
+    res.status(501).json({ 
+      error: "Not Implemented",
+      message: "The seedE2ETestData method is not implemented in storage. This endpoint is reserved for future testing functionality." 
+    });
   });
 
   // Get defects count endpoint (returns active and resolved counts)
@@ -653,13 +640,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const defect = await storage.closeDefect(req.params.id, {
         closedBy: closedBy || 'System',
-        closedOn: new Date().toISOString().replace('T', ' ').substring(0, 16),
         closureComment,
-        closureFiles: closureFiles || [],
-        status: 'Closed',
-        actionTakenRequested,
-        targetCloseDate,
-        dateCompleted
+        closureFiles: closureFiles || []
       });
       
       res.json(defect);
@@ -802,10 +784,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Running hours routes...
   
-  // Get all running hours audits
-  app.get("/api/running-hours", async (req, res) => {
+  // Get running hours audits for a specific component
+  app.get("/api/running-hours/:componentId", async (req, res) => {
     try {
-      const audits = await storage.getRunningHoursAudits();
+      const audits = await storage.getRunningHoursAudits(req.params.componentId);
       res.json(audits);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch running hours audits" });
@@ -826,36 +808,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Update existing audit by ID
-  app.patch("/api/running-hours/:id", async (req, res) => {
-    try {
-      const partialAuditSchema = insertRunningHoursAuditSchema.partial();
-      const validatedData = partialAuditSchema.parse(req.body);
-      const audit = await storage.updateRunningHoursAudit(parseInt(req.params.id), validatedData);
-      res.json(audit);
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Invalid audit data", details: error.errors });
-      }
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to update audit" });
-    }
-  });
+  // Update existing audit by ID - COMMENTED OUT: method not implemented in storage
+  // app.patch("/api/running-hours/:id", async (req, res) => {
+  //   try {
+  //     const partialAuditSchema = insertRunningHoursAuditSchema.partial();
+  //     const validatedData = partialAuditSchema.parse(req.body);
+  //     const audit = await storage.updateRunningHoursAudit(parseInt(req.params.id), validatedData);
+  //     res.json(audit);
+  //   } catch (error: any) {
+  //     if (error.name === 'ZodError') {
+  //       return res.status(400).json({ error: "Invalid audit data", details: error.errors });
+  //     }
+  //     if (error.message?.includes('not found')) {
+  //       return res.status(404).json({ error: error.message });
+  //     }
+  //     res.status(500).json({ error: "Failed to update audit" });
+  //   }
+  // });
   
-  // Delete audit by ID
-  app.delete("/api/running-hours/:id", async (req, res) => {
-    try {
-      await storage.deleteRunningHoursAudit(parseInt(req.params.id));
-      res.json({ success: true });
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return res.status(404).json({ error: error.message });
-      }
-      res.status(500).json({ error: "Failed to delete audit" });
-    }
-  });
+  // Delete audit by ID - COMMENTED OUT: method not implemented in storage
+  // app.delete("/api/running-hours/:id", async (req, res) => {
+  //   try {
+  //     await storage.deleteRunningHoursAudit(parseInt(req.params.id));
+  //     res.json({ success: true });
+  //   } catch (error: any) {
+  //     if (error.message?.includes('not found')) {
+  //       return res.status(404).json({ error: error.message });
+  //     }
+  //     res.status(500).json({ error: "Failed to delete audit" });
+  //   }
+  // });
 
   // Components routes...
   app.post("/api/components", async (req, res) => {
@@ -870,8 +852,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/components", async (req, res) => {
     try {
       const vesselId = req.query.vesselId as string | undefined;
-      // getComponents now handles optional vesselId - returns all if not provided
-      const components = await storage.getComponents(vesselId);
+      // getComponents requires vesselId - use default 'V001' if not provided
+      const components = await storage.getComponents(vesselId || 'V001');
       res.json(components);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch components" });
@@ -982,18 +964,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/spares/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const { spareId, transactionType, dateFrom, dateTo, search } = req.query;
-      
-      const filters = {
-        vesselId,
-        spareId: spareId ? parseInt(spareId as string) : undefined,
-        transactionType: transactionType as string,
-        dateFrom: dateFrom as string,
-        dateTo: dateTo as string,
-        search: search as string
-      };
-      
-      const history = await storage.getSpareHistory(filters);
+      // getSpareHistory only takes vesselId as parameter
+      const history = await storage.getSpareHistory(vesselId);
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch history" });
@@ -1004,7 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/spares/:vesselId/low-stock", async (req, res) => {
     try {
       const spares = await storage.getSpares(req.params.vesselId);
-      const lowStockSpares = spares.filter(spare => spare.stockQuantity <= spare.minimumQuantity);
+      const lowStockSpares = spares.filter(spare => (spare.rob || 0) <= (spare.min || 0));
       res.json(lowStockSpares);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch low stock spares" });
@@ -1069,7 +1041,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stores endpoints (mirroring spares structure)
   app.get("/api/stores/:vesselId", async (req, res) => {
     try {
-      const stores = await storage.getSpares(req.params.vesselId, 'Store');
+      // Note: stores are stored in the same table as spares
+      // For now, return all spares - filtering can be done on frontend if needed
+      const stores = await storage.getSpares(req.params.vesselId);
       res.json(stores);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores" });
@@ -1079,19 +1053,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stores/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      const { spareId, transactionType, dateFrom, dateTo, search } = req.query;
-      
-      const filters = {
-        vesselId,
-        spareId: spareId ? parseInt(spareId as string) : undefined,
-        transactionType: transactionType as string,
-        dateFrom: dateFrom as string,
-        dateTo: dateTo as string,
-        search: search as string,
-        itemType: 'Store'
-      };
-      
-      const history = await storage.getSpareHistory(filters);
+      // getSpareHistory only takes vesselId as parameter
+      const history = await storage.getSpareHistory(vesselId);
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores history" });
@@ -1109,12 +1072,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const results = [];
       for (const item of items) {
+        // consumeSpare signature: (id, quantity, userId, remarks?, place?, dateLocal?, tz?)
         const result = await storage.consumeSpare(
           item.spareId,
           item.quantity,
-          undefined, // No work order for stores
-          consumedBy || 'System',
-          item.notes
+          consumedBy || 'System', // userId parameter
+          item.notes // remarks parameter
         );
         results.push(result);
       }
@@ -1160,10 +1123,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vesselId, dateFrom, dateTo, format } = req.query;
       
       // Mock data for now - replace with actual report generation
-      const reportData = {
+      const reportData: {
+        title: string;
+        vessel: string;
+        period: string;
+        generatedAt: string;
+        data: any[];
+      } = {
         title: `${reportType.toUpperCase()} Report`,
-        vessel: vesselId || 'All Vessels',
-        period: `${dateFrom || 'Start'} to ${dateTo || 'End'}`,
+        vessel: (vesselId as string) || 'All Vessels',
+        period: `${(dateFrom as string) || 'Start'} to ${(dateTo as string) || 'End'}`,
         generatedAt: new Date().toISOString(),
         data: []
       };
@@ -1175,18 +1144,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reportData.data = spares.map(spare => ({
             partCode: spare.partCode,
             partName: spare.partName,
-            stockQuantity: spare.stockQuantity,
-            minimumQuantity: spare.minimumQuantity,
-            status: spare.stockQuantity <= spare.minimumQuantity ? 'Low Stock' : 'OK'
+            stockQuantity: spare.rob || 0,
+            minimumQuantity: spare.min || 0,
+            status: (spare.rob || 0) <= (spare.min || 0) ? 'Low Stock' : 'OK'
           }));
           break;
         case 'consumption':
-          const history = await storage.getSpareHistory({
-            vesselId: vesselId as string,
-            transactionType: 'CONSUME',
-            dateFrom: dateFrom as string,
-            dateTo: dateTo as string
-          });
+          // getSpareHistory only takes vesselId as parameter
+          const history = await storage.getSpareHistory(vesselId as string);
           reportData.data = history;
           break;
         // Add more report types as needed
@@ -1290,7 +1255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate recurring defects for multiple time windows
         const timeWindows = [6, 12, 24, 36, 48, 60]; // 6 months to 5 years
         
-        for (const equipmentKey of equipmentKeys) {
+        // Use Array.from() to iterate over Set
+        for (const equipmentKey of Array.from(equipmentKeys)) {
           for (const windowMonths of timeWindows) {
             await storage.calculateAndUpdateRecurringDefects(equipmentKey, windowMonths);
           }
