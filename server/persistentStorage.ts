@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode } from "./utils/codeGeneration";
 import { 
   type User, 
   type InsertUser,
@@ -219,6 +220,8 @@ export class PersistentFileStorage implements IStorage {
           recurringDefects: loadedData.recurringDefects || {},
           recurringDefectLinks: loadedData.recurringDefectLinks || [],
           importHistory: loadedData.importHistory || [],
+          makers: loadedData.makers || [],
+          masterLists: loadedData.masterLists || [],
           counters: loadedData.counters || {
             userId: 1,
             auditId: 1,
@@ -319,6 +322,7 @@ export class PersistentFileStorage implements IStorage {
     data.counters.userId = 2;
 
     // Add seed components
+    const now = new Date();
     const seedComponents: Component[] = [
       {
         id: "ME001",
@@ -329,15 +333,39 @@ export class PersistentFileStorage implements IStorage {
         currentCumulativeRH: "45230.5",
         lastUpdated: new Date().toISOString(),
         vesselId: "V001",
+        vesselCode: null,
+        dataScope: "vessel",
+        fleetEquipmentCode: null,
+        fleetEquipmentName: null,
+        parentFleetEquipmentCode: null,
         maker: null,
+        makerCode: null,
         model: null,
+        modelNumber: null,
+        modelCode: null,
         serialNo: null,
+        drawingNo: null,
+        department: null,
         deptCategory: null,
         componentCategory: null,
         location: null,
+        eqptSystemDept: null,
         commissionedDate: null,
+        installationDate: null,
         critical: false,
-        classItem: false
+        classItem: false,
+        conditionBased: false,
+        isActive: true,
+        rating: null,
+        noOfUnits: null,
+        parentComponent: null,
+        dimensionsSize: null,
+        notes: null,
+        runningHours: null,
+        applicableVesselIds: null,
+        scopeNotes: null,
+        createdAt: now,
+        updatedAt: now
       },
       {
         id: "AE001",
@@ -348,15 +376,39 @@ export class PersistentFileStorage implements IStorage {
         currentCumulativeRH: "22100.0",
         lastUpdated: new Date().toISOString(),
         vesselId: "V001",
+        vesselCode: null,
+        dataScope: "vessel",
+        fleetEquipmentCode: null,
+        fleetEquipmentName: null,
+        parentFleetEquipmentCode: null,
         maker: null,
+        makerCode: null,
         model: null,
+        modelNumber: null,
+        modelCode: null,
         serialNo: null,
+        drawingNo: null,
+        department: null,
         deptCategory: null,
         componentCategory: null,
         location: null,
+        eqptSystemDept: null,
         commissionedDate: null,
+        installationDate: null,
         critical: false,
-        classItem: false
+        classItem: false,
+        conditionBased: false,
+        isActive: true,
+        rating: null,
+        noOfUnits: null,
+        parentComponent: null,
+        dimensionsSize: null,
+        notes: null,
+        runningHours: null,
+        applicableVesselIds: null,
+        scopeNotes: null,
+        createdAt: now,
+        updatedAt: now
       }
     ];
     
@@ -394,8 +446,21 @@ export class PersistentFileStorage implements IStorage {
         nextDueDate: null,
         nextDueReading: null,
         currentReading: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        dataScope: "vessel",
+        fleetEquipmentCode: null,
+        fleetJobCode: null,
+        department: null,
+        isActive: true,
+        applicableVesselIds: null,
+        workMethod: null,
+        tools: null,
+        spares: null,
+        safetyPrecautions: null,
+        fleetJobTitle: null,
+        intervalCalendar: null,
+        intervalRunningHour: null,
+        createdAt: now,
+        updatedAt: now
       },
       {
         id: "2",
@@ -425,8 +490,21 @@ export class PersistentFileStorage implements IStorage {
         nextDueDate: null,
         nextDueReading: null,
         currentReading: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        dataScope: "vessel",
+        fleetEquipmentCode: null,
+        fleetJobCode: null,
+        department: null,
+        isActive: true,
+        applicableVesselIds: null,
+        workMethod: null,
+        tools: null,
+        spares: null,
+        safetyPrecautions: null,
+        fleetJobTitle: null,
+        intervalCalendar: null,
+        intervalRunningHour: null,
+        createdAt: now,
+        updatedAt: now
       }
     ];
     
@@ -474,9 +552,7 @@ export class PersistentFileStorage implements IStorage {
         rootCauseExplanation: null,
         holdReason: null,
         nextReviewDate: null,
-        defermentFlag: false,
-        defermentReason: null,
-        reportedTo: null,
+        deferReason: null,
         reportedBy: "Chief Engineer",
         operatingState: null,
         routineBreakdown: null,
@@ -523,8 +599,7 @@ export class PersistentFileStorage implements IStorage {
         rootCauseExplanation: null,
         holdReason: null,
         nextReviewDate: null,
-        defermentFlag: false,
-        defermentReason: null,
+        deferReason: null,
         reportedTo: null,
         reportedBy: "Chief Officer",
         operatingState: null,
@@ -604,38 +679,52 @@ export class PersistentFileStorage implements IStorage {
 
   async createComponent(component: InsertComponent): Promise<Component> {
     const id = component.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date();
     const newComponent: Component = {
       ...component,
       id,
-      vesselId: component.vesselId || "V001",
+      vesselId: component.vesselId ?? null,
+      dataScope: component.dataScope || "vessel",
       currentCumulativeRH: component.currentCumulativeRH || "0",
       lastUpdated: component.lastUpdated || new Date().toISOString().split('T')[0],
-      componentCode: component.componentCode || null,
-      parentId: component.parentId || null,
-      maker: component.maker || null,
-      makerCode: component.makerCode || null,
-      model: component.model || null,
-      modelNumber: component.modelNumber || null,
-      serialNo: component.serialNo || null,
-      drawingNo: component.drawingNo || null,
-      department: component.department || null,
-      deptCategory: component.deptCategory || null,
-      componentCategory: component.componentCategory || null,
-      eqptSystemDept: component.eqptSystemDept || null,
-      location: component.location || null,
-      commissionedDate: component.commissionedDate || null,
-      installationDate: component.installationDate || null,
-      rating: component.rating || null,
-      noOfUnits: component.noOfUnits || null,
-      dimensionsSize: component.dimensionsSize || null,
-      fleetEquipmentCode: component.fleetEquipmentCode || null,
-      fleetEquipmentName: component.fleetEquipmentName || null,
-      vesselCode: component.vesselCode || null,
-      notes: component.notes || null,
+      componentCode: component.componentCode ?? null,
+      parentId: component.parentId ?? null,
+      vesselCode: component.vesselCode ?? null,
+      fleetEquipmentCode: component.fleetEquipmentCode ?? null,
+      fleetEquipmentName: component.fleetEquipmentName ?? null,
+      parentFleetEquipmentCode: component.parentFleetEquipmentCode ?? null,
+      maker: component.maker ?? null,
+      makerCode: component.makerCode ?? null,
+      model: component.model ?? null,
+      modelNumber: component.modelNumber ?? null,
+      modelCode: component.modelCode ?? null,
+      serialNo: component.serialNo ?? null,
+      drawingNo: component.drawingNo ?? null,
+      department: component.department ?? null,
+      deptCategory: component.deptCategory ?? null,
+      componentCategory: component.componentCategory ?? null,
+      eqptSystemDept: component.eqptSystemDept ?? null,
+      location: component.location ?? null,
+      commissionedDate: component.commissionedDate ?? null,
+      installationDate: component.installationDate ?? null,
+      rating: component.rating ?? null,
+      noOfUnits: component.noOfUnits ?? null,
+      parentComponent: component.parentComponent ?? null,
+      dimensionsSize: component.dimensionsSize ?? null,
+      notes: component.notes ?? null,
+      runningHours: component.runningHours ?? null,
+      applicableVesselIds: component.applicableVesselIds ?? null,
+      scopeNotes: component.scopeNotes ?? null,
+      sfiBookletName: component.sfiBookletName ?? null,
+      sfiGroupCode: component.sfiGroupCode ?? null,
+      intervalCalendar: component.intervalCalendar ?? null,
+      intervalRunningHour: component.intervalRunningHour ?? null,
       critical: component.critical ?? false,
       classItem: component.classItem ?? false,
       conditionBased: component.conditionBased ?? false,
-      isActive: component.isActive ?? true
+      isActive: component.isActive ?? true,
+      createdAt: now,
+      updatedAt: now
     };
     this.data.components[id] = newComponent;
     this.persistData();
@@ -652,12 +741,14 @@ export class PersistentFileStorage implements IStorage {
 
   async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
     const createdComponents: Component[] = [];
+    const now = new Date();
     for (const component of components) {
       const id = component.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const newComponent: Component = {
         ...component,
         id,
         vesselId: component.vesselId || "V001",
+        dataScope: component.dataScope || "vessel",
         currentCumulativeRH: component.currentCumulativeRH || "0",
         lastUpdated: component.lastUpdated || new Date().toISOString().split('T')[0],
         componentCode: component.componentCode || null,
@@ -670,7 +761,9 @@ export class PersistentFileStorage implements IStorage {
         location: component.location || null,
         commissionedDate: component.commissionedDate || null,
         critical: component.critical ?? false,
-        classItem: component.classItem ?? false
+        classItem: component.classItem ?? false,
+        createdAt: now,
+        updatedAt: now
       };
       this.data.components[id] = newComponent;
       createdComponents.push(newComponent);
@@ -785,16 +878,20 @@ export class PersistentFileStorage implements IStorage {
 
   async createSpare(spare: InsertSpare): Promise<Spare> {
     const id = this.data.counters.spareId++;
+    const now = new Date();
     const newSpare: Spare = { 
       ...spare, 
       id,
       deleted: false,
-      componentCode: spare.componentCode || null,
-      location: spare.location || null,
-      componentSpareCode: spare.componentSpareCode || null,
-      vesselId: spare.vesselId || "V001",
+      dataScope: spare.dataScope || "vessel",
+      componentCode: spare.componentCode ?? null,
+      location: spare.location ?? null,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      vesselId: spare.vesselId ?? null,
       rob: spare.rob || 0,
-      min: spare.min || 0
+      min: spare.min || 0,
+      createdAt: now,
+      updatedAt: now
     };
     this.data.spares[id] = newSpare;
     this.persistData();
@@ -828,23 +925,23 @@ export class PersistentFileStorage implements IStorage {
     const history: SpareHistory = {
       id: this.data.counters.historyId++,
       timestampUTC: new Date(),
-      vesselId: spare.vesselId,
+      vesselId: spare.vesselId ?? "V001",
       spareId: id,
       partCode: spare.partCode,
       partName: spare.partName,
-      componentId: spare.componentId,
-      componentCode: spare.componentCode || null,
+      componentId: spare.componentId ?? "",
+      componentCode: spare.componentCode ?? null,
       componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode || null,
+      componentSpareCode: spare.componentSpareCode ?? null,
       eventType: 'CONSUME',
       qtyChange: -quantity,
       robAfter: spare.rob,
       userId,
-      remarks: remarks || null,
+      remarks: remarks ?? null,
       reference: null,
-      dateLocal: dateLocal || null,
-      tz: tz || null,
-      place: place || null
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null
     };
     
     this.data.sparesHistory.push(history);
@@ -863,23 +960,23 @@ export class PersistentFileStorage implements IStorage {
     const history: SpareHistory = {
       id: this.data.counters.historyId++,
       timestampUTC: new Date(),
-      vesselId: spare.vesselId,
+      vesselId: spare.vesselId ?? "V001",
       spareId: id,
       partCode: spare.partCode,
       partName: spare.partName,
-      componentId: spare.componentId,
-      componentCode: spare.componentCode || null,
+      componentId: spare.componentId ?? "",
+      componentCode: spare.componentCode ?? null,
       componentName: spare.componentName,
-      componentSpareCode: spare.componentSpareCode || null,
+      componentSpareCode: spare.componentSpareCode ?? null,
       eventType: 'RECEIVE',
       qtyChange: quantity,
       robAfter: spare.rob,
       userId,
-      remarks: remarks || null,
-      reference: supplierPO || null,
-      dateLocal: dateLocal || null,
-      tz: tz || null,
-      place: place || null
+      remarks: remarks ?? null,
+      reference: supplierPO ?? null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null
     };
     
     this.data.sparesHistory.push(history);
@@ -900,23 +997,23 @@ export class PersistentFileStorage implements IStorage {
         const history: SpareHistory = {
           id: this.data.counters.historyId++,
           timestampUTC: new Date(),
-          vesselId: spare.vesselId,
+          vesselId: spare.vesselId ?? "V001",
           spareId: update.id,
           partCode: spare.partCode,
           partName: spare.partName,
-          componentId: spare.componentId,
-          componentCode: spare.componentCode || null,
+          componentId: spare.componentId ?? "",
+          componentCode: spare.componentCode ?? null,
           componentName: spare.componentName,
-          componentSpareCode: spare.componentSpareCode || null,
+          componentSpareCode: spare.componentSpareCode ?? null,
           eventType: 'CONSUME',
           qtyChange: -update.consumed,
           robAfter: spare.rob,
           userId,
-          remarks: remarks || null,
+          remarks: remarks ?? null,
           reference: null,
-          dateLocal: update.receivedDate || null,
+          dateLocal: update.receivedDate ?? null,
           tz: null,
-          place: update.receivedPlace || null
+          place: update.receivedPlace ?? null
         };
         this.data.sparesHistory.push(history);
       }
@@ -927,14 +1024,14 @@ export class PersistentFileStorage implements IStorage {
         const history: SpareHistory = {
           id: this.data.counters.historyId++,
           timestampUTC: new Date(),
-          vesselId: spare.vesselId,
+          vesselId: spare.vesselId ?? "V001",
           spareId: update.id,
           partCode: spare.partCode,
           partName: spare.partName,
-          componentId: spare.componentId,
-          componentCode: spare.componentCode || null,
+          componentId: spare.componentId ?? "",
+          componentCode: spare.componentCode ?? null,
           componentName: spare.componentName,
-          componentSpareCode: spare.componentSpareCode || null,
+          componentSpareCode: spare.componentSpareCode ?? null,
           eventType: 'RECEIVE',
           qtyChange: update.received,
           robAfter: spare.rob,
@@ -1003,25 +1100,38 @@ export class PersistentFileStorage implements IStorage {
       id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      componentCode: workOrder.componentCode || null,
-      templateCode: workOrder.templateCode || null,
-      executionId: workOrder.executionId || null,
-      dateCompleted: workOrder.dateCompleted || null,
-      submittedDate: workOrder.submittedDate || null,
-      formData: workOrder.formData || null,
-      taskType: workOrder.taskType || null,
-      maintenanceBasis: workOrder.maintenanceBasis || null,
-      frequencyValue: workOrder.frequencyValue || null,
-      frequencyUnit: workOrder.frequencyUnit || null,
-      approverRemarks: workOrder.approverRemarks || null,
-      templateId: workOrder.templateId || null,
-      approver: workOrder.approver || null,
-      approvalDate: workOrder.approvalDate || null,
-      rejectionDate: workOrder.rejectionDate || null,
-      nextDueDate: workOrder.nextDueDate || null,
-      nextDueReading: workOrder.nextDueReading || null,
-      currentReading: workOrder.currentReading || null,
-      vesselId: workOrder.vesselId || "V001"
+      dataScope: workOrder.dataScope || "vessel",
+      componentCode: workOrder.componentCode ?? null,
+      templateCode: workOrder.templateCode ?? null,
+      executionId: workOrder.executionId ?? null,
+      dateCompleted: workOrder.dateCompleted ?? null,
+      submittedDate: workOrder.submittedDate ?? null,
+      formData: workOrder.formData ?? null,
+      taskType: workOrder.taskType ?? null,
+      maintenanceBasis: workOrder.maintenanceBasis ?? null,
+      frequencyValue: workOrder.frequencyValue ?? null,
+      frequencyUnit: workOrder.frequencyUnit ?? null,
+      approverRemarks: workOrder.approverRemarks ?? null,
+      templateId: workOrder.templateId ?? null,
+      approver: workOrder.approver ?? null,
+      approvalDate: workOrder.approvalDate ?? null,
+      rejectionDate: workOrder.rejectionDate ?? null,
+      nextDueDate: workOrder.nextDueDate ?? null,
+      nextDueReading: workOrder.nextDueReading ?? null,
+      currentReading: workOrder.currentReading ?? null,
+      vesselId: workOrder.vesselId ?? null,
+      fleetEquipmentCode: workOrder.fleetEquipmentCode ?? null,
+      fleetJobCode: workOrder.fleetJobCode ?? null,
+      department: workOrder.department ?? null,
+      isActive: workOrder.isActive ?? null,
+      applicableVesselIds: workOrder.applicableVesselIds ?? null,
+      workMethod: workOrder.workMethod ?? null,
+      tools: workOrder.tools ?? null,
+      spares: workOrder.spares ?? null,
+      safetyPrecautions: workOrder.safetyPrecautions ?? null,
+      fleetJobTitle: workOrder.fleetJobTitle ?? null,
+      intervalCalendar: workOrder.intervalCalendar ?? null,
+      intervalRunningHour: workOrder.intervalRunningHour ?? null
     };
     this.data.workOrders.push(newWorkOrder);
     this.persistData();
@@ -1038,6 +1148,83 @@ export class PersistentFileStorage implements IStorage {
     this.data.workOrders[index] = updated;
     this.persistData();
     return updated;
+  }
+
+  async deleteWorkOrder(id: string): Promise<void> {
+    const index = this.data.workOrders.findIndex(wo => wo && wo.id === id);
+    if (index !== -1) {
+      this.data.workOrders.splice(index, 1);
+      this.persistData();
+    }
+  }
+
+  async bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    const created: WorkOrder[] = [];
+    const now = new Date();
+    for (const workOrder of workOrders) {
+      const id = String(this.data.counters.workOrderId++);
+      const newWorkOrder: WorkOrder = {
+        ...workOrder,
+        id,
+        dataScope: workOrder.dataScope || "vessel",
+        createdAt: now,
+        updatedAt: now
+      };
+      this.data.workOrders.push(newWorkOrder);
+      created.push(newWorkOrder);
+    }
+    this.persistData();
+    return created;
+  }
+
+  async bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    const updated: WorkOrder[] = [];
+    for (const { templateCode, data } of workOrders) {
+      const index = this.data.workOrders.findIndex(wo => wo && wo.templateCode === templateCode);
+      if (index !== -1) {
+        const workOrder = this.data.workOrders[index];
+        const updatedWorkOrder = { ...workOrder, ...data, updatedAt: new Date() };
+        this.data.workOrders[index] = updatedWorkOrder;
+        updated.push(updatedWorkOrder);
+      }
+    }
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    let created = 0;
+    let updated = 0;
+    const now = new Date();
+    
+    for (const workOrder of workOrders) {
+      const existingIndex = this.data.workOrders.findIndex(wo =>
+        wo && wo.templateCode && workOrder.templateCode && wo.templateCode === workOrder.templateCode
+      );
+      
+      if (existingIndex !== -1) {
+        this.data.workOrders[existingIndex] = {
+          ...this.data.workOrders[existingIndex],
+          ...workOrder,
+          updatedAt: now
+        };
+        updated++;
+      } else {
+        const id = String(this.data.counters.workOrderId++);
+        const newWorkOrder: WorkOrder = {
+          ...workOrder,
+          id,
+          dataScope: workOrder.dataScope || "vessel",
+          createdAt: now,
+          updatedAt: now
+        };
+        this.data.workOrders.push(newWorkOrder);
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
   }
 
   // Defect methods
@@ -1236,88 +1423,10 @@ export class PersistentFileStorage implements IStorage {
     this.persistData();
   }
 
-  // Bulk Import methods
-  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
-    const created: Component[] = [];
-    for (const comp of components) {
-      const newComp: Component = {
-        ...comp,
-        id: comp.id || `C${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        vesselId: comp.vesselId || "V001",
-        currentCumulativeRH: comp.currentCumulativeRH || "0",
-        lastUpdated: comp.lastUpdated || new Date().toISOString(),
-        componentCode: comp.componentCode || null,
-        parentId: comp.parentId || null,
-        maker: comp.maker || null,
-        model: comp.model || null,
-        serialNo: comp.serialNo || null,
-        deptCategory: comp.deptCategory || null,
-        componentCategory: comp.componentCategory || null,
-        location: comp.location || null,
-        commissionedDate: comp.commissionedDate || null,
-        critical: comp.critical ?? false,
-        classItem: comp.classItem ?? false
-      };
-      this.data.components[newComp.id] = newComp;
-      created.push(newComp);
-    }
-    this.persistData();
-    return created;
-  }
-
-  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
-    const updated: Component[] = [];
-    for (const { id, data } of components) {
-      const component = this.data.components[id];
-      if (component) {
-        const updatedComponent = { ...component, ...data };
-        this.data.components[id] = updatedComponent;
-        updated.push(updatedComponent);
-      }
-    }
-    this.persistData();
-    return updated;
-  }
-
-  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
-    let created = 0;
-    let updated = 0;
-    
-    for (const comp of components) {
-      const id = comp.id || `C${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      if (this.data.components[id]) {
-        this.data.components[id] = { ...this.data.components[id], ...comp };
-        updated++;
-      } else {
-        const newComp: Component = {
-          ...comp,
-          id,
-          vesselId: comp.vesselId || "V001",
-          currentCumulativeRH: comp.currentCumulativeRH || "0",
-          lastUpdated: comp.lastUpdated || new Date().toISOString(),
-          componentCode: comp.componentCode || null,
-          parentId: comp.parentId || null,
-          maker: comp.maker || null,
-          model: comp.model || null,
-          serialNo: comp.serialNo || null,
-          deptCategory: comp.deptCategory || null,
-          componentCategory: comp.componentCategory || null,
-          location: comp.location || null,
-          commissionedDate: comp.commissionedDate || null,
-          critical: comp.critical ?? false,
-          classItem: comp.classItem ?? false
-        };
-        this.data.components[id] = newComp;
-        created++;
-      }
-    }
-    
-    this.persistData();
-    return { created, updated };
-  }
 
   async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
     const created: Spare[] = [];
+    const now = new Date();
     for (const spare of spares) {
       const id = this.data.counters.spareId++;
       const newSpare: Spare = { 
@@ -1329,7 +1438,9 @@ export class PersistentFileStorage implements IStorage {
         componentSpareCode: spare.componentSpareCode || null,
         vesselId: spare.vesselId || "V001",
         rob: spare.rob || 0,
-        min: spare.min || 0
+        min: spare.min || 0,
+        createdAt: now,
+        updatedAt: now
       };
       this.data.spares[id] = newSpare;
       created.push(newSpare);
@@ -1401,6 +1512,115 @@ export class PersistentFileStorage implements IStorage {
     return archived;
   }
 
+  // Fleet Components methods
+  async getFleetComponents(): Promise<Component[]> {
+    return Object.values(this.data.components).filter(c => c.dataScope === 'fleet');
+  }
+
+  async getFleetComponent(id: string): Promise<Component | undefined> {
+    const component = this.data.components[id];
+    if (component && component.dataScope === 'fleet') {
+      return component;
+    }
+    return undefined;
+  }
+
+  async createFleetComponent(insertComponent: InsertComponent): Promise<Component> {
+    const now = new Date();
+    
+    if (insertComponent.dataScope && insertComponent.dataScope !== 'fleet') {
+      throw new Error('Fleet component must have dataScope="fleet"');
+    }
+    if (insertComponent.vesselId) {
+      throw new Error('Fleet component cannot have vesselId');
+    }
+    
+    if (insertComponent.parentFleetEquipmentCode) {
+      const parent = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertComponent.parentFleetEquipmentCode
+      );
+      if (!parent) {
+        throw new Error(`Parent fleet component ${insertComponent.parentFleetEquipmentCode} not found`);
+      }
+    }
+    
+    const fleetEquipmentCode = insertComponent.fleetEquipmentCode || generateFleetEquipmentCode(insertComponent.parentFleetEquipmentCode ?? null);
+    
+    const component: Component = {
+      ...insertComponent,
+      id: insertComponent.id || fleetEquipmentCode,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetEquipmentCode,
+      currentCumulativeRH: insertComponent.currentCumulativeRH || "0",
+      lastUpdated: new Date().toISOString(),
+      critical: insertComponent.critical ?? false,
+      classItem: insertComponent.classItem ?? false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.data.components[component.id] = component;
+    this.persistData();
+    return component;
+  }
+
+  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const component = this.data.components[id];
+    if (!component) {
+      throw new Error(`Component ${id} not found`);
+    }
+    if (component.dataScope !== 'fleet') {
+      throw new Error(`Component ${id} is not a fleet component`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet component');
+    }
+    
+    if (data.parentFleetEquipmentCode && data.parentFleetEquipmentCode !== component.parentFleetEquipmentCode) {
+      const parent = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.parentFleetEquipmentCode
+      );
+      if (!parent) {
+        throw new Error(`Parent fleet component ${data.parentFleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated = { 
+      ...component, 
+      ...data, 
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    this.data.components[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteFleetComponent(id: string): Promise<void> {
+    const component = this.data.components[id];
+    if (!component) {
+      throw new Error(`Component ${id} not found`);
+    }
+    if (component.dataScope !== 'fleet') {
+      throw new Error(`Component ${id} is not a fleet component`);
+    }
+    
+    const hasChildren = Object.values(this.data.components).some(
+      c => c.dataScope === 'fleet' && c.parentFleetEquipmentCode === component.fleetEquipmentCode
+    );
+    if (hasChildren) {
+      throw new Error(`Cannot delete fleet component ${id} with child components`);
+    }
+    
+    delete this.data.components[id];
+    this.persistData();
+  }
+
   async archiveSparesByIds(ids: number[]): Promise<number> {
     let archived = 0;
     for (const id of ids) {
@@ -1411,6 +1631,117 @@ export class PersistentFileStorage implements IStorage {
     }
     this.persistData();
     return archived;
+  }
+
+  // Fleet Spares methods
+  async getFleetSpares(): Promise<Spare[]> {
+    return Object.values(this.data.spares).filter(s => s.dataScope === 'fleet' && !s.deleted);
+  }
+
+  async getFleetSpare(id: number): Promise<Spare | undefined> {
+    const spare = this.data.spares[id];
+    if (spare && spare.dataScope === 'fleet' && !spare.deleted) {
+      return spare;
+    }
+    return undefined;
+  }
+
+  async createFleetSpare(insertSpare: InsertSpare): Promise<Spare> {
+    const now = new Date();
+    
+    // Validation
+    if (insertSpare.dataScope && insertSpare.dataScope !== 'fleet') {
+      throw new Error('Fleet spare must have dataScope="fleet"');
+    }
+    if (insertSpare.vesselId) {
+      throw new Error('Fleet spare cannot have vesselId');
+    }
+    
+    // Validate fleetEquipmentCode references if provided
+    if (insertSpare.fleetEquipmentCode) {
+      const component = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertSpare.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${insertSpare.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    // Auto-generate fleetPartCode
+    const fleetPartCode = insertSpare.fleetPartCode || generateFleetPartCode();
+    
+    // Create spare
+    const id = this.data.counters.spareId++;
+    const spare: Spare = {
+      ...insertSpare,
+      id,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetPartCode,
+      componentCode: insertSpare.componentCode || null,
+      location: insertSpare.location || null,
+      componentSpareCode: insertSpare.componentSpareCode || null,
+      rob: insertSpare.rob || 0,
+      min: insertSpare.min || 0,
+      deleted: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.data.spares[id] = spare;
+    this.persistData();
+    return spare;
+  }
+
+  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const spare = this.data.spares[id];
+    if (!spare || spare.deleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    if (spare.dataScope !== 'fleet') {
+      throw new Error(`Spare ${id} is not a fleet spare`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet spare');
+    }
+    
+    // Validate fleetEquipmentCode if changing
+    if (data.fleetEquipmentCode && data.fleetEquipmentCode !== spare.fleetEquipmentCode) {
+      const component = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${data.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated = {
+      ...spare,
+      ...data,
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    this.data.spares[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteFleetSpare(id: number): Promise<void> {
+    const spare = this.data.spares[id];
+    if (!spare || spare.deleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    if (spare.dataScope !== 'fleet') {
+      throw new Error(`Spare ${id} is not a fleet spare`);
+    }
+    
+    // Hard delete
+    delete this.data.spares[id];
+    this.persistData();
   }
 
   // Change Request methods
@@ -1741,6 +2072,134 @@ export class PersistentFileStorage implements IStorage {
   // Additional placeholder methods
   async deleteWorkOrder(id: string): Promise<void> {
     delete this.data.workOrders[id];
+    this.persistData();
+  }
+
+  // Fleet Jobs methods
+  async getFleetJobs(): Promise<WorkOrder[]> {
+    return this.data.workOrders.filter(wo => wo && wo.dataScope === 'fleet');
+  }
+
+  async getFleetJob(id: string): Promise<WorkOrder | undefined> {
+    const workOrder = this.data.workOrders.find(wo => wo && wo.id === id);
+    if (workOrder && workOrder.dataScope === 'fleet') {
+      return workOrder;
+    }
+    return undefined;
+  }
+
+  async createFleetJob(insertJob: InsertWorkOrder): Promise<WorkOrder> {
+    const now = new Date();
+    
+    // Validation
+    if (insertJob.dataScope && insertJob.dataScope !== 'fleet') {
+      throw new Error('Fleet job must have dataScope="fleet"');
+    }
+    if (insertJob.vesselId) {
+      throw new Error('Fleet job cannot have vesselId');
+    }
+    
+    // Validate fleetEquipmentCode references if provided
+    if (insertJob.fleetEquipmentCode) {
+      const component = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertJob.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${insertJob.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    // Auto-generate fleetJobCode
+    const fleetJobCode = insertJob.fleetJobCode || generateFleetJobCode();
+    
+    // Create work order
+    const id = String(this.data.counters.workOrderId++);
+    
+    const workOrder: WorkOrder = {
+      ...insertJob,
+      id,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetJobCode,
+      isExecution: insertJob.isExecution ?? false,
+      componentCode: insertJob.componentCode ?? null,
+      templateCode: insertJob.templateCode ?? null,
+      executionId: insertJob.executionId ?? null,
+      dateCompleted: insertJob.dateCompleted ?? null,
+      submittedDate: insertJob.submittedDate ?? null,
+      formData: insertJob.formData ?? null,
+      taskType: insertJob.taskType ?? null,
+      maintenanceBasis: insertJob.maintenanceBasis ?? null,
+      frequencyValue: insertJob.frequencyValue ?? null,
+      frequencyUnit: insertJob.frequencyUnit ?? null,
+      approverRemarks: insertJob.approverRemarks ?? null,
+      templateId: insertJob.templateId ?? null,
+      approver: insertJob.approver ?? null,
+      approvalDate: insertJob.approvalDate ?? null,
+      rejectionDate: insertJob.rejectionDate ?? null,
+      nextDueDate: insertJob.nextDueDate ?? null,
+      nextDueReading: insertJob.nextDueReading ?? null,
+      currentReading: insertJob.currentReading ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.data.workOrders.push(workOrder);
+    this.persistData();
+    return workOrder;
+  }
+
+  async updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
+    const index = this.data.workOrders.findIndex(wo => wo && wo.id === id);
+    if (index === -1) {
+      throw new Error(`WorkOrder ${id} not found`);
+    }
+    const workOrder = this.data.workOrders[index];
+    if (!workOrder || workOrder.dataScope !== 'fleet') {
+      throw new Error(`WorkOrder ${id} is not a fleet job`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet job');
+    }
+    
+    // Validate fleetEquipmentCode if changing
+    if (data.fleetEquipmentCode && data.fleetEquipmentCode !== workOrder.fleetEquipmentCode) {
+      const component = Object.values(this.data.components).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${data.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated: WorkOrder = {
+      ...workOrder,
+      ...data,
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    
+    this.data.workOrders[index] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteFleetJob(id: string): Promise<void> {
+    const index = this.data.workOrders.findIndex(wo => wo && wo.id === id);
+    if (index === -1) {
+      throw new Error(`WorkOrder ${id} not found`);
+    }
+    const workOrder = this.data.workOrders[index];
+    if (!workOrder || workOrder.dataScope !== 'fleet') {
+      throw new Error(`WorkOrder ${id} is not a fleet job`);
+    }
+    
+    // Hard delete
+    this.data.workOrders.splice(index, 1);
     this.persistData();
   }
 
@@ -2692,6 +3151,10 @@ export class PersistentFileStorage implements IStorage {
       }
       return a.displayOrder - b.displayOrder;
     });
+  }
+
+  async getMasterListById(id: number): Promise<MasterList | undefined> {
+    return this.data.masterLists.find(ml => ml.id === id);
   }
 
   async getMasterListsByType(listType: string): Promise<MasterList[]> {
