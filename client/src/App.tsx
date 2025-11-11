@@ -9,9 +9,6 @@ import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
-import Admin4Dashboard from "./pages/admin/Admin4Dashboard";
-import MakerManagement from "./pages/admin/MakerManagement";
-import MasterListsManagement from "./pages/admin/MasterListsManagement";
 
 import NotFound from "./pages/not-found";
 
@@ -49,11 +46,6 @@ function App() {
                 
                 <Route path="/admin" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
-                
-                {/* Fleet Admin routes - standalone pages */}
-                <Route path="/admin/fleet-dashboard" component={Admin4Dashboard} />
-                <Route path="/admin/makers" component={MakerManagement} />
-                <Route path="/admin/master-lists" component={MasterListsManagement} />
                 
                 <Route path="/test-e2e" component={TestE2E} />
                 <Route component={NotFound} />

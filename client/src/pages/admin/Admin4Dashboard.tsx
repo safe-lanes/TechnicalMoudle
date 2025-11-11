@@ -1,24 +1,68 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, List, ArrowRight } from "lucide-react";
-import { useLocation } from "wouter";
+import { Building2, List, ArrowRight, ArrowLeft } from "lucide-react";
+import MakerManagement from "./MakerManagement";
+import MasterListsManagement from "./MasterListsManagement";
+
+type ViewType = 'dashboard' | 'makers' | 'master-lists';
 
 export default function Admin4Dashboard() {
-  const [, setLocation] = useLocation();
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
 
-  // Fetch makers count
   const { data: makersData, isLoading: isMakersLoading } = useQuery({
     queryKey: ['/api/fleet/makers'],
   });
 
-  // Fetch master lists count
   const { data: masterListsData, isLoading: isMasterListsLoading } = useQuery({
     queryKey: ['/api/fleet/master-lists'],
   });
 
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
   const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
+
+  if (currentView === 'makers') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Maker Management</h1>
+        </div>
+        <MakerManagement />
+      </div>
+    );
+  }
+
+  if (currentView === 'master-lists') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Master Lists Management</h1>
+        </div>
+        <MasterListsManagement />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -29,7 +73,6 @@ export default function Admin4Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Total Makers Widget */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -57,7 +100,7 @@ export default function Admin4Dashboard() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLocation('/admin/makers')}
+                  onClick={() => setCurrentView('makers')}
                   className="text-blue-600 hover:text-blue-700"
                   data-testid="button-view-makers"
                 >
@@ -68,7 +111,6 @@ export default function Admin4Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Total Master Lists Widget */}
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -96,7 +138,7 @@ export default function Admin4Dashboard() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLocation('/admin/master-lists')}
+                  onClick={() => setCurrentView('master-lists')}
                   className="text-green-600 hover:text-green-700"
                   data-testid="button-view-master-lists"
                 >
@@ -108,14 +150,13 @@ export default function Admin4Dashboard() {
           </Card>
         </div>
 
-        {/* Quick Links Section */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Links</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Button
               variant="outline"
               className="justify-start h-auto py-4 px-6"
-              onClick={() => setLocation('/admin/makers')}
+              onClick={() => setCurrentView('makers')}
               data-testid="link-manage-makers"
             >
               <Building2 className="mr-3 h-5 w-5 text-blue-600" />
@@ -128,7 +169,7 @@ export default function Admin4Dashboard() {
             <Button
               variant="outline"
               className="justify-start h-auto py-4 px-6"
-              onClick={() => setLocation('/admin/master-lists')}
+              onClick={() => setCurrentView('master-lists')}
               data-testid="link-manage-master-lists"
             >
               <List className="mr-3 h-5 w-5 text-green-600" />
