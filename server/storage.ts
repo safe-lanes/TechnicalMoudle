@@ -1,4 +1,5 @@
 
+import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode } from "./utils/codeGeneration";
 import { 
   users, 
   type User, 
@@ -93,6 +94,13 @@ export interface IStorage {
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
   
+  // Fleet Components methods
+  getFleetComponents(): Promise<Component[]>;
+  getFleetComponent(id: string): Promise<Component | undefined>;
+  createFleetComponent(component: InsertComponent): Promise<Component>;
+  updateFleetComponent(id: string, data: Partial<Component>): Promise<Component>;
+  deleteFleetComponent(id: string): Promise<void>;
+  
   // Spares methods
   getSpares(vesselId: string): Promise<Spare[]>;
   getSpare(id: number): Promise<Spare | undefined>;
@@ -102,6 +110,13 @@ export interface IStorage {
   consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
+  
+  // Fleet Spares methods
+  getFleetSpares(): Promise<Spare[]>;
+  getFleetSpare(id: number): Promise<Spare | undefined>;
+  createFleetSpare(spare: InsertSpare): Promise<Spare>;
+  updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare>;
+  deleteFleetSpare(id: number): Promise<void>;
   
   // Spares History methods
   getSpareHistory(vesselId: string): Promise<SpareHistory[]>;
@@ -197,6 +212,13 @@ export interface IStorage {
   bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]>;
   bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]>;
   bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
+  
+  // Fleet Jobs methods
+  getFleetJobs(): Promise<WorkOrder[]>;
+  getFleetJob(id: string): Promise<WorkOrder | undefined>;
+  createFleetJob(job: InsertWorkOrder): Promise<WorkOrder>;
+  updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder>;
+  deleteFleetJob(id: string): Promise<void>;
   
   // Defects methods
   getDefects(filters?: { 
@@ -776,6 +798,112 @@ export class MemStorage implements IStorage {
     this.components.delete(id);
   }
 
+  // Fleet Components methods
+  async getFleetComponents(): Promise<Component[]> {
+    return Array.from(this.components.values()).filter(c => c.dataScope === 'fleet');
+  }
+
+  async getFleetComponent(id: string): Promise<Component | undefined> {
+    const component = this.components.get(id);
+    if (component && component.dataScope === 'fleet') {
+      return component;
+    }
+    return undefined;
+  }
+
+  async createFleetComponent(insertComponent: InsertComponent): Promise<Component> {
+    const now = new Date();
+    
+    if (insertComponent.dataScope && insertComponent.dataScope !== 'fleet') {
+      throw new Error('Fleet component must have dataScope="fleet"');
+    }
+    if (insertComponent.vesselId) {
+      throw new Error('Fleet component cannot have vesselId');
+    }
+    
+    if (insertComponent.parentFleetEquipmentCode) {
+      const parent = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertComponent.parentFleetEquipmentCode
+      );
+      if (!parent) {
+        throw new Error(`Parent fleet component ${insertComponent.parentFleetEquipmentCode} not found`);
+      }
+    }
+    
+    const fleetEquipmentCode = insertComponent.fleetEquipmentCode || generateFleetEquipmentCode(insertComponent.parentFleetEquipmentCode ?? null);
+    
+    const component: Component = {
+      ...insertComponent,
+      id: insertComponent.id || fleetEquipmentCode,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetEquipmentCode,
+      currentCumulativeRH: insertComponent.currentCumulativeRH || "0",
+      lastUpdated: new Date().toISOString(),
+      critical: insertComponent.critical ?? false,
+      classItem: insertComponent.classItem ?? false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.components.set(component.id, component);
+    return component;
+  }
+
+  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const component = this.components.get(id);
+    if (!component) {
+      throw new Error(`Component ${id} not found`);
+    }
+    if (component.dataScope !== 'fleet') {
+      throw new Error(`Component ${id} is not a fleet component`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet component');
+    }
+    
+    if (data.parentFleetEquipmentCode && data.parentFleetEquipmentCode !== component.parentFleetEquipmentCode) {
+      const parent = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.parentFleetEquipmentCode
+      );
+      if (!parent) {
+        throw new Error(`Parent fleet component ${data.parentFleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated = { 
+      ...component, 
+      ...data, 
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    this.components.set(id, updated);
+    return updated;
+  }
+
+  async deleteFleetComponent(id: string): Promise<void> {
+    const component = this.components.get(id);
+    if (!component) {
+      throw new Error(`Component ${id} not found`);
+    }
+    if (component.dataScope !== 'fleet') {
+      throw new Error(`Component ${id} is not a fleet component`);
+    }
+    
+    const hasChildren = Array.from(this.components.values()).some(
+      c => c.dataScope === 'fleet' && c.parentFleetEquipmentCode === component.fleetEquipmentCode
+    );
+    if (hasChildren) {
+      throw new Error(`Cannot delete fleet component ${id} with child components`);
+    }
+    
+    this.components.delete(id);
+  }
+
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
     const id = this.currentAuditId++;
     const fullAudit: RunningHoursAudit = { 
@@ -950,6 +1078,114 @@ export class MemStorage implements IStorage {
       spare.deleted = true;
       this.spares.set(id, spare);
     }
+  }
+
+  // Fleet Spares methods
+  async getFleetSpares(): Promise<Spare[]> {
+    return Array.from(this.spares.values()).filter(s => s.dataScope === 'fleet' && !s.deleted);
+  }
+
+  async getFleetSpare(id: number): Promise<Spare | undefined> {
+    const spare = this.spares.get(id);
+    if (spare && spare.dataScope === 'fleet' && !spare.deleted) {
+      return spare;
+    }
+    return undefined;
+  }
+
+  async createFleetSpare(insertSpare: InsertSpare): Promise<Spare> {
+    const now = new Date();
+    
+    // Validation
+    if (insertSpare.dataScope && insertSpare.dataScope !== 'fleet') {
+      throw new Error('Fleet spare must have dataScope="fleet"');
+    }
+    if (insertSpare.vesselId) {
+      throw new Error('Fleet spare cannot have vesselId');
+    }
+    
+    // Validate fleetEquipmentCode references if provided
+    if (insertSpare.fleetEquipmentCode) {
+      const component = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertSpare.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${insertSpare.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    // Auto-generate fleetPartCode
+    const fleetPartCode = insertSpare.fleetPartCode || generateFleetPartCode();
+    
+    // Create spare
+    const id = this.currentSpareId++;
+    const spare: Spare = {
+      ...insertSpare,
+      id,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetPartCode,
+      componentCode: insertSpare.componentCode || null,
+      location: insertSpare.location || null,
+      componentSpareCode: insertSpare.componentSpareCode || null,
+      rob: insertSpare.rob || 0,
+      min: insertSpare.min || 0,
+      deleted: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.spares.set(id, spare);
+    return spare;
+  }
+
+  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const spare = this.spares.get(id);
+    if (!spare || spare.deleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    if (spare.dataScope !== 'fleet') {
+      throw new Error(`Spare ${id} is not a fleet spare`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet spare');
+    }
+    
+    // Validate fleetEquipmentCode if changing
+    if (data.fleetEquipmentCode && data.fleetEquipmentCode !== spare.fleetEquipmentCode) {
+      const component = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${data.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated = {
+      ...spare,
+      ...data,
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    this.spares.set(id, updated);
+    return updated;
+  }
+
+  async deleteFleetSpare(id: number): Promise<void> {
+    const spare = this.spares.get(id);
+    if (!spare || spare.deleted) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    if (spare.dataScope !== 'fleet') {
+      throw new Error(`Spare ${id} is not a fleet spare`);
+    }
+    
+    // Hard delete
+    this.spares.delete(id);
   }
 
   async consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
@@ -2284,6 +2520,130 @@ export class MemStorage implements IStorage {
     if (!this.workOrders.has(id)) {
       throw new Error(`WorkOrder with id ${id} not found`);
     }
+    this.workOrders.delete(id);
+  }
+
+  // Fleet Jobs methods
+  async getFleetJobs(): Promise<WorkOrder[]> {
+    return Array.from(this.workOrders.values()).filter(wo => wo.dataScope === 'fleet');
+  }
+
+  async getFleetJob(id: string): Promise<WorkOrder | undefined> {
+    const workOrder = this.workOrders.get(id);
+    if (workOrder && workOrder.dataScope === 'fleet') {
+      return workOrder;
+    }
+    return undefined;
+  }
+
+  async createFleetJob(insertJob: InsertWorkOrder): Promise<WorkOrder> {
+    const now = new Date();
+    
+    // Validation
+    if (insertJob.dataScope && insertJob.dataScope !== 'fleet') {
+      throw new Error('Fleet job must have dataScope="fleet"');
+    }
+    if (insertJob.vesselId) {
+      throw new Error('Fleet job cannot have vesselId');
+    }
+    
+    // Validate fleetEquipmentCode references if provided
+    if (insertJob.fleetEquipmentCode) {
+      const component = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === insertJob.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${insertJob.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    // Auto-generate fleetJobCode
+    const fleetJobCode = insertJob.fleetJobCode || generateFleetJobCode();
+    
+    // Create work order
+    const id = this.currentWorkOrderId.toString();
+    this.currentWorkOrderId++;
+    
+    const workOrder: WorkOrder = {
+      ...insertJob,
+      id,
+      dataScope: 'fleet',
+      vesselId: null,
+      fleetJobCode,
+      isExecution: insertJob.isExecution ?? false,
+      componentCode: insertJob.componentCode ?? null,
+      templateCode: insertJob.templateCode ?? null,
+      executionId: insertJob.executionId ?? null,
+      dateCompleted: insertJob.dateCompleted ?? null,
+      submittedDate: insertJob.submittedDate ?? null,
+      formData: insertJob.formData ?? null,
+      taskType: insertJob.taskType ?? null,
+      maintenanceBasis: insertJob.maintenanceBasis ?? null,
+      frequencyValue: insertJob.frequencyValue ?? null,
+      frequencyUnit: insertJob.frequencyUnit ?? null,
+      approverRemarks: insertJob.approverRemarks ?? null,
+      templateId: insertJob.templateId ?? null,
+      approver: insertJob.approver ?? null,
+      approvalDate: insertJob.approvalDate ?? null,
+      rejectionDate: insertJob.rejectionDate ?? null,
+      nextDueDate: insertJob.nextDueDate ?? null,
+      nextDueReading: insertJob.nextDueReading ?? null,
+      currentReading: insertJob.currentReading ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.workOrders.set(id, workOrder);
+    return workOrder;
+  }
+
+  async updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder) {
+      throw new Error(`WorkOrder ${id} not found`);
+    }
+    if (workOrder.dataScope !== 'fleet') {
+      throw new Error(`WorkOrder ${id} is not a fleet job`);
+    }
+    if (data.dataScope && data.dataScope !== 'fleet') {
+      throw new Error('Cannot change dataScope from fleet to vessel');
+    }
+    if (data.vesselId) {
+      throw new Error('Cannot assign vesselId to fleet job');
+    }
+    
+    // Validate fleetEquipmentCode if changing
+    if (data.fleetEquipmentCode && data.fleetEquipmentCode !== workOrder.fleetEquipmentCode) {
+      const component = Array.from(this.components.values()).find(
+        c => c.dataScope === 'fleet' && c.fleetEquipmentCode === data.fleetEquipmentCode
+      );
+      if (!component) {
+        throw new Error(`Fleet component ${data.fleetEquipmentCode} not found`);
+      }
+    }
+    
+    const updated: WorkOrder = {
+      ...workOrder,
+      ...data,
+      dataScope: 'fleet',
+      vesselId: null,
+      updatedAt: new Date()
+    };
+    
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  async deleteFleetJob(id: string): Promise<void> {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder) {
+      throw new Error(`WorkOrder ${id} not found`);
+    }
+    if (workOrder.dataScope !== 'fleet') {
+      throw new Error(`WorkOrder ${id} is not a fleet job`);
+    }
+    
+    // Hard delete
     this.workOrders.delete(id);
   }
 
