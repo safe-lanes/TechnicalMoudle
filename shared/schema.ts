@@ -58,8 +58,9 @@ export const components = pgTable("components", {
   lastUpdated: text("last_updated"),
   vesselId: text("vessel_id").notNull().default("V001"),
   vesselCode: text("vessel_code"), // Vessel identification code
+  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel' - discriminator for fleet vs vessel data
   // Fleet Equipment fields (from Fleet_Component Sheet)
-  fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment
+  fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment (XXX.XXX.XX format)
   fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet
   parentFleetEquipmentCode: text("parent_fleet_equipment_code"), // For fleet hierarchy
   // Maker and Model fields
@@ -93,9 +94,22 @@ export const components = pgTable("components", {
   notes: text("notes"), // Specifications or additional information
   // Running Hours (already has currentCumulativeRH)
   runningHours: decimal("running_hours", { precision: 10, scale: 2 }), // For storing template running hours value
-});
+  // Fleet-specific fields (when dataScope='fleet')
+  applicableVesselIds: text("applicable_vessel_ids").array(), // Array of vessel codes that can use this fleet equipment
+  scopeNotes: text("scope_notes"), // Notes about scope applicability
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  dataScopeIdx: index("idx_comp_data_scope").on(table.dataScope),
+  fleetTreeIdx: index("idx_comp_fleet_tree").on(table.dataScope, table.parentFleetEquipmentCode),
+  vesselTreeIdx: index("idx_comp_vessel_tree").on(table.dataScope, table.vesselId, table.parentId),
+  fleetEquipmentCodeUniqueIdx: unique("unique_fleet_equipment_code").on(table.fleetEquipmentCode, table.dataScope),
+}));
 
-export const insertComponentSchema = createInsertSchema(components).omit({});
+export const insertComponentSchema = createInsertSchema(components).omit({
+  createdAt: true,
+  updatedAt: true,
+});
 
 export type InsertComponent = z.infer<typeof insertComponentSchema>;
 export type Component = typeof components.$inferSelect;
@@ -212,7 +226,7 @@ export const spares = pgTable("spares", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   partCode: text("part_code").notNull(),
   partName: text("part_name").notNull(),
-  componentId: text("component_id").notNull(),
+  componentId: text("component_id"), // Nullable for fleet spares
   componentCode: text("component_code"),
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Format: SP-<ComponentCode>-<NNN>
@@ -220,17 +234,46 @@ export const spares = pgTable("spares", {
   rob: integer("rob").notNull().default(0), // Remaining on Board
   min: integer("min").notNull().default(0), // Minimum stock
   location: text("location"),
-  vesselId: text("vessel_id").notNull().default("V001"),
+  vesselId: text("vessel_id").default("V001"), // Nullable for fleet spares
   deleted: boolean("deleted").notNull().default(false),
+  // Fleet-specific fields (when dataScope='fleet')
+  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
+  fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet component
+  fleetPartCode: text("fleet_part_code"), // Auto-generated PT-XXXXXXX for fleet spares
+  partNumber: text("part_number"), // Manufacturer's part number
+  uom: text("uom"), // Unit of measurement
+  drawingNumber: text("drawing_number"), // Drawing number from manual
+  positionNumber: text("position_number"), // Position/reference number
+  note: text("note"), // Additional information
+  specification: text("specification"), // Technical specifications (size, dimensions, material)
+  maker: text("maker"), // Manufacturer name
+  makerCode: text("maker_code"), // Maker code reference
+  model: text("model"), // Equipment model
+  manualName: text("manual_name"), // Name of manual
+  pageNumber: text("page_number"), // Page number in manual
+  criticality: text("criticality"), // 'Yes' | 'No' for fleet spares
+  isActive: boolean("is_active").default(true), // Active status for fleet spares
+  ihm: text("ihm"), // IHM related text/number
+  evidenceType: text("evidence_type"), // Supporting document reference
+  partCategory: text("part_category"), // Category from master data
+  applicableVesselIds: text("applicable_vessel_ids").array(), // Vessels that can use this fleet spare
+  scopeNotes: text("scope_notes"), // Notes about scope applicability
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   componentIdIdx: index("idx_spare_component").on(table.componentId),
   vesselIdIdx: index("idx_spare_vessel").on(table.vesselId),
   componentSpareCodeIdx: index("idx_spare_code").on(table.vesselId, table.componentSpareCode),
+  dataScopeIdx: index("idx_spare_data_scope").on(table.dataScope),
+  fleetEquipmentCodeIdx: index("idx_spare_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
+  fleetPartCodeUniqueIdx: unique("unique_fleet_part_code").on(table.fleetPartCode, table.dataScope),
 }));
 
 export const insertSpareSchema = createInsertSchema(spares).omit({
   id: true,
   deleted: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertSpare = z.infer<typeof insertSpareSchema>;
@@ -480,7 +523,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // Work Orders Table
 export const workOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
-  vesselId: text("vessel_id").notNull().default("V001"),
+  vesselId: text("vessel_id").default("V001"), // Nullable for fleet jobs
   component: text("component").notNull(),
   componentCode: text("component_code"),
   workOrderNo: text("work_order_no").notNull(),
@@ -488,8 +531,8 @@ export const workOrders = pgTable("work_orders", {
   executionId: text("execution_id"),
   jobTitle: text("job_title").notNull(),
   assignedTo: text("assigned_to").notNull(),
-  dueDate: text("due_date").notNull(), // ISO date string
-  status: text("status").notNull(), // 'Completed' | 'Due' | 'Due (Grace P)' | 'Overdue' | 'Postponed' | 'Pending Approval'
+  dueDate: text("due_date"), // ISO date string, nullable for fleet jobs
+  status: text("status").notNull().default("Active"), // 'Completed' | 'Due' | 'Due (Grace P)' | 'Overdue' | 'Postponed' | 'Pending Approval' | 'Active'
   dateCompleted: text("date_completed"),
   submittedDate: text("submitted_date"),
   formData: json("form_data"), // Form submission data
@@ -509,6 +552,21 @@ export const workOrders = pgTable("work_orders", {
   classRelated: text("class_related"), // 'Yes' | 'No'
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   briefWorkDescription: text("brief_work_description"),
+  // Fleet-specific fields (when dataScope='fleet')
+  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
+  fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet component
+  fleetJobCode: text("fleet_job_code"), // Auto-generated WO-XXXXXXX for fleet jobs
+  jobGroup: text("job_group"), // Grouping/categorization for fleet jobs
+  jobCategory: text("job_category"), // Category from master data
+  sfiCode: text("sfi_code"), // SFI classification code
+  maintenanceIntervalValue: integer("maintenance_interval_value"), // Numeric interval value
+  maintenanceIntervalUnit: text("maintenance_interval_unit"), // Unit from master data
+  intervalRunningHour: integer("interval_running_hour"), // Running hour interval
+  department: text("department"), // Department from master data
+  criticality: text("criticality"), // 'Yes' | 'No' for fleet jobs
+  isActive: boolean("is_active").default(true), // Active status for fleet jobs
+  applicableVesselIds: text("applicable_vessel_ids").array(), // Vessels that can use this fleet job
+  scopeNotes: text("scope_notes"), // Notes about scope applicability
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -517,6 +575,9 @@ export const workOrders = pgTable("work_orders", {
   dueDateIdx: index("idx_wo_due_date").on(table.dueDate),
   componentCodeIdx: index("idx_wo_component").on(table.componentCode),
   templateCodeIdx: index("idx_wo_template").on(table.templateCode),
+  dataScopeIdx: index("idx_wo_data_scope").on(table.dataScope),
+  fleetEquipmentCodeIdx: index("idx_wo_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
+  fleetJobCodeUniqueIdx: unique("unique_fleet_job_code").on(table.fleetJobCode, table.dataScope),
 }));
 
 export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
