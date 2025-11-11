@@ -23,6 +23,13 @@ The application utilizes a modern full-stack architecture. The frontend is built
     -   **Bulk Data Import**: Supports Machinery Components (CSV/Excel with SFI code hierarchy, auto-creation of intermediate nodes, multi-sheet support, smart validation, duplicate detection, and 24 field import), and Work Orders (auto-generated WO codes, pre-populated leaf node components, and Excel dropdowns with validations).
     -   **Alerts Tab**: Alert policy management.
     -   **Forms Tab**: Form configuration.
+    -   **Fleet Admin Dashboard (Admin 4)**: Comprehensive fleet-level master data management with federated schema design using dataScope discriminator ('fleet' | 'vessel') to distinguish fleet templates from vessel instances:
+        -   **Makers Management**: CRUD for manufacturer/vendor master data with company details.
+        -   **Master Lists Management**: Configuration repository for dropdown options and system reference data.
+        -   **Fleet Components Management**: Hierarchical tree view with SFI code structure, auto-generated Fleet Equipment Codes (XXX.XXX.XX format), full CRUD, and Excel export capabilities.
+        -   **Fleet Jobs Management**: Template work order definitions with equipment linkage, maintenance intervals, auto-generated WO codes (WO-XXXXXXX), and bulk operations.
+        -   **Fleet Spares Management**: Parts catalog with component associations, auto-generated Part Codes (PT-XXXXXXX), criticality classification, and inventory templates.
+        -   **Architecture**: All fleet entities use nullable vesselId, optional name/category fields for flexible hierarchy, auto-generated IDs, and consistent timestamp tracking. Backend provides 15 RESTful endpoints with Zod validation and dataScope enforcement.
 -   **Shared Architecture Features**: Consistent component tree structure, RESTful API with error handling, real-time stock status, and audit trails for inventory.
 
 ## External Dependencies
