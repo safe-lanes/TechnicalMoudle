@@ -21,6 +21,7 @@ function App() {
             <div className="min-h-screen bg-gray-50">
               <Switch>
                 <Route path="/" component={TechnicalModule} />
+                <Route path="/pms" component={TechnicalModule} />
                 <Route path="/pms/:subpage" component={TechnicalModule} />
                 <Route path="/spares" component={TechnicalModule} />
                 <Route path="/stores" component={TechnicalModule} />
