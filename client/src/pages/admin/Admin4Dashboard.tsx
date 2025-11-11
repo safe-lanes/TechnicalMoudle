@@ -2,11 +2,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, List, ArrowRight, ArrowLeft } from "lucide-react";
+import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
+import FleetComponentsManagement from "./FleetComponentsManagement";
+import FleetJobsManagement from "./FleetJobsManagement";
+import FleetSparesManagement from "./FleetSparesManagement";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'components' | 'jobs' | 'spares';
 
 export default function Admin4Dashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -19,8 +22,23 @@ export default function Admin4Dashboard() {
     queryKey: ['/api/fleet/master-lists'],
   });
 
+  const { data: componentsData, isLoading: isComponentsLoading } = useQuery({
+    queryKey: ['/api/fleet/components'],
+  });
+
+  const { data: jobsData, isLoading: isJobsLoading } = useQuery({
+    queryKey: ['/api/fleet/jobs'],
+  });
+
+  const { data: sparesData, isLoading: isSparesLoading } = useQuery({
+    queryKey: ['/api/fleet/spares'],
+  });
+
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
   const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
+  const totalComponents = Array.isArray(componentsData) ? componentsData.length : 0;
+  const totalJobs = Array.isArray(jobsData) ? jobsData.length : 0;
+  const totalSpares = Array.isArray(sparesData) ? sparesData.length : 0;
 
   if (currentView === 'makers') {
     return (
@@ -64,15 +82,78 @@ export default function Admin4Dashboard() {
     );
   }
 
+  if (currentView === 'components') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Fleet Components Management</h1>
+        </div>
+        <FleetComponentsManagement />
+      </div>
+    );
+  }
+
+  if (currentView === 'jobs') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Fleet Jobs Management</h1>
+        </div>
+        <FleetJobsManagement />
+      </div>
+    );
+  }
+
+  if (currentView === 'spares') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Fleet Spares Management</h1>
+        </div>
+        <FleetSparesManagement />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Fleet Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Manage equipment makers and master list configurations</p>
+          <p className="text-gray-600 mt-2">Manage fleet-level master data including makers, components, jobs, spares, and configurations</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -148,11 +229,125 @@ export default function Admin4Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Fleet Components
+              </CardTitle>
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Box className="h-5 w-5 text-purple-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end justify-between">
+                <div>
+                  {isComponentsLoading ? (
+                    <div className="h-10 w-20 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    <div 
+                      className="text-3xl font-bold text-gray-900"
+                      data-testid="widget-total-components"
+                    >
+                      {totalComponents}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">SFI hierarchy</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentView('components')}
+                  className="text-purple-600 hover:text-purple-700"
+                  data-testid="button-view-components"
+                >
+                  View All
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Fleet Jobs
+              </CardTitle>
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Wrench className="h-5 w-5 text-orange-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end justify-between">
+                <div>
+                  {isJobsLoading ? (
+                    <div className="h-10 w-20 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    <div 
+                      className="text-3xl font-bold text-gray-900"
+                      data-testid="widget-total-jobs"
+                    >
+                      {totalJobs}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Maintenance tasks</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentView('jobs')}
+                  className="text-orange-600 hover:text-orange-700"
+                  data-testid="button-view-jobs"
+                >
+                  View All
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Fleet Spares
+              </CardTitle>
+              <div className="p-2 bg-teal-100 rounded-lg">
+                <Package className="h-5 w-5 text-teal-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end justify-between">
+                <div>
+                  {isSparesLoading ? (
+                    <div className="h-10 w-20 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    <div 
+                      className="text-3xl font-bold text-gray-900"
+                      data-testid="widget-total-spares"
+                    >
+                      {totalSpares}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Spare parts catalog</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentView('spares')}
+                  className="text-teal-600 hover:text-teal-700"
+                  data-testid="button-view-spares"
+                >
+                  View All
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Links</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Button
               variant="outline"
               className="justify-start h-auto py-4 px-6"
@@ -162,7 +357,7 @@ export default function Admin4Dashboard() {
               <Building2 className="mr-3 h-5 w-5 text-blue-600" />
               <div className="text-left">
                 <div className="font-medium">Manage Makers</div>
-                <div className="text-sm text-gray-500">Add, edit, and organize equipment manufacturers</div>
+                <div className="text-sm text-gray-500">Equipment manufacturers</div>
               </div>
             </Button>
 
@@ -175,7 +370,46 @@ export default function Admin4Dashboard() {
               <List className="mr-3 h-5 w-5 text-green-600" />
               <div className="text-left">
                 <div className="font-medium">Manage Master Lists</div>
-                <div className="text-sm text-gray-500">Configure dropdown options and classifications</div>
+                <div className="text-sm text-gray-500">Dropdown configurations</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('components')}
+              data-testid="link-manage-components"
+            >
+              <Box className="mr-3 h-5 w-5 text-purple-600" />
+              <div className="text-left">
+                <div className="font-medium">Fleet Components</div>
+                <div className="text-sm text-gray-500">SFI equipment hierarchy</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('jobs')}
+              data-testid="link-manage-jobs"
+            >
+              <Wrench className="mr-3 h-5 w-5 text-orange-600" />
+              <div className="text-left">
+                <div className="font-medium">Fleet Jobs</div>
+                <div className="text-sm text-gray-500">Maintenance work orders</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('spares')}
+              data-testid="link-manage-spares"
+            >
+              <Package className="mr-3 h-5 w-5 text-teal-600" />
+              <div className="text-left">
+                <div className="font-medium">Fleet Spares</div>
+                <div className="text-sm text-gray-500">Spare parts catalog</div>
               </div>
             </Button>
           </div>
