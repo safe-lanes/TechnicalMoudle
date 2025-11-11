@@ -35,29 +35,8 @@ import {
   ClipboardCheck,
   FileCheck
 } from "lucide-react";
-import {
-  ComposedChart,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Line,
-  LineChart,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar
-} from "recharts";
+import { AgCharts } from "ag-charts-react";
+import { AgChartOptions } from "ag-charts-community";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -545,20 +524,28 @@ const Dashboard: React.FC = () => {
         
         {sparklineData && (
           <div className="h-12">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sparklineData}>
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke={color.includes('blue') ? '#3b82f6' : 
-                          color.includes('red') ? '#ef4444' :
-                          color.includes('green') ? '#10b981' : 
-                          color.includes('yellow') ? '#f59e0b' : '#6b7280'}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <AgCharts options={{
+              data: sparklineData,
+              series: [{
+                type: 'line',
+                xKey: 'date',
+                yKey: 'value',
+                stroke: color.includes('blue') ? '#3b82f6' : 
+                        color.includes('red') ? '#ef4444' :
+                        color.includes('green') ? '#10b981' : 
+                        color.includes('yellow') ? '#f59e0b' : '#6b7280',
+                strokeWidth: 2,
+                marker: { enabled: false }
+              }],
+              axes: [
+                { type: 'category', position: 'bottom', label: { enabled: false }, line: { enabled: false }, tick: { enabled: false } },
+                { type: 'number', position: 'left', label: { enabled: false }, line: { enabled: false }, gridLine: { enabled: false } }
+              ],
+              legend: { enabled: false },
+              tooltip: { enabled: false },
+              background: { visible: false },
+              padding: { top: 0, right: 0, bottom: 0, left: 0 }
+            }} />
           </div>
         )}
         
@@ -731,26 +718,26 @@ const Dashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={workOrderStatusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          dataKey="value"
-                          onClick={(data) => navigateToWorkOrders(data.name.toLowerCase())}
-                          className="cursor-pointer"
-                        >
-                          {workOrderStatusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <AgCharts options={{
+                      data: workOrderStatusData,
+                      series: [{
+                        type: 'pie',
+                        angleKey: 'value',
+                        calloutLabelKey: 'name',
+                        sectorLabelKey: 'value',
+                        fills: workOrderStatusData.map(d => d.color),
+                        strokes: workOrderStatusData.map(d => d.color)
+                      } as any],
+                      listeners: {
+                        seriesNodeClick: (event: any) => {
+                          const datum = event.datum;
+                          if (datum && datum.name) {
+                            navigateToWorkOrders(datum.name.toLowerCase());
+                          }
+                        }
+                      },
+                      legend: { enabled: true, position: 'bottom' }
+                    } as AgChartOptions} />
                   </div>
                 </CardContent>
               </Card>
@@ -765,32 +752,36 @@ const Dashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={completionTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Area 
-                          type="monotone" 
-                          dataKey="completed" 
-                          stackId="1"
-                          stroke="#10b981" 
-                          fill="#10b981" 
-                          fillOpacity={0.6}
-                          name="Completed"
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="created" 
-                          stackId="2"
-                          stroke="#3b82f6" 
-                          fill="#3b82f6" 
-                          fillOpacity={0.6}
-                          name="Created"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    <AgCharts options={{
+                      data: completionTrendData,
+                      series: [
+                        {
+                          type: 'area',
+                          xKey: 'date',
+                          yKey: 'completed',
+                          yName: 'Completed',
+                          fill: '#10b981',
+                          fillOpacity: 0.6,
+                          stroke: '#10b981',
+                          strokeWidth: 2
+                        },
+                        {
+                          type: 'area',
+                          xKey: 'date',
+                          yKey: 'created',
+                          yName: 'Created',
+                          fill: '#3b82f6',
+                          fillOpacity: 0.6,
+                          stroke: '#3b82f6',
+                          strokeWidth: 2
+                        }
+                      ],
+                      axes: [
+                        { type: 'category', position: 'bottom' },
+                        { type: 'number', position: 'left' }
+                      ],
+                      legend: { enabled: true, position: 'bottom' }
+                    }} />
                   </div>
                 </CardContent>
               </Card>
@@ -944,17 +935,36 @@ const Dashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={riskRadarData}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="category" />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                      <Radar name="Engine Dept" dataKey="engineRisk" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                      <Radar name="Deck Dept" dataKey="deckRisk" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
-                      <Legend />
-                      <Tooltip />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                  <AgCharts options={{
+                    data: riskRadarData,
+                    series: [
+                      {
+                        type: 'radar-area',
+                        angleKey: 'category',
+                        radiusKey: 'engineRisk',
+                        radiusName: 'Engine Dept',
+                        fill: '#3b82f6',
+                        fillOpacity: 0.3,
+                        stroke: '#3b82f6',
+                        strokeWidth: 2
+                      },
+                      {
+                        type: 'radar-area',
+                        angleKey: 'category',
+                        radiusKey: 'deckRisk',
+                        radiusName: 'Deck Dept',
+                        fill: '#10b981',
+                        fillOpacity: 0.3,
+                        stroke: '#10b981',
+                        strokeWidth: 2
+                      }
+                    ],
+                    axes: [
+                      { type: 'angle-category' },
+                      { type: 'radius-number', innerRadiusRatio: 0 }
+                    ],
+                    legend: { enabled: true, position: 'bottom' }
+                  }} />
                 </div>
               </CardContent>
             </Card>
@@ -1016,30 +1026,43 @@ const Dashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={upcomingMaintenanceData} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" />
-                      <Tooltip />
-                      <Bar 
-                        dataKey="critical" 
-                        stackId="a" 
-                        fill="#ef4444" 
-                        name="Critical"
-                        onClick={() => navigateToWorkOrders('critical')}
-                        className="cursor-pointer"
-                      />
-                      <Bar 
-                        dataKey="routine" 
-                        stackId="a" 
-                        fill="#10b981" 
-                        name="Routine"
-                        onClick={() => navigateToWorkOrders('routine')}
-                        className="cursor-pointer"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <AgCharts options={{
+                    data: upcomingMaintenanceData,
+                    series: [
+                      {
+                        type: 'bar',
+                        xKey: 'name',
+                        yKey: 'critical',
+                        yName: 'Critical',
+                        fill: '#ef4444',
+                        strokeWidth: 0,
+                        stacked: true
+                      },
+                      {
+                        type: 'bar',
+                        xKey: 'name',
+                        yKey: 'routine',
+                        yName: 'Routine',
+                        fill: '#10b981',
+                        strokeWidth: 0,
+                        stacked: true
+                      }
+                    ] as any,
+                    axes: [
+                      { type: 'category', position: 'bottom' },
+                      { type: 'number', position: 'left' }
+                    ] as any,
+                    listeners: {
+                      seriesNodeClick: (event: any) => {
+                        if (event.yKey === 'critical') {
+                          navigateToWorkOrders('critical');
+                        } else if (event.yKey === 'routine') {
+                          navigateToWorkOrders('routine');
+                        }
+                      }
+                    },
+                    legend: { enabled: true, position: 'bottom' }
+                  } as AgChartOptions} />
                 </div>
               </CardContent>
             </Card>
