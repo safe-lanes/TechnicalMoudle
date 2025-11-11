@@ -50,10 +50,10 @@ export type RunningHoursAudit = typeof runningHoursAudit.$inferSelect;
 // Components Table (for storing current cumulative RH)
 export const components = pgTable("components", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name"), // Nullable - only required when dataScope='vessel'
   componentCode: text("component_code"),
   parentId: text("parent_id"),
-  category: text("category").notNull(),
+  category: text("category"), // Nullable - only required when dataScope='vessel'
   currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
   lastUpdated: text("last_updated"),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
@@ -107,6 +107,7 @@ export const components = pgTable("components", {
 }));
 
 export const insertComponentSchema = createInsertSchema(components).omit({
+  id: true, // Auto-generated
   createdAt: true,
   updatedAt: true,
 });

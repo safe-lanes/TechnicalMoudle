@@ -13,25 +13,7 @@
     null,
     null,
     null,
-    {
-      "id": "6",
-      "componentCode": "6",
-      "name": "MACHINERY MAIN COMPONENTS",
-      "category": "6 6 Machinery Main Components",
-      "parentId": null,
-      "vesselId": "V001",
-      "currentCumulativeRH": "0",
-      "critical": false,
-      "classItem": false,
-      "lastUpdated": "2025-11-04",
-      "maker": null,
-      "model": null,
-      "serialNo": null,
-      "deptCategory": null,
-      "componentCategory": "6 6 Machinery Main Components",
-      "location": null,
-      "commissionedDate": null
-    },
+    null,
     {
       "id": "7",
       "componentCode": "7",
@@ -324810,26 +324792,6 @@
       "originalName": "new format_1762491409433.xlsx"
     }
   ],
-  "counters": {
-    "userId": 1,
-    "auditId": 1,
-    "spareId": 1,
-    "historyId": 1,
-    "changeRequestId": 1,
-    "attachmentId": 1,
-    "commentId": 1,
-    "alertPolicyId": 1,
-    "alertEventId": 1,
-    "alertDeliveryId": 1,
-    "alertConfigId": 1,
-    "formDefinitionId": 1,
-    "formVersionId": 1,
-    "workOrderId": 25,
-    "defectId": 49,
-    "defectActionId": 1,
-    "defectAttachmentId": 1,
-    "recurringDefectId": 87
-  },
   "makers": [
     {
       "id": 1,
@@ -324853,5 +324815,25 @@
       "isActive": true,
       "createdAt": "2025-11-11T04:49:28.598Z"
     }
-  ]
+  ],
+  "counters": {
+    "userId": 1,
+    "auditId": 1,
+    "spareId": 1,
+    "historyId": 1,
+    "changeRequestId": 1,
+    "attachmentId": 1,
+    "commentId": 1,
+    "alertPolicyId": 1,
+    "alertEventId": 1,
+    "alertDeliveryId": 1,
+    "alertConfigId": 1,
+    "formDefinitionId": 1,
+    "formVersionId": 1,
+    "workOrderId": 25,
+    "defectId": 49,
+    "defectActionId": 1,
+    "defectAttachmentId": 1,
+    "recurringDefectId": 87
+  }
 }

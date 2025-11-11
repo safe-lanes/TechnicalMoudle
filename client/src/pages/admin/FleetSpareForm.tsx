@@ -198,7 +198,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
               </SelectTrigger>
               <SelectContent>
                 {components?.filter(c => c.fleetEquipmentCode).map((comp) => (
-                  <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
+                  <SelectItem key={comp.id} value={comp.fleetEquipmentCode!}>
                     {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
                   </SelectItem>
                 ))}
@@ -320,14 +320,14 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
             <div className="space-y-2">
               <Label htmlFor="criticality">Criticality</Label>
               <Select
-                value={form.watch("criticality") || ""}
-                onValueChange={(value) => form.setValue("criticality", value)}
+                value={form.watch("criticality") || "none"}
+                onValueChange={(value) => form.setValue("criticality", value === "none" ? undefined : value)}
               >
                 <SelectTrigger data-testid="select-criticality">
                   <SelectValue placeholder="Select criticality" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   <SelectItem value="Yes">Yes</SelectItem>
                   <SelectItem value="No">No</SelectItem>
                 </SelectContent>

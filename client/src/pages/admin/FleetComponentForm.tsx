@@ -202,16 +202,16 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
           <div className="space-y-2">
             <Label htmlFor="parentFleetEquipmentCode">Parent Component</Label>
             <Select
-              value={form.watch("parentFleetEquipmentCode") || ""}
-              onValueChange={(value) => form.setValue("parentFleetEquipmentCode", value || undefined)}
+              value={form.watch("parentFleetEquipmentCode") || "none"}
+              onValueChange={(value) => form.setValue("parentFleetEquipmentCode", value === "none" ? undefined : value)}
             >
               <SelectTrigger data-testid="select-parent-component">
                 <SelectValue placeholder="Select parent (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Top Level)</SelectItem>
-                {parentOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.fleetEquipmentCode || ""}>
+                <SelectItem value="none">None (Top Level)</SelectItem>
+                {parentOptions.filter(c => c.fleetEquipmentCode).map((c) => (
+                  <SelectItem key={c.id} value={c.fleetEquipmentCode!}>
                     {c.fleetEquipmentCode} - {c.fleetEquipmentName}
                   </SelectItem>
                 ))}

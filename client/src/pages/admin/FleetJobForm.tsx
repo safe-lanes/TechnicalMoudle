@@ -193,7 +193,7 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
               </SelectTrigger>
               <SelectContent>
                 {components?.filter(c => c.fleetEquipmentCode).map((comp) => (
-                  <SelectItem key={comp.id} value={comp.fleetEquipmentCode || ""}>
+                  <SelectItem key={comp.id} value={comp.fleetEquipmentCode!}>
                     {comp.fleetEquipmentCode} - {comp.fleetEquipmentName}
                   </SelectItem>
                 ))}
