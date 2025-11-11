@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import Papa from "papaparse";
@@ -1464,6 +1464,258 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   }
+  
+  // Fleet Admin - Components Routes
+  
+  // Get all fleet components
+  app.get("/api/fleet/components", async (req, res) => {
+    try {
+      const components = await storage.getFleetComponents();
+      res.json(components);
+    } catch (error) {
+      console.error("Error fetching fleet components:", error);
+      res.status(500).json({ error: "Failed to fetch fleet components" });
+    }
+  });
+  
+  // Get fleet component by ID
+  app.get("/api/fleet/components/:id", async (req, res) => {
+    try {
+      const component = await storage.getFleetComponent(req.params.id);
+      if (!component) {
+        return res.status(404).json({ error: "Fleet component not found" });
+      }
+      res.json(component);
+    } catch (error) {
+      console.error("Error fetching fleet component:", error);
+      res.status(500).json({ error: "Failed to fetch fleet component" });
+    }
+  });
+  
+  // Create new fleet component
+  app.post("/api/fleet/components", async (req, res) => {
+    try {
+      const validatedData = insertComponentSchema.parse(req.body);
+      const component = await storage.createFleetComponent(validatedData);
+      res.status(201).json(component);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid component data", details: error.errors });
+      }
+      if (error.message?.includes('must have dataScope') || error.message?.includes('cannot have vesselId') || error.message?.includes('not found')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error creating fleet component:", error);
+      res.status(500).json({ error: error.message || "Failed to create fleet component" });
+    }
+  });
+  
+  // Update fleet component
+  app.patch("/api/fleet/components/:id", async (req, res) => {
+    try {
+      const partialComponentSchema = insertComponentSchema.partial();
+      const validatedData = partialComponentSchema.parse(req.body);
+      const component = await storage.updateFleetComponent(req.params.id, validatedData);
+      res.json(component);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid component data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('not a fleet component') || error.message?.includes('Cannot change dataScope') || error.message?.includes('Cannot assign vesselId')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error updating fleet component:", error);
+      res.status(500).json({ error: "Failed to update fleet component" });
+    }
+  });
+  
+  // Delete fleet component
+  app.delete("/api/fleet/components/:id", async (req, res) => {
+    try {
+      await storage.deleteFleetComponent(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('with child components')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error deleting fleet component:", error);
+      res.status(500).json({ error: "Failed to delete fleet component" });
+    }
+  });
+  
+  // Fleet Admin - Jobs Routes
+  
+  // Get all fleet jobs
+  app.get("/api/fleet/jobs", async (req, res) => {
+    try {
+      const jobs = await storage.getFleetJobs();
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching fleet jobs:", error);
+      res.status(500).json({ error: "Failed to fetch fleet jobs" });
+    }
+  });
+  
+  // Get fleet job by ID
+  app.get("/api/fleet/jobs/:id", async (req, res) => {
+    try {
+      const job = await storage.getFleetJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Fleet job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error("Error fetching fleet job:", error);
+      res.status(500).json({ error: "Failed to fetch fleet job" });
+    }
+  });
+  
+  // Create new fleet job
+  app.post("/api/fleet/jobs", async (req, res) => {
+    try {
+      const validatedData = insertWorkOrderSchema.parse(req.body);
+      const job = await storage.createFleetJob(validatedData);
+      res.status(201).json(job);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      if (error.message?.includes('must have dataScope') || error.message?.includes('cannot have vesselId') || error.message?.includes('not found')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error creating fleet job:", error);
+      res.status(500).json({ error: error.message || "Failed to create fleet job" });
+    }
+  });
+  
+  // Update fleet job
+  app.patch("/api/fleet/jobs/:id", async (req, res) => {
+    try {
+      const partialJobSchema = insertWorkOrderSchema.partial();
+      const validatedData = partialJobSchema.parse(req.body);
+      const job = await storage.updateFleetJob(req.params.id, validatedData);
+      res.json(job);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('not a fleet') || error.message?.includes('Cannot change dataScope') || error.message?.includes('Cannot assign vesselId')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error updating fleet job:", error);
+      res.status(500).json({ error: "Failed to update fleet job" });
+    }
+  });
+  
+  // Delete fleet job
+  app.delete("/api/fleet/jobs/:id", async (req, res) => {
+    try {
+      await storage.deleteFleetJob(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('not a fleet')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error deleting fleet job:", error);
+      res.status(500).json({ error: "Failed to delete fleet job" });
+    }
+  });
+  
+  // Fleet Admin - Spares Routes
+  
+  // Get all fleet spares
+  app.get("/api/fleet/spares", async (req, res) => {
+    try {
+      const spares = await storage.getFleetSpares();
+      res.json(spares);
+    } catch (error) {
+      console.error("Error fetching fleet spares:", error);
+      res.status(500).json({ error: "Failed to fetch fleet spares" });
+    }
+  });
+  
+  // Get fleet spare by ID
+  app.get("/api/fleet/spares/:id", async (req, res) => {
+    try {
+      const spare = await storage.getFleetSpare(parseInt(req.params.id));
+      if (!spare) {
+        return res.status(404).json({ error: "Fleet spare not found" });
+      }
+      res.json(spare);
+    } catch (error) {
+      console.error("Error fetching fleet spare:", error);
+      res.status(500).json({ error: "Failed to fetch fleet spare" });
+    }
+  });
+  
+  // Create new fleet spare
+  app.post("/api/fleet/spares", async (req, res) => {
+    try {
+      const validatedData = insertSpareSchema.parse(req.body);
+      const spare = await storage.createFleetSpare(validatedData);
+      res.status(201).json(spare);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid spare data", details: error.errors });
+      }
+      if (error.message?.includes('must have dataScope') || error.message?.includes('cannot have vesselId') || error.message?.includes('not found')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error creating fleet spare:", error);
+      res.status(500).json({ error: error.message || "Failed to create fleet spare" });
+    }
+  });
+  
+  // Update fleet spare
+  app.patch("/api/fleet/spares/:id", async (req, res) => {
+    try {
+      const partialSpareSchema = insertSpareSchema.partial();
+      const validatedData = partialSpareSchema.parse(req.body);
+      const spare = await storage.updateFleetSpare(parseInt(req.params.id), validatedData);
+      res.json(spare);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid spare data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('not a fleet') || error.message?.includes('Cannot change dataScope') || error.message?.includes('Cannot assign vesselId')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error updating fleet spare:", error);
+      res.status(500).json({ error: "Failed to update fleet spare" });
+    }
+  });
+  
+  // Delete fleet spare
+  app.delete("/api/fleet/spares/:id", async (req, res) => {
+    try {
+      await storage.deleteFleetSpare(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('not a fleet')) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error deleting fleet spare:", error);
+      res.status(500).json({ error: "Failed to delete fleet spare" });
+    }
+  });
   
   // Fleet Admin - Makers Routes
   
