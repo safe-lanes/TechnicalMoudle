@@ -16,8 +16,7 @@ import {
   BarChart3,
   Activity,
   Wrench,
-  Shield,
-  DollarSign
+  Shield
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
@@ -311,36 +310,6 @@ const Dashboard = () => {
     ];
   }, [filteredWorkOrders]);
 
-  // Financial data: Weekly maintenance cost trends - based on work order volume
-  const financialData = useMemo(() => {
-    const weeks = 12;
-    const data = [];
-    
-    for (let i = 0; i < weeks; i++) {
-      const weekStart = subDays(new Date(), (weeks - i) * 7);
-      const weekEnd = subDays(new Date(), (weeks - i - 1) * 7);
-      
-      // Count WOs in this week
-      const weekWOs = filteredWorkOrders.filter(wo => {
-        const woDate = new Date(wo.createdAt);
-        return woDate >= weekStart && woDate < weekEnd;
-      });
-      
-      const baseCost = weekWOs.length * 1050; // Avg $1050 per WO
-      const variance = weekWOs.length * 200;  // Cost variance
-      
-      data.push({
-        week: `Week ${i + 1}`,
-        open: baseCost,
-        high: baseCost + variance,
-        low: Math.max(baseCost - variance, 0),
-        close: baseCost + (weekWOs.length % 2 === 0 ? variance / 2 : -variance / 2),
-        date: format(weekStart, 'MMM dd')
-      });
-    }
-    return data;
-  }, [filteredWorkOrders]);
-
   // Equipment category performance metrics
   const equipmentPerformanceData = useMemo(() => {
     const categories = ['Main Engine', 'Auxiliary Machinery', 'Pumps & Systems', 'Deck Machinery', 'Safety Equipment', 'Navigation & Electronics'];
@@ -459,7 +428,7 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto" data-testid="tabs-navigation">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto" data-testid="tabs-navigation">
             <TabsTrigger value="overview" data-testid="tab-overview">
               <BarChart3 className="w-4 h-4 mr-2" />
               Overview
@@ -475,10 +444,6 @@ const Dashboard = () => {
             <TabsTrigger value="compliance" data-testid="tab-compliance">
               <Shield className="w-4 h-4 mr-2" />
               Compliance
-            </TabsTrigger>
-            <TabsTrigger value="financial" data-testid="tab-financial">
-              <DollarSign className="w-4 h-4 mr-2" />
-              Financial
             </TabsTrigger>
           </TabsList>
 
@@ -1002,120 +967,6 @@ const Dashboard = () => {
                         { type: 'number', position: 'left', title: { text: 'Cost ($)' } }
                       ] as any,
                       legend: { enabled: false }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* FINANCIAL TAB */}
-          <TabsContent value="financial" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Candlestick Chart */}
-              <Card data-testid="card-candlestick">
-                <CardHeader>
-                  <CardTitle>Maintenance Cost Trends</CardTitle>
-                  <CardDescription>Weekly cost fluctuations with anomaly detection</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: financialData,
-                      series: [
-                        {
-                          type: 'line',
-                          xKey: 'week',
-                          yKey: 'high',
-                          yName: 'High',
-                          stroke: '#ef4444',
-                          strokeWidth: 2,
-                          marker: { enabled: true, size: 6 }
-                        },
-                        {
-                          type: 'line',
-                          xKey: 'week',
-                          yKey: 'low',
-                          yName: 'Low',
-                          stroke: '#10b981',
-                          strokeWidth: 2,
-                          marker: { enabled: true, size: 6 }
-                        },
-                        {
-                          type: 'line',
-                          xKey: 'week',
-                          yKey: 'close',
-                          yName: 'Actual',
-                          stroke: '#3b82f6',
-                          strokeWidth: 3,
-                          marker: { enabled: true, size: 8 }
-                        }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Cost ($)' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Resource Usage Area Chart */}
-              <Card data-testid="card-resource-usage">
-                <CardHeader>
-                  <CardTitle>Resource Usage Analytics</CardTitle>
-                  <CardDescription>Cost trends by department over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: timeSeriesData.map((d, i) => ({
-                        ...d,
-                        engine: Math.floor(Math.random() * 5000) + 3000,
-                        deck: Math.floor(Math.random() * 3000) + 2000,
-                        electrical: Math.floor(Math.random() * 2000) + 1000
-                      })),
-                      series: [
-                        {
-                          type: 'area',
-                          xKey: 'date',
-                          yKey: 'engine',
-                          yName: 'Engine',
-                          fill: '#3b82f6',
-                          fillOpacity: 0.5,
-                          stroke: '#3b82f6',
-                          strokeWidth: 2,
-                          stacked: true
-                        },
-                        {
-                          type: 'area',
-                          xKey: 'date',
-                          yKey: 'deck',
-                          yName: 'Deck',
-                          fill: '#10b981',
-                          fillOpacity: 0.5,
-                          stroke: '#10b981',
-                          strokeWidth: 2,
-                          stacked: true
-                        },
-                        {
-                          type: 'area',
-                          xKey: 'date',
-                          yKey: 'electrical',
-                          yName: 'Electrical',
-                          fill: '#f59e0b',
-                          fillOpacity: 0.5,
-                          stroke: '#f59e0b',
-                          strokeWidth: 2,
-                          stacked: true
-                        }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Cost ($)' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
                     } as AgChartOptions} />
                   </div>
                 </CardContent>
