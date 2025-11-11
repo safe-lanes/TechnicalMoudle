@@ -291,25 +291,6 @@ const Dashboard = () => {
     }).filter(d => d.value > 0); // Only show departments with work orders
   }, [filteredWorkOrders]);
 
-  // Waterfall chart data: Cost breakdown analysis - based on work order data
-  const waterfallData = useMemo(() => {
-    const totalWOs = filteredWorkOrders.length;
-    const baselineCost = totalWOs * 500;  // $500 baseline per WO
-    const laborCost = totalWOs * 350;     // Labor
-    const partsCost = totalWOs * 520;     // Parts
-    const servicesCost = totalWOs * 180;  // Services
-    const contingency = totalWOs * 100;   // Contingency
-    
-    return [
-      { category: 'Baseline Budget', value: baselineCost, type: 'total' },
-      { category: 'Labor Costs', value: laborCost, type: 'increase' },
-      { category: 'Parts & Materials', value: partsCost, type: 'increase' },
-      { category: 'External Services', value: servicesCost, type: 'increase' },
-      { category: 'Contingency', value: -contingency, type: 'decrease' },
-      { category: 'Total Spent', value: baselineCost + laborCost + partsCost + servicesCost - contingency, type: 'total' }
-    ];
-  }, [filteredWorkOrders]);
-
   // Equipment category performance metrics
   const equipmentPerformanceData = useMemo(() => {
     const categories = ['Main Engine', 'Auxiliary Machinery', 'Pumps & Systems', 'Deck Machinery', 'Safety Equipment', 'Navigation & Electronics'];
@@ -908,7 +889,7 @@ const Dashboard = () => {
 
           {/* COMPLIANCE TAB */}
           <TabsContent value="compliance" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Certificate Status Pie */}
               <Card data-testid="card-compliance-status">
                 <CardHeader>
@@ -932,41 +913,6 @@ const Dashboard = () => {
                         strokes: ['#10b981', '#f59e0b', '#ef4444']
                       } as any],
                       legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Waterfall Chart: Cost Breakdown */}
-              <Card data-testid="card-waterfall">
-                <CardHeader>
-                  <CardTitle>Maintenance Cost Breakdown</CardTitle>
-                  <CardDescription>Contribution analysis - Waterfall view</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: waterfallData,
-                      series: [{
-                        type: 'bar',
-                        xKey: 'category',
-                        yKey: 'value',
-                        fill: (params: any) => {
-                          if (params.datum.type === 'total') return '#3b82f6';
-                          if (params.datum.type === 'increase') return '#10b981';
-                          return '#ef4444';
-                        },
-                        tooltip: {
-                          renderer: (params: any) => ({
-                            content: `${params.datum.category}<br/>$${params.datum.value.toLocaleString()}`
-                          })
-                        }
-                      } as any],
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Cost ($)' } }
-                      ] as any,
-                      legend: { enabled: false }
                     } as AgChartOptions} />
                   </div>
                 </CardContent>
