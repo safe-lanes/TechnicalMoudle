@@ -1,0 +1,57 @@
+'------------------------------ SUMMARY ------------------------------
+'Macro Name : Assign_ParentFleetEquipmentCode
+'Purpose    : Assign Parent Fleet Equipment Codes in Column A of
+'             "Fleet_Component Sheet".
+'
+'PROCESS FLOW:
+'1. Skip first 3 rows — start from row 4.
+'2. Set Column A to Text format.
+'3. Extract the first 7 digits (leftmost characters) of the
+'   Fleet Equipment Code from Column B.
+'4. Write that value in Column A (Parent Fleet Equipment Code).
+'5. If Column B is blank, skip the row.
+'6. Show completion popup at the end.
+'----------------------------------------------------------------------
+
+Sub Assign_ParentFleetEquipmentCode()
+
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim fleetCode As String
+    Dim parentCode As String
+
+    On Error GoTo ErrHandler
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+
+    '--- Set the worksheet ---
+    Set ws = ThisWorkbook.Sheets("Fleet_Component Sheet")
+
+    '--- Ensure Column A is Text Format ---
+    ws.Columns("A").NumberFormat = "@"
+
+    '--- Find last row based on Column B ---
+    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+
+    '--- Loop through rows ---
+    For i = 4 To lastRow
+        fleetCode = Trim(ws.Cells(i, "B").Value)
+        If fleetCode <> "" Then
+            parentCode = Left(fleetCode, 7)
+            ws.Cells(i, "A").Value = parentCode
+        End If
+    Next i
+
+    MsgBox "? Parent Fleet Equipment Codes Assigned Successfully!", vbInformation
+    GoTo CleanExit
+
+ErrHandler:
+    MsgBox "? Error: " & Err.Description, vbCritical
+
+CleanExit:
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+
+End Sub
+
