@@ -56,7 +56,7 @@ export const components = pgTable("components", {
   category: text("category").notNull(),
   currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
   lastUpdated: text("last_updated"),
-  vesselId: text("vessel_id").notNull().default("V001"),
+  vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   vesselCode: text("vessel_code"), // Vessel identification code
   dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel' - discriminator for fleet vs vessel data
   // Fleet Equipment fields (from Fleet_Component Sheet)
@@ -234,7 +234,7 @@ export const spares = pgTable("spares", {
   rob: integer("rob").notNull().default(0), // Remaining on Board
   min: integer("min").notNull().default(0), // Minimum stock
   location: text("location"),
-  vesselId: text("vessel_id").default("V001"), // Nullable for fleet spares
+  vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   deleted: boolean("deleted").notNull().default(false),
   // Fleet-specific fields (when dataScope='fleet')
   dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
@@ -523,7 +523,7 @@ export type AlertConfig = typeof alertConfig.$inferSelect;
 // Work Orders Table
 export const workOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
-  vesselId: text("vessel_id").default("V001"), // Nullable for fleet jobs
+  vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),
   componentCode: text("component_code"),
   workOrderNo: text("work_order_no").notNull(),

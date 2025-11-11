@@ -612,57 +612,105 @@ export class MemStorage implements IStorage {
     return {};
   }
 
+  // Helper to create vessel component with all required fields
+  private createVesselComponent(data: Partial<Component> & { id: string; name: string; category: string }): Component {
+    const now = new Date();
+    return {
+      id: data.id,
+      name: data.name,
+      componentCode: data.componentCode || null,
+      parentId: data.parentId || null,
+      category: data.category,
+      currentCumulativeRH: data.currentCumulativeRH || "0",
+      lastUpdated: data.lastUpdated || null,
+      vesselId: data.vesselId || null,
+      vesselCode: data.vesselCode || null,
+      dataScope: "vessel", // All these are vessel-level components
+      fleetEquipmentCode: data.fleetEquipmentCode || null,
+      fleetEquipmentName: data.fleetEquipmentName || null,
+      parentFleetEquipmentCode: data.parentFleetEquipmentCode || null,
+      maker: data.maker || null,
+      makerCode: data.makerCode || null,
+      model: data.model || null,
+      modelNumber: data.modelNumber || null,
+      modelCode: data.modelCode || null,
+      serialNo: data.serialNo || null,
+      drawingNo: data.drawingNo || null,
+      department: data.department || null,
+      deptCategory: data.deptCategory || null,
+      componentCategory: data.componentCategory || null,
+      location: data.location || null,
+      eqptSystemDept: data.eqptSystemDept || null,
+      commissionedDate: data.commissionedDate || null,
+      installationDate: data.installationDate || null,
+      critical: data.critical || false,
+      classItem: data.classItem || false,
+      conditionBased: data.conditionBased || false,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      rating: data.rating || null,
+      noOfUnits: data.noOfUnits || null,
+      parentComponent: data.parentComponent || null,
+      dimensionsSize: data.dimensionsSize || null,
+      notes: data.notes || null,
+      runningHours: data.runningHours || null,
+      applicableVesselIds: data.applicableVesselIds || null,
+      scopeNotes: data.scopeNotes || null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   private initializeComponents() {
     // Create hierarchical component structure for MV Test Vessel
     const sampleComponents: Component[] = [
       // Top level - Ship groups
-      { id: "1", name: "Ship General", componentCode: "1", parentId: null, vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "2", name: "Hull", componentCode: "2", parentId: null, vesselId: "MV Test Vessel", category: "Hull", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "3", name: "Equipment for Cargo", componentCode: "3", parentId: null, vesselId: "MV Test Vessel", category: "Equipment for Cargo", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "4", name: "Ship's Equipment", componentCode: "4", parentId: null, vesselId: "MV Test Vessel", category: "Ship's Equipment", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "5", name: "Equipment for Crew & Passengers", componentCode: "5", parentId: null, vesselId: "MV Test Vessel", category: "Equipment for Crew & Passengers", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "6", name: "Machinery Main Components", componentCode: "6", parentId: null, vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "7", name: "Systems for Machinery Main Components", componentCode: "7", parentId: null, vesselId: "MV Test Vessel", category: "Systems for Machinery Main Components", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "8", name: "Ship Common Systems", componentCode: "8", parentId: null, vesselId: "MV Test Vessel", category: "Ship Common Systems", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
+      this.createVesselComponent({ id: "1", name: "Ship General", componentCode: "1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "2", name: "Hull", componentCode: "2", vesselId: "MV Test Vessel", category: "Hull", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "3", name: "Equipment for Cargo", componentCode: "3", vesselId: "MV Test Vessel", category: "Equipment for Cargo", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "4", name: "Ship's Equipment", componentCode: "4", vesselId: "MV Test Vessel", category: "Ship's Equipment", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "5", name: "Equipment for Crew & Passengers", componentCode: "5", vesselId: "MV Test Vessel", category: "Equipment for Crew & Passengers", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "6", name: "Machinery Main Components", componentCode: "6", vesselId: "MV Test Vessel", category: "Machinery Main Components", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "7", name: "Systems for Machinery Main Components", componentCode: "7", vesselId: "MV Test Vessel", category: "Systems for Machinery Main Components", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "8", name: "Ship Common Systems", componentCode: "8", vesselId: "MV Test Vessel", category: "Ship Common Systems", lastUpdated: "02-Jun-2025" }),
       
       // Level 2 - Under Ship General
-      { id: "1.1", name: "Fresh Water System", componentCode: "1.1", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "1.2", name: "Sewage Treatment System", componentCode: "1.2", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "1.3", name: "HVAC – Accommodation", componentCode: "1.3", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
+      this.createVesselComponent({ id: "1.1", name: "Fresh Water System", componentCode: "1.1", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "1.2", name: "Sewage Treatment System", componentCode: "1.2", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "1.3", name: "HVAC – Accommodation", componentCode: "1.3", parentId: "1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
       
       // Level 3 - Under Fresh Water System
-      { id: "1.1.1", name: "Hydrophore Unit", componentCode: "1.1.1", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "1.1.2", name: "Potable Water Maker", componentCode: "1.1.2", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "1.1.3", name: "UV Sterilizer", componentCode: "1.1.3", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
+      this.createVesselComponent({ id: "1.1.1", name: "Hydrophore Unit", componentCode: "1.1.1", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "1.1.2", name: "Potable Water Maker", componentCode: "1.1.2", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "1.1.3", name: "UV Sterilizer", componentCode: "1.1.3", parentId: "1.1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025" }),
       
       // Level 4 - Under Hydrophore Unit
-      { id: "1.1.1.1", name: "Pressure Vessel", componentCode: "1.1.1.1", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025",
-        maker: "ACME Marine", model: "PV-2000", serialNo: "PV2024001", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: false },
-      { id: "1.1.1.2", name: "Feed Pump", componentCode: "1.1.1.2", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "12450", lastUpdated: "02-Jun-2025",
-        maker: "Grundfos", model: "CR32-4", serialNo: "GF2024002", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true },
-      { id: "1.1.1.3", name: "Pressure Switch", componentCode: "1.1.1.3", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025",
-        maker: "Danfoss", model: "KP35", serialNo: "DF2024003", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: false, classItem: false },
+      this.createVesselComponent({ id: "1.1.1.1", name: "Pressure Vessel", componentCode: "1.1.1.1", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025",
+        maker: "ACME Marine", model: "PV-2000", serialNo: "PV2024001", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true }),
+      this.createVesselComponent({ id: "1.1.1.2", name: "Feed Pump", componentCode: "1.1.1.2", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", currentCumulativeRH: "12450", lastUpdated: "02-Jun-2025",
+        maker: "Grundfos", model: "CR32-4", serialNo: "GF2024002", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true }),
+      this.createVesselComponent({ id: "1.1.1.3", name: "Pressure Switch", componentCode: "1.1.1.3", parentId: "1.1.1", vesselId: "MV Test Vessel", category: "Ship General", lastUpdated: "02-Jun-2025",
+        maker: "Danfoss", model: "KP35", serialNo: "DF2024003", deptCategory: "Engineering", componentCategory: "Ship General", location: "Engine Room", commissionedDate: "01-Jan-2020" }),
       
       // Level 2 - Under Machinery Main Components
-      { id: "6.1", name: "Diesel Engines", componentCode: "6.1", parentId: "6", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "6.2", name: "Turbines", componentCode: "6.2", parentId: "6", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "0", lastUpdated: "02-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
+      this.createVesselComponent({ id: "6.1", name: "Diesel Engines", componentCode: "6.1", parentId: "6", vesselId: "MV Test Vessel", category: "Machinery Main Components", lastUpdated: "02-Jun-2025" }),
+      this.createVesselComponent({ id: "6.2", name: "Turbines", componentCode: "6.2", parentId: "6", vesselId: "MV Test Vessel", category: "Machinery Main Components", lastUpdated: "02-Jun-2025" }),
       
       // Level 3 - Under Diesel Engines
-      { id: "6.1.1", name: "Main Engine", componentCode: "6.1.1", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "6.1.2", name: "Auxiliary Engine #1", componentCode: "6.1.2", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "15670", lastUpdated: "09-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
-      { id: "6.1.3", name: "Auxiliary Engine #2", componentCode: "6.1.3", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "14980", lastUpdated: "16-Jun-2025", maker: null, model: null, serialNo: null, deptCategory: null, componentCategory: null, location: null, commissionedDate: null, critical: false, classItem: false },
+      this.createVesselComponent({ id: "6.1.1", name: "Main Engine", componentCode: "6.1.1", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025" }),
+      this.createVesselComponent({ id: "6.1.2", name: "Auxiliary Engine #1", componentCode: "6.1.2", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "15670", lastUpdated: "09-Jun-2025" }),
+      this.createVesselComponent({ id: "6.1.3", name: "Auxiliary Engine #2", componentCode: "6.1.3", parentId: "6.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "14980", lastUpdated: "16-Jun-2025" }),
       
       // Level 4 - Under Main Engine
-      { id: "6.1.1.1", name: "Crankshaft", componentCode: "6.1.1.1", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
-        maker: "MAN B&W", model: "6S60MC-C", serialNo: "MB2020001", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true },
-      { id: "6.1.1.2", name: "Cylinder Liners", componentCode: "6.1.1.2", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
-        maker: "MAN B&W", model: "CL-600", serialNo: "MB2020002", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true },
-      { id: "6.1.1.3", name: "Piston & Piston Rod", componentCode: "6.1.1.3", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
-        maker: "MAN B&W", model: "PR-600", serialNo: "MB2020003", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true },
-      { id: "6.1.1.4", name: "Connecting Rod", componentCode: "6.1.1.4", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
-        maker: "MAN B&W", model: "CR-600", serialNo: "MB2020004", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: false },
-      { id: "6.1.1.5", name: "Camshaft", componentCode: "6.1.1.5", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
-        maker: "MAN B&W", model: "CS-600", serialNo: "MB2020005", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: false }
+      this.createVesselComponent({ id: "6.1.1.1", name: "Crankshaft", componentCode: "6.1.1.1", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
+        maker: "MAN B&W", model: "6S60MC-C", serialNo: "MB2020001", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true }),
+      this.createVesselComponent({ id: "6.1.1.2", name: "Cylinder Liners", componentCode: "6.1.1.2", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
+        maker: "MAN B&W", model: "CL-600", serialNo: "MB2020002", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true }),
+      this.createVesselComponent({ id: "6.1.1.3", name: "Piston & Piston Rod", componentCode: "6.1.1.3", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
+        maker: "MAN B&W", model: "PR-600", serialNo: "MB2020003", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true, classItem: true }),
+      this.createVesselComponent({ id: "6.1.1.4", name: "Connecting Rod", componentCode: "6.1.1.4", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
+        maker: "MAN B&W", model: "CR-600", serialNo: "MB2020004", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true }),
+      this.createVesselComponent({ id: "6.1.1.5", name: "Camshaft", componentCode: "6.1.1.5", parentId: "6.1.1", vesselId: "MV Test Vessel", category: "Machinery Main Components", currentCumulativeRH: "12580", lastUpdated: "30-Jun-2025",
+        maker: "MAN B&W", model: "CS-600", serialNo: "MB2020005", deptCategory: "Engineering", componentCategory: "Machinery Main Components", location: "Engine Room", commissionedDate: "01-Jan-2020", critical: true })
     ];
     
     sampleComponents.forEach(comp => this.components.set(comp.id, comp));
@@ -685,6 +733,10 @@ export class MemStorage implements IStorage {
     return user;
   }
 
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
   // Running Hours methods
   async getComponents(vesselId: string): Promise<Component[]> {
     return Array.from(this.components.values()).filter(c => c.vesselId === vesselId);
@@ -695,13 +747,16 @@ export class MemStorage implements IStorage {
   }
 
   async createComponent(insertComponent: InsertComponent): Promise<Component> {
+    const now = new Date();
     const component: Component = {
       ...insertComponent,
       id: insertComponent.componentCode || insertComponent.id,
       currentCumulativeRH: insertComponent.currentCumulativeRH || "0",
       lastUpdated: new Date().toISOString(),
       critical: insertComponent.critical ?? false,
-      classItem: insertComponent.classItem ?? false
+      classItem: insertComponent.classItem ?? false,
+      createdAt: now,
+      updatedAt: now
     };
     this.components.set(component.id, component);
     return component;
