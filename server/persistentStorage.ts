@@ -42,7 +42,11 @@ import {
   type ImportHistory,
   type InsertImportHistory,
   type RecurringDefect,
-  type RecurringDefectLink
+  type RecurringDefectLink,
+  type Maker,
+  type InsertMaker,
+  type MasterList,
+  type InsertMasterList
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -69,6 +73,8 @@ interface PersistentData {
   recurringDefects: Record<number, RecurringDefect>;
   recurringDefectLinks: RecurringDefectLink[];
   importHistory: ImportHistory[];
+  makers: Maker[];
+  masterLists: MasterList[];
   
   // Counter state
   counters: {
@@ -271,6 +277,8 @@ export class PersistentFileStorage implements IStorage {
       recurringDefects: {},
       recurringDefectLinks: [],
       importHistory: [],
+      makers: [],
+      masterLists: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -2599,5 +2607,137 @@ export class PersistentFileStorage implements IStorage {
 
   async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
     return this.data.importHistory.find(h => h.id === id);
+  }
+
+  // Fleet Admin - Makers methods
+  async getMakers(search?: string): Promise<Maker[]> {
+    let filtered = this.data.makers || [];
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(m => 
+        m.makerName.toLowerCase().includes(searchLower) ||
+        m.makerCode.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered.sort((a, b) => a.makerName.localeCompare(b.makerName));
+  }
+
+  async getMakerById(id: number): Promise<Maker | undefined> {
+    return (this.data.makers || []).find(m => m.id === id);
+  }
+
+  async createMaker(maker: InsertMaker): Promise<Maker> {
+    if (!this.data.makers) this.data.makers = [];
+    
+    // Generate next ID
+    const existingIds = this.data.makers.map(m => m.id);
+    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+    const makerCode = `MKR-${String(nextId).padStart(6, '0')}`;
+    
+    const newMaker: Maker = {
+      id: nextId,
+      makerCode,
+      ...maker,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    this.data.makers.push(newMaker);
+    this.persistData();
+    return newMaker;
+  }
+
+  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    if (!this.data.makers) this.data.makers = [];
+    
+    const index = this.data.makers.findIndex(m => m.id === id);
+    if (index === -1) {
+      throw new Error(`Maker with id ${id} not found`);
+    }
+    
+    const updated: Maker = {
+      ...this.data.makers[index],
+      ...data,
+      updatedAt: new Date(),
+    };
+    
+    this.data.makers[index] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteMaker(id: number): Promise<void> {
+    if (!this.data.makers) return;
+    
+    this.data.makers = this.data.makers.filter(m => m.id !== id);
+    this.persistData();
+  }
+
+  // Fleet Admin - Master Lists methods
+  async getMasterLists(listType?: string): Promise<MasterList[]> {
+    let filtered = this.data.masterLists || [];
+    
+    if (listType) {
+      filtered = filtered.filter(m => m.listType === listType && m.isActive);
+    } else {
+      filtered = filtered.filter(m => m.isActive);
+    }
+    
+    return filtered.sort((a, b) => {
+      // First sort by listType, then by displayOrder
+      if (a.listType !== b.listType) {
+        return a.listType.localeCompare(b.listType);
+      }
+      return a.displayOrder - b.displayOrder;
+    });
+  }
+
+  async getMasterListsByType(listType: string): Promise<MasterList[]> {
+    return this.getMasterLists(listType);
+  }
+
+  async createMasterList(list: InsertMasterList): Promise<MasterList> {
+    if (!this.data.masterLists) this.data.masterLists = [];
+    
+    // Generate next ID
+    const existingIds = this.data.masterLists.map(m => m.id);
+    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+    
+    const newList: MasterList = {
+      id: nextId,
+      ...list,
+      createdAt: new Date(),
+    };
+    
+    this.data.masterLists.push(newList);
+    this.persistData();
+    return newList;
+  }
+
+  async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    if (!this.data.masterLists) this.data.masterLists = [];
+    
+    const index = this.data.masterLists.findIndex(m => m.id === id);
+    if (index === -1) {
+      throw new Error(`Master list with id ${id} not found`);
+    }
+    
+    const updated: MasterList = {
+      ...this.data.masterLists[index],
+      ...data,
+    };
+    
+    this.data.masterLists[index] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteMasterList(id: number): Promise<void> {
+    if (!this.data.masterLists) return;
+    
+    this.data.masterLists = this.data.masterLists.filter(m => m.id !== id);
+    this.persistData();
   }
 }
