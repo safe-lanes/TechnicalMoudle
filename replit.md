@@ -17,8 +17,14 @@ The application utilizes a modern full-stack architecture. The frontend is built
 
 **Key Modules & Features:**
 -   **PMS Dashboard**: Professional analytics workspace with tabbed layout (Overview, Departments, Equipment, Compliance). All visualizations built exclusively with AG Charts React (`ag-charts-react`), featuring interactive legends, detailed tooltips, and responsive design. Charts derive data from real filtered work orders with no mock/random data. Includes KPI cards with sparklines, stacked bar charts, line/area charts, pie charts, scatter/bubble plots, bubble-based heatmaps, and grouped bar charts (hierarchical cost views). All visualizations respond to vessel and date range filters. Financial analytics and cost-related charts planned for future phase.
--   **PMS Submodules**: Components (CRUD, hierarchical tree), Work Orders (with automatic status computation), Running Hours (tracking, utilization, audit), Spares (inventory, transactions, bulk updates), Reports, Modify PMS, and Admin.
+-   **PMS Submodules**: Components (CRUD, hierarchical tree), Work Orders (with automatic status computation and comprehensive form management), Running Hours (tracking, utilization, audit), Spares (inventory, transactions, bulk updates), Reports, Modify PMS, and Admin.
 -   **Work Order Automation (November 2025)**: Fully automatic status computation eliminates manual status updates. Work order status (Active/Due/Due (Grace P)/Overdue/Completed) is calculated in real-time by comparing due dates to current date. Grace period thresholds: Due Horizon (30 days), Grace Period (7 days). Backend augments all API responses with `computedStatus` field; frontend tabs, badges, and filtering use computed status exclusively. Stored status field maintained for audit/historical purposes only.
+-   **Work Order Form Enhancements (November 2025)**: Comprehensive WorkOrderForm with 13 fully functional management buttons:
+    -   **Part A (Template)**: Inline editing for Required Spare Parts (A2), Required Tools (A3), and Safety Requirements (A4) with add/edit/delete functionality
+    -   **Part B (Execution)**: Document management system with Upload/View/Delete buttons for Risk Assessment, Safety Checklist, and Operational Form documents using Replit Object Storage
+    -   **Part B4**: Consumed Spare Parts tracking with inline add/edit/delete
+    -   **Data Persistence**: All form data stored as JSON fields in work orders table (requiredSpareParts, requiredTools, safetyRequirements, uploadedDocuments, consumedSpareParts)
+    -   **Object Storage Integration**: Backend uses ObjectStorageService with proper Replit SDK for secure document upload, retrieval, and deletion via `/api/upload-document` and `/api/documents/:fileKey` endpoints
 -   **Modify PMS - Change Requests**: Comprehensive workflow for change requests (draft to approved/rejected), including target selection (Components/Work Orders/Spares/Stores), proposed field-specific modifications, and impact previews.
 -   **Defects Module**:
     -   **Condition of Class (CoC)**: Tracking and filtered views.
