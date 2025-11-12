@@ -409,6 +409,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete work order" });
     }
   });
+
+  // Document management routes for work orders
+  app.post("/api/upload-document", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const file = req.file;
+      const documentType = req.body.documentType || 'general';
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `${documentType}_${timestamp}_${sanitizedOriginalName}`;
+      const fileKey = `/.private/work-orders/documents/${fileName}`;
+
+      // Store file in object storage using environment variable
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Get the private directory from environment variable
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '/.private';
+      const documentsDir = path.join(privateDir, 'work-orders', 'documents');
+      
+      // Ensure directory exists
+      await fs.mkdir(documentsDir, { recursive: true });
+      
+      // Write file
+      const filePath = path.join(documentsDir, fileName);
+      await fs.writeFile(filePath, file.buffer);
+
+      res.json({
+        success: true,
+        fileName: file.originalname,
+        fileKey: fileKey,
+        uploadedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  app.get("/api/documents/:fileKey(*)", async (req, res) => {
+    try {
+      const fileKey = req.params.fileKey;
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Get the private directory from environment variable
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '/.private';
+      const filePath = path.join(privateDir, 'work-orders', 'documents', fileKey);
+      
+      // Read file
+      const fileBuffer = await fs.readFile(filePath);
+      const base64 = fileBuffer.toString('base64');
+      
+      // Determine mime type from file extension
+      const ext = path.extname(fileKey).toLowerCase();
+      let mimeType = 'application/octet-stream';
+      if (ext === '.pdf') mimeType = 'application/pdf';
+      else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.png') mimeType = 'image/png';
+      
+      // Return as data URL for opening in new tab
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+      
+      res.json({ dataUrl });
+    } catch (error) {
+      console.error('Error retrieving document:', error);
+      res.status(500).json({ error: "Failed to retrieve document" });
+    }
+  });
+
+  app.delete("/api/documents/:fileKey(*)", async (req, res) => {
+    try {
+      const fileKey = req.params.fileKey;
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Get the private directory from environment variable
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '/.private';
+      const filePath = path.join(privateDir, 'work-orders', 'documents', fileKey);
+      
+      // Delete file
+      await fs.unlink(filePath);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
   
   // Defects API routes
   
@@ -1955,6 +2049,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error deleting master list:", error);
       res.status(500).json({ error: "Failed to delete master list" });
+    }
+  });
+
+  // Document Management API routes for Work Orders
+  // Upload document to object storage
+  app.post("/api/upload-document", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const { documentType } = req.body;
+      const file = req.file;
+      
+      // Get private object directory from environment
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || '/.private';
+      
+      // Create unique file key with timestamp
+      const timestamp = Date.now();
+      const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.'));
+      const fileKey = `${privateDir}/work-orders/documents/${documentType}_${timestamp}${fileExtension}`;
+      
+      // Import file system module
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Ensure directory exists
+      const dirPath = path.dirname(fileKey);
+      await fs.mkdir(dirPath, { recursive: true });
+      
+      // Write file to object storage
+      await fs.writeFile(fileKey, file.buffer);
+      
+      // Return file metadata
+      res.json({
+        success: true,
+        fileName: file.originalname,
+        fileKey: fileKey,
+        uploadedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error("Document upload error:", error);
+      res.status(500).json({ error: "Failed to upload document: " + error.message });
+    }
+  });
+
+  // Get signed URL for document viewing
+  app.get("/api/documents/:fileKey(*)", async (req, res) => {
+    try {
+      const fileKey = '/' + req.params.fileKey;
+      
+      // Import file system module
+      const fs = await import('fs/promises');
+      
+      // Check if file exists
+      try {
+        await fs.access(fileKey);
+      } catch {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Read file and send as base64 data URL for opening in new tab
+      const fileContent = await fs.readFile(fileKey);
+      const base64Content = fileContent.toString('base64');
+      
+      // Determine MIME type based on file extension
+      const extension = fileKey.substring(fileKey.lastIndexOf('.'));
+      let mimeType = 'application/octet-stream';
+      if (extension === '.pdf') mimeType = 'application/pdf';
+      else if (extension === '.jpg' || extension === '.jpeg') mimeType = 'image/jpeg';
+      else if (extension === '.png') mimeType = 'image/png';
+      
+      // Return data URL that can be opened in new tab
+      res.json({
+        success: true,
+        dataUrl: `data:${mimeType};base64,${base64Content}`,
+        fileName: fileKey.substring(fileKey.lastIndexOf('/') + 1)
+      });
+    } catch (error: any) {
+      console.error("Document retrieval error:", error);
+      res.status(500).json({ error: "Failed to retrieve document: " + error.message });
+    }
+  });
+
+  // Delete document from object storage
+  app.delete("/api/documents/:fileKey(*)", async (req, res) => {
+    try {
+      const fileKey = '/' + req.params.fileKey;
+      
+      // Import file system module
+      const fs = await import('fs/promises');
+      
+      // Check if file exists
+      try {
+        await fs.access(fileKey);
+      } catch {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Delete file from object storage
+      await fs.unlink(fileKey);
+      
+      res.json({ success: true, message: "Document deleted successfully" });
+    } catch (error: any) {
+      console.error("Document deletion error:", error);
+      res.status(500).json({ error: "Failed to delete document: " + error.message });
     }
   });
   

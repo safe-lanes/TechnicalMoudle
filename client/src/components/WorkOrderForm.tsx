@@ -5,6 +5,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, FileText, ArrowLeft, AlertCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, ArrowLeft, AlertCircle, Pencil, Trash2, Check, X, Plus, Eye, Upload } from "lucide-react";
 import { useLocation } from "wouter";
 import WorkInstructionsDialog from "./WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -216,15 +226,31 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
-    requiredSpareParts: [],
-    requiredTools: [],
+    requiredSpareParts: [] as Array<{partNo: string, description: string, quantityRequired: string, remarks: string}>,
+    requiredTools: [] as Array<{toolName: string, quantity: string, remarks: string}>,
     safetyRequirements: {
-      ppe: "",
-      permits: "",
-      other: ""
+      ppeRequirements: [] as string[],
+      permitRequirements: [] as string[],
+      otherRequirements: [] as string[]
     },
     workHistory: []
   });
+  
+  // State for inline editing
+  const [editingSparePart, setEditingSparePart] = useState<number | null>(null);
+  const [editingTool, setEditingTool] = useState<number | null>(null);
+  const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
+  const [newSafetyRequirement, setNewSafetyRequirement] = useState("");
+  
+  // State for Part B document management
+  const riskAssessmentFileRef = useRef<HTMLInputElement>(null);
+  const safetyChecklistFileRef = useRef<HTMLInputElement>(null);
+  const operationalFormFileRef = useRef<HTMLInputElement>(null);
+  const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string} | null>(null);
+  
+  // State for Part B4 spare parts consumed inline editing
+  const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
 
   // Execution data (Part B)
   const [executionData, setExecutionData] = useState({
@@ -243,7 +269,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     jobExperienceNotes: "",
     previousReading: "",
     currentReading: "",
-    sparePartsConsumed: [],
+    uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
     // IHM fields
     ihmUpdate: {
       enabled: false,
@@ -332,9 +359,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         requiredSpareParts: [],
         requiredTools: [],
         safetyRequirements: {
-          ppe: "",
-          permits: "",
-          other: ""
+          ppeRequirements: [],
+          permitRequirements: [],
+          otherRequirements: []
         },
         workHistory: []
       };
@@ -380,6 +407,318 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     setExecutionData(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+
+  // Part B1 - Document Upload Handlers
+  const handleUploadDocument = async (documentType: string, fileInputRef: React.RefObject<HTMLInputElement>) => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentType', documentType);
+
+      // Upload to backend
+      const response = await fetch('/api/upload-document', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload document');
+      }
+
+      const result = await response.json();
+
+      // Add to uploadedDocuments array
+      setExecutionData(prev => ({
+        ...prev,
+        uploadedDocuments: [
+          ...prev.uploadedDocuments.filter(doc => doc.type !== documentType),
+          {
+            type: documentType,
+            fileName: result.fileName,
+            fileKey: result.fileKey,
+            uploadedAt: result.uploadedAt,
+            uploadedBy: 'current_user'
+          }
+        ]
+      }));
+
+      toast({
+        title: "Document uploaded successfully",
+        description: `${file.name} has been uploaded.`,
+      });
+
+      // Reset file input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleViewDocument = async (documentType: string) => {
+    const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
+    if (!document) return;
+
+    try {
+      // Get signed URL from backend
+      const fileKeyEncoded = encodeURIComponent(document.fileKey.substring(1));
+      const response = await fetch(`/api/documents/${fileKeyEncoded}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to retrieve document');
+      }
+
+      const result = await response.json();
+      
+      // Open in new tab
+      window.open(result.dataUrl, '_blank');
+    } catch (error) {
+      console.error('View error:', error);
+      toast({
+        title: "View failed",
+        description: "Failed to open document. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteDocumentClick = (documentType: string) => {
+    const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
+    if (!document) return;
+
+    setDocumentToDelete({ type: documentType, fileKey: document.fileKey });
+    setDeleteDocumentDialogOpen(true);
+  };
+
+  const handleDeleteDocumentConfirm = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      // Delete from backend
+      const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
+      const response = await fetch(`/api/documents/${fileKeyEncoded}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document');
+      }
+
+      // Remove from uploadedDocuments array
+      setExecutionData(prev => ({
+        ...prev,
+        uploadedDocuments: prev.uploadedDocuments.filter(doc => doc.type !== documentToDelete.type)
+      }));
+
+      toast({
+        title: "Document deleted successfully",
+        description: "The document has been removed.",
+      });
+
+      setDeleteDocumentDialogOpen(false);
+      setDocumentToDelete(null);
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete document. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Helper function to get uploaded document for a type
+  const getUploadedDocument = (documentType: string) => {
+    return executionData.uploadedDocuments.find(doc => doc.type === documentType);
+  };
+
+  // Part B4 - Consumed Spare Parts Handlers
+  const handleAddConsumedSparePart = () => {
+    const newPart = {
+      partNo: "",
+      description: "",
+      quantityConsumed: "",
+      comments: ""
+    };
+    setExecutionData(prev => ({
+      ...prev,
+      consumedSpareParts: [...prev.consumedSpareParts, newPart]
+    }));
+    setEditingConsumedSparePart(executionData.consumedSpareParts.length);
+  };
+
+  const handleEditConsumedSparePart = (index: number) => {
+    setEditingConsumedSparePart(index);
+  };
+
+  const handleSaveConsumedSparePart = (index: number) => {
+    setEditingConsumedSparePart(null);
+  };
+
+  const handleCancelEditConsumedSparePart = () => {
+    // If it's a new part (empty values), remove it
+    const currentPart = executionData.consumedSpareParts[editingConsumedSparePart!];
+    if (!currentPart.partNo && !currentPart.description && !currentPart.quantityConsumed && !currentPart.comments) {
+      setExecutionData(prev => ({
+        ...prev,
+        consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== editingConsumedSparePart)
+      }));
+    }
+    setEditingConsumedSparePart(null);
+  };
+
+  const handleDeleteConsumedSparePart = (index: number) => {
+    setExecutionData(prev => ({
+      ...prev,
+      consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateConsumedSparePartField = (index: number, field: keyof typeof executionData.consumedSpareParts[0], value: string) => {
+    setExecutionData(prev => ({
+      ...prev,
+      consumedSpareParts: prev.consumedSpareParts.map((part, i) =>
+        i === index ? { ...part, [field]: value } : part
+      )
+    }));
+  };
+
+  // Section A2 - Spare Parts handlers
+  const handleAddSparePart = () => {
+    const newPart = {
+      partNo: "",
+      description: "",
+      quantityRequired: "",
+      remarks: ""
+    };
+    setTemplateData(prev => ({
+      ...prev,
+      requiredSpareParts: [...prev.requiredSpareParts, newPart]
+    }));
+    setEditingSparePart(templateData.requiredSpareParts.length);
+  };
+
+  const handleEditSparePart = (index: number) => {
+    setEditingSparePart(index);
+  };
+
+  const handleSaveSparePart = (index: number) => {
+    setEditingSparePart(null);
+  };
+
+  const handleCancelEditSparePart = () => {
+    // If it's a new part (empty values), remove it
+    const currentPart = templateData.requiredSpareParts[editingSparePart!];
+    if (!currentPart.partNo && !currentPart.description && !currentPart.quantityRequired && !currentPart.remarks) {
+      setTemplateData(prev => ({
+        ...prev,
+        requiredSpareParts: prev.requiredSpareParts.filter((_, i) => i !== editingSparePart)
+      }));
+    }
+    setEditingSparePart(null);
+  };
+
+  const handleDeleteSparePart = (index: number) => {
+    setTemplateData(prev => ({
+      ...prev,
+      requiredSpareParts: prev.requiredSpareParts.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateSparePartField = (index: number, field: keyof typeof templateData.requiredSpareParts[0], value: string) => {
+    setTemplateData(prev => ({
+      ...prev,
+      requiredSpareParts: prev.requiredSpareParts.map((part, i) =>
+        i === index ? { ...part, [field]: value } : part
+      )
+    }));
+  };
+
+  // Section A3 - Tools handlers
+  const handleAddTool = () => {
+    const newTool = {
+      toolName: "",
+      quantity: "",
+      remarks: ""
+    };
+    setTemplateData(prev => ({
+      ...prev,
+      requiredTools: [...prev.requiredTools, newTool]
+    }));
+    setEditingTool(templateData.requiredTools.length);
+  };
+
+  const handleEditTool = (index: number) => {
+    setEditingTool(index);
+  };
+
+  const handleSaveTool = (index: number) => {
+    setEditingTool(null);
+  };
+
+  const handleCancelEditTool = () => {
+    // If it's a new tool (empty values), remove it
+    const currentTool = templateData.requiredTools[editingTool!];
+    if (!currentTool.toolName && !currentTool.quantity && !currentTool.remarks) {
+      setTemplateData(prev => ({
+        ...prev,
+        requiredTools: prev.requiredTools.filter((_, i) => i !== editingTool)
+      }));
+    }
+    setEditingTool(null);
+  };
+
+  const handleDeleteTool = (index: number) => {
+    setTemplateData(prev => ({
+      ...prev,
+      requiredTools: prev.requiredTools.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateToolField = (index: number, field: keyof typeof templateData.requiredTools[0], value: string) => {
+    setTemplateData(prev => ({
+      ...prev,
+      requiredTools: prev.requiredTools.map((tool, i) =>
+        i === index ? { ...tool, [field]: value } : tool
+      )
+    }));
+  };
+
+  // Section A4 - Safety Requirements handlers
+  const handleAddSafetyRequirement = (type: 'ppeRequirements' | 'permitRequirements' | 'otherRequirements') => {
+    if (!newSafetyRequirement.trim()) return;
+    
+    setTemplateData(prev => ({
+      ...prev,
+      safetyRequirements: {
+        ...prev.safetyRequirements,
+        [type]: [...prev.safetyRequirements[type], newSafetyRequirement.trim()]
+      }
+    }));
+    setNewSafetyRequirement("");
+  };
+
+  const handleDeleteSafetyRequirement = (type: 'ppeRequirements' | 'permitRequirements' | 'otherRequirements', index: number) => {
+    setTemplateData(prev => ({
+      ...prev,
+      safetyRequirements: {
+        ...prev.safetyRequirements,
+        [type]: prev.safetyRequirements[type].filter((_, i) => i !== index)
+      }
     }));
   };
 
@@ -918,20 +1257,114 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A2. Required Spare Parts</h4>
-                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Spare Part</button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={handleAddSparePart}
+                        disabled={isReadOnly}
+                        data-testid="button-add-spare-part-a2"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Spare Part
+                      </Button>
                     </div>
                     
                     <div className="border border-gray-200 rounded">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                        <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
                           <div>Part No</div>
                           <div>Description</div>
                           <div>Quantity Required</div>
                           <div>Remarks</div>
+                          <div className="w-20">Actions</div>
                         </div>
                       </div>
-                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                        No spare parts required yet
+                      <div className="divide-y divide-gray-200">
+                        {templateData.requiredSpareParts.length > 0 ? (
+                          templateData.requiredSpareParts.map((part, index) => (
+                            <div key={index} className="px-4 py-3">
+                              {editingSparePart === index ? (
+                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <Input
+                                    value={part.partNo}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
+                                    placeholder="Part No"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={part.description}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
+                                    placeholder="Description"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    type="number"
+                                    value={part.quantityRequired}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
+                                    placeholder="Qty"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={part.remarks}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'remarks', e.target.value)}
+                                    placeholder="Remarks"
+                                    className="text-sm"
+                                  />
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleSaveSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleCancelEditSparePart}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.description || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.quantityRequired || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.remarks || '-'}</div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                      disabled={isReadOnly}
+                                    >
+                                      <Pencil className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                      disabled={isReadOnly}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                            No spare parts required yet
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -940,19 +1373,106 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A3. Required Tools & Equipment</h4>
-                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Tool</button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={handleAddTool}
+                        disabled={isReadOnly}
+                        data-testid="button-add-tool-a3"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Tool
+                      </Button>
                     </div>
                     
                     <div className="border border-gray-200 rounded">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-700">
+                        <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
                           <div>Tool Name</div>
                           <div>Quantity</div>
                           <div>Remarks</div>
+                          <div className="w-20">Actions</div>
                         </div>
                       </div>
-                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                        No tools required yet
+                      <div className="divide-y divide-gray-200">
+                        {templateData.requiredTools.length > 0 ? (
+                          templateData.requiredTools.map((tool, index) => (
+                            <div key={index} className="px-4 py-3">
+                              {editingTool === index ? (
+                                <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <Input
+                                    value={tool.toolName}
+                                    onChange={(e) => handleUpdateToolField(index, 'toolName', e.target.value)}
+                                    placeholder="Tool Name"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    type="number"
+                                    value={tool.quantity}
+                                    onChange={(e) => handleUpdateToolField(index, 'quantity', e.target.value)}
+                                    placeholder="Qty"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={tool.remarks}
+                                    onChange={(e) => handleUpdateToolField(index, 'remarks', e.target.value)}
+                                    placeholder="Remarks"
+                                    className="text-sm"
+                                  />
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleSaveTool(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleCancelEditTool}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <div className="text-sm text-gray-900">{tool.toolName || '-'}</div>
+                                  <div className="text-sm text-gray-900">{tool.quantity || '-'}</div>
+                                  <div className="text-sm text-gray-900">{tool.remarks || '-'}</div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditTool(index)}
+                                      className="h-8 w-8 p-0"
+                                      disabled={isReadOnly}
+                                    >
+                                      <Pencil className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteTool(index)}
+                                      className="h-8 w-8 p-0"
+                                      disabled={isReadOnly}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                            No tools required yet
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -961,23 +1481,93 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A4. Safety Requirements</h4>
-                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Requirement</button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={() => setIsSafetyModalOpen(true)}
+                        disabled={isReadOnly}
+                        data-testid="button-add-requirement-a4"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Requirement
+                      </Button>
                     </div>
                     
                     <div className="space-y-4">
+                      {/* PPE Requirements */}
                       <div className="border border-gray-200 rounded p-4">
                         <h5 className="text-sm font-medium text-gray-700 mb-3">PPE Requirements</h5>
-                        <div className="text-sm text-gray-500">No PPE requirements specified yet</div>
+                        {templateData.safetyRequirements.ppeRequirements.length > 0 ? (
+                          <div className="space-y-2">
+                            {templateData.safetyRequirements.ppeRequirements.map((req, index) => (
+                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                <span className="text-sm text-gray-900">{req}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
+                                  className="h-6 w-6 p-0"
+                                  disabled={isReadOnly}
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-600" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">No PPE requirements specified yet</div>
+                        )}
                       </div>
                       
+                      {/* Permit Requirements */}
                       <div className="border border-gray-200 rounded p-4">
                         <h5 className="text-sm font-medium text-gray-700 mb-3">Permit Requirements</h5>
-                        <div className="text-sm text-gray-500">No permit requirements specified yet</div>
+                        {templateData.safetyRequirements.permitRequirements.length > 0 ? (
+                          <div className="space-y-2">
+                            {templateData.safetyRequirements.permitRequirements.map((req, index) => (
+                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                <span className="text-sm text-gray-900">{req}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
+                                  className="h-6 w-6 p-0"
+                                  disabled={isReadOnly}
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-600" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">No permit requirements specified yet</div>
+                        )}
                       </div>
                       
+                      {/* Other Safety Requirements */}
                       <div className="border border-gray-200 rounded p-4">
                         <h5 className="text-sm font-medium text-gray-700 mb-3">Other Safety Requirements</h5>
-                        <div className="text-sm text-gray-500">No other safety requirements specified yet</div>
+                        {templateData.safetyRequirements.otherRequirements.length > 0 ? (
+                          <div className="space-y-2">
+                            {templateData.safetyRequirements.otherRequirements.map((req, index) => (
+                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                <span className="text-sm text-gray-900">{req}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
+                                  className="h-6 w-6 p-0"
+                                  disabled={isReadOnly}
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-600" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">No other safety requirements specified yet</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1155,19 +1745,43 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           </label>
                         </div>
                         <div className="col-span-3 flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="text-xs">Upload</Button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd"/>
-                              <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h8a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 8a1 1 0 012 0v3a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v3a1 1 0 102 0V8z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
+                          <input
+                            ref={riskAssessmentFileRef}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileSelected(e, 'riskAssessment')}
+                            className="hidden"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
+                            data-testid="button-upload-risk-assessment"
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewDocument('riskAssessment')}
+                            disabled={!getUploadedDocument('riskAssessment')}
+                            data-testid="button-view-risk-assessment"
+                          >
+                            <Eye className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-blue-600' : 'text-gray-400'}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleDeleteDocumentClick('riskAssessment')}
+                            disabled={!getUploadedDocument('riskAssessment')}
+                            data-testid="button-delete-risk-assessment"
+                          >
+                            <Trash2 className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-red-600' : 'text-gray-400'}`} />
+                          </Button>
                         </div>
                       </div>
 
@@ -1191,19 +1805,43 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           </label>
                         </div>
                         <div className="col-span-3 flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="text-xs">Upload</Button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd"/>
-                              <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h8a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 8a1 1 0 012 0v3a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v3a1 1 0 102 0V8z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
+                          <input
+                            ref={safetyChecklistFileRef}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
+                            className="hidden"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
+                            data-testid="button-upload-safety-checklist"
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewDocument('safetyChecklist')}
+                            disabled={!getUploadedDocument('safetyChecklist')}
+                            data-testid="button-view-safety-checklist"
+                          >
+                            <Eye className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-blue-600' : 'text-gray-400'}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleDeleteDocumentClick('safetyChecklist')}
+                            disabled={!getUploadedDocument('safetyChecklist')}
+                            data-testid="button-delete-safety-checklist"
+                          >
+                            <Trash2 className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-red-600' : 'text-gray-400'}`} />
+                          </Button>
                         </div>
                       </div>
 
@@ -1227,19 +1865,43 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           </label>
                         </div>
                         <div className="col-span-3 flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="text-xs">Upload</Button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd"/>
-                              <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 001 1h8a1 1 0 001-1V3a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 8a1 1 0 012 0v3a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v3a1 1 0 102 0V8z" clipRule="evenodd"/>
-                            </svg>
-                          </button>
+                          <input
+                            ref={operationalFormFileRef}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileSelected(e, 'operationalForm')}
+                            className="hidden"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
+                            data-testid="button-upload-operational-form"
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleViewDocument('operationalForm')}
+                            disabled={!getUploadedDocument('operationalForm')}
+                            data-testid="button-view-operational-form"
+                          >
+                            <Eye className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-blue-600' : 'text-gray-400'}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleDeleteDocumentClick('operationalForm')}
+                            disabled={!getUploadedDocument('operationalForm')}
+                            data-testid="button-delete-operational-form"
+                          >
+                            <Trash2 className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-red-600' : 'text-gray-400'}`} />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -1381,20 +2043,111 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>B4. Spare Parts Consumed</h4>
-                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Spare Part</button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={handleAddConsumedSparePart}
+                        data-testid="button-add-spare-part-b4"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Spare Part
+                      </Button>
                     </div>
                     
                     <div className="border border-gray-200 rounded">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                        <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
                           <div>Part No</div>
                           <div>Description</div>
                           <div>Quantity Consumed</div>
-                          <div>Comments (if any)</div>
+                          <div>Comments</div>
+                          <div className="w-20">Actions</div>
                         </div>
                       </div>
-                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                        No spare parts consumed yet
+                      <div className="divide-y divide-gray-200">
+                        {executionData.consumedSpareParts.length > 0 ? (
+                          executionData.consumedSpareParts.map((part, index) => (
+                            <div key={index} className="px-4 py-3">
+                              {editingConsumedSparePart === index ? (
+                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <Input
+                                    value={part.partNo}
+                                    onChange={(e) => handleUpdateConsumedSparePartField(index, 'partNo', e.target.value)}
+                                    placeholder="Part No"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={part.description}
+                                    onChange={(e) => handleUpdateConsumedSparePartField(index, 'description', e.target.value)}
+                                    placeholder="Description"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    type="number"
+                                    value={part.quantityConsumed}
+                                    onChange={(e) => handleUpdateConsumedSparePartField(index, 'quantityConsumed', e.target.value)}
+                                    placeholder="Qty"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={part.comments}
+                                    onChange={(e) => handleUpdateConsumedSparePartField(index, 'comments', e.target.value)}
+                                    placeholder="Comments"
+                                    className="text-sm"
+                                  />
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleSaveConsumedSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleCancelEditConsumedSparePart}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                  <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.description || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.quantityConsumed || '-'}</div>
+                                  <div className="text-sm text-gray-900">{part.comments || '-'}</div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditConsumedSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Pencil className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteConsumedSparePart(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                            No spare parts consumed yet
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1657,6 +2410,184 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
       />
+      
+      {/* Safety Requirements Modal */}
+      <Dialog open={isSafetyModalOpen} onOpenChange={setIsSafetyModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Safety Requirements</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* PPE Requirements Section */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-900">PPE Requirements</h4>
+              <div className="flex gap-2">
+                <Input
+                  value={newSafetyRequirement}
+                  onChange={(e) => setNewSafetyRequirement(e.target.value)}
+                  placeholder="Enter PPE requirement (e.g., Safety helmet, gloves)"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddSafetyRequirement('ppeRequirements');
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => handleAddSafetyRequirement('ppeRequirements')}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              {templateData.safetyRequirements.ppeRequirements.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  {templateData.safetyRequirements.ppeRequirements.map((req, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-900">{req}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Permit Requirements Section */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-900">Permit Requirements</h4>
+              <div className="flex gap-2">
+                <Input
+                  value={newSafetyRequirement}
+                  onChange={(e) => setNewSafetyRequirement(e.target.value)}
+                  placeholder="Enter permit requirement (e.g., Hot work permit, Confined space)"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddSafetyRequirement('permitRequirements');
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => handleAddSafetyRequirement('permitRequirements')}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              {templateData.safetyRequirements.permitRequirements.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  {templateData.safetyRequirements.permitRequirements.map((req, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-900">{req}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Other Requirements Section */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-900">Other Safety Requirements</h4>
+              <div className="flex gap-2">
+                <Input
+                  value={newSafetyRequirement}
+                  onChange={(e) => setNewSafetyRequirement(e.target.value)}
+                  placeholder="Enter other safety requirement"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddSafetyRequirement('otherRequirements');
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => handleAddSafetyRequirement('otherRequirements')}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              {templateData.safetyRequirements.otherRequirements.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  {templateData.safetyRequirements.otherRequirements.map((req, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-900">{req}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-3 w-3 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsSafetyModalOpen(false);
+                setNewSafetyRequirement("");
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Document Confirmation Dialog */}
+      <AlertDialog open={deleteDocumentDialogOpen} onOpenChange={setDeleteDocumentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this document? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDocumentDialogOpen(false);
+              setDocumentToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDocumentConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
