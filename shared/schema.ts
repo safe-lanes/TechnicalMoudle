@@ -597,6 +597,47 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
 export type WorkOrder = typeof workOrders.$inferSelect;
 
+// Work Order Executions Table - for tracking historical maintenance records
+export const workOrderExecutions = pgTable("work_order_executions", {
+  id: text("id").primaryKey(),
+  templateId: text("template_id").notNull(), // Reference to work_orders (template)
+  componentId: text("component_id").notNull(), // Component this execution belongs to
+  vesselId: text("vessel_id").notNull(), // Vessel identifier
+  executionId: text("execution_id").notNull().unique(), // Unique execution code (WOE-XXXXXXX)
+  
+  // Execution tracking
+  dateCompleted: text("date_completed"), // ISO date when work was completed
+  performedBy: text("performed_by"), // User who performed the work
+  approvedBy: text("approved_by"), // User who approved the work
+  status: text("status").notNull().default("In Progress"), // 'In Progress' | 'Completed' | 'Approved'
+  
+  // Execution data (Section B fields)
+  uploadedDocuments: json("uploaded_documents").notNull().default([]), // [{type, fileName, fileKey, uploadedAt, uploadedBy}]
+  consumedSpareParts: json("consumed_spare_parts").notNull().default([]), // [{partNo, description, quantityConsumed, comments}]
+  
+  // Additional execution details
+  workDescription: text("work_description"), // What was actually done
+  remarks: text("remarks"), // Any additional notes
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  templateIdIdx: index("idx_exec_template").on(table.templateId),
+  componentIdIdx: index("idx_exec_component").on(table.componentId),
+  vesselIdIdx: index("idx_exec_vessel").on(table.vesselId),
+  statusIdx: index("idx_exec_status").on(table.status),
+  dateCompletedIdx: index("idx_exec_date_completed").on(table.dateCompleted),
+}));
+
+export const insertWorkOrderExecutionSchema = createInsertSchema(workOrderExecutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkOrderExecution = z.infer<typeof insertWorkOrderExecutionSchema>;
+export type WorkOrderExecution = typeof workOrderExecutions.$inferSelect;
+
 // Defects Table for maritime defect tracking
 export const defects = pgTable("defects", {
   id: text("id").primaryKey(),
