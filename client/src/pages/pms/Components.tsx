@@ -925,14 +925,31 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     setIsWorkOrderFormOpen(true);
   };
 
-  const handleWorkOrderSubmit = async (formData: any) => {
+  const handleWorkOrderSubmit = async (workOrderId: string, payload: { type: string; data: any }) => {
     try {
+      // Extract the actual form data from payload
+      const formData = payload.data;
+      
       // Prepare work order data with componentCode
       const workOrderData = {
-        ...formData,
+        jobTitle: formData.woTitle,
+        assignedTo: formData.assignedTo,
+        taskType: formData.taskType,
+        maintenanceBasis: formData.maintenanceBasis,
+        frequencyValue: formData.frequencyValue,
+        frequencyUnit: formData.frequencyUnit,
+        nextDueDate: formData.nextDueDate,
+        nextDueReading: formData.nextDueReading,
+        currentReading: formData.currentReading,
+        jobPriority: formData.jobPriority,
+        classRelated: formData.classRelated,
+        briefWorkDescription: formData.briefWorkDescription,
+        approver: formData.approver,
         componentCode: componentCode,
         component: componentName,
         vesselId: formData.vesselId || 'V001',
+        workOrderNo: formData.woTemplateCode || `WO-TEMP-${Date.now()}`,
+        status: 'Active',
         // Backend will auto-generate templateCode if not provided
         // Format: WO-{componentCode}-{year}-{sequence}
       };
