@@ -428,22 +428,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         return;
       }
 
-      // Calculate next due
-      if (templateData.maintenanceBasis === "Calendar") {
-        const today = new Date();
-        const freq = parseInt(templateData.frequencyValue);
-        if (templateData.frequencyUnit === "Days") {
-          today.setDate(today.getDate() + freq);
-        } else if (templateData.frequencyUnit === "Weeks") {
-          today.setDate(today.getDate() + (freq * 7));
-        } else if (templateData.frequencyUnit === "Months") {
-          today.setMonth(today.getMonth() + freq);
-        } else if (templateData.frequencyUnit === "Years") {
-          today.setFullYear(today.getFullYear() + freq);
-        }
-        templateData.nextDueDate = today.toISOString().split('T')[0];
-      }
-
+      // Note: Due date calculation is now handled by the backend
+      // The backend will auto-calculate if nextDueDate is empty, using component installation date
+      
       if (onSubmit) {
         const workOrderId = workOrder?.id || `new-${Date.now()}`;
         
@@ -882,13 +869,27 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">
-                          {templateData.maintenanceBasis === "Calendar" ? "Next Due Date" : "Next Due Reading"}
+                          {templateData.maintenanceBasis === "Calendar" ? "Next Due Date (Optional)" : "Next Due Reading"}
                         </Label>
-                        <div className="text-sm text-gray-900 p-2 bg-gray-100 rounded">
-                          {templateData.maintenanceBasis === "Calendar" 
-                            ? (templateData.nextDueDate || "Calculated on save")
-                            : (templateData.nextDueReading || "Calculated on save")}
-                        </div>
+                        {templateData.maintenanceBasis === "Calendar" ? (
+                          <Input
+                            type="date"
+                            value={templateData.nextDueDate}
+                            onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
+                            className="text-sm"
+                            placeholder="Leave empty to auto-calculate"
+                            disabled={isReadOnly}
+                          />
+                        ) : (
+                          <Input
+                            type="text"
+                            value={templateData.nextDueReading}
+                            onChange={(e) => handleTemplateChange('nextDueReading', e.target.value)}
+                            className="text-sm"
+                            placeholder="Leave empty to auto-calculate"
+                            disabled={isReadOnly}
+                          />
+                        )}
                       </div>
                     </div>
 

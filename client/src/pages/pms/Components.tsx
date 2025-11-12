@@ -938,6 +938,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         maintenanceBasis: formData.maintenanceBasis,
         frequencyValue: formData.frequencyValue,
         frequencyUnit: formData.frequencyUnit,
+        dueDate: formData.nextDueDate, // Map nextDueDate to dueDate for backend
         nextDueDate: formData.nextDueDate,
         nextDueReading: formData.nextDueReading,
         currentReading: formData.currentReading,

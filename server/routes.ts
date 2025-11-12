@@ -276,6 +276,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       let workOrderData = insertWorkOrderSchema.parse(req.body);
       
+      // Convert ISO date (YYYY-MM-DD) to DD-MM-YYYY if provided by frontend
+      if (workOrderData.dueDate && workOrderData.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = workOrderData.dueDate.split('-');
+        workOrderData.dueDate = `${day}-${month}-${year}`;
+        console.log(`Converted dueDate from ISO to DD-MM-YYYY: ${workOrderData.dueDate}`);
+      }
+      
       // Auto-generate template code if not provided (format: WO-{ComponentCode}-{Year}-{Sequence})
       if (!workOrderData.templateCode && workOrderData.componentCode) {
         const currentYear = new Date().getFullYear().toString();
