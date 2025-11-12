@@ -886,6 +886,7 @@ const RunningHoursConditionSection: React.FC = () => {
 const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string }> = ({ componentCode, componentName }) => {
   const [isWorkOrderFormOpen, setIsWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
+  const { toast } = useToast();
   
   const { data: allWorkOrders = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/work-orders'],
@@ -924,10 +925,52 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     setIsWorkOrderFormOpen(true);
   };
 
-  const handleWorkOrderSubmit = (formData: any) => {
-    console.log('Work Order submitted:', formData);
-    // Handle saving the work order
-    setIsWorkOrderFormOpen(false);
+  const handleWorkOrderSubmit = async (formData: any) => {
+    try {
+      // Prepare work order data with componentCode
+      const workOrderData = {
+        ...formData,
+        componentCode: componentCode,
+        component: componentName,
+        vesselId: formData.vesselId || 'V001',
+        // Backend will auto-generate templateCode if not provided
+        // Format: WO-{componentCode}-{year}-{sequence}
+      };
+      
+      // POST to create work order
+      const response = await fetch('/api/work-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(workOrderData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create work order');
+      }
+      
+      const savedWorkOrder = await response.json();
+      
+      // Invalidate query cache to refresh the work order list
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      
+      // Show success message
+      toast({
+        title: "Work Order Created",
+        description: `Work order ${savedWorkOrder.templateCode || savedWorkOrder.workOrderNo} created successfully.`,
+      });
+      
+      setIsWorkOrderFormOpen(false);
+    } catch (error: any) {
+      console.error('Error creating work order:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create work order",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
