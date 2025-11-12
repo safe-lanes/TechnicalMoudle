@@ -914,6 +914,74 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                     </div>
                   </div>
 
+                  {/* A2. Required Spare Parts */}
+                  <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A2. Required Spare Parts</h4>
+                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Spare Part</button>
+                    </div>
+                    
+                    <div className="border border-gray-200 rounded">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                          <div>Part No</div>
+                          <div>Description</div>
+                          <div>Quantity Required</div>
+                          <div>Remarks</div>
+                        </div>
+                      </div>
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No spare parts required yet
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* A3. Required Tools & Equipment */}
+                  <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A3. Required Tools & Equipment</h4>
+                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Tool</button>
+                    </div>
+                    
+                    <div className="border border-gray-200 rounded">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-700">
+                          <div>Tool Name</div>
+                          <div>Quantity</div>
+                          <div>Remarks</div>
+                        </div>
+                      </div>
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No tools required yet
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* A4. Safety Requirements */}
+                  <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A4. Safety Requirements</h4>
+                      <button className="text-sm text-blue-600 hover:text-blue-800">+ Add Requirement</button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="border border-gray-200 rounded p-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-3">PPE Requirements</h5>
+                        <div className="text-sm text-gray-500">No PPE requirements specified yet</div>
+                      </div>
+                      
+                      <div className="border border-gray-200 rounded p-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-3">Permit Requirements</h5>
+                        <div className="text-sm text-gray-500">No permit requirements specified yet</div>
+                      </div>
+                      
+                      <div className="border border-gray-200 rounded p-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-3">Other Safety Requirements</h5>
+                        <div className="text-sm text-gray-500">No other safety requirements specified yet</div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* A5. Work History (Executions for this template) */}
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>A5. Work History</h4>
