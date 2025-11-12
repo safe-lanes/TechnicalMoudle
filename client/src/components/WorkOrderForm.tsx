@@ -294,12 +294,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   };
 
   // Generate WO Execution ID
+  // Format: WO-EXE-XXXXXXX where XXXXXXX is a unique 7-digit number
   const generateWOExecutionId = () => {
-    const year = new Date().getFullYear();
-    const templateCode = templateData.woTemplateCode || workOrder?.templateCode || generateWOTemplateCodePlaceholder();
-    // In real implementation, get sequence from database based on existing executions
-    const sequence = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
-    return `${year}-${templateCode}-${sequence}`;
+    // Generate a unique 7-digit number (1000000-9999999)
+    const uniqueId = Math.floor(Math.random() * 9000000) + 1000000;
+    return `WO-EXE-${uniqueId}`;
   };
 
   // Update template code placeholder display when component code changes
