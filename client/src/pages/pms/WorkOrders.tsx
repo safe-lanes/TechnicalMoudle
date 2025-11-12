@@ -19,7 +19,13 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { WorkOrder, InsertWorkOrder } from "@shared/schema";
+import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
+
+// Extend WorkOrder type to include computedStatus from backend
+type WorkOrderWithComputedStatus = WorkOrder & {
+  computedStatus?: ComputedWorkOrderStatus;
+};
 
 // Using WorkOrder type from shared schema
 // The WorkOrder interface is now imported from @shared/schema
@@ -65,9 +71,9 @@ const WorkOrders: React.FC = () => {
   const [location] = useLocation();
   const { toast } = useToast();
   
-  // Fetch work orders using React Query
+  // Fetch work orders using React Query (includes computedStatus from backend)
   const vesselId = "V001"; // Default vessel ID
-  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrder[]>({
+  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithComputedStatus[]>({
     queryKey: ['/api/work-orders', vesselId],
     enabled: true, // Always fetch on mount
   });
@@ -200,12 +206,13 @@ const WorkOrders: React.FC = () => {
 
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
+  // Use computedStatus for tab counts (automatic status calculation)
   const tabs = [
     { id: "All W.O", label: "All W.O", count: safeWorkOrdersList.filter(wo => !wo.isExecution).length },
-    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.status === "Due" || wo.status.includes("Grace"))).length },
-    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.isExecution && wo.status === "Pending Approval").length },
-    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.status === "Overdue").length },
-    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.isExecution && wo.status === "Approved").length }
+    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.computedStatus === "Due" || wo.computedStatus === "Due (Grace P)")).length },
+    { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
+    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.computedStatus === "Overdue").length },
+    { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Completed").length }
   ];
 
   const getStatusBadgeColor = (status: string) => {
@@ -233,23 +240,21 @@ const WorkOrders: React.FC = () => {
     }
   };
 
+  // Filter work orders using computedStatus (automatic real-time status)
   const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
     if (activeTab === "All W.O") {
       // Show templates and rejected executions
-      if (wo.isExecution && wo.status !== "Rejected") return false;
+      if (wo.isExecution && wo.computedStatus !== "Rejected") return false;
     } else if (activeTab === "Due") {
       if (wo.isExecution) return false;
-      if (wo.status !== "Due" && !wo.status.includes("Grace")) return false;
+      if (wo.computedStatus !== "Due" && wo.computedStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
       if (wo.isExecution) return false;
-      if (wo.status !== "Overdue") return false;
+      if (wo.computedStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
-      // Show only approved executions (templates don't get completed)
-      if (!wo.isExecution) return false;
-      if (wo.status !== "Approved") return false;
+      if (wo.computedStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
-      // Show only execution records with Pending Approval status
-      if (!wo.isExecution || wo.status !== "Pending Approval") return false;
+      if (wo.computedStatus !== "Pending Approval") return false;
     }
     
     if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -532,8 +537,8 @@ const WorkOrders: React.FC = () => {
                     : workOrder.dueDate}
                 </td>
                 <td className="py-3 px-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.status)}`}>
-                    {workOrder.status}
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status)}`}>
+                    {workOrder.computedStatus || workOrder.status}
                   </span>
                 </td>
                 {activeTab !== "Pending Approval" && (

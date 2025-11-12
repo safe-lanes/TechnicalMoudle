@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
+import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { z } from "zod";
 import multer from "multer";
 import Papa from "papaparse";
@@ -252,7 +253,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const vesselId = req.query.vesselId as string;
       const workOrders = await storage.getWorkOrders(vesselId);
-      res.json(workOrders);
+      
+      // Augment each work order with computed status
+      const workOrdersWithComputedStatus = workOrders.map(wo => ({
+        ...wo,
+        computedStatus: computeWorkOrderStatus({
+          dueDate: wo.dueDate,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.dateCompleted
+        })
+      }));
+      
+      res.json(workOrdersWithComputedStatus);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work orders" });
     }
@@ -265,7 +278,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!workOrder) {
         return res.status(404).json({ error: "Work order not found" });
       }
-      res.json(workOrder);
+      
+      // Augment with computed status
+      const workOrderWithComputedStatus = {
+        ...workOrder,
+        computedStatus: computeWorkOrderStatus({
+          dueDate: workOrder.dueDate,
+          isExecution: workOrder.isExecution,
+          status: workOrder.status,
+          completionDateTime: workOrder.dateCompleted
+        })
+      };
+      
+      res.json(workOrderWithComputedStatus);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work order" });
     }
@@ -315,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-calculate due date if not provided and component has installation date
       if (!workOrderData.dueDate && workOrderData.componentCode) {
         try {
-          const { calculateDueDate } = await import('./utils/dateCalculations');
+          const { calculateDueDate } = await import('@shared/utils/dateCalculations');
           const vesselId = workOrderData.vesselId || 'V001';
           
           // Get all components for the vessel to find the matching one
