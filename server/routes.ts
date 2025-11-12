@@ -305,6 +305,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
       
+      // Auto-calculate due date if not provided and component has installation date
+      if (!workOrderData.dueDate && workOrderData.componentCode) {
+        try {
+          const { calculateDueDate } = await import('./utils/dateCalculations');
+          const vesselId = workOrderData.vesselId || 'V001';
+          
+          // Get all components for the vessel to find the matching one
+          const components = await storage.getComponents(vesselId);
+          const component = components.find(c => c.componentCode === workOrderData.componentCode);
+          
+          if (component?.installationDate) {
+            const calculatedDueDate = calculateDueDate(
+              component.installationDate,
+              workOrderData.frequencyValue,
+              workOrderData.frequencyUnit
+            );
+            
+            if (calculatedDueDate) {
+              workOrderData = {
+                ...workOrderData,
+                dueDate: calculatedDueDate
+              };
+              console.log(`Auto-calculated due date: ${calculatedDueDate} based on installation date: ${component.installationDate}`);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to auto-calculate due date:', error);
+          // Continue without due date if calculation fails
+        }
+      }
+      
       const workOrder = await storage.createWorkOrder(workOrderData);
       res.status(201).json(workOrder);
     } catch (error: any) {
