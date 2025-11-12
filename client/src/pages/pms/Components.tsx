@@ -1431,7 +1431,7 @@ const RequisitionsSection: React.FC = () => {
 const Components: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedComponent, setSelectedComponent] = useState<ComponentNode | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H"]));
   const [isComponentFormOpen, setIsComponentFormOpen] = useState(false);
   const [showReviewDrawer, setShowReviewDrawer] = useState(false);
