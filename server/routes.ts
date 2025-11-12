@@ -40,6 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.'));
       
       let parsedData: any[] = [];
+      let detectedHeaders: string[] = [];
       
       // Parse based on file type
       if (fileExtension === '.csv') {
@@ -50,10 +51,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dynamicTyping: true
         });
         parsedData = parseResult.data;
+        detectedHeaders = parseResult.meta.fields || [];
       } else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
         const workbook = XLSX.read(file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+        
+        // Get headers from first row (A1:Z1 range)
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+          const cell = worksheet[cellAddress];
+          if (cell && cell.v) {
+            detectedHeaders.push(String(cell.v));
+          }
+        }
+        
         parsedData = XLSX.utils.sheet_to_json(worksheet);
       } else {
         return res.status(400).json({ error: "Unsupported file format. Please upload CSV, XLS, or XLSX file." });
@@ -65,8 +78,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Component Name': 'name',
         'Component Code': 'componentCode',
         'Parent ID': 'parentId',
+        'Parent Component Code': 'parentId',
         'Category': 'category',
         'Vessel ID': 'vesselId',
+        'Vessel Code': 'vesselCode',
         'Current Cumulative RH': 'currentCumulativeRH',
         'Last Updated': 'lastUpdated',
         'Maker': 'maker',
@@ -77,8 +92,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Location': 'location',
         'Commissioned Date': 'commissionedDate',
         'Critical': 'critical',
-        'Class Item': 'classItem'
+        'Critical (Yes/No)': 'critical',
+        'Class Item': 'classItem',
+        'Condition Based': 'conditionBased',
+        'Condition Based (Yes/No)': 'conditionBased',
+        'Running Hours': 'runningHours'
       };
+
+      // Create normalized mapping (case-insensitive, flexible separator matching)
+      // Handles: "Vessel Code", "vessel code", "VesselCode", "vessel_code", etc.
+      const normalizeKey = (key: string) => key.toLowerCase().trim().replace(/[\s_-]+/g, '');
+      const normalizedMapping: { [key: string]: string } = {};
+      for (const [fileHeader, dbField] of Object.entries(fieldMapping)) {
+        normalizedMapping[normalizeKey(fileHeader)] = dbField;
+      }
+
+      // Column detection for user feedback (use actual headers, not first row data)
+      let columnInfo: any = null;
+      if (detectedHeaders.length > 0) {
+        const mappedColumns = detectedHeaders
+          .map(col => ({ original: col, mapped: normalizedMapping[normalizeKey(col)] }))
+          .filter(c => c.mapped);
+        
+        const unmappedColumns = detectedHeaders.filter(col => !normalizedMapping[normalizeKey(col)]);
+        
+        columnInfo = {
+          detected: detectedHeaders,
+          mapped: mappedColumns, // Return as objects, not strings
+          unmapped: unmappedColumns
+        };
+        
+        console.log('📊 Excel Import - Column Detection:');
+        console.log('  Detected headers:', detectedHeaders.join(', '));
+        console.log('  Successfully mapped columns:', mappedColumns.map(c => `${c.original} → ${c.mapped}`).join(', '));
+        if (unmappedColumns.length > 0) {
+          console.log('  ⚠️  Unmapped columns (will be ignored):', unmappedColumns.join(', '));
+        }
+      }
 
       // Process and validate data
       const errors: any[] = [];
@@ -88,25 +138,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const row = parsedData[i];
         const rowNum = i + 2; // Account for header row
         
-        // Map fields
+        // Map fields with flexible column matching
         const component: any = {};
-        for (const [fileHeader, dbField] of Object.entries(fieldMapping)) {
-          if (row[fileHeader] !== undefined && row[fileHeader] !== null && row[fileHeader] !== '') {
-            let value = row[fileHeader];
+        for (const [originalHeader, value] of Object.entries(row)) {
+          const normalizedHeader = normalizeKey(originalHeader);
+          const dbField = normalizedMapping[normalizedHeader];
+          
+          if (dbField && value !== undefined && value !== null && value !== '') {
+            let processedValue = value;
             
             // Convert boolean fields
-            if (dbField === 'critical' || dbField === 'classItem') {
-              if (typeof value === 'string') {
-                value = value.toLowerCase() === 'true' || value.toLowerCase() === 'yes' || value === '1';
+            if (dbField === 'critical' || dbField === 'classItem' || dbField === 'conditionBased') {
+              if (typeof processedValue === 'string') {
+                processedValue = processedValue.toLowerCase() === 'true' || 
+                                 processedValue.toLowerCase() === 'yes' || 
+                                 processedValue === '1';
               }
             }
             
             // Convert decimal fields
-            if (dbField === 'currentCumulativeRH' && value !== '') {
-              value = parseFloat(value).toString();
+            if ((dbField === 'currentCumulativeRH' || dbField === 'runningHours') && processedValue !== '') {
+              const numValue = typeof processedValue === 'number' ? processedValue : parseFloat(String(processedValue));
+              if (!isNaN(numValue)) {
+                processedValue = numValue.toString();
+              }
             }
             
-            component[dbField] = value;
+            component[dbField] = processedValue;
           }
         }
 
@@ -129,20 +187,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           continue;
         }
-        if (!component.category) {
+        if (!component.componentCategory) {
           errors.push({
             row: rowNum,
-            field: 'Category',
-            message: 'Category is required',
+            field: 'Component Category',
+            message: 'Component Category is required',
             data: row
           });
           continue;
         }
-        if (!component.vesselId) {
+        if (!component.vesselCode) {
           errors.push({
             row: rowNum,
-            field: 'Vessel ID',
-            message: 'Vessel ID is required',
+            field: 'Vessel Code',
+            message: 'Vessel Code is required - critical for tracking which vessel components belong to',
             data: row
           });
           continue;
@@ -163,7 +221,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           created: 0,
           updated: 0,
           failed: errors.length,
-          errors: errors
+          errors: errors,
+          columnInfo: columnInfo
         });
       }
 
@@ -176,7 +235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updated: result.updated,
         failed: errors.length,
         errors: errors,
-        preview: processedComponents.slice(0, 5) // Show first 5 records as preview
+        preview: processedComponents.slice(0, 5), // Show first 5 records as preview
+        columnInfo: columnInfo
       });
 
     } catch (error: any) {
