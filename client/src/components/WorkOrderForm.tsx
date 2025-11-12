@@ -48,6 +48,7 @@ interface WorkOrderFormProps {
   };
   workOrder?: any;
   isApprovalMode?: boolean;
+  mode?: 'template' | 'execution' | 'history'; // Controls Section A/B visibility and edit capabilities
 }
 
 const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
@@ -58,7 +59,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   onReject,
   component,
   workOrder,
-  isApprovalMode = false
+  isApprovalMode = false,
+  mode = 'execution' // Default to execution for backward compatibility
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<'partA' | 'partB'>('partA');
@@ -207,7 +209,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   const executionMode = workOrder?.executionMode === true;
   
   // Check if form should be read-only - BUT in modify mode, make it editable
-  const isReadOnly = !isModifyMode && (workOrder?.status === "Pending Approval" || workOrder?.status === "Approved" || isApprovalMode);
+  const isReadOnly = !isModifyMode && (workOrder?.status === "Pending Approval" || workOrder?.status === "Approved" || isApprovalMode || mode === 'history');
 
   // Template data (Part A)
   const [templateData, setTemplateData] = useState({
@@ -966,19 +968,22 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                 </div>
                 <span className="font-medium">Work Order Details</span>
               </div>
-              <div 
-                className={`flex items-center gap-2 p-3 rounded cursor-pointer ${
-                  activeSection === 'partB' ? 'bg-[#16569e] text-white' : 'bg-transparent text-[#8a8a8a] hover:bg-gray-100'
-                }`}
-                onClick={() => selectSection('partB')}
-              >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  activeSection === 'partB' ? 'bg-white text-[#52baf3]' : 'bg-gray-300 text-white'
-                }`}>
-                  B
+              {/* Hide Part B tab when in template mode */}
+              {mode !== 'template' && (
+                <div 
+                  className={`flex items-center gap-2 p-3 rounded cursor-pointer ${
+                    activeSection === 'partB' ? 'bg-[#16569e] text-white' : 'bg-transparent text-[#8a8a8a] hover:bg-gray-100'
+                  }`}
+                  onClick={() => selectSection('partB')}
+                >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    activeSection === 'partB' ? 'bg-white text-[#52baf3]' : 'bg-gray-300 text-white'
+                  }`}>
+                    B
+                  </div>
+                  <span className="font-medium">Work Completion Record</span>
                 </div>
-                <span className="font-medium">Work Completion Record</span>
-              </div>
+              )}
             </div>
           </div>
 
