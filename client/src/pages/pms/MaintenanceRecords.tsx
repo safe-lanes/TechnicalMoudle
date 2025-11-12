@@ -110,7 +110,7 @@ const MaintenanceRecords: React.FC = () => {
     // Find the template WorkOrder for this execution (scoped to component)
     const template = allWorkOrders.find(wo => 
       wo.id === execution.templateId && 
-      wo.componentCode === execution.componentCode
+      wo.componentCode === execution.componentId
     );
     
     if (!template) {
