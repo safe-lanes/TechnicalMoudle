@@ -1572,7 +1572,8 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     category: row['Component Category'] || row['Main Group Name'] || '',
     // Use Parent Component Code (auto-calculated from SFI)
     parentId: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
-    vesselId: vesselId || row['Vessel Code'] || 'V001',
+    vesselId: vesselId || row['Vessel Code'] || 'V001',  // Vessel FK/reference (fallback to Vessel Code from Excel)
+    vesselCode: row['Vessel Code'] || null,  // CRITICAL: Vessel identification code for tracking/display
     // Fleet Equipment fields
     fleetEquipmentCode: row['Fleet Equipment Code'] || null,
     fleetEquipmentName: row['Fleet Equipment Name'] || null,
@@ -1672,8 +1673,11 @@ async function updateComponentFromRow(componentCode: string, row: any) {
     updateData.runningHours = String(row['Running Hours']);
     updateData.currentCumulativeRH = String(row['Running Hours']);
   }
-  // Vessel Code
-  if (row['Vessel Code']) updateData.vesselId = row['Vessel Code'];
+  // Vessel Code - CRITICAL: Update BOTH vesselId and vesselCode for consistency
+  if (row['Vessel Code']) {
+    updateData.vesselId = row['Vessel Code'];  // FK/reference
+    updateData.vesselCode = row['Vessel Code'];  // Display value
+  }
 
   return await storage.updateComponent(componentCode, updateData);
 }
