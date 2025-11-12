@@ -3388,57 +3388,64 @@ export class MemStorage implements IStorage {
 }
 
 export class PostgresStorage implements IStorage {
-  private db: typeof import('./db').db;
-
-  constructor() {
-    this.db = require('./db').db;
+  private async getDb() {
+    const { db } = await import('./db');
+    return db;
   }
 
   // ============= USERS =============
   async getUser(id: number): Promise<User | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(users).where(eq(users.id, id));
+    const result = await db.select().from(users).where(eq(users.id, id));
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(users).where(eq(users.username, username));
+    const result = await db.select().from(users).where(eq(users.username, username));
     return result[0];
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const result = await this.db.insert(users).values(user).returning();
+    const db = await this.getDb();
+    const result = await db.insert(users).values(user).returning();
     return result[0];
   }
 
   async getUsers(): Promise<User[]> {
-    return await this.db.select().from(users);
+    const db = await this.getDb();
+    return await db.select().from(users);
   }
 
   // ============= COMPONENTS =============
   async getComponents(vesselId: string): Promise<Component[]> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
-    return await this.db.select().from(components)
+    return await db.select().from(components)
       .where(and(eq(components.vesselId, vesselId), eq(components.dataScope, 'vessel')));
   }
 
   async getComponent(id: string): Promise<Component | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(components).where(eq(components.id, id));
+    const result = await db.select().from(components).where(eq(components.id, id));
     return result[0];
   }
 
   async createComponent(component: InsertComponent): Promise<Component> {
+    const db = await this.getDb();
     const { nanoid } = await import('nanoid');
     const id = nanoid();
-    const result = await this.db.insert(components).values({ ...component, id }).returning();
+    const result = await db.insert(components).values({ ...component, id }).returning();
     return result[0];
   }
 
   async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(components)
+    const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(components.id, id))
       .returning();
@@ -3446,28 +3453,32 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteComponent(id: string): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(components).where(eq(components.id, id));
+    await db.delete(components).where(eq(components.id, id));
   }
 
   // ============= FLEET COMPONENTS =============
   async getFleetComponents(): Promise<Component[]> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    return await this.db.select().from(components).where(eq(components.dataScope, 'fleet'));
+    return await db.select().from(components).where(eq(components.dataScope, 'fleet'));
   }
 
   async getFleetComponent(id: string): Promise<Component | undefined> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
-    const result = await this.db.select().from(components)
+    const result = await db.select().from(components)
       .where(and(eq(components.id, id), eq(components.dataScope, 'fleet')));
     return result[0];
   }
 
   async createFleetComponent(component: InsertComponent): Promise<Component> {
+    const db = await this.getDb();
     const { nanoid } = await import('nanoid');
     const fleetEquipmentCode = await generateFleetEquipmentCode();
     const id = nanoid();
-    const result = await this.db.insert(components).values({
+    const result = await db.insert(components).values({
       ...component,
       id,
       dataScope: 'fleet',
@@ -3477,8 +3488,9 @@ export class PostgresStorage implements IStorage {
   }
 
   async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(components)
+    const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(components.id, id))
       .returning();
@@ -3486,19 +3498,22 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteFleetComponent(id: string): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(components).where(eq(components.id, id));
+    await db.delete(components).where(eq(components.id, id));
   }
 
   // ============= RUNNING HOURS AUDITS =============
   async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
-    const result = await this.db.insert(runningHoursAudit).values(audit).returning();
+    const db = await this.getDb();
+    const result = await db.insert(runningHoursAudit).values(audit).returning();
     return result[0];
   }
 
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
+    const db = await this.getDb();
     const { eq, desc } = await import('drizzle-orm');
-    const query = this.db.select().from(runningHoursAudit)
+    const query = db.select().from(runningHoursAudit)
       .where(eq(runningHoursAudit.componentId, componentId))
       .orderBy(desc(runningHoursAudit.enteredAtUTC));
     
@@ -3509,8 +3524,9 @@ export class PostgresStorage implements IStorage {
   }
 
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]> {
+    const db = await this.getDb();
     const { eq, and, gte, lte, desc } = await import('drizzle-orm');
-    return await this.db.select().from(runningHoursAudit)
+    return await db.select().from(runningHoursAudit)
       .where(and(
         eq(runningHoursAudit.componentId, componentId),
         gte(runningHoursAudit.enteredAtUTC, startDate),
@@ -3521,25 +3537,29 @@ export class PostgresStorage implements IStorage {
 
   // ============= SPARES =============
   async getSpares(vesselId: string): Promise<Spare[]> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
-    return await this.db.select().from(spares)
+    return await db.select().from(spares)
       .where(and(eq(spares.vesselId, vesselId), eq(spares.dataScope, 'vessel'), eq(spares.deleted, false)));
   }
 
   async getSpare(id: number): Promise<Spare | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(spares).where(eq(spares.id, id));
+    const result = await db.select().from(spares).where(eq(spares.id, id));
     return result[0];
   }
 
   async createSpare(spare: InsertSpare): Promise<Spare> {
-    const result = await this.db.insert(spares).values(spare).returning();
+    const db = await this.getDb();
+    const result = await db.insert(spares).values(spare).returning();
     return result[0];
   }
 
   async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(spares)
+    const result = await db.update(spares)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(spares.id, id))
       .returning();
@@ -3547,19 +3567,21 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteSpare(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.update(spares)
+    await db.update(spares)
       .set({ deleted: true })
       .where(eq(spares.id, id));
   }
 
   async consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
     const spare = await this.getSpare(id);
     if (!spare) throw new Error(`Spare ${id} not found`);
 
     const newRob = spare.rob - quantity;
-    const updated = await this.db.update(spares)
+    const updated = await db.update(spares)
       .set({ rob: newRob, updatedAt: new Date() })
       .where(eq(spares.id, id))
       .returning();
@@ -3588,12 +3610,13 @@ export class PostgresStorage implements IStorage {
   }
 
   async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
     const spare = await this.getSpare(id);
     if (!spare) throw new Error(`Spare ${id} not found`);
 
     const newRob = spare.rob + quantity;
-    const updated = await this.db.update(spares)
+    const updated = await db.update(spares)
       .set({ rob: newRob, updatedAt: new Date() })
       .where(eq(spares.id, id))
       .returning();
@@ -3624,21 +3647,24 @@ export class PostgresStorage implements IStorage {
 
   // ============= FLEET SPARES =============
   async getFleetSpares(): Promise<Spare[]> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
-    return await this.db.select().from(spares)
+    return await db.select().from(spares)
       .where(and(eq(spares.dataScope, 'fleet'), eq(spares.deleted, false)));
   }
 
   async getFleetSpare(id: number): Promise<Spare | undefined> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
-    const result = await this.db.select().from(spares)
+    const result = await db.select().from(spares)
       .where(and(eq(spares.id, id), eq(spares.dataScope, 'fleet')));
     return result[0];
   }
 
   async createFleetSpare(spare: InsertSpare): Promise<Spare> {
+    const db = await this.getDb();
     const fleetPartCode = await generateFleetPartCode();
-    const result = await this.db.insert(spares).values({
+    const result = await db.insert(spares).values({
       ...spare,
       dataScope: 'fleet',
       fleetPartCode,
@@ -3647,8 +3673,9 @@ export class PostgresStorage implements IStorage {
   }
 
   async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(spares)
+    const result = await db.update(spares)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(spares.id, id))
       .returning();
@@ -3656,58 +3683,66 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteFleetSpare(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.update(spares)
+    await db.update(spares)
       .set({ deleted: true })
       .where(eq(spares.id, id));
   }
 
   // ============= SPARES HISTORY =============
   async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+    const db = await this.getDb();
     const { eq, desc } = await import('drizzle-orm');
-    return await this.db.select().from(sparesHistory)
+    return await db.select().from(sparesHistory)
       .where(eq(sparesHistory.vesselId, vesselId))
       .orderBy(desc(sparesHistory.timestampUTC));
   }
 
   async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
+    const db = await this.getDb();
     const { eq, desc } = await import('drizzle-orm');
-    return await this.db.select().from(sparesHistory)
+    return await db.select().from(sparesHistory)
       .where(eq(sparesHistory.spareId, spareId))
       .orderBy(desc(sparesHistory.timestampUTC));
   }
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
-    const result = await this.db.insert(sparesHistory).values(history).returning();
+    const db = await this.getDb();
+    const result = await db.insert(sparesHistory).values(history).returning();
     return result[0];
   }
 
   // ============= WORK ORDERS =============
   async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
     if (vesselId) {
-      return await this.db.select().from(workOrders)
+      return await db.select().from(workOrders)
         .where(and(eq(workOrders.vesselId, vesselId), eq(workOrders.dataScope, 'vessel')));
     }
-    return await this.db.select().from(workOrders);
+    return await db.select().from(workOrders);
   }
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(workOrders).where(eq(workOrders.id, id));
+    const result = await db.select().from(workOrders).where(eq(workOrders.id, id));
     return result[0];
   }
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
+    const db = await this.getDb();
     const { nanoid } = await import('nanoid');
     const id = nanoid();
-    const result = await this.db.insert(workOrders).values({ ...workOrder, id }).returning();
+    const result = await db.insert(workOrders).values({ ...workOrder, id }).returning();
     return result[0];
   }
 
   async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(workOrders)
+    const result = await db.update(workOrders)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(workOrders.id, id))
       .returning();
@@ -3715,8 +3750,9 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteWorkOrder(id: string): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(workOrders).where(eq(workOrders.id, id));
+    await db.delete(workOrders).where(eq(workOrders.id, id));
   }
 
   // ============= DEFECTS =============
@@ -3733,6 +3769,7 @@ export class PostgresStorage implements IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<Defect[]> {
+    const db = await this.getDb();
     const { eq, and, or, like, isNull, isNotNull } = await import('drizzle-orm');
     const conditions = [];
 
@@ -3768,7 +3805,7 @@ export class PostgresStorage implements IStorage {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    return await this.db.select().from(defects).where(whereClause);
+    return await db.select().from(defects).where(whereClause);
   }
 
   async getDefectsCount(filters?: {
@@ -3782,6 +3819,7 @@ export class PostgresStorage implements IStorage {
     group?: string;
     dueOverdue?: string;
   }): Promise<number> {
+    const db = await this.getDb();
     const { eq, and, or, like } = await import('drizzle-orm');
     const { sql } = await import('drizzle-orm');
     const conditions = [];
@@ -3816,26 +3854,29 @@ export class PostgresStorage implements IStorage {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    const result = await this.db.select({ count: sql<number>`count(*)` }).from(defects).where(whereClause);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(defects).where(whereClause);
     return result[0]?.count || 0;
   }
 
   async getDefect(id: string): Promise<Defect | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(defects).where(eq(defects.id, id));
+    const result = await db.select().from(defects).where(eq(defects.id, id));
     return result[0];
   }
 
   async createDefect(defect: InsertDefect): Promise<Defect> {
+    const db = await this.getDb();
     const { nanoid } = await import('nanoid');
     const id = nanoid();
-    const result = await this.db.insert(defects).values({ ...defect, id }).returning();
+    const result = await db.insert(defects).values({ ...defect, id }).returning();
     return result[0];
   }
 
   async updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(defects)
+    const result = await db.update(defects)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(defects.id, id))
       .returning();
@@ -3843,24 +3884,28 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteDefect(id: string): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(defects).where(eq(defects.id, id));
+    await db.delete(defects).where(eq(defects.id, id));
   }
 
   // ============= DEFECT ACTIONS =============
   async getDefectActions(defectId: string): Promise<DefectAction[]> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    return await this.db.select().from(defectActions).where(eq(defectActions.defectId, defectId));
+    return await db.select().from(defectActions).where(eq(defectActions.defectId, defectId));
   }
 
   async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
-    const result = await this.db.insert(defectActions).values(action).returning();
+    const db = await this.getDb();
+    const result = await db.insert(defectActions).values(action).returning();
     return result[0];
   }
 
   async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(defectActions)
+    const result = await db.update(defectActions)
       .set(updates)
       .where(eq(defectActions.id, id))
       .returning();
@@ -3868,28 +3913,33 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteDefectAction(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(defectActions).where(eq(defectActions.id, id));
+    await db.delete(defectActions).where(eq(defectActions.id, id));
   }
 
   // ============= DEFECT ATTACHMENTS =============
   async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    return await this.db.select().from(defectAttachments).where(eq(defectAttachments.defectId, defectId));
+    return await db.select().from(defectAttachments).where(eq(defectAttachments.defectId, defectId));
   }
 
   async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
-    const result = await this.db.insert(defectAttachments).values(attachment).returning();
+    const db = await this.getDb();
+    const result = await db.insert(defectAttachments).values(attachment).returning();
     return result[0];
   }
 
   async deleteDefectAttachment(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(defectAttachments).where(eq(defectAttachments.id, id));
+    await db.delete(defectAttachments).where(eq(defectAttachments.id, id));
   }
 
   // ============= CHANGE REQUESTS =============
   async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+    const db = await this.getDb();
     const { eq, and, like, desc } = await import('drizzle-orm');
     const conditions = [];
 
@@ -3907,25 +3957,28 @@ export class PostgresStorage implements IStorage {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    return await this.db.select().from(changeRequest)
+    return await db.select().from(changeRequest)
       .where(whereClause)
       .orderBy(desc(changeRequest.createdAt));
   }
 
   async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(changeRequest).where(eq(changeRequest.id, id));
+    const result = await db.select().from(changeRequest).where(eq(changeRequest.id, id));
     return result[0];
   }
 
   async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
-    const result = await this.db.insert(changeRequest).values(request).returning();
+    const db = await this.getDb();
+    const result = await db.insert(changeRequest).values(request).returning();
     return result[0];
   }
 
   async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(changeRequest)
+    const result = await db.update(changeRequest)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(changeRequest.id, id))
       .returning();
@@ -3934,22 +3987,24 @@ export class PostgresStorage implements IStorage {
 
   // ============= IMPORT HISTORY =============
   async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
-    const result = await this.db.insert(importHistory).values(history).returning();
+    const db = await this.getDb();
+    const result = await db.insert(importHistory).values(history).returning();
     return result[0];
   }
 
   async getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }> {
+    const db = await this.getDb();
     const { eq, desc, sql } = await import('drizzle-orm');
     
     const whereClause = type ? eq(importHistory.importType, type) : undefined;
     
-    const items = await this.db.select().from(importHistory)
+    const items = await db.select().from(importHistory)
       .where(whereClause)
       .orderBy(desc(importHistory.importedAt))
       .limit(limit || 50)
       .offset(offset || 0);
 
-    const totalResult = await this.db.select({ count: sql<number>`count(*)` })
+    const totalResult = await db.select({ count: sql<number>`count(*)` })
       .from(importHistory)
       .where(whereClause);
 
@@ -3960,13 +4015,15 @@ export class PostgresStorage implements IStorage {
   }
 
   async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(importHistory).where(eq(importHistory.id, id));
+    const result = await db.select().from(importHistory).where(eq(importHistory.id, id));
     return result[0];
   }
 
   // ============= RECURRING DEFECTS =============
   async getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]> {
+    const db = await this.getDb();
     const { eq, and, gte } = await import('drizzle-orm');
     const conditions = [];
 
@@ -3981,47 +4038,53 @@ export class PostgresStorage implements IStorage {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    return await this.db.select().from(recurringDefects).where(whereClause);
+    return await db.select().from(recurringDefects).where(whereClause);
   }
 
   async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(recurringDefects).where(eq(recurringDefects.id, id));
+    const result = await db.select().from(recurringDefects).where(eq(recurringDefects.id, id));
     return result[0];
   }
 
   async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    return await this.db.select().from(recurringDefectLinks).where(eq(recurringDefectLinks.recurringId, recurringId));
+    return await db.select().from(recurringDefectLinks).where(eq(recurringDefectLinks.recurringId, recurringId));
   }
 
   // ============= MAKERS =============
   async getMakers(search?: string): Promise<Maker[]> {
+    const db = await this.getDb();
     const { like, or } = await import('drizzle-orm');
     if (search) {
-      return await this.db.select().from(makers)
+      return await db.select().from(makers)
         .where(or(
           like(makers.makerName, `%${search}%`),
           like(makers.makerCode, `%${search}%`)
         ));
     }
-    return await this.db.select().from(makers);
+    return await db.select().from(makers);
   }
 
   async getMakerById(id: number): Promise<Maker | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(makers).where(eq(makers.id, id));
+    const result = await db.select().from(makers).where(eq(makers.id, id));
     return result[0];
   }
 
   async createMaker(maker: InsertMaker): Promise<Maker> {
-    const result = await this.db.insert(makers).values(maker).returning();
+    const db = await this.getDb();
+    const result = await db.insert(makers).values(maker).returning();
     return result[0];
   }
 
   async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(makers)
+    const result = await db.update(makers)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(makers.id, id))
       .returning();
@@ -4029,23 +4092,26 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteMaker(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(makers).where(eq(makers.id, id));
+    await db.delete(makers).where(eq(makers.id, id));
   }
 
   // ============= MASTER LISTS =============
   async getMasterLists(listType?: string): Promise<MasterList[]> {
+    const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
     if (listType) {
-      return await this.db.select().from(masterLists)
+      return await db.select().from(masterLists)
         .where(and(eq(masterLists.listType, listType), eq(masterLists.isActive, true)));
     }
-    return await this.db.select().from(masterLists).where(eq(masterLists.isActive, true));
+    return await db.select().from(masterLists).where(eq(masterLists.isActive, true));
   }
 
   async getMasterListById(id: number): Promise<MasterList | undefined> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.select().from(masterLists).where(eq(masterLists.id, id));
+    const result = await db.select().from(masterLists).where(eq(masterLists.id, id));
     return result[0];
   }
 
@@ -4054,13 +4120,15 @@ export class PostgresStorage implements IStorage {
   }
 
   async createMasterList(list: InsertMasterList): Promise<MasterList> {
-    const result = await this.db.insert(masterLists).values(list).returning();
+    const db = await this.getDb();
+    const result = await db.insert(masterLists).values(list).returning();
     return result[0];
   }
 
   async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    const result = await this.db.update(masterLists)
+    const result = await db.update(masterLists)
       .set(data)
       .where(eq(masterLists.id, id))
       .returning();
@@ -4068,8 +4136,9 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteMasterList(id: number): Promise<void> {
+    const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
-    await this.db.delete(masterLists).where(eq(masterLists.id, id));
+    await db.delete(masterLists).where(eq(masterLists.id, id));
   }
 
   // ============= STUBS FOR NON-PRIORITY METHODS =============
@@ -4359,8 +4428,11 @@ export class PostgresStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL database for all storage
-const storage: IStorage = new PostgresStorage();
-console.log("✅ Application configured with PostgreSQL - all data will persist to database");
+// Use file-based storage for Technical Module
+// PostgreSQL migration pending (DATABASE_URL environment variable issue)
+import { PersistentFileStorage } from "./persistentStorage";
+
+const storage: IStorage = new PersistentFileStorage('test-data.json');
+console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
 
 export { storage };
