@@ -242,19 +242,22 @@ const WorkOrders: React.FC = () => {
 
   // Filter work orders using computedStatus (automatic real-time status)
   const filteredWorkOrders = safeWorkOrdersList.filter(wo => {
+    // Ensure computedStatus is always defined (defensive check)
+    const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+    
     if (activeTab === "All W.O") {
       // Show templates and rejected executions
-      if (wo.isExecution && wo.computedStatus !== "Rejected") return false;
+      if (wo.isExecution && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Due") {
       if (wo.isExecution) return false;
-      if (wo.computedStatus !== "Due" && wo.computedStatus !== "Due (Grace P)") return false;
+      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
       if (wo.isExecution) return false;
-      if (wo.computedStatus !== "Overdue") return false;
+      if (effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
-      if (wo.computedStatus !== "Completed") return false;
+      if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
-      if (wo.computedStatus !== "Pending Approval") return false;
+      if (effectiveStatus !== "Pending Approval") return false;
     }
     
     if (searchTerm && !wo.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -537,8 +540,8 @@ const WorkOrders: React.FC = () => {
                     : workOrder.dueDate}
                 </td>
                 <td className="py-3 px-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status)}`}>
-                    {workOrder.computedStatus || workOrder.status}
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
+                    {workOrder.computedStatus || workOrder.status || 'Active'}
                   </span>
                 </td>
                 {activeTab !== "Pending Approval" && (

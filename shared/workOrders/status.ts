@@ -33,11 +33,17 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     return 'Active';
   }
   
+  // Templates: check for completion first (before due date calculation)
+  if (completionDateTime || status === 'Completed') {
+    return 'Completed';
+  }
+  
+  // Check for manual postponed or rejected status
+  if (status === 'Postponed') return 'Postponed';
+  if (status === 'Rejected') return 'Rejected';
+  
   // Templates: compute status based on due date
   if (!dueDate) return 'Active';
-  
-  // Check for manual postponed status
-  if (status === 'Postponed') return 'Postponed';
   
   // Parse due date (DD-MM-YYYY format)
   const dueDateObj = parseDDMMYYYY(dueDate);
