@@ -1707,6 +1707,26 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                     </div>
                   </div>
                 )}
+                
+                {/* Maintenance Records Button - Show in template mode */}
+                {mode === 'template' && (workOrder?.componentId || workOrder?.componentCode || component?.code) && (
+                  <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+                    <div className="flex justify-center">
+                      <Button 
+                        size="lg" 
+                        className="bg-[#16569e] hover:bg-[#124580] text-white px-8 py-3 text-base font-medium"
+                        onClick={() => {
+                          const componentId = workOrder?.componentId || workOrder?.componentCode || component?.code;
+                          setLocation(`/pms/maintenance-records/${componentId}`);
+                        }}
+                        data-testid="button-maintenance-records"
+                      >
+                        <FileText className="h-5 w-5 mr-2" />
+                        View Maintenance Records
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
