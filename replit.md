@@ -7,7 +7,13 @@ This project is a full-stack Technical Module for a maritime Planned Maintenance
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
-The application utilizes a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), focusing on a mobile-first responsive design and consistent UI/UX. The backend uses Express.js (TypeScript) and integrates with PostgreSQL via Drizzle ORM, with an in-memory fallback for development.
+The application utilizes a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), focusing on a mobile-first responsive design and consistent UI/UX. The backend uses Express.js (TypeScript).
+
+**Current Storage Configuration (November 2025)**:
+- **Active Storage**: PersistentFileStorage - File-based JSON persistence to `/home/runner/workspace/test-data.json`
+- **Status**: Fully operational with all CRUD operations persisting to disk
+- **Migration Blocker**: PostgreSQL integration incomplete due to DATABASE_URL environment variable not loading into process.env at runtime. PostgresStorage class is implemented in server/storage.ts and ready for activation once environment variable issue is resolved.
+- **Seeded Data**: 8 SFI category components (1-Ship General through 8-Ship Common Systems) for vessel V001
 
 **Key Modules & Features:**
 -   **PMS Dashboard**: Professional analytics workspace with tabbed layout (Overview, Departments, Equipment, Compliance). All visualizations built exclusively with AG Charts React (`ag-charts-react`), featuring interactive legends, detailed tooltips, and responsive design. Charts derive data from real filtered work orders with no mock/random data. Includes KPI cards with sparklines, stacked bar charts, line/area charts, pie charts, scatter/bubble plots, bubble-based heatmaps, and grouped bar charts (hierarchical cost views). All visualizations respond to vessel and date range filters. Financial analytics and cost-related charts planned for future phase.
