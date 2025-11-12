@@ -1064,6 +1064,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         onSubmit={handleWorkOrderSubmit}
         component={{ code: componentCode, name: componentName }}
         workOrder={selectedWorkOrder}
+        mode="template"
       />
     </>
   );
