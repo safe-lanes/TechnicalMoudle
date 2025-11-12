@@ -915,37 +915,6 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                     </div>
                   </div>
 
-                  {/* A4. Safety Requirements */}
-                  <div className="border border-gray-200 rounded-lg p-4 mb-6">
-                    <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>A4. Safety Requirements</h4>
-                    
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label className="text-sm text-[#8798ad]">PPE Requirements:</Label>
-                          <div className="text-sm text-gray-900">Leather Gloves, Goggles, Safety Helmet</div>
-                        </div>
-                        <div></div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label className="text-sm text-[#8798ad]">Permit Requirements:</Label>
-                          <div className="text-sm text-gray-900">Enclosed Space Entry Permit</div>
-                        </div>
-                        <div></div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label className="text-sm text-[#8798ad]">Other Safety Requirements:</Label>
-                          <div className="text-sm text-gray-900">Free Text</div>
-                        </div>
-                        <div></div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* A5. Work History (Executions for this template) */}
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>A5. Work History</h4>
