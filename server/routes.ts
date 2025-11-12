@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { z } from "zod";
 import multer from "multer";
@@ -28,6 +28,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching components:", error);
       res.status(500).json({ error: "Failed to fetch components" });
+    }
+  });
+
+  // Get single component by ID (for component details)
+  app.get("/api/components/details/:id", async (req, res) => {
+    try {
+      const component = await storage.getComponent(req.params.id);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      res.json(component);
+    } catch (error) {
+      console.error("Error fetching component:", error);
+      res.status(500).json({ error: "Failed to fetch component" });
     }
   });
 
@@ -408,6 +422,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to delete work order" });
+    }
+  });
+
+  // Work Order Execution API routes
+  
+  // Get all executions for a component
+  app.get("/api/work-order-executions/:componentId", async (req, res) => {
+    try {
+      const executions = await storage.getWorkOrderExecutions(req.params.componentId);
+      res.json(executions);
+    } catch (error) {
+      console.error("Error fetching work order executions:", error);
+      res.status(500).json({ error: "Failed to fetch work order executions" });
+    }
+  });
+  
+  // Get single execution by ID
+  app.get("/api/work-order-executions/details/:id", async (req, res) => {
+    try {
+      const execution = await storage.getWorkOrderExecutionById(req.params.id);
+      if (!execution) {
+        return res.status(404).json({ error: "Work order execution not found" });
+      }
+      res.json(execution);
+    } catch (error) {
+      console.error("Error fetching work order execution:", error);
+      res.status(500).json({ error: "Failed to fetch work order execution" });
+    }
+  });
+  
+  // Create new execution
+  app.post("/api/work-order-executions", async (req, res) => {
+    try {
+      const executionData = insertWorkOrderExecutionSchema.parse(req.body);
+      const execution = await storage.createWorkOrderExecution(executionData);
+      res.json(execution);
+    } catch (error: any) {
+      console.error('Work order execution creation error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid execution data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create work order execution" });
+    }
+  });
+  
+  // Update execution
+  app.patch("/api/work-order-executions/:id", async (req, res) => {
+    try {
+      const partialExecutionSchema = insertWorkOrderExecutionSchema.partial();
+      const validatedData = partialExecutionSchema.parse(req.body);
+      const execution = await storage.updateWorkOrderExecution(req.params.id, validatedData);
+      res.json(execution);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid execution data", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update work order execution" });
     }
   });
 

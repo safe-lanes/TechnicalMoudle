@@ -35,6 +35,13 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
+import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
+
+// Type for history mode payload
+export interface HistoryWorkOrderPayload {
+  template: WorkOrder;
+  execution: WorkOrderExecution;
+}
 
 interface WorkOrderFormProps {
   isOpen: boolean;
@@ -46,7 +53,8 @@ interface WorkOrderFormProps {
     code: string;
     name: string;
   };
-  workOrder?: any;
+  workOrder?: any; // For template/execution modes
+  workOrderHistory?: HistoryWorkOrderPayload; // For history mode
   isApprovalMode?: boolean;
   mode?: 'template' | 'execution' | 'history'; // Controls Section A/B visibility and edit capabilities
 }
@@ -59,6 +67,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   onReject,
   component,
   workOrder,
+  workOrderHistory,
   isApprovalMode = false,
   mode = 'execution' // Default to execution for backward compatibility
 }) => {
@@ -330,18 +339,86 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     return `WO-EXE-${uniqueId}`;
   };
 
+  // History mode: Hydrate state from workOrderHistory
+  useEffect(() => {
+    if (mode === 'history' && workOrderHistory) {
+      const { template, execution } = workOrderHistory;
+      
+      // Hydrate Section A (Template Data) from template
+      setTemplateData({
+        woTitle: template.workOrderNo || '',
+        component: template.component || '',
+        componentCode: template.componentCode || '',
+        woTemplateCode: template.workOrderNo || '',
+        maintenanceBasis: template.maintenanceBasis || 'Calendar',
+        frequencyValue: template.frequency || '',
+        frequencyUnit: template.frequencyUnit || 'Months',
+        taskType: template.taskType || 'Inspection',
+        assignedTo: template.assignedTo || '',
+        approver: template.approver || '',
+        jobPriority: template.jobPriority || 'Medium',
+        classRelated: template.classRelated || 'No',
+        briefWorkDescription: template.jobDescription || '',
+        nextDueDate: template.nextDueDate || '',
+        nextDueReading: template.nextDueReading || '',
+        requiredSpareParts: Array.isArray(template.requiredSpareParts) ? template.requiredSpareParts : [],
+        requiredTools: Array.isArray(template.requiredTools) ? template.requiredTools : [],
+        safetyRequirements: template.safetyRequirements || {
+          ppeRequirements: [],
+          permitRequirements: [],
+          otherRequirements: []
+        },
+        workHistory: []
+      });
+      
+      // Hydrate Section B (Execution Data) from execution
+      setExecutionData({
+        woExecutionId: execution.executionId || '',
+        riskAssessment: 'No', // Not stored in execution
+        safetyChecklists: 'No',
+        operationalForms: 'No',
+        startDateTime: '',
+        completionDateTime: execution.dateCompleted || '',
+        assignedTo: '',
+        performedBy: execution.performedBy || '',
+        noOfPersons: '',
+        totalTimeHours: '',
+        manhours: '',
+        workCarriedOut: execution.workDescription || '',
+        jobExperienceNotes: execution.remarks || '',
+        previousReading: '',
+        currentReading: '',
+        uploadedDocuments: Array.isArray(execution.uploadedDocuments) ? execution.uploadedDocuments : [],
+        consumedSpareParts: Array.isArray(execution.consumedSpareParts) ? execution.consumedSpareParts : [],
+        ihmUpdate: {
+          enabled: false,
+          action: '',
+          targetComponent: '',
+          targetSpare: '',
+          quantity: '',
+          location: '',
+          materials: [],
+          remarks: ''
+        }
+      });
+      
+      // Set active section to Part B to show execution data
+      setActiveSection('partB');
+    }
+  }, [mode, workOrderHistory]);
+
   // Update template code placeholder display when component code changes
   useEffect(() => {
-    if (!templateData.woTemplateCode && templateData.componentCode) {
+    if (mode !== 'history' && !templateData.woTemplateCode && templateData.componentCode) {
       const placeholder = generateWOTemplateCodePlaceholder();
       // Store placeholder for display only - don't send to backend
       setTemplateData(prev => ({ ...prev, woTemplateCode: placeholder }));
     }
-  }, [templateData.componentCode]);
+  }, [mode, templateData.componentCode]);
 
-  // Load existing workOrder data
+  // Load existing workOrder data (skip in history mode)
   useEffect(() => {
-    if (workOrder) {
+    if (mode !== 'history' && workOrder) {
       const initialData = {
         woTitle: workOrder.jobTitle || "",
         component: workOrder.component || component?.name || "",

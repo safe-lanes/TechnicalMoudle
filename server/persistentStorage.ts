@@ -34,6 +34,8 @@ import {
   type InsertFormVersionUsage,
   type WorkOrder,
   type InsertWorkOrder,
+  type WorkOrderExecution,
+  type InsertWorkOrderExecution,
   type Defect,
   type InsertDefect,
   type DefectAction,
@@ -68,6 +70,7 @@ interface PersistentData {
   formVersions: Record<number, FormVersion>;
   formVersionUsages: FormVersionUsage[];
   workOrders: WorkOrder[];
+  workOrderExecutions: WorkOrderExecution[];
   defects: Record<string, Defect>;
   defectActions: DefectAction[];
   defectAttachments: DefectAttachment[];
@@ -93,6 +96,7 @@ interface PersistentData {
     formDefinitionId: number;
     formVersionId: number;
     workOrderId: number;
+    executionId: number;
     defectId: number;
     defectActionId: number;
     defectAttachmentId: number;
@@ -214,6 +218,7 @@ export class PersistentFileStorage implements IStorage {
           workOrders: Array.isArray(loadedData.workOrders) 
             ? loadedData.workOrders 
             : Object.values(loadedData.workOrders || {}).filter(wo => wo !== null),
+          workOrderExecutions: loadedData.workOrderExecutions || [],
           defects: loadedData.defects || {},
           defectActions: loadedData.defectActions || [],
           defectAttachments: loadedData.defectAttachments || [],
@@ -274,6 +279,7 @@ export class PersistentFileStorage implements IStorage {
       formVersions: {},
       formVersionUsages: [],
       workOrders: [],
+      workOrderExecutions: [],
       defects: {},
       defectActions: [],
       defectAttachments: [],
@@ -297,6 +303,7 @@ export class PersistentFileStorage implements IStorage {
         formDefinitionId: 1,
         formVersionId: 1,
         workOrderId: 1,
+        executionId: 1,
         defectId: 1,
         defectActionId: 1,
         defectAttachmentId: 1,
@@ -1304,6 +1311,59 @@ export class PersistentFileStorage implements IStorage {
     
     this.persistData();
     return { created, updated };
+  }
+
+  async getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]> {
+    return this.data.workOrderExecutions
+      .filter(exec => exec.componentId === componentId)
+      .sort((a, b) => {
+        const dateA = a.dateCompleted ? new Date(a.dateCompleted).getTime() : 0;
+        const dateB = b.dateCompleted ? new Date(b.dateCompleted).getTime() : 0;
+        return dateB - dateA; // Most recent first
+      });
+  }
+
+  async getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null> {
+    return this.data.workOrderExecutions.find(exec => exec.id === id) || null;
+  }
+
+  async createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution> {
+    const executionId = `WOE-${String(this.data.counters.executionId++).padStart(7, '0')}`;
+    const id = `${data.componentId}-${executionId}`;
+    const now = new Date();
+    
+    const newExecution: WorkOrderExecution = {
+      ...data,
+      id,
+      executionId,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.data.workOrderExecutions.push(newExecution);
+    this.persistData();
+    return newExecution;
+  }
+
+  async updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution> {
+    const index = this.data.workOrderExecutions.findIndex(exec => exec.id === id);
+    if (index === -1) {
+      throw new Error(`Work order execution ${id} not found`);
+    }
+    
+    const execution = this.data.workOrderExecutions[index];
+    const updated: WorkOrderExecution = {
+      ...execution,
+      ...data,
+      id: execution.id, // Prevent ID override
+      executionId: execution.executionId, // Prevent execution ID override
+      createdAt: execution.createdAt, // Preserve creation date
+      updatedAt: new Date()
+    };
+    
+    this.data.workOrderExecutions[index] = updated;
+    this.persistData();
+    return updated;
   }
 
   // Defect methods

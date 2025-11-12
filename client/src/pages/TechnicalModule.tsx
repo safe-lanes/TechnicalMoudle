@@ -5,6 +5,7 @@ import Dashboard from "./pms/Dashboard";
 import Components from "./pms/Components";
 import WorkOrders from "./pms/WorkOrders";
 import RunningHours from "./pms/RunningHours";
+import MaintenanceRecords from "./pms/MaintenanceRecords";
 import { ModifyPMS } from "@/components/modifyPms/ModifyPMS";
 import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
@@ -132,6 +133,8 @@ export const TechnicalModule: React.FC = () => {
             <ModifyPMS />
           ) : selectedSubModule === "pms" && selectedMenuItem === "admin" ? (
             <PMSAdmin />
+          ) : selectedSubModule === "pms" && selectedMenuItem.startsWith("maintenance-records") ? (
+            <MaintenanceRecords />
           ) : selectedSubModule === "admin" ? (
             <AdminPanel />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (

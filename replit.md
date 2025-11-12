@@ -25,6 +25,13 @@ The application utilizes a modern full-stack architecture. The frontend is built
     -   **Part B4**: Consumed Spare Parts tracking with inline add/edit/delete
     -   **Data Persistence**: All form data stored as JSON fields in work orders table (requiredSpareParts, requiredTools, safetyRequirements, uploadedDocuments, consumedSpareParts)
     -   **Object Storage Integration**: Backend uses ObjectStorageService with proper Replit SDK for secure document upload, retrieval, and deletion via `/api/upload-document` and `/api/documents/:fileKey` endpoints
+-   **Template vs Execution Workflow (November 2025)**: Comprehensive work order lifecycle management with clear separation between templates and executions:
+    -   **Template Mode**: Component Tree displays work order templates with Section A only (job description, maintenance intervals, required spares/tools, safety requirements). "Maintenance Records" button provides access to historical executions.
+    -   **History Mode**: Maintenance Records page displays completed work order executions in a full-screen data table with date filters (All Time, Last Month, Last Quarter, Last Year, Custom Range) and search functionality. Clicking a row opens WorkOrderForm in read-only mode showing merged data: Section A from template + Section B from execution (uploaded documents, consumed spares, work description, completion details).
+    -   **Data Architecture**: workOrderExecutions table stores historical maintenance records with templateId reference, componentId/vesselId tracking, and top-level fields (workDescription, remarks, uploadedDocuments, consumedSpareParts, performedBy, approvedBy, dateCompleted, status).
+    -   **Type Safety**: Full TypeScript integration with HistoryWorkOrderPayload type, WorkOrder and WorkOrderExecution types from schema, and proper state management in MaintenanceRecords component.
+    -   **Backend API**: Complete REST endpoints - GET /api/work-order-executions/:componentId for fetching executions, POST /api/work-order-executions for creating records, PATCH /api/work-order-executions/:id for updates. GET /api/components/details/:id for component information.
+    -   **UI/UX**: Toast notifications for missing templates, data-testid attributes for testing, graceful error handling with user feedback, and automatic section navigation to Part B when viewing history.
 -   **Modify PMS - Change Requests**: Comprehensive workflow for change requests (draft to approved/rejected), including target selection (Components/Work Orders/Spares/Stores), proposed field-specific modifications, and impact previews.
 -   **Defects Module**:
     -   **Condition of Class (CoC)**: Tracking and filtered views.

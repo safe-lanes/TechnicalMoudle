@@ -49,6 +49,9 @@ import {
   workOrders,
   type WorkOrder,
   type InsertWorkOrder,
+  workOrderExecutions,
+  type WorkOrderExecution,
+  type InsertWorkOrderExecution,
   defects,
   type Defect,
   type InsertDefect,
@@ -220,6 +223,12 @@ export interface IStorage {
   updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder>;
   deleteFleetJob(id: string): Promise<void>;
   
+  // Work Order Execution methods
+  getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]>;
+  getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null>;
+  createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution>;
+  updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution>;
+  
   // Defects methods
   getDefects(filters?: { 
     vesselId?: string; 
@@ -372,6 +381,8 @@ export class MemStorage implements IStorage {
   private currentFormUsageId: number;
   private workOrders: Map<string, WorkOrder>;
   private currentWorkOrderId: number;
+  private workOrderExecutions: Map<string, WorkOrderExecution>;
+  private currentExecutionId: number;
   private defects: Map<string, Defect>;
   private currentDefectId: number;
   private defectActions: Map<number, DefectAction>;
@@ -416,6 +427,8 @@ export class MemStorage implements IStorage {
     this.currentFormUsageId = 1;
     this.workOrders = new Map();
     this.currentWorkOrderId = 1;
+    this.workOrderExecutions = new Map();
+    this.currentExecutionId = 1;
     this.defects = new Map();
     this.currentDefectId = 1;
     this.defectActions = new Map();
@@ -2691,6 +2704,56 @@ export class MemStorage implements IStorage {
     }
     
     return { created, updated };
+  }
+
+  async getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]> {
+    return Array.from(this.workOrderExecutions.values())
+      .filter(exec => exec.componentId === componentId)
+      .sort((a, b) => {
+        const dateA = a.dateCompleted ? new Date(a.dateCompleted).getTime() : 0;
+        const dateB = b.dateCompleted ? new Date(b.dateCompleted).getTime() : 0;
+        return dateB - dateA; // Most recent first
+      });
+  }
+
+  async getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null> {
+    return this.workOrderExecutions.get(id) || null;
+  }
+
+  async createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution> {
+    const executionId = `WOE-${String(this.currentExecutionId).padStart(7, '0')}`;
+    const id = `${data.componentId}-${executionId}`;
+    this.currentExecutionId++;
+    
+    const newExecution: WorkOrderExecution = {
+      ...data,
+      id,
+      executionId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.workOrderExecutions.set(id, newExecution);
+    return newExecution;
+  }
+
+  async updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution> {
+    const execution = this.workOrderExecutions.get(id);
+    if (!execution) {
+      throw new Error(`Work order execution ${id} not found`);
+    }
+    
+    const updated: WorkOrderExecution = {
+      ...execution,
+      ...data,
+      id: execution.id, // Prevent ID override
+      executionId: execution.executionId, // Prevent execution ID override
+      createdAt: execution.createdAt, // Preserve creation date
+      updatedAt: new Date()
+    };
+    
+    this.workOrderExecutions.set(id, updated);
+    return updated;
   }
 
   private initializeDefects() {
