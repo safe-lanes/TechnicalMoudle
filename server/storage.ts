@@ -3387,12 +3387,980 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Use in-memory storage for Technical Module
-// Import PersistentFileStorage instead of using MemStorage
-import { PersistentFileStorage } from "./persistentStorage";
+export class PostgresStorage implements IStorage {
+  private db: typeof import('./db').db;
 
-// ALWAYS use PersistentFileStorage - no fallback to MemStorage
-const storage: IStorage = new PersistentFileStorage('test-data.json');
-console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
+  constructor() {
+    this.db = require('./db').db;
+  }
+
+  // ============= USERS =============
+  async getUser(id: number): Promise<User | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await this.db.insert(users).values(user).returning();
+    return result[0];
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await this.db.select().from(users);
+  }
+
+  // ============= COMPONENTS =============
+  async getComponents(vesselId: string): Promise<Component[]> {
+    const { eq, and } = await import('drizzle-orm');
+    return await this.db.select().from(components)
+      .where(and(eq(components.vesselId, vesselId), eq(components.dataScope, 'vessel')));
+  }
+
+  async getComponent(id: string): Promise<Component | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(components).where(eq(components.id, id));
+    return result[0];
+  }
+
+  async createComponent(component: InsertComponent): Promise<Component> {
+    const { nanoid } = await import('nanoid');
+    const id = nanoid();
+    const result = await this.db.insert(components).values({ ...component, id }).returning();
+    return result[0];
+  }
+
+  async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(components)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(components.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComponent(id: string): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(components).where(eq(components.id, id));
+  }
+
+  // ============= FLEET COMPONENTS =============
+  async getFleetComponents(): Promise<Component[]> {
+    const { eq } = await import('drizzle-orm');
+    return await this.db.select().from(components).where(eq(components.dataScope, 'fleet'));
+  }
+
+  async getFleetComponent(id: string): Promise<Component | undefined> {
+    const { eq, and } = await import('drizzle-orm');
+    const result = await this.db.select().from(components)
+      .where(and(eq(components.id, id), eq(components.dataScope, 'fleet')));
+    return result[0];
+  }
+
+  async createFleetComponent(component: InsertComponent): Promise<Component> {
+    const { nanoid } = await import('nanoid');
+    const fleetEquipmentCode = await generateFleetEquipmentCode();
+    const id = nanoid();
+    const result = await this.db.insert(components).values({
+      ...component,
+      id,
+      dataScope: 'fleet',
+      fleetEquipmentCode,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(components)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(components.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFleetComponent(id: string): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(components).where(eq(components.id, id));
+  }
+
+  // ============= RUNNING HOURS AUDITS =============
+  async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
+    const result = await this.db.insert(runningHoursAudit).values(audit).returning();
+    return result[0];
+  }
+
+  async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
+    const { eq, desc } = await import('drizzle-orm');
+    const query = this.db.select().from(runningHoursAudit)
+      .where(eq(runningHoursAudit.componentId, componentId))
+      .orderBy(desc(runningHoursAudit.enteredAtUTC));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+
+  async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]> {
+    const { eq, and, gte, lte, desc } = await import('drizzle-orm');
+    return await this.db.select().from(runningHoursAudit)
+      .where(and(
+        eq(runningHoursAudit.componentId, componentId),
+        gte(runningHoursAudit.enteredAtUTC, startDate),
+        lte(runningHoursAudit.enteredAtUTC, endDate)
+      ))
+      .orderBy(desc(runningHoursAudit.enteredAtUTC));
+  }
+
+  // ============= SPARES =============
+  async getSpares(vesselId: string): Promise<Spare[]> {
+    const { eq, and } = await import('drizzle-orm');
+    return await this.db.select().from(spares)
+      .where(and(eq(spares.vesselId, vesselId), eq(spares.dataScope, 'vessel'), eq(spares.deleted, false)));
+  }
+
+  async getSpare(id: number): Promise<Spare | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(spares).where(eq(spares.id, id));
+    return result[0];
+  }
+
+  async createSpare(spare: InsertSpare): Promise<Spare> {
+    const result = await this.db.insert(spares).values(spare).returning();
+    return result[0];
+  }
+
+  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(spares)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(spares.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSpare(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.update(spares)
+      .set({ deleted: true })
+      .where(eq(spares.id, id));
+  }
+
+  async consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const { eq } = await import('drizzle-orm');
+    const spare = await this.getSpare(id);
+    if (!spare) throw new Error(`Spare ${id} not found`);
+
+    const newRob = spare.rob - quantity;
+    const updated = await this.db.update(spares)
+      .set({ rob: newRob, updatedAt: new Date() })
+      .where(eq(spares.id, id))
+      .returning();
+
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || '',
+      spareId: id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode || '',
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode || '',
+      eventType: 'CONSUME',
+      qtyChange: -quantity,
+      robAfter: newRob,
+      userId,
+      remarks,
+      dateLocal,
+      tz,
+      place,
+    });
+
+    return updated[0];
+  }
+
+  async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    const { eq } = await import('drizzle-orm');
+    const spare = await this.getSpare(id);
+    if (!spare) throw new Error(`Spare ${id} not found`);
+
+    const newRob = spare.rob + quantity;
+    const updated = await this.db.update(spares)
+      .set({ rob: newRob, updatedAt: new Date() })
+      .where(eq(spares.id, id))
+      .returning();
+
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || '',
+      spareId: id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode || '',
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode || '',
+      eventType: 'RECEIVE',
+      qtyChange: quantity,
+      robAfter: newRob,
+      userId,
+      remarks,
+      reference: supplierPO,
+      dateLocal,
+      tz,
+      place,
+    });
+
+    return updated[0];
+  }
+
+  // ============= FLEET SPARES =============
+  async getFleetSpares(): Promise<Spare[]> {
+    const { eq, and } = await import('drizzle-orm');
+    return await this.db.select().from(spares)
+      .where(and(eq(spares.dataScope, 'fleet'), eq(spares.deleted, false)));
+  }
+
+  async getFleetSpare(id: number): Promise<Spare | undefined> {
+    const { eq, and } = await import('drizzle-orm');
+    const result = await this.db.select().from(spares)
+      .where(and(eq(spares.id, id), eq(spares.dataScope, 'fleet')));
+    return result[0];
+  }
+
+  async createFleetSpare(spare: InsertSpare): Promise<Spare> {
+    const fleetPartCode = await generateFleetPartCode();
+    const result = await this.db.insert(spares).values({
+      ...spare,
+      dataScope: 'fleet',
+      fleetPartCode,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(spares)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(spares.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFleetSpare(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.update(spares)
+      .set({ deleted: true })
+      .where(eq(spares.id, id));
+  }
+
+  // ============= SPARES HISTORY =============
+  async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+    const { eq, desc } = await import('drizzle-orm');
+    return await this.db.select().from(sparesHistory)
+      .where(eq(sparesHistory.vesselId, vesselId))
+      .orderBy(desc(sparesHistory.timestampUTC));
+  }
+
+  async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
+    const { eq, desc } = await import('drizzle-orm');
+    return await this.db.select().from(sparesHistory)
+      .where(eq(sparesHistory.spareId, spareId))
+      .orderBy(desc(sparesHistory.timestampUTC));
+  }
+
+  async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
+    const result = await this.db.insert(sparesHistory).values(history).returning();
+    return result[0];
+  }
+
+  // ============= WORK ORDERS =============
+  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const { eq, and } = await import('drizzle-orm');
+    if (vesselId) {
+      return await this.db.select().from(workOrders)
+        .where(and(eq(workOrders.vesselId, vesselId), eq(workOrders.dataScope, 'vessel')));
+    }
+    return await this.db.select().from(workOrders);
+  }
+
+  async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(workOrders).where(eq(workOrders.id, id));
+    return result[0];
+  }
+
+  async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
+    const { nanoid } = await import('nanoid');
+    const id = nanoid();
+    const result = await this.db.insert(workOrders).values({ ...workOrder, id }).returning();
+    return result[0];
+  }
+
+  async updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(workOrders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(workOrders.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWorkOrder(id: string): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(workOrders).where(eq(workOrders.id, id));
+  }
+
+  // ============= DEFECTS =============
+  async getDefects(filters?: {
+    vesselId?: string;
+    status?: string;
+    statusView?: 'active' | 'resolved';
+    category?: string;
+    critical?: boolean;
+    includeClosedDefects?: boolean;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<Defect[]> {
+    const { eq, and, or, like, isNull, isNotNull } = await import('drizzle-orm');
+    const conditions = [];
+
+    if (filters?.vesselId) {
+      conditions.push(eq(defects.vesselId, filters.vesselId));
+    }
+
+    if (filters?.statusView === 'active') {
+      conditions.push(or(
+        eq(defects.status, 'open'),
+        eq(defects.status, 'in_progress'),
+        eq(defects.status, 'pending_approval')
+      ));
+    } else if (filters?.statusView === 'resolved') {
+      conditions.push(eq(defects.status, 'closed'));
+    } else if (filters?.status) {
+      conditions.push(eq(defects.status, filters.status));
+    }
+
+    if (filters?.category) {
+      conditions.push(eq(defects.category, filters.category));
+    }
+
+    if (filters?.critical !== undefined) {
+      conditions.push(eq(defects.critical, filters.critical));
+    }
+
+    if (filters?.search) {
+      conditions.push(or(
+        like(defects.title, `%${filters.search}%`),
+        like(defects.description, `%${filters.search}%`)
+      ));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    return await this.db.select().from(defects).where(whereClause);
+  }
+
+  async getDefectsCount(filters?: {
+    statusView?: 'active' | 'resolved';
+    vesselId?: string;
+    isCoC?: boolean;
+    category?: string;
+    search?: string;
+    period?: string;
+    fleet?: string;
+    group?: string;
+    dueOverdue?: string;
+  }): Promise<number> {
+    const { eq, and, or, like } = await import('drizzle-orm');
+    const { sql } = await import('drizzle-orm');
+    const conditions = [];
+
+    if (filters?.vesselId) {
+      conditions.push(eq(defects.vesselId, filters.vesselId));
+    }
+
+    if (filters?.statusView === 'active') {
+      conditions.push(or(
+        eq(defects.status, 'open'),
+        eq(defects.status, 'in_progress'),
+        eq(defects.status, 'pending_approval')
+      ));
+    } else if (filters?.statusView === 'resolved') {
+      conditions.push(eq(defects.status, 'closed'));
+    }
+
+    if (filters?.isCoC !== undefined) {
+      conditions.push(eq(defects.isCoC, filters.isCoC));
+    }
+
+    if (filters?.category) {
+      conditions.push(eq(defects.category, filters.category));
+    }
+
+    if (filters?.search) {
+      conditions.push(or(
+        like(defects.title, `%${filters.search}%`),
+        like(defects.description, `%${filters.search}%`)
+      ));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const result = await this.db.select({ count: sql<number>`count(*)` }).from(defects).where(whereClause);
+    return result[0]?.count || 0;
+  }
+
+  async getDefect(id: string): Promise<Defect | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(defects).where(eq(defects.id, id));
+    return result[0];
+  }
+
+  async createDefect(defect: InsertDefect): Promise<Defect> {
+    const { nanoid } = await import('nanoid');
+    const id = nanoid();
+    const result = await this.db.insert(defects).values({ ...defect, id }).returning();
+    return result[0];
+  }
+
+  async updateDefect(id: string, updates: Partial<InsertDefect>): Promise<Defect> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(defects)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(defects.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDefect(id: string): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(defects).where(eq(defects.id, id));
+  }
+
+  // ============= DEFECT ACTIONS =============
+  async getDefectActions(defectId: string): Promise<DefectAction[]> {
+    const { eq } = await import('drizzle-orm');
+    return await this.db.select().from(defectActions).where(eq(defectActions.defectId, defectId));
+  }
+
+  async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
+    const result = await this.db.insert(defectActions).values(action).returning();
+    return result[0];
+  }
+
+  async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(defectActions)
+      .set(updates)
+      .where(eq(defectActions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDefectAction(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(defectActions).where(eq(defectActions.id, id));
+  }
+
+  // ============= DEFECT ATTACHMENTS =============
+  async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
+    const { eq } = await import('drizzle-orm');
+    return await this.db.select().from(defectAttachments).where(eq(defectAttachments.defectId, defectId));
+  }
+
+  async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
+    const result = await this.db.insert(defectAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  async deleteDefectAttachment(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(defectAttachments).where(eq(defectAttachments.id, id));
+  }
+
+  // ============= CHANGE REQUESTS =============
+  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+    const { eq, and, like, desc } = await import('drizzle-orm');
+    const conditions = [];
+
+    if (filters?.vesselId) {
+      conditions.push(eq(changeRequest.vesselId, filters.vesselId));
+    }
+    if (filters?.category) {
+      conditions.push(eq(changeRequest.category, filters.category));
+    }
+    if (filters?.status) {
+      conditions.push(eq(changeRequest.status, filters.status));
+    }
+    if (filters?.q) {
+      conditions.push(like(changeRequest.title, `%${filters.q}%`));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    return await this.db.select().from(changeRequest)
+      .where(whereClause)
+      .orderBy(desc(changeRequest.createdAt));
+  }
+
+  async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(changeRequest).where(eq(changeRequest.id, id));
+    return result[0];
+  }
+
+  async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
+    const result = await this.db.insert(changeRequest).values(request).returning();
+    return result[0];
+  }
+
+  async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(changeRequest)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(changeRequest.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // ============= IMPORT HISTORY =============
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    const result = await this.db.insert(importHistory).values(history).returning();
+    return result[0];
+  }
+
+  async getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }> {
+    const { eq, desc, sql } = await import('drizzle-orm');
+    
+    const whereClause = type ? eq(importHistory.importType, type) : undefined;
+    
+    const items = await this.db.select().from(importHistory)
+      .where(whereClause)
+      .orderBy(desc(importHistory.importedAt))
+      .limit(limit || 50)
+      .offset(offset || 0);
+
+    const totalResult = await this.db.select({ count: sql<number>`count(*)` })
+      .from(importHistory)
+      .where(whereClause);
+
+    return {
+      items,
+      total: totalResult[0]?.count || 0,
+    };
+  }
+
+  async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(importHistory).where(eq(importHistory.id, id));
+    return result[0];
+  }
+
+  // ============= RECURRING DEFECTS =============
+  async getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]> {
+    const { eq, and, gte } = await import('drizzle-orm');
+    const conditions = [];
+
+    if (filters?.equipmentKey) {
+      conditions.push(eq(recurringDefects.equipmentKey, filters.equipmentKey));
+    }
+    if (filters?.minOccurrences) {
+      conditions.push(gte(recurringDefects.occurrenceCount, filters.minOccurrences));
+    }
+    if (filters?.hasCoc !== undefined) {
+      conditions.push(eq(recurringDefects.hasCoc, filters.hasCoc));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    return await this.db.select().from(recurringDefects).where(whereClause);
+  }
+
+  async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(recurringDefects).where(eq(recurringDefects.id, id));
+    return result[0];
+  }
+
+  async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    const { eq } = await import('drizzle-orm');
+    return await this.db.select().from(recurringDefectLinks).where(eq(recurringDefectLinks.recurringId, recurringId));
+  }
+
+  // ============= MAKERS =============
+  async getMakers(search?: string): Promise<Maker[]> {
+    const { like, or } = await import('drizzle-orm');
+    if (search) {
+      return await this.db.select().from(makers)
+        .where(or(
+          like(makers.makerName, `%${search}%`),
+          like(makers.makerCode, `%${search}%`)
+        ));
+    }
+    return await this.db.select().from(makers);
+  }
+
+  async getMakerById(id: number): Promise<Maker | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(makers).where(eq(makers.id, id));
+    return result[0];
+  }
+
+  async createMaker(maker: InsertMaker): Promise<Maker> {
+    const result = await this.db.insert(makers).values(maker).returning();
+    return result[0];
+  }
+
+  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(makers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(makers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMaker(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(makers).where(eq(makers.id, id));
+  }
+
+  // ============= MASTER LISTS =============
+  async getMasterLists(listType?: string): Promise<MasterList[]> {
+    const { eq, and } = await import('drizzle-orm');
+    if (listType) {
+      return await this.db.select().from(masterLists)
+        .where(and(eq(masterLists.listType, listType), eq(masterLists.isActive, true)));
+    }
+    return await this.db.select().from(masterLists).where(eq(masterLists.isActive, true));
+  }
+
+  async getMasterListById(id: number): Promise<MasterList | undefined> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.select().from(masterLists).where(eq(masterLists.id, id));
+    return result[0];
+  }
+
+  async getMasterListsByType(listType: string): Promise<MasterList[]> {
+    return this.getMasterLists(listType);
+  }
+
+  async createMasterList(list: InsertMasterList): Promise<MasterList> {
+    const result = await this.db.insert(masterLists).values(list).returning();
+    return result[0];
+  }
+
+  async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    const { eq } = await import('drizzle-orm');
+    const result = await this.db.update(masterLists)
+      .set(data)
+      .where(eq(masterLists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMasterList(id: number): Promise<void> {
+    const { eq } = await import('drizzle-orm');
+    await this.db.delete(masterLists).where(eq(masterLists.id, id));
+  }
+
+  // ============= STUBS FOR NON-PRIORITY METHODS =============
+  
+  async bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]> {
+    throw new Error("Bulk update spares not yet migrated to PostgreSQL");
+  }
+
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
+    throw new Error("Update change request target not yet migrated to PostgreSQL");
+  }
+
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest> {
+    throw new Error("Update change request proposed not yet migrated to PostgreSQL");
+  }
+
+  async deleteChangeRequest(id: number): Promise<void> {
+    throw new Error("Delete change request not yet migrated to PostgreSQL");
+  }
+
+  async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
+    throw new Error("Submit change request not yet migrated to PostgreSQL");
+  }
+
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    throw new Error("Approve change request not yet migrated to PostgreSQL");
+  }
+
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    throw new Error("Reject change request not yet migrated to PostgreSQL");
+  }
+
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    throw new Error("Return change request not yet migrated to PostgreSQL");
+  }
+
+  async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
+    throw new Error("Change request attachments not yet migrated to PostgreSQL");
+  }
+
+  async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
+    throw new Error("Create change request attachment not yet migrated to PostgreSQL");
+  }
+
+  async getChangeRequestComments(changeRequestId: number): Promise<ChangeRequestComment[]> {
+    throw new Error("Change request comments not yet migrated to PostgreSQL");
+  }
+
+  async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
+    throw new Error("Create change request comment not yet migrated to PostgreSQL");
+  }
+
+  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
+    throw new Error("Bulk create components not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+    throw new Error("Bulk update components not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    throw new Error("Bulk upsert components not yet migrated to PostgreSQL");
+  }
+
+  async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
+    throw new Error("Bulk create spares not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    throw new Error("Bulk update spares by ROB not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    throw new Error("Bulk upsert spares not yet migrated to PostgreSQL");
+  }
+
+  async archiveComponentsByIds(ids: string[]): Promise<number> {
+    throw new Error("Archive components not yet migrated to PostgreSQL");
+  }
+
+  async archiveSparesByIds(ids: number[]): Promise<number> {
+    throw new Error("Archive spares not yet migrated to PostgreSQL");
+  }
+
+  async getAlertPolicies(): Promise<AlertPolicy[]> {
+    throw new Error("Alert policies not yet migrated to PostgreSQL");
+  }
+
+  async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
+    throw new Error("Alert policy not yet migrated to PostgreSQL");
+  }
+
+  async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
+    throw new Error("Create alert policy not yet migrated to PostgreSQL");
+  }
+
+  async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
+    throw new Error("Update alert policy not yet migrated to PostgreSQL");
+  }
+
+  async deleteAlertPolicy(id: number): Promise<void> {
+    throw new Error("Delete alert policy not yet migrated to PostgreSQL");
+  }
+
+  async getAlertEvents(filters?: { startDate?: Date; endDate?: Date; alertType?: string; priority?: string; status?: string; vesselId?: string }): Promise<AlertEvent[]> {
+    throw new Error("Alert events not yet migrated to PostgreSQL");
+  }
+
+  async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
+    throw new Error("Alert event not yet migrated to PostgreSQL");
+  }
+
+  async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
+    throw new Error("Create alert event not yet migrated to PostgreSQL");
+  }
+
+  async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
+    throw new Error("Acknowledge alert event not yet migrated to PostgreSQL");
+  }
+
+  async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
+    throw new Error("Alert deliveries not yet migrated to PostgreSQL");
+  }
+
+  async createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery> {
+    throw new Error("Create alert delivery not yet migrated to PostgreSQL");
+  }
+
+  async updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery> {
+    throw new Error("Update alert delivery status not yet migrated to PostgreSQL");
+  }
+
+  async getAlertConfig(vesselId: string): Promise<AlertConfig | undefined> {
+    throw new Error("Alert config not yet migrated to PostgreSQL");
+  }
+
+  async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
+    throw new Error("Create/update alert config not yet migrated to PostgreSQL");
+  }
+
+  async getFormDefinitions(): Promise<FormDefinition[]> {
+    throw new Error("Form definitions not yet migrated to PostgreSQL");
+  }
+
+  async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
+    throw new Error("Form definition not yet migrated to PostgreSQL");
+  }
+
+  async getFormDefinitionByName(name: string): Promise<FormDefinition | undefined> {
+    throw new Error("Form definition by name not yet migrated to PostgreSQL");
+  }
+
+  async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
+    throw new Error("Create form definition not yet migrated to PostgreSQL");
+  }
+
+  async getFormVersions(formId: number): Promise<FormVersion[]> {
+    throw new Error("Form versions not yet migrated to PostgreSQL");
+  }
+
+  async getFormVersion(id: number): Promise<FormVersion | undefined> {
+    throw new Error("Form version not yet migrated to PostgreSQL");
+  }
+
+  async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
+    throw new Error("Latest published version not yet migrated to PostgreSQL");
+  }
+
+  async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
+    throw new Error("Latest published version by name not yet migrated to PostgreSQL");
+  }
+
+  async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
+    throw new Error("Create form version not yet migrated to PostgreSQL");
+  }
+
+  async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
+    throw new Error("Update form version not yet migrated to PostgreSQL");
+  }
+
+  async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
+    throw new Error("Publish form version not yet migrated to PostgreSQL");
+  }
+
+  async discardFormVersion(id: number): Promise<void> {
+    throw new Error("Discard form version not yet migrated to PostgreSQL");
+  }
+
+  async createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage> {
+    throw new Error("Create form version usage not yet migrated to PostgreSQL");
+  }
+
+  async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
+    throw new Error("Form version usage not yet migrated to PostgreSQL");
+  }
+
+  async seedForms(): Promise<void> {
+    throw new Error("Seed forms not yet migrated to PostgreSQL");
+  }
+
+  async getIhmItem(id: string, type: 'component' | 'spare'): Promise<any | undefined> {
+    throw new Error("IHM items not yet migrated to PostgreSQL");
+  }
+
+  async upsertIhmItem(item: any): Promise<any> {
+    throw new Error("Upsert IHM item not yet migrated to PostgreSQL");
+  }
+
+  async getIhmMaintenanceLog(filters: any): Promise<any[]> {
+    throw new Error("IHM maintenance log not yet migrated to PostgreSQL");
+  }
+
+  async createIhmMaintenanceLogEntry(entry: any): Promise<any> {
+    throw new Error("Create IHM maintenance log entry not yet migrated to PostgreSQL");
+  }
+
+  async getIhmStatusReport(vesselId: string): Promise<any[]> {
+    throw new Error("IHM status report not yet migrated to PostgreSQL");
+  }
+
+  async bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    throw new Error("Bulk create work orders not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    throw new Error("Bulk update work orders not yet migrated to PostgreSQL");
+  }
+
+  async bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    throw new Error("Bulk upsert work orders not yet migrated to PostgreSQL");
+  }
+
+  async getFleetJobs(): Promise<WorkOrder[]> {
+    throw new Error("Fleet jobs not yet migrated to PostgreSQL");
+  }
+
+  async getFleetJob(id: string): Promise<WorkOrder | undefined> {
+    throw new Error("Fleet job not yet migrated to PostgreSQL");
+  }
+
+  async createFleetJob(job: InsertWorkOrder): Promise<WorkOrder> {
+    throw new Error("Create fleet job not yet migrated to PostgreSQL");
+  }
+
+  async updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
+    throw new Error("Update fleet job not yet migrated to PostgreSQL");
+  }
+
+  async deleteFleetJob(id: string): Promise<void> {
+    throw new Error("Delete fleet job not yet migrated to PostgreSQL");
+  }
+
+  async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string; }): Promise<Defect> {
+    throw new Error("Add defect note not yet migrated to PostgreSQL");
+  }
+
+  async linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect> {
+    throw new Error("Link defects not yet migrated to PostgreSQL");
+  }
+
+  async closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect> {
+    throw new Error("Close defect not yet migrated to PostgreSQL");
+  }
+
+  async calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null> {
+    throw new Error("Calculate recurring defects not yet migrated to PostgreSQL");
+  }
+
+  async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
+    throw new Error("Get defects for recurring not yet migrated to PostgreSQL");
+  }
+
+  async recalculateAllRecurringDefects(): Promise<void> {
+    throw new Error("Recalculate all recurring defects not yet migrated to PostgreSQL");
+  }
+
+  async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
+    throw new Error("Get defect by seed ID not yet migrated to PostgreSQL");
+  }
+
+  async getVesselIdByName(vesselName: string): Promise<string | undefined> {
+    throw new Error("Get vessel ID by name not yet migrated to PostgreSQL");
+  }
+
+  async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
+    throw new Error("Create vessel not yet migrated to PostgreSQL");
+  }
+}
+
+// Use PostgreSQL database for all storage
+const storage: IStorage = new PostgresStorage();
+console.log("✅ Application configured with PostgreSQL - all data will persist to database");
 
 export { storage };
