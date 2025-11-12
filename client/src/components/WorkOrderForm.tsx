@@ -1325,43 +1325,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           <div>Comments (if any)</div>
                         </div>
                       </div>
-                      <div className="divide-y divide-gray-200">
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
-                            <div className="text-gray-900">SP -001</div>
-                            <div className="text-gray-900">O-Ring Seal</div>
-                            <div>
-                              <Input type="text" className="w-full" defaultValue="2" />
-                            </div>
-                            <div>
-                              <Input type="text" className="w-full" />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
-                            <div className="text-gray-900">SP-002</div>
-                            <div className="text-gray-900">Filter Element</div>
-                            <div>
-                              <Input type="text" className="w-full" defaultValue="1" />
-                            </div>
-                            <div>
-                              <Input type="text" className="w-full" />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
-                            <div className="text-gray-900">SP -003</div>
-                            <div className="text-gray-900">Bearing</div>
-                            <div>
-                              <Input type="text" className="w-full" defaultValue="2" />
-                            </div>
-                            <div>
-                              <Input type="text" className="w-full" />
-                            </div>
-                          </div>
-                        </div>
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No spare parts consumed yet
                       </div>
                     </div>
                   </div>
