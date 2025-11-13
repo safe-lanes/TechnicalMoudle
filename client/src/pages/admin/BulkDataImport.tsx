@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileSpreadsheet } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
-import WorkOrderUpload from "./WorkOrderUpload";
+import JobUpload from "./JobUpload";
 
-type TemplateType = 'machinery' | 'stores' | 'spares' | 'work-orders' | 'template5' | 'template6';
+type TemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'template5' | 'template6';
 
 export default function BulkDataImport() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('machinery');
@@ -13,7 +13,7 @@ export default function BulkDataImport() {
     { id: 'machinery' as TemplateType, number: 1, name: 'Machinery Components' },
     { id: 'stores' as TemplateType, number: 2, name: 'Stores' },
     { id: 'spares' as TemplateType, number: 3, name: 'Spares' },
-    { id: 'work-orders' as TemplateType, number: 4, name: 'Work Orders' },
+    { id: 'jobs' as TemplateType, number: 4, name: 'Jobs' },
     { id: 'template5' as TemplateType, number: 5, name: 'Template 5' },
     { id: 'template6' as TemplateType, number: 6, name: 'Template 6' },
   ];
@@ -49,8 +49,8 @@ export default function BulkDataImport() {
       <div className="flex-1 bg-gray-50 overflow-auto">
         {selectedTemplate === 'machinery' ? (
           <MachineryComponentUpload />
-        ) : selectedTemplate === 'work-orders' ? (
-          <WorkOrderUpload />
+        ) : selectedTemplate === 'jobs' ? (
+          <JobUpload />
         ) : selectedTemplate === 'stores' ? (
           <div className="p-6">
             <Card>
