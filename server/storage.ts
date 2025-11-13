@@ -46,6 +46,9 @@ import {
   formVersionUsage,
   type FormVersionUsage,
   type InsertFormVersionUsage,
+  jobs,
+  type Job,
+  type InsertJob,
   workOrders,
   type WorkOrder,
   type InsertWorkOrder,
@@ -205,6 +208,16 @@ export interface IStorage {
   getIhmMaintenanceLog(filters: any): Promise<any[]>;
   createIhmMaintenanceLogEntry(entry: any): Promise<any>;
   getIhmStatusReport(vesselId: string): Promise<any[]>;
+  
+  // Jobs methods (Templates for maintenance jobs linked to components)
+  getJobs(vesselId?: string, componentId?: string): Promise<Job[]>;
+  getJob(id: string): Promise<Job | undefined>;
+  createJob(job: InsertJob): Promise<Job>;
+  updateJob(id: string, updates: Partial<InsertJob>): Promise<Job>;
+  deleteJob(id: string): Promise<void>;
+  bulkCreateJobs(jobs: InsertJob[]): Promise<Job[]>;
+  bulkUpdateJobs(jobs: Array<{ jobNo: string; data: Partial<Job> }>): Promise<Job[]>;
+  bulkUpsertJobs(jobs: InsertJob[]): Promise<{ created: number; updated: number }>;
   
   // Work Order methods
   getWorkOrders(vesselId?: string): Promise<WorkOrder[]>;
