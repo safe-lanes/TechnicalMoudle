@@ -81,7 +81,11 @@ const FIELD_MAPPINGS = [
   { field: "Critical", required: false, description: "Yes or No" },
 ];
 
-export default function JobUpload() {
+interface JobUploadProps {
+  vesselId: string;
+}
+
+export default function JobUpload({ vesselId }: JobUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
@@ -103,7 +107,7 @@ export default function JobUpload() {
   const handleDownloadTemplate = async () => {
     try {
       // Include vesselId to populate Components sheet with all system components
-      const response = await fetch('/api/bulk/template?type=jobs&vesselId=V001');
+      const response = await fetch(`/api/bulk/template?type=jobs&vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -159,6 +163,7 @@ export default function JobUpload() {
     formData.append('file', file);
     formData.append('type', 'jobs');
     formData.append('mode', importMode);
+    formData.append('vesselId', vesselId);
     formData.append('archiveMissing', 'false');
 
     try {
@@ -213,7 +218,7 @@ export default function JobUpload() {
           type: 'jobs',
           mode: importMode,
           archiveMissing: false,
-          vesselId: 'V001'
+          vesselId: vesselId
         })
       });
 

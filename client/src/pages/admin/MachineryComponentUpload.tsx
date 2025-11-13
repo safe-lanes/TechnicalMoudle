@@ -72,7 +72,11 @@ const FIELD_MAPPINGS = [
   { field: "Class Item", required: false, description: "Yes or No" },
 ];
 
-export default function AdminMachineryUpload() {
+interface MachineryComponentUploadProps {
+  vesselId: string;
+}
+
+export default function AdminMachineryUpload({ vesselId }: MachineryComponentUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
@@ -197,6 +201,7 @@ export default function AdminMachineryUpload() {
     formData.append('file', file);
     formData.append('type', 'components');
     formData.append('mode', importMode);
+    formData.append('vesselId', vesselId);
     formData.append('archiveMissing', 'false');
     
     // Add sheet name if provided
@@ -256,7 +261,7 @@ export default function AdminMachineryUpload() {
           type: 'components',
           mode: importMode,
           archiveMissing: false,
-          vesselId: 'V001'
+          vesselId: vesselId
         })
       });
 
@@ -276,7 +281,7 @@ export default function AdminMachineryUpload() {
       setSelectedFile(null);
       setDryRunResult(null);
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/components/V001'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
     } catch (error: any) {
       toast({
         title: 'Import Failed',
