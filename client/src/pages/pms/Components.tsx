@@ -888,35 +888,35 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
   const { toast } = useToast();
   
-  const { data: allWorkOrders = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/work-orders'],
+  const { data: allJobs = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/jobs'],
   });
   
-  const workOrders = allWorkOrders.filter(wo => wo.componentCode === componentCode);
+  const jobs = allJobs.filter(job => job.componentCode === componentCode);
   
-  // Check URL parameter to auto-open work order modal when returning from Maintenance Records
+  // Check URL parameter to auto-open job modal when returning from Maintenance Records
   React.useEffect(() => {
     // Only run when data has loaded (not loading)
     if (isLoading) return;
     
     const urlParams = new URLSearchParams(window.location.search);
-    const openWorkOrderId = urlParams.get('openWorkOrderId');
+    const openJobId = urlParams.get('openJobId');
     
-    if (openWorkOrderId) {
-      // Find and open the work order
-      const workOrderToOpen = allWorkOrders.find(wo => wo.id === openWorkOrderId);
-      if (workOrderToOpen) {
-        setSelectedWorkOrder(workOrderToOpen);
+    if (openJobId) {
+      // Find and open the job
+      const jobToOpen = allJobs.find((job: any) => job.id === openJobId);
+      if (jobToOpen) {
+        setSelectedWorkOrder(jobToOpen);
         setIsWorkOrderFormOpen(true);
       }
       
-      // Always clean up the openWorkOrderId parameter after data has loaded
-      urlParams.delete('openWorkOrderId');
+      // Always clean up the openJobId parameter after data has loaded
+      urlParams.delete('openJobId');
       const newSearch = urlParams.toString();
       const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [allWorkOrders, isLoading]);
+  }, [allJobs, isLoading]);
   
   // Generate template code for existing data
   const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: number, unit?: string) => {
@@ -1025,55 +1025,45 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
             className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
           >
             <Plus className="h-4 w-4 mr-1" />
-            Add WO
+            Add Job
           </Button>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">W.O No.</th>
+              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Job No.</th>
               <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Job Title</th>
-              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Assigned to</th>
-              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Due Date</th>
-              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Status</th>
-              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Date Completed</th>
+              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Maintenance Type</th>
+              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Frequency</th>
+              <th className="text-left py-2 px-3 font-medium text-[#8798ad]">Initial Next Due</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
-                  Loading work orders...
+                <td colSpan={5} className="py-8 text-center text-gray-500">
+                  Loading jobs...
                 </td>
               </tr>
-            ) : workOrders.length === 0 ? (
+            ) : jobs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
-                  No work orders found for this component
+                <td colSpan={5} className="py-8 text-center text-gray-500">
+                  No jobs found for this component
                 </td>
               </tr>
             ) : (
-              workOrders.map((order, index) => (
+              jobs.map((job, index) => (
                 <tr 
                   key={index} 
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleRowClick(order)}
-                  data-testid={`work-order-row-${order.templateCode}`}
+                  onClick={() => handleRowClick(job)}
+                  data-testid={`job-row-${job.jobNo}`}
                 >
-                  <td className="py-3 px-3 text-gray-900" data-testid={`wo-code-${order.templateCode}`}>{order.templateCode}</td>
-                  <td className="py-3 px-3 text-gray-900" data-testid={`wo-title-${order.templateCode}`}>{order.jobTitle}</td>
-                  <td className="py-3 px-3 text-gray-900">{order.assignedTo}</td>
-                  <td className="py-3 px-3 text-gray-900">{order.dueDate}</td>
-                  <td className="py-3 px-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      order.status === "Due" 
-                        ? "bg-yellow-100 text-yellow-800" 
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-gray-900">{order.dateCompleted || '-'}</td>
+                  <td className="py-3 px-3 text-gray-900" data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
+                  <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
+                  <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
+                  <td className="py-3 px-3 text-gray-900">{job.frequencyValue} {job.frequencyUnit}</td>
+                  <td className="py-3 px-3 text-gray-900">{job.initialNextDue || '-'}</td>
                 </tr>
               ))
             )}
