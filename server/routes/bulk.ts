@@ -1200,6 +1200,22 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     const warnings: string[] = [];
     const normalized: any = {};
 
+    // Validate Vessel Code matches selected vesselId (only for types that have Vessel Code)
+    // Note: work-orders template does NOT have Vessel Code column, so exclude it from validation
+    const typesWithVesselCode = ['components', 'jobs'];
+    if (typesWithVesselCode.includes(type)) {
+      if (vesselId && row['Vessel Code']) {
+        const rowVesselCode = String(row['Vessel Code']).trim().toUpperCase();
+        const selectedVessel = vesselId.trim().toUpperCase();
+        if (rowVesselCode !== selectedVessel) {
+          errors.push(`Row ${rowNum}: Vessel Code '${rowVesselCode}' does not match selected vessel '${vesselId}'. All rows must belong to the same vessel.`);
+        }
+      } else if (vesselId && !row['Vessel Code']) {
+        // Vessel Code is missing but vesselId is provided
+        errors.push(`Row ${rowNum}: Vessel Code is required and must match selected vessel '${vesselId}'.`);
+      }
+    }
+
     if (type === 'components') {
       // Validate Component Code (required, SFI format)
       const componentCode = row['Component Code'];
