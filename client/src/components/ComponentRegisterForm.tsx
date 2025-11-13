@@ -634,6 +634,12 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
 
+  // Fetch jobs for the component
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery<any[]>({
+    queryKey: ['/api/jobs', { componentId: componentData.componentId }],
+    enabled: !!componentData.componentId && !isAddMode,
+  });
+
   // Handle node selection
   const handleNodeSelect = (node: ComponentNode) => {
     setSelectedNode(node);
@@ -1537,14 +1543,35 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                           </div>
                         </div>
                         <div className="divide-y divide-gray-200">
-                          {isAddMode ? (
+                          {jobsLoading ? (
+                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                              Loading jobs...
+                            </div>
+                          ) : isAddMode ? (
                             <div className="px-4 py-8 text-center text-sm text-gray-500">
                               No jobs yet. Click "Add Job" to create one.
                             </div>
-                          ) : (
+                          ) : jobs.length === 0 ? (
                             <div className="px-4 py-8 text-center text-sm text-gray-500">
                               No jobs found for this component.
                             </div>
+                          ) : (
+                            jobs.map((job: any) => (
+                              <div key={job.id} className="px-4 py-3" data-testid={`job-row-${job.id}`}>
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">{job.jobNo}</div>
+                                  <div className="text-gray-900">{job.jobTitle}</div>
+                                  <div className="text-gray-900">{job.maintenanceType}</div>
+                                  <div className="text-gray-900">{job.frequencyValue} {job.frequencyUnit}</div>
+                                  <div className="text-gray-900">{job.initialNextDue || '-'}</div>
+                                  <div className="flex gap-2">
+                                    <button className="text-gray-400 hover:text-gray-600" data-testid={`button-view-job-${job.id}`}>
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
                       </div>
@@ -1565,14 +1592,35 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       </div>
                       <div className="divide-y divide-gray-200">
-                        {isAddMode ? (
+                        {jobsLoading ? (
+                          <div className="px-4 py-8 text-center text-sm text-gray-500">
+                            Loading jobs...
+                          </div>
+                        ) : isAddMode ? (
                           <div className="px-4 py-8 text-center text-sm text-gray-500">
                             No jobs yet. Click "Add Job" to create one.
                           </div>
-                        ) : (
+                        ) : jobs.length === 0 ? (
                           <div className="px-4 py-8 text-center text-sm text-gray-500">
                             No jobs found for this component.
                           </div>
+                        ) : (
+                          jobs.slice(0, 2).map((job: any) => (
+                            <div key={job.id} className="px-4 py-3">
+                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                <div className="text-gray-900">{job.jobNo}</div>
+                                <div className="text-gray-900">{job.jobTitle}</div>
+                                <div className="text-gray-900">{job.maintenanceType}</div>
+                                <div className="text-gray-900">{job.frequencyValue} {job.frequencyUnit}</div>
+                                <div className="text-gray-900">{job.initialNextDue || '-'}</div>
+                                <div className="flex gap-2">
+                                  <button className="text-gray-400 hover:text-gray-600">
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
