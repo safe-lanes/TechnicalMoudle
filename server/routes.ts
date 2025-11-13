@@ -261,6 +261,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Jobs API routes (Job templates linked to components)
+  
+  // Get all jobs with optional filters
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const vesselId = req.query.vesselId as string | undefined;
+      const componentId = req.query.componentId as string | undefined;
+      const jobs = await storage.getJobs(vesselId, componentId);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+  
+  // Get single job by ID
+  app.get("/api/jobs/:id", async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error("Failed to fetch job:", error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+  
+  // Create new job
+  app.post("/api/jobs", async (req, res) => {
+    try {
+      const { insertJobSchema } = await import("@shared/schema");
+      let jobData = insertJobSchema.parse(req.body);
+      
+      // Auto-generate job number if not provided (format: JOB-XXXXXXX)
+      if (!jobData.jobNo) {
+        const { nanoid } = await import('nanoid');
+        const generatedJobNo = `JOB-${nanoid(7).toUpperCase()}`;
+        jobData = {
+          ...jobData,
+          jobNo: generatedJobNo
+        };
+      }
+      
+      const job = await storage.createJob(jobData);
+      res.status(201).json(job);
+    } catch (error: any) {
+      console.error("Failed to create job:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create job" });
+    }
+  });
+  
+  // Update job
+  app.patch("/api/jobs/:id", async (req, res) => {
+    try {
+      const job = await storage.updateJob(req.params.id, req.body);
+      res.json(job);
+    } catch (error) {
+      console.error("Failed to update job:", error);
+      res.status(500).json({ error: "Failed to update job" });
+    }
+  });
+  
+  // Delete job
+  app.delete("/api/jobs/:id", async (req, res) => {
+    try {
+      await storage.deleteJob(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+      res.status(500).json({ error: "Failed to delete job" });
+    }
+  });
+  
   // Work Orders API routes
   
   // Get all work orders with optional vessel filter

@@ -32,6 +32,8 @@ import {
   type InsertFormVersion,
   type FormVersionUsage,
   type InsertFormVersionUsage,
+  type Job,
+  type InsertJob,
   type WorkOrder,
   type InsertWorkOrder,
   type WorkOrderExecution,
@@ -69,6 +71,7 @@ interface PersistentData {
   formDefinitions: Record<number, FormDefinition>;
   formVersions: Record<number, FormVersion>;
   formVersionUsages: FormVersionUsage[];
+  jobs: Record<string, Job>;
   workOrders: WorkOrder[];
   workOrderExecutions: WorkOrderExecution[];
   defects: Record<string, Defect>;
@@ -278,6 +281,7 @@ export class PersistentFileStorage implements IStorage {
       formDefinitions: {},
       formVersions: {},
       formVersionUsages: [],
+      jobs: {},
       workOrders: [],
       workOrderExecutions: [],
       defects: {},
@@ -1160,6 +1164,191 @@ export class PersistentFileStorage implements IStorage {
 
   // The rest of the methods will follow the same pattern...
   // I'll continue with the most important ones for now
+
+  // Jobs methods (Templates for maintenance jobs linked to components)
+  async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
+    const allJobs = Object.values(this.data.jobs).filter(job => job !== null);
+    let filtered = allJobs;
+    
+    if (vesselId) {
+      filtered = filtered.filter(job => job.vesselId === vesselId);
+    }
+    if (componentId) {
+      filtered = filtered.filter(job => job.componentId === componentId);
+    }
+    
+    return filtered;
+  }
+
+  async getJob(id: string): Promise<Job | undefined> {
+    return this.data.jobs[id];
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const { nanoid } = await import('nanoid');
+    const id = nanoid();
+    const newJob: Job = {
+      ...job,
+      id,
+      vesselId: job.vesselId || null,
+      assignedTo: job.assignedTo || null,
+      maintenanceType: job.maintenanceType || null,
+      maintenanceBasis: job.maintenanceBasis || null,
+      frequencyValue: job.frequencyValue || null,
+      frequencyUnit: job.frequencyUnit || null,
+      intervalRunningHour: job.intervalRunningHour || null,
+      initialNextDue: job.initialNextDue || null,
+      jobPriority: job.jobPriority || null,
+      classRelated: job.classRelated || null,
+      briefWorkDescription: job.briefWorkDescription || null,
+      department: job.department || null,
+      dataScope: job.dataScope || "vessel",
+      fleetEquipmentCode: job.fleetEquipmentCode || null,
+      fleetJobCode: job.fleetJobCode || null,
+      sfiCode: job.sfiCode || null,
+      criticality: job.criticality || null,
+      isActive: job.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.data.jobs[id] = newJob;
+    this.persistData();
+    return newJob;
+  }
+
+  async updateJob(id: string, updates: Partial<InsertJob>): Promise<Job> {
+    const job = this.data.jobs[id];
+    if (!job) {
+      throw new Error(`Job ${id} not found`);
+    }
+    const updatedJob = {
+      ...job,
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.data.jobs[id] = updatedJob;
+    this.persistData();
+    return updatedJob;
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    if (this.data.jobs[id]) {
+      delete this.data.jobs[id];
+      this.persistData();
+    }
+  }
+
+  async bulkCreateJobs(jobs: InsertJob[]): Promise<Job[]> {
+    const { nanoid } = await import('nanoid');
+    const created: Job[] = [];
+    const now = new Date();
+    
+    for (const job of jobs) {
+      const id = nanoid();
+      const newJob: Job = {
+        ...job,
+        id,
+        vesselId: job.vesselId || null,
+        assignedTo: job.assignedTo || null,
+        maintenanceType: job.maintenanceType || null,
+        maintenanceBasis: job.maintenanceBasis || null,
+        frequencyValue: job.frequencyValue || null,
+        frequencyUnit: job.frequencyUnit || null,
+        intervalRunningHour: job.intervalRunningHour || null,
+        initialNextDue: job.initialNextDue || null,
+        jobPriority: job.jobPriority || null,
+        classRelated: job.classRelated || null,
+        briefWorkDescription: job.briefWorkDescription || null,
+        department: job.department || null,
+        dataScope: job.dataScope || "vessel",
+        fleetEquipmentCode: job.fleetEquipmentCode || null,
+        fleetJobCode: job.fleetJobCode || null,
+        sfiCode: job.sfiCode || null,
+        criticality: job.criticality || null,
+        isActive: job.isActive ?? true,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.data.jobs[id] = newJob;
+      created.push(newJob);
+    }
+    
+    this.persistData();
+    return created;
+  }
+
+  async bulkUpdateJobs(jobs: Array<{ jobNo: string; data: Partial<Job> }>): Promise<Job[]> {
+    const updated: Job[] = [];
+    const now = new Date();
+    
+    for (const { jobNo, data } of jobs) {
+      const job = Object.values(this.data.jobs).find(j => j.jobNo === jobNo);
+      if (job) {
+        const updatedJob = {
+          ...job,
+          ...data,
+          updatedAt: now
+        };
+        this.data.jobs[job.id] = updatedJob;
+        updated.push(updatedJob);
+      }
+    }
+    
+    this.persistData();
+    return updated;
+  }
+
+  async bulkUpsertJobs(jobs: InsertJob[]): Promise<{ created: number; updated: number }> {
+    const { nanoid } = await import('nanoid');
+    let created = 0;
+    let updated = 0;
+    const now = new Date();
+    
+    for (const job of jobs) {
+      const existingJob = Object.values(this.data.jobs).find(j => j.jobNo === job.jobNo);
+      
+      if (existingJob) {
+        this.data.jobs[existingJob.id] = {
+          ...existingJob,
+          ...job,
+          id: existingJob.id,
+          updatedAt: now
+        };
+        updated++;
+      } else {
+        const id = nanoid();
+        const newJob: Job = {
+          ...job,
+          id,
+          vesselId: job.vesselId || null,
+          assignedTo: job.assignedTo || null,
+          maintenanceType: job.maintenanceType || null,
+          maintenanceBasis: job.maintenanceBasis || null,
+          frequencyValue: job.frequencyValue || null,
+          frequencyUnit: job.frequencyUnit || null,
+          intervalRunningHour: job.intervalRunningHour || null,
+          initialNextDue: job.initialNextDue || null,
+          jobPriority: job.jobPriority || null,
+          classRelated: job.classRelated || null,
+          briefWorkDescription: job.briefWorkDescription || null,
+          department: job.department || null,
+          dataScope: job.dataScope || "vessel",
+          fleetEquipmentCode: job.fleetEquipmentCode || null,
+          fleetJobCode: job.fleetJobCode || null,
+          sfiCode: job.sfiCode || null,
+          criticality: job.criticality || null,
+          isActive: job.isActive ?? true,
+          createdAt: now,
+          updatedAt: now
+        };
+        this.data.jobs[id] = newJob;
+        created++;
+      }
+    }
+    
+    this.persistData();
+    return { created, updated };
+  }
 
   // Work Order methods
   async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
