@@ -1514,10 +1514,10 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             size="sm" 
                             className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
                             onClick={(e) => e.stopPropagation()}
-                            data-testid="button-add-job"
+                            data-testid="button-add-wo"
                           >
                             <Plus className="h-4 w-4 mr-1" />
-                            Add Job
+                            Add WO
                           </Button>
                         </div>
                       </div>
@@ -1527,39 +1527,49 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <CollapsibleContent>
                       <div className="border border-gray-200 rounded">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
-                            <div>Job No.</div>
-                            <div>Job Title</div>
-                            <div>Maintenance Type</div>
-                            <div>Frequency</div>
-                            <div>Initial Next Due</div>
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="status" className="text-sm font-medium text-gray-700" />
+                            </div>
                             <div></div>
                           </div>
                         </div>
                         <div className="divide-y divide-gray-200">
-                          {jobsLoading ? (
+                          {isAddMode ? (
                             <div className="px-4 py-8 text-center text-sm text-gray-500">
-                              Loading jobs...
+                              No work orders yet. Click "Add WO" to create one.
                             </div>
-                          ) : isAddMode ? (
+                          ) : componentData.workOrders.length === 0 ? (
                             <div className="px-4 py-8 text-center text-sm text-gray-500">
-                              No jobs yet. Click "Add Job" to create one.
-                            </div>
-                          ) : jobs.length === 0 ? (
-                            <div className="px-4 py-8 text-center text-sm text-gray-500">
-                              No jobs found for this component.
+                              No work orders found for this component.
                             </div>
                           ) : (
-                            jobs.map((job: any) => (
-                              <div key={job.id} className="px-4 py-3" data-testid={`job-row-${job.id}`}>
-                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="text-gray-900">{job.jobNo}</div>
-                                  <div className="text-gray-900">{job.jobTitle}</div>
-                                  <div className="text-gray-900">{job.maintenanceType}</div>
-                                  <div className="text-gray-900">{job.frequencyValue} {job.frequencyUnit}</div>
-                                  <div className="text-gray-900">{job.initialNextDue || '-'}</div>
+                            componentData.workOrders.map((wo: any) => (
+                              <div key={wo.title} className="px-4 py-3">
+                                <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">{wo.title}</div>
+                                  <div className="text-gray-900">{wo.assignedTo}</div>
+                                  <div className="text-gray-900">{wo.frequency}</div>
+                                  <div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                      wo.status === "Overdue" 
+                                        ? "bg-red-100 text-red-800" 
+                                        : "bg-yellow-100 text-yellow-800"
+                                    }`}>
+                                      {wo.status}
+                                    </span>
+                                  </div>
                                   <div className="flex gap-2">
-                                    <button className="text-gray-400 hover:text-gray-600" data-testid={`button-view-job-${job.id}`}>
+                                    <button className="text-gray-400 hover:text-gray-600">
                                       <Eye className="w-4 h-4" />
                                     </button>
                                   </div>
@@ -1576,37 +1586,47 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                   {collapsedSections.C && (
                     <div className="border border-gray-200 rounded mb-4">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
-                          <div>Job No.</div>
-                          <div>Job Title</div>
-                          <div>Maintenance Type</div>
-                          <div>Frequency</div>
-                          <div>Initial Next Due</div>
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="status" className="text-sm font-medium text-gray-700" />
+                          </div>
                           <div></div>
                         </div>
                       </div>
                       <div className="divide-y divide-gray-200">
-                        {jobsLoading ? (
+                        {isAddMode ? (
                           <div className="px-4 py-8 text-center text-sm text-gray-500">
-                            Loading jobs...
+                            No work orders yet. Click "Add WO" to create one.
                           </div>
-                        ) : isAddMode ? (
+                        ) : componentData.workOrders.length === 0 ? (
                           <div className="px-4 py-8 text-center text-sm text-gray-500">
-                            No jobs yet. Click "Add Job" to create one.
-                          </div>
-                        ) : jobs.length === 0 ? (
-                          <div className="px-4 py-8 text-center text-sm text-gray-500">
-                            No jobs found for this component.
+                            No work orders found for this component.
                           </div>
                         ) : (
-                          jobs.slice(0, 2).map((job: any) => (
-                            <div key={job.id} className="px-4 py-3">
-                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                <div className="text-gray-900">{job.jobNo}</div>
-                                <div className="text-gray-900">{job.jobTitle}</div>
-                                <div className="text-gray-900">{job.maintenanceType}</div>
-                                <div className="text-gray-900">{job.frequencyValue} {job.frequencyUnit}</div>
-                                <div className="text-gray-900">{job.initialNextDue || '-'}</div>
+                          componentData.workOrders.slice(0, 2).map((wo: any) => (
+                            <div key={wo.title} className="px-4 py-3">
+                              <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                                <div className="text-gray-900">{wo.title}</div>
+                                <div className="text-gray-900">{wo.assignedTo}</div>
+                                <div className="text-gray-900">{wo.frequency}</div>
+                                <div>
+                                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    wo.status === "Overdue" 
+                                      ? "bg-red-100 text-red-800" 
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }`}>
+                                    {wo.status}
+                                  </span>
+                                </div>
                                 <div className="flex gap-2">
                                   <button className="text-gray-400 hover:text-gray-600">
                                     <Eye className="w-4 h-4" />
