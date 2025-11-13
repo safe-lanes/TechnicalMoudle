@@ -1377,8 +1377,8 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                 </div>
 
                 {/* B. Running Hours & Condition Monitoring Metrics */}
-                <Collapsible open={!collapsedSections.B} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, B: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.B} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, B: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex justify-between items-center mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -1401,30 +1401,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         )}
                       </div>
                     </CollapsibleTrigger>
-                    
-                    {/* Preview when collapsed - 2 rows */}
-                    {collapsedSections.B && (
-                      <div className="grid grid-cols-2 gap-6 mb-4">
-                        <DeletableField fieldKey="runningHours">
-                          <EditableLabel fieldKey="runningHours" />
-                          <Input 
-                            value={componentData.runningHours}
-                            onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                            placeholder="20000"
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                        <DeletableField fieldKey="dateUpdated">
-                          <EditableLabel fieldKey="dateUpdated" />
-                          <Input 
-                            value={componentData.dateUpdated}
-                            onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
-                            placeholder="dd-mm-yyyy"
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                      </div>
-                    )}
                     
                     {/* Full content when expanded */}
                     <CollapsibleContent>
@@ -1483,12 +1459,36 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       )}
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.B && (
+                    <div className="grid grid-cols-2 gap-6 mb-4">
+                      <DeletableField fieldKey="runningHours">
+                        <EditableLabel fieldKey="runningHours" />
+                        <Input 
+                          value={componentData.runningHours}
+                          onChange={(e) => handleInputChange('runningHours', e.target.value)}
+                          placeholder="20000"
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                      <DeletableField fieldKey="dateUpdated">
+                        <EditableLabel fieldKey="dateUpdated" />
+                        <Input 
+                          value={componentData.dateUpdated}
+                          onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
+                          placeholder="dd-mm-yyyy"
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                    </div>
+                  )}
+                </div>
 
                 {/* C. Work Orders */}
-                <Collapsible open={!collapsedSections.C} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, C: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.C} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, C: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -1522,70 +1522,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                     </CollapsibleTrigger>
                     
-                    {/* Preview when collapsed - header + 2 rows */}
-                    {collapsedSections.C && (
-                      <div className="border border-gray-200 rounded mb-4">
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div></div>
-                          </div>
-                        </div>
-                        <div className="divide-y divide-gray-200">
-                          {isAddMode ? (
-                            <div className="px-4 py-8 text-center text-sm text-gray-500">
-                              No work orders yet. Click "Add W.O" to create one.
-                            </div>
-                          ) : (
-                            <>
-                              <div className="px-4 py-3">
-                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                  <div className="text-gray-900">Chief Engineer</div>
-                                  <div className="text-gray-900">Running Hours</div>
-                                  <div className="text-gray-900">500</div>
-                                  <div className="text-gray-900">02-Jun-2025</div>
-                                  <div className="flex gap-2">
-                                    <button className="text-gray-400 hover:text-gray-600">
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="px-4 py-3">
-                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                  <div className="text-gray-900">Chief Engineer</div>
-                                  <div className="text-gray-900">Calendar</div>
-                                  <div className="text-gray-900">30</div>
-                                  <div className="text-gray-900">02-Jun-2025</div>
-                                  <div className="flex gap-2">
-                                    <button className="text-gray-400 hover:text-gray-600">
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
                     {/* Full content when expanded */}
                     <CollapsibleContent>
                       <div className="border border-gray-200 rounded">
@@ -1649,12 +1585,76 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - header + 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.C && (
+                    <div className="border border-gray-200 rounded mb-4">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div></div>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {isAddMode ? (
+                          <div className="px-4 py-8 text-center text-sm text-gray-500">
+                            No work orders yet. Click "Add W.O" to create one.
+                          </div>
+                        ) : (
+                          <>
+                            <div className="px-4 py-3">
+                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                <div className="text-gray-900">Chief Engineer</div>
+                                <div className="text-gray-900">Running Hours</div>
+                                <div className="text-gray-900">500</div>
+                                <div className="text-gray-900">02-Jun-2025</div>
+                                <div className="flex gap-2">
+                                  <button className="text-gray-400 hover:text-gray-600">
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="px-4 py-3">
+                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                <div className="text-gray-900">Chief Engineer</div>
+                                <div className="text-gray-900">Calendar</div>
+                                <div className="text-gray-900">30</div>
+                                <div className="text-gray-900">02-Jun-2025</div>
+                                <div className="flex gap-2">
+                                  <button className="text-gray-400 hover:text-gray-600">
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* D. Maintenance History */}
-                <Collapsible open={!collapsedSections.D} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, D: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.D} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, D: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -1688,76 +1688,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                     </CollapsibleTrigger>
                     
-                    {/* Preview when collapsed - header + 2 rows */}
-                    {collapsedSections.D && (
-                      <div className="border border-gray-200 rounded mb-4">
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                            </div>
-                          </div>
-                        </div>
-                        {isAddMode ? (
-                          <div className="px-4 py-8 text-center text-sm text-gray-500">
-                            No maintenance history yet. Click "Add M History" to create one.
-                          </div>
-                        ) : (
-                          <div className="px-4 py-3">
-                            <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                              <div>
-                                <Input 
-                                  value={componentData.workOrderNo}
-                                  onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
-                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Input 
-                                  value={componentData.performedBy}
-                                  onChange={(e) => handleInputChange('performedBy', e.target.value)}
-                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Input 
-                                  value={componentData.totalTimeHrs}
-                                  onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
-                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Input 
-                                  value={componentData.completionDate}
-                                  onChange={(e) => handleInputChange('completionDate', e.target.value)}
-                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Input 
-                                  value={componentData.status}
-                                  onChange={(e) => handleInputChange('status', e.target.value)}
-                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
                     {/* Full content when expanded */}
                     <CollapsibleContent>
                       <div className="border border-gray-200 rounded">
@@ -1827,12 +1757,82 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         )}
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - header + 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.D && (
+                    <div className="border border-gray-200 rounded mb-4">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                          </div>
+                        </div>
+                      </div>
+                      {isAddMode ? (
+                        <div className="px-4 py-8 text-center text-sm text-gray-500">
+                          No maintenance history yet. Click "Add M History" to create one.
+                        </div>
+                      ) : (
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                            <div>
+                              <Input 
+                                value={componentData.workOrderNo}
+                                onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.performedBy}
+                                onChange={(e) => handleInputChange('performedBy', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.totalTimeHrs}
+                                onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.completionDate}
+                                onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.status}
+                                onChange={(e) => handleInputChange('status', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* E. Spares */}
-                <Collapsible open={!collapsedSections.E} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, E: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.E} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, E: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -1850,70 +1850,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                     </CollapsibleTrigger>
                     
-                    {/* Preview when collapsed - header + 2 rows */}
-                    {collapsedSections.E && (
-                      <div className="border border-gray-200 rounded mb-4">
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                            <div>
-                              <Input 
-                                value={componentData.partCode}
-                                onChange={(e) => handleInputChange('partCode', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.partName}
-                                onChange={(e) => handleInputChange('partName', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.minQty}
-                                onChange={(e) => handleInputChange('minQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.criticalQty}
-                                onChange={(e) => handleInputChange('criticalQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.locationStore}
-                                onChange={(e) => handleInputChange('locationStore', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
                     {/* Full content when expanded */}
                     <CollapsibleContent>
                       <div className="border border-gray-200 rounded">
@@ -1977,12 +1913,76 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - header + 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.E && (
+                    <div className="border border-gray-200 rounded mb-4">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3">
+                        <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                          <div>
+                            <Input 
+                              value={componentData.partCode}
+                              onChange={(e) => handleInputChange('partCode', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.partName}
+                              onChange={(e) => handleInputChange('partName', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.minQty}
+                              onChange={(e) => handleInputChange('minQty', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.criticalQty}
+                              onChange={(e) => handleInputChange('criticalQty', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Input 
+                              value={componentData.locationStore}
+                              onChange={(e) => handleInputChange('locationStore', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* F. Drawings & Manuals */}
-                <Collapsible open={!collapsedSections.F} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, F: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.F} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, F: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -1999,24 +1999,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </Button>
                       </div>
                     </CollapsibleTrigger>
-                    
-                    {/* Preview when collapsed - first 2 rows */}
-                    {collapsedSections.F && (
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="woTitle" className="text-sm" />
-                          </div>
-                          <Upload className="h-4 w-4 text-[#52baf3]" />
-                        </div>
-                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="assignedTo" className="text-sm" />
-                          </div>
-                          <Upload className="h-4 w-4 text-[#52baf3]" />
-                        </div>
-                      </div>
-                    )}
                     
                     {/* Full content when expanded */}
                     <CollapsibleContent>
@@ -2047,40 +2029,36 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - first 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.F && (
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="woTitle" className="text-sm" />
+                        </div>
+                        <Upload className="h-4 w-4 text-[#52baf3]" />
+                      </div>
+                      <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                        <div className="flex items-center gap-2">
+                          <EditableLabel fieldKey="assignedTo" className="text-sm" />
+                        </div>
+                        <Upload className="h-4 w-4 text-[#52baf3]" />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* G. Classification & Regulatory Data */}
-                <Collapsible open={!collapsedSections.G} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, G: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.G} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, G: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center gap-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         {collapsedSections.G ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                         <h4 className="text-lg font-semibold text-[#16569e]">G. Classification & Regulatory Data</h4>
                       </div>
                     </CollapsibleTrigger>
-                    
-                    {/* Preview when collapsed - first 2 fields */}
-                    {collapsedSections.G && (
-                      <div className="grid grid-cols-2 gap-6 mb-4">
-                        <DeletableField fieldKey="classificationProvider">
-                          <EditableLabel fieldKey="classificationProvider" />
-                          <Input 
-                            value={componentData.classificationData.classificationProvider}
-                            onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                        <DeletableField fieldKey="certificateNo">
-                          <EditableLabel fieldKey="certificateNo" />
-                          <Input 
-                            value={componentData.classificationData.certificateNo}
-                            onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                      </div>
-                    )}
                     
                     {/* Full content when expanded */}
                     <CollapsibleContent>
@@ -2151,12 +2129,34 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </DeletableField>
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - first 2 fields - OUTSIDE Collapsible */}
+                  {collapsedSections.G && (
+                    <div className="grid grid-cols-2 gap-6 mb-4">
+                      <DeletableField fieldKey="classificationProvider">
+                        <EditableLabel fieldKey="classificationProvider" />
+                        <Input 
+                          value={componentData.classificationData.classificationProvider}
+                          onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                      <DeletableField fieldKey="certificateNo">
+                        <EditableLabel fieldKey="certificateNo" />
+                        <Input 
+                          value={componentData.classificationData.certificateNo}
+                          onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
+                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        />
+                      </DeletableField>
+                    </div>
+                  )}
+                </div>
 
                 {/* H. Requisitions */}
-                <Collapsible open={!collapsedSections.H} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, H: !open }))}>
-                  <div>
+                <div>
+                  <Collapsible open={!collapsedSections.H} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, H: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
@@ -2190,34 +2190,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                     </CollapsibleTrigger>
                     
-                    {/* Preview when collapsed - header + 2 rows */}
-                    {collapsedSections.H && (
-                      <div className="border border-gray-200 rounded mb-4">
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div>Req. No.</div>
-                            <div>Part/Description</div>
-                            <div>Qty</div>
-                            <div>Date</div>
-                            <div>Status</div>
-                          </div>
-                        </div>
-                        <div className="divide-y divide-gray-200">
-                          {componentData.requisitions?.slice(0, 2).map((req: any, index: number) => (
-                            <div key={index} className="px-4 py-3">
-                              <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                                <div className="text-gray-900">{req.reqNo}</div>
-                                <div className="text-gray-900">{req.reqPart}</div>
-                                <div className="text-gray-900">{req.reqQty}</div>
-                                <div className="text-gray-900">{req.reqDate}</div>
-                                <div className="text-gray-900">{req.reqStatus}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
                     {/* Full content when expanded */}
                     <CollapsibleContent>
                       <div className="border border-gray-200 rounded">
@@ -2245,8 +2217,36 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </div>
                       </div>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                  
+                  {/* Preview when collapsed - header + 2 rows - OUTSIDE Collapsible */}
+                  {collapsedSections.H && (
+                    <div className="border border-gray-200 rounded mb-4">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div>Req. No.</div>
+                          <div>Part/Description</div>
+                          <div>Qty</div>
+                          <div>Date</div>
+                          <div>Status</div>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {componentData.requisitions?.slice(0, 2).map((req: any, index: number) => (
+                          <div key={index} className="px-4 py-3">
+                            <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                              <div className="text-gray-900">{req.reqNo}</div>
+                              <div className="text-gray-900">{req.reqPart}</div>
+                              <div className="text-gray-900">{req.reqQty}</div>
+                              <div className="text-gray-900">{req.reqDate}</div>
+                              <div className="text-gray-900">{req.reqStatus}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Render Custom Sections */}
                 {customSections.map((section) => (
