@@ -218,6 +218,7 @@ export class PersistentFileStorage implements IStorage {
           formDefinitions: loadedData.formDefinitions || {},
           formVersions: loadedData.formVersions || {},
           formVersionUsages: loadedData.formVersionUsages || [],
+          jobs: loadedData.jobs || {},
           workOrders: Array.isArray(loadedData.workOrders) 
             ? loadedData.workOrders 
             : Object.values(loadedData.workOrders || {}).filter(wo => wo !== null),

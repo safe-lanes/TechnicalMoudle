@@ -1486,14 +1486,14 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                   )}
                 </div>
 
-                {/* C. Work Orders */}
+                {/* C. Jobs */}
                 <div>
                   <Collapsible open={!collapsedSections.C} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, C: !open }))}>
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
                           {collapsedSections.C ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                          <h4 className="text-lg font-semibold text-[#16569e]">C. Work Orders</h4>
+                          <h4 className="text-lg font-semibold text-[#16569e]">C. Jobs</h4>
                         </div>
                         <div className="flex gap-2">
                           {hasFormConfigPermission && (
@@ -1516,7 +1516,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Plus className="h-4 w-4 mr-1" />
-                            Add W.O
+                            Add Job
                           </Button>
                         </div>
                       </div>
@@ -1548,7 +1548,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         <div className="divide-y divide-gray-200">
                           {isAddMode ? (
                             <div className="px-4 py-8 text-center text-sm text-gray-500">
-                              No work orders yet. Click "Add W.O" to create one.
+                              No jobs yet. Click "Add Job" to create one.
                             </div>
                           ) : (
                             <>
@@ -1613,7 +1613,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       <div className="divide-y divide-gray-200">
                         {isAddMode ? (
                           <div className="px-4 py-8 text-center text-sm text-gray-500">
-                            No work orders yet. Click "Add W.O" to create one.
+                            No jobs yet. Click "Add Job" to create one.
                           </div>
                         ) : (
                           <>
