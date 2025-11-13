@@ -480,15 +480,15 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   const [sessionAddedFields, setSessionAddedFields] = useState<Set<string>>(new Set());
   const [sessionModifiedFields, setSessionModifiedFields] = useState<Set<string>>(new Set());
   
-  // Collapsible sections state (B-H) - all start expanded
+  // Collapsible sections state (B-H) - all start collapsed
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    B: false,
-    C: false,
-    D: false,
-    E: false,
-    F: false,
-    G: false,
-    H: false,
+    B: true,
+    C: true,
+    D: true,
+    E: true,
+    F: true,
+    G: true,
+    H: true,
   });
 
   // Auto-generate component code based on parent
