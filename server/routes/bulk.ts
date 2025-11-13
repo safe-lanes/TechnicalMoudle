@@ -1963,6 +1963,104 @@ async function performImport(
         }
       }
     }
+  } else if (type === 'jobs') {
+    // Import jobs using storage layer
+    console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+    
+    // Prefetch all jobs once for efficiency (avoid O(n²))
+    const allJobs = await storage.getJobs(vesselId);
+    const jobsByJobNo = new Map(allJobs.map(j => [j.jobNo, j]));
+    
+    for (const row of data) {
+      const componentCode = String(row['Component Code']).trim();
+      const vesselCodeFromExcel = String(row['Vessel Code']).trim();
+      
+      // Resolve actual component ID from component code
+      const component = await storage.getComponent(componentCode);
+      if (!component) {
+        console.error(`⚠️ Component not found: ${componentCode}, skipping job`);
+        result.skipped++;
+        continue;
+      }
+      
+      // Use canonical vesselId from request parameter (FK reference)
+      // vesselCode is for display/tracking only
+      const canonicalVesselId = vesselId || vesselCodeFromExcel;
+      
+      // Map Excel columns to job schema fields
+      const jobData: any = {
+        vesselId: canonicalVesselId,        // FK reference to vessel
+        vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
+        componentId: component.id,          // FK reference to component (UUID)
+        componentCode: componentCode,       // Display/tracking field (SFI code)
+        componentName: row['Component Name'] || component.name || null,
+        jobCategory: row['Job Category'] || null,
+        jobTitle: row['Maintenance Task'],  // Job title from Maintenance Task column
+        maintenanceType: row['Task Type'],   // maintenanceType from Task Type column
+        maintenanceBasis: row['Maintenance Basis'],
+        frequencyValue: row['Frequency Value'] ? parseFloat(row['Frequency Value']) : null,
+        frequencyUnit: row['Frequency Unit'] || null,
+        jobDescription: row['Brief Job Description'] || null,
+        // JSON array fields - split comma-separated lists
+        requiredSpareParts: row['Required Spare Parts'] 
+          ? row['Required Spare Parts'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
+          : null,
+        requiredTools: row['Required Tools']
+          ? row['Required Tools'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
+          : null,
+        safetyRequirements: row['Required Safety Items']
+          ? row['Required Safety Items'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
+          : null,
+        jobPriority: row['Job Priority'] || null,
+        plannedDuration: row['Planned Duration'] ? parseFloat(row['Planned Duration']) : null,
+        lastDoneDate: row['Last Done Date'] || null,
+        initialNextDue: row['Initial Next Due'] || null,
+        personInCharge: row['Person In Charge'] || null,
+        responsibleDepartment: row['Responsible Department'] || null,
+        deptCode: row['Dept Code'] || null,
+        classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes') : null,
+        critical: row['Critical'] ? (row['Critical'].toString().toLowerCase() === 'yes') : null
+      };
+      
+      // Auto-generate job number if not provided (format: JOB-XXXXXXX)
+      if (!row['Job Code']) {
+        const { nanoid } = await import('nanoid');
+        jobData.jobNo = `JOB-${nanoid(7).toUpperCase()}`;
+      } else {
+        jobData.jobNo = String(row['Job Code']).trim();
+      }
+      
+      // Check if job already exists by job number (using prefetched map)
+      const existing = jobsByJobNo.get(jobData.jobNo);
+      
+      if (mode === 'add') {
+        if (existing) {
+          result.skipped++;
+        } else {
+          const createdJob = await storage.createJob(jobData);
+          jobsByJobNo.set(createdJob.jobNo, createdJob);
+          result.created++;
+        }
+      } else if (mode === 'update') {
+        if (existing) {
+          await storage.updateJob(existing.id, jobData);
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
+      } else if (mode === 'upsert') {
+        if (existing) {
+          await storage.updateJob(existing.id, jobData);
+          result.updated++;
+        } else {
+          const createdJob = await storage.createJob(jobData);
+          jobsByJobNo.set(createdJob.jobNo, createdJob);
+          result.created++;
+        }
+      }
+    }
+    
+    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   }
 
   if (archiveMissing) {
