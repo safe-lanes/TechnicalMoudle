@@ -521,6 +521,59 @@ export const insertAlertConfigSchema = createInsertSchema(alertConfig).omit({
 export type InsertAlertConfig = z.infer<typeof insertAlertConfigSchema>;
 export type AlertConfig = typeof alertConfig.$inferSelect;
 
+// Jobs Table - Templates/Blueprints for maintenance jobs linked to components
+export const jobs = pgTable("jobs", {
+  id: text("id").primaryKey(),
+  vesselId: text("vessel_id"),
+  componentId: text("component_id").notNull(), // Component this job belongs to
+  componentCode: text("component_code").notNull(),
+  componentName: text("component_name").notNull(),
+  jobNo: text("job_no").notNull().unique(), // Auto-generated JOB-XXXXXXX
+  jobTitle: text("job_title").notNull(),
+  assignedTo: text("assigned_to"),
+  maintenanceType: text("maintenance_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
+  maintenanceBasis: text("maintenance_basis"), // 'Calendar' | 'Running Hours'
+  frequencyValue: text("frequency_value"),
+  frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days'
+  intervalRunningHour: integer("interval_running_hour"),
+  initialNextDue: text("initial_next_due"), // Initial due date for calendar-based jobs
+  jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
+  classRelated: text("class_related"), // 'Yes' | 'No'
+  briefWorkDescription: text("brief_work_description"),
+  department: text("department"),
+  
+  // Template data (Part A)
+  requiredSpareParts: json("required_spare_parts").notNull().default([]),
+  requiredTools: json("required_tools").notNull().default([]),
+  safetyRequirements: json("safety_requirements").notNull().default({ppeRequirements: [], permitRequirements: [], otherRequirements: []}),
+  
+  // Fleet-specific fields
+  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel'
+  fleetEquipmentCode: text("fleet_equipment_code"),
+  fleetJobCode: text("fleet_job_code"),
+  sfiCode: text("sfi_code"),
+  criticality: text("criticality"),
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdIdx: index("idx_job_vessel").on(table.vesselId),
+  componentIdIdx: index("idx_job_component").on(table.componentId),
+  componentCodeIdx: index("idx_job_component_code").on(table.componentCode),
+  dataScopeIdx: index("idx_job_data_scope").on(table.dataScope),
+  jobNoUniqueIdx: unique("unique_job_no").on(table.jobNo),
+}));
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
+
 // Work Orders Table
 export const workOrders = pgTable("work_orders", {
   id: text("id").primaryKey(),
