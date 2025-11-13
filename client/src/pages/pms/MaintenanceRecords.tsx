@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Search, Calendar, ArrowLeft } from "lucide-react";
-import { useLocation, useRoute } from "wouter";
+import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 const MaintenanceRecords: React.FC = () => {
   const { toast } = useToast();
   const [, params] = useRoute("/pms/maintenance-records/:componentId");
-  const [, setLocation] = useLocation();
   const componentId = params?.componentId || "";
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -159,12 +158,12 @@ const MaintenanceRecords: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setLocation('/pms/components')}
+                onClick={() => window.history.back()}
                 className="text-gray-600"
                 data-testid="button-back-to-components"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Components
+                Back
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Maintenance Records</h1>
@@ -176,87 +175,95 @@ const MaintenanceRecords: React.FC = () => {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[300px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Search by Execution ID, Performed By, Approved By..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white"
-                  data-testid="input-search-executions"
-                />
-              </div>
+          <div className="space-y-3">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search by Execution ID, Performed By, Approved By..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-white"
+                data-testid="input-search-executions"
+              />
             </div>
 
-            <Select value={selectedDateFilter} onValueChange={setSelectedDateFilter}>
-              <SelectTrigger className="w-[180px] bg-white" data-testid="select-date-filter">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Date Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="lastMonth">Last Month</SelectItem>
-                <SelectItem value="lastQuarter">Last Quarter</SelectItem>
-                <SelectItem value="lastYear">Last Year</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Date Range Filter */}
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Date Range:</span>
+              <Select value={selectedDateFilter} onValueChange={setSelectedDateFilter}>
+                <SelectTrigger className="w-[180px] bg-white" data-testid="select-date-filter">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Date Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="lastMonth">Last Month</SelectItem>
+                  <SelectItem value="lastQuarter">Last Quarter</SelectItem>
+                  <SelectItem value="lastYear">Last Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {selectedDateFilter === "custom" && (
-              <>
-                <Input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-[150px]"
-                  placeholder="Start Date"
-                  data-testid="input-custom-start-date"
-                />
-                <Input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-[150px]"
-                  placeholder="End Date"
-                  data-testid="input-custom-end-date"
-                />
-              </>
-            )}
+              {selectedDateFilter === "custom" && (
+                <>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-[150px] bg-white"
+                    placeholder="Start Date"
+                    data-testid="input-custom-start-date"
+                  />
+                  <span className="text-gray-500">to</span>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-[150px] bg-white"
+                    placeholder="End Date"
+                    data-testid="input-custom-end-date"
+                  />
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        {filteredExecutions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <Calendar className="h-16 w-16 mb-4 text-gray-300" />
-            <p className="text-lg font-medium">No maintenance records found</p>
-            <p className="text-sm">
-              {searchTerm || selectedDateFilter !== "all"
-                ? "Try adjusting your filters"
-                : "No historical maintenance data available for this component"}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">S.No</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Execution ID</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Date Completed</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Performed By</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Approved By</th>
-                    <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Status</th>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">S.No</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Execution ID</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Date Completed</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Performed By</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Approved By</th>
+                  <th className="text-left py-3 px-4 font-semibold text-sm text-gray-700">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredExecutions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-500">
+                        <Calendar className="h-16 w-16 mb-4 text-gray-300" />
+                        <p className="text-lg font-medium">No maintenance records found</p>
+                        <p className="text-sm">
+                          {searchTerm || selectedDateFilter !== "all"
+                            ? "Try adjusting your filters"
+                            : "No historical maintenance data available for this component"}
+                        </p>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredExecutions.map((execution, index) => (
+                ) : (
+                  filteredExecutions.map((execution, index) => (
                     <tr
                       key={execution.id}
                       onClick={() => handleRowClick(execution)}
@@ -284,19 +291,19 @@ const MaintenanceRecords: React.FC = () => {
                         </span>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Results Count */}
-            <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
-              <p className="text-sm text-gray-600">
-                Showing {filteredExecutions.length} {filteredExecutions.length === 1 ? 'record' : 'records'}
-              </p>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+
+          {/* Results Count */}
+          <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+            <p className="text-sm text-gray-600">
+              Showing {filteredExecutions.length} {filteredExecutions.length === 1 ? 'record' : 'records'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Execution Details Dialog */}
