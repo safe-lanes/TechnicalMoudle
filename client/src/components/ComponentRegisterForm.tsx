@@ -1487,447 +1487,838 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                 </Collapsible>
 
                 {/* C. Work Orders */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">C. Work Orders</h4>
-                    <div className="flex gap-2">
-                      {hasFormConfigPermission && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setCurrentSection('C');
-                            setShowAddFieldModal(true);
-                          }}
-                          className="text-[#52baf3] hover:text-[#52baf3]"
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Add field
-                        </Button>
-                      )}
-                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add W.O
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                <Collapsible open={!collapsedSections.C} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, C: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          {collapsedSections.C ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">C. Work Orders</h4>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                        <div className="flex gap-2">
+                          {hasFormConfigPermission && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentSection('C');
+                                setShowAddFieldModal(true);
+                              }}
+                              className="text-[#52baf3] hover:text-[#52baf3]"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add field
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add W.O
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div></div>
                       </div>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {isAddMode ? (
-                        <div className="px-4 py-8 text-center text-sm text-gray-500">
-                          No work orders yet. Click "Add W.O" to create one.
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - header + 2 rows */}
+                    {collapsedSections.C && (
+                      <div className="border border-gray-200 rounded mb-4">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div></div>
+                          </div>
                         </div>
-                      ) : (
-                        <>
-                          <div className="px-4 py-3">
-                            <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                              <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                              <div className="text-gray-900">Chief Engineer</div>
-                              <div className="text-gray-900">Running Hours</div>
-                              <div className="text-gray-900">500</div>
-                              <div className="text-gray-900">02-Jun-2025</div>
-                              <div className="flex gap-2">
-                                <button className="text-gray-400 hover:text-gray-600">
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                              </div>
+                        <div className="divide-y divide-gray-200">
+                          {isAddMode ? (
+                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                              No work orders yet. Click "Add W.O" to create one.
                             </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                              <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                              <div className="text-gray-900">Chief Engineer</div>
-                              <div className="text-gray-900">Calendar</div>
-                              <div className="text-gray-900">30</div>
-                              <div className="text-gray-900">02-Jun-2025</div>
-                              <div className="flex gap-2">
-                                <button className="text-gray-400 hover:text-gray-600">
-                                  <Eye className="w-4 h-4" />
-                                </button>
+                          ) : (
+                            <>
+                              <div className="px-4 py-3">
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                  <div className="text-gray-900">Chief Engineer</div>
+                                  <div className="text-gray-900">Running Hours</div>
+                                  <div className="text-gray-900">500</div>
+                                  <div className="text-gray-900">02-Jun-2025</div>
+                                  <div className="flex gap-2">
+                                    <button className="text-gray-400 hover:text-gray-600">
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
+                              <div className="px-4 py-3">
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                  <div className="text-gray-900">Chief Engineer</div>
+                                  <div className="text-gray-900">Calendar</div>
+                                  <div className="text-gray-900">30</div>
+                                  <div className="text-gray-900">02-Jun-2025</div>
+                                  <div className="flex gap-2">
+                                    <button className="text-gray-400 hover:text-gray-600">
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="border border-gray-200 rounded">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
                             </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div></div>
                           </div>
-                        </>
-                      )}
-                    </div>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                          {isAddMode ? (
+                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                              No work orders yet. Click "Add W.O" to create one.
+                            </div>
+                          ) : (
+                            <>
+                              <div className="px-4 py-3">
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                  <div className="text-gray-900">Chief Engineer</div>
+                                  <div className="text-gray-900">Running Hours</div>
+                                  <div className="text-gray-900">500</div>
+                                  <div className="text-gray-900">02-Jun-2025</div>
+                                  <div className="flex gap-2">
+                                    <button className="text-gray-400 hover:text-gray-600">
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="px-4 py-3">
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
+                                  <div className="text-gray-900">Chief Engineer</div>
+                                  <div className="text-gray-900">Calendar</div>
+                                  <div className="text-gray-900">30</div>
+                                  <div className="text-gray-900">02-Jun-2025</div>
+                                  <div className="flex gap-2">
+                                    <button className="text-gray-400 hover:text-gray-600">
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
 
                 {/* D. Maintenance History */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">D. Maintenance History</h4>
-                    <div className="flex gap-2">
-                      {hasFormConfigPermission && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setCurrentSection('D');
-                            setShowAddFieldModal(true);
-                          }}
-                          className="text-[#52baf3] hover:text-[#52baf3]"
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Add field
-                        </Button>
-                      )}
-                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add M History
-                      </Button>
-                    </div>
+                <Collapsible open={!collapsedSections.D} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, D: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
+                        <div className="flex items-center gap-2">
+                          {collapsedSections.D ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">D. Maintenance History</h4>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasFormConfigPermission && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentSection('D');
+                                setShowAddFieldModal(true);
+                              }}
+                              className="text-[#52baf3] hover:text-[#52baf3]"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add field
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add M History
+                          </Button>
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - header + 2 rows */}
+                    {collapsedSections.D && (
+                      <div className="border border-gray-200 rounded mb-4">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                            </div>
+                          </div>
+                        </div>
+                        {isAddMode ? (
+                          <div className="px-4 py-8 text-center text-sm text-gray-500">
+                            No maintenance history yet. Click "Add M History" to create one.
+                          </div>
+                        ) : (
+                          <div className="px-4 py-3">
+                            <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                              <div>
+                                <Input 
+                                  value={componentData.workOrderNo}
+                                  onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.performedBy}
+                                  onChange={(e) => handleInputChange('performedBy', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.totalTimeHrs}
+                                  onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.completionDate}
+                                  onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.status}
+                                  onChange={(e) => handleInputChange('status', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="border border-gray-200 rounded">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
+                            </div>
+                          </div>
+                        </div>
+                        {isAddMode ? (
+                          <div className="px-4 py-8 text-center text-sm text-gray-500">
+                            No maintenance history yet. Click "Add M History" to create one.
+                          </div>
+                        ) : (
+                          <div className="px-4 py-3">
+                            <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                              <div>
+                                <Input 
+                                  value={componentData.workOrderNo}
+                                  onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.performedBy}
+                                  onChange={(e) => handleInputChange('performedBy', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.totalTimeHrs}
+                                  onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.completionDate}
+                                  onChange={(e) => handleInputChange('completionDate', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Input 
+                                  value={componentData.status}
+                                  onChange={(e) => handleInputChange('status', e.target.value)}
+                                  className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                </Collapsible>
+
+                {/* E. Spares */}
+                <Collapsible open={!collapsedSections.E} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, E: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          {collapsedSections.E ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">E. Spares</h4>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Spares
+                        </Button>
                       </div>
-                    </div>
-                    {isAddMode ? (
-                      <div className="px-4 py-8 text-center text-sm text-gray-500">
-                        No maintenance history yet. Click "Add M History" to create one.
-                      </div>
-                    ) : (
-                      <div className="px-4 py-3">
-                        <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                          <div>
-                            <Input 
-                              value={componentData.workOrderNo}
-                              onChange={(e) => handleInputChange('workOrderNo', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - header + 2 rows */}
+                    {collapsedSections.E && (
+                      <div className="border border-gray-200 rounded mb-4">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
                           </div>
-                          <div>
-                            <Input 
-                              value={componentData.performedBy}
-                              onChange={(e) => handleInputChange('performedBy', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Input 
-                              value={componentData.totalTimeHrs}
-                              onChange={(e) => handleInputChange('totalTimeHrs', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Input 
-                              value={componentData.completionDate}
-                              onChange={(e) => handleInputChange('completionDate', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Input 
-                              value={componentData.status}
-                              onChange={(e) => handleInputChange('status', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
+                        </div>
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                            <div>
+                              <Input 
+                                value={componentData.partCode}
+                                onChange={(e) => handleInputChange('partCode', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.partName}
+                                onChange={(e) => handleInputChange('partName', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.minQty}
+                                onChange={(e) => handleInputChange('minQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.criticalQty}
+                                onChange={(e) => handleInputChange('criticalQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.locationStore}
+                                onChange={(e) => handleInputChange('locationStore', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* E. Spares */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">E. Spares</h4>
-                    <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Spares
-                    </Button>
-                  </div>
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="border border-gray-200 rounded">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="px-4 py-3">
-                      <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                        <div>
-                          <Input 
-                            value={componentData.partCode}
-                            onChange={(e) => handleInputChange('partCode', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.partName}
-                            onChange={(e) => handleInputChange('partName', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.minQty}
-                            onChange={(e) => handleInputChange('minQty', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.criticalQty}
-                            onChange={(e) => handleInputChange('criticalQty', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.locationStore}
-                            onChange={(e) => handleInputChange('locationStore', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                            <div>
+                              <Input 
+                                value={componentData.partCode}
+                                onChange={(e) => handleInputChange('partCode', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.partName}
+                                onChange={(e) => handleInputChange('partName', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.minQty}
+                                onChange={(e) => handleInputChange('minQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.criticalQty}
+                                onChange={(e) => handleInputChange('criticalQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.locationStore}
+                                onChange={(e) => handleInputChange('locationStore', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
 
                 {/* F. Drawings & Manuals */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">F. Drawings & Manuals</h4>
-                    <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Document
-                    </Button>
+                <Collapsible open={!collapsedSections.F} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, F: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
+                        <div className="flex items-center gap-2">
+                          {collapsedSections.F ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">F. Drawings & Manuals</h4>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Document
+                        </Button>
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - first 2 rows */}
+                    {collapsedSections.F && (
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="woTitle" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="assignedTo" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="metric" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                        <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
+                          <div className="flex items-center gap-2">
+                            <EditableLabel fieldKey="alertsThresholds" className="text-sm" />
+                          </div>
+                          <Upload className="h-4 w-4 text-[#52baf3]" />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                      <div className="flex items-center gap-2">
-                        <EditableLabel fieldKey="woTitle" className="text-sm" />
-                      </div>
-                      <Upload className="h-4 w-4 text-[#52baf3]" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                      <div className="flex items-center gap-2">
-                        <EditableLabel fieldKey="assignedTo" className="text-sm" />
-                      </div>
-                      <Upload className="h-4 w-4 text-[#52baf3]" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                      <div className="flex items-center gap-2">
-                        <EditableLabel fieldKey="metric" className="text-sm" />
-                      </div>
-                      <Upload className="h-4 w-4 text-[#52baf3]" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 border border-[#52baf3] rounded">
-                      <div className="flex items-center gap-2">
-                        <EditableLabel fieldKey="alertsThresholds" className="text-sm" />
-                      </div>
-                      <Upload className="h-4 w-4 text-[#52baf3]" />
-                    </div>
-                  </div>
-                </div>
+                </Collapsible>
 
                 {/* G. Classification & Regulatory Data */}
-                <div>
-                  <h4 className="text-lg font-semibold mb-4 text-[#16569e]">G. Classification & Regulatory Data</h4>
-                  <div className="grid grid-cols-2 gap-6">
-                    <DeletableField fieldKey="classificationProvider">
-                      <EditableLabel fieldKey="classificationProvider" />
-                      <Input 
-                        value={componentData.classificationData.classificationProvider}
-                        onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="certificateNo">
-                      <EditableLabel fieldKey="certificateNo" />
-                      <Input 
-                        value={componentData.classificationData.certificateNo}
-                        onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="lastDataSurvey">
-                      <EditableLabel fieldKey="lastDataSurvey" />
-                      <Input 
-                        value={componentData.classificationData.lastDataSurvey}
-                        onChange={(e) => handleInputChange('classificationData.lastDataSurvey', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="nextDataSurvey">
-                      <EditableLabel fieldKey="nextDataSurvey" />
-                      <Input 
-                        value={componentData.classificationData.nextDataSurvey}
-                        onChange={(e) => handleInputChange('classificationData.nextDataSurvey', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="surveyType">
-                      <EditableLabel fieldKey="surveyType" />
-                      <Input 
-                        value={componentData.classificationData.surveyType}
-                        onChange={(e) => handleInputChange('classificationData.surveyType', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="classRequirements">
-                      <EditableLabel fieldKey="classRequirements" />
-                      <Input 
-                        value={componentData.classificationData.classRequirements}
-                        onChange={(e) => handleInputChange('classificationData.classRequirements', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="classCode">
-                      <EditableLabel fieldKey="classCode" />
-                      <Input 
-                        value={componentData.classificationData.classCode}
-                        onChange={(e) => handleInputChange('classificationData.classCode', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="information">
-                      <EditableLabel fieldKey="information" />
-                      <Input 
-                        value={componentData.classificationData.information}
-                        onChange={(e) => handleInputChange('classificationData.information', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
+                <Collapsible open={!collapsedSections.G} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, G: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center gap-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
+                        {collapsedSections.G ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                        <h4 className="text-lg font-semibold text-[#16569e]">G. Classification & Regulatory Data</h4>
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - first 2 fields */}
+                    {collapsedSections.G && (
+                      <div className="grid grid-cols-2 gap-6 mb-4">
+                        <DeletableField fieldKey="classificationProvider">
+                          <EditableLabel fieldKey="classificationProvider" />
+                          <Input 
+                            value={componentData.classificationData.classificationProvider}
+                            onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="certificateNo">
+                          <EditableLabel fieldKey="certificateNo" />
+                          <Input 
+                            value={componentData.classificationData.certificateNo}
+                            onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                      </div>
+                    )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-6">
+                        <DeletableField fieldKey="classificationProvider">
+                          <EditableLabel fieldKey="classificationProvider" />
+                          <Input 
+                            value={componentData.classificationData.classificationProvider}
+                            onChange={(e) => handleInputChange('classificationData.classificationProvider', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="certificateNo">
+                          <EditableLabel fieldKey="certificateNo" />
+                          <Input 
+                            value={componentData.classificationData.certificateNo}
+                            onChange={(e) => handleInputChange('classificationData.certificateNo', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="lastDataSurvey">
+                          <EditableLabel fieldKey="lastDataSurvey" />
+                          <Input 
+                            value={componentData.classificationData.lastDataSurvey}
+                            onChange={(e) => handleInputChange('classificationData.lastDataSurvey', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="nextDataSurvey">
+                          <EditableLabel fieldKey="nextDataSurvey" />
+                          <Input 
+                            value={componentData.classificationData.nextDataSurvey}
+                            onChange={(e) => handleInputChange('classificationData.nextDataSurvey', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="surveyType">
+                          <EditableLabel fieldKey="surveyType" />
+                          <Input 
+                            value={componentData.classificationData.surveyType}
+                            onChange={(e) => handleInputChange('classificationData.surveyType', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="classRequirements">
+                          <EditableLabel fieldKey="classRequirements" />
+                          <Input 
+                            value={componentData.classificationData.classRequirements}
+                            onChange={(e) => handleInputChange('classificationData.classRequirements', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="classCode">
+                          <EditableLabel fieldKey="classCode" />
+                          <Input 
+                            value={componentData.classificationData.classCode}
+                            onChange={(e) => handleInputChange('classificationData.classCode', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="information">
+                          <EditableLabel fieldKey="information" />
+                          <Input 
+                            value={componentData.classificationData.information}
+                            onChange={(e) => handleInputChange('classificationData.information', e.target.value)}
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
 
                 {/* H. Requisitions */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">H. Requisitions</h4>
-                    <div className="flex gap-2">
-                      {hasFormConfigPermission && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setCurrentSection('H');
-                            setShowAddFieldModal(true);
-                          }}
-                          className="text-[#52baf3] hover:text-[#52baf3]"
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Add field
-                        </Button>
-                      )}
-                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Requisition
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                <Collapsible open={!collapsedSections.H} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, H: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                          {collapsedSections.H ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">H. Requisitions</h4>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                        <div className="flex gap-2">
+                          {hasFormConfigPermission && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentSection('H');
+                                setShowAddFieldModal(true);
+                              }}
+                              className="text-[#52baf3] hover:text-[#52baf3]"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add field
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Requisition
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    <div className="px-4 py-3">
-                      <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                        <div>
-                          <Input 
-                            value={componentData.reqNo}
-                            onChange={(e) => handleInputChange('reqNo', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - header + 2 rows */}
+                    {collapsedSections.H && (
+                      <div className="border border-gray-200 rounded mb-4">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <Input 
-                            value={componentData.reqPart}
-                            onChange={(e) => handleInputChange('reqPart', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.reqQty}
-                            onChange={(e) => handleInputChange('reqQty', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.reqDate}
-                            onChange={(e) => handleInputChange('reqDate', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Input 
-                            value={componentData.reqStatus}
-                            onChange={(e) => handleInputChange('reqStatus', e.target.value)}
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                          />
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                            <div>
+                              <Input 
+                                value={componentData.reqNo}
+                                onChange={(e) => handleInputChange('reqNo', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqPart}
+                                onChange={(e) => handleInputChange('reqPart', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqQty}
+                                onChange={(e) => handleInputChange('reqQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqDate}
+                                onChange={(e) => handleInputChange('reqDate', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqStatus}
+                                onChange={(e) => handleInputChange('reqStatus', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="border border-gray-200 rounded">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                            <div>
+                              <Input 
+                                value={componentData.reqNo}
+                                onChange={(e) => handleInputChange('reqNo', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqPart}
+                                onChange={(e) => handleInputChange('reqPart', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqQty}
+                                onChange={(e) => handleInputChange('reqQty', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqDate}
+                                onChange={(e) => handleInputChange('reqDate', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Input 
+                                value={componentData.reqStatus}
+                                onChange={(e) => handleInputChange('reqStatus', e.target.value)}
+                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
                 
                 {/* Render Custom Sections */}
                 {customSections.map((section) => (
