@@ -100,7 +100,7 @@ export default function AdminMachineryUpload({ vesselId }: MachineryComponentUpl
   // Download template
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch('/api/bulk/template?type=components');
+      const response = await fetch(`/api/bulk/template?type=components&vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
