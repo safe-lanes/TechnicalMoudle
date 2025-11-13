@@ -1514,6 +1514,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             size="sm" 
                             className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
                             onClick={(e) => e.stopPropagation()}
+                            data-testid="button-add-job"
                           >
                             <Plus className="h-4 w-4 mr-1" />
                             Add Job
@@ -1527,21 +1528,11 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       <div className="border border-gray-200 rounded">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                           <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
-                            </div>
+                            <div>Job No.</div>
+                            <div>Job Title</div>
+                            <div>Maintenance Type</div>
+                            <div>Frequency</div>
+                            <div>Initial Next Due</div>
                             <div></div>
                           </div>
                         </div>
@@ -1551,36 +1542,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                               No jobs yet. Click "Add Job" to create one.
                             </div>
                           ) : (
-                            <>
-                              <div className="px-4 py-3">
-                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                  <div className="text-gray-900">Chief Engineer</div>
-                                  <div className="text-gray-900">Running Hours</div>
-                                  <div className="text-gray-900">500</div>
-                                  <div className="text-gray-900">02-Jun-2025</div>
-                                  <div className="flex gap-2">
-                                    <button className="text-gray-400 hover:text-gray-600">
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="px-4 py-3">
-                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                  <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                  <div className="text-gray-900">Chief Engineer</div>
-                                  <div className="text-gray-900">Calendar</div>
-                                  <div className="text-gray-900">30</div>
-                                  <div className="text-gray-900">02-Jun-2025</div>
-                                  <div className="flex gap-2">
-                                    <button className="text-gray-400 hover:text-gray-600">
-                                      <Eye className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
+                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                              No jobs found for this component.
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1592,21 +1556,11 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="border border-gray-200 rounded mb-4">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                         <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="maintenanceType" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="initialNextDue" className="text-sm font-medium text-gray-700" />
-                          </div>
+                          <div>Job No.</div>
+                          <div>Job Title</div>
+                          <div>Maintenance Type</div>
+                          <div>Frequency</div>
+                          <div>Initial Next Due</div>
                           <div></div>
                         </div>
                       </div>
@@ -1616,36 +1570,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             No jobs yet. Click "Add Job" to create one.
                           </div>
                         ) : (
-                          <>
-                            <div className="px-4 py-3">
-                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                <div className="text-gray-900">Chief Engineer</div>
-                                <div className="text-gray-900">Running Hours</div>
-                                <div className="text-gray-900">500</div>
-                                <div className="text-gray-900">02-Jun-2025</div>
-                                <div className="flex gap-2">
-                                  <button className="text-gray-400 hover:text-gray-600">
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="px-4 py-3">
-                              <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                                <div className="text-gray-900">Main Engine Overhaul - Replace Main Bearings</div>
-                                <div className="text-gray-900">Chief Engineer</div>
-                                <div className="text-gray-900">Calendar</div>
-                                <div className="text-gray-900">30</div>
-                                <div className="text-gray-900">02-Jun-2025</div>
-                                <div className="flex gap-2">
-                                  <button className="text-gray-400 hover:text-gray-600">
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </>
+                          <div className="px-4 py-8 text-center text-sm text-gray-500">
+                            No jobs found for this component.
+                          </div>
                         )}
                       </div>
                     </div>
