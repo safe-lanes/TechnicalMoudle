@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Search, Calendar, ArrowLeft } from "lucide-react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,12 @@ import { useToast } from "@/hooks/use-toast";
 const MaintenanceRecords: React.FC = () => {
   const { toast } = useToast();
   const [, params] = useRoute("/pms/maintenance-records/:componentId");
+  const [, setLocation] = useLocation();
   const componentId = params?.componentId || "";
+  
+  // Get source workOrderId from URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const sourceWorkOrderId = urlParams.get('sourceWorkOrderId');
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDateFilter, setSelectedDateFilter] = useState("all");
@@ -158,7 +163,13 @@ const MaintenanceRecords: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => window.history.back()}
+                onClick={() => {
+                  if (sourceWorkOrderId) {
+                    setLocation(`/pms/components?openWorkOrderId=${sourceWorkOrderId}`);
+                  } else {
+                    setLocation('/pms/components');
+                  }
+                }}
                 className="text-gray-600"
                 data-testid="button-back-to-components"
               >

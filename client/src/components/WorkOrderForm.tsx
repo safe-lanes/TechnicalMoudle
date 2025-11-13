@@ -1794,7 +1794,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         className="bg-[#16569e] hover:bg-[#124580] text-white px-8 py-3 text-base font-medium"
                         onClick={() => {
                           const componentId = workOrder?.componentId || workOrder?.componentCode || component?.code;
-                          setLocation(`/pms/maintenance-records/${componentId}`);
+                          const workOrderId = workOrder?.id;
+                          const url = workOrderId 
+                            ? `/pms/maintenance-records/${componentId}?sourceWorkOrderId=${workOrderId}`
+                            : `/pms/maintenance-records/${componentId}`;
+                          setLocation(url);
                         }}
                         data-testid="button-maintenance-records"
                       >

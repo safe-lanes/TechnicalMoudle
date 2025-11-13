@@ -894,6 +894,30 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   
   const workOrders = allWorkOrders.filter(wo => wo.componentCode === componentCode);
   
+  // Check URL parameter to auto-open work order modal when returning from Maintenance Records
+  React.useEffect(() => {
+    // Only run when data has loaded (not loading)
+    if (isLoading) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const openWorkOrderId = urlParams.get('openWorkOrderId');
+    
+    if (openWorkOrderId) {
+      // Find and open the work order
+      const workOrderToOpen = allWorkOrders.find(wo => wo.id === openWorkOrderId);
+      if (workOrderToOpen) {
+        setSelectedWorkOrder(workOrderToOpen);
+        setIsWorkOrderFormOpen(true);
+      }
+      
+      // Always clean up the openWorkOrderId parameter after data has loaded
+      urlParams.delete('openWorkOrderId');
+      const newSearch = urlParams.toString();
+      const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [allWorkOrders, isLoading]);
+  
   // Generate template code for existing data
   const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: number, unit?: string) => {
     const taskCodes: Record<string, string> = {
