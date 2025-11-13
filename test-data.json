@@ -6514,6 +6514,39 @@
   "formDefinitions": {},
   "formVersions": {},
   "formVersionUsages": [],
+  "jobs": {
+    "6PxTPbnEjNBAkTXOCjd70": {
+      "vesselId": "V001",
+      "componentId": "601.003.XXX",
+      "componentCode": "601.003.XXX",
+      "componentName": "6.1 Main Engine",
+      "jobNo": "JOB-TEST-0001",
+      "jobTitle": "Main Engine Overhaul - Test Job",
+      "maintenanceType": "Running Hours",
+      "frequencyValue": "500",
+      "frequencyUnit": "hours",
+      "initialNextDue": "2025-06-02",
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": [],
+      "id": "6PxTPbnEjNBAkTXOCjd70",
+      "assignedTo": null,
+      "maintenanceBasis": null,
+      "intervalRunningHour": null,
+      "jobPriority": null,
+      "classRelated": null,
+      "briefWorkDescription": null,
+      "department": null,
+      "dataScope": "vessel",
+      "fleetEquipmentCode": null,
+      "fleetJobCode": null,
+      "sfiCode": null,
+      "criticality": null,
+      "isActive": true,
+      "createdAt": "2025-11-13T10:07:48.130Z",
+      "updatedAt": "2025-11-13T10:07:48.130Z"
+    }
+  },
   "workOrders": [
     {
       "vesselId": "V001",
@@ -6986,6 +7019,7 @@
       "criticality": null
     }
   ],
+  "workOrderExecutions": [],
   "defects": [
     null,
     null,
