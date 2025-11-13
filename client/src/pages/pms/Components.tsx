@@ -1861,7 +1861,7 @@ const Components: React.FC = () => {
   const formSections = [
     { id: "A", title: "Component Information" },
     { id: "B", title: "Running Hours & Condition Monitoring" },
-    { id: "C", title: "Work Orders" },
+    { id: "C", title: "Jobs" },
     { id: "D", title: "Maintenance History" },
     { id: "E", title: "Spares" },
     { id: "F", title: "Drawings & Manuals" },
