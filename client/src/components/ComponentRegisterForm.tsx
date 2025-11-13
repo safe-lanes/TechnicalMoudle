@@ -16,6 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ArrowLeft, Plus, Upload, Eye, Trash2, Edit3, X, ChevronRight, ChevronDown, Search, AlertCircle } from "lucide-react";
 import {
   AlertDialog,
@@ -474,6 +479,17 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   // Track newly added fields for session
   const [sessionAddedFields, setSessionAddedFields] = useState<Set<string>>(new Set());
   const [sessionModifiedFields, setSessionModifiedFields] = useState<Set<string>>(new Set());
+  
+  // Collapsible sections state (B-H) - all start expanded
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    B: false,
+    C: false,
+    D: false,
+    E: false,
+    F: false,
+    G: false,
+    H: false,
+  });
 
   // Auto-generate component code based on parent
   const generateComponentCode = (parent: ComponentNode | null) => {
@@ -1361,78 +1377,114 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                 </div>
 
                 {/* B. Running Hours & Condition Monitoring Metrics */}
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-lg font-semibold text-[#16569e]">B. Running Hours & Condition Monitoring Metrics</h4>
-                    {hasFormConfigPermission && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setCurrentSection('B');
-                          setShowAddFieldModal(true);
-                        }}
-                        className="text-[#52baf3] hover:text-[#52baf3]"
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Add field
-                      </Button>
+                <Collapsible open={!collapsedSections.B} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, B: !open }))}>
+                  <div>
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex justify-between items-center mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
+                        <div className="flex items-center gap-2">
+                          {collapsedSections.B ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                          <h4 className="text-lg font-semibold text-[#16569e]">B. Running Hours & Condition Monitoring Metrics</h4>
+                        </div>
+                        {hasFormConfigPermission && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentSection('B');
+                              setShowAddFieldModal(true);
+                            }}
+                            className="text-[#52baf3] hover:text-[#52baf3]"
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Add field
+                          </Button>
+                        )}
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    {/* Preview when collapsed - 2 rows */}
+                    {collapsedSections.B && (
+                      <div className="grid grid-cols-2 gap-6 mb-4">
+                        <DeletableField fieldKey="runningHours">
+                          <EditableLabel fieldKey="runningHours" />
+                          <Input 
+                            value={componentData.runningHours}
+                            onChange={(e) => handleInputChange('runningHours', e.target.value)}
+                            placeholder="20000"
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="dateUpdated">
+                          <EditableLabel fieldKey="dateUpdated" />
+                          <Input 
+                            value={componentData.dateUpdated}
+                            onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
+                            placeholder="dd-mm-yyyy"
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                      </div>
                     )}
+                    
+                    {/* Full content when expanded */}
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-6 mb-4">
+                        <DeletableField fieldKey="runningHours">
+                          <EditableLabel fieldKey="runningHours" />
+                          <Input 
+                            value={componentData.runningHours}
+                            onChange={(e) => handleInputChange('runningHours', e.target.value)}
+                            placeholder="20000"
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                        <DeletableField fieldKey="dateUpdated">
+                          <EditableLabel fieldKey="dateUpdated" />
+                          <Input 
+                            value={componentData.dateUpdated}
+                            onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
+                            placeholder="dd-mm-yyyy"
+                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                          />
+                        </DeletableField>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-medium text-gray-900">Condition Monitoring Metrics</h5>
+                          <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Metric
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                          <DeletableField fieldKey="metric">
+                            <EditableLabel fieldKey="metric" />
+                            <Input 
+                              value={componentData.metric}
+                              onChange={(e) => handleInputChange('metric', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                            />
+                          </DeletableField>
+                          <DeletableField fieldKey="alertsThresholds">
+                            <EditableLabel fieldKey="alertsThresholds" />
+                            <Input 
+                              value={componentData.alertsThresholds}
+                              onChange={(e) => handleInputChange('alertsThresholds', e.target.value)}
+                              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                            />
+                          </DeletableField>
+                        </div>
+                      </div>
+                      
+                      {/* Custom Fields for Section B */}
+                      {customFields['B'] && customFields['B'].length > 0 && (
+                        <div className="grid grid-cols-2 gap-6 mt-6 pt-6 border-t border-gray-200">
+                          {customFields['B'].map(field => renderCustomField(field))}
+                        </div>
+                      )}
+                    </CollapsibleContent>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 mb-4">
-                    <DeletableField fieldKey="runningHours">
-                      <EditableLabel fieldKey="runningHours" />
-                      <Input 
-                        value={componentData.runningHours}
-                        onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                        placeholder="20000"
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="dateUpdated">
-                      <EditableLabel fieldKey="dateUpdated" />
-                      <Input 
-                        value={componentData.dateUpdated}
-                        onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
-                        placeholder="dd-mm-yyyy"
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-medium text-gray-900">Condition Monitoring Metrics</h5>
-                      <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Metric
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                      <DeletableField fieldKey="metric">
-                        <EditableLabel fieldKey="metric" />
-                        <Input 
-                          value={componentData.metric}
-                          onChange={(e) => handleInputChange('metric', e.target.value)}
-                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        />
-                      </DeletableField>
-                      <DeletableField fieldKey="alertsThresholds">
-                        <EditableLabel fieldKey="alertsThresholds" />
-                        <Input 
-                          value={componentData.alertsThresholds}
-                          onChange={(e) => handleInputChange('alertsThresholds', e.target.value)}
-                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        />
-                      </DeletableField>
-                    </div>
-                  </div>
-                  
-                  {/* Custom Fields for Section B */}
-                  {customFields['B'] && customFields['B'].length > 0 && (
-                    <div className="grid grid-cols-2 gap-6 mt-6 pt-6 border-t border-gray-200">
-                      {customFields['B'].map(field => renderCustomField(field))}
-                    </div>
-                  )}
-                </div>
+                </Collapsible>
 
                 {/* C. Work Orders */}
                 <div>
