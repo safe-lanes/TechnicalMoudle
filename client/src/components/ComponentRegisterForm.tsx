@@ -597,11 +597,11 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     criticalQty: "5",
     locationStore: "Engine Room R-3",
     // Section H: Requisitions  
-    reqNo: "REQ-2025-089",
-    reqPart: "Fuel Injection Pump",
-    reqQty: "2",
-    reqDate: "15-Jan-2025",
-    reqStatus: "Pending",
+    requisitions: [
+      { reqNo: "REQ-2025-089", reqPart: "Fuel Injection Pump", reqQty: "2", reqDate: "15-Jan-2025", reqStatus: "Pending" },
+      { reqNo: "REQ-2025-090", reqPart: "Air Filter Element", reqQty: "4", reqDate: "18-Jan-2025", reqStatus: "Approved" },
+      { reqNo: "REQ-2025-091", reqPart: "Hydraulic Oil", reqQty: "200L", reqDate: "20-Jan-2025", reqStatus: "Pending" },
+    ],
     conditionMonitoringMetrics: {
       metric: "",
       interval: "",
@@ -2195,61 +2195,25 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       <div className="border border-gray-200 rounded mb-4">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                           <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
+                            <div>Req. No.</div>
+                            <div>Part/Description</div>
+                            <div>Qty</div>
+                            <div>Date</div>
+                            <div>Status</div>
                           </div>
                         </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                            <div>
-                              <Input 
-                                value={componentData.reqNo}
-                                onChange={(e) => handleInputChange('reqNo', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
+                        <div className="divide-y divide-gray-200">
+                          {componentData.requisitions?.slice(0, 2).map((req: any, index: number) => (
+                            <div key={index} className="px-4 py-3">
+                              <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                                <div className="text-gray-900">{req.reqNo}</div>
+                                <div className="text-gray-900">{req.reqPart}</div>
+                                <div className="text-gray-900">{req.reqQty}</div>
+                                <div className="text-gray-900">{req.reqDate}</div>
+                                <div className="text-gray-900">{req.reqStatus}</div>
+                              </div>
                             </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqPart}
-                                onChange={(e) => handleInputChange('reqPart', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqQty}
-                                onChange={(e) => handleInputChange('reqQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqDate}
-                                onChange={(e) => handleInputChange('reqDate', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqStatus}
-                                onChange={(e) => handleInputChange('reqStatus', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -2259,61 +2223,25 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       <div className="border border-gray-200 rounded">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                           <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="dateUpdated" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
+                            <div>Req. No.</div>
+                            <div>Part/Description</div>
+                            <div>Qty</div>
+                            <div>Date</div>
+                            <div>Status</div>
                           </div>
                         </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                            <div>
-                              <Input 
-                                value={componentData.reqNo}
-                                onChange={(e) => handleInputChange('reqNo', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
+                        <div className="divide-y divide-gray-200">
+                          {componentData.requisitions?.map((req: any, index: number) => (
+                            <div key={index} className="px-4 py-3">
+                              <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                                <div className="text-gray-900">{req.reqNo}</div>
+                                <div className="text-gray-900">{req.reqPart}</div>
+                                <div className="text-gray-900">{req.reqQty}</div>
+                                <div className="text-gray-900">{req.reqDate}</div>
+                                <div className="text-gray-900">{req.reqStatus}</div>
+                              </div>
                             </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqPart}
-                                onChange={(e) => handleInputChange('reqPart', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqQty}
-                                onChange={(e) => handleInputChange('reqQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqDate}
-                                onChange={(e) => handleInputChange('reqDate', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.reqStatus}
-                                onChange={(e) => handleInputChange('reqStatus', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </CollapsibleContent>
