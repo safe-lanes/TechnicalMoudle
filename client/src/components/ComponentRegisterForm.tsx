@@ -634,12 +634,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
 
-  // Fetch jobs for the component
-  const { data: jobs = [], isLoading: jobsLoading } = useQuery<any[]>({
-    queryKey: ['/api/jobs', { componentId: componentData.componentId }],
-    enabled: !!componentData.componentId && !isAddMode,
-  });
-
   // Handle node selection
   const handleNodeSelect = (node: ComponentNode) => {
     setSelectedNode(node);
