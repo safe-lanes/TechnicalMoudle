@@ -46,6 +46,8 @@ import {
   type InsertDefectAttachment,
   type ImportHistory,
   type InsertImportHistory,
+  type ImportChangeLog,
+  type InsertImportChangeLog,
   type RecurringDefect,
   type RecurringDefectLink,
   type Maker,
@@ -179,11 +181,34 @@ function normalizeRootCause(data: any): { individualFactor: string[], systemFact
 
 export class PersistentFileStorage implements IStorage {
   private readonly dataFile: string;
+  private readonly changeLogFile: string;
   private data: PersistentData;
+  private importChangeLogs: ImportChangeLog[];
+  private readonly MAX_IMPORTS_PER_VESSEL = 50;
 
-  constructor(filePath: string = 'test-data.json') {
+  constructor(filePath: string = 'test-data.json', changeLogPath?: string) {
     this.dataFile = path.resolve(process.cwd(), filePath);
+    
+    // Derive change log path from data file path (sibling file with -change-log suffix)
+    if (changeLogPath) {
+      this.changeLogFile = path.resolve(process.cwd(), changeLogPath);
+    } else {
+      const dir = path.dirname(this.dataFile);
+      const baseName = path.basename(this.dataFile, path.extname(this.dataFile));
+      this.changeLogFile = path.join(dir, `${baseName}-change-log.json`);
+    }
+    
+    // Ensure parent directory exists for both files
+    const dataDir = path.dirname(this.dataFile);
+    const logDir = path.dirname(this.changeLogFile);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
     this.data = this.loadData();
+    this.importChangeLogs = this.loadChangeLogs();
     
     // Persist the initial data if it was newly created
     if (!fs.existsSync(this.dataFile)) {
@@ -192,6 +217,7 @@ export class PersistentFileStorage implements IStorage {
     
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
     console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
+    console.log(`📋 Change logs loaded: ${this.importChangeLogs.length} entries`);
   }
 
   private loadData(): PersistentData {
@@ -640,10 +666,71 @@ export class PersistentFileStorage implements IStorage {
       const tempFile = `${this.dataFile}.tmp`;
       fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2));
       fs.renameSync(tempFile, this.dataFile);
+      this.saveChangeLogs();
     } catch (error) {
       console.error('❌ Error persisting data:', error);
       throw error;
     }
+  }
+
+  private loadChangeLogs(): ImportChangeLog[] {
+    try {
+      if (fs.existsSync(this.changeLogFile)) {
+        const fileContent = fs.readFileSync(this.changeLogFile, 'utf-8');
+        const logs = JSON.parse(fileContent) as ImportChangeLog[];
+        console.log(`📂 Loaded ${logs.length} import change logs from ${this.changeLogFile}`);
+        return logs;
+      } else {
+        console.log(`📝 No existing change log file, starting fresh`);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error loading change log file:', error);
+      console.log('🔄 Starting with empty change logs');
+      return [];
+    }
+  }
+
+  private saveChangeLogs(): void {
+    try {
+      this.pruneOldChangeLogs();
+      const tempFile = `${this.changeLogFile}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify(this.importChangeLogs, null, 2));
+      fs.renameSync(tempFile, this.changeLogFile);
+    } catch (error) {
+      console.error('❌ Error saving change logs:', error);
+    }
+  }
+
+  private pruneOldChangeLogs(): void {
+    const vesselImportCounts = new Map<string, number>();
+    const importsByVessel = new Map<string, ImportHistory[]>();
+    
+    this.data.importHistory.forEach(history => {
+      if (history.vesselId) {
+        if (!importsByVessel.has(history.vesselId)) {
+          importsByVessel.set(history.vesselId, []);
+        }
+        importsByVessel.get(history.vesselId)!.push(history);
+      }
+    });
+    
+    const importIdsToKeep = new Set<string>();
+    importsByVessel.forEach((imports, vesselId) => {
+      imports.sort((a, b) => {
+        const dateA = a.startedAt instanceof Date ? a.startedAt : new Date(a.startedAt);
+        const dateB = b.startedAt instanceof Date ? b.startedAt : new Date(b.startedAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      imports.slice(0, this.MAX_IMPORTS_PER_VESSEL).forEach(imp => {
+        importIdsToKeep.add(imp.id);
+      });
+    });
+    
+    this.importChangeLogs = this.importChangeLogs.filter(log => 
+      importIdsToKeep.has(log.importHistoryId)
+    );
   }
 
   // User methods
@@ -3407,6 +3494,42 @@ export class PersistentFileStorage implements IStorage {
 
   async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
     return this.data.importHistory.find(h => h.id === id);
+  }
+
+  async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    const index = this.data.importHistory.findIndex(h => h.id === id);
+    if (index === -1) {
+      throw new Error(`Import history with id ${id} not found`);
+    }
+    
+    const updated: ImportHistory = {
+      ...this.data.importHistory[index],
+      ...data
+    };
+    
+    this.data.importHistory[index] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  // Import Change Log methods
+  async createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog> {
+    const newLog: ImportChangeLog = {
+      ...log,
+      createdAt: new Date()
+    };
+    this.importChangeLogs.push(newLog);
+    this.saveChangeLogs();
+    return newLog;
+  }
+
+  async getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]> {
+    return this.importChangeLogs.filter(log => log.importHistoryId === importHistoryId);
+  }
+
+  async deleteImportChangeLogs(importHistoryId: string): Promise<void> {
+    this.importChangeLogs = this.importChangeLogs.filter(log => log.importHistoryId !== importHistoryId);
+    this.saveChangeLogs();
   }
 
   // Fleet Admin - Makers methods

@@ -1,4 +1,5 @@
 
+import crypto from "crypto";
 import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode } from "./utils/codeGeneration";
 import { 
   users, 
@@ -73,6 +74,9 @@ import {
   importHistory,
   type ImportHistory,
   type InsertImportHistory,
+  importChangeLog,
+  type ImportChangeLog,
+  type InsertImportChangeLog,
   makers,
   type Maker,
   type InsertMaker,
@@ -80,6 +84,50 @@ import {
   type MasterList,
   type InsertMasterList
 } from "@shared/schema";
+
+// Utility function to calculate checksum for record tracking
+export function calculateRecordChecksum(record: any): string {
+  try {
+    const sortObjectKeys = (obj: any): any => {
+      if (obj === null || obj === undefined) {
+        return obj;
+      }
+      
+      if (Array.isArray(obj)) {
+        return obj.map(sortObjectKeys);
+      }
+      
+      if (typeof obj === 'object' && obj.constructor === Object) {
+        const sorted: any = {};
+        Object.keys(obj).sort().forEach(key => {
+          sorted[key] = sortObjectKeys(obj[key]);
+        });
+        return sorted;
+      }
+      
+      return obj;
+    };
+    
+    const sortedRecord = sortObjectKeys(record);
+    const canonicalJson = JSON.stringify(sortedRecord, (key, value) => {
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      if (typeof value === 'function' || typeof value === 'symbol') {
+        return undefined;
+      }
+      return value;
+    });
+    
+    return crypto.createHash('sha256').update(canonicalJson).digest('hex');
+  } catch (error) {
+    console.error('Error calculating checksum:', error);
+    return crypto.createHash('sha256').update(JSON.stringify(record)).digest('hex');
+  }
+}
 
 // modify the interface with any CRUD methods
 // you might need
@@ -309,6 +357,12 @@ export interface IStorage {
   createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
   getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }>;
   getImportHistoryById(id: string): Promise<ImportHistory | undefined>;
+  updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory>;
+  
+  // Import Change Log methods
+  createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog>;
+  getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]>;
+  deleteImportChangeLogs(importHistoryId: string): Promise<void>;
   
   // Fleet Admin - Makers methods
   getMakers(search?: string): Promise<Maker[]>;
@@ -403,6 +457,7 @@ export class MemStorage implements IStorage {
   private defectAttachments: Map<number, DefectAttachment>;
   private currentDefectAttachmentId: number;
   private importHistory: ImportHistory[];
+  private importChangeLogs: ImportChangeLog[];
   private makers: Map<number, Maker>;
   private currentMakerId: number;
   private masterLists: Map<number, MasterList>;
@@ -449,6 +504,7 @@ export class MemStorage implements IStorage {
     this.defectAttachments = new Map();
     this.currentDefectAttachmentId = 1;
     this.importHistory = [];
+    this.importChangeLogs = [];
     this.makers = new Map();
     this.currentMakerId = 1;
     this.masterLists = new Map();
@@ -3348,6 +3404,39 @@ export class MemStorage implements IStorage {
     return this.importHistory.find(h => h.id === id);
   }
 
+  async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    const index = this.importHistory.findIndex(h => h.id === id);
+    if (index === -1) {
+      throw new Error(`Import history with id ${id} not found`);
+    }
+    
+    const updated: ImportHistory = {
+      ...this.importHistory[index],
+      ...data
+    };
+    
+    this.importHistory[index] = updated;
+    return updated;
+  }
+
+  // Import Change Log methods
+  async createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog> {
+    const newLog: ImportChangeLog = {
+      ...log,
+      createdAt: new Date()
+    };
+    this.importChangeLogs.push(newLog);
+    return newLog;
+  }
+
+  async getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]> {
+    return this.importChangeLogs.filter(log => log.importHistoryId === importHistoryId);
+  }
+
+  async deleteImportChangeLogs(importHistoryId: string): Promise<void> {
+    this.importChangeLogs = this.importChangeLogs.filter(log => log.importHistoryId !== importHistoryId);
+  }
+
   // Fleet Admin - Makers methods
   async getMakers(search?: string): Promise<Maker[]> {
     let filtered = Array.from(this.makers.values());
@@ -4095,6 +4184,40 @@ export class PostgresStorage implements IStorage {
     const { eq } = await import('drizzle-orm');
     const result = await db.select().from(importHistory).where(eq(importHistory.id, id));
     return result[0];
+  }
+
+  async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(importHistory)
+      .set(data)
+      .where(eq(importHistory.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Import history with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  // ============= IMPORT CHANGE LOG =============
+  async createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog> {
+    const db = await this.getDb();
+    const result = await db.insert(importChangeLog).values(log).returning();
+    return result[0];
+  }
+
+  async getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(importChangeLog)
+      .where(eq(importChangeLog.importHistoryId, importHistoryId));
+  }
+
+  async deleteImportChangeLogs(importHistoryId: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(importChangeLog)
+      .where(eq(importChangeLog.importHistoryId, importHistoryId));
   }
 
   // ============= RECURRING DEFECTS =============
