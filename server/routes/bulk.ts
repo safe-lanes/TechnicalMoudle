@@ -6,7 +6,8 @@ import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
-import { storage } from '../storage';
+import crypto from 'crypto';
+import { storage, calculateRecordChecksum } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
 
 const router = Router();
@@ -1045,6 +1046,9 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
 
 // Actual import
 router.post('/import', async (req, res) => {
+  const historyId = uuidv4();
+  const startedAt = new Date();
+  
   try {
     const { fileToken, type, mode, archiveMissing, vesselId } = req.body;
 
@@ -1058,6 +1062,25 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ error: 'Cannot import file with errors' });
     }
 
+    // Create initial ImportHistory with status='in_progress'
+    await storeImportHistory({
+      id: historyId,
+      type,
+      mode,
+      archiveMissing: archiveMissing || false,
+      userId: (req as any).user?.id || 'system',
+      vesselId,
+      originalName: cachedData.originalName,
+      fileSize: cachedData.file.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      archived: 0,
+      startedAt: startedAt,
+      finishedAt: null,
+      status: 'in_progress'
+    });
+
     // Perform the actual import using normalized data
     const importResult = await performImport(
       type,
@@ -1065,22 +1088,15 @@ router.post('/import', async (req, res) => {
       mode,
       archiveMissing,
       vesselId,
-      (req as any).user?.id || 'system'
+      (req as any).user?.id || 'system',
+      historyId // Pass history ID for change tracking
     );
 
-    // Store in history
-    const historyId = uuidv4();
-    await storeImportHistory({
-      id: historyId,
-      type,
-      mode,
-      archiveMissing,
-      userId: (req as any).user?.id || 'system',
-      vesselId,
+    // Update ImportHistory with status='complete' and include file metadata
+    await storage.updateImportHistory(historyId, {
       ...importResult,
-      startedAt: new Date(),
       finishedAt: new Date(),
-      status: 'success',
+      status: 'complete',
       originalFile: cachedData.file,
       originalName: cachedData.originalName
     });
@@ -1092,9 +1108,24 @@ router.post('/import', async (req, res) => {
       ...importResult,
       historyId
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Import error:', error);
-    res.status(500).json({ error: 'Failed to import data' });
+    
+    // Update ImportHistory with status='failed' and error message
+    try {
+      await storage.updateImportHistory(historyId, {
+        finishedAt: new Date(),
+        status: 'failed',
+        errorMessage: error?.message || 'Unknown error during import'
+      });
+    } catch (updateError) {
+      console.error('Failed to update import history:', updateError);
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to import data',
+      message: error?.message || 'Unknown error'
+    });
   }
 });
 
@@ -1779,6 +1810,29 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   return results;
 }
 
+// Helper function to track change in ImportChangeLog
+async function trackChange(
+  importHistoryId: string,
+  operation: 'created' | 'updated' | 'archived',
+  entityType: 'component' | 'job' | 'spare' | 'workOrder',
+  entityId: string,
+  previousData: any | null,
+  newData: any | null
+) {
+  const checksum = newData ? calculateRecordChecksum(newData) : (previousData ? calculateRecordChecksum(previousData) : '');
+  
+  await storage.createImportChangeLog({
+    id: uuidv4(),
+    importHistoryId,
+    operation,
+    entityType,
+    entityId,
+    previousData: previousData ? JSON.stringify(previousData) : null,
+    newData: newData ? JSON.stringify(newData) : null,
+    checksum
+  });
+}
+
 // Perform actual import
 async function performImport(
   type: string,
@@ -1786,7 +1840,8 @@ async function performImport(
   mode: string,
   archiveMissing: boolean,
   vesselId: string | undefined,
-  userId: string
+  userId: string,
+  importHistoryId?: string
 ) {
   const result = {
     created: 0,
@@ -1853,8 +1908,7 @@ async function performImport(
         // else: keep the getSFIName fallback for three or more digits
       }
       
-      await storage.createComponent({
-        id: parentCode,
+      const parentComponent = await storage.createComponent({
         componentCode: parentCode,
         name: parentName,
         category: getComponentCategory(parentMainGroup) || '',
@@ -1866,6 +1920,11 @@ async function performImport(
       });
       console.log(`📁 Created parent node: ${parentCode} (${parentName})`);
       result.created++;
+      
+      // Track parent component creation
+      if (importHistoryId) {
+        await trackChange(importHistoryId, 'created', 'component', parentCode, null, parentComponent);
+      }
     }
     
     // Sort components by SFI hierarchy depth (parents before children)
@@ -1886,24 +1945,46 @@ async function performImport(
         if (existing) {
           result.skipped++;
         } else {
-          await createComponentFromRow(row, vesselId);
+          const newComponent = await createComponentFromRow(row, vesselId);
           result.created++;
+          
+          // Track component creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
+          }
         }
       } else if (mode === 'update') {
         if (existing) {
-          await updateComponentFromRow(componentCode, row);
+          const previousData = { ...existing };
+          const updatedComponent = await updateComponentFromRow(componentCode, row);
           result.updated++;
+          
+          // Track component update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, previousData, updatedComponent);
+          }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
         if (existing) {
           console.log(`🔄 Updating existing component: ${componentCode}`);
-          await updateComponentFromRow(componentCode, row);
+          const previousData = { ...existing };
+          const updatedComponent = await updateComponentFromRow(componentCode, row);
           result.updated++;
+          
+          // Track component update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, previousData, updatedComponent);
+          }
         } else {
-          await createComponentFromRow(row, vesselId);
+          const newComponent = await createComponentFromRow(row, vesselId);
           result.created++;
+          
+          // Track component creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
+          }
         }
       }
     }
@@ -1957,25 +2038,47 @@ async function performImport(
         if (existing) {
           result.skipped++;
         } else {
-          await createWorkOrderFromRow(row, templateCode, vesselId);
+          const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
           result.created++;
           woSequenceMap.set(componentYearKey, sequence + 1);
+          
+          // Track work order creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+          }
         }
       } else if (mode === 'update') {
         if (existing) {
-          await updateWorkOrderFromRow(existing.id, row);
+          const previousData = { ...existing };
+          const updatedWorkOrder = await updateWorkOrderFromRow(existing.id, row);
           result.updated++;
+          
+          // Track work order update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, previousData, updatedWorkOrder);
+          }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
         if (existing) {
-          await updateWorkOrderFromRow(existing.id, row);
+          const previousData = { ...existing };
+          const updatedWorkOrder = await updateWorkOrderFromRow(existing.id, row);
           result.updated++;
+          
+          // Track work order update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, previousData, updatedWorkOrder);
+          }
         } else {
-          await createWorkOrderFromRow(row, templateCode, vesselId);
+          const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
           result.created++;
           woSequenceMap.set(componentYearKey, sequence + 1);
+          
+          // Track work order creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
+          }
         }
       }
     }
@@ -2056,22 +2159,46 @@ async function performImport(
           const createdJob = await storage.createJob(jobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
+          
+          // Track job creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, createdJob);
+          }
         }
       } else if (mode === 'update') {
         if (existing) {
-          await storage.updateJob(existing.id, jobData);
+          const previousData = { ...existing };
+          const updatedJob = await storage.updateJob(existing.id, jobData);
+          jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
+          
+          // Track job update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, previousData, updatedJob);
+          }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
         if (existing) {
-          await storage.updateJob(existing.id, jobData);
+          const previousData = { ...existing };
+          const updatedJob = await storage.updateJob(existing.id, jobData);
+          jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
+          
+          // Track job update with previousData and newData
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, previousData, updatedJob);
+          }
         } else {
           const createdJob = await storage.createJob(jobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
+          
+          // Track job creation
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, createdJob);
+          }
         }
       }
     }
@@ -2092,7 +2219,6 @@ async function performImport(
 async function createComponentFromRow(row: any, vesselId?: string) {
   const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
   const componentData = {
-    id: componentCode,
     componentCode: componentCode,
     name: row['Component Name'] || '',
     category: row['Component Category'] || row['Main Group Name'] || '',
@@ -2255,7 +2381,8 @@ async function updateWorkOrderFromRow(workOrderId: string, row: any) {
 
 // Store import history
 async function storeImportHistory(data: any) {
-  await storage.createImportHistory(data);
+  const result = await storage.createImportHistory(data);
+  return result;
 }
 
 // Get import history

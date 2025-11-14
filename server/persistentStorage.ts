@@ -57,6 +57,18 @@ import {
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
+class StorageInitializationError extends Error {
+  constructor(
+    message: string,
+    public readonly targetPath: string,
+    public readonly operation: string,
+    public readonly originalError?: Error
+  ) {
+    super(message);
+    this.name = 'StorageInitializationError';
+  }
+}
+
 interface PersistentData {
   users: Record<number, User>;
   components: Record<string, Component>;
@@ -207,6 +219,28 @@ export class PersistentFileStorage implements IStorage {
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
+    
+    // Test write permissions with temp files (fail-fast on permission issues)
+    try {
+      // Test data directory write
+      const testDataFile = `${this.dataFile}.init-test`;
+      fs.writeFileSync(testDataFile, '[]', 'utf-8');
+      fs.unlinkSync(testDataFile);
+      
+      // Test log directory write
+      const testLogFile = `${this.changeLogFile}.init-test`;
+      fs.writeFileSync(testLogFile, '[]', 'utf-8');
+      fs.unlinkSync(testLogFile);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      throw new StorageInitializationError(
+        `Cannot write to storage directory. Check permissions for path: ${err.path || this.dataFile}. Error code: ${err.code || 'UNKNOWN'}`,
+        err.path || this.dataFile,
+        'initialization',
+        err
+      );
+    }
+    
     this.data = this.loadData();
     this.importChangeLogs = this.loadChangeLogs();
     
@@ -699,6 +733,7 @@ export class PersistentFileStorage implements IStorage {
       fs.renameSync(tempFile, this.changeLogFile);
     } catch (error) {
       console.error('❌ Error saving change logs:', error);
+      throw error;
     }
   }
 

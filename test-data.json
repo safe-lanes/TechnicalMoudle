@@ -6560,12 +6560,12 @@
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
       "frequencyUnit": "Weeks",
-      "approver": "Chief Engineer",
-      "nextDueDate": "2025-11-19",
-      "nextDueReading": null,
+      "approver": "",
+      "nextDueDate": "",
+      "nextDueReading": "",
       "classRelated": "No",
       "jobPriority": "Medium",
-      "briefWorkDescription": "test work",
+      "briefWorkDescription": "",
       "templateCode": "WO-331.831-2025-01",
       "id": "27",
       "createdAt": "2025-11-12T10:46:01.771Z",
@@ -6593,7 +6593,14 @@
       "intervalRunningHour": null,
       "scopeNotes": null,
       "criticality": null,
-      "dueDate": null
+      "dueDate": null,
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": {
+        "ppeRequirements": [],
+        "permitRequirements": [],
+        "otherRequirements": []
+      }
     },
     {
       "vesselId": "V001",
