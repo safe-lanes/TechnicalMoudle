@@ -429,6 +429,7 @@ export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private currentUserId: number;
   private components: Map<string, Component>;
+  private componentCodeIndex: Map<string, Map<string, string>>; // vesselId → (componentCode → componentId)
   private runningHoursAudits: RunningHoursAudit[];
   private currentAuditId: number;
   private spares: Map<number, Spare>;
@@ -477,6 +478,7 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.currentUserId = 1;
     this.components = new Map();
+    this.componentCodeIndex = new Map();
     this.runningHoursAudits = [];
     this.currentAuditId = 1;
     this.spares = new Map();
@@ -528,6 +530,20 @@ export class MemStorage implements IStorage {
     this.initializeFormDefinitions();
     this.initializeWorkOrders();
     this.initializeDefects();
+    this.rebuildComponentCodeIndex();
+  }
+  
+  private rebuildComponentCodeIndex(): void {
+    this.componentCodeIndex.clear();
+    for (const component of this.components.values()) {
+      if (component && component.componentCode) {
+        const vesselId = component.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselId)) {
+          this.componentCodeIndex.set(vesselId, new Map());
+        }
+        this.componentCodeIndex.get(vesselId)!.set(component.componentCode, component.id);
+      }
+    }
   }
   
   private async initializeFormDefinitions() {
@@ -874,6 +890,16 @@ export class MemStorage implements IStorage {
       updatedAt: now
     };
     this.components.set(component.id, component);
+    
+    // Update index
+    if (component.componentCode) {
+      const vesselId = component.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(component.componentCode, component.id);
+    }
+    
     return component;
   }
 
@@ -882,12 +908,41 @@ export class MemStorage implements IStorage {
     if (!component) {
       throw new Error(`Component ${id} not found`);
     }
+    
+    // Remove old index entry if componentCode or vesselId changed
+    if (component.componentCode && (data.componentCode !== undefined || data.vesselId !== undefined)) {
+      const oldVesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
+    
     const updated = { ...component, ...data };
     this.components.set(id, updated);
+    
+    // Add new index entry
+    if (updated.componentCode) {
+      const vesselId = updated.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(updated.componentCode, updated.id);
+    }
+    
     return updated;
   }
 
   async deleteComponent(id: string): Promise<void> {
+    const component = this.components.get(id);
+    if (component && component.componentCode) {
+      // Remove from index
+      const vesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
     this.components.delete(id);
   }
 
@@ -940,6 +995,16 @@ export class MemStorage implements IStorage {
     };
     
     this.components.set(component.id, component);
+    
+    // Update index
+    if (component.componentCode) {
+      const vesselId = component.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(component.componentCode, component.id);
+    }
+    
     return component;
   }
 
@@ -967,6 +1032,15 @@ export class MemStorage implements IStorage {
       }
     }
     
+    // Remove old index entry if componentCode changed
+    if (component.componentCode && data.componentCode !== undefined) {
+      const oldVesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
+    
     const updated = { 
       ...component, 
       ...data, 
@@ -975,6 +1049,16 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.components.set(id, updated);
+    
+    // Add new index entry
+    if (updated.componentCode) {
+      const vesselId = updated.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(updated.componentCode, updated.id);
+    }
+    
     return updated;
   }
 
@@ -992,6 +1076,15 @@ export class MemStorage implements IStorage {
     );
     if (hasChildren) {
       throw new Error(`Cannot delete fleet component ${id} with child components`);
+    }
+    
+    // Remove from index
+    if (component.componentCode) {
+      const vesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
     }
     
     this.components.delete(id);
@@ -1695,6 +1788,16 @@ export class MemStorage implements IStorage {
         classItem: comp.classItem ?? false
       };
       this.components.set(newComp.id, newComp);
+      
+      // Update index
+      if (newComp.componentCode) {
+        const vesselId = newComp.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselId)) {
+          this.componentCodeIndex.set(vesselId, new Map());
+        }
+        this.componentCodeIndex.get(vesselId)!.set(newComp.componentCode, newComp.id);
+      }
+      
       created.push(newComp);
     }
     return created;
@@ -1705,8 +1808,27 @@ export class MemStorage implements IStorage {
     for (const { id, data } of updates) {
       const existing = this.components.get(id);
       if (existing) {
+        // Remove old index entry if componentCode or vesselId changed
+        if (existing.componentCode && (data.componentCode !== undefined || data.vesselId !== undefined)) {
+          const oldVesselId = existing.vesselId || 'global';
+          const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+          if (vesselIndex) {
+            vesselIndex.delete(existing.componentCode);
+          }
+        }
+        
         const updatedComp = { ...existing, ...data };
         this.components.set(id, updatedComp);
+        
+        // Add new index entry
+        if (updatedComp.componentCode) {
+          const vesselId = updatedComp.vesselId || 'global';
+          if (!this.componentCodeIndex.has(vesselId)) {
+            this.componentCodeIndex.set(vesselId, new Map());
+          }
+          this.componentCodeIndex.get(vesselId)!.set(updatedComp.componentCode, updatedComp.id);
+        }
+        
         updated.push(updatedComp);
       }
     }
@@ -1723,7 +1845,28 @@ export class MemStorage implements IStorage {
       
       if (this.components.has(id)) {
         const existing = this.components.get(id)!;
-        this.components.set(id, { ...existing, ...comp });
+        
+        // Remove old index entry if componentCode or vesselId changed
+        if (existing.componentCode && (comp.componentCode !== undefined || comp.vesselId !== undefined)) {
+          const oldVesselId = existing.vesselId || 'global';
+          const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+          if (vesselIndex) {
+            vesselIndex.delete(existing.componentCode);
+          }
+        }
+        
+        const updatedComp = { ...existing, ...comp };
+        this.components.set(id, updatedComp);
+        
+        // Add new index entry
+        if (updatedComp.componentCode) {
+          const vesselId = updatedComp.vesselId || 'global';
+          if (!this.componentCodeIndex.has(vesselId)) {
+            this.componentCodeIndex.set(vesselId, new Map());
+          }
+          this.componentCodeIndex.get(vesselId)!.set(updatedComp.componentCode, updatedComp.id);
+        }
+        
         updated++;
       } else {
         const newComp: Component = {
@@ -1745,6 +1888,16 @@ export class MemStorage implements IStorage {
           classItem: comp.classItem ?? false
         };
         this.components.set(id, newComp);
+        
+        // Update index
+        if (newComp.componentCode) {
+          const vesselId = newComp.vesselId || 'global';
+          if (!this.componentCodeIndex.has(vesselId)) {
+            this.componentCodeIndex.set(vesselId, new Map());
+          }
+          this.componentCodeIndex.get(vesselId)!.set(newComp.componentCode, newComp.id);
+        }
+        
         created++;
       }
     }
@@ -1857,12 +2010,20 @@ export class MemStorage implements IStorage {
 
   async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
     const result = new Map<string, Component>();
+    const vesselKey = vesselId || 'global';
+    const vesselIndex = this.componentCodeIndex.get(vesselKey);
+    
+    if (!vesselIndex) {
+      return result;
+    }
+    
     for (const code of codes) {
-      const component = Array.from(this.components.values()).find(
-        c => c.componentCode === code && (!vesselId || c.vesselId === vesselId)
-      );
-      if (component) {
-        result.set(code, component);
+      const componentId = vesselIndex.get(code);
+      if (componentId) {
+        const component = this.components.get(componentId);
+        if (component) {
+          result.set(code, component);
+        }
       }
     }
     return result;
@@ -3633,9 +3794,27 @@ export class MemStorage implements IStorage {
 }
 
 export class PostgresStorage implements IStorage {
+  private componentCodeIndex: Map<string, Map<string, string>> = new Map(); // vesselId → (componentCode → componentId)
+  
   private async getDb() {
     const { db } = await import('./db');
     return db;
+  }
+  
+  private async rebuildComponentCodeIndex(): Promise<void> {
+    const db = await this.getDb();
+    const allComponents = await db.select().from(components);
+    
+    this.componentCodeIndex.clear();
+    for (const component of allComponents) {
+      if (component.componentCode) {
+        const vesselId = component.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselId)) {
+          this.componentCodeIndex.set(vesselId, new Map());
+        }
+        this.componentCodeIndex.get(vesselId)!.set(component.componentCode, component.id);
+      }
+    }
   }
 
   // ============= USERS =============
@@ -3684,22 +3863,66 @@ export class PostgresStorage implements IStorage {
     const { nanoid } = await import('nanoid');
     const id = nanoid();
     const result = await db.insert(components).values({ ...component, id }).returning();
-    return result[0];
+    const created = result[0];
+    
+    // Update index
+    if (created.componentCode) {
+      const vesselId = created.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(created.componentCode, created.id);
+    }
+    
+    return created;
   }
 
   async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
+    
+    // Get existing component to handle index updates
+    const existing = await this.getComponent(id);
+    if (existing && existing.componentCode && (data.componentCode !== undefined || data.vesselId !== undefined)) {
+      const oldVesselId = existing.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(existing.componentCode);
+      }
+    }
+    
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(components.id, id))
       .returning();
-    return result[0];
+    const updated = result[0];
+    
+    // Add new index entry
+    if (updated.componentCode) {
+      const vesselId = updated.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(updated.componentCode, updated.id);
+    }
+    
+    return updated;
   }
 
   async deleteComponent(id: string): Promise<void> {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
+    
+    // Get component to remove from index
+    const component = await this.getComponent(id);
+    if (component && component.componentCode) {
+      const vesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
+    
     await db.delete(components).where(eq(components.id, id));
   }
 
@@ -3729,22 +3952,66 @@ export class PostgresStorage implements IStorage {
       dataScope: 'fleet',
       fleetEquipmentCode,
     }).returning();
-    return result[0];
+    const created = result[0];
+    
+    // Update index
+    if (created.componentCode) {
+      const vesselId = created.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(created.componentCode, created.id);
+    }
+    
+    return created;
   }
 
   async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
+    
+    // Get existing component to handle index updates
+    const existing = await this.getFleetComponent(id);
+    if (existing && existing.componentCode && data.componentCode !== undefined) {
+      const oldVesselId = existing.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(oldVesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(existing.componentCode);
+      }
+    }
+    
     const result = await db.update(components)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(components.id, id))
       .returning();
-    return result[0];
+    const updated = result[0];
+    
+    // Add new index entry
+    if (updated.componentCode) {
+      const vesselId = updated.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselId)) {
+        this.componentCodeIndex.set(vesselId, new Map());
+      }
+      this.componentCodeIndex.get(vesselId)!.set(updated.componentCode, updated.id);
+    }
+    
+    return updated;
   }
 
   async deleteFleetComponent(id: string): Promise<void> {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
+    
+    // Get component to remove from index
+    const component = await this.getFleetComponent(id);
+    if (component && component.componentCode) {
+      const vesselId = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
+    
     await db.delete(components).where(eq(components.id, id));
   }
 
@@ -4503,22 +4770,32 @@ export class PostgresStorage implements IStorage {
   }
 
   async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
-    const db = await this.getDb();
-    const { eq, and, inArray } = await import('drizzle-orm');
-    
-    const conditions = [inArray(components.componentCode, codes)];
-    if (vesselId) {
-      conditions.push(eq(components.vesselId, vesselId));
+    // Lazy initialization: rebuild index if empty
+    if (this.componentCodeIndex.size === 0) {
+      await this.rebuildComponentCodeIndex();
     }
     
-    const results = await db.select().from(components).where(and(...conditions));
-    const map = new Map<string, Component>();
-    for (const component of results) {
-      if (component.componentCode) {
-        map.set(component.componentCode, component);
+    const result = new Map<string, Component>();
+    const vesselKey = vesselId || 'global';
+    const vesselIndex = this.componentCodeIndex.get(vesselKey);
+    
+    if (!vesselIndex) {
+      return result;
+    }
+    
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    for (const code of codes) {
+      const componentId = vesselIndex.get(code);
+      if (componentId) {
+        const results = await db.select().from(components).where(eq(components.id, componentId));
+        if (results[0]) {
+          result.set(code, results[0]);
+        }
       }
     }
-    return map;
+    return result;
   }
 
   async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
