@@ -12,7 +12,9 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   Clock,
-  Undo2
+  Undo2,
+  Eye,
+  FileWarning
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +37,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DryRunResult {
   fileToken: string;
@@ -109,6 +120,8 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [selectedHistoryType, setSelectedHistoryType] = useState<string>('');
   const [isUndoing, setIsUndoing] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [partialImportDialogOpen, setPartialImportDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch import history
@@ -272,23 +285,33 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     }
   };
 
-  // Perform import
-  const handleImport = async () => {
+  // Perform import (all valid rows or partial)
+  const handleImport = async (validRowsOnly = false) => {
     if (!dryRunResult) return;
 
     setIsImporting(true);
 
     try {
+      const requestBody: any = {
+        fileToken: dryRunResult.fileToken,
+        type: 'jobs',
+        mode: importMode,
+        archiveMissing: false,
+        vesselId: vesselId
+      };
+
+      // If partial import, only include valid row indices
+      if (validRowsOnly) {
+        const validRowIndices = dryRunResult.rows
+          .filter(row => row.status === 'ok')
+          .map(row => row.row);
+        requestBody.rowIndices = validRowIndices;
+      }
+
       const response = await fetch('/api/bulk/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileToken: dryRunResult.fileToken,
-          type: 'jobs',
-          mode: importMode,
-          archiveMissing: false,
-          vesselId: vesselId
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -298,14 +321,21 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
 
       const result = await response.json();
 
+      const totalRows = validRowsOnly 
+        ? dryRunResult.rows.filter(row => row.status === 'ok').length
+        : dryRunResult.rows.length;
+
       toast({
         title: 'Import Successful',
-        description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
+        description: validRowsOnly 
+          ? `Imported ${result.created + result.updated} valid rows, skipped ${dryRunResult.summary.errors} error rows`
+          : `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
       });
 
       // Clear state and refresh
       setSelectedFile(null);
       setDryRunResult(null);
+      setPartialImportDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', 'jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
     } catch (error: any) {
@@ -317,6 +347,18 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     } finally {
       setIsImporting(false);
     }
+  };
+
+  // Get error rows for dialog display
+  const getErrorRows = () => {
+    if (!dryRunResult) return [];
+    return dryRunResult.rows.filter(row => row.status === 'error');
+  };
+
+  // Get valid rows count
+  const getValidRowsCount = () => {
+    if (!dryRunResult) return 0;
+    return dryRunResult.rows.filter(row => row.status === 'ok').length;
   };
 
   // Handle undo click
@@ -512,12 +554,25 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
 
                 {dryRunResult && (
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Validation Results</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Validation Results</h3>
+                      {dryRunResult.summary.errors > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setErrorDialogOpen(true)}
+                          data-testid="button-view-errors"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View All Errors
+                        </Button>
+                      )}
+                    </div>
                     
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 flex-wrap">
                       <Badge variant="outline" className="px-3 py-1">
                         <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                        OK: {dryRunResult.summary.ok}
+                        Valid: {dryRunResult.summary.ok}
                       </Badge>
                       <Badge variant="outline" className="px-3 py-1">
                         <AlertTriangle className="h-4 w-4 mr-1 text-yellow-600" />
@@ -526,6 +581,9 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
                       <Badge variant="outline" className="px-3 py-1">
                         <AlertCircle className="h-4 w-4 mr-1 text-red-600" />
                         Errors: {dryRunResult.summary.errors}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        Total Rows: {dryRunResult.rows.length}
                       </Badge>
                     </div>
 
@@ -568,14 +626,28 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
                       </Table>
                     </div>
 
-                    <Button 
-                      onClick={handleImport} 
-                      disabled={dryRunResult.summary.errors > 0 || isImporting}
-                      className="w-full"
-                      data-testid="button-import"
-                    >
-                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Jobs`}
-                    </Button>
+                    {dryRunResult.summary.errors === 0 ? (
+                      <Button 
+                        onClick={() => handleImport(false)} 
+                        disabled={isImporting}
+                        className="w-full"
+                        data-testid="button-import"
+                      >
+                        {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Jobs`}
+                      </Button>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Button 
+                          onClick={() => setPartialImportDialogOpen(true)}
+                          disabled={isImporting || getValidRowsCount() === 0}
+                          className="flex-1"
+                          data-testid="button-import-valid"
+                        >
+                          <FileWarning className="h-4 w-4 mr-2" />
+                          {isImporting ? 'Importing...' : `Ignore Errors & Import ${getValidRowsCount()} Valid Rows`}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -722,6 +794,103 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
               data-testid="button-undo-confirm"
             >
               {isUndoing ? 'Undoing...' : 'Yes, Undo Import'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              All Validation Errors ({getErrorRows().length} rows)
+            </DialogTitle>
+            <DialogDescription>
+              Review all rows with validation errors. Fix these errors in your file before importing.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[500px] pr-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Row</TableHead>
+                  <TableHead>Vessel Code</TableHead>
+                  <TableHead>Component Code</TableHead>
+                  <TableHead>Maintenance Task</TableHead>
+                  <TableHead className="min-w-[300px]">Errors</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {getErrorRows().map((row) => (
+                  <TableRow key={row.row} className="border-l-4 border-l-red-500">
+                    <TableCell className="font-medium">{row.row}</TableCell>
+                    <TableCell>{row.normalized['Vessel Code'] || '-'}</TableCell>
+                    <TableCell>{row.normalized['Component Code'] || '-'}</TableCell>
+                    <TableCell>{row.normalized['Maintenance Task'] || '-'}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {row.errors.map((error, idx) => (
+                          <div key={idx} className="text-sm text-red-600 flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <span>{error}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+          <DialogFooter>
+            <Button onClick={() => setErrorDialogOpen(false)} data-testid="button-close-errors">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={partialImportDialogOpen} onOpenChange={setPartialImportDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <FileWarning className="h-5 w-5 text-yellow-600" />
+              Import Valid Rows Only?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3">
+                <p>This will import only the valid rows and skip all rows with errors:</p>
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="font-medium text-green-700 dark:text-green-400">
+                      {getValidRowsCount()} valid rows will be imported
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <span className="font-medium text-red-700 dark:text-red-400">
+                      {getErrorRows().length} error rows will be skipped
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm">
+                  You can fix the errors and import the remaining rows later. Do you want to proceed?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isImporting} data-testid="button-partial-cancel">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleImport(true)}
+              disabled={isImporting}
+              data-testid="button-partial-confirm"
+            >
+              {isImporting ? 'Importing...' : `Yes, Import ${getValidRowsCount()} Valid Rows`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
