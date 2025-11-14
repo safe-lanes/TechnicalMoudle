@@ -1050,16 +1050,32 @@ router.post('/import', async (req, res) => {
   const startedAt = new Date();
   
   try {
-    const { fileToken, type, mode, archiveMissing, vesselId } = req.body;
+    const { fileToken, type, mode, archiveMissing, vesselId, rowIndices } = req.body;
 
     const cachedData = dryRunCache.get(fileToken);
     if (!cachedData) {
       return res.status(400).json({ error: 'Invalid or expired file token' });
     }
 
-    // Check if there are errors
-    if (cachedData.results.summary.errors > 0) {
-      return res.status(400).json({ error: 'Cannot import file with errors' });
+    // Prepare data for import
+    let dataToImport = cachedData.normalizedData || cachedData.data;
+
+    // If rowIndices is provided, filter to only include those rows (partial import)
+    if (rowIndices && Array.isArray(rowIndices)) {
+      console.log(`📋 Partial import: filtering ${rowIndices.length} rows out of ${dataToImport.length} total`);
+      
+      // Filter normalized data to only include specified row indices
+      dataToImport = dataToImport.filter((_: any, index: number) => {
+        // Row indices are 1-based in validation results, but 0-based in array
+        return rowIndices.includes(index + 1);
+      });
+
+      console.log(`✅ Filtered data: ${dataToImport.length} rows ready for import`);
+    } else {
+      // Check if there are errors (only for full import)
+      if (cachedData.results.summary.errors > 0) {
+        return res.status(400).json({ error: 'Cannot import file with errors. Use rowIndices parameter to import only valid rows.' });
+      }
     }
 
     // Create initial ImportHistory with status='in_progress'
@@ -1081,10 +1097,10 @@ router.post('/import', async (req, res) => {
       status: 'in_progress'
     });
 
-    // Perform the actual import using normalized data
+    // Perform the actual import using filtered/normalized data
     const importResult = await performImport(
       type,
-      cachedData.normalizedData || cachedData.data, // Use normalized data if available
+      dataToImport,
       mode,
       archiveMissing,
       vesselId,
