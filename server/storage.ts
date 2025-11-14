@@ -154,6 +154,26 @@ export interface IStorage {
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
   
+  // New: Get parent components with running-hour based child jobs
+  getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>>;
+  
+  // New: Cascade running hours update to parent and children
+  cascadeRunningHoursUpdate(params: {
+    parentComponentId: string;
+    mode: 'setTotal' | 'addDelta';
+    value: number;
+    dateUpdated: string;
+    comments?: string;
+    meterReplaced?: boolean;
+    oldMeterFinal?: string;
+    newMeterStart?: string;
+  }): Promise<{ 
+    updatedComponents: number; 
+    auditsCreated: number; 
+    workOrdersGenerated: number;
+    workOrders: any[];
+  }>;
+  
   // Fleet Components methods
   getFleetComponents(): Promise<Component[]>;
   getFleetComponent(id: string): Promise<Component | undefined>;

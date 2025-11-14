@@ -1183,6 +1183,357 @@ export class PersistentFileStorage implements IStorage {
       .sort((a, b) => a.enteredAtUTC.getTime() - b.enteredAtUTC.getTime());
   }
 
+  async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
+    // 1. Get all jobs where maintenanceBasis === "Running Hours" and vesselId matches
+    const rhJobs = Object.values(this.data.jobs).filter(
+      job => job && job.maintenanceBasis === "Running Hours" && job.vesselId === vesselId
+    );
+
+    // 2. Extract componentIds from those jobs (the children)
+    const childComponentIds = new Set<string>();
+    rhJobs.forEach(job => {
+      if (job.componentId) {
+        childComponentIds.add(job.componentId);
+      }
+    });
+
+    // 3. For each child, get its parentId
+    const parentIds = new Set<string>();
+    childComponentIds.forEach(childId => {
+      const child = this.data.components[childId];
+      if (child && child.parentId) {
+        parentIds.add(child.parentId);
+      }
+    });
+
+    // 4-6. For each parentId: get parent component, count children with RH jobs, get latest audit
+    const parents: Array<Component & { childCount: number; latestUpdate?: string }> = [];
+    
+    for (const parentId of Array.from(parentIds)) {
+      const parent = this.data.components[parentId];
+      // Only include if parent exists AND parent itself doesn't have a parent (true top-level parent)
+      if (!parent || parent.parentId) continue;
+
+      // Count children with RH jobs
+      const children = Object.values(this.data.components).filter(
+        c => c && c.parentId === parentId
+      );
+      const childrenWithRHJobs = children.filter(child =>
+        rhJobs.some(job => job.componentId === child.id)
+      );
+
+      // Get latest audit for parent to find latestUpdate date
+      const parentAudits = this.data.runningHoursAudits
+        .filter(a => a.componentId === parentId)
+        .sort((a, b) => b.enteredAtUTC.getTime() - a.enteredAtUTC.getTime());
+      
+      const latestUpdate = parentAudits.length > 0 
+        ? parentAudits[0].dateUpdatedLocal 
+        : undefined;
+
+      parents.push({
+        ...parent,
+        childCount: childrenWithRHJobs.length,
+        latestUpdate
+      });
+    }
+
+    return parents;
+  }
+
+  async cascadeRunningHoursUpdate(params: {
+    parentComponentId: string;
+    mode: 'setTotal' | 'addDelta';
+    value: number;
+    dateUpdated: string;
+    dateUpdatedTZ?: string;
+    comments?: string;
+    meterReplaced?: boolean;
+    oldMeterFinal?: string;
+    newMeterStart?: string;
+    userId?: string;
+  }): Promise<{ 
+    updatedComponents: number; 
+    auditsCreated: number; 
+    workOrdersGenerated: number;
+    workOrders: any[];
+  }> {
+    // Helper function to normalize frequency to hours
+    const normalizeFrequencyToHours = (job: Job): number | null => {
+      if (!job.frequencyValue || !job.frequencyUnit) {
+        console.warn(`Job ${job.jobNo} missing frequency information`);
+        return null;
+      }
+      
+      const value = parseFloat(job.frequencyValue);
+      if (isNaN(value)) {
+        console.warn(`Job ${job.jobNo} has invalid frequencyValue: ${job.frequencyValue}`);
+        return null;
+      }
+
+      if (job.frequencyUnit === "Hours") {
+        return value;
+      } else if (job.frequencyUnit === "Days") {
+        return value * 24;
+      } else {
+        console.warn(`Job ${job.jobNo} has unsupported frequencyUnit: ${job.frequencyUnit}`);
+        return null;
+      }
+    };
+
+    // Helper function to check if active work order exists for a job
+    const hasActiveWorkOrder = (jobNo: string, workOrders: WorkOrder[]): boolean => {
+      return workOrders.some(
+        wo => wo.jobNo === jobNo && 
+             wo.status !== 'Completed' && 
+             wo.status !== 'Cancelled'
+      );
+    };
+
+    // 1. Deep clone entire data (working set) for atomic updates
+    const workingData = JSON.parse(JSON.stringify(this.data)) as PersistentData;
+
+    // 2. Get parent component from working set
+    const parent = workingData.components[params.parentComponentId];
+    if (!parent) {
+      throw new Error(`Parent component ${params.parentComponentId} not found`);
+    }
+
+    // 3. Calculate delta
+    const currentParentRH = parseFloat(parent.currentCumulativeRH);
+    let delta: number;
+    
+    if (params.mode === 'setTotal') {
+      delta = params.value - currentParentRH;
+    } else {
+      delta = params.value;
+    }
+
+    // 4. Update parent.currentCumulativeRH by applying delta
+    const newParentRH = currentParentRH + delta;
+    parent.currentCumulativeRH = newParentRH.toFixed(2);
+
+    // 5. Get all children of parent
+    const children = Object.values(workingData.components).filter(
+      c => c && c.parentId === params.parentComponentId
+    );
+
+    // Track stats
+    let updatedComponents = 1; // Parent
+    let auditsCreated = 0;
+    let workOrdersGenerated = 0;
+    const generatedWorkOrders: any[] = [];
+    
+    const userId = params.userId || 'admin';
+    const dateUpdatedTZ = params.dateUpdatedTZ || 'UTC';
+    const enteredAtUTC = new Date(Date.now());
+
+    // 6. For each child: update RH, create audit, update lastUpdated
+    for (const child of children) {
+      const prevChildRH = parseFloat(child.currentCumulativeRH);
+      const newChildRH = prevChildRH + delta;
+      
+      // Update child.currentCumulativeRH
+      child.currentCumulativeRH = newChildRH.toFixed(2);
+      
+      // Create audit entry with all fields
+      const childAudit: RunningHoursAudit = {
+        id: workingData.counters.auditId++,
+        vesselId: child.vesselId || parent.vesselId || '',
+        componentId: child.id,
+        previousRH: prevChildRH.toFixed(2),
+        newRH: delta.toFixed(2),
+        cumulativeRH: newChildRH.toFixed(2),
+        dateUpdatedLocal: params.dateUpdated,
+        dateUpdatedTZ: dateUpdatedTZ,
+        enteredAtUTC: enteredAtUTC,
+        userId: userId,
+        source: 'cascade',
+        notes: params.comments || null,
+        meterReplaced: params.meterReplaced || false,
+        oldMeterFinal: params.oldMeterFinal || null,
+        newMeterStart: params.newMeterStart || null,
+        version: 1
+      };
+      
+      workingData.runningHoursAudits.push(childAudit);
+      auditsCreated++;
+      
+      // Update child.lastUpdated
+      child.lastUpdated = params.dateUpdated;
+      updatedComponents++;
+    }
+
+    // 7. Create audit for parent too
+    const parentAudit: RunningHoursAudit = {
+      id: workingData.counters.auditId++,
+      vesselId: parent.vesselId || '',
+      componentId: parent.id,
+      previousRH: currentParentRH.toFixed(2),
+      newRH: delta.toFixed(2),
+      cumulativeRH: newParentRH.toFixed(2),
+      dateUpdatedLocal: params.dateUpdated,
+      dateUpdatedTZ: dateUpdatedTZ,
+      enteredAtUTC: enteredAtUTC,
+      userId: userId,
+      source: 'cascade',
+      notes: params.comments || null,
+      meterReplaced: params.meterReplaced || false,
+      oldMeterFinal: params.oldMeterFinal || null,
+      newMeterStart: params.newMeterStart || null,
+      version: 1
+    };
+    
+    workingData.runningHoursAudits.push(parentAudit);
+    auditsCreated++;
+
+    // 8. Update parent.lastUpdated
+    parent.lastUpdated = params.dateUpdated;
+
+    // 9. For each child, check RH jobs for threshold crossing
+    for (const child of children) {
+      const prevChildRH = parseFloat(child.currentCumulativeRH) - delta;
+      const newChildRH = parseFloat(child.currentCumulativeRH);
+      
+      // Get all jobs for child where maintenanceBasis === "Running Hours"
+      const childRHJobs = Object.values(workingData.jobs).filter(
+        job => job && 
+               job.componentId === child.id && 
+               job.maintenanceBasis === "Running Hours"
+      );
+
+      for (const job of childRHJobs) {
+        // a) Determine interval from job.intervalRunningHour or normalize frequency
+        let interval: number;
+        if (job.intervalRunningHour) {
+          interval = parseFloat(job.intervalRunningHour);
+        } else {
+          const normalizedInterval = normalizeFrequencyToHours(job);
+          if (normalizedInterval === null) {
+            console.warn(`Job ${job.jobNo} has no valid interval, skipping WO generation`);
+            continue;
+          }
+          interval = normalizedInterval;
+        }
+        
+        // Handle edge case: interval must be positive
+        if (interval <= 0) {
+          console.warn(`Job ${job.jobNo} has zero or negative interval (${interval}), skipping WO generation`);
+          continue;
+        }
+
+        // b) Find last completed work order for this job
+        const completedWOs = workingData.workOrders.filter(
+          wo => wo.jobNo === job.jobNo && wo.status === 'Completed'
+        );
+        
+        let nextDueRH: number;
+        
+        if (completedWOs.length > 0) {
+          // Sort by dateCompleted (most recent first), fall back to id if dateCompleted is missing
+          completedWOs.sort((a, b) => {
+            if (a.dateCompleted && b.dateCompleted) {
+              return new Date(b.dateCompleted).getTime() - new Date(a.dateCompleted).getTime();
+            }
+            // Fall back to id comparison (higher id = more recent)
+            return parseInt(b.id) - parseInt(a.id);
+          });
+          
+          const lastCompletedWO = completedWOs[0];
+          nextDueRH = parseFloat(lastCompletedWO.nextDueReading || '0');
+          
+          // If nextDueReading is 0 or invalid, use interval
+          if (nextDueRH <= 0) {
+            nextDueRH = interval;
+          }
+        } else {
+          // No completed work orders yet, start from the first interval
+          nextDueRH = interval;
+        }
+
+        // c) Handle multiple threshold crossings with while loop
+        while (newChildRH >= nextDueRH) {
+          // Check if active WO already exists for this job
+          const activeWOExists = hasActiveWorkOrder(job.jobNo || '', workingData.workOrders);
+          
+          // Only create WO if no active one exists
+          if (!activeWOExists) {
+            const today = new Date().toISOString().split('T')[0];
+            const newWO: WorkOrder = {
+              id: String(workingData.counters.workOrderId++),
+              vesselId: child.vesselId || parent.vesselId || '',
+              component: child.name || '',
+              componentCode: child.componentCode || '',
+              componentId: child.id,
+              workOrderNo: `WO-${String(workingData.counters.workOrderId).padStart(6, '0')}`,
+              templateCode: job.jobNo ?? null,
+              executionId: null,
+              jobTitle: job.jobTitle ?? '',
+              jobNo: job.jobNo ?? '',
+              assignedTo: job.assignedTo ?? null,
+              dueDate: today,
+              status: 'Active',
+              dateCompleted: null,
+              submittedDate: null,
+              formData: null,
+              taskType: job.maintenanceType ?? null,
+              maintenanceBasis: job.maintenanceBasis ?? null,
+              frequencyValue: job.frequencyValue ?? null,
+              frequencyUnit: job.frequencyUnit ?? null,
+              approverRemarks: null,
+              isExecution: false,
+              templateId: null,
+              approver: null,
+              approvalDate: null,
+              rejectionDate: null,
+              nextDueDate: null,
+              nextDueReading: (nextDueRH + interval).toString(),
+              currentReading: newChildRH.toString(),
+              dataScope: child.dataScope ?? "vessel",
+              fleetEquipmentCode: child.fleetEquipmentCode ?? null,
+              fleetJobCode: (job as any).fleetJobCode ?? null,
+              department: (job as any).department ?? null,
+              isActive: true,
+              applicableVesselIds: null,
+              classRelated: (job as any).classRelated ?? null,
+              jobPriority: (job as any).jobPriority ?? null,
+              briefWorkDescription: (job as any).briefWorkDescription ?? null,
+              jobGroup: (job as any).jobGroup ?? null,
+              jobCategory: (job as any).jobCategory ?? null,
+              sfiCode: (job as any).sfiCode ?? null,
+              maintenanceIntervalValue: (job as any).maintenanceIntervalValue ?? null,
+              maintenanceIntervalUnit: (job as any).maintenanceIntervalUnit ?? null,
+              intervalRunningHour: (job as any).intervalRunningHour ?? null,
+              scopeNotes: null,
+              criticality: (job as any).criticality ?? null,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+            
+            workingData.workOrders.push(newWO);
+            generatedWorkOrders.push(newWO);
+            workOrdersGenerated++;
+          }
+          
+          // Advance to next threshold
+          nextDueRH += interval;
+        }
+      }
+    }
+
+    // 10. Save working set to disk (single atomic write)
+    this.data = workingData;
+    this.persistData();
+
+    // 11. Return stats
+    return {
+      updatedComponents,
+      auditsCreated,
+      workOrdersGenerated,
+      workOrders: generatedWorkOrders
+    };
+  }
+
   // Spares methods
   async getSpares(vesselId: string): Promise<Spare[]> {
     return Object.values(this.data.spares)

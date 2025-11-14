@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Search, FileSpreadsheet, Calendar } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { getComponentCategory } from "@/utils/componentUtils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
@@ -54,93 +54,31 @@ const RunningHours = () => {
   const { toast } = useToast();
   const vesselId = "V001"; // Default vessel ID
   
-  // Utilization rate cache (15 minutes)
-  const [utilizationCache, setUtilizationCache] = useState<{
-    data: Record<string, number | null>;
-    timestamp: number;
-  } | null>(null);
+  // Fetch parent components with RH-based child jobs
+  const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
+    queryKey: ['/api/running-hours/parents', vesselId],
+    enabled: true
+  });
 
-  // Mock data with Component Category derived from tree structure
-  // These component codes map to tree positions for category derivation
-  const mockData: RunningHoursData[] = [
-    { id: "1", component: "Radar System", componentCode: "4.1.1", componentCategory: getComponentCategory("4.1.1"), runningHours: "18,560 hrs", lastUpdated: "02-Jun-2025", utilizationRate: null },
-    { id: "2", component: "Diesel Generator 1", componentCode: "7.2.1", componentCategory: getComponentCategory("7.2.1"), runningHours: "15,670 hrs", lastUpdated: "09-Jun-2025", utilizationRate: null },
-    { id: "3", component: "Diesel Generator 2", componentCode: "7.2.2", componentCategory: getComponentCategory("7.2.2"), runningHours: "14,980 hrs", lastUpdated: "16-Jun-2025", utilizationRate: null },
-    { id: "4", component: "Main Cooling Seawater Pump", componentCode: "8.3.1", componentCategory: getComponentCategory("8.3.1"), runningHours: "12,800 hrs", lastUpdated: "23-Jun-2025", utilizationRate: null },
-    { id: "5", component: "Main Engine", componentCode: "6.1.1", componentCategory: getComponentCategory("6.1.1"), runningHours: "12,580 hrs", lastUpdated: "30-Jun-2025", utilizationRate: null },
-    { id: "6", component: "Propeller System", componentCode: "6.2.1", componentCategory: getComponentCategory("6.2.1"), runningHours: "12,580 hrs", lastUpdated: "02-Jun-2025", utilizationRate: null },
-    { id: "7", component: "Main Lubrication Oil Pump", componentCode: "7.3.1", componentCategory: getComponentCategory("7.3.1"), runningHours: "12,450 hrs", lastUpdated: "09-Jun-2025", utilizationRate: null },
-    { id: "8", component: "Steering Gear", componentCode: "4.3.1", componentCategory: getComponentCategory("4.3.1"), runningHours: "11,240 hrs", lastUpdated: "16-Jun-2025", utilizationRate: null },
-    { id: "9", component: "Main Air Compressor", componentCode: "8.1.1", componentCategory: getComponentCategory("8.1.1"), runningHours: "10,840 hrs", lastUpdated: "23-Jun-2025", utilizationRate: null },
-    { id: "10", component: "Bow Thruster", componentCode: "6.3.1", componentCategory: getComponentCategory("6.3.1"), runningHours: "10,450 hrs", lastUpdated: "30-Jun-2025", utilizationRate: null },
-  ];
-  
-  const [runningHoursData, setRunningHoursData] = useState<RunningHoursData[]>(mockData);
+  // Map API data to display format
+  const runningHoursData: RunningHoursData[] = Array.isArray(rawRunningHoursData) ? rawRunningHoursData.map((parent: any) => ({
+    id: parent.id,
+    component: parent.name || '',
+    componentCode: parent.componentCode || '',
+    componentCategory: parent.category || '',
+    runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
+    lastUpdated: parent.latestUpdate || parent.lastUpdated || '',
+    utilizationRate: null
+  })) : [];
 
-  // Fetch utilization rates asynchronously (non-blocking)
-  useEffect(() => {
-    const fetchUtilizationRates = async () => {
-      // Check cache first
-      if (utilizationCache && (Date.now() - utilizationCache.timestamp < 15 * 60 * 1000)) {
-        // Apply cached rates to data
-        setRunningHoursData(prev => prev.map(item => ({
-          ...item,
-          utilizationRate: utilizationCache.data[item.id] || null
-        })));
-        return;
-      }
-      
-      try {
-        // Simulate async calculation with timeout
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock utilization rates calculation
-        const rates: Record<string, number> = {};
-        runningHoursData.forEach(item => {
-          // Mock calculation: random rate between 0-24 hrs/day
-          rates[item.id] = Math.round((Math.random() * 24) * 10) / 10;
-        });
-        
-        // Update cache
-        setUtilizationCache({
-          data: rates,
-          timestamp: Date.now()
-        });
-        
-        // Apply rates to data
-        setRunningHoursData(prev => prev.map(item => ({
-          ...item,
-          utilizationRate: rates[item.id] || null
-        })));
-      } catch (error) {
-        // Silently fail - utilization rates remain null
-        console.error('Failed to fetch utilization rates:', error);
-      }
-    };
-    
-    fetchUtilizationRates();
-  }, []); // Run once on mount
-
-  // Mutation for single update
-  const updateRunningHours = useMutation({
+  // Cascade update mutation
+  const cascadeUpdateMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { success: true };
+      return await apiRequest('POST', '/api/running-hours/cascade', data);
     },
-    onSuccess: (_, variables) => {
-      // Update local data
-      setRunningHoursData(prev => prev.map(item => 
-        item.id === variables.componentId 
-          ? { ...item, runningHours: `${variables.audit.cumulativeRH.toLocaleString()} hrs`, lastUpdated: variables.dateUpdatedLocal }
-          : item
-      ));
-      // Bust cache
-      setUtilizationCache(null);
-      toast({
-        title: "Success",
-        description: "Running hours updated successfully",
-      });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
+      toast({ title: "Success", description: "Running hours updated successfully" });
       setIsUpdateDialogOpen(false);
       handleCancelUpdate();
     },
@@ -148,38 +86,30 @@ const RunningHours = () => {
       toast({
         title: "Error",
         description: error.message || "Failed to update running hours",
-        variant: "destructive",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Mutation for bulk update
+  // Mutation for bulk update - calls cascade endpoint for each component
   const bulkUpdateRunningHours = useMutation({
-    mutationFn: async (data: any) => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { success: true };
+    mutationFn: async (updates: any[]) => {
+      const promises = updates.map(update => 
+        apiRequest('POST', '/api/running-hours/cascade', {
+          parentComponentId: update.componentId,
+          mode: update.mode,
+          value: update.value,
+          dateUpdated: update.dateUpdated,
+          comments: update.comments || '',
+          meterReplaced: update.meterReplaced,
+          oldMeterFinal: update.oldMeterFinal,
+          newMeterStart: update.newMeterStart
+        })
+      );
+      return await Promise.all(promises);
     },
-    onSuccess: (_, variables) => {
-      // Update local data for all updated components
-      if (variables.updates) {
-        setRunningHoursData(prev => {
-          const updatedData = [...prev];
-          variables.updates.forEach((update: any) => {
-            const index = updatedData.findIndex(item => item.id === update.componentId);
-            if (index !== -1) {
-              updatedData[index] = {
-                ...updatedData[index],
-                runningHours: `${update.cumulativeRH.toLocaleString()} hrs`,
-                lastUpdated: update.dateUpdatedLocal
-              };
-            }
-          });
-          return updatedData;
-        });
-      }
-      // Bust cache
-      setUtilizationCache(null);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",
@@ -296,27 +226,6 @@ const RunningHours = () => {
       return;
     }
     
-    // Calculate new total
-    const previousValue = parseFloat(updateForm.oldValue);
-    const inputValue = parseFloat(updateForm.newValue);
-    let newTotal: number;
-    
-    if (updateMode === "addDelta") {
-      newTotal = previousValue + inputValue;
-    } else {
-      newTotal = inputValue;
-    }
-    
-    // Validation: new hours must be >= previous unless meter replaced
-    if (!meterReplaced && newTotal < previousValue) {
-      toast({
-        title: "Validation Error",
-        description: "New hours must be ≥ previous hours. Use 'Meter replaced?' if the counter was reset.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     // Format date in vessel local time
     const dateLocal = selectedDate.toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -328,32 +237,15 @@ const RunningHours = () => {
       hour12: false
     });
     
-    // Prepare audit data
-    const auditData = {
-      vesselId: vesselId,
-      componentId: selectedComponent.id,
-      previousRH: previousValue,
-      newRH: newTotal,
-      cumulativeRH: meterReplaced ? 
-        previousValue + (inputValue - parseFloat(updateForm.newMeterStart || "0")) : 
-        newTotal,
-      dateUpdatedLocal: dateLocal,
-      dateUpdatedTZ: "Asia/Kolkata", // Default timezone
-      enteredAtUTC: new Date(),
-      userId: "current-user", // Placeholder
-      source: "single" as const,
-      notes: updateForm.comments,
-      meterReplaced: meterReplaced,
-      oldMeterFinal: meterReplaced ? parseFloat(updateForm.oldMeterFinal) : null,
-      newMeterStart: meterReplaced ? parseFloat(updateForm.newMeterStart) : null,
-      version: 1
-    };
-    
-    updateRunningHours.mutate({
-      componentId: selectedComponent.id,
-      audit: auditData,
-      cumulativeRH: auditData.cumulativeRH,
-      dateUpdatedLocal: dateLocal
+    cascadeUpdateMutation.mutate({
+      parentComponentId: selectedComponent.id,
+      mode: updateMode,
+      value: parseFloat(updateForm.newValue),
+      dateUpdated: dateLocal,
+      comments: updateForm.comments,
+      meterReplaced,
+      oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
+      newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined
     });
   };
 
@@ -402,6 +294,17 @@ const RunningHours = () => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     
+    // Format date in vessel local time
+    const dateLocal = today.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }) + ' ' + today.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
     // Process each component with updates
     for (const component of runningHoursData) {
       const updateData = bulkUpdateData[component.id];
@@ -414,58 +317,15 @@ const RunningHours = () => {
         continue;
       }
       
-      const previousValue = parseFloat(component.runningHours.replace(" hrs", "").replace(/,/g, ""));
-      let newTotal: number;
-      
-      if (bulkUpdateMode === "addDelta") {
-        newTotal = previousValue + inputValue;
-      } else {
-        newTotal = inputValue;
-      }
-      
-      // Validation: new hours must be >= previous unless meter replaced
-      if (!updateData.meterReplaced && newTotal < previousValue) {
-        errors[component.id] = "New hours must be ≥ previous hours. Check 'Meter replaced?' if the counter was reset.";
-        continue;
-      }
-      
-      // Format date in vessel local time
-      const dateLocal = today.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      }) + ' ' + today.toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-      
-      // Prepare audit data
-      const auditData = {
-        vesselId: vesselId,
-        componentId: component.id,
-        previousRH: previousValue,
-        newRH: newTotal,
-        cumulativeRH: updateData.meterReplaced ? 
-          previousValue + (inputValue - parseFloat(updateData.newMeterStart || "0")) : 
-          newTotal,
-        dateUpdatedLocal: dateLocal,
-        dateUpdatedTZ: "Asia/Kolkata",
-        enteredAtUTC: new Date(),
-        userId: "current-user",
-        source: "bulk" as const,
-        notes: "",
-        meterReplaced: updateData.meterReplaced || false,
-        oldMeterFinal: updateData.meterReplaced ? parseFloat(updateData.oldMeterFinal) : null,
-        newMeterStart: updateData.meterReplaced ? parseFloat(updateData.newMeterStart) : null,
-        version: 1
-      };
-      
       updates.push({
         componentId: component.id,
-        audit: auditData,
-        cumulativeRH: auditData.cumulativeRH,
-        dateUpdatedLocal: dateLocal
+        mode: bulkUpdateMode,
+        value: inputValue,
+        dateUpdated: dateLocal,
+        comments: '',
+        meterReplaced: updateData.meterReplaced || false,
+        oldMeterFinal: updateData.meterReplaced ? updateData.oldMeterFinal : undefined,
+        newMeterStart: updateData.meterReplaced ? updateData.newMeterStart : undefined
       });
     }
     
@@ -482,7 +342,7 @@ const RunningHours = () => {
       return;
     }
     
-    bulkUpdateRunningHours.mutate({ updates });
+    bulkUpdateRunningHours.mutate(updates);
   };
 
   return (
@@ -537,7 +397,11 @@ const RunningHours = () => {
 
         {/* Table Body */}
         <div className="divide-y divide-gray-200">
-          {(() => {
+          {isLoadingParents ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              Loading running hours data...
+            </div>
+          ) : (() => {
             const filteredData = runningHoursData.filter(item => 
               !searchTerm || item.component.toLowerCase().includes(searchTerm.toLowerCase())
             );
@@ -546,6 +410,14 @@ const RunningHours = () => {
               return (
                 <div className="px-4 py-8 text-center text-gray-500">
                   No results found. <button onClick={clearFilters} className="text-blue-600 underline">Reset</button>
+                </div>
+              );
+            }
+            
+            if (filteredData.length === 0) {
+              return (
+                <div className="px-4 py-8 text-center text-gray-500">
+                  No running hours data available
                 </div>
               );
             }

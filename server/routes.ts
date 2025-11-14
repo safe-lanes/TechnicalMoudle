@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { z } from "zod";
 import multer from "multer";
@@ -1082,6 +1082,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid audit data", details: error.errors });
       }
       res.status(500).json({ error: "Failed to create audit" });
+    }
+  });
+  
+  // Get parent components whose children have running-hour based jobs
+  app.get("/api/running-hours/parents", async (req, res) => {
+    try {
+      const vesselId = (req.query.vesselId as string) || 'V001';
+      const parents = await storage.getRunningHourParents(vesselId);
+      res.json(parents);
+    } catch (error: any) {
+      console.error('Error fetching running hour parents:', error);
+      res.status(500).json({ error: "Failed to fetch running hour parents" });
+    }
+  });
+  
+  // Cascade running hours update to parent and children
+  app.post("/api/running-hours/cascade", async (req, res) => {
+    try {
+      const validatedData = cascadeRunningHoursSchema.parse(req.body);
+      const result = await storage.cascadeRunningHoursUpdate(validatedData);
+      res.json(result);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid cascade data", details: error.errors });
+      }
+      console.error('Error cascading running hours update:', error);
+      res.status(500).json({ error: error.message || "Failed to cascade running hours update" });
     }
   });
   

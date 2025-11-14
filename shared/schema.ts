@@ -47,6 +47,31 @@ export const insertRunningHoursAuditSchema = createInsertSchema(runningHoursAudi
 export type InsertRunningHoursAudit = z.infer<typeof insertRunningHoursAuditSchema>;
 export type RunningHoursAudit = typeof runningHoursAudit.$inferSelect;
 
+// Running Hours Cascade Schema - for updating parent and cascading to children
+export const cascadeRunningHoursSchema = z.object({
+  parentComponentId: z.string(),
+  mode: z.enum(['setTotal', 'addDelta']),
+  value: z.number().nonnegative(), // Allow zero for setTotal (meter replacement), but addDelta will be validated separately
+  dateUpdated: z.string(), // DD-MMM-YYYY HH:mm format
+  dateUpdatedTZ: z.string().default('UTC'),
+  comments: z.string().optional(),
+  meterReplaced: z.boolean().optional().default(false),
+  oldMeterFinal: z.string().optional(),
+  newMeterStart: z.string().optional(),
+  userId: z.string().default('admin')
+}).refine(data => data.mode === 'setTotal' || data.value > 0, {
+  message: "addDelta mode requires value > 0",
+  path: ["value"]
+});
+
+export type CascadeRunningHoursRequest = z.infer<typeof cascadeRunningHoursSchema>;
+
+// Running Hour Parent Response - parent component with child summary
+export type RunningHourParent = Component & {
+  childCount: number;
+  latestUpdate?: string;
+};
+
 // Components Table (for storing current cumulative RH)
 export const components = pgTable("components", {
   id: text("id").primaryKey(),
