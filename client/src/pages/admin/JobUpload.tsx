@@ -300,10 +300,10 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
         vesselId: vesselId
       };
 
-      // If partial import, only include valid row indices
+      // If partial import, include valid and warning row indices (exclude only errors)
       if (validRowsOnly) {
         const validRowIndices = dryRunResult.rows
-          .filter(row => row.status === 'ok')
+          .filter(row => row.status === 'ok' || row.status === 'warning')
           .map(row => row.row);
         requestBody.rowIndices = validRowIndices;
       }
@@ -325,10 +325,12 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
         ? dryRunResult.rows.filter(row => row.status === 'ok').length
         : dryRunResult.rows.length;
 
+      const importableCount = validRowsOnly ? getValidRowsCount() : dryRunResult.rows.length;
+      
       toast({
         title: 'Import Successful',
         description: validRowsOnly 
-          ? `Imported ${result.created + result.updated} valid rows, skipped ${dryRunResult.summary.errors} error rows`
+          ? `Imported ${result.created + result.updated} rows (${dryRunResult.summary.ok} valid${dryRunResult.summary.warnings > 0 ? ` + ${dryRunResult.summary.warnings} warnings` : ''}), skipped ${dryRunResult.summary.errors} error rows`
           : `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
       });
 
@@ -355,10 +357,10 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     return dryRunResult.rows.filter(row => row.status === 'error');
   };
 
-  // Get valid rows count
+  // Get valid rows count (ok + warning, excluding only errors)
   const getValidRowsCount = () => {
     if (!dryRunResult) return 0;
-    return dryRunResult.rows.filter(row => row.status === 'ok').length;
+    return dryRunResult.rows.filter(row => row.status === 'ok' || row.status === 'warning').length;
   };
 
   // Handle undo click
@@ -860,12 +862,12 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
             </AlertDialogTitle>
             <AlertDialogDescription>
               <div className="space-y-3">
-                <p>This will import only the valid rows and skip all rows with errors:</p>
+                <p>This will import valid rows (including warnings) and skip only rows with errors:</p>
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md space-y-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-600" />
                     <span className="font-medium text-green-700 dark:text-green-400">
-                      {getValidRowsCount()} valid rows will be imported
+                      {getValidRowsCount()} rows will be imported ({dryRunResult?.summary.ok || 0} valid{dryRunResult?.summary.warnings ? ` + ${dryRunResult.summary.warnings} warnings` : ''})
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

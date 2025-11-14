@@ -130,5 +130,27 @@
     "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:04:40.596Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"R8p6pOsw5V85y8fZvGPF1\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-WCS7DLV\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:04:40.596Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
     "checksum": "a6aefab157b5fcc955c80f9c1abfe4df5db2e874753dd3cb62218debe9e64a53",
     "createdAt": "2025-11-14T07:04:40.674Z"
+  },
+  {
+    "id": "f337f345-e309-4456-b49d-afffc7123691",
+    "importHistoryId": "b05bc1b9-2913-4051-aa15-3baee5c7539b",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "ZhBM9uIImN_XPU07FU0w0",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":true,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:25:26.012Z\",\"critical\":true,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":\"ENG\",\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"ZhBM9uIImN_XPU07FU0w0\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":\"Propulsion\",\"jobDescription\":\"Check engine performance\",\"jobNo\":\"JOB-MGACEE5\",\"jobPriority\":\"High\",\"jobTitle\":\"Test VALID Job 2\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Testing\",\"personInCharge\":\"Jane Smith\",\"plannedDuration\":4,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":\"Engine\",\"safetyRequirements\":[\"Hard hat\"],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:25:26.012Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "d384fe9efdafa80ee6a9f301b5617acc7bbb044a6e5ab215c273ddeacdbf760d",
+    "createdAt": "2025-11-14T07:25:26.092Z"
+  },
+  {
+    "id": "b28f34e8-ff0a-4123-a736-e1af2bac21e6",
+    "importHistoryId": "b05bc1b9-2913-4051-aa15-3baee5c7539b",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "8hDV1ujeOjvP5rzh3VYzx",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":true,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:25:26.097Z\",\"critical\":true,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":\"ENG\",\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":12,\"id\":\"8hDV1ujeOjvP5rzh3VYzx\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":\"Propulsion\",\"jobDescription\":\"Annual engine overhaul\",\"jobNo\":\"JOB-FYQX4JZ\",\"jobPriority\":\"Critical\",\"jobTitle\":\"Test VALID Job 3\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Overhaul\",\"personInCharge\":\"Mike Johnson\",\"plannedDuration\":8,\"requiredSpareParts\":[\"Oil filter\"],\"requiredTools\":[\"Wrench set\"],\"responsibleDepartment\":\"Engine\",\"safetyRequirements\":[\"Safety gloves\"],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:25:26.097Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "b5ea6de813f7289a62c35b5d4d800e3cc8ef7bc43f088a0050dca018d71c490e",
+    "createdAt": "2025-11-14T07:25:26.152Z"
   }
 ]
