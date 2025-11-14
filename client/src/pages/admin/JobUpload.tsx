@@ -11,7 +11,8 @@ import {
   CheckCircle, 
   AlertTriangle,
   FileSpreadsheet,
-  Clock
+  Clock,
+  Undo2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +25,16 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DryRunResult {
   fileToken: string;
@@ -94,6 +105,10 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [isLoadingSheets, setIsLoadingSheets] = useState(false);
+  const [undoDialogOpen, setUndoDialogOpen] = useState(false);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [selectedHistoryType, setSelectedHistoryType] = useState<string>('');
+  const [isUndoing, setIsUndoing] = useState(false);
   const { toast } = useToast();
 
   // Fetch import history
@@ -301,6 +316,62 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
       });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  // Handle undo click
+  const handleUndoClick = (historyId: string, type: string) => {
+    setSelectedHistoryId(historyId);
+    setSelectedHistoryType(type);
+    setUndoDialogOpen(true);
+  };
+
+  // Handle undo
+  const handleUndo = async () => {
+    if (!selectedHistoryId) return;
+    
+    setIsUndoing(true);
+    
+    try {
+      const response = await fetch(`/api/bulk/undo/${selectedHistoryId}`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to undo import');
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: 'Import Undone Successfully',
+        description: `Deleted: ${result.deleted}, Restored: ${result.restored}, Unarchived: ${result.unarchived}`
+      });
+      
+      // Refresh history and data
+      queryClient.invalidateQueries({ queryKey: ['/api/bulk/history'] });
+      
+      // For components: refresh components list
+      if (selectedHistoryType === 'components') {
+        queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+      }
+      // For jobs: refresh jobs list
+      if (selectedHistoryType === 'jobs') {
+        queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      }
+      
+      setUndoDialogOpen(false);
+      setSelectedHistoryId(null);
+      
+    } catch (error: any) {
+      toast({
+        title: 'Undo Failed',
+        description: error.message || 'Failed to undo import',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUndoing(false);
     }
   };
 
@@ -577,6 +648,7 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
                       <TableHead>Updated</TableHead>
                       <TableHead>Skipped</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -599,6 +671,18 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
                             {item.status}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={item.status !== 'complete'}
+                            onClick={() => handleUndoClick(item.id, item.type)}
+                            data-testid={`button-undo-${item.id}`}
+                          >
+                            <Undo2 className="h-4 w-4 mr-1" />
+                            Undo
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -614,6 +698,34 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={undoDialogOpen} onOpenChange={setUndoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo Import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse all changes from this import. Created records will be deleted, 
+              updated records will be restored to their previous state, and archived records 
+              will be unarchived.
+              {'\n\n'}
+              This action cannot be undone. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUndoing} data-testid="button-undo-cancel">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleUndo}
+              disabled={isUndoing}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-undo-confirm"
+            >
+              {isUndoing ? 'Undoing...' : 'Yes, Undo Import'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
