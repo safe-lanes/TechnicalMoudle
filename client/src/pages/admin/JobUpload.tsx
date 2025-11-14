@@ -91,6 +91,9 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>('');
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
   const { toast } = useToast();
 
   // Fetch import history
@@ -106,7 +109,6 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
   // Download template
   const handleDownloadTemplate = async () => {
     try {
-      // Include vesselId to populate Components sheet with all system components
       const response = await fetch(`/api/bulk/template?type=jobs&vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to download template');
       
@@ -133,6 +135,45 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     }
   };
 
+  // Load sheet names from Excel file
+  const loadSheets = async (file: File) => {
+    setIsLoadingSheets(true);
+    setAvailableSheets([]);
+    setSelectedSheet('');
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/bulk/sheets', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load sheets');
+      }
+
+      const result = await response.json();
+      setAvailableSheets(result.sheets || []);
+      
+      // Auto-select first sheet AND run dry-run
+      if (result.sheets && result.sheets.length > 0) {
+        setSelectedSheet(result.sheets[0]);
+        // Immediately validate the first sheet
+        await handleDryRun(file, result.sheets[0]);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to read file sheets.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoadingSheets(false);
+    }
+  };
+
   // Handle file selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -151,11 +192,19 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     }
 
     setSelectedFile(file);
-    await handleDryRun(file);
+    setDryRunResult(null);
+    
+    // Load sheets if Excel file
+    if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+      await loadSheets(file);
+    } else {
+      // CSV files don't have sheets - run dry-run immediately
+      await handleDryRun(file, '');
+    }
   };
 
   // Dry run validation
-  const handleDryRun = async (file: File) => {
+  const handleDryRun = async (file: File, sheetName?: string) => {
     setIsUploading(true);
     setDryRunResult(null);
 
@@ -165,6 +214,11 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
     formData.append('mode', importMode);
     formData.append('vesselId', vesselId);
     formData.append('archiveMissing', 'false');
+    
+    // Add sheet name if provided
+    if (sheetName) {
+      formData.append('sheetName', sheetName);
+    }
 
     try {
       const response = await fetch('/api/bulk/dry-run', {
@@ -234,14 +288,11 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
         description: `Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`
       });
 
-      // Reset state
+      // Clear state and refresh
       setSelectedFile(null);
       setDryRunResult(null);
-      
-      // Refresh history
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', 'jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
-      
     } catch (error: any) {
       toast({
         title: 'Import Failed',
@@ -254,242 +305,315 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Jobs Bulk Upload</CardTitle>
-          <CardDescription>
-            Upload jobs via Excel. Download template to get dropdown of all system components. Job codes auto-generated as JOB-XXXXXXX.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Template Download */}
-          <div>
-            <Button 
-              onClick={handleDownloadTemplate} 
-              variant="outline" 
-              className="w-full"
-              data-testid="button-download-template"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Excel Template
-            </Button>
-          </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Jobs Bulk Upload</h1>
+          <p className="text-gray-600 mt-2">Upload jobs via Excel. Download template to get dropdown of all system components. Job codes auto-generated as JOB-XXXXXXX.</p>
+        </div>
+        <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
+          <Download className="h-4 w-4 mr-2" />
+          Download Template
+        </Button>
+      </div>
 
-          {/* Import Mode Selection */}
-          <div className="space-y-2">
-            <Label>Import Mode</Label>
-            <Select value={importMode} onValueChange={(val) => setImportMode(val as any)}>
-              <SelectTrigger data-testid="select-import-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="add">Create Only (Skip if exists)</SelectItem>
-                <SelectItem value="update">Update Only (Skip if not exists)</SelectItem>
-                <SelectItem value="upsert">Create & Update (Upsert)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <Tabs defaultValue="upload" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="upload" data-testid="tab-upload">Upload</TabsTrigger>
+          <TabsTrigger value="mapping" data-testid="tab-mapping">Field Mapping Guide</TabsTrigger>
+          <TabsTrigger value="history" data-testid="tab-history">Upload History</TabsTrigger>
+        </TabsList>
 
-          {/* File Upload */}
-          <div className="space-y-2">
-            <Label>Upload File</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileSelect}
-                className="flex-1"
-                data-testid="input-file-upload"
-              />
-              {isUploading && <span className="text-sm text-gray-500">Validating...</span>}
-            </div>
-          </div>
-
-          {/* Validation Results */}
-          {dryRunResult && (
-            <Tabs defaultValue="summary">
-              <TabsList>
-                <TabsTrigger value="summary">Summary</TabsTrigger>
-                <TabsTrigger value="preview">Data Preview</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="summary" className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="text-2xl font-bold">{dryRunResult.summary.ok}</p>
-                          <p className="text-sm text-gray-500">Valid</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                        <div>
-                          <p className="text-2xl font-bold">{dryRunResult.summary.warnings}</p>
-                          <p className="text-sm text-gray-500">Warnings</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-5 h-5 text-red-600" />
-                        <div>
-                          <p className="text-2xl font-bold">{dryRunResult.summary.errors}</p>
-                          <p className="text-sm text-gray-500">Errors</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <TabsContent value="upload">
+          <div className="grid grid-cols-1 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>File Upload</CardTitle>
+                <CardDescription>
+                  Upload CSV, XLS, or XLSX files containing job data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <Label>Import Mode</Label>
+                    <Select value={importMode} onValueChange={(v: any) => setImportMode(v)}>
+                      <SelectTrigger data-testid="select-import-mode">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="add">Create Only (Skip Existing)</SelectItem>
+                        <SelectItem value="update">Update Only (Skip New)</SelectItem>
+                        <SelectItem value="upsert">Create & Update (Recommended)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <Button 
-                  onClick={handleImport} 
-                  disabled={dryRunResult.summary.errors > 0 || isImporting}
-                  className="w-full"
-                  data-testid="button-import"
-                >
-                  {isImporting ? 'Importing...' : 'Import Jobs'}
-                </Button>
-              </TabsContent>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <input
+                    type="file"
+                    accept=".csv,.xls,.xlsx"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                    disabled={isUploading || isImporting}
+                    data-testid="input-file-upload"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer flex flex-col items-center"
+                  >
+                    <Upload className="h-12 w-12 text-gray-400 mb-3" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Click to upload or drag and drop
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      CSV, XLS, or XLSX (max 20MB)
+                    </span>
+                  </label>
+                  {selectedFile && (
+                    <p className="mt-4 text-sm font-medium" data-testid="text-selected-file">
+                      {selectedFile.name}
+                    </p>
+                  )}
+                </div>
 
-              <TabsContent value="preview">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="max-h-96 overflow-auto">
+                {/* Sheet Selection for Excel files */}
+                {availableSheets.length > 0 && selectedFile && (
+                  <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label htmlFor="sheet-select" className="text-sm font-medium">
+                          Select Sheet to Import
+                        </Label>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          This Excel file contains multiple sheets. Choose which one to import.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Select 
+                          value={selectedSheet} 
+                          onValueChange={setSelectedSheet}
+                          disabled={isLoadingSheets || isUploading}
+                        >
+                          <SelectTrigger id="sheet-select" data-testid="select-sheet">
+                            <SelectValue placeholder="Select a sheet" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSheets.map((sheet) => (
+                              <SelectItem key={sheet} value={sheet}>
+                                {sheet}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Button 
+                          onClick={() => selectedFile && handleDryRun(selectedFile, selectedSheet)} 
+                          disabled={!selectedSheet || isUploading || isLoadingSheets}
+                          className="w-full"
+                          data-testid="button-validate-sheet"
+                        >
+                          {isUploading ? 'Validating...' : 'Validate Selected Sheet'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isLoadingSheets && (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Reading file sheets...</p>
+                  </div>
+                )}
+
+                {isUploading && (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600">Validating file...</p>
+                  </div>
+                )}
+
+                {dryRunResult && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Validation Results</h3>
+                    
+                    <div className="flex gap-4">
+                      <Badge variant="outline" className="px-3 py-1">
+                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                        OK: {dryRunResult.summary.ok}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        <AlertTriangle className="h-4 w-4 mr-1 text-yellow-600" />
+                        Warnings: {dryRunResult.summary.warnings}
+                      </Badge>
+                      <Badge variant="outline" className="px-3 py-1">
+                        <AlertCircle className="h-4 w-4 mr-1 text-red-600" />
+                        Errors: {dryRunResult.summary.errors}
+                      </Badge>
+                    </div>
+
+                    <div className="border rounded-lg overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-20">Row</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead className="w-16">Row</TableHead>
+                            <TableHead className="w-24">Status</TableHead>
                             <TableHead>Vessel Code</TableHead>
                             <TableHead>Component Code</TableHead>
                             <TableHead>Maintenance Task</TableHead>
-                            <TableHead>Issues</TableHead>
+                            <TableHead>Errors</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {dryRunResult.rows.map((row) => (
+                          {dryRunResult.rows.slice(0, 20).map((row) => (
                             <TableRow key={row.row}>
                               <TableCell>{row.row}</TableCell>
                               <TableCell>
-                                {row.status === 'ok' && <Badge variant="default">OK</Badge>}
-                                {row.status === 'warning' && <Badge variant="secondary">Warning</Badge>}
-                                {row.status === 'error' && <Badge variant="destructive">Error</Badge>}
+                                <Badge
+                                  variant={row.status === 'ok' ? 'default' : row.status === 'warning' ? 'secondary' : 'destructive'}
+                                >
+                                  {row.status}
+                                </Badge>
                               </TableCell>
                               <TableCell>{row.normalized['Vessel Code']}</TableCell>
                               <TableCell>{row.normalized['Component Code']}</TableCell>
                               <TableCell>{row.normalized['Maintenance Task']}</TableCell>
                               <TableCell>
-                                {row.errors.map((err, i) => (
-                                  <div key={i} className="text-sm text-red-600">{err}</div>
-                                ))}
+                                {row.errors.length > 0 && (
+                                  <div className="text-sm text-red-600">
+                                    {row.errors.join(', ')}
+                                  </div>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Field Mapping Reference */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Field Mapping Reference</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Required</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {FIELD_MAPPINGS.map((field) => (
-                <TableRow key={field.field}>
-                  <TableCell className="font-medium">{field.field}</TableCell>
-                  <TableCell>
-                    {field.required ? (
-                      <Badge variant="destructive">Required</Badge>
-                    ) : (
-                      <Badge variant="secondary">Optional</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">{field.description}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <Button 
+                      onClick={handleImport} 
+                      disabled={dryRunResult.summary.errors > 0 || isImporting}
+                      className="w-full"
+                      data-testid="button-import"
+                    >
+                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Jobs`}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      {/* Import History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Import History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {historyLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Clock className="w-6 h-6 animate-spin text-gray-400" />
-            </div>
-          ) : history?.items?.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Mode</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead>Skipped</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.items.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{new Date(item.date).toLocaleString()}</TableCell>
-                    <TableCell>{item.user}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.mode}</Badge>
-                    </TableCell>
-                    <TableCell>{item.created}</TableCell>
-                    <TableCell>{item.updated}</TableCell>
-                    <TableCell>{item.skipped}</TableCell>
-                    <TableCell>
-                      <Badge>{item.status}</Badge>
-                    </TableCell>
+        <TabsContent value="mapping">
+          <Card>
+            <CardHeader>
+              <CardTitle>Field Mapping Guide</CardTitle>
+              <CardDescription>
+                Required and optional fields for job import
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field Name</TableHead>
+                    <TableHead className="w-32">Required</TableHead>
+                    <TableHead>Description</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-              <FileSpreadsheet className="w-12 h-12 mb-2" />
-              <p>No import history yet</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {FIELD_MAPPINGS.map((field) => (
+                    <TableRow key={field.field}>
+                      <TableCell className="font-medium">{field.field}</TableCell>
+                      <TableCell>
+                        {field.required ? (
+                          <Badge variant="destructive">Required</Badge>
+                        ) : (
+                          <Badge variant="secondary">Optional</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{field.description}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upload History</CardTitle>
+              <CardDescription>
+                View past job import operations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Clock className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              ) : history?.items?.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Date
+                        </div>
+                      </TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead>Skipped</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.items.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-gray-400" />
+                            {new Date(item.startedAt).toLocaleString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{item.mode}</Badge>
+                        </TableCell>
+                        <TableCell>{item.created}</TableCell>
+                        <TableCell>{item.updated}</TableCell>
+                        <TableCell>{item.skipped}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.status === 'completed' ? 'default' : 'secondary'}>
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <FileSpreadsheet className="w-16 h-16 mb-3" />
+                  <p className="text-lg font-medium">No upload history</p>
+                  <p className="text-sm">Import history will appear here after your first upload</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
