@@ -1085,15 +1085,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // TEST endpoint - does ANY new code load?
+  app.get("/api/test-new-endpoint", async (req, res) => {
+    res.json({ message: "This is a brand new endpoint added just now!", timestamp: new Date().toISOString() });
+  });
+  
+  // DEBUG endpoint to check jobs data
+  app.get("/api/debug/jobs", async (req, res) => {
+    try {
+      const allJobs = await storage.getJobs();
+      const rhJobs = allJobs.filter(j => j.maintenanceBasis === "Running Hours" && j.vesselId === "V001");
+      res.json({
+        totalJobs: allJobs.length,
+        rhJobsCount: rhJobs.length,
+        sampleRHJobs: rhJobs.slice(0, 3).map(j => ({
+          id: j.id,
+          jobNo: j.jobNo,
+          componentId: j.componentId,
+          maintenanceBasis: j.maintenanceBasis,
+          vesselId: j.vesselId
+        }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
   // Get parent components whose children have running-hour based jobs
   app.get("/api/running-hours/parents", async (req, res) => {
     try {
       const vesselId = (req.query.vesselId as string) || 'V001';
+      
+      // TEMPORARY DEBUG: Return raw debug data in JSON
+      const allComponents = await storage.getComponents(vesselId);
+      const allJobs = await storage.getJobs();
+      const rhJobs = allJobs.filter(j => j.maintenanceBasis === "Running Hours");
+      const rhJobsWithComponent = rhJobs.filter(j => {
+        const comp = allComponents.find(c => c.id === j.componentId);
+        return comp && comp.vesselId === vesselId;
+      });
+      
       const parents = await storage.getRunningHourParents(vesselId);
-      res.json(parents);
+      
+      res.json({
+        DEBUG_MODE: true,
+        vesselId,
+        allComponents: allComponents.length,
+        allJobs: allJobs.length,
+        rhJobs: rhJobs.length,
+        rhJobsWithComponent: rhJobsWithComponent.length,
+        parentsReturned: parents.length,
+        sampleRHJobs: rhJobsWithComponent.slice(0, 3).map(j => ({
+          jobNo: j.jobNo,
+          componentId: j.componentId
+        })),
+        parents
+      });
     } catch (error: any) {
-      console.error('Error fetching running hour parents:', error);
-      res.status(500).json({ error: "Failed to fetch running hour parents" });
+      res.status(500).json({ error: "Failed to fetch running hour parents", message: error.message, stack: error.stack });
     }
   });
   

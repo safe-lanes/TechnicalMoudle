@@ -255,7 +255,7 @@ export class PersistentFileStorage implements IStorage {
     }
     
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
-    console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares`);
+    console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares, ${Object.keys(this.data.jobs).length} jobs`);
     console.log(`📋 Change logs loaded: ${this.importChangeLogs.length} entries`);
   }
 
@@ -1184,12 +1184,19 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
-    // 1. Get all jobs where maintenanceBasis === "Running Hours" and vesselId matches
-    const rhJobs = Object.values(this.data.jobs).filter(
-      job => job && job.maintenanceBasis === "Running Hours" && job.vesselId === vesselId
-    );
+    // Get all components for the vessel first
+    const allComponents = await this.getComponents(vesselId);
+    const componentMap = new Map(allComponents.map(c => [c.id, c]));
+    
+    // Get all RH jobs and filter by component's vesselId (since jobs may lack vesselId)
+    const allJobs = await this.getJobs();
+    const rhJobs = allJobs.filter(job => {
+      if (job.maintenanceBasis !== "Running Hours") return false;
+      const component = job.componentId ? componentMap.get(job.componentId) : null;
+      return component && component.vesselId === vesselId;
+    });
 
-    // 2. Extract componentIds from those jobs (the children)
+    // Extract componentIds from those jobs (the children with RH jobs)
     const childComponentIds = new Set<string>();
     rhJobs.forEach(job => {
       if (job.componentId) {
@@ -1197,20 +1204,20 @@ export class PersistentFileStorage implements IStorage {
       }
     });
 
-    // 3. For each child, get its parentId
+    // For each child, get its parentId
     const parentIds = new Set<string>();
     childComponentIds.forEach(childId => {
-      const child = this.data.components[childId];
+      const child = componentMap.get(childId);
       if (child && child.parentId) {
         parentIds.add(child.parentId);
       }
     });
 
-    // 4-6. For each parentId: get parent component, count children with RH jobs, get latest audit
+    // For each parentId: get parent component, count children with RH jobs, get latest audit
     const parents: Array<Component & { childCount: number; latestUpdate?: string }> = [];
     
     for (const parentId of Array.from(parentIds)) {
-      const parent = this.data.components[parentId];
+      const parent = allComponents.find(c => c.id === parentId);
       // Only include if parent exists AND parent itself doesn't have a parent (true top-level parent)
       if (!parent || parent.parentId) continue;
 

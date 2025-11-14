@@ -57,6 +57,11 @@ const RunningHours = () => {
   // Fetch parent components with RH-based child jobs
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
     queryKey: ['/api/running-hours/parents', vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/api/running-hours/parents?vesselId=${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch running hour parents');
+      return response.json();
+    },
     enabled: true
   });
 
@@ -109,7 +114,7 @@ const RunningHours = () => {
       return await Promise.all(promises);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/running-hours/parents?vesselId=${vesselId}`] });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",
