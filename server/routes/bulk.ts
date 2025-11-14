@@ -2539,4 +2539,265 @@ async function getHistoryFile(id: string, fileType: string): Promise<{ mimeType:
   return null;
 }
 
+// POST /api/bulk/undo/:historyId - Undo an import with conflict detection
+router.post('/undo/:historyId', async (req, res) => {
+  const { historyId } = req.params;
+  
+  try {
+    // 1. Fetch and Validate Import History
+    const history = await storage.getImportHistoryById(historyId);
+    if (!history) {
+      return res.status(404).json({ error: 'Import history not found' });
+    }
+    
+    // Validate status - only 'complete' imports can be undone
+    if (history.status === 'undone') {
+      return res.status(400).json({ error: 'Import has already been undone' });
+    }
+    
+    if (history.status !== 'complete') {
+      return res.status(400).json({ 
+        error: `Cannot undo import with status '${history.status}'. Only completed imports can be undone.` 
+      });
+    }
+    
+    // Fetch all change logs for this import
+    const changeLogs = await storage.getImportChangeLogs(historyId);
+    if (changeLogs.length === 0) {
+      return res.status(400).json({ error: 'No change logs found for this import' });
+    }
+    
+    console.log(`🔄 Starting undo for import ${historyId} with ${changeLogs.length} change logs`);
+    
+    // 2. Conflict Detection - Validate checksums to detect conflicts
+    const conflicts: Array<{entityType: string; entityId: string; reason: string}> = [];
+    
+    for (const log of changeLogs) {
+      // Skip created entities that don't have newData (shouldn't happen, but safety check)
+      if (log.operation === 'created' && !log.newData) continue;
+      
+      // Fetch current state from database
+      let currentEntity;
+      if (log.entityType === 'component') {
+        currentEntity = await storage.getComponent(log.entityId);
+      } else if (log.entityType === 'job') {
+        currentEntity = await storage.getJob(log.entityId);
+      } else if (log.entityType === 'workOrder') {
+        currentEntity = await storage.getWorkOrder(log.entityId);
+      }
+      
+      // If entity was deleted or doesn't exist (and it wasn't a created operation)
+      if (!currentEntity && log.operation !== 'created') {
+        conflicts.push({
+          entityType: log.entityType,
+          entityId: log.entityId,
+          reason: 'Entity no longer exists'
+        });
+        continue;
+      }
+      
+      // For created entities, we need to check if they still exist and match
+      if (currentEntity) {
+        // Calculate current checksum
+        const currentChecksum = calculateRecordChecksum(currentEntity);
+        
+        // Get expected data from log
+        const expectedData = log.newData;
+        const expectedChecksum = expectedData ? calculateRecordChecksum(expectedData) : '';
+        
+        if (currentChecksum !== expectedChecksum) {
+          conflicts.push({
+            entityType: log.entityType,
+            entityId: log.entityId,
+            reason: 'Entity has been modified since import'
+          });
+        }
+      }
+    }
+    
+    // If conflicts exist, return error with details
+    if (conflicts.length > 0) {
+      console.log(`❌ Undo aborted due to ${conflicts.length} conflicts`);
+      return res.status(409).json({ 
+        error: 'Cannot undo import due to conflicts',
+        conflicts,
+        message: `${conflicts.length} entities have been modified since import. Undo operation aborted.`
+      });
+    }
+    
+    console.log(`✅ No conflicts detected, proceeding with undo`);
+    
+    // 3. Apply Reverse Operations with Transactional Rollback Support
+    const result = {
+      deleted: 0,
+      restored: 0,
+      unarchived: 0
+    };
+    
+    // Track applied changes for rollback
+    const appliedChanges: Array<{
+      log: any;
+      previousState: any;
+    }> = [];
+    
+    try {
+      // Process in reverse order (undo last changes first)
+      const reversedLogs = [...changeLogs].reverse();
+      
+      for (const log of reversedLogs) {
+        // Capture current state BEFORE applying undo operation
+        let currentState;
+        if (log.entityType === 'component') {
+          currentState = await storage.getComponent(log.entityId);
+        } else if (log.entityType === 'job') {
+          currentState = await storage.getJob(log.entityId);
+        } else if (log.entityType === 'workOrder') {
+          currentState = await storage.getWorkOrder(log.entityId);
+        }
+        
+        // Apply undo operation
+        if (log.entityType === 'component') {
+          if (log.operation === 'created') {
+            // Delete created component (archive it)
+            await storage.archiveComponent(log.entityId);
+            result.deleted++;
+            console.log(`  ✓ Archived component ${log.entityId}`);
+          } else if (log.operation === 'updated') {
+            // Restore previous state
+            const previousData = log.previousData as any;
+            await storage.updateComponent(log.entityId, previousData);
+            result.restored++;
+            console.log(`  ✓ Restored component ${log.entityId}`);
+          } else if (log.operation === 'archived') {
+            // Restore isActive:true
+            await storage.updateComponent(log.entityId, { isActive: true });
+            result.unarchived++;
+            console.log(`  ✓ Unarchived component ${log.entityId}`);
+          }
+        } else if (log.entityType === 'job') {
+          if (log.operation === 'created') {
+            await storage.archiveJob(log.entityId);
+            result.deleted++;
+            console.log(`  ✓ Archived job ${log.entityId}`);
+          } else if (log.operation === 'updated') {
+            const previousData = log.previousData as any;
+            await storage.updateJob(log.entityId, previousData);
+            result.restored++;
+            console.log(`  ✓ Restored job ${log.entityId}`);
+          } else if (log.operation === 'archived') {
+            await storage.updateJob(log.entityId, { isActive: true });
+            result.unarchived++;
+            console.log(`  ✓ Unarchived job ${log.entityId}`);
+          }
+        } else if (log.entityType === 'workOrder') {
+          if (log.operation === 'created') {
+            await storage.archiveWorkOrder(log.entityId);
+            result.deleted++;
+            console.log(`  ✓ Archived work order ${log.entityId}`);
+          } else if (log.operation === 'updated') {
+            const previousData = log.previousData as any;
+            await storage.updateWorkOrder(log.entityId, previousData);
+            result.restored++;
+            console.log(`  ✓ Restored work order ${log.entityId}`);
+          } else if (log.operation === 'archived') {
+            await storage.updateWorkOrder(log.entityId, { isActive: true });
+            result.unarchived++;
+            console.log(`  ✓ Unarchived work order ${log.entityId}`);
+          }
+        }
+        
+        // Track this change for potential rollback
+        appliedChanges.push({ log, previousState: currentState });
+      }
+      
+      // All changes successful - mark as undone
+      await storage.updateImportHistory(historyId, {
+        status: 'undone',
+        undoneAt: new Date()
+      });
+      
+      console.log(`✅ Import ${historyId} successfully undone`);
+      console.log(`   - Deleted: ${result.deleted}`);
+      console.log(`   - Restored: ${result.restored}`);
+      console.log(`   - Unarchived: ${result.unarchived}`);
+      
+      res.json({
+        message: 'Import successfully undone',
+        ...result,
+        historyId
+      });
+      
+    } catch (undoError: any) {
+      // ROLLBACK: Restore all changes in reverse order
+      console.error('Undo operation failed, rolling back changes:', undoError);
+      
+      const rollbackErrors: string[] = [];
+      
+      // Reverse the applied changes (restore to state before undo)
+      for (const change of appliedChanges.reverse()) {
+        try {
+          if (change.previousState) {
+            // Restore the state that existed before we started undo
+            if (change.log.entityType === 'component') {
+              await storage.updateComponent(change.log.entityId, change.previousState);
+              console.log(`  ↩️ Rolled back component ${change.log.entityId}`);
+            } else if (change.log.entityType === 'job') {
+              await storage.updateJob(change.log.entityId, change.previousState);
+              console.log(`  ↩️ Rolled back job ${change.log.entityId}`);
+            } else if (change.log.entityType === 'workOrder') {
+              await storage.updateWorkOrder(change.log.entityId, change.previousState);
+              console.log(`  ↩️ Rolled back work order ${change.log.entityId}`);
+            }
+          }
+        } catch (rollbackError: any) {
+          rollbackErrors.push(`Failed to rollback ${change.log.entityType} ${change.log.entityId}: ${rollbackError.message}`);
+          console.error(`  ❌ Rollback failed for ${change.log.entityType} ${change.log.entityId}:`, rollbackError);
+        }
+      }
+      
+      // Mark import as undo_failed
+      try {
+        await storage.updateImportHistory(historyId, {
+          status: 'undo_failed',
+          errorMessage: rollbackErrors.length > 0 
+            ? `Undo failed: ${undoError.message}. Rollback errors: ${rollbackErrors.join('; ')}`
+            : `Undo failed: ${undoError.message}. All changes rolled back successfully.`
+        });
+      } catch (updateError) {
+        console.error('Failed to update history status:', updateError);
+      }
+      
+      console.log(`❌ Import ${historyId} undo failed and rolled back`);
+      console.log(`   - Applied changes before failure: ${appliedChanges.length}`);
+      console.log(`   - Rollback status: ${rollbackErrors.length === 0 ? 'success' : 'partial'}`);
+      
+      // Return error to client
+      return res.status(500).json({
+        error: 'Failed to undo import',
+        details: undoError.message,
+        rollbackStatus: rollbackErrors.length === 0 ? 'success' : 'partial',
+        rollbackErrors: rollbackErrors.length > 0 ? rollbackErrors : undefined
+      });
+    }
+    
+  } catch (error: any) {
+    console.error('Undo error:', error);
+    
+    // Try to mark history as failed
+    try {
+      await storage.updateImportHistory(historyId, {
+        status: 'undo_failed',
+        errorMessage: error.message
+      });
+    } catch (updateError) {
+      console.error('Failed to update history status:', updateError);
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to undo import',
+      details: error.message
+    });
+  }
+});
+
 export default router;

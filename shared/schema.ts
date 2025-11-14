@@ -953,9 +953,11 @@ export const importHistory = pgTable("import_history", {
   archived: integer("archived").notNull().default(0),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   finishedAt: timestamp("finished_at"),
-  status: text("status").notNull(), // 'complete' | 'failed' | 'undone'
+  status: text("status").notNull(), // 'complete' | 'failed' | 'undone' | 'undo_failed'
   originalName: text("original_name"), // Original uploaded filename
   fileSize: integer("file_size"), // File size in bytes
+  undoneAt: timestamp("undone_at"), // Timestamp when import was undone
+  errorMessage: text("error_message"), // Error message if import or undo failed
 }, (table) => ({
   typeIdx: index("idx_import_history_type").on(table.type),
   startedAtIdx: index("idx_import_history_started").on(table.startedAt),
