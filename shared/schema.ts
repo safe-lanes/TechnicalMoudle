@@ -942,7 +942,7 @@ export type RecurringDefectLink = typeof recurringDefectLinks.$inferSelect;
 // Import History Table
 export const importHistory = pgTable("import_history", {
   id: text("id").primaryKey(),
-  type: text("type").notNull(), // 'components' | 'spares' | 'stores'
+  type: text("type").notNull(), // 'components' | 'spares' | 'stores' | 'jobs'
   mode: text("mode").notNull(), // 'add' | 'update' | 'upsert'
   archiveMissing: boolean("archive_missing").notNull().default(false),
   userId: text("user_id").notNull(),
@@ -953,11 +953,29 @@ export const importHistory = pgTable("import_history", {
   archived: integer("archived").notNull().default(0),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   finishedAt: timestamp("finished_at"),
-  status: text("status").notNull(), // 'success' | 'failed'
-  originalName: text("original_name"),
+  status: text("status").notNull(), // 'complete' | 'failed' | 'undone'
+  originalName: text("original_name"), // Original uploaded filename
+  fileSize: integer("file_size"), // File size in bytes
 }, (table) => ({
   typeIdx: index("idx_import_history_type").on(table.type),
   startedAtIdx: index("idx_import_history_started").on(table.startedAt),
+  vesselIdx: index("idx_import_history_vessel").on(table.vesselId),
+}));
+
+// Import Change Log Table - tracks individual record changes for undo functionality
+export const importChangeLog = pgTable("import_change_log", {
+  id: text("id").primaryKey(),
+  importHistoryId: text("import_history_id").notNull().references(() => importHistory.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // 'component' | 'job' | 'spare' | 'store'
+  entityId: text("entity_id").notNull(), // ID of the affected record
+  operation: text("operation").notNull(), // 'created' | 'updated' | 'archived'
+  previousData: json("previous_data"), // Full snapshot before change (for updated/archived)
+  newData: json("new_data"), // Minimal snapshot after change
+  checksum: text("checksum").notNull(), // Hash of the record at time of change for conflict detection
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  importHistoryIdx: index("idx_change_log_import").on(table.importHistoryId),
+  entityIdx: index("idx_change_log_entity").on(table.entityType, table.entityId),
 }));
 
 export const insertImportHistorySchema = createInsertSchema(importHistory).omit({
@@ -966,6 +984,13 @@ export const insertImportHistorySchema = createInsertSchema(importHistory).omit(
 
 export type InsertImportHistory = z.infer<typeof insertImportHistorySchema>;
 export type ImportHistory = typeof importHistory.$inferSelect;
+
+export const insertImportChangeLogSchema = createInsertSchema(importChangeLog).omit({
+  createdAt: true,
+});
+
+export type InsertImportChangeLog = z.infer<typeof insertImportChangeLogSchema>;
+export type ImportChangeLog = typeof importChangeLog.$inferSelect;
 
 // Makers Table (Fleet Admin - Equipment Manufacturers)
 export const makers = pgTable("makers", {
