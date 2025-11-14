@@ -85,29 +85,28 @@ import {
   type InsertMasterList
 } from "@shared/schema";
 
-// Utility function to calculate checksum for record tracking
+export function sortObjectKeys(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeys);
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const sorted: any = {};
+    Object.keys(obj).sort().forEach(key => {
+      sorted[key] = sortObjectKeys(obj[key]);
+    });
+    return sorted;
+  }
+  
+  return obj;
+}
+
 export function calculateRecordChecksum(record: any): string {
   try {
-    const sortObjectKeys = (obj: any): any => {
-      if (obj === null || obj === undefined) {
-        return obj;
-      }
-      
-      if (Array.isArray(obj)) {
-        return obj.map(sortObjectKeys);
-      }
-      
-      if (typeof obj === 'object' && obj.constructor === Object) {
-        const sorted: any = {};
-        Object.keys(obj).sort().forEach(key => {
-          sorted[key] = sortObjectKeys(obj[key]);
-        });
-        return sorted;
-      }
-      
-      return obj;
-    };
-    
     const sortedRecord = sortObjectKeys(record);
     const canonicalJson = JSON.stringify(sortedRecord, (key, value) => {
       if (typeof value === 'bigint') {
@@ -207,6 +206,16 @@ export interface IStorage {
   bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }>;
   archiveComponentsByIds(ids: string[]): Promise<number>;
   archiveSparesByIds(ids: number[]): Promise<number>;
+  
+  // Bulk prefetch methods for performance
+  getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>>;
+  getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>>;
+  getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>>;
+  
+  // Individual archive methods
+  archiveComponent(id: string): Promise<Component>;
+  archiveJob(id: string): Promise<Job>;
+  archiveWorkOrder(id: string): Promise<WorkOrder>;
   
   // Alert methods
   getAlertPolicies(): Promise<AlertPolicy[]>;
@@ -446,6 +455,7 @@ export class MemStorage implements IStorage {
   private currentFormVersionId: number;
   private formVersionUsages: FormVersionUsage[];
   private currentFormUsageId: number;
+  private jobs: Map<string, Job>;
   private workOrders: Map<string, WorkOrder>;
   private currentWorkOrderId: number;
   private workOrderExecutions: Map<string, WorkOrderExecution>;
@@ -493,6 +503,7 @@ export class MemStorage implements IStorage {
     this.currentFormVersionId = 1;
     this.formVersionUsages = [];
     this.currentFormUsageId = 1;
+    this.jobs = new Map();
     this.workOrders = new Map();
     this.currentWorkOrderId = 1;
     this.workOrderExecutions = new Map();
@@ -1841,6 +1852,75 @@ export class MemStorage implements IStorage {
         archived++;
       }
     }
+    return archived;
+  }
+
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
+    const result = new Map<string, Component>();
+    for (const code of codes) {
+      const component = Array.from(this.components.values()).find(
+        c => c.componentCode === code && (!vesselId || c.vesselId === vesselId)
+      );
+      if (component) {
+        result.set(code, component);
+      }
+    }
+    return result;
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
+    const result = new Map<string, Job>();
+    for (const jobNo of jobNos) {
+      const job = Array.from(this.jobs.values()).find(
+        j => j.jobNo === jobNo && (!vesselId || j.vesselId === vesselId)
+      );
+      if (job) {
+        result.set(jobNo, job);
+      }
+    }
+    return result;
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>> {
+    const result = new Map<string, WorkOrder>();
+    for (const templateId of templateIds) {
+      const workOrder = Array.from(this.workOrders.values()).find(
+        wo => wo.templateCode === templateId && (!vesselId || wo.vesselId === vesselId)
+      );
+      if (workOrder) {
+        result.set(templateId, workOrder);
+      }
+    }
+    return result;
+  }
+
+  async archiveComponent(id: string): Promise<Component> {
+    const component = this.components.get(id);
+    if (!component) {
+      throw new Error(`Component not found: ${id}`);
+    }
+    const archived = { ...component, isActive: false };
+    this.components.set(id, archived);
+    return archived;
+  }
+
+  async archiveJob(id: string): Promise<Job> {
+    const job = this.jobs.get(id);
+    if (!job) {
+      throw new Error(`Job not found: ${id}`);
+    }
+    const archived = { ...job, isActive: false };
+    this.jobs.set(id, archived);
+    return archived;
+  }
+
+  async archiveWorkOrder(id: string): Promise<WorkOrder> {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder) {
+      throw new Error(`WorkOrder not found: ${id}`);
+    }
+    const archived = { ...workOrder, isActive: false };
+    this.workOrders.set(id, archived);
     return archived;
   }
 
@@ -4420,6 +4500,102 @@ export class PostgresStorage implements IStorage {
 
   async archiveSparesByIds(ids: number[]): Promise<number> {
     throw new Error("Archive spares not yet migrated to PostgreSQL");
+  }
+
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
+    const db = await this.getDb();
+    const { eq, and, inArray } = await import('drizzle-orm');
+    
+    const conditions = [inArray(components.componentCode, codes)];
+    if (vesselId) {
+      conditions.push(eq(components.vesselId, vesselId));
+    }
+    
+    const results = await db.select().from(components).where(and(...conditions));
+    const map = new Map<string, Component>();
+    for (const component of results) {
+      if (component.componentCode) {
+        map.set(component.componentCode, component);
+      }
+    }
+    return map;
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
+    const db = await this.getDb();
+    const { eq, and, inArray } = await import('drizzle-orm');
+    
+    const conditions = [inArray(jobs.jobNo, jobNos)];
+    if (vesselId) {
+      conditions.push(eq(jobs.vesselId, vesselId));
+    }
+    
+    const results = await db.select().from(jobs).where(and(...conditions));
+    const map = new Map<string, Job>();
+    for (const job of results) {
+      if (job.jobNo) {
+        map.set(job.jobNo, job);
+      }
+    }
+    return map;
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>> {
+    const db = await this.getDb();
+    const { eq, and, inArray } = await import('drizzle-orm');
+    
+    const conditions = [inArray(workOrders.templateCode, templateIds)];
+    if (vesselId) {
+      conditions.push(eq(workOrders.vesselId, vesselId));
+    }
+    
+    const results = await db.select().from(workOrders).where(and(...conditions));
+    const map = new Map<string, WorkOrder>();
+    for (const workOrder of results) {
+      if (workOrder.templateCode) {
+        map.set(workOrder.templateCode, workOrder);
+      }
+    }
+    return map;
+  }
+
+  async archiveComponent(id: string): Promise<Component> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(components)
+      .set({ isActive: false })
+      .where(eq(components.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Component not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  async archiveJob(id: string): Promise<Job> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(jobs)
+      .set({ isActive: false })
+      .where(eq(jobs.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Job not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  async archiveWorkOrder(id: string): Promise<WorkOrder> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(workOrders)
+      .set({ isActive: false })
+      .where(eq(workOrders.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`WorkOrder not found: ${id}`);
+    }
+    return result[0];
   }
 
   async getAlertPolicies(): Promise<AlertPolicy[]> {

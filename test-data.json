@@ -6803,12 +6803,12 @@
       "maintenanceBasis": "Calendar",
       "frequencyValue": "3",
       "frequencyUnit": "Months",
-      "approver": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
+      "approver": "",
+      "nextDueDate": "",
+      "nextDueReading": "",
       "classRelated": "No",
       "jobPriority": "Medium",
-      "briefWorkDescription": null,
+      "briefWorkDescription": "",
       "templateCode": "WO-1-2025-05",
       "id": "32",
       "createdAt": "2025-11-12T11:22:25.061Z",
@@ -6835,7 +6835,14 @@
       "maintenanceIntervalUnit": null,
       "intervalRunningHour": null,
       "scopeNotes": null,
-      "criticality": null
+      "criticality": null,
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": {
+        "ppeRequirements": [],
+        "permitRequirements": [],
+        "otherRequirements": []
+      }
     },
     {
       "vesselId": "V001",

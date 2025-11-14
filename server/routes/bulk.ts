@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { storage, calculateRecordChecksum } from '../storage';
+import { storage, calculateRecordChecksum, sortObjectKeys } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
 
 const router = Router();
@@ -1810,7 +1810,29 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   return results;
 }
 
-// Helper function to track change in ImportChangeLog
+function createRecordSnapshot(record: any): { checksum: string; snapshot: string | null } {
+  if (!record) {
+    return { checksum: '', snapshot: null };
+  }
+  
+  const sorted = sortObjectKeys(record);
+  const snapshot = JSON.stringify(sorted, (key, value) => {
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === 'function' || typeof value === 'symbol') {
+      return undefined;
+    }
+    return value;
+  });
+  const checksum = calculateRecordChecksum(sorted);
+  
+  return { checksum, snapshot };
+}
+
 async function trackChange(
   importHistoryId: string,
   operation: 'created' | 'updated' | 'archived',
@@ -1819,7 +1841,10 @@ async function trackChange(
   previousData: any | null,
   newData: any | null
 ) {
-  const checksum = newData ? calculateRecordChecksum(newData) : (previousData ? calculateRecordChecksum(previousData) : '');
+  const previousSnapshot = createRecordSnapshot(previousData);
+  const newSnapshot = createRecordSnapshot(newData);
+  
+  const checksum = newSnapshot.checksum || previousSnapshot.checksum;
   
   await storage.createImportChangeLog({
     id: uuidv4(),
@@ -1827,8 +1852,8 @@ async function trackChange(
     operation,
     entityType,
     entityId,
-    previousData: previousData ? JSON.stringify(previousData) : null,
-    newData: newData ? JSON.stringify(newData) : null,
+    previousData: previousSnapshot.snapshot,
+    newData: newSnapshot.snapshot,
     checksum
   });
 }
@@ -1853,6 +1878,10 @@ async function performImport(
   if (type === 'components') {
     console.log(`🚀 Starting component import: ${data.length} rows, mode: ${mode}`);
     
+    // Step 1: Prefetch all existing components by codes for performance
+    const allCodes = data.map(row => String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim());
+    const existingComponentsMap = await storage.getComponentsByCodes(allCodes, vesselId);
+    
     // First, ensure all intermediate parent nodes exist
     // For each component, create parent hierarchy if missing
     const parentsToCreate = new Set<string>();
@@ -1870,7 +1899,7 @@ async function performImport(
       let currentCode = getParentSFICode(originalSFICode);
       
       while (currentCode && currentCode.length > 0) {
-        const parentExists = await storage.getComponent(currentCode);
+        const parentExists = existingComponentsMap.get(currentCode);
         if (!parentExists) {
           parentsToCreate.add(currentCode);
         }
@@ -1879,7 +1908,7 @@ async function performImport(
       }
     }
     
-    // Create missing parent nodes (sorted by depth, shallowest first)
+    // Step 2: Create missing parent nodes (sorted by depth, shallowest first) with tracking
     const sortedParents = Array.from(parentsToCreate).sort((a, b) => {
       const aDepth = (a.match(/\./g) || []).length;
       const bDepth = (b.match(/\./g) || []).length;
@@ -1918,16 +1947,20 @@ async function performImport(
         critical: false,
         classItem: false
       });
+      
+      // Add to map for subsequent lookups
+      existingComponentsMap.set(parentCode, parentComponent);
+      
       console.log(`📁 Created parent node: ${parentCode} (${parentName})`);
       result.created++;
       
-      // Track parent component creation
+      // Track parent component creation with authoritative state
       if (importHistoryId) {
-        await trackChange(importHistoryId, 'created', 'component', parentCode, null, parentComponent);
+        await trackChange(importHistoryId, 'created', 'component', parentComponent.id, null, parentComponent);
       }
     }
     
-    // Sort components by SFI hierarchy depth (parents before children)
+    // Step 3: Sort components by SFI hierarchy depth (parents before children)
     // e.g., "6" before "61" before "612.005"
     const sortedData = [...data].sort((a, b) => {
       const aCode = String(a['Component Code'] || a['Generated Code'] || a['Original SFI Code'] || '').trim();
@@ -1937,51 +1970,56 @@ async function performImport(
       return aDepth - bDepth; // Lower depth (parents) first
     });
 
+    // Step 4: Process each data row individually with authoritative state capture
     for (const row of sortedData) {
       const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
-      const existing = await storage.getComponent(componentCode);
+      const existingComponent = existingComponentsMap.get(componentCode);
 
       if (mode === 'add') {
-        if (existing) {
-          result.skipped++;
-        } else {
+        if (!existingComponent) {
           const newComponent = await createComponentFromRow(row, vesselId);
+          existingComponentsMap.set(componentCode, newComponent);
           result.created++;
           
-          // Track component creation
+          // Track component creation with authoritative state
           if (importHistoryId) {
             await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
           }
+        } else {
+          result.skipped++;
         }
       } else if (mode === 'update') {
-        if (existing) {
-          const previousData = { ...existing };
+        if (existingComponent) {
+          const previousSnapshot = createRecordSnapshot(existingComponent);
           const updatedComponent = await updateComponentFromRow(componentCode, row);
+          existingComponentsMap.set(componentCode, updatedComponent);
           result.updated++;
           
-          // Track component update with previousData and newData
+          // Track component update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, previousData, updatedComponent);
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, existingComponent, updatedComponent);
           }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
-        if (existing) {
+        if (existingComponent) {
           console.log(`🔄 Updating existing component: ${componentCode}`);
-          const previousData = { ...existing };
+          const previousSnapshot = createRecordSnapshot(existingComponent);
           const updatedComponent = await updateComponentFromRow(componentCode, row);
+          existingComponentsMap.set(componentCode, updatedComponent);
           result.updated++;
           
-          // Track component update with previousData and newData
+          // Track component update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, previousData, updatedComponent);
+            await trackChange(importHistoryId, 'updated', 'component', updatedComponent.id, existingComponent, updatedComponent);
           }
         } else {
           const newComponent = await createComponentFromRow(row, vesselId);
+          existingComponentsMap.set(componentCode, newComponent);
           result.created++;
           
-          // Track component creation
+          // Track component creation with authoritative state
           if (importHistoryId) {
             await trackChange(importHistoryId, 'created', 'component', newComponent.id, null, newComponent);
           }
@@ -1989,7 +2027,28 @@ async function performImport(
       }
     }
     
-    console.log(`✅ Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    // Step 5: Archive missing components if requested
+    if (archiveMissing) {
+      const importedCodes = new Set(data.map(row => String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim()));
+      const allVesselComponents = await storage.getComponents(vesselId || 'V001');
+      
+      for (const component of allVesselComponents) {
+        if (component.componentCode && !importedCodes.has(component.componentCode) && component.isActive !== false) {
+          const previousSnapshot = createRecordSnapshot(component);
+          const archivedComponent = await storage.archiveComponent(component.id);
+          result.archived++;
+          
+          // Track component archive with authoritative before/after snapshots
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'archived', 'component', component.id, component, archivedComponent);
+          }
+          
+          console.log(`📦 Archived component: ${component.componentCode}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   } else if (type === 'spares') {
     // TODO: Implement spares import
     for (const row of data) {
@@ -2001,95 +2060,132 @@ async function performImport(
       result.created++;
     }
   } else if (type === 'work-orders') {
+    console.log(`🚀 Starting work-orders import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+    
     // Generate WO code sequence counter for each component-year combination
     // Format: WO-{ComponentCode}-{Year}-{Sequence}
     const currentYear = new Date().getFullYear().toString();
     const woSequenceMap = new Map<string, number>();
     
-    for (const row of data) {
+    // Step 1: Prefetch all work orders and generate template codes for bulk lookup
+    const allWorkOrders = await storage.getWorkOrders(vesselId);
+    const allTemplateCodes = data.map(row => {
       const componentCode = String(row['Generated_Component_Code']).trim();
       const componentYearKey = `${componentCode}-${currentYear}`;
       
-      // Get or initialize sequence number for this component-year combination
+      // Calculate sequence for this component-year
       if (!woSequenceMap.has(componentYearKey)) {
-        // Check existing WOs for this component in current year to determine next sequence
-        const existingWOs = await storage.getWorkOrders(vesselId);
-        const componentYearWOs = existingWOs.filter(wo => 
+        const componentYearWOs = allWorkOrders.filter(wo => 
           wo.templateCode?.startsWith(`WO-${componentCode}-${currentYear}-`)
         );
         const maxSeq = componentYearWOs.length > 0 
           ? Math.max(...componentYearWOs.map(wo => {
-              // Extract sequence from format: WO-{code}-{year}-{seq}
               const match = wo.templateCode?.match(/-(\d+)$/);
               return match ? parseInt(match[1]) : 0;
             }))
           : 0;
         woSequenceMap.set(componentYearKey, maxSeq + 1);
       }
-
+      
+      const sequence = woSequenceMap.get(componentYearKey)!;
+      return `WO-${componentCode}-${currentYear}-${String(sequence).padStart(2, '0')}`;
+    });
+    
+    const workOrdersByTemplateCode = await storage.getWorkOrdersByTemplateIds(allTemplateCodes, vesselId);
+    
+    // Step 2: Process each row individually with authoritative state capture
+    for (const row of data) {
+      const componentCode = String(row['Generated_Component_Code']).trim();
+      const componentYearKey = `${componentCode}-${currentYear}`;
+      
       const sequence = woSequenceMap.get(componentYearKey)!;
       const templateCode = `WO-${componentCode}-${currentYear}-${String(sequence).padStart(2, '0')}`;
       
-      const existing = Array.from((await storage.getWorkOrders(vesselId))).find(
-        wo => wo.templateCode === templateCode
-      );
+      const existingWorkOrder = workOrdersByTemplateCode.get(templateCode);
 
       if (mode === 'add') {
-        if (existing) {
-          result.skipped++;
-        } else {
+        if (!existingWorkOrder) {
           const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
+          workOrdersByTemplateCode.set(templateCode, newWorkOrder);
           result.created++;
           woSequenceMap.set(componentYearKey, sequence + 1);
           
-          // Track work order creation
+          // Track work order creation with authoritative state
           if (importHistoryId) {
             await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
           }
+        } else {
+          result.skipped++;
         }
       } else if (mode === 'update') {
-        if (existing) {
-          const previousData = { ...existing };
-          const updatedWorkOrder = await updateWorkOrderFromRow(existing.id, row);
+        if (existingWorkOrder) {
+          const previousSnapshot = createRecordSnapshot(existingWorkOrder);
+          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+          workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
           result.updated++;
           
-          // Track work order update with previousData and newData
+          // Track work order update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, previousData, updatedWorkOrder);
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
           }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
-        if (existing) {
-          const previousData = { ...existing };
-          const updatedWorkOrder = await updateWorkOrderFromRow(existing.id, row);
+        if (existingWorkOrder) {
+          const previousSnapshot = createRecordSnapshot(existingWorkOrder);
+          const updatedWorkOrder = await updateWorkOrderFromRow(existingWorkOrder.id, row);
+          workOrdersByTemplateCode.set(templateCode, updatedWorkOrder);
           result.updated++;
           
-          // Track work order update with previousData and newData
+          // Track work order update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, previousData, updatedWorkOrder);
+            await trackChange(importHistoryId, 'updated', 'workOrder', updatedWorkOrder.id, existingWorkOrder, updatedWorkOrder);
           }
         } else {
           const newWorkOrder = await createWorkOrderFromRow(row, templateCode, vesselId);
+          workOrdersByTemplateCode.set(templateCode, newWorkOrder);
           result.created++;
           woSequenceMap.set(componentYearKey, sequence + 1);
           
-          // Track work order creation
+          // Track work order creation with authoritative state
           if (importHistoryId) {
             await trackChange(importHistoryId, 'created', 'workOrder', newWorkOrder.id, null, newWorkOrder);
           }
         }
       }
     }
+    
+    // Step 3: Archive missing work orders if requested
+    if (archiveMissing) {
+      const importedTemplateCodes = new Set(allTemplateCodes);
+      
+      for (const workOrder of allWorkOrders) {
+        if (workOrder.templateCode && !importedTemplateCodes.has(workOrder.templateCode)) {
+          const previousSnapshot = createRecordSnapshot(workOrder);
+          const archivedWorkOrder = await storage.archiveWorkOrder(workOrder.id);
+          result.archived++;
+          
+          // Track work order archive with authoritative before/after snapshots
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'archived', 'workOrder', workOrder.id, workOrder, archivedWorkOrder);
+          }
+          
+          console.log(`📦 Archived work order: ${workOrder.templateCode}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Work-orders import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   } else if (type === 'jobs') {
     // Import jobs using storage layer
     console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
     
-    // Prefetch all jobs once for efficiency (avoid O(n²))
-    const allJobs = await storage.getJobs(vesselId);
-    const jobsByJobNo = new Map(allJobs.map(j => [j.jobNo, j]));
+    // Step 1: Prefetch all existing jobs by job numbers for performance
+    const allJobNos = data.map(row => row['Job Code'] ? String(row['Job Code']).trim() : null).filter(Boolean) as string[];
+    const jobsByJobNo = await storage.getJobsByJobNos(allJobNos, vesselId);
     
+    // Step 2: Process each row individually with authoritative state capture
     for (const row of data) {
       const componentCode = String(row['Component Code']).trim();
       const vesselCodeFromExcel = String(row['Vessel Code']).trim();
@@ -2150,45 +2246,45 @@ async function performImport(
       }
       
       // Check if job already exists by job number (using prefetched map)
-      const existing = jobsByJobNo.get(jobData.jobNo);
+      const existingJob = jobsByJobNo.get(jobData.jobNo);
       
       if (mode === 'add') {
-        if (existing) {
-          result.skipped++;
-        } else {
+        if (!existingJob) {
           const createdJob = await storage.createJob(jobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
-          // Track job creation
+          // Track job creation with authoritative state
           if (importHistoryId) {
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, createdJob);
           }
+        } else {
+          result.skipped++;
         }
       } else if (mode === 'update') {
-        if (existing) {
-          const previousData = { ...existing };
-          const updatedJob = await storage.updateJob(existing.id, jobData);
+        if (existingJob) {
+          const previousSnapshot = createRecordSnapshot(existingJob);
+          const updatedJob = await storage.updateJob(existingJob.id, jobData);
           jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
           
-          // Track job update with previousData and newData
+          // Track job update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, previousData, updatedJob);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, updatedJob);
           }
         } else {
           result.skipped++;
         }
       } else if (mode === 'upsert') {
-        if (existing) {
-          const previousData = { ...existing };
-          const updatedJob = await storage.updateJob(existing.id, jobData);
+        if (existingJob) {
+          const previousSnapshot = createRecordSnapshot(existingJob);
+          const updatedJob = await storage.updateJob(existingJob.id, jobData);
           jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
           
-          // Track job update with previousData and newData
+          // Track job update with authoritative before/after snapshots
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, previousData, updatedJob);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, updatedJob);
           }
         } else {
           const createdJob = await storage.createJob(jobData);
@@ -2203,13 +2299,32 @@ async function performImport(
       }
     }
     
-    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
-  }
-
-  if (archiveMissing) {
-    // Archive records not in the file
-    // TODO: Implement archiving logic
-    result.archived = 0;
+    // Step 3: Archive missing jobs if requested
+    if (archiveMissing) {
+      const importedJobNos = new Set(
+        data
+          .map(row => row['Job Code'] ? String(row['Job Code']).trim() : null)
+          .filter(Boolean) as string[]
+      );
+      const allVesselJobs = await storage.getJobs(vesselId);
+      
+      for (const job of allVesselJobs) {
+        if (job.jobNo && !importedJobNos.has(job.jobNo)) {
+          const previousSnapshot = createRecordSnapshot(job);
+          const archivedJob = await storage.archiveJob(job.id);
+          result.archived++;
+          
+          // Track job archive with authoritative before/after snapshots
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'archived', 'job', job.id, job, archivedJob);
+          }
+          
+          console.log(`📦 Archived job: ${job.jobNo}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   }
 
   return result;

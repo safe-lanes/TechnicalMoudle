@@ -197,6 +197,7 @@ export class PersistentFileStorage implements IStorage {
   private data: PersistentData;
   private importChangeLogs: ImportChangeLog[];
   private readonly MAX_IMPORTS_PER_VESSEL = 50;
+  private componentCodeIndex: Map<string, Map<string, string>>; // vesselId → (componentCode → componentId)
 
   constructor(filePath: string = 'test-data.json', changeLogPath?: string) {
     this.dataFile = path.resolve(process.cwd(), filePath);
@@ -243,6 +244,10 @@ export class PersistentFileStorage implements IStorage {
     
     this.data = this.loadData();
     this.importChangeLogs = this.loadChangeLogs();
+    
+    // Initialize component code index
+    this.componentCodeIndex = new Map();
+    this.rebuildComponentCodeIndex();
     
     // Persist the initial data if it was newly created
     if (!fs.existsSync(this.dataFile)) {
@@ -768,6 +773,19 @@ export class PersistentFileStorage implements IStorage {
     );
   }
 
+  private rebuildComponentCodeIndex(): void {
+    this.componentCodeIndex.clear();
+    for (const component of Object.values(this.data.components)) {
+      if (component && component.componentCode) {
+        const vesselId = component.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselId)) {
+          this.componentCodeIndex.set(vesselId, new Map());
+        }
+        this.componentCodeIndex.get(vesselId)!.set(component.componentCode, component.id);
+      }
+    }
+  }
+
   // User methods
   async getUser(id: number): Promise<User | undefined> {
     return this.data.users[id];
@@ -808,6 +826,35 @@ export class PersistentFileStorage implements IStorage {
     if (!component) {
       throw new Error(`Component ${id} not found`);
     }
+    
+    // If componentCode or vesselId changed, update index
+    if (data.componentCode && data.componentCode !== component.componentCode) {
+      const vesselKey = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselKey);
+      if (vesselIndex && component.componentCode) {
+        vesselIndex.delete(component.componentCode); // Remove old
+      }
+      
+      const newVesselKey = data.vesselId !== undefined ? (data.vesselId || 'global') : vesselKey;
+      if (!this.componentCodeIndex.has(newVesselKey)) {
+        this.componentCodeIndex.set(newVesselKey, new Map());
+      }
+      this.componentCodeIndex.get(newVesselKey)!.set(data.componentCode, id); // Add new
+    } else if (data.vesselId !== undefined && data.vesselId !== component.vesselId && component.componentCode) {
+      // VesselId changed but not componentCode
+      const oldVesselKey = component.vesselId || 'global';
+      const newVesselKey = data.vesselId || 'global';
+      const oldVesselIndex = this.componentCodeIndex.get(oldVesselKey);
+      if (oldVesselIndex) {
+        oldVesselIndex.delete(component.componentCode);
+      }
+      
+      if (!this.componentCodeIndex.has(newVesselKey)) {
+        this.componentCodeIndex.set(newVesselKey, new Map());
+      }
+      this.componentCodeIndex.get(newVesselKey)!.set(component.componentCode, id);
+    }
+    
     const updated = { ...component, ...data };
     this.data.components[id] = updated;
     this.persistData();
@@ -862,14 +909,35 @@ export class PersistentFileStorage implements IStorage {
       updatedAt: now
     };
     this.data.components[id] = newComponent;
+    
+    // Update index
+    if (newComponent.componentCode) {
+      const vesselKey = newComponent.vesselId || 'global';
+      if (!this.componentCodeIndex.has(vesselKey)) {
+        this.componentCodeIndex.set(vesselKey, new Map());
+      }
+      this.componentCodeIndex.get(vesselKey)!.set(newComponent.componentCode, newComponent.id);
+    }
+    
     this.persistData();
     return newComponent;
   }
 
   async deleteComponent(id: string): Promise<void> {
-    if (!this.data.components[id]) {
+    const component = this.data.components[id];
+    if (!component) {
       throw new Error(`Component ${id} not found`);
     }
+    
+    // Remove from index
+    if (component.componentCode) {
+      const vesselKey = component.vesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselKey);
+      if (vesselIndex) {
+        vesselIndex.delete(component.componentCode);
+      }
+    }
+    
     delete this.data.components[id];
     this.persistData();
   }
@@ -925,6 +993,15 @@ export class PersistentFileStorage implements IStorage {
       };
       this.data.components[id] = newComponent;
       createdComponents.push(newComponent);
+      
+      // Update index
+      if (newComponent.componentCode) {
+        const vesselKey = newComponent.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselKey)) {
+          this.componentCodeIndex.set(vesselKey, new Map());
+        }
+        this.componentCodeIndex.get(vesselKey)!.set(newComponent.componentCode, newComponent.id);
+      }
     }
     this.persistData();
     return createdComponents;
@@ -935,6 +1012,34 @@ export class PersistentFileStorage implements IStorage {
     for (const { id, data } of components) {
       const component = this.data.components[id];
       if (component) {
+        // If componentCode or vesselId changed, update index
+        if (data.componentCode && data.componentCode !== component.componentCode) {
+          const vesselKey = component.vesselId || 'global';
+          const vesselIndex = this.componentCodeIndex.get(vesselKey);
+          if (vesselIndex && component.componentCode) {
+            vesselIndex.delete(component.componentCode); // Remove old
+          }
+          
+          const newVesselKey = data.vesselId !== undefined ? (data.vesselId || 'global') : vesselKey;
+          if (!this.componentCodeIndex.has(newVesselKey)) {
+            this.componentCodeIndex.set(newVesselKey, new Map());
+          }
+          this.componentCodeIndex.get(newVesselKey)!.set(data.componentCode, id); // Add new
+        } else if (data.vesselId !== undefined && data.vesselId !== component.vesselId && component.componentCode) {
+          // VesselId changed but not componentCode
+          const oldVesselKey = component.vesselId || 'global';
+          const newVesselKey = data.vesselId || 'global';
+          const oldVesselIndex = this.componentCodeIndex.get(oldVesselKey);
+          if (oldVesselIndex) {
+            oldVesselIndex.delete(component.componentCode);
+          }
+          
+          if (!this.componentCodeIndex.has(newVesselKey)) {
+            this.componentCodeIndex.set(newVesselKey, new Map());
+          }
+          this.componentCodeIndex.get(newVesselKey)!.set(component.componentCode, id);
+        }
+        
         const updated = { ...component, ...data };
         this.data.components[id] = updated;
         updatedComponents.push(updated);
@@ -953,11 +1058,28 @@ export class PersistentFileStorage implements IStorage {
       if (key && this.data.components[key]) {
         // Update existing component
         const existing = this.data.components[key];
-        this.data.components[key] = {
+        const updatedComponent = {
           ...existing,
           ...component,
           id: existing.id // Preserve the original ID
         };
+        this.data.components[key] = updatedComponent;
+        
+        // Update index if vesselId changed
+        if (component.vesselId !== undefined && component.vesselId !== existing.vesselId && existing.componentCode) {
+          const oldVesselKey = existing.vesselId || 'global';
+          const newVesselKey = component.vesselId || 'global';
+          const oldVesselIndex = this.componentCodeIndex.get(oldVesselKey);
+          if (oldVesselIndex) {
+            oldVesselIndex.delete(existing.componentCode);
+          }
+          
+          if (!this.componentCodeIndex.has(newVesselKey)) {
+            this.componentCodeIndex.set(newVesselKey, new Map());
+          }
+          this.componentCodeIndex.get(newVesselKey)!.set(existing.componentCode, existing.id);
+        }
+        
         updated++;
       } else {
         // Create new component
@@ -1008,6 +1130,16 @@ export class PersistentFileStorage implements IStorage {
           updatedAt: now
         };
         this.data.components[id] = newComponent;
+        
+        // Update index
+        if (newComponent.componentCode) {
+          const vesselKey = newComponent.vesselId || 'global';
+          if (!this.componentCodeIndex.has(vesselKey)) {
+            this.componentCodeIndex.set(vesselKey, new Map());
+          }
+          this.componentCodeIndex.get(vesselKey)!.set(newComponent.componentCode, newComponent.id);
+        }
+        
         created++;
       }
     }
@@ -2091,6 +2223,89 @@ export class PersistentFileStorage implements IStorage {
         this.data.spares[id].deleted = true;
         archived++;
       }
+    }
+    this.persistData();
+    return archived;
+  }
+
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
+    const result = new Map<string, Component>();
+    const vesselKey = vesselId || 'global';
+    const vesselIndex = this.componentCodeIndex.get(vesselKey);
+    
+    if (!vesselIndex) {
+      return result; // No components for this vessel
+    }
+    
+    for (const code of codes) {
+      const componentId = vesselIndex.get(code);
+      if (componentId) {
+        const component = this.data.components[componentId];
+        if (component) {
+          result.set(code, component);
+        }
+      }
+    }
+    return result;
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
+    const result = new Map<string, Job>();
+    for (const jobNo of jobNos) {
+      const job = Object.values(this.data.jobs).find(
+        j => j.jobNo === jobNo && (!vesselId || j.vesselId === vesselId)
+      );
+      if (job) {
+        result.set(jobNo, job);
+      }
+    }
+    return result;
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>> {
+    const result = new Map<string, WorkOrder>();
+    for (const templateId of templateIds) {
+      const workOrder = this.data.workOrders.find(
+        wo => wo && wo.templateCode === templateId && (!vesselId || wo.vesselId === vesselId)
+      );
+      if (workOrder) {
+        result.set(templateId, workOrder);
+      }
+    }
+    return result;
+  }
+
+  async archiveComponent(id: string): Promise<Component> {
+    const component = this.data.components[id];
+    if (!component) {
+      throw new Error(`Component not found: ${id}`);
+    }
+    const archived = { ...component, isActive: false };
+    this.data.components[id] = archived;
+    this.persistData();
+    return archived;
+  }
+
+  async archiveJob(id: string): Promise<Job> {
+    const job = this.data.jobs[id];
+    if (!job) {
+      throw new Error(`Job not found: ${id}`);
+    }
+    const archived = { ...job, isActive: false };
+    this.data.jobs[id] = archived;
+    this.persistData();
+    return archived;
+  }
+
+  async archiveWorkOrder(id: string): Promise<WorkOrder> {
+    const workOrder = this.data.workOrders.find(wo => wo && wo.id === id);
+    if (!workOrder) {
+      throw new Error(`WorkOrder not found: ${id}`);
+    }
+    const archived = { ...workOrder, isActive: false };
+    const index = this.data.workOrders.findIndex(wo => wo && wo.id === id);
+    if (index !== -1) {
+      this.data.workOrders[index] = archived;
     }
     this.persistData();
     return archived;
