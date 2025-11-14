@@ -2185,13 +2185,17 @@ async function performImport(
     const allJobNos = data.map(row => row['Job Code'] ? String(row['Job Code']).trim() : null).filter(Boolean) as string[];
     const jobsByJobNo = await storage.getJobsByJobNos(allJobNos, vesselId);
     
+    // Step 1.5: Prefetch all existing components by codes for performance
+    const allComponentCodes = data.map(row => String(row['Component Code']).trim());
+    const componentsByCode = await storage.getComponentsByCodes(allComponentCodes, vesselId);
+    
     // Step 2: Process each row individually with authoritative state capture
     for (const row of data) {
       const componentCode = String(row['Component Code']).trim();
       const vesselCodeFromExcel = String(row['Vessel Code']).trim();
       
-      // Resolve actual component ID from component code
-      const component = await storage.getComponent(componentCode);
+      // Resolve actual component from prefetched map
+      const component = componentsByCode.get(componentCode);
       if (!component) {
         console.error(`⚠️ Component not found: ${componentCode}, skipping job`);
         result.skipped++;
@@ -2216,16 +2220,16 @@ async function performImport(
         frequencyValue: row['Frequency Value'] ? parseFloat(row['Frequency Value']) : null,
         frequencyUnit: row['Frequency Unit'] || null,
         jobDescription: row['Brief Job Description'] || null,
-        // JSON array fields - split comma-separated lists
+        // JSON array fields - split comma-separated lists (normalize null to [] for consistent checksums)
         requiredSpareParts: row['Required Spare Parts'] 
           ? row['Required Spare Parts'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : null,
+          : [],
         requiredTools: row['Required Tools']
           ? row['Required Tools'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : null,
+          : [],
         safetyRequirements: row['Required Safety Items']
           ? row['Required Safety Items'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : null,
+          : [],
         jobPriority: row['Job Priority'] || null,
         plannedDuration: row['Planned Duration'] ? parseFloat(row['Planned Duration']) : null,
         lastDoneDate: row['Last Done Date'] || null,
@@ -2254,9 +2258,10 @@ async function performImport(
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
-          // Track job creation with authoritative state
+          // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, createdJob);
+            const canonicalJob = await storage.getJob(createdJob.id);
+            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         } else {
           result.skipped++;
@@ -2268,9 +2273,10 @@ async function performImport(
           jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
           
-          // Track job update with authoritative before/after snapshots
+          // Track job update with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, updatedJob);
+            const canonicalJob = await storage.getJob(updatedJob.id);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
           }
         } else {
           result.skipped++;
@@ -2282,18 +2288,20 @@ async function performImport(
           jobsByJobNo.set(updatedJob.jobNo, updatedJob);
           result.updated++;
           
-          // Track job update with authoritative before/after snapshots
+          // Track job update with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, updatedJob);
+            const canonicalJob = await storage.getJob(updatedJob.id);
+            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
           }
         } else {
           const createdJob = await storage.createJob(jobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
-          // Track job creation
+          // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
-            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, createdJob);
+            const canonicalJob = await storage.getJob(createdJob.id);
+            await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         }
       }
@@ -2601,9 +2609,12 @@ router.post('/undo/:historyId', async (req, res) => {
         // Calculate current checksum
         const currentChecksum = calculateRecordChecksum(currentEntity);
         
-        // Get expected data from log
+        // Get expected data from log (parse if it's a JSON string)
         const expectedData = log.newData;
-        const expectedChecksum = expectedData ? calculateRecordChecksum(expectedData) : '';
+        const parsedExpectedData = typeof expectedData === 'string' 
+          ? JSON.parse(expectedData) 
+          : expectedData;
+        const expectedChecksum = parsedExpectedData ? calculateRecordChecksum(parsedExpectedData) : '';
         
         if (currentChecksum !== expectedChecksum) {
           conflicts.push({

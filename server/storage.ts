@@ -107,7 +107,14 @@ export function sortObjectKeys(obj: any): any {
 
 export function calculateRecordChecksum(record: any): string {
   try {
-    const sortedRecord = sortObjectKeys(record);
+    // Exclude volatile fields that change between creation and retrieval
+    const volatileFields = ['id', 'createdAt', 'updatedAt', 'created_at', 'updated_at'];
+    const stableRecord = { ...record };
+    for (const field of volatileFields) {
+      delete stableRecord[field];
+    }
+    
+    const sortedRecord = sortObjectKeys(stableRecord);
     const canonicalJson = JSON.stringify(sortedRecord, (key, value) => {
       if (typeof value === 'bigint') {
         return value.toString();

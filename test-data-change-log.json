@@ -1,1 +1,134 @@
-[]
+[
+  {
+    "id": "97cf01d9-e548-4515-9b2b-32c0b6eabbce",
+    "importHistoryId": "ef4b0a57-b533-4bfd-962f-87b28a5f84da",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "cGu-SoXNbZ45RQ2FsdH58",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T06:52:03.422Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"cGu-SoXNbZ45RQ2FsdH58\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-VJ0IO2M\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:52:03.422Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "4eb12864379bfade321f140d9a0cf4e9e1c056314805c115dafb57a7367818bb",
+    "createdAt": "2025-11-14T06:52:03.536Z"
+  },
+  {
+    "id": "fb391ae5-c811-445c-9edf-814d8c18e4f8",
+    "importHistoryId": "ef4b0a57-b533-4bfd-962f-87b28a5f84da",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "Y83myQTHSFm773IgZbaua",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T06:52:03.541Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"Y83myQTHSFm773IgZbaua\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-LEQDDLX\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:52:03.541Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "e0740e2e1e81dff5ec4004be7151375099229f48cf89abb9e661764e2447584b",
+    "createdAt": "2025-11-14T06:52:03.668Z"
+  },
+  {
+    "id": "3cac7cd6-f67f-4bbd-bb80-124b0e724ae5",
+    "importHistoryId": "54f3abf1-6b43-4728-814e-4dc081130ca7",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "xc72bRtLZFmObDYgaO-8l",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T06:56:35.320Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"xc72bRtLZFmObDYgaO-8l\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-L3KNGYY\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:56:35.320Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "48799f7272ee4233c2d2827aa4daeb5cda33c407fcb3a0c0b639507bc3a68c2c",
+    "createdAt": "2025-11-14T06:56:35.371Z"
+  },
+  {
+    "id": "15ef9586-847a-48fb-9fa4-8cf1e049efdb",
+    "importHistoryId": "54f3abf1-6b43-4728-814e-4dc081130ca7",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "81iwa1OIxAORa7JM8-eIw",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T06:56:35.375Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"81iwa1OIxAORa7JM8-eIw\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-S5FNH7T\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:56:35.375Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "ac687ba129fefff6a5e5086c03dfb5920bcc7c21281769ed931879ad55efe60b",
+    "createdAt": "2025-11-14T06:56:35.432Z"
+  },
+  {
+    "id": "bb7e83a3-52ce-42f9-9c97-a81680f4d8c3",
+    "importHistoryId": "dc57817d-fcda-4e9f-8320-30dba210f262",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "Z9U9y6hpzRrp55sYkR1Mp",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T06:59:43.917Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"Z9U9y6hpzRrp55sYkR1Mp\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-KE2U4_L\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:59:43.917Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "80cfa2f48c7a312129b2c7f21203e3e6c28ff3885c980f641211822ba83e81ee",
+    "createdAt": "2025-11-14T06:59:43.975Z"
+  },
+  {
+    "id": "d9e0705e-7e1f-48d8-803f-2cf279dadc6a",
+    "importHistoryId": "dc57817d-fcda-4e9f-8320-30dba210f262",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "pDcB563RhSQrMWE1xvwXs",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T06:59:43.980Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"pDcB563RhSQrMWE1xvwXs\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-Q_F-L8L\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":null,\"requiredTools\":null,\"responsibleDepartment\":null,\"safetyRequirements\":null,\"sfiCode\":null,\"updatedAt\":\"2025-11-14T06:59:43.980Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "9f3b4783c9734ee814588ac1b4f7a2c46826440be15f10e7268c7b89f658f5e2",
+    "createdAt": "2025-11-14T06:59:44.032Z"
+  },
+  {
+    "id": "4d9d6e1b-4994-41c2-8f86-927ee6655072",
+    "importHistoryId": "11e8d565-44d2-4629-8c03-6e355879de76",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "hWIB6nl5IaJly5yATPBSw",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T07:01:57.755Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"hWIB6nl5IaJly5yATPBSw\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-4QJYRFO\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:01:57.755Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "00b3dc5084b280e4b10ae888a6bfa4bffceb4c0dac95676c58df2b1b780283b7",
+    "createdAt": "2025-11-14T07:01:57.863Z"
+  },
+  {
+    "id": "4a74d505-a416-4a2d-9a67-b912469479e4",
+    "importHistoryId": "11e8d565-44d2-4629-8c03-6e355879de76",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "_LPd3C__Li6IYi1zrJwqb",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:01:57.886Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"_LPd3C__Li6IYi1zrJwqb\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-Z7O5_M4\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:01:57.886Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "adc5b47b30be3c165e61a08d2d63f1438a8179d766ff9f891c34f5892c9b2f52",
+    "createdAt": "2025-11-14T07:01:57.975Z"
+  },
+  {
+    "id": "375b0380-884f-4732-b826-2d3773300a7d",
+    "importHistoryId": "c58a9255-8ace-48e8-8ba9-732dd574c704",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "LckK4DTOXAztTKs4DOAqj",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T07:03:20.534Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"LckK4DTOXAztTKs4DOAqj\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB--N2T1IW\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:03:20.534Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "717cb1753593ec0a8ca1a1dad2b1373c8a40bac8a5024b24dec29b9d3d568e54",
+    "createdAt": "2025-11-14T07:03:20.602Z"
+  },
+  {
+    "id": "e03cbcd9-9355-4244-8845-e761c4b27a5d",
+    "importHistoryId": "c58a9255-8ace-48e8-8ba9-732dd574c704",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "PjLaU81hnk_4VcQwx9lle",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:03:20.607Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"PjLaU81hnk_4VcQwx9lle\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-TNEZ7OK\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:03:20.607Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "647ed6972ccfb02ed14ebbd87ce033a98a36f86c01ca2896499344bc59b9ed40",
+    "createdAt": "2025-11-14T07:03:20.662Z"
+  },
+  {
+    "id": "93d8632f-827d-4326-b436-cb8354c9b278",
+    "importHistoryId": "ad6f76d2-0733-4a1d-8005-59f5c4cc51e1",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "NSN_b9Hen8IX79xr-aWYX",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"411\",\"componentId\":\"1762942984292_viqa3fvzt\",\"componentName\":\"RADAR PLANTS\",\"createdAt\":\"2025-11-14T07:04:40.461Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Months\",\"frequencyValue\":6,\"id\":\"NSN_b9Hen8IX79xr-aWYX\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-68HY3FQ\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Alpha 411\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Calendar\",\"maintenanceType\":\"Inspection\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:04:40.461Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "29f49ba9bc63fd144f6339c527c9f9009d8ac6f07528f05d0b067924e4c57293",
+    "createdAt": "2025-11-14T07:04:40.586Z"
+  },
+  {
+    "id": "0e8ce7bc-9f45-4e0c-b920-466fd9dec725",
+    "importHistoryId": "ad6f76d2-0733-4a1d-8005-59f5c4cc51e1",
+    "operation": "created",
+    "entityType": "job",
+    "entityId": "R8p6pOsw5V85y8fZvGPF1",
+    "previousData": null,
+    "newData": "{\"assignedTo\":null,\"briefWorkDescription\":null,\"classRelated\":null,\"componentCode\":\"220\",\"componentId\":\"1762942984507_wgqkenssz\",\"componentName\":\"GENERAL\",\"createdAt\":\"2025-11-14T07:04:40.596Z\",\"critical\":null,\"criticality\":null,\"dataScope\":\"vessel\",\"department\":null,\"deptCode\":null,\"fleetEquipmentCode\":null,\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"R8p6pOsw5V85y8fZvGPF1\",\"initialNextDue\":null,\"intervalRunningHour\":null,\"isActive\":true,\"jobCategory\":null,\"jobDescription\":null,\"jobNo\":\"JOB-WCS7DLV\",\"jobPriority\":null,\"jobTitle\":\"Test UNDO Job Beta 220\",\"lastDoneDate\":null,\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"personInCharge\":null,\"plannedDuration\":null,\"requiredSpareParts\":[],\"requiredTools\":[],\"responsibleDepartment\":null,\"safetyRequirements\":[],\"sfiCode\":null,\"updatedAt\":\"2025-11-14T07:04:40.596Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "a6aefab157b5fcc955c80f9c1abfe4df5db2e874753dd3cb62218debe9e64a53",
+    "createdAt": "2025-11-14T07:04:40.674Z"
+  }
+]
