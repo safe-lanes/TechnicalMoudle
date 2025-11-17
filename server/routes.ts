@@ -392,6 +392,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get work order context (for running hours validation)
+  app.get("/api/work-orders/:id/context", async (req, res) => {
+    try {
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ error: "Work order not found" });
+      }
+      
+      // Get component data
+      const component = await storage.getComponent(workOrder.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // Get parent component data if exists
+      let parentComponent = null;
+      if (component.parentId) {
+        parentComponent = await storage.getComponent(component.parentId);
+      }
+      
+      // Get latest running hours audit for this component
+      const audits = await storage.getRunningHoursAudit(workOrder.componentId);
+      const latestAudit = audits.length > 0 ? audits[0] : null;
+      
+      res.json({
+        workOrder,
+        component: {
+          id: component.id,
+          componentCode: component.componentCode,
+          name: component.name,
+          parentId: component.parentId,
+          currentCumulativeRH: component.currentCumulativeRH,
+          lastUpdated: latestAudit?.dateUpdatedLocal || component.lastUpdated
+        },
+        parentComponent: parentComponent ? {
+          id: parentComponent.id,
+          componentCode: parentComponent.componentCode,
+          name: parentComponent.name,
+          currentCumulativeRH: parentComponent.currentCumulativeRH
+        } : null,
+        maintenanceBasis: workOrder.maintenanceBasis
+      });
+    } catch (error) {
+      console.error("Failed to fetch work order context:", error);
+      res.status(500).json({ error: "Failed to fetch work order context" });
+    }
+  });
+  
   // Create new work order
   app.post("/api/work-orders", async (req, res) => {
     try {
