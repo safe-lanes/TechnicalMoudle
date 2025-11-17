@@ -259,6 +259,12 @@ export const spares = pgTable("spares", {
   critical: text("critical").notNull(), // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
   rob: integer("rob").notNull().default(0), // Remaining on Board
   min: integer("min").notNull().default(0), // Minimum stock
+  max: integer("max"), // Maximum stock level
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // Cost per unit
+  stockingNumber: text("stocking_number"), // Internal stocking reference
+  leadTime: text("lead_time"), // Procurement lead time
+  supplier: text("supplier"), // Supplier name
+  lastOrderDate: text("last_order_date"), // Last procurement date (DD-MMM-YYYY format)
   location: text("location"),
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   deleted: boolean("deleted").notNull().default(false),

@@ -529,6 +529,141 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
+// Helper function to generate spares template using ExcelJS with prepopulated components
+async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  // Fetch all components from the system for this vessel
+  const allComponents = await storage.getComponents(vesselId);
+  console.log(`📋 Fetched ${allComponents.length} components for vessel ${vesselId}`);
+  
+  // Filter out components without valid codes
+  const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '' && c.name && c.name.trim() !== '');
+  console.log(`✅ ${validComponents.length} components have valid codes and names`);
+  
+  // Create main "Spares" sheet
+  const sparesSheet = workbook.addWorksheet('Spares');
+  
+  // Add headers - 23 columns matching user's template
+  sparesSheet.columns = [
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 25 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Component Code', key: 'componentCode', width: 20 },
+    { header: 'Component Name', key: 'componentName', width: 30 },
+    { header: 'Part Code', key: 'partCode', width: 18 },
+    { header: 'Part Name', key: 'partName', width: 35 },
+    { header: 'Part Number', key: 'partNumber', width: 20 },
+    { header: 'Unit Of Measurement', key: 'uom', width: 12 },
+    { header: 'Stocking Number', key: 'stockingNumber', width: 20 },
+    { header: 'Maker', key: 'maker', width: 20 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Specification', key: 'specification', width: 30 },
+    { header: 'Drawing No', key: 'drawingNo', width: 18 },
+    { header: 'Location', key: 'location', width: 20 },
+    { header: 'ROB', key: 'rob', width: 10 },
+    { header: 'Min Stock', key: 'minStock', width: 10 },
+    { header: 'Max Stock', key: 'maxStock', width: 10 },
+    { header: 'Unit Cost', key: 'unitCost', width: 12 },
+    { header: 'Criticality (Yes/No)', key: 'criticality', width: 15 },
+    { header: 'Lead Time', key: 'leadTime', width: 15 },
+    { header: 'Supplier', key: 'supplier', width: 25 },
+    { header: 'Last Order Date', key: 'lastOrderDate', width: 18 },
+    { header: 'Remarks', key: 'remarks', width: 35 }
+  ];
+  
+  // Add one example row
+  sparesSheet.addRow({
+    fleetEquipmentName: 'ME cylinder covers',
+    vesselCode: vesselId,
+    componentCode: '651.552.AA',
+    componentName: 'ME cylinder covers,exhaust',
+    partCode: 'PT-000001',
+    partName: 'Cylinder Head Gasket',
+    partNumber: 'GHI-2345',
+    uom: 'PCS',
+    stockingNumber: 'STK-12345',
+    maker: 'Maker ZZZ',
+    makerCode: 'MKR-001',
+    specification: 'Size: YYY',
+    drawingNo: 'DRW-651-552',
+    location: 'Engine Room Store',
+    rob: '5',
+    minStock: '2',
+    maxStock: '10',
+    unitCost: '1250.00',
+    criticality: 'Yes',
+    leadTime: '30 days',
+    supplier: 'ABC Suppliers Ltd',
+    lastOrderDate: '15-NOV-2024',
+    remarks: 'Critical spare for main engine'
+  });
+  
+  console.log(`📝 Added example row to spares template`);
+  
+  // Create "Components" reference sheet
+  const componentsSheet = workbook.addWorksheet('Components');
+  componentsSheet.columns = [
+    { header: 'Component Code', key: 'componentCode', width: 20 },
+    { header: 'Component Name', key: 'componentName', width: 40 },
+    { header: 'Category', key: 'category', width: 35 }
+  ];
+  
+  // Add all valid components to reference sheet
+  validComponents.forEach(component => {
+    componentsSheet.addRow({
+      componentCode: component.componentCode,
+      componentName: component.name,
+      category: component.category || ''
+    });
+  });
+  
+  console.log(`📋 Added ${validComponents.length} components to reference sheet`);
+  
+  // Create "Lists" sheet for dropdown values
+  const listsSheet = workbook.addWorksheet('Lists');
+  listsSheet.columns = [
+    { header: 'UOM', key: 'uom', width: 15 },
+    { header: 'Criticality', key: 'criticality', width: 15 }
+  ];
+  
+  // Add UOM values
+  UOM_LIST.forEach(uom => {
+    listsSheet.addRow({ uom: uom.toUpperCase(), criticality: '' });
+  });
+  
+  // Add Yes/No for Criticality in the first two rows
+  listsSheet.getCell('B1').value = 'Criticality';
+  listsSheet.getCell('B2').value = 'Yes';
+  listsSheet.getCell('B3').value = 'No';
+  
+  // Add data validations to Spares sheet
+  // Column H (UOM) - row 2 onwards
+  sparesSheet.getColumn(8).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$A$2:$A$11']
+      };
+    }
+  });
+  
+  // Column S (Criticality) - row 2 onwards
+  sparesSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$B$2:$B$3']
+      };
+    }
+  });
+  
+  // Write to buffer and return
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 // Generate template based on type
 router.get('/template', async (req, res) => {
   const { type, vesselId } = req.query;
@@ -581,21 +716,30 @@ router.get('/template', async (req, res) => {
 
     case 'spares':
       headers = [
-        'Part Code', 'Part Name', 'Component Code',
-        'UOM', 'Min', 'Critical (Yes/No)', 'ROB', 'Location',
-        'Maker', 'Model', 'Remarks'
+        'Fleet Equipment Name', 'Vessel Code', 'Component Code', 'Component Name',
+        'Part Code', 'Part Name', 'Part Number', 'Unit Of Measurement',
+        'Stocking Number', 'Maker', 'Maker Code', 'Specification',
+        'Drawing No', 'Location', 'ROB', 'Min Stock', 'Max Stock',
+        'Unit Cost', 'Criticality (Yes/No)', 'Lead Time', 'Supplier',
+        'Last Order Date', 'Remarks'
       ];
 
       validValues = [
-        'Required, Unique', 'Required', 'Required, Must exist',
-        UOM_LIST.join('|'), 'Number >= 0', 'Yes/No', 'Number >= 0', 'Text',
-        'Text', 'Text', 'Text'
+        'Text (Fleet reference)', 'Required (e.g., V001)', 'Required, Must exist in system', 'Auto-filled from component',
+        'Auto-generated PT-XXXXXX or manual', 'Required', 'Text (Manufacturer P/N)', UOM_LIST.join('|'),
+        'Text (Internal stock ref)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Technical specs)',
+        'Text (Drawing reference)', 'Text (Storage location)', 'Number >= 0', 'Number >= 0', 'Number >= 0',
+        'Decimal (Cost per unit)', 'Yes/No', 'Text (e.g., 30 days)', 'Text (Supplier name)',
+        'DD-MMM-YYYY', 'Text (Additional notes)'
       ];
 
       example = [
-        'SP-001', 'Cylinder Head Gasket', '1.1.1',
-        'pcs', '2', 'Yes', '5', 'Store Room A',
-        'MAN B&W', 'GS-12345', 'For main engine only'
+        'ME cylinder covers', 'V001', '651.552.AA', 'ME cylinder covers,exhaust',
+        'PT-000001', 'Cylinder Head Gasket', 'GHI-2345', 'PCS',
+        'STK-12345', 'Maker ZZZ', 'MKR-001', 'Size: YYY',
+        'DRW-651-552', 'Engine Room Store', '5', '2', '10',
+        '1250.00', 'Yes', '30 days', 'ABC Suppliers Ltd',
+        '15-NOV-2024', 'Critical spare for main engine'
       ];
       break;
 
@@ -695,11 +839,11 @@ router.get('/template', async (req, res) => {
       mainSheet['!dataValidation'] = [];
     }
 
-    // UOM dropdown (Column D, starting from row 2)
+    // UOM dropdown (Column H - Unit Of Measurement, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'D2:D1000',
+      sqref: 'H2:H1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -707,11 +851,11 @@ router.get('/template', async (req, res) => {
       error: `Please select from: ${UOM_LIST.join(', ')}`
     });
 
-    // Critical (Yes/No) dropdown (Column F, starting from row 2)
+    // Criticality (Yes/No) dropdown (Column S, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'F2:F1000',
+      sqref: 'S2:S1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -901,7 +1045,21 @@ router.get('/template', async (req, res) => {
     }
   }
 
-  // Create meta sheet with instructions (for non-work-orders and non-jobs templates)
+  // For spares, use exceljs to generate template with prepopulated components
+  if (type === 'spares') {
+    try {
+      const buffer = await generateSparesTemplate(defaultVesselId);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${type}_template.xlsx"`);
+      res.send(buffer);
+      return;
+    } catch (error) {
+      console.error('Error generating spares template:', error);
+      return res.status(500).json({ error: 'Failed to generate template' });
+    }
+  }
+
+  // Create meta sheet with instructions (for non-work-orders, non-jobs, and non-spares templates)
   const metaData = [
     ['Template Type', type],
     ['Template Version', '3.0'],
@@ -1383,58 +1541,108 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Component Category'] = String(row['Component Category']).trim();
       }
     } else if (type === 'spares') {
-      // Validate spare
-      if (!row['Part Code']) {
-        errors.push(`Row ${rowNum}: Part Code is required`);
-      } else {
-        normalized['Part Code'] = String(row['Part Code']).trim();
+      // Validate Vessel Code matches selected vesselId
+      if (vesselId && row['Vessel Code']) {
+        const rowVesselCode = String(row['Vessel Code']).trim().toUpperCase();
+        const selectedVessel = vesselId.trim().toUpperCase();
+        if (rowVesselCode !== selectedVessel) {
+          errors.push(`Row ${rowNum}: Vessel Code '${rowVesselCode}' does not match selected vessel '${vesselId}'. All rows must belong to the same vessel.`);
+        } else {
+          normalized['Vessel Code'] = rowVesselCode;
+        }
+      } else if (vesselId && !row['Vessel Code']) {
+        // Auto-populate Vessel Code if missing
+        normalized['Vessel Code'] = vesselId;
       }
 
+      // Validate Component Code (required, must exist in system)
+      if (!row['Component Code']) {
+        errors.push(`Row ${rowNum}: Component Code is required`);
+      } else {
+        const componentCode = String(row['Component Code']).trim();
+        normalized['Component Code'] = componentCode;
+        
+        // Validate that Component Code exists in the system
+        // Note: This check will be performed during import, not during dry-run
+        // to avoid loading all components into memory for validation
+      }
+
+      // Component Name - auto-filled or provided
+      if (row['Component Name']) {
+        normalized['Component Name'] = String(row['Component Name']).trim();
+      }
+
+      // Part Code - can be auto-generated or manually entered
+      if (row['Part Code'] && String(row['Part Code']).trim()) {
+        normalized['Part Code'] = String(row['Part Code']).trim();
+      }
+      // Note: Part Code will be auto-generated during import if not provided
+
+      // Part Name - required
       if (!row['Part Name']) {
         errors.push(`Row ${rowNum}: Part Name is required`);
       } else {
         normalized['Part Name'] = String(row['Part Name']).trim();
       }
 
-      if (!row['Component Code']) {
-        errors.push(`Row ${rowNum}: Component Code is required`);
-      } else {
-        normalized['Component Code'] = String(row['Component Code']).trim();
-        // TODO: Check if component exists
+      // Part Number - optional
+      if (row['Part Number']) {
+        normalized['Part Number'] = String(row['Part Number']).trim();
       }
 
-      if (row['UOM'] && !UOM_LIST.includes(row['UOM'].toLowerCase())) {
-        errors.push(`Row ${rowNum}: Invalid UOM. Allowed: ${UOM_LIST.join(', ')}`);
-      } else if (row['UOM']) {
-        normalized['UOM'] = row['UOM'].toLowerCase();
+      // Unit Of Measurement - validate against UOM_LIST
+      const uomField = row['Unit Of Measurement'] || row['UOM'];
+      if (uomField) {
+        const uomValue = String(uomField).toLowerCase().trim();
+        if (!UOM_LIST.includes(uomValue)) {
+          errors.push(`Row ${rowNum}: Invalid Unit Of Measurement. Allowed: ${UOM_LIST.join(', ')}`);
+        } else {
+          normalized['Unit Of Measurement'] = uomValue.toUpperCase();
+        }
       }
 
-      // Validate numbers
-      ['Min', 'ROB'].forEach(field => {
-        if (row[field]) {
-          const num = parseFloat(row[field]);
+      // Validate numeric fields
+      ['ROB', 'Min Stock', 'Max Stock'].forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+          const num = parseInt(row[field]);
           if (isNaN(num) || num < 0) {
-            errors.push(`Row ${rowNum}: ${field} must be a non-negative number`);
+            errors.push(`Row ${rowNum}: ${field} must be a non-negative integer`);
           } else {
             normalized[field] = num;
           }
         }
       });
 
-      // Validate Critical
-      if (row['Critical (Yes/No)']) {
-        const value = row['Critical (Yes/No)'].toString().toLowerCase();
-        if (!['yes', 'no'].includes(value)) {
-          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
+      // Validate Unit Cost (decimal)
+      if (row['Unit Cost'] !== undefined && row['Unit Cost'] !== null && row['Unit Cost'] !== '') {
+        const cost = parseFloat(row['Unit Cost']);
+        if (isNaN(cost) || cost < 0) {
+          errors.push(`Row ${rowNum}: Unit Cost must be a non-negative number`);
         } else {
-          normalized['Critical (Yes/No)'] = value === 'yes' ? 'Yes' : 'No';
+          normalized['Unit Cost'] = cost;
         }
       }
 
-      // Copy other fields
-      Object.keys(row).forEach(key => {
-        if (!normalized[key]) {
-          normalized[key] = row[key];
+      // Validate Criticality (Yes/No)
+      if (row['Criticality (Yes/No)']) {
+        const value = String(row['Criticality (Yes/No)']).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
+        } else {
+          normalized['Criticality (Yes/No)'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+        }
+      }
+
+      // Copy text fields directly
+      const textFields = [
+        'Fleet Equipment Name', 'Stocking Number', 'Maker', 'Maker Code',
+        'Specification', 'Drawing No', 'Location', 'Lead Time',
+        'Supplier', 'Last Order Date', 'Remarks'
+      ];
+      
+      textFields.forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+          normalized[field] = String(row[field]).trim();
         }
       });
     } else if (type === 'stores') {
