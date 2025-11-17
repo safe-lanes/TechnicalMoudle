@@ -118,7 +118,7 @@ const RunningHours = () => {
       return await Promise.all(promises);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/running-hours/parents?vesselId=${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",
