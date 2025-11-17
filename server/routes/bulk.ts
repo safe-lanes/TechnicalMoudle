@@ -2274,10 +2274,225 @@ async function performImport(
     
     console.log(`✅ Component import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
   } else if (type === 'spares') {
-    // TODO: Implement spares import
+    const sparesVesselId = vesselId || 'V001';
+    console.log(`🚀 Starting spares import: ${data.length} rows, mode: ${mode}, vesselId: ${sparesVesselId}`);
+    
+    // Step 1: Fetch all components for validation
+    const allComponents = await storage.getComponents(sparesVesselId);
+    const componentsByCode = new Map(allComponents.map(c => [c.componentCode, c]));
+    console.log(`📋 Loaded ${allComponents.length} components for validation`);
+    
+    // Step 2: Fetch existing spares to check for duplicates and generate Part Codes
+    const existingSpares = await storage.getSpares(sparesVesselId);
+    const sparesByPartCode = new Map(existingSpares.map(s => [s.partCode, s]));
+    
+    // Step 3: Generate next Part Code sequence
+    let maxPartCodeNum = 0;
+    existingSpares.forEach(spare => {
+      if (spare.partCode && spare.partCode.startsWith('PT-')) {
+        const match = spare.partCode.match(/PT-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > maxPartCodeNum) maxPartCodeNum = num;
+        }
+      }
+    });
+    let nextPartCodeNum = maxPartCodeNum + 1;
+    console.log(`🔢 Next auto-generated Part Code will be: PT-${String(nextPartCodeNum).padStart(6, '0')}`);
+    
+    // Step 4: Process each row with validation
     for (const row of data) {
-      result.created++;
+      try {
+        // Validate Component Code exists
+        const componentCode = String(row['Component Code']).trim();
+        const component = componentsByCode.get(componentCode);
+        
+        if (!component) {
+          console.warn(`⚠️ Component ${componentCode} not found in system, skipping spare`);
+          result.skipped++;
+          continue;
+        }
+        
+        // Auto-generate Part Code if not provided
+        let partCode = row['Part Code'] ? String(row['Part Code']).trim() : '';
+        if (!partCode || partCode === '') {
+          partCode = `PT-${String(nextPartCodeNum).padStart(6, '0')}`;
+          nextPartCodeNum++;
+          console.log(`✨ Auto-generated Part Code: ${partCode}`);
+        }
+        
+        // Check for duplicates
+        const existingSpare = sparesByPartCode.get(partCode);
+        
+        if (mode === 'add') {
+          if (existingSpare) {
+            console.log(`⏭️ Part Code ${partCode} already exists, skipping`);
+            result.skipped++;
+            continue;
+          }
+          
+          // Create new spare
+          const newSpare = await storage.createSpare({
+            partCode: partCode,
+            partName: String(row['Part Name']).trim(),
+            componentId: component.id,
+            componentCode: componentCode,
+            componentName: component.name || '',
+            componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
+            critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+            rob: row['ROB'] ? parseInt(row['ROB']) : 0,
+            min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
+            location: row['Location'] ? String(row['Location']).trim() : null,
+            vesselId: vesselId,
+            partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
+            uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
+            stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
+            maker: row['Maker'] ? String(row['Maker']).trim() : null,
+            makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
+            specification: row['Specification'] ? String(row['Specification']).trim() : null,
+            drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
+            max: row['Max Stock'] ? parseInt(row['Max Stock']) : null,
+            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
+            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
+            supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
+            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
+            note: row['Remarks'] ? String(row['Remarks']).trim() : null,
+            dataScope: 'vessel'
+          });
+          
+          sparesByPartCode.set(partCode, newSpare);
+          result.created++;
+          
+          // Track change if history tracking is enabled
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'spare', String(newSpare.id), null, newSpare);
+          }
+          
+          console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
+          
+        } else if (mode === 'update') {
+          if (!existingSpare) {
+            console.log(`⏭️ Part Code ${partCode} not found for update, skipping`);
+            result.skipped++;
+            continue;
+          }
+          
+          // Update existing spare
+          const updatedSpare = await storage.updateSpare(existingSpare.id, {
+            partName: String(row['Part Name']).trim(),
+            componentId: component.id,
+            componentCode: componentCode,
+            componentName: component.name || '',
+            critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+            rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
+            min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
+            location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
+            partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
+            uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
+            stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
+            maker: row['Maker'] ? String(row['Maker']).trim() : existingSpare.maker,
+            makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
+            specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
+            drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
+            max: row['Max Stock'] ? parseInt(row['Max Stock']) : existingSpare.max,
+            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : existingSpare.unitCost,
+            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingSpare.leadTime,
+            supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingSpare.supplier,
+            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingSpare.lastOrderDate,
+            note: row['Remarks'] ? String(row['Remarks']).trim() : existingSpare.note
+          });
+          
+          sparesByPartCode.set(partCode, updatedSpare);
+          result.updated++;
+          
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
+          }
+          
+          console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
+          
+        } else if (mode === 'upsert') {
+          if (existingSpare) {
+            // Update existing
+            const updatedSpare = await storage.updateSpare(existingSpare.id, {
+              partName: String(row['Part Name']).trim(),
+              componentId: component.id,
+              componentCode: componentCode,
+              componentName: component.name || '',
+              critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+              rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
+              min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
+              location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
+              partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
+              uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
+              stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
+              maker: row['Maker'] ? String(row['Maker']).trim() : existingSpare.maker,
+              makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
+              specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
+              drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
+              max: row['Max Stock'] ? parseInt(row['Max Stock']) : existingSpare.max,
+              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : existingSpare.unitCost,
+              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingSpare.leadTime,
+              supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingSpare.supplier,
+              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingSpare.lastOrderDate,
+              note: row['Remarks'] ? String(row['Remarks']).trim() : existingSpare.note
+            });
+            
+            sparesByPartCode.set(partCode, updatedSpare);
+            result.updated++;
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
+            }
+            
+            console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
+          } else {
+            // Create new
+            const newSpare = await storage.createSpare({
+              partCode: partCode,
+              partName: String(row['Part Name']).trim(),
+              componentId: component.id,
+              componentCode: componentCode,
+              componentName: component.name || '',
+              componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
+              critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+              rob: row['ROB'] ? parseInt(row['ROB']) : 0,
+              min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
+              location: row['Location'] ? String(row['Location']).trim() : null,
+              vesselId: vesselId,
+              partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
+              uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
+              stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
+              maker: row['Maker'] ? String(row['Maker']).trim() : null,
+              makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
+              specification: row['Specification'] ? String(row['Specification']).trim() : null,
+              drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
+              max: row['Max Stock'] ? parseInt(row['Max Stock']) : null,
+              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
+              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
+              supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
+              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
+              note: row['Remarks'] ? String(row['Remarks']).trim() : null,
+              dataScope: 'vessel'
+            });
+            
+            sparesByPartCode.set(partCode, newSpare);
+            result.created++;
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'spare', String(newSpare.id), null, newSpare);
+            }
+            
+            console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`❌ Error processing spare row:`, error);
+        result.skipped++;
+      }
     }
+    
+    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'stores') {
     // TODO: Implement stores import
     for (const row of data) {

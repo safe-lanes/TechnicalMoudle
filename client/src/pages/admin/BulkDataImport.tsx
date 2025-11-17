@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { FileSpreadsheet, Ship } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
+import SparesUpload from "./bulk/SparesUpload";
 import { VESSELS, type VesselId } from "@/lib/vessels";
 
 type TemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'template5' | 'template6';
@@ -84,21 +85,14 @@ export default function BulkDataImport() {
             <MachineryComponentUpload vesselId={selectedVessel} />
           ) : selectedTemplate === 'jobs' ? (
             <JobUpload vesselId={selectedVessel} />
+          ) : selectedTemplate === 'spares' ? (
+            <SparesUpload vesselId={selectedVessel} />
           ) : selectedTemplate === 'stores' ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FileSpreadsheet className="h-16 w-16 text-gray-300 mb-4" />
                 <p className="text-gray-500 text-center">
                   Stores bulk upload functionality will be available soon
-                </p>
-              </CardContent>
-            </Card>
-          ) : selectedTemplate === 'spares' ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FileSpreadsheet className="h-16 w-16 text-gray-300 mb-4" />
-                <p className="text-gray-500 text-center">
-                  Spares bulk upload functionality will be available soon
                 </p>
               </CardContent>
             </Card>
