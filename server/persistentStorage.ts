@@ -1328,6 +1328,30 @@ export class PersistentFileStorage implements IStorage {
     return parents;
   }
 
+  // Helper function to parse dateUpdatedLocal format: "DD-MMM-YYYY HH:mm" to Date object
+  private parseDateUpdatedLocal(dateStr: string): Date {
+    // Format: "17-Nov-2025 23:59"
+    const months: {[key: string]: number} = {
+      'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+      'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+    };
+    
+    const parts = dateStr.match(/(\d+)-(\w+)-(\d+)\s+(\d+):(\d+)/);
+    if (!parts) {
+      // Fallback to current date if parsing fails
+      console.warn(`Failed to parse date: ${dateStr}, using current date`);
+      return new Date();
+    }
+    
+    const day = parseInt(parts[1], 10);
+    const month = months[parts[2]] || 0;
+    const year = parseInt(parts[3], 10);
+    const hour = parseInt(parts[4], 10);
+    const minute = parseInt(parts[5], 10);
+    
+    return new Date(year, month, day, hour, minute);
+  }
+
   async cascadeRunningHoursUpdate(params: {
     parentComponentId: string;
     mode: 'setTotal' | 'addDelta';
@@ -1386,14 +1410,51 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Parent component ${params.parentComponentId} not found`);
     }
 
-    // 3. Calculate delta
+    // 3. Calculate delta and validate
     const currentParentRH = parseFloat(parent.currentCumulativeRH);
     let delta: number;
     
     if (params.mode === 'setTotal') {
       delta = params.value - currentParentRH;
+      
+      // VALIDATION 1: Reject if new RH < current RH (unless meter was replaced)
+      if (delta < 0 && !params.meterReplaced) {
+        throw new Error(
+          `Running hours cannot decrease from ${currentParentRH.toFixed(2)} to ${params.value.toFixed(2)} hours. ` +
+          `If the meter was replaced, please check the "Meter Replaced" box.`
+        );
+      }
     } else {
       delta = params.value;
+      
+      // For addDelta mode, delta should always be positive (already validated by Zod)
+      // But let's add extra safety check
+      if (delta < 0) {
+        throw new Error(`Delta hours must be positive when using Add Delta mode. Received: ${delta}`);
+      }
+    }
+    
+    // VALIDATION 2: Check realistic hourly delta based on date difference
+    // Parse the dateUpdated to get the update date
+    const updateDate = this.parseDateUpdatedLocal(params.dateUpdated);
+    
+    // Get the last update date from audit history
+    const lastAudit = workingData.runningHoursAudits
+      .filter(audit => audit.componentId === params.parentComponentId)
+      .sort((a, b) => new Date(b.enteredAtUTC).getTime() - new Date(a.enteredAtUTC).getTime())[0];
+    
+    if (lastAudit && delta > 0) {
+      const lastUpdateDate = this.parseDateUpdatedLocal(lastAudit.dateUpdatedLocal);
+      const daysDiff = Math.max(1, Math.ceil((updateDate.getTime() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const maxRealisticHours = daysDiff * 25; // 25 hours/day to account for timezone changes and clock adjustments
+      
+      if (delta > maxRealisticHours) {
+        throw new Error(
+          `Running hours increase of ${delta.toFixed(2)} hours over ${daysDiff} day(s) is unrealistic. ` +
+          `Maximum realistic increase: ${maxRealisticHours.toFixed(2)} hours (25 hrs/day to account for timezone changes). ` +
+          `Please verify the entered values.`
+        );
+      }
     }
 
     // 4. Update parent.currentCumulativeRH by applying delta
