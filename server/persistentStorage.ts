@@ -540,6 +540,11 @@ export class PersistentFileStorage implements IStorage {
         intervalRunningHour: null,
         scopeNotes: null,
         criticality: null,
+        requiredSpareParts: [],
+        requiredTools: [],
+        safetyRequirements: {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
+        uploadedDocuments: [],
+        consumedSpareParts: [],
         createdAt: now,
         updatedAt: now
       },
@@ -588,6 +593,11 @@ export class PersistentFileStorage implements IStorage {
         intervalRunningHour: null,
         scopeNotes: null,
         criticality: null,
+        requiredSpareParts: [],
+        requiredTools: [],
+        safetyRequirements: {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
+        uploadedDocuments: [],
+        consumedSpareParts: [],
         createdAt: now,
         updatedAt: now
       }
@@ -608,12 +618,15 @@ export class PersistentFileStorage implements IStorage {
         category: "Defect",
         defectType: "Corrective",
         description: "S-Band was observed to be defective. There was no spare on board",
+        descriptionHtml: null,
+        descriptionText: null,
         actionTakenRequested: "Requisition raised for shore Service. Expected at next port",
         targetCloseDate: "01-Sep-2024",
         dateCompleted: null,
         status: "Open",
         priority: "High",
         critical: false,
+        is_coc: false,
         severity: 2,
         source: "Internal",
         equipmentCategory: "Navigation",
@@ -630,6 +643,8 @@ export class PersistentFileStorage implements IStorage {
         defectCategory: null,
         viqVersion: null,
         viqRef: null,
+        viqChapter: null,
+        viqSection: null,
         sfiCodeRef: null,
         immediateCause: null,
         immediateCauseExplanation: null,
@@ -637,11 +652,40 @@ export class PersistentFileStorage implements IStorage {
         rootCauseExplanation: null,
         holdReason: null,
         nextReviewDate: null,
-        deferReason: null,
-        reportedBy: "Chief Engineer",
+        seedId: null,
+        equipment_key: null,
         raisedById: null,
+        raisedByName: null,
+        raisedByRank: null,
+        operatingCondition: null,
+        locationText: null,
+        occurrenceType: null,
+        responsibleRole: null,
+        responsibleRoleId: null,
+        deferReason: null,
+        deferNewTargetDate: null,
+        deferApprovalRequired: true,
+        isDeferred: false,
+        reportReferenceNo: null,
+        reportDate: null,
+        reportToThirdParty: false,
+        classReport: false,
+        flagReport: false,
+        portReport: false,
+        vesselLocationType: null,
+        portName: null,
+        latitude: null,
+        longitude: null,
+        vesselLocationDetail: null,
+        reportedBy: "Chief Engineer",
         assignedTo: null,
         reviewedBy: null,
+        closedBy: null,
+        closedDate: null,
+        closureComments: null,
+        linkedDefectIds: null,
+        notes: null,
+        auditTrail: null,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -653,12 +697,15 @@ export class PersistentFileStorage implements IStorage {
         category: "COC",
         defectType: "Routine",
         description: "Port anchor windlass brake issue",
+        descriptionHtml: null,
+        descriptionText: null,
         actionTakenRequested: null,
         targetCloseDate: null,
         dateCompleted: null,
         status: "Open", 
         priority: "Medium",
         critical: false,
+        is_coc: true,
         severity: 1,
         source: "Internal",
         equipmentCategory: "Deck",
@@ -675,6 +722,8 @@ export class PersistentFileStorage implements IStorage {
         defectCategory: null,
         viqVersion: null,
         viqRef: null,
+        viqChapter: null,
+        viqSection: null,
         sfiCodeRef: null,
         immediateCause: null,
         immediateCauseExplanation: null,
@@ -682,11 +731,40 @@ export class PersistentFileStorage implements IStorage {
         rootCauseExplanation: null,
         holdReason: null,
         nextReviewDate: null,
-        deferReason: null,
-        reportedBy: "Chief Officer",
+        seedId: null,
+        equipment_key: null,
         raisedById: null,
+        raisedByName: null,
+        raisedByRank: null,
+        operatingCondition: null,
+        locationText: null,
+        occurrenceType: null,
+        responsibleRole: null,
+        responsibleRoleId: null,
+        deferReason: null,
+        deferNewTargetDate: null,
+        deferApprovalRequired: true,
+        isDeferred: false,
+        reportReferenceNo: null,
+        reportDate: null,
+        reportToThirdParty: false,
+        classReport: false,
+        flagReport: false,
+        portReport: false,
+        vesselLocationType: null,
+        portName: null,
+        latitude: null,
+        longitude: null,
+        vesselLocationDetail: null,
+        reportedBy: "Chief Officer",
         assignedTo: null,
         reviewedBy: null,
+        closedBy: null,
+        closedDate: null,
+        closureComments: null,
+        linkedDefectIds: null,
+        notes: null,
+        auditTrail: null,
         createdAt: new Date(),
         updatedAt: new Date()
       }
@@ -1572,24 +1650,36 @@ export class PersistentFileStorage implements IStorage {
       maker: spare.maker || null,
       makerCode: spare.makerCode || null,
       model: spare.model || null,
-      critical: spare.critical || null,
-      partCode: spare.partCode || null,
-      partName: spare.partName || null,
+      critical: spare.critical,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentName: spare.componentName,
       drawingNo: spare.drawingNo || null,
       location2: spare.location2 || null,
       remarks: spare.remarks || null,
       unit: spare.unit || null,
-      maxStock: spare.maxStock || null,
       fleetPartCode: spare.fleetPartCode || null,
-      primarySupplier: spare.primarySupplier || null,
-      alternateSupplier: spare.alternateSupplier || null,
       leadTime: spare.leadTime || null,
-      unitPrice: spare.unitPrice || null,
-      currency: spare.currency || null,
       lastOrderDate: spare.lastOrderDate || null,
-      lastOrderQty: spare.lastOrderQty || null,
-      lastPurchasePrice: spare.lastPurchasePrice || null,
       partCategory: spare.partCategory || null,
+      max: spare.max || null,
+      unitCost: spare.unitCost || null,
+      stockingNumber: spare.stockingNumber || null,
+      supplier: spare.supplier || null,
+      partNumber: spare.partNumber || null,
+      uom: spare.uom || null,
+      drawingNumber: spare.drawingNumber || null,
+      positionNumber: spare.positionNumber || null,
+      note: spare.note || null,
+      specification: spare.specification || null,
+      manualName: spare.manualName || null,
+      pageNumber: spare.pageNumber || null,
+      criticality: spare.criticality || null,
+      isActive: spare.isActive !== undefined ? spare.isActive : true,
+      ihm: spare.ihm || null,
+      evidenceType: spare.evidenceType || null,
+      applicableVesselIds: spare.applicableVesselIds || null,
+      scopeNotes: spare.scopeNotes || null,
       createdAt: now,
       updatedAt: now
     };
@@ -1724,23 +1814,23 @@ export class PersistentFileStorage implements IStorage {
         const history: SpareHistory = {
           id: this.data.counters.historyId++,
           timestampUTC: new Date(),
-          vesselId: spare.vesselId || "V001",
+          vesselId: spare.vesselId ?? "V001",
           spareId: update.id,
           partCode: spare.partCode,
           partName: spare.partName,
-          componentId: spare.componentId || "",
-          componentCode: spare.componentCode || null,
+          componentId: spare.componentId ?? "",
+          componentCode: spare.componentCode ?? null,
           componentName: spare.componentName,
-          componentSpareCode: spare.componentSpareCode || null,
+          componentSpareCode: spare.componentSpareCode ?? null,
           eventType: 'RECEIVE',
           qtyChange: update.received,
           robAfter: spare.rob,
           userId,
-          remarks: remarks || null,
+          remarks: remarks ?? null,
           reference: null,
-          dateLocal: update.receivedDate || null,
+          dateLocal: update.receivedDate ?? null,
           tz: null,
-          place: update.receivedPlace || null
+          place: update.receivedPlace ?? null
         };
         this.data.sparesHistory.push(history);
       }
@@ -1770,6 +1860,7 @@ export class PersistentFileStorage implements IStorage {
     const newHistory: SpareHistory = {
       ...history,
       id,
+      componentCode: history.componentCode ?? null,
       timestampUTC: history.timestampUTC || new Date()
     };
     this.data.sparesHistory.push(newHistory);
@@ -1855,9 +1946,9 @@ export class PersistentFileStorage implements IStorage {
     }
     
     // Calculate deltas for each part
-    const allKeys = new Set([...priorSnapshot.keys(), ...newSnapshot.keys()]);
+    const allKeys = new Set([...Array.from(priorSnapshot.keys()), ...Array.from(newSnapshot.keys())]);
     
-    for (const key of allKeys) {
+    for (const key of Array.from(allKeys)) {
       const priorQty = priorSnapshot.get(key) || 0;
       const newEntry = newSnapshot.get(key);
       const newQty = newEntry?.qty || 0;
@@ -2003,6 +2094,9 @@ export class PersistentFileStorage implements IStorage {
       sfiCode: job.sfiCode || null,
       criticality: job.criticality || null,
       isActive: job.isActive ?? true,
+      requiredSpareParts: job.requiredSpareParts || [],
+      requiredTools: job.requiredTools || [],
+      safetyRequirements: job.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -2061,6 +2155,9 @@ export class PersistentFileStorage implements IStorage {
         sfiCode: job.sfiCode || null,
         criticality: job.criticality || null,
         isActive: job.isActive ?? true,
+        requiredSpareParts: job.requiredSpareParts || [],
+        requiredTools: job.requiredTools || [],
+        safetyRequirements: job.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
         createdAt: now,
         updatedAt: now
       };
@@ -2133,6 +2230,9 @@ export class PersistentFileStorage implements IStorage {
           sfiCode: job.sfiCode || null,
           criticality: job.criticality || null,
           isActive: job.isActive ?? true,
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
           createdAt: now,
           updatedAt: now
         };
@@ -2166,7 +2266,8 @@ export class PersistentFileStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
       dataScope: workOrder.dataScope || "vessel",
-      componentCode: workOrder.componentCode || null,
+      status: workOrder.status || "Pending",
+      componentCode: workOrder.componentCode ?? null,
       templateCode: workOrder.templateCode || null,
       executionId: workOrder.executionId || null,
       dateCompleted: workOrder.dateCompleted || null,
@@ -2201,7 +2302,12 @@ export class PersistentFileStorage implements IStorage {
       intervalRunningHour: workOrder.intervalRunningHour || null,
       scopeNotes: workOrder.scopeNotes || null,
       criticality: workOrder.criticality || null,
-      dueDate: workOrder.dueDate || null
+      dueDate: workOrder.dueDate || null,
+      requiredSpareParts: workOrder.requiredSpareParts || [],
+      requiredTools: workOrder.requiredTools || [],
+      safetyRequirements: workOrder.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
+      uploadedDocuments: workOrder.uploadedDocuments || [],
+      consumedSpareParts: workOrder.consumedSpareParts || []
     };
     this.data.workOrders.push(newWorkOrder);
     this.persistData();
@@ -2237,6 +2343,8 @@ export class PersistentFileStorage implements IStorage {
         ...workOrder,
         id,
         dataScope: workOrder.dataScope || "vessel",
+        componentCode: workOrder.componentCode ?? null,
+        status: workOrder.status || "Pending",
         createdAt: now,
         updatedAt: now
       };
@@ -2320,6 +2428,12 @@ export class PersistentFileStorage implements IStorage {
       ...data,
       id,
       executionId,
+      remarks: data.remarks ?? null,
+      status: data.status || "Completed",
+      dateCompleted: data.dateCompleted ?? null,
+      performedBy: data.performedBy ?? null,
+      actualManHours: data.actualManHours ?? null,
+      workDescription: data.workDescription ?? null,
       createdAt: now,
       updatedAt: now
     };
@@ -2587,6 +2701,7 @@ export class PersistentFileStorage implements IStorage {
         ...spare, 
         id,
         deleted: false,
+        dataScope: spare.dataScope || "vessel",
         componentCode: spare.componentCode || null,
         location: spare.location || null,
         componentSpareCode: spare.componentSpareCode || null,
@@ -2622,6 +2737,7 @@ export class PersistentFileStorage implements IStorage {
   async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
     let created = 0;
     let updated = 0;
+    const now = new Date();
     
     for (const spare of spares) {
       // Try to find existing spare by partCode and vesselId
@@ -2630,7 +2746,7 @@ export class PersistentFileStorage implements IStorage {
       );
       
       if (existing) {
-        Object.assign(existing, spare);
+        Object.assign(existing, spare, { updatedAt: now });
         updated++;
       } else {
         const id = this.data.counters.spareId++;
@@ -2638,12 +2754,15 @@ export class PersistentFileStorage implements IStorage {
           ...spare, 
           id,
           deleted: false,
+          dataScope: spare.dataScope || "vessel",
           componentCode: spare.componentCode || null,
           location: spare.location || null,
           componentSpareCode: spare.componentSpareCode || null,
           vesselId: spare.vesselId || "V001",
           rob: spare.rob || 0,
-          min: spare.min || 0
+          min: spare.min || 0,
+          createdAt: now,
+          updatedAt: now
         };
         this.data.spares[id] = newSpare;
         created++;
@@ -3316,12 +3435,6 @@ export class PersistentFileStorage implements IStorage {
 
   async getIhmStatusReport(vesselId: string): Promise<any[]> {
     return [];
-  }
-
-  // Additional placeholder methods
-  async deleteWorkOrder(id: string): Promise<void> {
-    delete this.data.workOrders[id];
-    this.persistData();
   }
 
   // Fleet Jobs methods

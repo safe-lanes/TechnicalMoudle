@@ -275,6 +275,10 @@ export const spares = pgTable("spares", {
   partNumber: text("part_number"), // Manufacturer's part number
   uom: text("uom"), // Unit of measurement
   drawingNumber: text("drawing_number"), // Drawing number from manual
+  drawingNo: text("drawing_no"), // Drawing number reference from manual (user-specified)
+  location2: text("location_2"), // Second storage location for spares stored in multiple locations
+  remarks: text("remarks"), // User notes for spares
+  unit: text("unit"), // Unit of measurement (user-specified)
   positionNumber: text("position_number"), // Position/reference number
   note: text("note"), // Additional information
   specification: text("specification"), // Technical specifications (size, dimensions, material)
