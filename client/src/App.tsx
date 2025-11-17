@@ -9,6 +9,7 @@ import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
+import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
 
 import NotFound from "./pages/not-found";
 
@@ -23,6 +24,15 @@ function App() {
                 <Route path="/" component={TechnicalModule} />
                 <Route path="/pms" component={TechnicalModule} />
                 <Route path="/pms/maintenance-records/:componentId" component={TechnicalModule} />
+                
+                {/* Work Order form routes - standalone, no TechnicalModule layout */}
+                <Route path="/pms/work-order/new/:componentId">
+                  {() => <WorkOrderFormPage mode="new" />}
+                </Route>
+                <Route path="/pms/work-order/:id">
+                  {() => <WorkOrderFormPage mode="execution" />}
+                </Route>
+                
                 <Route path="/pms/:subpage" component={TechnicalModule} />
                 <Route path="/spares" component={TechnicalModule} />
                 <Route path="/stores" component={TechnicalModule} />
