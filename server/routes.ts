@@ -541,6 +541,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Complete work order with running hours update (atomic operation)
+  app.post("/api/work-orders/:id/complete", async (req, res) => {
+    try {
+      const { runningHours, dateOfCompletion, ...executionData } = req.body;
+      
+      // Get work order and component context
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ error: "Work order not found" });
+      }
+      
+      const component = await storage.getComponent(workOrder.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // Backend validation
+      if (runningHours) {
+        const newRH = parseInt(runningHours);
+        
+        // Validate against parent if exists
+        if (component.parentId) {
+          const parentComponent = await storage.getComponent(component.parentId);
+          if (parentComponent && newRH > parentComponent.currentCumulativeRH) {
+            return res.status(400).json({
+              error: `Running hours (${newRH}) cannot exceed parent component's running hours (${parentComponent.currentCumulativeRH})`
+            });
+          }
+        }
+        
+        // Validate no decrease
+        if (newRH < component.currentCumulativeRH) {
+          return res.status(400).json({
+            error: `Running hours cannot decrease from ${component.currentCumulativeRH} to ${newRH}`
+          });
+        }
+        
+        // Validate realistic delta (max 25 hrs/day)
+        if (dateOfCompletion && component.lastUpdated) {
+          const completionDate = new Date(dateOfCompletion);
+          const lastUpdate = new Date(component.lastUpdated);
+          const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+          const hoursDelta = newRH - component.currentCumulativeRH;
+          const maxAllowed = daysDiff * 25;
+          
+          if (hoursDelta > maxAllowed) {
+            return res.status(400).json({
+              error: `Running hours increase of ${hoursDelta} hrs over ${daysDiff.toFixed(1)} days exceeds realistic limit (max ${maxAllowed.toFixed(0)} hrs at 25 hrs/day)`
+            });
+          }
+        }
+        
+        // Update component running hours
+        await storage.updateComponent(component.id, {
+          currentCumulativeRH: newRH,
+          lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
+        });
+        
+        // Record running hours audit entry
+        await storage.createRunningHoursAudit({
+          componentId: component.id,
+          vesselId: component.vesselId,
+          componentCode: component.componentCode,
+          previousRH: component.currentCumulativeRH,
+          newRH: newRH,
+          delta: newRH - component.currentCumulativeRH,
+          dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
+          enteredAtUTC: new Date().toISOString(),
+          enteredBy: executionData.performedBy || 'System',
+          comments: `Updated via work order completion: ${workOrder.templateCode}`,
+          meterReplaced: false
+        });
+        
+        // Cascade delta to all children
+        const delta = newRH - component.currentCumulativeRH;
+        if (delta > 0) {
+          const vesselId = component.vesselId || 'V001';
+          const allComponents = await storage.getComponents(vesselId);
+          
+          // Find all children recursively
+          const getAllChildren = (parentId: string): typeof allComponents => {
+            const directChildren = allComponents.filter(c => c.parentId === parentId);
+            const allDescendants = [...directChildren];
+            directChildren.forEach(child => {
+              allDescendants.push(...getAllChildren(child.id));
+            });
+            return allDescendants;
+          };
+          
+          const children = getAllChildren(component.id);
+          
+          // Update each child with the delta
+          for (const child of children) {
+            const childNewRH = child.currentCumulativeRH + delta;
+            await storage.updateComponent(child.id, {
+              currentCumulativeRH: childNewRH,
+              lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
+            });
+            
+            // Record audit for each child
+            await storage.createRunningHoursAudit({
+              componentId: child.id,
+              vesselId: child.vesselId,
+              componentCode: child.componentCode,
+              previousRH: child.currentCumulativeRH,
+              newRH: childNewRH,
+              delta: delta,
+              dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
+              enteredAtUTC: new Date().toISOString(),
+              enteredBy: executionData.performedBy || 'System',
+              comments: `Cascaded from parent ${component.componentCode} via work order: ${workOrder.templateCode}`,
+              meterReplaced: false
+            });
+          }
+        }
+      }
+      
+      // Update work order execution data
+      const updatedWorkOrder = await storage.updateWorkOrder(req.params.id, {
+        ...executionData,
+        runningHoursAtCompletion: runningHours ? parseInt(runningHours) : undefined,
+        dateCompleted: dateOfCompletion,
+        status: 'Completed'
+      });
+      
+      res.json({
+        success: true,
+        workOrder: updatedWorkOrder,
+        runningHoursUpdated: !!runningHours
+      });
+    } catch (error: any) {
+      console.error('Work order completion error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid completion data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to complete work order" });
+    }
+  });
+  
   // Delete work order
   app.delete("/api/work-orders/:id", async (req, res) => {
     try {
