@@ -6740,6 +6740,56 @@
       "submittedAt": null,
       "reviewedByUserId": "current_user",
       "reviewedAt": "2025-11-14T11:05:32.063Z"
+    },
+    "2": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Modify Component: 611.243 Steam boiler",
+      "reason": "Component modification request",
+      "targetType": "component",
+      "targetId": "1762942987299_o7ilzmvc8",
+      "snapshotBeforeJson": {
+        "displayKey": "611.243",
+        "displayName": "Steam boiler",
+        "displayPath": "611.243 Steam boiler",
+        "fields": {
+          "id": "1762942987299_o7ilzmvc8",
+          "code": "611.243",
+          "name": "Steam boiler",
+          "maker": "",
+          "model": "",
+          "serialNo": "",
+          "department": "",
+          "location": "",
+          "critical": "",
+          "classItem": "",
+          "commissionedDate": "",
+          "installationDate": "",
+          "rating": "",
+          "conditionBased": "",
+          "noOfUnits": "",
+          "eqptSystemDept": "",
+          "parentComponent": "",
+          "dimensionsSize": "",
+          "notes": ""
+        }
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.isActive",
+          "oldValue": "Yes",
+          "newValue": "No"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "current_user",
+      "id": 2,
+      "createdAt": "2025-11-17T04:34:49.137Z",
+      "updatedAt": "2025-11-17T04:34:49.137Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
     }
   },
   "changeRequestAttachments": [],
@@ -478373,7 +478423,7 @@
     "auditId": 1,
     "spareId": 1,
     "historyId": 1,
-    "changeRequestId": 2,
+    "changeRequestId": 3,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
