@@ -1777,6 +1777,102 @@ export class PersistentFileStorage implements IStorage {
     return newHistory;
   }
 
+  // Find spare by partCode
+  findSpareByPartCode(partCode: string, vesselId: string): Spare | undefined {
+    return Object.values(this.data.spares).find(
+      s => s.partCode === partCode && s.vesselId === vesselId && !s.deleted
+    );
+  }
+
+  // Process consumed spares from work order execution
+  async processConsumedSpares(
+    consumedSpareParts: Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+    vesselId: string,
+    userId: string,
+    woExecutionId: string
+  ): Promise<{success: boolean, errors: string[]}> {
+    const errors: string[] = [];
+    
+    if (!consumedSpareParts || consumedSpareParts.length === 0) {
+      return { success: true, errors: [] };
+    }
+    
+    for (const consumedPart of consumedSpareParts) {
+      try {
+        // Normalize part number (trim whitespace)
+        const normalizedPartNo = consumedPart.partNo?.trim();
+        
+        // Skip empty entries
+        if (!normalizedPartNo || !consumedPart.quantityConsumed) {
+          continue;
+        }
+        
+        // Strict numeric validation - reject decimals and non-numeric values
+        const quantityStr = consumedPart.quantityConsumed.trim();
+        if (!/^\d+$/.test(quantityStr)) {
+          errors.push(`Invalid quantity for ${normalizedPartNo}: must be a positive integer, got '${consumedPart.quantityConsumed}'`);
+          continue;
+        }
+        const quantity = Number(quantityStr);
+        if (quantity <= 0) {
+          errors.push(`Invalid quantity for ${normalizedPartNo}: must be greater than 0`);
+          continue;
+        }
+        
+        // Find spare by partCode (partNo in consumed spares maps to partCode in spares table)
+        const spare = this.findSpareByPartCode(normalizedPartNo, vesselId);
+        
+        if (!spare) {
+          errors.push(`Spare not found: ${normalizedPartNo}`);
+          continue;
+        }
+        
+        // Validate enough stock available
+        if (spare.rob < quantity) {
+          errors.push(`Insufficient stock for ${normalizedPartNo}: ROB=${spare.rob}, Required=${quantity}`);
+          continue;
+        }
+        
+        // Consume the spare (decreases ROB and creates history record)
+        spare.rob = spare.rob - quantity;
+        
+        const history: SpareHistory = {
+          id: this.data.counters.historyId++,
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId ?? vesselId,
+          spareId: spare.id,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: spare.componentId ?? "",
+          componentCode: spare.componentCode ?? null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode ?? null,
+          eventType: 'CONSUME',
+          qtyChange: -quantity,
+          robAfter: spare.rob,
+          userId,
+          remarks: consumedPart.comments || null,
+          reference: woExecutionId, // Link to work order execution
+          dateLocal: null,
+          tz: null,
+          place: null
+        };
+        
+        this.data.sparesHistory.push(history);
+        
+      } catch (error) {
+        errors.push(`Error processing ${consumedPart.partNo}: ${error}`);
+      }
+    }
+    
+    // Persist all changes at once
+    if (errors.length === 0 || errors.length < consumedSpareParts.length) {
+      this.persistData();
+    }
+    
+    return { success: errors.length === 0, errors };
+  }
+
   // The rest of the methods will follow the same pattern...
   // I'll continue with the most important ones for now
 
@@ -2146,6 +2242,21 @@ export class PersistentFileStorage implements IStorage {
     
     this.data.workOrderExecutions.push(newExecution);
     this.persistData();
+    
+    // Process consumed spares (if any)
+    if (data.consumedSpareParts && Array.isArray(data.consumedSpareParts) && data.consumedSpareParts.length > 0) {
+      const result = await this.processConsumedSpares(
+        data.consumedSpareParts as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+        data.vesselId,
+        data.performedBy || 'system',
+        executionId
+      );
+      
+      if (!result.success) {
+        console.warn(`Spare consumption warnings for ${executionId}:`, result.errors);
+      }
+    }
+    
     return newExecution;
   }
 
@@ -2167,6 +2278,31 @@ export class PersistentFileStorage implements IStorage {
     
     this.data.workOrderExecutions[index] = updated;
     this.persistData();
+    
+    // Process consumed spares only if they haven't been processed before
+    // Check if there are any CONSUME history entries for this execution
+    if (data.consumedSpareParts && Array.isArray(data.consumedSpareParts) && data.consumedSpareParts.length > 0) {
+      const priorConsumption = this.data.sparesHistory.filter(
+        h => h.eventType === 'CONSUME' && h.reference === updated.executionId
+      );
+      
+      // Only process if no prior consumption exists (allows adding spares if forgotten at creation)
+      if (priorConsumption.length === 0) {
+        const result = await this.processConsumedSpares(
+          data.consumedSpareParts as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+          updated.vesselId,
+          updated.performedBy || 'system',
+          updated.executionId
+        );
+        
+        if (!result.success) {
+          console.warn(`Spare consumption warnings for ${updated.executionId}:`, result.errors);
+        }
+      }
+      // If spares were already consumed, subsequent updates don't reprocess them
+      // Users must use the Spares module to manually adjust inventory if needed
+    }
+    
     return updated;
   }
 
