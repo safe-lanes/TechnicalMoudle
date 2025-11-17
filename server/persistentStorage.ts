@@ -1784,57 +1784,115 @@ export class PersistentFileStorage implements IStorage {
     );
   }
 
-  // Process consumed spares from work order execution
-  async processConsumedSpares(
-    consumedSpareParts: Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+  // Normalize consumed spare key for differential tracking
+  private normalizeConsumedSpareKey(partNo: string): string {
+    return partNo.trim().toUpperCase();
+  }
+
+  // Load prior consumption snapshot from sparesHistory for a given execution
+  // Returns net consumed quantity per part (always positive or zero)
+  private loadExecutionConsumptionSnapshot(executionId: string): Map<string, number> {
+    const snapshot = new Map<string, number>();
+    
+    // Find all history entries for this execution (CONSUME and ADJUST)
+    const historyEntries = this.data.sparesHistory.filter(
+      h => h.reference === executionId && (h.eventType === 'CONSUME' || h.eventType === 'ADJUST')
+    );
+    
+    // Calculate net consumption by aggregating all quantity changes
+    // CONSUME entries have negative qtyChange (e.g., -10 means consumed 10, decreased ROB by 10)
+    // ADJUST reversals have positive qtyChange (e.g., +3 means restocked 3, increased ROB by 3)
+    // Net qtyChange = -10 + 3 = -7 (net change to ROB is -7)
+    // Net consumed qty = -netQtyChange = 7 (7 units were consumed net)
+    
+    for (const entry of historyEntries) {
+      const key = this.normalizeConsumedSpareKey(entry.partCode);
+      const currentNetChange = snapshot.get(key) || 0;
+      
+      // Accumulate net ROB change (negative for consumption, positive for restock)
+      // Then invert to get consumed quantity
+      snapshot.set(key, currentNetChange - entry.qtyChange);
+    }
+    
+    // All values in snapshot now represent net consumed quantity (positive values)
+    return snapshot;
+  }
+
+  // Reconcile consumed spares with differential tracking
+  async reconcileConsumedSpares(
+    newConsumedSpareParts: Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
     vesselId: string,
     userId: string,
     woExecutionId: string
   ): Promise<{success: boolean, errors: string[]}> {
     const errors: string[] = [];
     
-    if (!consumedSpareParts || consumedSpareParts.length === 0) {
-      return { success: true, errors: [] };
+    // Load prior consumption snapshot
+    const priorSnapshot = this.loadExecutionConsumptionSnapshot(woExecutionId);
+    
+    // Build new consumption map
+    const newSnapshot = new Map<string, {qty: number, comments: string}>();
+    for (const part of newConsumedSpareParts || []) {
+      const normalizedPartNo = part.partNo?.trim();
+      if (!normalizedPartNo || !part.quantityConsumed) {
+        continue;
+      }
+      
+      // Strict numeric validation
+      const quantityStr = part.quantityConsumed.trim();
+      if (!/^\d+$/.test(quantityStr)) {
+        errors.push(`Invalid quantity for ${normalizedPartNo}: must be a positive integer, got '${part.quantityConsumed}'`);
+        continue;
+      }
+      const quantity = Number(quantityStr);
+      if (quantity <= 0) {
+        errors.push(`Invalid quantity for ${normalizedPartNo}: must be greater than 0`);
+        continue;
+      }
+      
+      const key = this.normalizeConsumedSpareKey(normalizedPartNo);
+      newSnapshot.set(key, {qty: quantity, comments: part.comments});
     }
     
-    for (const consumedPart of consumedSpareParts) {
-      try {
-        // Normalize part number (trim whitespace)
-        const normalizedPartNo = consumedPart.partNo?.trim();
-        
-        // Skip empty entries
-        if (!normalizedPartNo || !consumedPart.quantityConsumed) {
+    // Calculate deltas for each part
+    const allKeys = new Set([...priorSnapshot.keys(), ...newSnapshot.keys()]);
+    
+    for (const key of allKeys) {
+      const priorQty = priorSnapshot.get(key) || 0;
+      const newEntry = newSnapshot.get(key);
+      const newQty = newEntry?.qty || 0;
+      const delta = newQty - priorQty;
+      
+      if (delta === 0) {
+        continue; // No change
+      }
+      
+      // Find the spare (use the part code from newSnapshot if available, else from prior history)
+      let partCode = key;
+      if (newEntry) {
+        // Use the raw part code from the new entry (preserving original case)
+        const matchingPart = (newConsumedSpareParts || []).find(p => 
+          this.normalizeConsumedSpareKey(p.partNo?.trim() || '') === key
+        );
+        if (matchingPart) {
+          partCode = matchingPart.partNo.trim();
+        }
+      }
+      
+      const spare = this.findSpareByPartCode(partCode, vesselId);
+      if (!spare) {
+        errors.push(`Spare not found: ${partCode}`);
+        continue;
+      }
+      
+      if (delta > 0) {
+        // Additional consumption needed
+        if (spare.rob < delta) {
+          errors.push(`Insufficient stock for ${partCode}: ROB=${spare.rob}, Additional Required=${delta}`);
           continue;
         }
         
-        // Strict numeric validation - reject decimals and non-numeric values
-        const quantityStr = consumedPart.quantityConsumed.trim();
-        if (!/^\d+$/.test(quantityStr)) {
-          errors.push(`Invalid quantity for ${normalizedPartNo}: must be a positive integer, got '${consumedPart.quantityConsumed}'`);
-          continue;
-        }
-        const quantity = Number(quantityStr);
-        if (quantity <= 0) {
-          errors.push(`Invalid quantity for ${normalizedPartNo}: must be greater than 0`);
-          continue;
-        }
-        
-        // Find spare by partCode (partNo in consumed spares maps to partCode in spares table)
-        const spare = this.findSpareByPartCode(normalizedPartNo, vesselId);
-        
-        if (!spare) {
-          errors.push(`Spare not found: ${normalizedPartNo}`);
-          continue;
-        }
-        
-        // Validate enough stock available
-        if (spare.rob < quantity) {
-          errors.push(`Insufficient stock for ${normalizedPartNo}: ROB=${spare.rob}, Required=${quantity}`);
-          continue;
-        }
-        
-        // Consume the spare (decreases ROB and creates history record)
-        spare.rob = spare.rob - quantity;
+        spare.rob = spare.rob - delta;
         
         const history: SpareHistory = {
           id: this.data.counters.historyId++,
@@ -1848,11 +1906,11 @@ export class PersistentFileStorage implements IStorage {
           componentName: spare.componentName,
           componentSpareCode: spare.componentSpareCode ?? null,
           eventType: 'CONSUME',
-          qtyChange: -quantity,
+          qtyChange: -delta,
           robAfter: spare.rob,
           userId,
-          remarks: consumedPart.comments || null,
-          reference: woExecutionId, // Link to work order execution
+          remarks: newEntry?.comments || null,
+          reference: woExecutionId,
           dateLocal: null,
           tz: null,
           place: null
@@ -1860,13 +1918,39 @@ export class PersistentFileStorage implements IStorage {
         
         this.data.sparesHistory.push(history);
         
-      } catch (error) {
-        errors.push(`Error processing ${consumedPart.partNo}: ${error}`);
+      } else {
+        // Reversal needed (quantity reduced or removed)
+        const reversalQty = Math.abs(delta);
+        spare.rob = spare.rob + reversalQty;
+        
+        const history: SpareHistory = {
+          id: this.data.counters.historyId++,
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId ?? vesselId,
+          spareId: spare.id,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: spare.componentId ?? "",
+          componentCode: spare.componentCode ?? null,
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode ?? null,
+          eventType: 'ADJUST',
+          qtyChange: reversalQty,
+          robAfter: spare.rob,
+          userId,
+          remarks: `Reversal of consumption from WO ${woExecutionId} (qty reduced from ${priorQty} to ${newQty})`,
+          reference: woExecutionId,
+          dateLocal: null,
+          tz: null,
+          place: null
+        };
+        
+        this.data.sparesHistory.push(history);
       }
     }
     
-    // Persist all changes at once
-    if (errors.length === 0 || errors.length < consumedSpareParts.length) {
+    // Persist all changes
+    if (errors.length === 0 || errors.length < Array.from(allKeys).length) {
       this.persistData();
     }
     
@@ -2243,9 +2327,9 @@ export class PersistentFileStorage implements IStorage {
     this.data.workOrderExecutions.push(newExecution);
     this.persistData();
     
-    // Process consumed spares (if any)
+    // Process consumed spares using differential reconciliation (if any)
     if (data.consumedSpareParts && Array.isArray(data.consumedSpareParts) && data.consumedSpareParts.length > 0) {
-      const result = await this.processConsumedSpares(
+      const result = await this.reconcileConsumedSpares(
         data.consumedSpareParts as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
         data.vesselId,
         data.performedBy || 'system',
@@ -2279,28 +2363,19 @@ export class PersistentFileStorage implements IStorage {
     this.data.workOrderExecutions[index] = updated;
     this.persistData();
     
-    // Process consumed spares only if they haven't been processed before
-    // Check if there are any CONSUME history entries for this execution
-    if (data.consumedSpareParts && Array.isArray(data.consumedSpareParts) && data.consumedSpareParts.length > 0) {
-      const priorConsumption = this.data.sparesHistory.filter(
-        h => h.eventType === 'CONSUME' && h.reference === updated.executionId
+    // Process consumed spares using differential reconciliation
+    // This compares prior consumption vs new data and applies only deltas
+    if (data.consumedSpareParts !== undefined) { // Allow empty array to remove all consumed spares
+      const result = await this.reconcileConsumedSpares(
+        (data.consumedSpareParts || []) as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+        updated.vesselId,
+        updated.performedBy || 'system',
+        updated.executionId
       );
       
-      // Only process if no prior consumption exists (allows adding spares if forgotten at creation)
-      if (priorConsumption.length === 0) {
-        const result = await this.processConsumedSpares(
-          data.consumedSpareParts as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
-          updated.vesselId,
-          updated.performedBy || 'system',
-          updated.executionId
-        );
-        
-        if (!result.success) {
-          console.warn(`Spare consumption warnings for ${updated.executionId}:`, result.errors);
-        }
+      if (!result.success) {
+        console.warn(`Spare consumption warnings for ${updated.executionId}:`, result.errors);
       }
-      // If spares were already consumed, subsequent updates don't reprocess them
-      // Users must use the Spares module to manually adjust inventory if needed
     }
     
     return updated;
