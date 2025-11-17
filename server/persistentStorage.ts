@@ -1184,11 +1184,16 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
-    // Get all RH jobs for this vessel
+    // DEBUG: Write to file to prove code is executing
+    fs.writeFileSync('/tmp/debug-rh-parents.txt', `Called at: ${new Date().toISOString()}, vesselId: ${vesselId}\n`, { flag: 'a' });
+    
+    // [TIMESTAMP: 2025-11-17-04:24] Get all RH jobs for this vessel
     const allJobs = await this.getJobs();
     const rhJobs = allJobs.filter(
       job => job.maintenanceBasis === "Running Hours" && job.vesselId === vesselId
     );
+    
+    fs.writeFileSync('/tmp/debug-rh-parents.txt', `RH Jobs found: ${rhJobs.length}\n`, { flag: 'a' });
 
     // Get all components for the vessel  
     const allComponents = await this.getComponents(vesselId);
