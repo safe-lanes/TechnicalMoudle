@@ -25,7 +25,11 @@ router.get("/", async (req, res) => {
     }
     
     // Sort by most recent first
-    requests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    requests.sort((a, b) => {
+      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+      return bTime - aTime;
+    });
     
     res.json(requests);
   } catch (error) {

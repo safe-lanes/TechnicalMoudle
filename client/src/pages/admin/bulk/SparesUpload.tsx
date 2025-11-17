@@ -94,7 +94,7 @@ export default function SparesUpload({ vesselId }: SparesUploadProps) {
   const { toast } = useToast();
 
   // Fetch import history
-  const { data: historyData } = useQuery<ImportHistory[]>({
+  const { data: historyData } = useQuery<{items: ImportHistory[], total: number}>({
     queryKey: ['/api/bulk/history'],
     queryFn: async () => {
       const response = await fetch('/api/bulk/history');
@@ -103,7 +103,7 @@ export default function SparesUpload({ vesselId }: SparesUploadProps) {
     }
   });
 
-  const sparesHistory = historyData?.filter(h => h.type === 'spares') || [];
+  const sparesHistory = historyData?.items?.filter(h => h.type === 'spares') || [];
 
   // Download template
   const handleDownloadTemplate = async () => {
