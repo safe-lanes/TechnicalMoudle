@@ -1685,6 +1685,7 @@ export class PersistentFileStorage implements IStorage {
   // Spares methods
   async getSpares(vesselId: string): Promise<Spare[]> {
     return Object.values(this.data.spares)
+      .filter(s => s !== null && s !== undefined)
       .filter(s => s.vesselId === vesselId && !s.deleted);
   }
 

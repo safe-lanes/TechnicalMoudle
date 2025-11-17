@@ -1434,8 +1434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const spares = await storage.getSpares(req.params.vesselId);
       res.json(spares);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch spares" });
+    } catch (error: any) {
+      console.error("Error fetching spares:", error);
+      res.status(500).json({ error: "Failed to fetch spares", details: error.message });
     }
   });
   
