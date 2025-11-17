@@ -1184,18 +1184,15 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
-    // Get all components for the vessel first
-    const allComponents = await this.getComponents(vesselId);
-    const componentMap = new Map(allComponents.map(c => [c.id, c]));
-    
-    // Get all RH jobs and filter by component's vesselId (since jobs may lack vesselId)
+    // Get all RH jobs for this vessel
     const allJobs = await this.getJobs();
-    const rhJobs = allJobs.filter(job => {
-      if (job.maintenanceBasis !== "Running Hours") return false;
-      const component = job.componentId ? componentMap.get(job.componentId) : null;
-      return component && component.vesselId === vesselId;
-    });
+    const rhJobs = allJobs.filter(
+      job => job.maintenanceBasis === "Running Hours" && job.vesselId === vesselId
+    );
 
+    // Get all components for the vessel  
+    const allComponents = await this.getComponents(vesselId);
+    
     // Extract componentIds from those jobs (the children with RH jobs)
     const childComponentIds = new Set<string>();
     rhJobs.forEach(job => {
@@ -1207,7 +1204,7 @@ export class PersistentFileStorage implements IStorage {
     // For each child, get its parentId
     const parentIds = new Set<string>();
     childComponentIds.forEach(childId => {
-      const child = componentMap.get(childId);
+      const child = allComponents.find(c => c.id === childId);
       if (child && child.parentId) {
         parentIds.add(child.parentId);
       }
