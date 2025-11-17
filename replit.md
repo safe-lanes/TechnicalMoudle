@@ -58,6 +58,16 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
         *   Validates realistic hourly deltas based on date differences (max 25 hrs/day to account for timezone changes).
         *   Clear, actionable error messages explaining validation failures.
     *   **Audit Trail**: Dual timestamps - user-entered `dateUpdatedLocal` and system-captured `enteredAtUTC` for complete audit trail.
+    *   **Work Order Integration**: 
+        *   Full-page Work Order form at `/pms/work-order/:id` (migrated from dialog popup).
+        *   Date of Completion and Running Hours fields in Part B2 section.
+        *   Context endpoint (`/api/work-orders/:id/context`) fetches component hierarchy data for validation.
+        *   Completion endpoint (`/api/work-orders/:id/complete`) performs atomic work order + running hours update.
+        *   Frontend validation enforces: child RH ≤ parent RH, no decrease, max 25 hrs/day realistic delta.
+        *   Backend validation duplicates all frontend checks for security.
+        *   Automatic delta cascading to all child components recursively.
+        *   Complete audit trail for component and all children with work order reference.
+        *   Separate workflows for draft saves (PATCH) vs. completions (POST /complete).
 *   **Admin Module**:
     *   **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (with SFI hierarchy, validation, duplicate detection, multi-vessel support), Jobs, and Spares.
         *   **Multi-Vessel Support**: Explicit vessel selection for bulk uploads.

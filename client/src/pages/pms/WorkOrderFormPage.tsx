@@ -560,81 +560,100 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Handle save
   const handleSave = async () => {
     try {
-      // Running Hours Validation (frontend pre-check)
-      if (executionData.runningHours && workOrderContext) {
-        const { component, parentComponent, maintenanceBasis } = workOrderContext;
-        const newRunningHours = parseInt(executionData.runningHours);
-        
-        if (isNaN(newRunningHours)) {
+      // Determine if this is a completion or draft save
+      const isCompleting = !!(executionData.completionDateTime || executionData.dateOfCompletion);
+      
+      // Running Hours Validation (frontend pre-check for completions)
+      if (isCompleting) {
+        // Enforce RH requirement for RH-based maintenance
+        if (workOrderContext?.maintenanceBasis === 'Running Hours' && !executionData.runningHours) {
           toast({
             title: "Validation Error",
-            description: "Running hours must be a valid number",
+            description: "Running hours is required for RH-based maintenance when completing work order",
             variant: "destructive",
           });
           return;
         }
         
-        // 1. Check if running hours can exceed parent running hours
-        if (parentComponent && newRunningHours > parentComponent.currentCumulativeRH) {
-          toast({
-            title: "Validation Error",
-            description: `Running hours (${newRunningHours}) cannot exceed parent component's running hours (${parentComponent.currentCumulativeRH}). Please update parent running hours first.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // 2. Check for decrease (no meter replacement flag yet - will add if needed)
-        if (newRunningHours < component.currentCumulativeRH) {
-          toast({
-            title: "Validation Error",
-            description: `Running hours cannot decrease from ${component.currentCumulativeRH} to ${newRunningHours}. If meter was replaced, please use the Running Hours module.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // 3. Check realistic delta (max 25 hrs/day)
-        if (executionData.dateOfCompletion && component.lastUpdated) {
-          const completionDate = new Date(executionData.dateOfCompletion);
-          const lastUpdate = new Date(component.lastUpdated);
-          const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-          const hoursDelta = newRunningHours - component.currentCumulativeRH;
-          const maxAllowed = daysDiff * 25;
+        // Validate running hours if provided
+        if (executionData.runningHours && workOrderContext) {
+          const { component, parentComponent } = workOrderContext;
+          const newRunningHours = parseInt(executionData.runningHours);
           
-          if (hoursDelta > maxAllowed) {
+          if (isNaN(newRunningHours)) {
             toast({
               title: "Validation Error",
-              description: `Running hours increase of ${hoursDelta} hrs over ${daysDiff.toFixed(1)} days exceeds realistic limit (max ${maxAllowed.toFixed(0)} hrs at 25 hrs/day). Please verify the entered value.`,
+              description: "Running hours must be a valid number",
               variant: "destructive",
             });
             return;
           }
+          
+          // 1. Check if running hours can exceed parent running hours
+          if (parentComponent && newRunningHours > parentComponent.currentCumulativeRH) {
+            toast({
+              title: "Validation Error",
+              description: `Running hours (${newRunningHours}) cannot exceed parent component's running hours (${parentComponent.currentCumulativeRH}). Please update parent running hours first.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // 2. Check for decrease
+          if (newRunningHours < component.currentCumulativeRH) {
+            toast({
+              title: "Validation Error",
+              description: `Running hours cannot decrease from ${component.currentCumulativeRH} to ${newRunningHours}. If meter was replaced, please use the Running Hours module.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // 3. Check realistic delta (max 25 hrs/day)
+          if (executionData.dateOfCompletion && component.lastUpdated) {
+            const completionDate = new Date(executionData.dateOfCompletion);
+            const lastUpdate = new Date(component.lastUpdated);
+            const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+            const hoursDelta = newRunningHours - component.currentCumulativeRH;
+            const maxAllowed = daysDiff * 25;
+            
+            if (hoursDelta > maxAllowed) {
+              toast({
+                title: "Validation Error",
+                description: `Running hours increase of ${hoursDelta} hrs over ${daysDiff.toFixed(1)} days exceeds realistic limit (max ${maxAllowed.toFixed(0)} hrs at 25 hrs/day). Please verify the entered value.`,
+                variant: "destructive",
+              });
+              return;
+            }
+          }
         }
       }
       
-      // If RH-based maintenance and status will be completed, require running hours
-      if (workOrderContext?.maintenanceBasis === 'Running Hours' && executionData.completionDateTime && !executionData.runningHours) {
-        toast({
-          title: "Validation Error",
-          description: "Running hours is required for RH-based maintenance when completing work order",
-          variant: "destructive",
+      // Call appropriate API endpoint
+      let response;
+      if (isCompleting) {
+        // Use completion endpoint for atomic RH update
+        response = await fetch(`/api/work-orders/${workOrderId}/complete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...executionData,
+            runningHours: executionData.runningHours,
+            dateOfCompletion: executionData.dateOfCompletion
+          })
         });
-        return;
+      } else {
+        // Use regular update for draft saves
+        response = await fetch(`/api/work-orders/${workOrderId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(executionData)
+        });
       }
-      
-      // Call backend completion API
-      const response = await fetch(`/api/work-orders/${workOrderId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...executionData,
-          runningHours: executionData.runningHours,
-          dateOfCompletion: executionData.dateOfCompletion
-        })
-      });
       
       const result = await response.json();
       
@@ -644,9 +663,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       
       toast({
         title: "Success",
-        description: result.runningHoursUpdated 
+        description: isCompleting && result.runningHoursUpdated 
           ? "Work order completed and running hours updated successfully" 
-          : "Work order completed successfully",
+          : isCompleting 
+            ? "Work order completed successfully"
+            : "Work order saved successfully",
       });
       navigate("/pms/work-orders");
     } catch (error: any) {

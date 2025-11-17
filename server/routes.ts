@@ -557,9 +557,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Component not found" });
       }
       
-      // Backend validation
+      // This endpoint is ONLY for completing work orders
+      // Enforce running hours requirement for RH-based maintenance
+      if (workOrder.maintenanceBasis === 'Running Hours' && !runningHours) {
+        return res.status(400).json({
+          error: "Running hours is required for RH-based maintenance work orders"
+        });
+      }
+      
+      // Backend validation and update
       if (runningHours) {
         const newRH = parseInt(runningHours);
+        
+        // CRITICAL: Capture original RH BEFORE updating
+        const previousRH = component.currentCumulativeRH;
+        
+        // Ensure complete metadata for audit (get from work order which always has it)
+        const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
+        const componentCode = workOrder.componentCode || component.componentCode;
         
         // Validate against parent if exists
         if (component.parentId) {
@@ -572,9 +587,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Validate no decrease
-        if (newRH < component.currentCumulativeRH) {
+        if (newRH < previousRH) {
           return res.status(400).json({
-            error: `Running hours cannot decrease from ${component.currentCumulativeRH} to ${newRH}`
+            error: `Running hours cannot decrease from ${previousRH} to ${newRH}`
           });
         }
         
@@ -583,7 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const completionDate = new Date(dateOfCompletion);
           const lastUpdate = new Date(component.lastUpdated);
           const daysDiff = Math.max(1, (completionDate.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-          const hoursDelta = newRH - component.currentCumulativeRH;
+          const hoursDelta = newRH - previousRH;
           const maxAllowed = daysDiff * 25;
           
           if (hoursDelta > maxAllowed) {
@@ -593,20 +608,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Calculate delta for cascading
+        const delta = newRH - previousRH;
+        
         // Update component running hours
         await storage.updateComponent(component.id, {
           currentCumulativeRH: newRH,
           lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
         });
         
-        // Record running hours audit entry
+        // Record running hours audit entry with complete metadata
         await storage.createRunningHoursAudit({
           componentId: component.id,
-          vesselId: component.vesselId,
-          componentCode: component.componentCode,
-          previousRH: component.currentCumulativeRH,
+          vesselId: componentVesselId,
+          componentCode: componentCode,
+          previousRH: previousRH,
           newRH: newRH,
-          delta: newRH - component.currentCumulativeRH,
+          delta: delta,
           dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
           enteredAtUTC: new Date().toISOString(),
           enteredBy: executionData.performedBy || 'System',
@@ -615,9 +633,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Cascade delta to all children
-        const delta = newRH - component.currentCumulativeRH;
         if (delta > 0) {
-          const vesselId = component.vesselId || 'V001';
+          const vesselId = componentVesselId;
           const allComponents = await storage.getComponents(vesselId);
           
           // Find all children recursively
@@ -634,24 +651,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Update each child with the delta
           for (const child of children) {
-            const childNewRH = child.currentCumulativeRH + delta;
+            const childPreviousRH = child.currentCumulativeRH;
+            const childNewRH = childPreviousRH + delta;
+            const childVesselId = child.vesselId || componentVesselId;
+            const childComponentCode = child.componentCode;
+            
             await storage.updateComponent(child.id, {
               currentCumulativeRH: childNewRH,
               lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
             });
             
-            // Record audit for each child
+            // Record audit for each child with complete metadata
             await storage.createRunningHoursAudit({
               componentId: child.id,
-              vesselId: child.vesselId,
-              componentCode: child.componentCode,
-              previousRH: child.currentCumulativeRH,
+              vesselId: childVesselId,
+              componentCode: childComponentCode,
+              previousRH: childPreviousRH,
               newRH: childNewRH,
               delta: delta,
               dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
               enteredAtUTC: new Date().toISOString(),
               enteredBy: executionData.performedBy || 'System',
-              comments: `Cascaded from parent ${component.componentCode} via work order: ${workOrder.templateCode}`,
+              comments: `Cascaded from parent ${componentCode} via work order: ${workOrder.templateCode}`,
               meterReplaced: false
             });
           }
