@@ -21,7 +21,7 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
 **Key Features & Technical Implementations**:
 
 *   **PMS Dashboard**: Professional analytics workspace with tabbed layout (Overview, Departments, Equipment, Compliance). Visualizations use AG Charts React and display data from real filtered work orders.
-*   **PMS Submodules**: Includes CRUD for Components (hierarchical tree), Work Orders (automatic status computation, comprehensive form management), Running Hours, Spares (inventory, transactions), Reports, Modify PMS, and Admin.
+*   **PMS Submodules**: Includes CRUD for Components (hierarchical tree), Work Orders (automatic status computation, comprehensive form management), Running Hours (with bulk update validation), Spares (inventory, transactions), Reports, Modify PMS, and Admin.
 *   **Jobs vs. Work Orders Architecture**:
     *   **Jobs**: Template definitions for maintenance tasks linked to components (Part A data: job details, required spares/tools).
     *   **Work Orders**: Active and historical execution records, including execution-specific details (Part B data: due date, status, uploaded documents, consumed spares, completion details).
@@ -51,6 +51,13 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
         *   CONSUME entries created for increases (with ROB validation), ADJUST entries for decreases/removals.
         *   Prevents double-consumption and maintains accurate ROB across all updates.
         *   Full audit trail with work order reference linking in `sparesHistory`.
+*   **Running Hours Module with Data Integrity Protection**:
+    *   **Bulk Update Dialog**: Date picker and comments field for documenting when running hours were updated.
+    *   **Backend Validation**: 
+        *   Rejects decreases in running hours (unless meter was replaced).
+        *   Validates realistic hourly deltas based on date differences (max 25 hrs/day to account for timezone changes).
+        *   Clear, actionable error messages explaining validation failures.
+    *   **Audit Trail**: Dual timestamps - user-entered `dateUpdatedLocal` and system-captured `enteredAtUTC` for complete audit trail.
 *   **Admin Module**:
     *   **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (with SFI hierarchy, validation, duplicate detection, multi-vessel support), Jobs, and Spares.
         *   **Multi-Vessel Support**: Explicit vessel selection for bulk uploads.
