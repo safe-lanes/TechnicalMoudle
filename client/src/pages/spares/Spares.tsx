@@ -9,10 +9,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import type { Spare } from "@shared/schema";
 
 // Component tree is now imported from shared data
 
-const sparesData = [
+const sparesDataOld = [
   {
     id: 1,
     partCode: "SP-ME-001",
@@ -347,6 +348,9 @@ const historyData = [
 ];
 
 const Spares: React.FC = () => {
+  const { toast } = useToast();
+  const vesselId = "V001";
+  
   const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
@@ -358,6 +362,60 @@ const Spares: React.FC = () => {
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number}}>({});
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
+  const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
+  
+  // Fetch spares from API
+  const { data: sparesData = [], isLoading: sparesLoading } = useQuery<Spare[]>({
+    queryKey: ['/api/spares', vesselId],
+  });
+  
+  // Adjust spare quantity mutation
+  const adjustMutation = useMutation({
+    mutationFn: async ({ spareId, qtyChange, eventType, notes }: {
+      spareId: number;
+      qtyChange: number;
+      eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST';
+      notes?: string;
+    }) => {
+      return apiRequest('POST', `/api/spares/${vesselId}/${spareId}/adjust`, {
+        qtyChange,
+        eventType,
+        notes,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      toast({
+        title: "Success",
+        description: "Spare quantity updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update spare quantity",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleAdjustQuantity = async (spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
+    setAdjustingSpares(prev => new Set(prev).add(spareId));
+    try {
+      await adjustMutation.mutateAsync({
+        spareId,
+        qtyChange,
+        eventType,
+        notes: 'Manual adjustment',
+      });
+    } finally {
+      setAdjustingSpares(prev => {
+        const next = new Set(prev);
+        next.delete(spareId);
+        return next;
+      });
+    }
+  };
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -399,7 +457,7 @@ const Spares: React.FC = () => {
       filtered = filtered.filter(spare => 
         spare.partCode.toLowerCase().includes(search) ||
         spare.partName.toLowerCase().includes(search) ||
-        spare.component.toLowerCase().includes(search)
+        (spare.componentName || '').toLowerCase().includes(search)
       );
     }
 
@@ -421,7 +479,7 @@ const Spares: React.FC = () => {
     }
 
     return filtered;
-  }, [selectedComponentId, searchTerm, criticalityFilter, stockFilter]);
+  }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, stockFilter]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -608,7 +666,7 @@ const Spares: React.FC = () => {
                   COMPONENTS
                 </div>
                 <div>
-                  {renderComponentTree(componentsTree)}
+                  {renderComponentTree(componentTree)}
                 </div>
               </div>
             </div>
@@ -620,7 +678,7 @@ const Spares: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border">
               {/* Table Header */}
               <div className="bg-[#52baf3] text-white px-4 py-3 rounded-t-lg">
-                <div className="grid grid-cols-9 gap-4 text-sm font-medium">
+                <div className="grid grid-cols-10 gap-4 text-sm font-medium">
                   <div>Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
@@ -628,60 +686,92 @@ const Spares: React.FC = () => {
                   <div>ROB</div>
                   <div>Min</div>
                   <div>Stock</div>
-                  <div>Location</div>
+                  <div>Location A</div>
+                  <div>Location B</div>
                   <div>Actions</div>
                 </div>
               </div>
 
               {/* Table Body */}
               <div className="divide-y divide-gray-200">
-                {filteredSpares.map((spare) => {
-                  const stockStatus = getStockStatus(spare.rob, spare.min);
-                  const isCritical = spare.critical === "Critical" || spare.critical === "Yes";
-                  
-                  return (
-                    <div key={spare.id} className="px-4 py-3">
-                      <div className="grid grid-cols-9 gap-4 text-sm items-center">
-                        <div className="text-gray-900">{spare.partCode}</div>
-                        <div className="text-gray-900">{spare.partName}</div>
-                        <div className="text-gray-700">{spare.component}</div>
-                        <div>
-                          {isCritical && (
-                            <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
-                              Critical
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-gray-700">{spare.rob}</div>
-                        <div className="text-gray-700">{spare.min}</div>
-                        <div>
-                          {stockStatus === "Low" && (
-                            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
-                              Low
-                            </span>
-                          )}
-                          {stockStatus === "OK" && (
-                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                              OK
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-gray-700">{spare.location}</div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                {sparesLoading ? (
+                  <div className="px-4 py-8 text-center text-gray-500">
+                    Loading spares...
+                  </div>
+                ) : filteredSpares.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-gray-500">
+                    No spares found
+                  </div>
+                ) : (
+                  filteredSpares.map((spare) => {
+                    const stockStatus = getStockStatus(spare.rob, spare.min);
+                    const isCritical = spare.critical === "Critical" || spare.critical === "Yes";
+                    const isAdjusting = adjustingSpares.has(spare.id);
+                    
+                    return (
+                      <div key={spare.id} className="px-4 py-3">
+                        <div className="grid grid-cols-10 gap-4 text-sm items-center">
+                          <div className="text-gray-900">{spare.partCode}</div>
+                          <div className="text-gray-900">{spare.partName}</div>
+                          <div className="text-gray-700">{spare.componentName || '-'}</div>
+                          <div>
+                            {isCritical && (
+                              <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
+                                Critical
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-gray-700">{spare.rob}</div>
+                          <div className="text-gray-700">{spare.min}</div>
+                          <div>
+                            {stockStatus === "Low" && (
+                              <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
+                                Low
+                              </span>
+                            )}
+                            {stockStatus === "Minimum" && (
+                              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
+                                Min
+                              </span>
+                            )}
+                            {stockStatus === "OK" && (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                OK
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-gray-700">{spare.location || '-'}</div>
+                          <div className="text-gray-700">{spare.location2 || '-'}</div>
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleAdjustQuantity(spare.id, -1, 'CONSUME')}
+                              disabled={isAdjusting || spare.rob <= 0}
+                              data-testid={`button-decrease-${spare.id}`}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleAdjustQuantity(spare.id, 1, 'RECEIVE')}
+                              disabled={isAdjusting}
+                              data-testid={`button-increase-${spare.id}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -697,7 +787,7 @@ const Spares: React.FC = () => {
                   COMPONENTS
                 </div>
                 <div>
-                  {renderComponentTree(componentsTree)}
+                  {renderComponentTree(componentTree)}
                 </div>
               </div>
             </div>
@@ -994,7 +1084,7 @@ const Spares: React.FC = () => {
                     <div key={spare.id} className="grid grid-cols-8 gap-3 p-3 border-b bg-white items-center">
                       <div className="text-gray-900 text-sm">{spare.partCode}</div>
                       <div className="text-gray-900 text-sm">{spare.partName}</div>
-                      <div className="text-gray-700 text-sm">{spare.component}</div>
+                      <div className="text-gray-700 text-sm">{spare.componentName || '-'}</div>
                       <div className="text-gray-700 text-sm">{spare.rob}</div>
                       <div>
                         <Input 

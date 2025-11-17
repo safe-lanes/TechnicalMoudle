@@ -1904,6 +1904,54 @@ export class PersistentFileStorage implements IStorage {
     return updatedSpares;
   }
 
+  async adjustSpareQuantity(
+    spareId: number,
+    qtyChange: number,
+    eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
+    reference?: string,
+    notes?: string
+  ): Promise<Spare> {
+    const spare = this.data.spares[spareId];
+    if (!spare) {
+      throw new Error(`Spare ${spareId} not found`);
+    }
+    
+    const newROB = spare.rob + qtyChange;
+    
+    if (eventType === 'CONSUME' && newROB < 0) {
+      throw new Error(`Cannot consume ${Math.abs(qtyChange)} units. Only ${spare.rob} units available.`);
+    }
+    
+    spare.rob = newROB;
+    spare.updatedAt = new Date();
+    
+    const history: SpareHistory = {
+      id: this.data.counters.historyId++,
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId ?? "V001",
+      spareId,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId ?? "",
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType,
+      qtyChange,
+      robAfter: newROB,
+      userId: 'system',
+      remarks: notes ?? null,
+      reference: reference ?? null,
+      dateLocal: null,
+      tz: null,
+      place: null
+    };
+    
+    this.data.sparesHistory.push(history);
+    this.persistData();
+    return spare;
+  }
+
   // Spares History methods
   async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
     return this.data.sparesHistory

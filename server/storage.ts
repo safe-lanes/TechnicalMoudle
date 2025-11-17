@@ -190,6 +190,13 @@ export interface IStorage {
   consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
+  adjustSpareQuantity(
+    spareId: number,
+    qtyChange: number,
+    eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
+    reference?: string,
+    notes?: string
+  ): Promise<Spare>;
   
   // Fleet Spares methods
   getFleetSpares(): Promise<Spare[]>;
