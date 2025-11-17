@@ -400,8 +400,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      // Get component data
-      const component = await storage.getComponent(workOrder.componentId);
+      // Get component data (work orders store component ID in 'component' field)
+      const component = await storage.getComponent(workOrder.component);
       if (!component) {
         return res.status(404).json({ error: "Component not found" });
       }
@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get latest running hours audit for this component
-      const audits = await storage.getRunningHoursAudit(workOrder.componentId);
+      const audits = await storage.getRunningHoursAudits(workOrder.component);
       const latestAudit = audits.length > 0 ? audits[0] : null;
       
       res.json({
@@ -552,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      const component = await storage.getComponent(workOrder.componentId);
+      const component = await storage.getComponent(workOrder.component);
       if (!component) {
         return res.status(404).json({ error: "Component not found" });
       }
@@ -569,8 +569,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (runningHours) {
         const newRH = parseInt(runningHours);
         
-        // CRITICAL: Capture original RH BEFORE updating
-        const previousRH = component.currentCumulativeRH;
+        // CRITICAL: Capture original RH BEFORE updating (parse from string)
+        const previousRH = parseInt(component.currentCumulativeRH);
         
         // Ensure complete metadata for audit (get from work order which always has it)
         const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
@@ -579,10 +579,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Validate against parent if exists
         if (component.parentId) {
           const parentComponent = await storage.getComponent(component.parentId);
-          if (parentComponent && newRH > parentComponent.currentCumulativeRH) {
-            return res.status(400).json({
-              error: `Running hours (${newRH}) cannot exceed parent component's running hours (${parentComponent.currentCumulativeRH})`
-            });
+          if (parentComponent) {
+            const parentRH = parseInt(parentComponent.currentCumulativeRH);
+            if (newRH > parentRH) {
+              return res.status(400).json({
+                error: `Running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`
+              });
+            }
           }
         }
         
@@ -611,9 +614,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate delta for cascading
         const delta = newRH - previousRH;
         
-        // Update component running hours
+        // Update component running hours (convert back to string for storage)
         await storage.updateComponent(component.id, {
-          currentCumulativeRH: newRH,
+          currentCumulativeRH: newRH.toString(),
           lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
         });
         
@@ -621,14 +624,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createRunningHoursAudit({
           componentId: component.id,
           vesselId: componentVesselId,
-          componentCode: componentCode,
-          previousRH: previousRH,
-          newRH: newRH,
-          delta: delta,
+          previousRH: previousRH.toString(),
+          newRH: newRH.toString(),
+          cumulativeRH: newRH.toString(),
           dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
-          enteredAtUTC: new Date().toISOString(),
-          enteredBy: executionData.performedBy || 'System',
-          comments: `Updated via work order completion: ${workOrder.templateCode}`,
+          dateUpdatedTZ: 'UTC',
+          enteredAtUTC: new Date(),
+          userId: executionData.performedBy || 'System',
+          source: 'single',
+          notes: `Updated via work order completion: ${workOrder.templateCode}`,
           meterReplaced: false
         });
         
@@ -665,14 +669,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createRunningHoursAudit({
               componentId: child.id,
               vesselId: childVesselId,
-              componentCode: childComponentCode,
-              previousRH: childPreviousRH,
-              newRH: childNewRH,
-              delta: delta,
+              previousRH: childPreviousRH.toString(),
+              newRH: childNewRH.toString(),
+              cumulativeRH: childNewRH.toString(),
               dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
-              enteredAtUTC: new Date().toISOString(),
-              enteredBy: executionData.performedBy || 'System',
-              comments: `Cascaded from parent ${componentCode} via work order: ${workOrder.templateCode}`,
+              dateUpdatedTZ: 'UTC',
+              enteredAtUTC: new Date(),
+              userId: executionData.performedBy || 'System',
+              source: 'single',
+              notes: `Cascaded from parent ${componentCode} via work order: ${workOrder.templateCode}`,
               meterReplaced: false
             });
           }
