@@ -23,6 +23,7 @@ interface Spare {
   critical: string;
   rob: number;
   min: number;
+  max?: number;
   location?: string;
   vesselId: string;
   stockStatus?: string;
@@ -262,6 +263,17 @@ const Spares: React.FC = () => {
     }
   });
 
+  // Helper function to compute stock status based on ROB vs Min/Max
+  const getStockStatus = (rob: number, min: number): { label: string; color: string } => {
+    if (rob < min) {
+      return { label: 'Low', color: 'bg-red-100 text-red-800' }; // RED
+    } else if (rob === min) {
+      return { label: 'At Min', color: 'bg-orange-100 text-orange-800' }; // ORANGE
+    } else {
+      return { label: 'OK', color: 'bg-green-100 text-green-800' }; // GREEN
+    }
+  };
+
   // Helper function to check if a component matches selection (including children)
   const isComponentMatch = (spare: Spare, selectedId: string): boolean => {
     if (spare.componentId === selectedId) return true;
@@ -299,9 +311,12 @@ const Spares: React.FC = () => {
       }
     }
 
-    // Filter by stock status
+    // Filter by stock status (using computed status)
     if (stockFilter && stockFilter !== "All") {
-      filtered = filtered.filter((spare: Spare) => spare.stockStatus === stockFilter);
+      filtered = filtered.filter((spare: Spare) => {
+        const status = getStockStatus(spare.rob, spare.min);
+        return status.label === stockFilter;
+      });
     }
 
     return filtered;
@@ -654,6 +669,7 @@ const Spares: React.FC = () => {
           <SelectContent>
             <SelectItem value="All">All</SelectItem>
             <SelectItem value="OK">OK</SelectItem>
+            <SelectItem value="At Min">At Min</SelectItem>
             <SelectItem value="Low">Low</SelectItem>
           </SelectContent>
         </Select>
@@ -684,7 +700,7 @@ const Spares: React.FC = () => {
             <>
               {/* Inventory Table Header */}
               <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm font-semibold text-[#ffffff]`}>
+                <div className={`grid ${FEATURES.IHM ? 'grid-cols-12' : 'grid-cols-11'} gap-4 text-sm font-semibold text-[#ffffff]`}>
                   <div className="text-[#ffffff]">Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
@@ -692,6 +708,7 @@ const Spares: React.FC = () => {
                   <div>Critical</div>
                   <div className="text-center">ROB</div>
                   <div className="text-center">Min</div>
+                  <div className="text-center">Max</div>
                   <div className="text-center">Stock</div>
                   <div>Location</div>
                   {FEATURES.IHM && <div className="text-center">IHM</div>}
@@ -708,9 +725,11 @@ const Spares: React.FC = () => {
                     No spares found. Try adjusting your filters.
                   </div>
                 ) : (
-                  filteredSpares.map((spare: Spare) => (
+                  filteredSpares.map((spare: Spare) => {
+                    const stockStatus = getStockStatus(spare.rob, spare.min);
+                    return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm items-center`}>
+                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-12' : 'grid-cols-11'} gap-4 text-sm items-center`}>
                         <div className="text-gray-900">{spare.partCode}</div>
                         <div className="text-gray-700">{spare.partName}</div>
                         <div className="text-gray-700">{spare.componentName}</div>
@@ -726,18 +745,11 @@ const Spares: React.FC = () => {
                         </div>
                         <div className="text-center">{spare.rob}</div>
                         <div className="text-center">{spare.min}</div>
+                        <div className="text-center">{spare.max || '-'}</div>
                         <div className="text-center">
-                          {spare.stockStatus && (
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              spare.stockStatus === 'Low' 
-                                ? 'bg-red-100 text-red-800' 
-                                : spare.stockStatus === 'OK'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {spare.stockStatus}
-                            </span>
-                          )}
+                          <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
+                            {stockStatus.label}
+                          </span>
                         </div>
                         <div className="text-gray-700">{spare.location || '-'}</div>
                         {FEATURES.IHM && (
@@ -788,7 +800,8 @@ const Spares: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </>
