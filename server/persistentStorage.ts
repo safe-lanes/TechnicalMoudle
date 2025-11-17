@@ -1184,7 +1184,7 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
-    // DEBUG: Write to file to prove code is executing
+    // DEBUG: Write to file to prove code is executing [TRIGGER RELOAD]
     fs.writeFileSync('/tmp/debug-rh-parents.txt', `Called at: ${new Date().toISOString()}, vesselId: ${vesselId}\n`, { flag: 'a' });
     
     // [TIMESTAMP: 2025-11-17-04:24] Get all RH jobs for this vessel

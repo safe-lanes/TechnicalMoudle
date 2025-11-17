@@ -1114,8 +1114,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get parent components whose children have running-hour based jobs
   app.get("/api/running-hours/parents", async (req, res) => {
     try {
+      console.log('🔍 [RH PARENTS] Route handler executing - TIMESTAMP:', new Date().toISOString());
       const vesselId = (req.query.vesselId as string) || 'V001';
-      const parents = await storage.getRunningHourParents(vesselId);
+      console.log('🔍 [RH PARENTS] vesselId:', vesselId);
+      
+      // TEMPORARY INLINE IMPLEMENTATION TO BYPASS CACHING ISSUE
+      const allJobs = await storage.getJobs();
+      console.log('🔍 [RH PARENTS] Total jobs:', allJobs.length);
+      const rhJobs = allJobs.filter(
+        job => job.maintenanceBasis === "Running Hours" && job.vesselId === vesselId
+      );
+      
+      const allComponents = await storage.getComponents(vesselId);
+      
+      // Extract componentIds from those jobs (the children with RH jobs)
+      const childComponentIds = new Set<string>();
+      rhJobs.forEach(job => {
+        if (job.componentId) {
+          childComponentIds.add(job.componentId);
+        }
+      });
+
+      // For each child, get its parentId
+      const parentIds = new Set<string>();
+      childComponentIds.forEach(childId => {
+        const child = allComponents.find(c => c.id === childId);
+        if (child && child.parentId) {
+          parentIds.add(child.parentId);
+        }
+      });
+
+      // For each parentId: get parent component, count children with RH jobs
+      const parents: any[] = [];
+      
+      for (const parentId of Array.from(parentIds)) {
+        const parent = allComponents.find(c => c.id === parentId);
+        // Only include if parent exists AND parent itself doesn't have a parent (true top-level parent)
+        if (!parent || parent.parentId) continue;
+
+        // Count children with RH jobs
+        const children = allComponents.filter(c => c.parentId === parentId);
+        const childrenWithRHJobs = children.filter(child =>
+          rhJobs.some(job => job.componentId === child.id)
+        );
+
+        parents.push({
+          ...parent,
+          childCount: childrenWithRHJobs.length,
+          latestUpdate: undefined
+        });
+      }
+      
       res.json(parents);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch running hour parents", message: error.message, stack: error.stack });
