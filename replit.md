@@ -40,10 +40,20 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
     *   Multi-step defect reporting form with persistent data and action management.
     *   Streamlined defect closure workflow, automatically setting status to 'Closed' and moving to 'Resolved' tab.
     *   Uses TanStack Query for cache invalidation with `exact: false` for hierarchical query keys.
+*   **Spares Module with Full Integration**:
+    *   **Inventory Management**: ROB/Min/Max tracking with RED/ORANGE/GREEN stock indicators (RED: ROB < Min, ORANGE: ROB = Min, GREEN: ROB > Min).
+    *   **Bulk Upload**: CSV/Excel import with auto-generated PT-XXXXXX codes, three modes (Add/Update/Upsert), Component Code validation, and duplicate detection.
+    *   **Transaction History**: Complete audit trail of all inventory movements (CONSUME, RECEIVE, ADJUST, CREATE, EDIT).
+    *   **Work Order Integration (Part B4)**: Differential reconciliation system for consumed spares:
+        *   Uses `sparesHistory` as source of truth to track net consumption per work order execution.
+        *   Supports add/edit/remove of consumed spares with automatic inventory adjustments.
+        *   On save: compares new consumption vs. prior history, applies only deltas (positive for additional consumption, negative for restocking).
+        *   CONSUME entries created for increases (with ROB validation), ADJUST entries for decreases/removals.
+        *   Prevents double-consumption and maintains accurate ROB across all updates.
+        *   Full audit trail with work order reference linking in `sparesHistory`.
 *   **Admin Module**:
     *   **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (with SFI hierarchy, validation, duplicate detection, multi-vessel support), Jobs, and Spares.
         *   **Multi-Vessel Support**: Explicit vessel selection for bulk uploads.
-        *   **Spares Bulk Upload**: Comprehensive validation, auto-generated part codes, three import modes (Add, Update, Upsert), and transaction history recording.
         *   **Error Viewing & Partial Import**: Enhanced UX for handling validation errors, allowing viewing of errors and selective import of valid rows.
     *   **Alerts Tab**: Alert policy management.
     *   **Forms Tab**: Form configuration.
