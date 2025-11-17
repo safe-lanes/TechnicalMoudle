@@ -1115,32 +1115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/running-hours/parents", async (req, res) => {
     try {
       const vesselId = (req.query.vesselId as string) || 'V001';
-      
-      // TEMPORARY DEBUG: Return raw debug data in JSON
-      const allComponents = await storage.getComponents(vesselId);
-      const allJobs = await storage.getJobs();
-      const rhJobs = allJobs.filter(j => j.maintenanceBasis === "Running Hours");
-      const rhJobsWithComponent = rhJobs.filter(j => {
-        const comp = allComponents.find(c => c.id === j.componentId);
-        return comp && comp.vesselId === vesselId;
-      });
-      
       const parents = await storage.getRunningHourParents(vesselId);
-      
-      res.json({
-        DEBUG_MODE: true,
-        vesselId,
-        allComponents: allComponents.length,
-        allJobs: allJobs.length,
-        rhJobs: rhJobs.length,
-        rhJobsWithComponent: rhJobsWithComponent.length,
-        parentsReturned: parents.length,
-        sampleRHJobs: rhJobsWithComponent.slice(0, 3).map(j => ({
-          jobNo: j.jobNo,
-          componentId: j.componentId
-        })),
-        parents
-      });
+      res.json(parents);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch running hour parents", message: error.message, stack: error.stack });
     }
