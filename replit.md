@@ -41,7 +41,13 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
     *   Streamlined defect closure workflow, automatically setting status to 'Closed' and moving to 'Resolved' tab.
     *   Uses TanStack Query for cache invalidation with `exact: false` for hierarchical query keys.
 *   **Spares Module with Full Integration**:
+    *   **Dual-Location Tracking**: Supports two storage locations (Location A and Location B) via `location` and `location2` fields for spares stored in multiple locations.
     *   **Inventory Management**: ROB/Min/Max tracking with RED/ORANGE/GREEN stock indicators (RED: ROB < Min, ORANGE: ROB = Min, GREEN: ROB > Min).
+    *   **Quick Quantity Adjustments**: +/- buttons for immediate inventory adjustments with automatic validation and history tracking.
+        *   POST `/api/spares/:vesselId/:id/adjust` endpoint with signed qtyChange parameter (negative for CONSUME, positive for RECEIVE).
+        *   Frontend disables minus button when ROB ≤ 0.
+        *   Backend validates ROB won't go negative for CONSUME events.
+        *   Automatic creation of sparesHistory entries with complete audit trail.
     *   **Bulk Upload**: CSV/Excel import with auto-generated PT-XXXXXX codes, three modes (Add/Update/Upsert), Component Code validation, and duplicate detection.
     *   **Transaction History**: Complete audit trail of all inventory movements (CONSUME, RECEIVE, ADJUST, CREATE, EDIT).
     *   **Work Order Integration (Part B4)**: Differential reconciliation system for consumed spares:
