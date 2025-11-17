@@ -50,6 +50,10 @@ const RunningHours = () => {
     newMeterStart: string;
   }}>({});
   const [bulkUpdateErrors, setBulkUpdateErrors] = useState<{[key: string]: string}>({});
+  const [bulkUpdateGlobal, setBulkUpdateGlobal] = useState({
+    dateUpdated: new Date().toISOString().split('T')[0],
+    comments: ""
+  });
   
   const { toast } = useToast();
   const vesselId = "V001"; // Default vessel ID
@@ -272,6 +276,10 @@ const RunningHours = () => {
   const openBulkUpdate = () => {
     setBulkUpdateData({});
     setBulkUpdateErrors({});
+    setBulkUpdateGlobal({
+      dateUpdated: new Date().toISOString().split('T')[0],
+      comments: ""
+    });
     setIsBulkUpdateOpen(true);
   };
 
@@ -296,15 +304,26 @@ const RunningHours = () => {
   const handleBulkSave = () => {
     const errors: {[key: string]: string} = {};
     const updates = [];
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
     
-    // Format date in vessel local time
-    const dateLocal = today.toLocaleDateString('en-GB', {
+    // Validate global date
+    if (!bulkUpdateGlobal.dateUpdated) {
+      toast({
+        title: "Date Required",
+        description: "Please select the date when running hours were updated",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Parse user-selected date and format it
+    const selectedDate = new Date(bulkUpdateGlobal.dateUpdated);
+    selectedDate.setHours(23, 59, 59, 999);
+    
+    const dateLocal = selectedDate.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
-    }) + ' ' + today.toLocaleTimeString('en-GB', {
+    }) + ' ' + selectedDate.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
@@ -327,7 +346,7 @@ const RunningHours = () => {
         mode: bulkUpdateMode,
         value: inputValue,
         dateUpdated: dateLocal,
-        comments: '',
+        comments: bulkUpdateGlobal.comments,
         meterReplaced: updateData.meterReplaced || false,
         oldMeterFinal: updateData.meterReplaced ? updateData.oldMeterFinal : undefined,
         newMeterStart: updateData.meterReplaced ? updateData.newMeterStart : undefined
@@ -602,6 +621,34 @@ const RunningHours = () => {
                   <Label htmlFor="bulkAddDelta">Add Delta</Label>
                 </div>
               </RadioGroup>
+            </div>
+            
+            {/* Global Date and Comments - applies to all updates */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+              <div>
+                <Label className="text-sm text-gray-700 font-medium">Date Updated <span className="text-red-500">*</span></Label>
+                <Input 
+                  type="date"
+                  value={bulkUpdateGlobal.dateUpdated}
+                  onChange={(e) => setBulkUpdateGlobal(prev => ({ ...prev, dateUpdated: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="mt-1"
+                  data-testid="input-bulk-date"
+                />
+                <p className="text-xs text-gray-500 mt-1">When were the running hours readings taken?</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-700 font-medium">Comments</Label>
+                <Input 
+                  type="text"
+                  value={bulkUpdateGlobal.comments}
+                  onChange={(e) => setBulkUpdateGlobal(prev => ({ ...prev, comments: e.target.value }))}
+                  placeholder="e.g., Monthly update, After dry dock"
+                  className="mt-1"
+                  data-testid="input-bulk-comments"
+                />
+                <p className="text-xs text-gray-500 mt-1">Optional notes about this update</p>
+              </div>
             </div>
           </DialogHeader>
           
