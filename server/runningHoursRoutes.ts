@@ -56,10 +56,9 @@ export function registerRunningHoursRoutes(app: Express) {
       
       res.json(parents);
     } catch (error: any) {
+      console.error("Error fetching running hour parents:", error);
       res.status(500).json({ 
-        error: "Failed to fetch running hour parents", 
-        message: error.message, 
-        stack: error.stack 
+        error: "Failed to fetch running hour parents"
       });
     }
   });
