@@ -694,7 +694,8 @@ export const workOrderExecutions = pgTable("work_order_executions", {
   executionId: text("execution_id").notNull().unique(), // Unique execution code (WOE-XXXXXXX)
   
   // Execution tracking
-  dateCompleted: text("date_completed"), // ISO date when work was completed
+  dateCompleted: text("date_completed"), // ISO date when work was completed (format: DD-MMM-YYYY HH:mm for consistency)
+  runningHoursAtCompletion: decimal("running_hours_at_completion", { precision: 10, scale: 2 }), // Running hours when work was completed
   performedBy: text("performed_by"), // User who performed the work
   approvedBy: text("approved_by"), // User who approved the work
   status: text("status").notNull().default("In Progress"), // 'In Progress' | 'Completed' | 'Approved'
