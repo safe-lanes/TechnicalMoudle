@@ -83,6 +83,99 @@ const Spares: React.FC = () => {
   });
   
   const { toast } = useToast();
+  const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
+  const [pendingAdjustments, setPendingAdjustments] = useState<Map<number, number>>(new Map());
+
+  // Quick adjust mutation (for +/- buttons) with optimistic updates
+  const adjustMutation = useMutation({
+    mutationFn: async ({ spareId, qtyChange, eventType, notes }: { spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE', notes?: string }) => {
+      const response = await fetch(`/api/spares/${vesselId}/${spareId}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qtyChange, eventType, notes: notes || 'Manual adjustment' }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to adjust quantity');
+      }
+      return response.json();
+    },
+    onMutate: async ({ spareId, qtyChange }) => {
+      // Track pending adjustment optimistically
+      setPendingAdjustments(prev => {
+        const next = new Map(prev);
+        next.set(spareId, (next.get(spareId) || 0) + qtyChange);
+        return next;
+      });
+      
+      // Return rollback function
+      return { spareId, qtyChange };
+    },
+    onError: (error: any, variables, context) => {
+      // Rollback optimistic update on error
+      if (context) {
+        setPendingAdjustments(prev => {
+          const next = new Map(prev);
+          const currentDelta = next.get(context.spareId) || 0;
+          const newDelta = currentDelta - context.qtyChange;
+          if (newDelta === 0) {
+            next.delete(context.spareId);
+          } else {
+            next.set(context.spareId, newDelta);
+          }
+          return next;
+        });
+      }
+      
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to adjust quantity",
+        variant: "destructive"
+      });
+    },
+    onSettled: async (data, error, variables) => {
+      // Wait for queries to refetch before clearing pending state
+      await queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      
+      // Clear pending adjustment and loading state
+      setPendingAdjustments(prev => {
+        const next = new Map(prev);
+        next.delete(variables.spareId);
+        return next;
+      });
+      setAdjustingSpares(prev => {
+        const next = new Set(prev);
+        next.delete(variables.spareId);
+        return next;
+      });
+      
+      if (!error) {
+        toast({ title: "Success", description: "Quantity adjusted successfully" });
+      }
+    }
+  });
+
+  const handleQuickAdjust = async (spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
+    // Validate stock availability using effective ROB (actual + pending adjustments)
+    if (eventType === 'CONSUME') {
+      const spare = sparesData.find((s: Spare) => s.id === spareId);
+      const pendingDelta = pendingAdjustments.get(spareId) || 0;
+      const effectiveRob = (spare?.rob || 0) + pendingDelta;
+      
+      if (!spare || effectiveRob + qtyChange < 0) {
+        toast({
+          title: "Insufficient Stock",
+          description: `Cannot consume ${Math.abs(qtyChange)} units. Only ${effectiveRob} units available.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    setAdjustingSpares(prev => new Set(prev).add(spareId));
+    await adjustMutation.mutateAsync({ spareId, qtyChange, eventType });
+  };
 
   // Fetch spares data
   const { data: sparesData = [], isLoading, refetch } = useQuery({
@@ -769,34 +862,40 @@ const Spares: React.FC = () => {
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => {}}
-                            title="Edit"
+                            onClick={() => openConsumeModal(spare)}
+                            title="Consume (detailed)"
+                            data-testid={`button-consume-detailed-${spare.id}`}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Minus className="h-4 w-4 text-red-600" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => openConsumeModal(spare)}
-                            title="Consume"
+                            onClick={() => handleQuickAdjust(spare.id, -1, 'CONSUME')}
+                            disabled={adjustingSpares.has(spare.id) || spare.rob <= 0}
+                            title="Quick decrease (-1)"
+                            data-testid={`button-decrease-${spare.id}`}
                           >
-                            <Minus className="h-4 w-4" />
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleQuickAdjust(spare.id, 1, 'RECEIVE')}
+                            disabled={adjustingSpares.has(spare.id)}
+                            title="Quick increase (+1)"
+                            data-testid={`button-increase-${spare.id}`}
+                          >
+                            <Plus className="h-3 w-3" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
                             onClick={() => openReceiveModal(spare)}
-                            title="Receive"
+                            title="Receive (detailed)"
+                            data-testid={`button-receive-detailed-${spare.id}`}
                           >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => {}}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
+                            <Plus className="h-4 w-4 text-green-600" />
                           </Button>
                         </div>
                       </div>
