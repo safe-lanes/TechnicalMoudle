@@ -1989,7 +1989,7 @@ const Components: React.FC = () => {
                 COMPONENTS
               </div>
               <div>
-                {renderComponentTree(componentTreeData)}
+                {renderComponentTree(filteredComponentTree)}
               </div>
             </div>
           </div>
