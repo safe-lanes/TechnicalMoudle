@@ -458,6 +458,13 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   parentComponent,
 }) => {
   const { toast } = useToast();
+  const { vesselId } = useVessel();
+  
+  // Fetch components from API
+  const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
+    queryKey: [`/api/components/${vesselId}`],
+  });
+  
   const [selectedNode, setSelectedNode] = useState<ComponentNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
   const [isAddMode, setIsAddMode] = useState(false);
@@ -626,6 +633,83 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     queryKey: [`/api/ihm/component/${componentData.componentId}`],
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
+
+  // Build component tree from fetched data
+  const componentTreeData = React.useMemo(() => {
+    // Start with the 8 main categories
+    const mainCategories: ComponentNode[] = [
+      { id: "1", code: "1", name: "Ship General", children: [] },
+      { id: "2", code: "2", name: "Hull", children: [] },
+      { id: "3", code: "3", name: "Equipment for Cargo", children: [] },
+      { id: "4", code: "4", name: "Ship's Equipment", children: [] },
+      { id: "5", code: "5", name: "Equipment for Crew & Passengers", children: [] },
+      { id: "6", code: "6", name: "Machinery Main Components", children: [] },
+      { id: "7", code: "7", name: "Systems for Machinery Main Components", children: [] },
+      { id: "8", code: "8", name: "Ship Common Systems", children: [] }
+    ];
+    
+    if (!fetchedComponents || fetchedComponents.length === 0) {
+      return mainCategories;
+    }
+    
+    // Build a map for quick lookup
+    const componentMap = new Map<string, ComponentNode>();
+    
+    // First, add all main categories to the map
+    mainCategories.forEach(cat => {
+      componentMap.set(cat.code, cat);
+    });
+    
+    // Convert fetched components to ComponentNode format and add to map
+    // Skip main categories (1-8) as they're already in the map
+    fetchedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      // Skip if this is a main category (single digit 1-8)
+      if (code.match(/^[1-8]$/)) {
+        return;
+      }
+      const node: ComponentNode = {
+        id: code,
+        code: code,
+        name: comp.name,
+        ...comp,
+        critical: comp.critical === "Yes" || comp.critical === true,
+        children: []
+      };
+      componentMap.set(node.code, node);
+    });
+    
+    // Build parent-child relationships
+    fetchedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      const node = componentMap.get(code);
+      
+      if (!node) return;
+      
+      if (comp.parentId) {
+        // Has explicit parent ID - use it
+        const parent = componentMap.get(comp.parentId);
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+        }
+      } else {
+        // No parent ID - determine category from code prefix
+        const categoryCode = code.split('.')[0];
+        const category = componentMap.get(categoryCode);
+        if (category && categoryCode !== code) {
+          if (!category.children) {
+            category.children = [];
+          }
+          category.children.push(node);
+        }
+      }
+    });
+    
+    return mainCategories;
+  }, [fetchedComponents]);
 
   // Handle node selection
   const handleNodeSelect = (node: ComponentNode) => {
