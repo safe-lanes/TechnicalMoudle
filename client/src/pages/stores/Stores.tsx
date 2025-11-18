@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import { FEATURES } from "@/config/features";
+import { VESSELS } from "@/lib/vessels";
 
 // IHM constants
 const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
@@ -1255,9 +1256,11 @@ const Stores: React.FC = () => {
               <SelectValue placeholder="Select Vessel" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
-              <SelectItem value="V002">MV Sea Explorer</SelectItem>
-              <SelectItem value="V003">MV Maritime Star</SelectItem>
+              {VESSELS.map(vessel => (
+                <SelectItem key={vessel.id} value={vessel.id}>
+                  {vessel.id} - {vessel.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { FEATURES, IHM_PRESENCE, IHM_EVIDENCE_TYPES } from '@/config/features';
+import { VESSELS } from "@/lib/vessels";
 
 interface Spare {
   id: number;
@@ -791,9 +792,11 @@ const Spares: React.FC = () => {
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
-            <SelectItem value="V002">MV Sea Explorer</SelectItem>
-            <SelectItem value="V003">MV Maritime Star</SelectItem>
+            {VESSELS.map(vessel => (
+              <SelectItem key={vessel.id} value={vessel.id}>
+                {vessel.id} - {vessel.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

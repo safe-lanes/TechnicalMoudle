@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
+import { VESSELS } from "@/lib/vessels";
 import {
   Select,
   SelectContent,
@@ -1953,9 +1954,11 @@ const Components: React.FC = () => {
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
-                <SelectItem value="V002">MV Sea Explorer</SelectItem>
-                <SelectItem value="V003">MV Maritime Star</SelectItem>
+                {VESSELS.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.id} - {vessel.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

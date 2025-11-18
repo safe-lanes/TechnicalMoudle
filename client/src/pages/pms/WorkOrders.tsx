@@ -22,6 +22,7 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { WorkOrder, InsertWorkOrder } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
+import { VESSELS } from "@/lib/vessels";
 
 // Extend WorkOrder type to include computedStatus from backend
 type WorkOrderWithComputedStatus = WorkOrder & {
@@ -433,9 +434,11 @@ const WorkOrders: React.FC = () => {
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
-            <SelectItem value="V002">MV Sea Explorer</SelectItem>
-            <SelectItem value="V003">MV Maritime Star</SelectItem>
+            {VESSELS.map(vessel => (
+              <SelectItem key={vessel.id} value={vessel.id}>
+                {vessel.id} - {vessel.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

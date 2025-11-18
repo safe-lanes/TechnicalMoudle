@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkOrder } from "@shared/schema";
+import { VESSELS } from "@/lib/vessels";
 
 interface DashboardFilters {
   vesselId: string;
@@ -64,12 +65,6 @@ const Dashboard = () => {
     return defaultFilters;
   });
 
-  // Vessel list
-  const vessels = [
-    { id: 'V001', name: 'MV Ocean Pioneer' },
-    { id: 'V002', name: 'MV Sea Explorer' },
-    { id: 'V003', name: 'MV Maritime Star' }
-  ];
 
   // Date range presets
   const dateRanges = [
@@ -382,8 +377,10 @@ const Dashboard = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {vessels.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  {VESSELS.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.id} - {vessel.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
