@@ -41,6 +41,7 @@ import AddSectionModal from "@/components/modals/AddSectionModal";
 import { FEATURES } from '@/config/features';
 import IhmManagementModal from '@/components/modals/IhmManagementModal';
 import { useQuery } from '@tanstack/react-query';
+import { useVessel } from "@/contexts/VesselContext";
 
 interface ComponentNode {
   id: string;
