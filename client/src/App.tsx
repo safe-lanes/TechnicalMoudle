@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Switch, Route, useLocation } from "wouter";
 import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
+import { VesselProvider } from "@/contexts/VesselContext";
 import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
@@ -16,9 +17,10 @@ import NotFound from "./pages/not-found";
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ChangeRequestProvider>
-        <ChangeModeProvider>
-          <TooltipProvider>
+      <VesselProvider>
+        <ChangeRequestProvider>
+          <ChangeModeProvider>
+            <TooltipProvider>
             <div className="min-h-screen bg-gray-50">
               <Switch>
                 <Route path="/" component={TechnicalModule} />
@@ -64,9 +66,10 @@ function App() {
               </Switch>
             </div>
             <Toaster />
-          </TooltipProvider>
-        </ChangeModeProvider>
-      </ChangeRequestProvider>
+            </TooltipProvider>
+          </ChangeModeProvider>
+        </ChangeRequestProvider>
+      </VesselProvider>
     </QueryClientProvider>
   );
 }
