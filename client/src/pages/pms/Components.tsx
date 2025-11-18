@@ -71,31 +71,36 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   // Component data - uses selected component code or defaults (empty until populated from Excel)
   const [componentData, setComponentData] = useState({
+    fleetEquipmentCode: "",
+    fleetEquipmentName: "",
+    parentComponent: "",
+    componentCode: "",
+    componentName: "",
+    componentCategory: "",
     maker: "",
     makerCode: "",
     model: "",
-    modelNumber: "",
+    modelCode: "",
     serialNo: "",
     drawingNo: "",
-    department: "",
-    componentCategory: "",
-    componentCode: "",
-    critical: "",
-    classItem: "",
     location: "",
-    commissionedDate: "",
-    installationDate: "",
-    rating: "",
+    critical: "",
     conditionBased: "",
-    noOfUnits: "",
+    installationDate: "",
+    commissionedDate: "",
+    rating: "",
     eqptSystemDept: "",
-    parentComponent: "",
-    dimensionsSize: "",
-    fleetEquipmentCode: "",
-    fleetEquipmentName: "",
-    vesselCode: "",
+    notes: "",
+    runningHours: "",
     isActive: "",
-    notes: ""
+    vesselCode: "",
+    isParent: "",
+    // Legacy fields kept for compatibility
+    classItem: "",
+    modelNumber: "",
+    department: "",
+    noOfUnits: "",
+    dimensionsSize: ""
   });
   
   // Track original component data for modify mode
@@ -115,31 +120,36 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       };
       
       const newData = {
+        fleetEquipmentCode: comp.fleetEquipmentCode || "",
+        fleetEquipmentName: comp.fleetEquipmentName || "",
+        parentComponent: comp.parentId || "",
+        componentCode: selectedComponent.code,
+        componentName: comp.name || selectedComponent.name || "",
+        componentCategory: getComponentCategory(selectedComponent.id),
         maker: comp.maker || "",
         makerCode: comp.makerCode || "",
         model: comp.model || "",
-        modelNumber: comp.modelNumber || "",
+        modelCode: comp.modelCode || "",
         serialNo: comp.serialNo || "",
         drawingNo: comp.drawingNo || "",
-        department: comp.department || comp.deptCategory || "",
-        componentCategory: getComponentCategory(selectedComponent.id),
-        componentCode: selectedComponent.code,
-        critical: toBoolString(comp.critical),
-        classItem: toBoolString(comp.classItem),
         location: comp.location || "",
-        commissionedDate: comp.commissionedDate || "",
-        installationDate: comp.installationDate || "",
-        rating: comp.rating || "",
+        critical: toBoolString(comp.critical),
         conditionBased: toBoolString(comp.conditionBased),
-        noOfUnits: comp.noOfUnits || "",
+        installationDate: comp.installationDate || "",
+        commissionedDate: comp.commissionedDate || "",
+        rating: comp.rating || "",
         eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || "",
-        parentComponent: comp.parentId || "",
-        dimensionsSize: comp.dimensionsSize || "",
-        fleetEquipmentCode: comp.fleetEquipmentCode || "",
-        fleetEquipmentName: comp.fleetEquipmentName || "",
-        vesselCode: comp.vesselCode || "",
+        notes: comp.notes || "",
+        runningHours: comp.currentCumulativeRH || comp.runningHours || "",
         isActive: toBoolString(comp.isActive),
-        notes: comp.notes || ""
+        vesselCode: comp.vesselCode || "",
+        isParent: toBoolString(comp.isParent),
+        // Legacy fields
+        classItem: toBoolString(comp.classItem),
+        modelNumber: comp.modelNumber || "",
+        department: comp.department || comp.deptCategory || "",
+        noOfUnits: comp.noOfUnits || "",
+        dimensionsSize: comp.dimensionsSize || ""
       };
       setComponentData(newData);
       
@@ -186,271 +196,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
-      {/* Row 1: Maker, Maker Code, Model, Model Number */}
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.maker}
-              onChange={(e) => handleFieldChange('maker', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('maker') || hasPreviewChange('maker') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="maker"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.maker}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker Code</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.makerCode}
-              onChange={(e) => handleFieldChange('makerCode', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('makerCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="makerCode"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.makerCode}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Model</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.model}
-              onChange={(e) => handleFieldChange('model', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('model') || hasPreviewChange('model') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="model"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.model}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Model Number</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.modelNumber}
-              onChange={(e) => handleFieldChange('modelNumber', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('modelNumber') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="modelNumber"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.modelNumber}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Serial No</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.serialNo}
-              onChange={(e) => handleFieldChange('serialNo', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('serialNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="serialNo"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.serialNo}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Drawing No</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.drawingNo}
-              onChange={(e) => handleFieldChange('drawingNo', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('drawingNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="drawingNo"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.drawingNo}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Department</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.department}
-              onChange={(e) => handleFieldChange('department', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('department') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="department"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.department}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>&nbsp;</label>
-          <div className="text-sm text-gray-900">
-            &nbsp;
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Code</label>
-          <div className="text-sm text-gray-900">
-            {componentData.componentCode}
-          </div>
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Category</label>
-          <div className="text-sm text-gray-900">
-            {componentData.componentCategory}
-          </div>
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Critical</label>
-          {isChangeMode || isPreviewMode ? (
-            <select
-              value={isPreviewMode && hasPreviewChange('critical') ? getPreviewValue('critical') : componentData.critical}
-              onChange={(e) => handleFieldChange('critical', e.target.value)}
-              disabled={isPreviewMode}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('critical') || hasPreviewChange('critical') ? 'text-red-600 border-red-300 bg-red-50' : 'text-[#52BAF3] border-[#52BAF3]'
-              } ${isPreviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              data-field-value="critical"
-            >
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          ) : (
-            <div className="text-sm text-gray-900">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                componentData.critical === "Yes" 
-                  ? "bg-red-100 text-red-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {componentData.critical}
-              </span>
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Class Item</label>
-          {isChangeMode ? (
-            <select
-              value={componentData.classItem}
-              onChange={(e) => handleFieldChange('classItem', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('classItem') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="classItem"
-            >
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          ) : (
-            <div className="text-sm text-gray-900">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                componentData.classItem === "Yes" 
-                  ? "bg-blue-100 text-blue-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {componentData.classItem}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Third row */}
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Location</label>
-          <div className="text-sm text-gray-900">
-            {componentData.location}
-          </div>
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioned Date</label>
-          <div className="text-sm text-gray-900">
-            {componentData.commissionedDate}
-          </div>
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rating</label>
-          {isChangeMode ? (
-            <input
-              type="text"
-              value={componentData.rating}
-              onChange={(e) => handleFieldChange('rating', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('rating') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="rating"
-            />
-          ) : (
-            <div className="text-sm text-gray-900">
-              {componentData.rating}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active</label>
-          {isChangeMode ? (
-            <select
-              value={componentData.isActive}
-              onChange={(e) => handleFieldChange('isActive', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('isActive') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-field-value="isActive"
-            >
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          ) : (
-            <div className="text-sm text-gray-900">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                componentData.isActive === "Yes" 
-                  ? "bg-green-100 text-green-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
-                {componentData.isActive}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Fourth row - Fleet Equipment fields */}
+      {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
       <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Fleet Equipment Code</label>
@@ -462,10 +208,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('fleetEquipmentCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-field-value="fleetEquipmentCode"
+              data-testid="input-fleet-equipment-code"
             />
           ) : (
-            <div className="text-sm text-gray-900">
+            <div className="text-sm text-gray-900" data-testid="text-fleet-equipment-code">
               {componentData.fleetEquipmentCode}
             </div>
           )}
@@ -480,16 +226,404 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('fleetEquipmentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-field-value="fleetEquipmentName"
+              data-testid="input-fleet-equipment-name"
             />
           ) : (
-            <div className="text-sm text-gray-900">
+            <div className="text-sm text-gray-900" data-testid="text-fleet-equipment-name">
               {componentData.fleetEquipmentName}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Vessel Code</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Parent Component Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.parentComponent}
+              onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('parentComponent') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-parent-component-code"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-parent-component-code">
+              {componentData.parentComponent}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Code</label>
+          <div className="text-sm text-gray-900" data-testid="text-component-code">
+            {componentData.componentCode}
+          </div>
+        </div>
+      </div>
+      {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Name</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.componentName}
+              onChange={(e) => handleFieldChange('componentName', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('componentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-component-name"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-component-name">
+              {componentData.componentName}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Category</label>
+          <div className="text-sm text-gray-900" data-testid="text-component-category">
+            {componentData.componentCategory}
+          </div>
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.maker}
+              onChange={(e) => handleFieldChange('maker', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('maker') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-maker"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-maker">
+              {componentData.maker}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.makerCode}
+              onChange={(e) => handleFieldChange('makerCode', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('makerCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-maker-code"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-maker-code">
+              {componentData.makerCode}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Row 3: Model, Model Code, Serial No, Drawing No */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Model</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.model}
+              onChange={(e) => handleFieldChange('model', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('model') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-model"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-model">
+              {componentData.model}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Model Code</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.modelCode}
+              onChange={(e) => handleFieldChange('modelCode', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('modelCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-model-code"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-model-code">
+              {componentData.modelCode}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Serial No</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.serialNo}
+              onChange={(e) => handleFieldChange('serialNo', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('serialNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-serial-no"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-serial-no">
+              {componentData.serialNo}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Drawing No</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.drawingNo}
+              onChange={(e) => handleFieldChange('drawingNo', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('drawingNo') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-drawing-no"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-drawing-no">
+              {componentData.drawingNo}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Row 4: Location, Critical (Yes/No), Condition Based (Yes/No), Installation Date */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Location</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.location}
+              onChange={(e) => handleFieldChange('location', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('location') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-location"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-location">
+              {componentData.location}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Critical (Yes/No)</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.critical}
+              onChange={(e) => handleFieldChange('critical', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('critical') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-critical"
+            >
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-critical">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.critical === "Yes" 
+                  ? "bg-red-100 text-red-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.critical}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Condition Based (Yes/No)</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.conditionBased}
+              onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('conditionBased') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-condition-based"
+            >
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-condition-based">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.conditionBased === "Yes" 
+                  ? "bg-blue-100 text-blue-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.conditionBased}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Installation Date (DD-MM-YYYY)</label>
+          {isChangeMode ? (
+            <input
+              type="date"
+              value={componentData.installationDate}
+              onChange={(e) => handleFieldChange('installationDate', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('installationDate') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-installation-date"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-installation-date">
+              {componentData.installationDate}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioning Date (DD-MM-YYYY)</label>
+          {isChangeMode ? (
+            <input
+              type="date"
+              value={componentData.commissionedDate}
+              onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('commissionedDate') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-commissioned-date"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-commissioned-date">
+              {componentData.commissionedDate}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rating</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.rating}
+              onChange={(e) => handleFieldChange('rating', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('rating') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-rating"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-rating">
+              {componentData.rating}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Equip/System Department</label>
+          {isChangeMode ? (
+            <input
+              type="text"
+              value={componentData.eqptSystemDept}
+              onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('eqptSystemDept') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-eqpt-system-dept"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-eqpt-system-dept">
+              {componentData.eqptSystemDept}
+            </div>
+          )}
+        </div>
+        <div>
+          {/* Empty spacer field */}
+        </div>
+      </div>
+
+      {/* Row 6: Notes (full width) */}
+      <div>
+        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Notes</label>
+        {isChangeMode ? (
+          <textarea
+            value={componentData.notes}
+            onChange={(e) => handleFieldChange('notes', e.target.value)}
+            className={`text-sm w-full px-2 py-1 border rounded ${
+              changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+            }`}
+            rows={3}
+            data-testid="input-notes"
+          />
+        ) : (
+          <div className="text-sm text-gray-900" data-testid="text-notes">
+            {componentData.notes}
+          </div>
+        )}
+      </div>
+
+      {/* Row 7: Running Hours, IS Active, Vessel Code, IS Parent */}
+      <div className="grid grid-cols-4 gap-4">
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Running Hours (Number ≥0)</label>
+          {isChangeMode ? (
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={componentData.runningHours}
+              onChange={(e) => handleFieldChange('runningHours', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('runningHours') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="input-running-hours"
+            />
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-running-hours">
+              {componentData.runningHours}
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active (Yes/No)</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.isActive}
+              onChange={(e) => handleFieldChange('isActive', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('isActive') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-is-active"
+            >
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-is-active">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.isActive === "Yes" 
+                  ? "bg-green-100 text-green-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.isActive}
+              </span>
+            </div>
+          )}
+        </div>
+        <div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Vessel Code / Tool Number</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -498,211 +632,42 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('vesselCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-field-value="vesselCode"
+              data-testid="input-vessel-code"
             />
           ) : (
-            <div className="text-sm text-gray-900">
+            <div className="text-sm text-gray-900" data-testid="text-vessel-code">
               {componentData.vesselCode}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>&nbsp;</label>
-          <div className="text-sm text-gray-900">
-            &nbsp;
-          </div>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Parent (Yes/No)</label>
+          {isChangeMode ? (
+            <select
+              value={componentData.isParent}
+              onChange={(e) => handleFieldChange('isParent', e.target.value)}
+              className={`text-sm w-full px-2 py-1 border rounded ${
+                changedFields.has('isParent') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+              }`}
+              data-testid="select-is-parent"
+            >
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          ) : (
+            <div className="text-sm text-gray-900" data-testid="text-is-parent">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                componentData.isParent === "Yes" 
+                  ? "bg-purple-100 text-purple-800" 
+                  : "bg-gray-100 text-gray-800"
+              }`}>
+                {componentData.isParent}
+              </span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Additional details - only visible when expanded */}
-      {isExpanded && (
-        <div className="space-y-4 pt-4">
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Installation Date</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.installationDate || componentData.installationDate}
-                  currentValue={componentData.installationDate}
-                  fieldName="installationDate"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('installationDate', value)}
-                >
-                  <input
-                    type="date"
-                    value={componentData.installationDate}
-                    onChange={(e) => handleFieldChange('installationDate', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.installationDate}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Commissioned Date</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.commissionedDate || componentData.commissionedDate}
-                  currentValue={componentData.commissionedDate}
-                  fieldName="commissionedDate"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('commissionedDate', value)}
-                >
-                  <input
-                    type="date"
-                    value={componentData.commissionedDate}
-                    onChange={(e) => handleFieldChange('commissionedDate', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.commissionedDate}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Rating</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.rating || componentData.rating}
-                  currentValue={componentData.rating}
-                  fieldName="rating"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('rating', value)}
-                >
-                  <input
-                    type="text"
-                    value={componentData.rating}
-                    onChange={(e) => handleFieldChange('rating', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                    placeholder="e.g., High Performance"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.rating}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Condition Based</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.conditionBased || componentData.conditionBased}
-                  currentValue={componentData.conditionBased}
-                  fieldName="conditionBased"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('conditionBased', value)}
-                >
-                  <select
-                    value={componentData.conditionBased}
-                    onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                  >
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.conditionBased}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">No of Units</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.noOfUnits || componentData.noOfUnits}
-                  currentValue={componentData.noOfUnits}
-                  fieldName="noOfUnits"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('noOfUnits', value)}
-                >
-                  <input
-                    type="text"
-                    value={componentData.noOfUnits}
-                    onChange={(e) => handleFieldChange('noOfUnits', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.noOfUnits}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Eqpt. System / Dept.</label>
-              <div className="text-sm text-gray-900">
-                {componentData.eqptSystemDept}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Parent Component</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.parentComponent || componentData.parentComponent}
-                  currentValue={componentData.parentComponent}
-                  fieldName="parentComponent"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('parentComponent', value)}
-                >
-                  <input
-                    type="text"
-                    value={componentData.parentComponent}
-                    onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                    placeholder="e.g., Level 6.1.1"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.parentComponent}
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Dimensions / Size</label>
-              {isModifyMode || isChangeMode ? (
-                <ModifyFieldWrapper
-                  originalValue={originalComponentData?.dimensionsSize || componentData.dimensionsSize}
-                  currentValue={componentData.dimensionsSize}
-                  fieldName="dimensionsSize"
-                  isModifyMode={isModifyMode || isChangeMode}
-                  onFieldChange={(field, value) => handleFieldChange('dimensionsSize', value)}
-                >
-                  <input
-                    type="text"
-                    value={componentData.dimensionsSize}
-                    onChange={(e) => handleFieldChange('dimensionsSize', e.target.value)}
-                    className="text-sm w-full px-2 py-1 border rounded"
-                    placeholder="e.g., 0.5m x 0.3m"
-                  />
-                </ModifyFieldWrapper>
-              ) : (
-                <div className="text-sm text-gray-900">
-                  {componentData.dimensionsSize}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Notes</label>
-            <div className="text-sm text-gray-900">
-              {componentData.notes}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
