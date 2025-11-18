@@ -111,6 +111,7 @@ export const components = pgTable("components", {
   classItem: boolean("class_item").default(false),
   conditionBased: boolean("condition_based").default(false), // Condition Based maintenance (Yes/No)
   isActive: boolean("is_active").default(true), // IS Active (Yes/No)
+  isParent: boolean("is_parent").default(false), // IS Parent (Yes/No) - indicates if component has children
   // Technical specifications
   rating: text("rating"), // Capacity or rating from manual
   noOfUnits: text("no_of_units"),
