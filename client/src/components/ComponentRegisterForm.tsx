@@ -522,8 +522,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     runningHours: "Running Hours",
     dateUpdated: "Date Updated",
     nextDue: "Next Due",
-    metric: "Metric",
-    alertsThresholds: "Alerts/ Thresholds",
     woTitle: "WO Title",
     assignedTo: "Assigned To",
     maintenanceType: "Maintenance Type",
@@ -575,11 +573,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     vesselCode: "",
     isActive: "Yes",
     isParent: "No",
-    // Section B: Running Hours & Condition Monitoring
+    // Section B: Running Hours
     runningHours: "20000",
     dateUpdated: "",
-    metric: "",
-    alertsThresholds: "",
     // Section C: Work Orders
     woTitle: "",
     assignedTo: "",
@@ -604,12 +600,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       { reqNo: "REQ-2025-090", reqPart: "Air Filter Element", reqQty: "4", reqDate: "18-Jan-2025", reqStatus: "Approved" },
       { reqNo: "REQ-2025-091", reqPart: "Hydraulic Oil", reqQty: "200L", reqDate: "20-Jan-2025", reqStatus: "Pending" },
     ],
-    conditionMonitoringMetrics: {
-      metric: "",
-      interval: "",
-      temperature: "",
-      pressure: ""
-    },
     workOrders: [],
     maintenanceHistory: [],
     spares: [],

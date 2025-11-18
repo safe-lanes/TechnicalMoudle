@@ -679,10 +679,7 @@ const RunningHoursConditionSection: React.FC = () => {
   // State for running hours data - empty until populated from database
   const [runningHoursData, setRunningHoursData] = useState({
     currentHours: "",
-    updatedDate: "",
-    vibration: 0,
-    temperature: 0,
-    pressure: 0
+    updatedDate: ""
   });
   
   const [originalData] = useState(runningHoursData);
@@ -697,12 +694,12 @@ const RunningHoursConditionSection: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Running Hours */}
-      <div className="flex items-start gap-8">
-        <div className="flex items-center gap-2">
+      <div>
+        <div className="flex items-center gap-2 mb-3">
           <label className="text-sm font-medium text-gray-700">Running Hours:</label>
           <Edit2 className="h-4 w-4 text-gray-500" />
         </div>
-        <div className="flex gap-12">
+        <div className="flex gap-12 pl-2">
           <div>
             <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Current</label>
             {isModifyMode ? (
