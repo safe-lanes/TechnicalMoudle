@@ -560,6 +560,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     makerCode: "",
     model: "",
     modelNumber: "",
+    modelCode: "",
     department: "",
     critical: "No",
     classItem: "No",
@@ -573,6 +574,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     fleetEquipmentName: "",
     vesselCode: "",
     isActive: "Yes",
+    isParent: "No",
     // Section B: Running Hours & Condition Monitoring
     runningHours: "20000",
     dateUpdated: "",
@@ -1127,52 +1129,32 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-6">
+                    {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="maker" />
+                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Code</Label>
                       <Input 
-                        value={componentData.maker}
-                        onChange={(e) => handleInputChange('maker', e.target.value)}
+                        value={componentData.fleetEquipmentCode}
+                        onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-fleet-equipment-code"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Maker Code</Label>
+                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Name</Label>
                       <Input 
-                        value={componentData.makerCode}
-                        onChange={(e) => handleInputChange('makerCode', e.target.value)}
+                        value={componentData.fleetEquipmentName}
+                        onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-fleet-equipment-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="model" />
+                      <Label className="text-sm text-[#8798ad]">Parent Component Code</Label>
                       <Input 
-                        value={componentData.model}
-                        onChange={(e) => handleInputChange('model', e.target.value)}
+                        value={componentData.parentComponent}
+                        onChange={(e) => handleInputChange('parentComponent', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Model Number</Label>
-                      <Input 
-                        value={componentData.modelNumber}
-                        onChange={(e) => handleInputChange('modelNumber', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <EditableLabel fieldKey="serialNo" />
-                      <Input 
-                        value={componentData.serialNo}
-                        onChange={(e) => handleInputChange('serialNo', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <EditableLabel fieldKey="drawingNo" />
-                      <Input 
-                        value={componentData.drawingNo}
-                        onChange={(e) => handleInputChange('drawingNo', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-parent-component-code"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1182,6 +1164,19 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         readOnly
                         className="border-gray-300 bg-gray-50"
                         title="Component Code is auto-generated based on tree position"
+                        data-testid="input-component-code"
+                      />
+                    </div>
+                    
+                    {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Component Name *</Label>
+                      <Input 
+                        value={componentData.componentName || ''}
+                        onChange={(e) => handleInputChange('componentName', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        required
+                        data-testid="input-component-name"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1191,38 +1186,128 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         readOnly
                         className="border-gray-300 bg-gray-50"
                         title="Component Category is derived from the component's tree position"
+                        data-testid="input-component-category"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="maker" />
+                      <Input 
+                        value={componentData.maker}
+                        onChange={(e) => handleInputChange('maker', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-maker"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Maker Code</Label>
+                      <Input 
+                        value={componentData.makerCode}
+                        onChange={(e) => handleInputChange('makerCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-maker-code"
+                      />
+                    </div>
+                    
+                    {/* Row 3: Model, Model Code, Serial No, Drawing No */}
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="model" />
+                      <Input 
+                        value={componentData.model}
+                        onChange={(e) => handleInputChange('model', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-model"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Model Code</Label>
+                      <Input 
+                        value={componentData.modelCode}
+                        onChange={(e) => handleInputChange('modelCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-model-code"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="serialNo" />
+                      <Input 
+                        value={componentData.serialNo}
+                        onChange={(e) => handleInputChange('serialNo', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-serial-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="drawingNo" />
+                      <Input 
+                        value={componentData.drawingNo}
+                        onChange={(e) => handleInputChange('drawingNo', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-drawing-no"
+                      />
+                    </div>
+                    
+                    {/* Row 4: Location, Critical (Yes/No), Condition Based (Yes/No), Installation Date */}
                     <div className="space-y-2">
                       <EditableLabel fieldKey="location" />
                       <Input 
                         value={componentData.location}
                         onChange={(e) => handleInputChange('location', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-location"
                       />
                     </div>
                     <div className="space-y-2">
                       <EditableLabel fieldKey="critical" />
-                      <Input 
+                      <Select 
                         value={componentData.critical}
-                        onChange={(e) => handleInputChange('critical', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
+                        onValueChange={(value) => handleInputChange('critical', value)}
+                      >
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-critical">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Select</SelectItem>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <EditableLabel fieldKey="conditionBased" />
+                      <Select 
+                        value={componentData.conditionBased}
+                        onValueChange={(value) => handleInputChange('conditionBased', value)}
+                      >
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-condition-based">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Select</SelectItem>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <EditableLabel fieldKey="installation" />
                       <Input 
+                        type="date"
                         value={componentData.installation}
                         onChange={(e) => handleInputChange('installation', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-installation-date"
                       />
                     </div>
+                    
+                    {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
                     <div className="space-y-2">
                       <EditableLabel fieldKey="commissionedDate" />
                       <Input 
+                        type="date"
                         value={componentData.commissionedDate}
                         onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-commissioned-date"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1231,87 +1316,23 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         value={componentData.rating}
                         onChange={(e) => handleInputChange('rating', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-rating"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="conditionBased" />
-                      <Input 
-                        value={componentData.conditionBased}
-                        onChange={(e) => handleInputChange('conditionBased', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </div>
-                    <DeletableField fieldKey="noOfUnits">
-                      <EditableLabel fieldKey="noOfUnits" />
-                      <Input 
-                        value={componentData.noOfUnits}
-                        onChange={(e) => handleInputChange('noOfUnits', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="eqptSystemDept">
                       <EditableLabel fieldKey="eqptSystemDept" />
                       <Input 
                         value={componentData.equipmentDepartment}
                         onChange={(e) => handleInputChange('equipmentDepartment', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="parentComponent">
-                      <EditableLabel fieldKey="parentComponent" />
-                      <Input 
-                        value={componentData.parentComponent}
-                        onChange={(e) => handleInputChange('parentComponent', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <DeletableField fieldKey="dimensionsSize">
-                      <EditableLabel fieldKey="dimensionsSize" />
-                      <Input 
-                        value={componentData.dimensionsSize}
-                        onChange={(e) => handleInputChange('dimensionsSize', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </DeletableField>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Code</Label>
-                      <Input 
-                        value={componentData.fleetEquipmentCode}
-                        onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-eqpt-system-dept"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Fleet Equipment Name</Label>
-                      <Input 
-                        value={componentData.fleetEquipmentName}
-                        onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
+                      {/* Empty spacer */}
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Vessel Code</Label>
-                      <Input 
-                        value={componentData.vesselCode}
-                        onChange={(e) => handleInputChange('vesselCode', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">IS Active</Label>
-                      <Select 
-                        value={componentData.isActive}
-                        onValueChange={(value) => handleInputChange('isActive', value)}
-                      >
-                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Yes">Yes</SelectItem>
-                          <SelectItem value="No">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
+                    {/* Row 6: Notes (full width) */}
                     <div className="space-y-2 col-span-4">
                       <EditableLabel fieldKey="notes" />
                       <Textarea 
@@ -1319,7 +1340,63 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         onChange={(e) => handleInputChange('notes', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         rows={3}
+                        data-testid="input-notes"
                       />
+                    </div>
+                    
+                    {/* Row 7: Running Hours, IS Active, Vessel Code, IS Parent */}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Running Hours (Number ≥0)</Label>
+                      <Input 
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={componentData.runningHours}
+                        onChange={(e) => handleInputChange('runningHours', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-running-hours"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">IS Active (Yes/No)</Label>
+                      <Select 
+                        value={componentData.isActive}
+                        onValueChange={(value) => handleInputChange('isActive', value)}
+                      >
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-active">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Select</SelectItem>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Vessel Code / Tool Number</Label>
+                      <Input 
+                        value={componentData.vesselCode}
+                        onChange={(e) => handleInputChange('vesselCode', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        data-testid="input-vessel-code"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">IS Parent (Yes/No)</Label>
+                      <Select 
+                        value={componentData.isParent}
+                        onValueChange={(value) => handleInputChange('isParent', value)}
+                      >
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-parent">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Select</SelectItem>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   

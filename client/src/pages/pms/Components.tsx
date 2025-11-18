@@ -140,7 +140,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         rating: comp.rating || "",
         eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || "",
         notes: comp.notes || "",
-        runningHours: comp.currentCumulativeRH || comp.runningHours || "",
+        runningHours: comp.runningHours || "",
         isActive: toBoolString(comp.isActive),
         vesselCode: comp.vesselCode || "",
         isParent: toBoolString(comp.isParent),
