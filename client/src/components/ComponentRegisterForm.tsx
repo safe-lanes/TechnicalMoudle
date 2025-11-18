@@ -1263,10 +1263,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         onValueChange={(value) => handleInputChange('critical', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-critical">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Select</SelectItem>
                           <SelectItem value="Yes">Yes</SelectItem>
                           <SelectItem value="No">No</SelectItem>
                         </SelectContent>
@@ -1279,10 +1278,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         onValueChange={(value) => handleInputChange('conditionBased', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-condition-based">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Select</SelectItem>
                           <SelectItem value="Yes">Yes</SelectItem>
                           <SelectItem value="No">No</SelectItem>
                         </SelectContent>
@@ -1352,10 +1350,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         onValueChange={(value) => handleInputChange('isActive', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-active">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Select</SelectItem>
                           <SelectItem value="Yes">Yes</SelectItem>
                           <SelectItem value="No">No</SelectItem>
                         </SelectContent>
@@ -1377,10 +1374,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         onValueChange={(value) => handleInputChange('isParent', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-parent">
-                          <SelectValue />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Select</SelectItem>
                           <SelectItem value="Yes">Yes</SelectItem>
                           <SelectItem value="No">No</SelectItem>
                         </SelectContent>
