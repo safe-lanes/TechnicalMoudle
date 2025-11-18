@@ -1474,6 +1474,43 @@ const Components: React.FC = () => {
     return mainCategories;
   }, [fetchedComponents]);
 
+  // Filter component tree based on search term and critical filter
+  const filteredComponentTree = React.useMemo(() => {
+    const filterTree = (nodes: ComponentNode[]): ComponentNode[] => {
+      return nodes.map(node => {
+        // First, recursively filter children
+        const filteredChildren = node.children ? filterTree(node.children) : [];
+        
+        // Check if this node matches the filters
+        const matchesSearch = !searchTerm || 
+          node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          node.code.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCritical = 
+          criticalFilter === 'all' ||
+          (criticalFilter === 'critical' && node.critical === true) ||
+          (criticalFilter === 'non-critical' && node.critical !== true);
+        
+        // Include node if:
+        // 1. It matches both filters, OR
+        // 2. Any of its children were included (parent visibility)
+        const nodeMatches = matchesSearch && matchesCritical;
+        const hasMatchingChildren = filteredChildren.length > 0;
+        
+        if (nodeMatches || hasMatchingChildren) {
+          return {
+            ...node,
+            children: filteredChildren
+          };
+        }
+        
+        return null;
+      }).filter((node): node is ComponentNode => node !== null);
+    };
+    
+    return filterTree(componentTreeData);
+  }, [componentTreeData, searchTerm, criticalFilter]);
+
   // Helper function to find component by ID
   const findComponentById = (id: string): ComponentNode | null => {
     const searchInTree = (nodes: ComponentNode[]): ComponentNode | null => {
