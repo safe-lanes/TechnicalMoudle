@@ -1371,6 +1371,7 @@ const RequisitionsSection: React.FC = () => {
 
 const Components: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [criticalFilter, setCriticalFilter] = useState("all");
   const [selectedComponent, setSelectedComponent] = useState<ComponentNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H"]));
