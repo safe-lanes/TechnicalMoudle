@@ -318,29 +318,38 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   const handleNodeSelect = (node: ComponentNode) => {
     setSelectedNode(node);
     setIsAddMode(false);
-    // Load mock data for the selected component
-    const mockData = getComponentMockData(node.code);
+    // Load actual component data from the node object (which contains real database values)
     setComponentData(prev => ({
       ...prev,
-      componentName: node.name,
-      componentCode: node.code,
-      serialNo: mockData.serialNo || '',
-      drawingNo: mockData.drawingNo || '',
-      maker: mockData.maker || '',
-      model: mockData.model || '',
-      location: mockData.location || '',
-      installation: mockData.installationDate || '',
-      rating: mockData.rating || '',
-      noOfUnits: mockData.noOfUnits || '',
-      equipmentDepartment: mockData.eqptSystemDept || '',
-      parentComponent: mockData.parentComponent || '',
-      critical: mockData.critical || 'No',
-      classItem: mockData.classItem || 'No',
-      conditionBased: mockData.conditionBased || 'No',
-      dimensionsSize: mockData.dimensionsSize || '',
-      notes: mockData.notes || '',
-      commissionedDate: mockData.commissionedDate || '',
-      department: mockData.department || ''
+      componentId: node.id || '',
+      componentName: node.name || '',
+      componentCode: node.code || '',
+      serialNo: (node as any).serialNo || '',
+      drawingNo: (node as any).drawingNo || '',
+      maker: (node as any).maker || '',
+      model: (node as any).model || '',
+      location: (node as any).location || '',
+      installation: (node as any).installationDate || (node as any).installation || '',
+      rating: (node as any).rating || '',
+      noOfUnits: (node as any).noOfUnits || '',
+      equipmentDepartment: (node as any).equipmentDepartment || (node as any).eqptSystemDept || '',
+      parentComponent: (node as any).parentComponent || '',
+      critical: (node as any).critical ? 'Yes' : 'No',
+      classItem: (node as any).classItem || 'No',
+      conditionBased: (node as any).conditionBased || 'No',
+      dimensionsSize: (node as any).dimensionsSize || '',
+      notes: (node as any).notes || '',
+      commissionedDate: (node as any).commissionedDate || '',
+      department: (node as any).department || '',
+      installationDate: (node as any).installationDate || '',
+      eqptSystemDept: (node as any).eqptSystemDept || '',
+      runningHours: (node as any).runningHours?.toString() || '',
+      // Clear out arrays and other sections - these should come from separate API calls if needed
+      workOrders: [],
+      maintenanceHistory: [],
+      spares: [],
+      requisitions: [],
+      drawings: []
     }));
   };
 
