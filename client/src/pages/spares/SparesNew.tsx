@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Trash2, Plus, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { ComponentNode, componentTree } from "@/data/componentTree";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -61,6 +61,8 @@ const Spares: React.FC = () => {
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
   const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
@@ -175,6 +177,36 @@ const Spares: React.FC = () => {
     
     setAdjustingSpares(prev => new Set(prev).add(spareId));
     await adjustMutation.mutateAsync({ spareId, qtyChange, eventType });
+  };
+
+  // Open edit modal
+  const openEditModal = (spare: Spare) => {
+    setSelectedSpare(spare);
+    setAddSpareForm({
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId,
+      critical: spare.critical,
+      rob: spare.rob.toString(),
+      min: spare.min.toString(),
+      location: spare.location || "",
+      ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
+      ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Open consume/receive modal
+  const openConsumeReceiveModal = (spare: Spare) => {
+    setSelectedSpare(spare);
+    setIsConsumeReceiveModalOpen(true);
+  };
+
+  // Handle delete spare
+  const handleDeleteSpare = (spareId: number) => {
+    if (confirm("Are you sure you want to delete this spare? This action cannot be undone.")) {
+      deleteSpareMutation.mutate(spareId);
+    }
   };
 
   // Fetch spares data
@@ -352,6 +384,34 @@ const Spares: React.FC = () => {
       toast({ 
         title: "Error", 
         description: error.message || "Failed to perform bulk update",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete spare mutation
+  const deleteSpareMutation = useMutation({
+    mutationFn: async (spareId: number) => {
+      const response = await fetch(`/api/spares/${vesselId}/${spareId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete spare');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      toast({ title: "Success", description: "Spare deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to delete spare",
         variant: "destructive"
       });
     }
@@ -858,44 +918,33 @@ const Spares: React.FC = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex gap-1 justify-center flex-wrap">
+                        <div className="flex gap-1 justify-center">
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => openConsumeModal(spare)}
-                            title="Consume (detailed)"
-                            data-testid={`button-consume-detailed-${spare.id}`}
+                            onClick={() => openEditModal(spare)}
+                            title="Edit"
+                            data-testid={`button-edit-${spare.id}`}
                           >
-                            <Minus className="h-4 w-4 text-red-600" />
+                            <Edit2 className="h-4 w-4" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => handleQuickAdjust(spare.id, -1, 'CONSUME')}
-                            disabled={adjustingSpares.has(spare.id) || spare.rob <= 0}
-                            title="Quick decrease (-1)"
-                            data-testid={`button-decrease-${spare.id}`}
+                            onClick={() => openConsumeReceiveModal(spare)}
+                            title="Consume/Receive"
+                            data-testid={`button-plus-${spare.id}`}
                           >
-                            <Minus className="h-3 w-3" />
+                            <PlusCircle className="h-4 w-4" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
-                            onClick={() => handleQuickAdjust(spare.id, 1, 'RECEIVE')}
-                            disabled={adjustingSpares.has(spare.id)}
-                            title="Quick increase (+1)"
-                            data-testid={`button-increase-${spare.id}`}
+                            onClick={() => handleDeleteSpare(spare.id)}
+                            title="Delete"
+                            data-testid={`button-delete-${spare.id}`}
                           >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => openReceiveModal(spare)}
-                            title="Receive (detailed)"
-                            data-testid={`button-receive-detailed-${spare.id}`}
-                          >
-                            <Plus className="h-4 w-4 text-green-600" />
+                            <Square className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -1455,6 +1504,283 @@ const Spares: React.FC = () => {
             </Button>
             <Button onClick={handleAddSpareSubmit} disabled={createSpareMutation.isPending}>
               Create Spare
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Spare Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-part-code">Part Code *</Label>
+                <Input
+                  id="edit-part-code"
+                  value={addSpareForm.partCode}
+                  onChange={(e) => setAddSpareForm({...addSpareForm, partCode: e.target.value})}
+                  placeholder="e.g., SP-ME-001"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-part-name">Part Name *</Label>
+                <Input
+                  id="edit-part-name"
+                  value={addSpareForm.partName}
+                  onChange={(e) => setAddSpareForm({...addSpareForm, partName: e.target.value})}
+                  placeholder="e.g., Fuel Injector"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="edit-critical">Critical</Label>
+                <Select value={addSpareForm.critical} onValueChange={(value) => setAddSpareForm({...addSpareForm, critical: value})}>
+                  <SelectTrigger id="edit-critical">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-rob">ROB (Remain on Board)</Label>
+                <Input
+                  id="edit-rob"
+                  type="number"
+                  min="0"
+                  value={addSpareForm.rob}
+                  onChange={(e) => setAddSpareForm({...addSpareForm, rob: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-min">Minimum Stock</Label>
+                <Input
+                  id="edit-min"
+                  type="number"
+                  min="0"
+                  value={addSpareForm.min}
+                  onChange={(e) => setAddSpareForm({...addSpareForm, min: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="edit-location">Location</Label>
+              <Input
+                id="edit-location"
+                value={addSpareForm.location}
+                onChange={(e) => setAddSpareForm({...addSpareForm, location: e.target.value})}
+                placeholder="e.g., Store Room A"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              // TODO: Implement update mutation
+              toast({ title: "Info", description: "Edit functionality to be implemented" });
+              setIsEditModalOpen(false);
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consume/Receive Modal */}
+      <Dialog open={isConsumeReceiveModalOpen} onOpenChange={setIsConsumeReceiveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Consume or Receive Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
+              <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
+            </div>
+            <div className="flex gap-4">
+              <Button
+                onClick={() => {
+                  setIsConsumeReceiveModalOpen(false);
+                  if (selectedSpare) {
+                    setConsumeForm({ 
+                      quantity: "", 
+                      date: format(new Date(), 'yyyy-MM-dd'), 
+                      workOrder: "", 
+                      remarks: "" 
+                    });
+                    setIsConsumeModalOpen(true);
+                  }
+                }}
+                variant="destructive"
+                className="flex-1"
+              >
+                <Minus className="h-4 w-4 mr-2" />
+                Consume
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsConsumeReceiveModalOpen(false);
+                  if (selectedSpare) {
+                    setReceiveForm({ 
+                      quantity: "", 
+                      date: format(new Date(), 'yyyy-MM-dd'), 
+                      supplier: "", 
+                      remarks: "" 
+                    });
+                    setIsReceiveModalOpen(true);
+                  }
+                }}
+                variant="default"
+                className="flex-1"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Receive
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConsumeReceiveModalOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consume Modal */}
+      <Dialog open={isConsumeModalOpen} onOpenChange={setIsConsumeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Consume Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
+              <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
+            </div>
+            <div>
+              <Label htmlFor="consume-quantity">Quantity *</Label>
+              <Input
+                id="consume-quantity"
+                type="number"
+                min="1"
+                max={selectedSpare?.rob}
+                value={consumeForm.quantity}
+                onChange={(e) => setConsumeForm({...consumeForm, quantity: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="consume-date">Date *</Label>
+              <Input
+                id="consume-date"
+                type="date"
+                value={consumeForm.date}
+                onChange={(e) => setConsumeForm({...consumeForm, date: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="consume-work-order">Work Order/Reference</Label>
+              <Input
+                id="consume-work-order"
+                value={consumeForm.workOrder}
+                onChange={(e) => setConsumeForm({...consumeForm, workOrder: e.target.value})}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <Label htmlFor="consume-remarks">Remarks</Label>
+              <Input
+                id="consume-remarks"
+                value={consumeForm.remarks}
+                onChange={(e) => setConsumeForm({...consumeForm, remarks: e.target.value})}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConsumeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConsumeSubmit} disabled={consumeSpareMutation.isPending}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receive Modal */}
+      <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Receive Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
+              <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
+            </div>
+            <div>
+              <Label htmlFor="receive-quantity">Quantity *</Label>
+              <Input
+                id="receive-quantity"
+                type="number"
+                min="1"
+                value={receiveForm.quantity}
+                onChange={(e) => setReceiveForm({...receiveForm, quantity: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="receive-date">Date *</Label>
+              <Input
+                id="receive-date"
+                type="date"
+                value={receiveForm.date}
+                onChange={(e) => setReceiveForm({...receiveForm, date: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="receive-supplier">Supplier/PO</Label>
+              <Input
+                id="receive-supplier"
+                value={receiveForm.supplier}
+                onChange={(e) => setReceiveForm({...receiveForm, supplier: e.target.value})}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <Label htmlFor="receive-remarks">Remarks</Label>
+              <Input
+                id="receive-remarks"
+                value={receiveForm.remarks}
+                onChange={(e) => setReceiveForm({...receiveForm, remarks: e.target.value})}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReceiveSubmit} disabled={receiveSpareMutation.isPending}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
