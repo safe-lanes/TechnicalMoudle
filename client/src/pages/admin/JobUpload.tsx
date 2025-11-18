@@ -72,7 +72,7 @@ interface ImportHistory {
   updated: number;
   skipped: number;
   archived: number;
-  startedAt: string;
+  date: string;
   status: string;
   userId: string;
 }
@@ -731,7 +731,7 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-gray-400" />
-                            {new Date(item.startedAt).toLocaleString()}
+                            {new Date(item.date).toLocaleString()}
                           </div>
                         </TableCell>
                         <TableCell>

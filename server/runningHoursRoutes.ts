@@ -38,8 +38,8 @@ export function registerRunningHoursRoutes(app: Express) {
       
       for (const parentId of Array.from(parentIds)) {
         const parent = allComponents.find(c => c.id === parentId);
-        // Only include if parent exists AND parent itself doesn't have a parent (true top-level parent)
-        if (!parent || parent.parentId) continue;
+        // Only include if parent exists (show immediate parents regardless of hierarchy)
+        if (!parent) continue;
 
         // Count children with RH jobs
         const children = allComponents.filter(c => c.parentId === parentId);
