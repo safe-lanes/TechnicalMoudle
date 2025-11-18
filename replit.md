@@ -34,6 +34,12 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
     *   Storage supports full CRUD for jobs, filtering by `vesselId` and `componentId`.
     *   Type-safe separation between `Job` (template) and `WorkOrder` (execution) ensures clarity.
 *   **Work Order Automation**: Real-time status computation (Active/Due/Due (Grace P)/Overdue/Completed) based on due dates and grace periods. Backend augments API responses with `computedStatus`.
+*   **Work Order Vessel Filtering**: Work orders are strictly filtered by `vesselId` across all modules:
+    *   **Work Orders Page** (`WorkOrders.tsx`): Explicit `queryFn` passes `vesselId` query parameter to `/api/work-orders?vesselId=${vesselId}`.
+    *   **Dashboard** (`Dashboard.tsx`): Filters work orders by vessel for analytics and KPI calculations.
+    *   **Maintenance Records** (`MaintenanceRecords.tsx`): Fetches component's `vesselId` first, then filters work order templates by that vessel.
+    *   **Components Module** (`Components.tsx`): Cache invalidation includes `vesselId` to ensure correct data refresh.
+    *   Backend endpoint (`/api/work-orders`) filters by `vesselId` when provided in query parameters via `storage.getWorkOrders(vesselId)`.
 *   **Work Order Form Enhancements**: Comprehensive form for managing work orders, supporting inline editing for template details (Part A) and execution details (Part B). Includes document management with Replit Object Storage integration for uploads, retrieval, and deletion.
 *   **Template vs. Execution Workflow**:
     *   **Template Mode**: Component Tree displays work order templates.
