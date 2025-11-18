@@ -888,8 +888,9 @@ export class PersistentFileStorage implements IStorage {
   // Component methods
   async getComponents(vesselId?: string): Promise<Component[]> {
     // Return all components if no vesselId, otherwise filter by vesselId
+    // Exclude archived components (isActive === false)
     const allComponents = Object.values(this.data.components)
-      .filter(c => c !== null && c !== undefined);
+      .filter(c => c !== null && c !== undefined && c.isActive !== false);
     return vesselId 
       ? allComponents.filter(c => c.vesselId === vesselId)
       : allComponents;
@@ -2181,7 +2182,8 @@ export class PersistentFileStorage implements IStorage {
 
   // Jobs methods (Templates for maintenance jobs linked to components)
   async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
-    const allJobs = Object.values(this.data.jobs).filter(job => job !== null);
+    // Filter out archived jobs (isActive === false)
+    const allJobs = Object.values(this.data.jobs).filter(job => job !== null && job.isActive !== false);
     let filtered = allJobs;
     
     if (vesselId) {
