@@ -1443,7 +1443,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       <div className="flex justify-between items-center mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded -ml-2">
                         <div className="flex items-center gap-2">
                           {collapsedSections.B ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
-                          <h4 className="text-lg font-semibold text-[#16569e]">B. Running Hours & Condition Monitoring Metrics</h4>
+                          <h4 className="text-lg font-semibold text-[#16569e]">B. Running Hours</h4>
                         </div>
                         {hasFormConfigPermission && (
                           <Button 
@@ -1483,33 +1483,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                             className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                           />
                         </DeletableField>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h5 className="font-medium text-gray-900">Condition Monitoring Metrics</h5>
-                          <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add Metric
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                          <DeletableField fieldKey="metric">
-                            <EditableLabel fieldKey="metric" />
-                            <Input 
-                              value={componentData.metric}
-                              onChange={(e) => handleInputChange('metric', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                            />
-                          </DeletableField>
-                          <DeletableField fieldKey="alertsThresholds">
-                            <EditableLabel fieldKey="alertsThresholds" />
-                            <Input 
-                              value={componentData.alertsThresholds}
-                              onChange={(e) => handleInputChange('alertsThresholds', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                            />
-                          </DeletableField>
-                        </div>
                       </div>
                       
                       {/* Custom Fields for Section B */}
