@@ -25,6 +25,7 @@ interface Spare {
   min: number;
   max?: number;
   location?: string;
+  location2?: string;
   vesselId: string;
   stockStatus?: string;
 }
@@ -708,9 +709,9 @@ const Spares: React.FC = () => {
                   <div>Critical</div>
                   <div className="text-center">ROB</div>
                   <div className="text-center">Min</div>
-                  <div className="text-center">Max</div>
                   <div className="text-center">Stock</div>
-                  <div>Location</div>
+                  <div>Location A</div>
+                  <div>Location B</div>
                   {FEATURES.IHM && <div className="text-center">IHM</div>}
                   <div className="text-center">Actions</div>
                 </div>
@@ -745,13 +746,13 @@ const Spares: React.FC = () => {
                         </div>
                         <div className="text-center">{spare.rob}</div>
                         <div className="text-center">{spare.min}</div>
-                        <div className="text-center">{spare.max || '-'}</div>
                         <div className="text-center">
                           <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
                             {stockStatus.label}
                           </span>
                         </div>
                         <div className="text-gray-700">{spare.location || '-'}</div>
+                        <div className="text-gray-700">{spare.location2 || '-'}</div>
                         {FEATURES.IHM && (
                           <div className="flex justify-center">
                             {/* Mock IHM status - in real implementation, would come from API */}
@@ -764,7 +765,7 @@ const Spares: React.FC = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex gap-1 justify-center">
+                        <div className="flex gap-1 justify-center flex-wrap">
                           <Button 
                             size="sm" 
                             variant="ghost"
