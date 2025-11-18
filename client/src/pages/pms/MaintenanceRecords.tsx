@@ -38,16 +38,22 @@ const MaintenanceRecords: React.FC = () => {
     enabled: !!componentId,
   });
 
-  // Fetch all work orders to get templates
-  const { data: allWorkOrders = [], isLoading: templatesLoading } = useQuery<any[]>({
-    queryKey: ['/api/work-orders'],
-    enabled: !!componentId,
-  });
-
-  // Fetch component details using shared query fetcher
+  // Fetch component details first to get vesselId
   const { data: component, isLoading: componentLoading } = useQuery<any>({
     queryKey: [`/api/components/details/${componentId}`],
     enabled: !!componentId,
+  });
+
+  // Fetch all work orders to get templates - filter by vesselId from component
+  const { data: allWorkOrders = [], isLoading: templatesLoading } = useQuery<any[]>({
+    queryKey: ['/api/work-orders', component?.vesselId],
+    queryFn: async () => {
+      if (!component?.vesselId) return [];
+      const response = await fetch(`/api/work-orders?vesselId=${component.vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch work orders');
+      return await response.json();
+    },
+    enabled: !!componentId && !!component?.vesselId,
   });
 
   const isLoading = executionsLoading || templatesLoading || componentLoading;
