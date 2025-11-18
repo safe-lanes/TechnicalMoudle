@@ -1246,7 +1246,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     
-                    {/* Row 4: Location, Critical (Yes/No), Condition Based (Yes/No), Installation Date */}
+                    {/* Row 4: Location, Critical, Condition Based, Installation Date */}
                     <div className="space-y-2">
                       <EditableLabel fieldKey="location" />
                       <Input 
@@ -1332,21 +1332,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       {/* Empty spacer */}
                     </div>
                     
-                    {/* Row 6: Notes (full width) */}
-                    <div className="space-y-2 col-span-4">
-                      <EditableLabel fieldKey="notes" />
-                      <Textarea 
-                        value={componentData.notes}
-                        onChange={(e) => handleInputChange('notes', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        rows={3}
-                        data-testid="input-notes"
-                      />
-                    </div>
-                    
-                    {/* Row 7: Running Hours, IS Active, Vessel Code, IS Parent */}
+                    {/* Row 6: Running Hours, IS Active, Vessel Code, IS Parent */}
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Running Hours (Number ≥0)</Label>
+                      <Label className="text-sm text-[#8798ad]">Running Hours</Label>
                       <Input 
                         type="number"
                         min="0"
@@ -1358,7 +1346,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">IS Active (Yes/No)</Label>
+                      <Label className="text-sm text-[#8798ad]">IS Active</Label>
                       <Select 
                         value={componentData.isActive}
                         onValueChange={(value) => handleInputChange('isActive', value)}
@@ -1374,7 +1362,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Vessel Code / Tool Number</Label>
+                      <Label className="text-sm text-[#8798ad]">Vessel Code</Label>
                       <Input 
                         value={componentData.vesselCode}
                         onChange={(e) => handleInputChange('vesselCode', e.target.value)}
@@ -1383,7 +1371,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">IS Parent (Yes/No)</Label>
+                      <Label className="text-sm text-[#8798ad]">IS Parent</Label>
                       <Select 
                         value={componentData.isParent}
                         onValueChange={(value) => handleInputChange('isParent', value)}
@@ -1398,9 +1386,21 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         </SelectContent>
                       </Select>
                     </div>
+                    
+                    {/* Row 7: Notes (full width) */}
+                    <div className="space-y-2 col-span-4">
+                      <EditableLabel fieldKey="notes" />
+                      <Textarea 
+                        value={componentData.notes}
+                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
+                        rows={3}
+                        data-testid="input-notes"
+                      />
+                    </div>
                   </div>
                   
-                  {/* IHM Row - Full width below No of Units */}
+                  {/* IHM Row - Full width below Notes */}
                   {FEATURES.IHM && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between">
@@ -1431,19 +1431,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </div>
                     </div>
                   )}
-                  
-                  <div className="mt-4">
-                    <DeletableField fieldKey="notes">
-                      <EditableLabel fieldKey="notes" />
-                      <Textarea 
-                        value={componentData.notes}
-                        onChange={(e) => handleInputChange('notes', e.target.value)}
-                        placeholder="Notes"
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        rows={2}
-                      />
-                    </DeletableField>
-                  </div>
                   
                   {/* Custom Fields for Section A */}
                   {customFields['A'] && customFields['A'].length > 0 && (

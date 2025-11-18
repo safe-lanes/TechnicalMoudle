@@ -419,7 +419,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Critical (Yes/No)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Critical</label>
           {isChangeMode ? (
             <select
               value={componentData.critical}
@@ -446,7 +446,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Condition Based (Yes/No)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Condition Based</label>
           {isChangeMode ? (
             <select
               value={componentData.conditionBased}
@@ -473,7 +473,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Installation Date (DD-MM-YYYY)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Installation Date</label>
           {isChangeMode ? (
             <input
               type="date"
@@ -495,7 +495,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioning Date (DD-MM-YYYY)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioning Date</label>
           {isChangeMode ? (
             <input
               type="date"
@@ -553,30 +553,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         </div>
       </div>
 
-      {/* Row 6: Notes (full width) */}
-      <div>
-        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Notes</label>
-        {isChangeMode ? (
-          <textarea
-            value={componentData.notes}
-            onChange={(e) => handleFieldChange('notes', e.target.value)}
-            className={`text-sm w-full px-2 py-1 border rounded ${
-              changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-            }`}
-            rows={3}
-            data-testid="input-notes"
-          />
-        ) : (
-          <div className="text-sm text-gray-900" data-testid="text-notes">
-            {componentData.notes}
-          </div>
-        )}
-      </div>
-
-      {/* Row 7: Running Hours, IS Active, Vessel Code, IS Parent */}
+      {/* Row 6: Running Hours, IS Active, Vessel Code, IS Parent */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Running Hours (Number ≥0)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Running Hours</label>
           {isChangeMode ? (
             <input
               type="number"
@@ -596,7 +576,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active (Yes/No)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active</label>
           {isChangeMode ? (
             <select
               value={componentData.isActive}
@@ -623,7 +603,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Vessel Code / Tool Number</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Vessel Code</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -641,7 +621,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Parent (Yes/No)</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Parent</label>
           {isChangeMode ? (
             <select
               value={componentData.isParent}
@@ -667,6 +647,26 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+      </div>
+
+      {/* Row 7: Notes (full width) */}
+      <div>
+        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Notes</label>
+        {isChangeMode ? (
+          <textarea
+            value={componentData.notes}
+            onChange={(e) => handleFieldChange('notes', e.target.value)}
+            className={`text-sm w-full px-2 py-1 border rounded ${
+              changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
+            }`}
+            rows={3}
+            data-testid="input-notes"
+          />
+        ) : (
+          <div className="text-sm text-gray-900" data-testid="text-notes">
+            {componentData.notes}
+          </div>
+        )}
       </div>
     </div>
   );
