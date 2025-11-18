@@ -2895,7 +2895,13 @@ async function updateComponentFromRow(componentCode: string, row: any) {
     updateData.vesselCode = row['Vessel Code'];  // Display value
   }
 
-  return await storage.updateComponent(componentCode, updateData);
+  // Look up component by code to get its ID, then update by ID
+  const component = await storage.getComponentByCode(componentCode, updateData.vesselId);
+  if (!component) {
+    throw new Error(`Component ${componentCode} not found`);
+  }
+  
+  return await storage.updateComponent(component.id, updateData);
 }
 
 // Helper function to create work order from Excel row
