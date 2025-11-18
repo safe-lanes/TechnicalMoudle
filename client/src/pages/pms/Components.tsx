@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { useVessel } from "@/contexts/VesselContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -1524,9 +1525,9 @@ const Components: React.FC = () => {
   const { isChangeMode, changeRequestTitle, changeRequestCategory, setOriginalSnapshot, collectDiff, getDiffs, reset } = useChangeMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { vesselId } = useVessel();
   
   // Fetch components from API and build tree
-  const vesselId = "V001"; // Default vessel ID
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
     queryKey: [`/api/components/${vesselId}`],
   });

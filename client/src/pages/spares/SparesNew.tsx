@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,7 +57,7 @@ const Spares: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
-  const [vesselId, setVesselId] = useState("V001");
+  const { vesselId, setVesselId } = useVessel();
   
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);

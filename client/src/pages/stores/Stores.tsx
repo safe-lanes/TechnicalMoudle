@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -619,12 +620,12 @@ const storeItems: StoreItem[] = [
 
 const Stores: React.FC = () => {
   const { toast } = useToast();
+  const { vesselId, setVesselId } = useVessel();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">("stores");
   const [viewMode, setViewMode] = useState<"inventory" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
-  const [vesselFilter, setVesselFilter] = useState("");
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   const [placeReceived, setPlaceReceived] = useState("");
@@ -1249,12 +1250,16 @@ const Stores: React.FC = () => {
       {viewMode === "inventory" ? (
       <div className="flex gap-4 mb-6">
         <div className="flex-1">
-          <Input
-            placeholder="Vessel"
-            value={vesselFilter}
-            onChange={(e) => setVesselFilter(e.target.value)}
-            className="text-sm"
-          />
+          <Select value={vesselId} onValueChange={setVesselId}>
+            <SelectTrigger className="text-sm">
+              <SelectValue placeholder="Select Vessel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
+              <SelectItem value="V002">MV Sea Explorer</SelectItem>
+              <SelectItem value="V003">MV Maritime Star</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

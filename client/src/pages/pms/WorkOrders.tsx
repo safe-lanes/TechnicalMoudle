@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pen, Timer } from "lucide-react";
 import { useLocation } from "wouter";
+import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -70,9 +71,9 @@ const WorkOrders: React.FC = () => {
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location] = useLocation();
   const { toast } = useToast();
+  const { vesselId } = useVessel();
   
   // Fetch work orders using React Query (includes computedStatus from backend)
-  const vesselId = "V001"; // Default vessel ID
   const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithComputedStatus[]>({
     queryKey: ['/api/work-orders', vesselId],
     enabled: true, // Always fetch on mount

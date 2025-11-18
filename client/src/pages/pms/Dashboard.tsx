@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays, startOfMonth, endOfMonth, startOfYear } from "date-fns";
+import { useVessel } from "@/contexts/VesselContext";
 import {
   RefreshCw,
   Moon,
@@ -41,12 +42,12 @@ const Dashboard = () => {
     return localStorage.getItem('dashboard-dark-mode') === 'true';
   });
   const [activeTab, setActiveTab] = useState("overview");
+  const { vesselId, setVesselId } = useVessel();
 
-  // Dashboard filters
-  const [filters, setFilters] = useState<DashboardFilters>(() => {
+  // Dashboard filters (date range only, vessel comes from context)
+  const [filters, setFilters] = useState(() => {
     const saved = localStorage.getItem('dashboard-filters');
     const defaultFilters = {
-      vesselId: 'V001',
       dateRange: 'last30',
       startDate: subDays(new Date(), 30),
       endDate: new Date()
@@ -80,9 +81,9 @@ const Dashboard = () => {
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery({
-    queryKey: ['/api/work-orders', filters.vesselId],
+    queryKey: ['/api/work-orders', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/work-orders?vesselId=${filters.vesselId}`);
+      const response = await fetch(`/api/work-orders?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json() as WorkOrder[];
     }
@@ -90,9 +91,9 @@ const Dashboard = () => {
 
   // Fetch spares data
   const { data: sparesData = [] } = useQuery({
-    queryKey: ['/api/spares', filters.vesselId],
+    queryKey: ['/api/spares', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/spares/${filters.vesselId}`);
+      const response = await fetch(`/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     }
@@ -309,10 +310,8 @@ const Dashboard = () => {
   }, [filteredWorkOrders]);
 
   // Handle filter changes
-  const handleVesselChange = (vesselId: string) => {
-    const newFilters = { ...filters, vesselId };
-    setFilters(newFilters);
-    localStorage.setItem('dashboard-filters', JSON.stringify(newFilters));
+  const handleVesselChange = (newVesselId: string) => {
+    setVesselId(newVesselId);
   };
 
   const handleDateRangeChange = (rangeId: string) => {
@@ -378,7 +377,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <Ship className="w-4 h-4 text-gray-500" />
-              <Select value={filters.vesselId} onValueChange={handleVesselChange}>
+              <Select value={vesselId} onValueChange={handleVesselChange}>
                 <SelectTrigger className="w-48" data-testid="select-vessel">
                   <SelectValue />
                 </SelectTrigger>
