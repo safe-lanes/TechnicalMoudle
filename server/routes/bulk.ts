@@ -432,11 +432,11 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Yes_No', key: 'yesNo', width: 10 }
   ];
   
-  // Add dropdown values
+  // Add dropdown values (Only Calendar and Running Hours - frequency is REQUIRED for PMS)
   const listValues = [
     { maintenanceBasis: 'Calendar', frequencyUnit: 'Days', taskType: 'Inspection', jobPriority: 'Low', department: 'Engine', yesNo: 'Yes' },
     { maintenanceBasis: 'Running Hours', frequencyUnit: 'Weeks', taskType: 'Overhaul', jobPriority: 'Medium', department: 'Deck', yesNo: 'No' },
-    { maintenanceBasis: 'Condition Based', frequencyUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
+    { maintenanceBasis: '', frequencyUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
     { maintenanceBasis: '', frequencyUnit: 'Years', taskType: 'Testing', jobPriority: 'Critical', department: 'C/E', yesNo: '' },
     { maintenanceBasis: '', frequencyUnit: 'Hours', taskType: 'Repair', jobPriority: '', department: '2/E', yesNo: '' },
     { maintenanceBasis: '', frequencyUnit: '', taskType: 'Replacement', jobPriority: '', department: '3/E', yesNo: '' },
@@ -447,13 +447,13 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   listValues.forEach(row => listsSheet.addRow(row));
   
   // Add data validations to jobs sheet
-  // Column G (Maintenance Basis) - row 2 onwards
+  // Column G (Maintenance Basis) - row 2 onwards (Only Calendar and Running Hours allowed)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['=Lists!$A$2:$A$4']
+        formulae: ['=Lists!$A$2:$A$3']  // Only Calendar and Running Hours
       };
     }
   });
@@ -1862,50 +1862,51 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Job Category'] = String(row['Job Category']).trim();
       }
 
-      // Maintenance Basis - required
-      const validMaintenanceBasis = ['Calendar', 'Running Hours', 'Condition Based'];
+      // Maintenance Basis - required (Calendar or Running Hours only)
+      // CRITICAL: Frequency is the foundation of PMS scheduling - cannot be empty
+      const validMaintenanceBasis = ['Calendar', 'Running Hours'];
       if (!row['Maintenance Basis']) {
-        errors.push(`Row ${rowNum}: Maintenance Basis is required`);
+        errors.push(`Row ${rowNum}: Maintenance Basis is required (must be 'Calendar' or 'Running Hours')`);
       } else if (!validMaintenanceBasis.includes(row['Maintenance Basis'])) {
-        errors.push(`Row ${rowNum}: Invalid Maintenance Basis. Allowed: ${validMaintenanceBasis.join(', ')}`);
+        errors.push(`Row ${rowNum}: Invalid Maintenance Basis '${row['Maintenance Basis']}'. Must be 'Calendar' or 'Running Hours'`);
       } else {
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }
 
-      // Validate Frequency Value and Frequency Unit based on Maintenance Basis
+      // Validate Frequency Value and Frequency Unit - ALWAYS REQUIRED
+      // The entire planned maintenance system depends on frequency data
       const maintenanceBasis = row['Maintenance Basis'];
-      if (maintenanceBasis === 'Calendar' || maintenanceBasis === 'Running Hours') {
-        // Frequency Value is required for Calendar and Running Hours
-        if (!row['Frequency Value']) {
-          errors.push(`Row ${rowNum}: Frequency Value is required for ${maintenanceBasis} maintenance`);
+      
+      // Frequency Value is always required
+      if (!row['Frequency Value']) {
+        errors.push(`Row ${rowNum}: Frequency Value is REQUIRED - this drives the entire PMS scheduling system`);
+      } else {
+        const frequency = parseFloat(row['Frequency Value']);
+        if (isNaN(frequency) || frequency <= 0) {
+          errors.push(`Row ${rowNum}: Frequency Value must be a positive number (got: '${row['Frequency Value']}')`);
         } else {
-          const frequency = parseFloat(row['Frequency Value']);
-          if (isNaN(frequency) || frequency <= 0) {
-            errors.push(`Row ${rowNum}: Frequency Value must be a positive number`);
-          } else {
-            normalized['Frequency Value'] = String(frequency);
-          }
+          normalized['Frequency Value'] = String(frequency);
         }
+      }
 
-        // Frequency Unit is required only for Calendar basis
-        if (maintenanceBasis === 'Calendar') {
-          const validFrequencyUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
-          if (!row['Frequency Unit']) {
-            errors.push(`Row ${rowNum}: Frequency Unit is required for Calendar maintenance`);
-          } else if (!validFrequencyUnits.includes(row['Frequency Unit'])) {
-            errors.push(`Row ${rowNum}: Invalid Frequency Unit. Allowed: ${validFrequencyUnits.join(', ')}`);
-          } else {
-            normalized['Frequency Unit'] = row['Frequency Unit'];
-          }
+      // Frequency Unit validation depends on Maintenance Basis
+      if (maintenanceBasis === 'Calendar') {
+        const validFrequencyUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
+        if (!row['Frequency Unit']) {
+          errors.push(`Row ${rowNum}: Frequency Unit is REQUIRED for Calendar maintenance (allowed: ${validFrequencyUnits.join(', ')})`);
+        } else if (!validFrequencyUnits.includes(row['Frequency Unit'])) {
+          errors.push(`Row ${rowNum}: Invalid Frequency Unit '${row['Frequency Unit']}'. Allowed: ${validFrequencyUnits.join(', ')}`);
         } else {
-          // Running Hours - Frequency Unit defaults to Hours
-          if (row['Frequency Unit']) {
-            if (row['Frequency Unit'] !== 'Hours') {
-              warnings.push(`Row ${rowNum}: Frequency Unit for Running Hours should be 'Hours' (will be set to Hours)`);
-            }
-          }
-          normalized['Frequency Unit'] = 'Hours';
+          normalized['Frequency Unit'] = row['Frequency Unit'];
         }
+      } else if (maintenanceBasis === 'Running Hours') {
+        // Running Hours - Frequency Unit defaults to Hours
+        if (row['Frequency Unit']) {
+          if (row['Frequency Unit'] !== 'Hours') {
+            warnings.push(`Row ${rowNum}: Frequency Unit for Running Hours should be 'Hours' (will be set to Hours)`);
+          }
+        }
+        normalized['Frequency Unit'] = 'Hours';
       }
 
       // Task Type - required
@@ -2660,6 +2661,10 @@ async function performImport(
         maintenanceBasis: row['Maintenance Basis'],
         frequencyValue: row['Frequency Value'] ? parseFloat(row['Frequency Value']) : null,
         frequencyUnit: row['Frequency Unit'] || null,
+        // For Running Hours jobs: store interval in both fields for compatibility
+        intervalRunningHour: (row['Maintenance Basis'] === 'Running Hours' && row['Frequency Value']) 
+          ? parseInt(String(row['Frequency Value'])) 
+          : null,
         jobDescription: row['Brief Job Description'] || null,
         // JSON array fields - split comma-separated lists (normalize null to [] for consistent checksums)
         requiredSpareParts: row['Required Spare Parts'] 
