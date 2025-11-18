@@ -863,8 +863,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
       
       const savedWorkOrder = await response.json();
       
-      // Invalidate query cache to refresh the work order list
-      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      // Invalidate query cache to refresh the work order list for this vessel
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders', vesselId] });
       
       // Show success message
       toast({
