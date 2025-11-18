@@ -76,7 +76,12 @@ const WorkOrders: React.FC = () => {
   // Fetch work orders using React Query (includes computedStatus from backend)
   const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithComputedStatus[]>({
     queryKey: ['/api/work-orders', vesselId],
-    enabled: true, // Always fetch on mount
+    queryFn: async () => {
+      const response = await fetch(`/api/work-orders?vesselId=${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch work orders');
+      return await response.json() as WorkOrderWithComputedStatus[];
+    },
+    enabled: !!vesselId, // Only fetch when vesselId is available
   });
   
   // Create work order mutation
