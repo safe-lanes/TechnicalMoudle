@@ -147,6 +147,7 @@ export interface IStorage {
   // Running Hours methods
   getComponents(vesselId: string): Promise<Component[]>;
   getComponent(id: string): Promise<Component | undefined>;
+  getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined>;
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
   deleteComponent(id: string): Promise<void>;
@@ -909,6 +910,24 @@ export class MemStorage implements IStorage {
 
   async getComponent(id: string): Promise<Component | undefined> {
     return this.components.get(id);
+  }
+
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+    // Use componentCodeIndex for efficient lookup
+    const vesselKey = vesselId || 'global';
+    const vesselIndex = this.componentCodeIndex.get(vesselKey);
+    
+    if (vesselIndex) {
+      const componentId = vesselIndex.get(componentCode);
+      if (componentId) {
+        return this.components.get(componentId);
+      }
+    }
+    
+    // Fallback: linear search if not in index
+    return Array.from(this.components.values()).find(
+      c => c.componentCode === componentCode && c.vesselId === vesselId
+    );
   }
 
   async createComponent(insertComponent: InsertComponent): Promise<Component> {
@@ -3889,6 +3908,17 @@ export class PostgresStorage implements IStorage {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
     const result = await db.select().from(components).where(eq(components.id, id));
+    return result[0];
+  }
+
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const result = await db.select().from(components)
+      .where(and(
+        eq(components.componentCode, componentCode),
+        eq(components.vesselId, vesselId)
+      ));
     return result[0];
   }
 

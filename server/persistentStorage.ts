@@ -899,6 +899,24 @@ export class PersistentFileStorage implements IStorage {
     return this.data.components[id];
   }
 
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+    // Use componentCodeIndex for efficient lookup
+    const vesselKey = vesselId || 'global';
+    const vesselIndex = this.componentCodeIndex.get(vesselKey);
+    
+    if (vesselIndex) {
+      const componentId = vesselIndex.get(componentCode);
+      if (componentId) {
+        return this.data.components[componentId];
+      }
+    }
+    
+    // Fallback: linear search if not in index
+    return Object.values(this.data.components).find(
+      c => c && c.componentCode === componentCode && c.vesselId === vesselId
+    );
+  }
+
   async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
     const component = this.data.components[id];
     if (!component) {
