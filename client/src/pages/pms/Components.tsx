@@ -1525,7 +1525,7 @@ const Components: React.FC = () => {
   const { isChangeMode, changeRequestTitle, changeRequestCategory, setOriginalSnapshot, collectDiff, getDiffs, reset } = useChangeMode();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { vesselId } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
@@ -2041,14 +2041,14 @@ const Components: React.FC = () => {
         <div className="flex gap-4 mb-4">
           <div className="flex items-center gap-2">
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
-            <Select defaultValue="all">
-              <SelectTrigger className={`w-[150px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
+            <Select value={vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className={`w-[200px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Vessels</SelectItem>
-                <SelectItem value="vessel1">Vessel 1</SelectItem>
-                <SelectItem value="vessel2">Vessel 2</SelectItem>
+                <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
+                <SelectItem value="V002">MV Sea Explorer</SelectItem>
+                <SelectItem value="V003">MV Maritime Star</SelectItem>
               </SelectContent>
             </Select>
           </div>

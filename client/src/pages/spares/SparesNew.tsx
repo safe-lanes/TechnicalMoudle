@@ -787,12 +787,13 @@ const Spares: React.FC = () => {
       {/* Search and Filters */}
       <div className="flex gap-3 items-center mb-4">
         <Select value={vesselId} onValueChange={setVesselId}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Vessel" />
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="V001">Vessel 1</SelectItem>
-            <SelectItem value="V002">Vessel 2</SelectItem>
+            <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
+            <SelectItem value="V002">MV Sea Explorer</SelectItem>
+            <SelectItem value="V003">MV Maritime Star</SelectItem>
           </SelectContent>
         </Select>
 

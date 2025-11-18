@@ -56,7 +56,6 @@ const generateTemplateCode = (componentCode: string, taskType: string, basis: st
 
 const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVessel, setSelectedVessel] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedComponent, setSelectedComponent] = useState("");
@@ -71,7 +70,7 @@ const WorkOrders: React.FC = () => {
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
   const [location] = useLocation();
   const { toast } = useToast();
-  const { vesselId } = useVessel();
+  const { vesselId, setVesselId } = useVessel();
   
   // Fetch work orders using React Query (includes computedStatus from backend)
   const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithComputedStatus[]>({
@@ -429,13 +428,14 @@ const WorkOrders: React.FC = () => {
 
       {/* Filters */}
       <div className="flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-200">
-        <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Vessel" />
+        <Select value={vesselId} onValueChange={setVesselId}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="vessel1">Vessel 1</SelectItem>
-            <SelectItem value="vessel2">Vessel 2</SelectItem>
+            <SelectItem value="V001">MV Ocean Pioneer</SelectItem>
+            <SelectItem value="V002">MV Sea Explorer</SelectItem>
+            <SelectItem value="V003">MV Maritime Star</SelectItem>
           </SelectContent>
         </Select>
 
