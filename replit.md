@@ -21,7 +21,13 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
 **Key Features & Technical Implementations**:
 
 *   **PMS Dashboard**: Professional analytics workspace with tabbed layout (Overview, Departments, Equipment, Compliance). Visualizations use AG Charts React and display data from real filtered work orders.
-*   **PMS Submodules**: Includes CRUD for Components (hierarchical tree), Work Orders (automatic status computation, comprehensive form management), Running Hours (with bulk update validation), Spares (inventory, transactions), Reports, Modify PMS, and Admin.
+*   **PMS Submodules**: Includes CRUD for Components (hierarchical tree with critical filter and search), Work Orders (automatic status computation, comprehensive form management), Running Hours (with bulk update validation), Spares (inventory, transactions), Reports, Modify PMS, and Admin.
+*   **Components Module Filtering**:
+    *   **Critical Filter**: Dropdown with three options (All Items, Critical Only, Non-Critical) to filter components by critical status.
+    *   **Search Filter**: Real-time search input that filters components by name or code (case-insensitive).
+    *   **Combined Filtering**: Both filters work together with AND logic.
+    *   **Tree Hierarchy Preservation**: Parent categories remain visible if they contain matching children.
+    *   **Data Normalization**: Critical field normalized from "Yes"/"No" strings to boolean during tree building for consistent filter logic.
 *   **Jobs vs. Work Orders Architecture**:
     *   **Jobs**: Template definitions for maintenance tasks linked to components (Part A data: job details, required spares/tools).
     *   **Work Orders**: Active and historical execution records, including execution-specific details (Part B data: due date, status, uploaded documents, consumed spares, completion details).
