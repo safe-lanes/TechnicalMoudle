@@ -1920,7 +1920,7 @@ const Components: React.FC = () => {
           
           <div className="flex items-center gap-2">
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Critical Item:</span>
-            <Select defaultValue="all">
+            <Select value={criticalFilter} onValueChange={setCriticalFilter}>
               <SelectTrigger className={`w-[140px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
                 <SelectValue placeholder="All Items" />
               </SelectTrigger>
