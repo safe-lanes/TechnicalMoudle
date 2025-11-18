@@ -153,7 +153,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   });
 
   const [componentData, setComponentData] = useState({
-    componentId: "601.003.XXX",
+    componentId: "",
     componentName: "",
     serialNo: "",
     drawingNo: "",
@@ -189,7 +189,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     isActive: "Yes",
     isParent: "No",
     // Section B: Running Hours
-    runningHours: "20000",
+    runningHours: "",
     dateUpdated: "",
     // Section C: Work Orders
     woTitle: "",
@@ -198,23 +198,19 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     frequency: "",
     initialNextDue: "",
     // Section D: Maintenance History
-    workOrderNo: "WO-2025-01", 
-    performedBy: "Kane",
-    totalTimeHrs: "3",
-    completionDate: "08-Jan-2025",
-    status: "Completed",
+    workOrderNo: "",
+    performedBy: "",
+    totalTimeHrs: "",
+    completionDate: "",
+    status: "",
     // Section E: Spare Parts
-    partCode: "SP-306-001",
-    partName: "Fuel Injection",
-    minQty: "5",
-    criticalQty: "5",
-    locationStore: "Engine Room R-3",
+    partCode: "",
+    partName: "",
+    minQty: "",
+    criticalQty: "",
+    locationStore: "",
     // Section H: Requisitions  
-    requisitions: [
-      { reqNo: "REQ-2025-089", reqPart: "Fuel Injection Pump", reqQty: "2", reqDate: "15-Jan-2025", reqStatus: "Pending" },
-      { reqNo: "REQ-2025-090", reqPart: "Air Filter Element", reqQty: "4", reqDate: "18-Jan-2025", reqStatus: "Approved" },
-      { reqNo: "REQ-2025-091", reqPart: "Hydraulic Oil", reqQty: "200L", reqDate: "20-Jan-2025", reqStatus: "Pending" },
-    ],
+    requisitions: [],
     workOrders: [],
     maintenanceHistory: [],
     spares: [],
