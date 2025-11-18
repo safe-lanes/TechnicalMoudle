@@ -39,6 +39,8 @@ interface ComponentNode {
   name: string;
   children?: ComponentNode[];
   isExpanded?: boolean;
+  critical?: boolean;
+  [key: string]: any; // Allow additional properties from component data
 }
 
 
@@ -1436,6 +1438,7 @@ const Components: React.FC = () => {
         code: code,
         name: comp.name,
         ...comp,  // Include all component data
+        critical: comp.critical === "Yes" || comp.critical === true,  // Normalize to boolean
         children: []
       };
       componentMap.set(node.code, node);
@@ -1477,7 +1480,9 @@ const Components: React.FC = () => {
   // Filter component tree based on search term and critical filter
   const filteredComponentTree = React.useMemo(() => {
     const filterTree = (nodes: ComponentNode[]): ComponentNode[] => {
-      return nodes.map(node => {
+      const filtered: ComponentNode[] = [];
+      
+      for (const node of nodes) {
         // First, recursively filter children
         const filteredChildren = node.children ? filterTree(node.children) : [];
         
@@ -1498,14 +1503,14 @@ const Components: React.FC = () => {
         const hasMatchingChildren = filteredChildren.length > 0;
         
         if (nodeMatches || hasMatchingChildren) {
-          return {
+          filtered.push({
             ...node,
             children: filteredChildren
-          };
+          });
         }
-        
-        return null;
-      }).filter((node): node is ComponentNode => node !== null);
+      }
+      
+      return filtered;
     };
     
     return filterTree(componentTreeData);
