@@ -2227,7 +2227,12 @@ async function performImport(
           result.skipped++;
         }
       } else if (mode === 'upsert') {
-        if (existingComponent) {
+        // For upsert, verify component actually exists in database before updating
+        // (existingComponentsMap may contain components from spreadsheet that haven't been created yet)
+        const componentInDb = existingComponent && existingComponent.id ? 
+          await storage.getComponentById(existingComponent.id) : null;
+        
+        if (componentInDb) {
           console.log(`🔄 Updating existing component: ${componentCode}`);
           const previousSnapshot = createRecordSnapshot(existingComponent);
           const updatedComponent = await updateComponentFromRow(componentCode, row);
