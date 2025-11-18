@@ -1402,6 +1402,9 @@ const Components: React.FC = () => {
   
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
+    // Create a fresh clone of fetched components to avoid mutating React Query cache
+    const clonedComponents = fetchedComponents.map(comp => ({ ...comp }));
+    
     // Start with the 8 hardcoded main categories
     const mainCategories: ComponentNode[] = [
       { id: "1", code: "1", name: "Ship General", children: [] },
@@ -1414,7 +1417,7 @@ const Components: React.FC = () => {
       { id: "8", code: "8", name: "Ship Common Systems", children: [] }
     ];
     
-    if (!fetchedComponents || fetchedComponents.length === 0) {
+    if (!clonedComponents || clonedComponents.length === 0) {
       return mainCategories;
     }
     
@@ -1428,7 +1431,7 @@ const Components: React.FC = () => {
     
     // Convert fetched components to ComponentNode format and add to map
     // Skip main categories (1-8) as they're already in the map from hardcoded mainCategories
-    fetchedComponents.forEach((comp: any) => {
+    clonedComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
       // Skip if this is a main category (single digit 1-8) - already in map
       if (code.match(/^[1-8]$/)) {
@@ -1446,7 +1449,7 @@ const Components: React.FC = () => {
     });
     
     // Build parent-child relationships
-    fetchedComponents.forEach((comp: any) => {
+    clonedComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
       const node = componentMap.get(code);
       
