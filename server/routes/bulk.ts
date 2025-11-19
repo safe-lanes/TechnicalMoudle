@@ -381,7 +381,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Approver', key: 'approver', width: 20 },
     { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Class Related', key: 'classRelated', width: 15 },
-    { header: 'Last Done', key: 'lastDone', width: 15 },
+    { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
     { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
@@ -1965,9 +1965,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Last Done is optional
-      if (row['Last Done']) {
-        normalized['Last Done'] = String(row['Last Done']).trim();
+      // Last Done Date is optional
+      if (row['Last Done Date']) {
+        normalized['Last Done Date'] = String(row['Last Done Date']).trim();
       }
       
       // Brief Work Description is optional
@@ -2651,7 +2651,7 @@ async function performImport(
       
       // Map Excel columns to job schema fields (21-column specification)
       // Normalize Last Done date from Excel (handles various formats including Excel serials)
-      const rawLastDone = row['Last Done'];
+      const rawLastDone = row['Last Done Date'];
       let lastDoneDate = rawLastDone ? normalizeDateToDDMMMYYYY(rawLastDone) : null;
       
       // If Last Done Date is not provided, use component's installation date as fallback
