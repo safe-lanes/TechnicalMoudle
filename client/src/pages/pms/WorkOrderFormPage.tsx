@@ -20,7 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu } from "lucide-react";
+import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
@@ -54,6 +62,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const workOrderId = params?.id;
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  
+  // Navigation sections for sidebar and mobile menu
+  const navSections = [
+    { id: 'work-order-info', label: 'Work Order Information' },
+    { id: 'spare-parts', label: 'Required Spare Parts' },
+    { id: 'tools', label: 'Required Tools' },
+    { id: 'safety', label: 'Safety Requirements' },
+    { id: 'history', label: 'Work History' },
+    { id: 'completion', label: 'Work Completion' },
+    { id: 'documents', label: 'Documents' }
+  ];
   
   const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
     queryKey: ['/api/work-orders', workOrderId, 'context'],
@@ -188,6 +208,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       setExecutionData(prev => ({ ...prev, woExecutionId: generateWOExecutionId() }));
     }
   }, []);
+
+  // Load work order data when workOrderContext is fetched
+  useEffect(() => {
+    if (workOrderContext) {
+      const context = workOrderContext as any;
+      if (context.templateData) {
+        setTemplateData(prev => ({
+          ...prev,
+          ...context.templateData
+        }));
+      }
+      if (context.executionData) {
+        setExecutionData(prev => ({
+          ...prev,
+          ...context.executionData,
+          woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
+        }));
+      }
+      
+      // Set Modify Mode snapshot if enabled
+      if (isModifyMode && setOriginalSnapshot && context.templateData) {
+        setOriginalSnapshot(context.templateData);
+      }
+    }
+  }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
 
   const handleTemplateChange = (field: string, value: string) => {
     setTemplateData(prev => {
@@ -657,11 +702,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Header Bar */}
-      <div className="bg-white border-b border-gray-200">
+      {/* Top Header Bar - Professional maritime header with logo and actions */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 md:gap-6">
+              <img src={sailLogo} alt="SAIL Logo" className="h-10 w-auto" data-testid="img-logo" />
+              <div className="hidden md:block h-8 w-px bg-gray-300" />
               <Button
                 variant="ghost"
                 size="sm"
@@ -670,24 +717,66 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 data-testid="button-back"
               >
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <h1 className="text-lg font-semibold text-gray-900">Work Order Form</h1>
+              {/* Mobile Navigation Button */}
+              <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="lg:hidden"
+                    data-testid="button-mobile-nav"
+                  >
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[280px]">
+                  <SheetHeader>
+                    <SheetTitle>Sections</SheetTitle>
+                  </SheetHeader>
+                  <nav className="mt-6 space-y-1">
+                    {navSections.map((section) => (
+                      <a
+                        key={section.id}
+                        href={`#${section.id}`}
+                        onClick={() => setIsMobileNavOpen(false)}
+                        className="block px-3 py-2 text-sm text-gray-600 hover:text-[hsl(var(--primary))] hover:bg-blue-50 rounded-md transition-colors"
+                        data-testid={`mobile-nav-link-${section.id}`}
+                      >
+                        {section.label}
+                      </a>
+                    ))}
+                  </nav>
+                </SheetContent>
+              </Sheet>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Work Order Form</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsWorkInstructionsOpen(true)}
+                className="border-gray-300 hover:bg-gray-50"
                 data-testid="button-work-instructions"
               >
                 <FileText className="h-4 w-4 mr-1" />
                 Work Instructions
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="border-gray-300 hover:bg-gray-50"
+                data-testid="button-export"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+              <Button
                 onClick={handleSave}
                 size="sm"
-                className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
+                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-medium"
                 data-testid="button-save"
               >
                 Save
@@ -697,15 +786,37 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         </div>
       </div>
 
-      {/* Main Content - Single Scrollable Page */}
-      <div className="px-6 py-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          
-          {/* Section: Work Order Information */}
-          <SectionBlock 
-            title="Work Order Information" 
-            description="Basic details and configuration for this work order"
-          >
+      {/* Main Content - Single Scrollable Page with Left Navigation */}
+      <div className="flex">
+        {/* Left Navigation Sidebar - Sticky */}
+        <aside className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-6 px-6 py-6">
+            <nav className="space-y-1">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sections</div>
+              {navSections.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className="block px-3 py-2 text-sm text-gray-600 hover:text-[hsl(var(--primary))] hover:bg-blue-50 rounded-md transition-colors"
+                  data-testid={`nav-link-${section.id}`}
+                >
+                  {section.label}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex-1 px-6 py-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+            
+            {/* Section: Work Order Information */}
+            <SectionBlock 
+              id="work-order-info"
+              title="Work Order Information" 
+              description="Basic details and configuration for this work order"
+            >
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -926,6 +1037,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
           {/* Section: Required Spare Parts */}
           <SectionBlock
+            id="spare-parts"
             title="Required Spare Parts"
             description="Spare parts needed for this work order"
           >
@@ -944,13 +1056,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 { key: 'location', label: 'Location', width: '15%' },
                 { key: 'rob', label: 'ROB', width: '5%' }
               ]}
-              data={sampleSpareParts}
+              data={templateData.requiredSpareParts.length > 0 ? templateData.requiredSpareParts.map(sp => ({
+                partNumber: sp.partNo,
+                description: sp.description,
+                quantity: sp.quantityRequired,
+                unit: 'EA',
+                status: 'available' as const,
+                location: sp.remarks || '-',
+                rob: '-'
+              })) : sampleSpareParts}
               showActions={false}
             />
           </SectionBlock>
 
           {/* Section: Required Tools */}
           <SectionBlock
+            id="tools"
             title="Required Tools & Equipment"
             description="Tools and equipment needed for this work order"
           >
@@ -967,13 +1088,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 },
                 { key: 'location', label: 'Location', width: '20%' }
               ]}
-              data={sampleTools}
+              data={templateData.requiredTools.length > 0 ? templateData.requiredTools.map(tool => ({
+                toolId: '-',
+                description: tool.toolName,
+                quantity: tool.quantity,
+                status: 'available' as const,
+                location: tool.remarks || 'Tool Room'
+              })) : sampleTools}
               showActions={false}
             />
           </SectionBlock>
 
           {/* Section: Safety Requirements */}
           <SectionBlock
+            id="safety"
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
@@ -989,13 +1117,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   render: (value) => <StatusPill status={value} />
                 }
               ]}
-              data={sampleSafetyRequirements}
+              data={(() => {
+                const allSafetyReqs = [
+                  ...templateData.safetyRequirements.ppeRequirements.map(req => ({ requirement: req, type: 'PPE', responsibility: '-', status: 'completed' as const })),
+                  ...templateData.safetyRequirements.permitRequirements.map(req => ({ requirement: req, type: 'Permit', responsibility: '-', status: 'active' as const })),
+                  ...templateData.safetyRequirements.otherRequirements.map(req => ({ requirement: req, type: 'Other', responsibility: '-', status: 'active' as const }))
+                ];
+                return allSafetyReqs.length > 0 ? allSafetyReqs : sampleSafetyRequirements;
+              })()}
               showActions={false}
             />
           </SectionBlock>
 
           {/* Section: Work History */}
           <SectionBlock
+            id="history"
             title="Work History"
             description="Previous executions and completion history for this work order"
           >
@@ -1013,13 +1149,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 },
                 { key: 'remarks', label: 'Remarks', width: '20%' }
               ]}
-              data={sampleWorkHistory}
+              data={templateData.workHistory.length > 0 ? templateData.workHistory.map(history => ({
+                date: history.completionDate || history.workDate,
+                workOrder: history.woNo,
+                description: '-',
+                performedBy: history.performedBy,
+                status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
+                remarks: '-'
+              })) : sampleWorkHistory}
               showActions={false}
             />
           </SectionBlock>
 
           {/* Section: Work Completion Record */}
           <SectionBlock
+            id="completion"
             title="Work Completion Record"
             description="Record details of work execution and completion"
           >
@@ -1180,6 +1324,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
           {/* Section: Document Management */}
           <SectionBlock
+            id="documents"
             title="Document Management"
             description="Upload and manage risk assessments, checklists, and operational forms"
           >
@@ -1416,6 +1561,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
           </SectionBlock>
+          </div>
         </div>
       </div>
 

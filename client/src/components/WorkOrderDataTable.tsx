@@ -44,7 +44,8 @@ export function WorkOrderDataTable({
       )}
       
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px]">
           <thead className="bg-[hsl(var(--table-header-bg))]">
             <tr>
               {columns.map((col) => (
@@ -114,6 +115,7 @@ export function WorkOrderDataTable({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
