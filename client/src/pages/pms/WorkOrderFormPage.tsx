@@ -64,16 +64,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   
-  // Navigation sections for sidebar and mobile menu
-  const navSections = [
-    { id: 'work-order-info', label: 'Work Order Information' },
-    { id: 'spare-parts', label: 'Required Spare Parts' },
-    { id: 'tools', label: 'Required Tools' },
-    { id: 'safety', label: 'Safety Requirements' },
-    { id: 'history', label: 'Work History' },
-    { id: 'completion', label: 'Work Completion' },
-    { id: 'documents', label: 'Documents' }
+  // Minimal A/B navigation matching reference design
+  const navSteps = [
+    { id: 'part-a', label: 'A', title: 'Work Order Details' },
+    { id: 'part-b', label: 'B', title: 'Work Completion Record' }
   ];
+  
+  const [activeStep, setActiveStep] = useState('part-a');
   
   const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
     queryKey: ['/api/work-orders', workOrderId, 'context'],
@@ -731,20 +728,34 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[280px]">
+                <SheetContent side="left" className="w-[200px]">
                   <SheetHeader>
-                    <SheetTitle>Sections</SheetTitle>
+                    <SheetTitle>Navigation</SheetTitle>
                   </SheetHeader>
-                  <nav className="mt-6 space-y-1">
-                    {navSections.map((section) => (
+                  <nav className="mt-6 space-y-4">
+                    {navSteps.map((step) => (
                       <a
-                        key={section.id}
-                        href={`#${section.id}`}
-                        onClick={() => setIsMobileNavOpen(false)}
-                        className="block px-3 py-2 text-sm text-gray-600 hover:text-[hsl(var(--primary))] hover:bg-blue-50 rounded-md transition-colors"
-                        data-testid={`mobile-nav-link-${section.id}`}
+                        key={step.id}
+                        href={`#${step.id}`}
+                        onClick={() => {
+                          setActiveStep(step.id);
+                          setIsMobileNavOpen(false);
+                        }}
+                        className="flex items-center gap-3"
+                        data-testid={`mobile-nav-step-${step.id}`}
                       >
-                        {section.label}
+                        <div className={`
+                          w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm
+                          ${activeStep === step.id 
+                            ? 'bg-[hsl(var(--primary))] text-white' 
+                            : 'bg-gray-200 text-gray-600'
+                          }
+                        `}>
+                          {step.label}
+                        </div>
+                        <span className="text-sm text-gray-700">
+                          {step.title}
+                        </span>
                       </a>
                     ))}
                   </nav>
@@ -788,19 +799,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
       {/* Main Content - Single Scrollable Page with Left Navigation */}
       <div className="flex">
-        {/* Left Navigation Sidebar - Sticky */}
-        <aside className="hidden lg:block w-64 flex-shrink-0">
-          <div className="sticky top-6 px-6 py-6">
-            <nav className="space-y-1">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sections</div>
-              {navSections.map((section) => (
+        {/* Left Navigation Sidebar - Minimal A/B Steps */}
+        <aside className="hidden lg:block w-20 flex-shrink-0">
+          <div className="sticky top-6 px-4 py-6">
+            <nav className="space-y-6">
+              {navSteps.map((step) => (
                 <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="block px-3 py-2 text-sm text-gray-600 hover:text-[hsl(var(--primary))] hover:bg-blue-50 rounded-md transition-colors"
-                  data-testid={`nav-link-${section.id}`}
+                  key={step.id}
+                  href={`#${step.id}`}
+                  onClick={() => setActiveStep(step.id)}
+                  className="flex flex-col items-center gap-2 group"
+                  data-testid={`nav-step-${step.id}`}
                 >
-                  {section.label}
+                  <div className={`
+                    w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-colors
+                    ${activeStep === step.id 
+                      ? 'bg-[hsl(var(--primary))] text-white' 
+                      : 'bg-gray-200 text-gray-600 group-hover:bg-blue-100'
+                    }
+                  `}>
+                    {step.label}
+                  </div>
+                  <span className="text-xs text-center text-gray-500 max-w-[60px] leading-tight">
+                    {step.title}
+                  </span>
                 </a>
               ))}
             </nav>
