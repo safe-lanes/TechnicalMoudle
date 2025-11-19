@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import WorkOrderForm, { type HistoryWorkOrderPayload } from "@/components/WorkOrderForm";
 import { WorkOrderExecution } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,8 +28,6 @@ const MaintenanceRecords: React.FC = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState("all");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
-  const [selectedHistoryPayload, setSelectedHistoryPayload] = useState<HistoryWorkOrderPayload | null>(null);
-  const [isExecutionFormOpen, setIsExecutionFormOpen] = useState(false);
 
   // Fetch work order executions for this component
   const { data: executions = [], isLoading: executionsLoading } = useQuery<WorkOrderExecution[]>({
@@ -117,25 +114,9 @@ const MaintenanceRecords: React.FC = () => {
   }, [executions, searchTerm, selectedDateFilter, customStartDate, customEndDate]);
 
   const handleRowClick = (execution: WorkOrderExecution) => {
-    // Find the template WorkOrder for this execution (scoped to component)
-    const template = allWorkOrders.find(wo => 
-      wo.id === execution.templateId && 
-      wo.componentCode === execution.componentId
-    );
-    
-    if (!template) {
-      console.error('Template not found for execution:', execution);
-      toast({
-        title: "Error",
-        description: "Could not find the work order template for this execution record.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Pass { template, execution } payload for history mode
-    setSelectedHistoryPayload({ template, execution });
-    setIsExecutionFormOpen(true);
+    // Navigate to work order detail page (full-screen) with the execution/template ID
+    // The work order page will handle fetching both template and execution data
+    setLocation(`/pms/work-order/${execution.templateId || execution.id}`);
   };
 
   const getStatusBadgeColor = (status?: string) => {
@@ -322,19 +303,6 @@ const MaintenanceRecords: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Execution Details Dialog */}
-      {selectedHistoryPayload && (
-        <WorkOrderForm
-          isOpen={isExecutionFormOpen}
-          onClose={() => {
-            setIsExecutionFormOpen(false);
-            setSelectedHistoryPayload(null);
-          }}
-          workOrderHistory={selectedHistoryPayload}
-          mode="history"
-        />
-      )}
     </div>
   );
 };

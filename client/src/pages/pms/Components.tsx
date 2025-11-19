@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ComponentRegisterForm from "@/components/ComponentRegisterForm";
 import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
-import WorkOrderForm from "@/components/WorkOrderForm";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
@@ -752,8 +751,7 @@ const RunningHoursConditionSection: React.FC = () => {
 };
 
 const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string }> = ({ componentCode, componentName }) => {
-  const [isWorkOrderFormOpen, setIsWorkOrderFormOpen] = useState(false);
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState<any>(null);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
@@ -762,7 +760,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   
   const jobs = allJobs.filter(job => job.componentCode === componentCode);
   
-  // Check URL parameter to auto-open job modal when returning from Maintenance Records
+  // Check URL parameter to navigate to job page when returning from Maintenance Records
   React.useEffect(() => {
     // Only run when data has loaded (not loading)
     if (isLoading) return;
@@ -771,11 +769,10 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     const openJobId = urlParams.get('openJobId');
     
     if (openJobId) {
-      // Find and open the job
+      // Find the job and navigate to its full-screen page
       const jobToOpen = allJobs.find((job: any) => job.id === openJobId);
       if (jobToOpen) {
-        setSelectedWorkOrder(jobToOpen);
-        setIsWorkOrderFormOpen(true);
+        setLocation(`/pms/work-order/${jobToOpen.id}`);
       }
       
       // Always clean up the openJobId parameter after data has loaded
@@ -784,7 +781,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
       const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [allJobs, isLoading]);
+  }, [allJobs, isLoading, setLocation]);
   
   // Generate template code for existing data
   const generateTemplateCode = (componentCode: string, taskType: string, basis: string, frequency: number, unit?: string) => {
@@ -808,79 +805,13 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   };
 
   const handleAddWorkOrder = () => {
-    setSelectedWorkOrder(null);
-    setIsWorkOrderFormOpen(true);
+    // Navigate to new work order page for this component
+    setLocation(`/pms/work-order/new/${componentCode}`);
   };
 
   const handleRowClick = (workOrder: any) => {
-    setSelectedWorkOrder(workOrder);
-    setIsWorkOrderFormOpen(true);
-  };
-
-  const handleWorkOrderSubmit = async (workOrderId: string, payload: { type: string; data: any }) => {
-    try {
-      // Extract the actual form data from payload
-      const formData = payload.data;
-      
-      // Prepare work order data with componentCode
-      const workOrderData = {
-        jobTitle: formData.woTitle,
-        assignedTo: formData.assignedTo,
-        taskType: formData.taskType,
-        maintenanceBasis: formData.maintenanceBasis,
-        frequencyValue: formData.frequencyValue,
-        frequencyUnit: formData.frequencyUnit,
-        dueDate: formData.nextDueDate, // Map nextDueDate to dueDate for backend
-        nextDueDate: formData.nextDueDate,
-        nextDueReading: formData.nextDueReading,
-        currentReading: formData.currentReading,
-        jobPriority: formData.jobPriority,
-        classRelated: formData.classRelated,
-        briefWorkDescription: formData.briefWorkDescription,
-        approver: formData.approver,
-        componentCode: componentCode,
-        component: componentName,
-        vesselId: formData.vesselId || 'V001',
-        workOrderNo: formData.woTemplateCode || `WO-TEMP-${Date.now()}`,
-        status: 'Active',
-        // Backend will auto-generate templateCode if not provided
-        // Format: WO-{componentCode}-{year}-{sequence}
-      };
-      
-      // POST to create work order
-      const response = await fetch('/api/work-orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(workOrderData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create work order');
-      }
-      
-      const savedWorkOrder = await response.json();
-      
-      // Invalidate query cache to refresh the work order list for this vessel
-      queryClient.invalidateQueries({ queryKey: ['/api/work-orders', vesselId] });
-      
-      // Show success message
-      toast({
-        title: "Work Order Created",
-        description: `Work order ${savedWorkOrder.templateCode || savedWorkOrder.workOrderNo} created successfully.`,
-      });
-      
-      setIsWorkOrderFormOpen(false);
-    } catch (error: any) {
-      console.error('Error creating work order:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create work order",
-        variant: "destructive",
-      });
-    }
+    // Navigate to work order detail page
+    setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
   return (
@@ -938,16 +869,6 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
           </tbody>
         </table>
       </div>
-
-      {/* Work Order Form Dialog */}
-      <WorkOrderForm
-        isOpen={isWorkOrderFormOpen}
-        onClose={() => setIsWorkOrderFormOpen(false)}
-        onSubmit={handleWorkOrderSubmit}
-        component={{ code: componentCode, name: componentName }}
-        workOrder={selectedWorkOrder}
-        mode="template"
-      />
     </>
   );
 };

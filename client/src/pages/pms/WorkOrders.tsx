@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import PostponeWorkOrderDialog from "@/components/PostponeWorkOrderDialog";
-import WorkOrderForm from "@/components/WorkOrderForm";
 import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
@@ -63,13 +62,12 @@ const WorkOrders: React.FC = () => {
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [activeTab, setActiveTab] = useState("All W.O");
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
-  const [workOrderFormOpen, setWorkOrderFormOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   
@@ -137,78 +135,14 @@ const WorkOrders: React.FC = () => {
     const targetType = urlParams.get('targetType');
     const previewTargetId = urlParams.get('targetId');
     
-    // Auto-open work order form if navigating from "View Changes"
+    // Auto-navigate to work order page if navigating from "View Changes"
     if (previewChanges === '1' && targetType === 'workOrder' && previewTargetId) {
       const targetWorkOrder = safeWorkOrdersList.find(wo => wo.id === previewTargetId);
       if (targetWorkOrder) {
-        setSelectedWorkOrder(targetWorkOrder);
-        setWorkOrderFormOpen(true);
+        setLocation(`/pms/work-order/${targetWorkOrder.id}`);
       }
     }
-  }, [location, workOrdersList]);
-
-  const handleWorkOrderSubmit = (workOrderId: string, formData?: any) => {
-    if (formData?.type === 'execution') {
-      // Generate execution ID
-      const year = new Date().getFullYear();
-      const templateCode = formData.data.templateCode || formData.data.woTemplateCode;
-      
-      // Find existing executions for this template to get the next sequence number
-      const existingExecutions = safeWorkOrdersList.filter(wo => 
-        wo.isExecution && wo.templateId === workOrderId && 
-        wo.executionId?.startsWith(`${year}-${templateCode}`)
-      );
-      const sequence = String(existingExecutions.length + 1).padStart(2, '0');
-      const executionId = `${year}-${templateCode}-${sequence}`;
-      
-      // Create new execution record
-      const executionData: InsertWorkOrder = {
-        vesselId: vesselId,
-        component: formData.data.component,
-        componentCode: formData.data.componentCode,
-        workOrderNo: executionId,
-        templateCode: templateCode,
-        executionId: executionId,
-        jobTitle: formData.data.woTitle || formData.data.jobTitle,
-        assignedTo: formData.data.assignedTo,
-        dueDate: formData.data.dueDate || "",
-        status: "Pending Approval",
-        submittedDate: new Date().toISOString().split('T')[0],
-        formData: formData.data,
-        isExecution: true,
-        templateId: workOrderId
-      };
-      
-      createWorkOrderMutation.mutate(executionData, {
-        onSuccess: () => {
-          setActiveTab("Pending Approval");
-        }
-      });
-    } else if (formData?.type === 'template') {
-      // Update template
-      const updateData = {
-        ...formData.data,
-        templateCode: formData.data.woTemplateCode || formData.data.templateCode
-      };
-      
-      updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });
-    } else if (formData?.type === 'new') {
-      // Create new work order
-      const newWorkOrderData: InsertWorkOrder = {
-        vesselId: vesselId,
-        ...formData.data,
-        templateCode: formData.data.woTemplateCode || formData.data.templateCode || generateTemplateCode(
-          formData.data.componentCode || "",
-          formData.data.taskType || "",
-          formData.data.maintenanceBasis || "Calendar",
-          formData.data.frequencyValue || "",
-          formData.data.frequencyUnit
-        )
-      };
-      
-      createWorkOrderMutation.mutate(newWorkOrderData);
-    }
-  };
+  }, [location, workOrdersList, setLocation]);
 
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
@@ -282,21 +216,13 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleWorkOrderClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    
-    // If in modify mode, activate modify mode for this specific work order
-    if (isModifyMode) {
-      // The modify mode is already active via URL params
-      // Just open the form and it will detect modify mode automatically
-      setWorkOrderFormOpen(true);
-    } else {
-      setWorkOrderFormOpen(true);
-    }
+    // Navigate to work order detail page (full-screen)
+    setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
   const handlePencilClick = (workOrder: WorkOrder) => {
-    setSelectedWorkOrder(workOrder);
-    setWorkOrderFormOpen(true);
+    // Navigate to work order detail page (full-screen)
+    setLocation(`/pms/work-order/${workOrder.id}`);
   };
 
   const handleTimerClick = (workOrder: WorkOrder) => {
@@ -366,21 +292,9 @@ const WorkOrders: React.FC = () => {
   };
 
   const handleAddWorkOrderClick = () => {
-    // Create a temporary work order object for the form
-    const newWorkOrder = {
-      id: `new-${Date.now()}`,
-      component: "",
-      componentCode: "",
-      workOrderNo: "",
-      templateCode: "",
-      jobTitle: "",
-      assignedTo: "",
-      dueDate: "",
-      status: "Draft",
-      vesselId: vesselId
-    } as WorkOrder;
-    setSelectedWorkOrder(newWorkOrder);
-    setWorkOrderFormOpen(true);
+    // Navigate to new work order page (full-screen)
+    // Note: We'll need to update the route to handle creating new work orders without a component
+    setLocation('/pms/work-order/new/general');
   };
 
   return (
@@ -597,17 +511,6 @@ const WorkOrders: React.FC = () => {
         onClose={() => setPostponeDialogOpen(false)}
         workOrder={selectedWorkOrder}
         onConfirm={handlePostponeConfirm}
-      />
-
-      {/* Work Order Form */}
-      <WorkOrderForm
-        isOpen={workOrderFormOpen}
-        onClose={() => setWorkOrderFormOpen(false)}
-        onSubmit={handleWorkOrderSubmit}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        workOrder={selectedWorkOrder}
-        isApprovalMode={activeTab === "Pending Approval" && selectedWorkOrder?.status === "Pending Approval"}
       />
 
       {/* Unplanned Work Order Form */}
