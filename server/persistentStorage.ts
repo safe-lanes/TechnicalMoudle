@@ -1480,9 +1480,10 @@ export class PersistentFileStorage implements IStorage {
     const newParentRH = currentParentRH + delta;
     parent.currentCumulativeRH = newParentRH.toFixed(2);
 
-    // 5. Get all children of parent
+    // 5. Get all children of parent (parentId contains component code, not database ID)
+    const parentCode = parent.componentCode;
     const children = Object.values(workingData.components).filter(
-      c => c && c.parentId === params.parentComponentId
+      c => c && c.parentId === parentCode
     );
 
     // Track stats

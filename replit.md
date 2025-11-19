@@ -13,6 +13,12 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
 -   Currently uses `PersistentFileStorage` for file-based JSON persistence (`/home/runner/workspace/test-data.json`).
 -   `PostgresStorage` is implemented and ready for activation upon resolution of environment variable loading issues.
 
+**Component Hierarchy Design**:
+-   Components use `parentId` field to establish parent-child relationships.
+-   **CRITICAL**: `parentId` stores **component codes** (e.g., "411", "331"), NOT database IDs (e.g., "1763482263091_al0yxafgt").
+-   When filtering children: `components.filter(c => c.parentId === parent.componentCode)` ✓
+-   Never filter by: `components.filter(c => c.parentId === parent.id)` ✗
+
 **UI/UX Decisions**:
 -   Mobile-first responsive design.
 -   Consistent UI/UX across the application.
@@ -69,8 +75,14 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
         *   CONSUME entries created for increases (with ROB validation), ADJUST entries for decreases/removals.
         *   Prevents double-consumption and maintains accurate ROB across all updates.
         *   Full audit trail with work order reference linking in `sparesHistory`.
-*   **Running Hours Module with Data Integrity Protection**:
-    *   **Bulk Update Dialog**: Date picker and comments field for documenting when running hours were updated.
+*   **Running Hours Module with Automatic Work Order Generation**:
+    *   **Cascade Update System** (`POST /api/running-hours/cascade`):
+        *   Updates parent component running hours, then automatically cascades delta to ALL child components.
+        *   Uses parent's component code (not database ID) to find children where `parentId === parent.componentCode`.
+        *   For each child, checks jobs with `maintenanceBasis === "Running Hours"`.
+        *   **Automatic Work Order Generation**: When child's new running hours exceed job's `intervalRunningHour` threshold AND no active work order exists, auto-generates new work order.
+        *   Handles multiple threshold crossings (e.g., if RH jumps 500 hrs with 300-hr interval, generates 1 WO and queues future).
+        *   Returns statistics: `{updatedComponents, auditsCreated, workOrdersGenerated, workOrders[]}`.
     *   **Backend Validation**: 
         *   Rejects decreases in running hours (unless meter was replaced).
         *   Validates realistic hourly deltas based on date differences (max 25 hrs/day to account for timezone changes).
