@@ -41,6 +41,7 @@ import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
 import { sampleSpareParts, sampleTools, sampleSafetyRequirements, sampleWorkHistory } from '@/lib/workOrderSampleData';
 import { SectionBlock } from '@/components/SectionBlock';
+import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
 
@@ -71,6 +72,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   ];
   
   const [activeStep, setActiveStep] = useState('part-a');
+  
+  // Scroll tracking for navigation
+  useEffect(() => {
+    const handleScroll = () => {
+      const partAElement = document.getElementById('part-a');
+      const partBElement = document.getElementById('part-b');
+      
+      if (!partAElement || !partBElement) return;
+      
+      const scrollPosition = window.scrollY + 200; // Offset for header
+      const partATop = partAElement.offsetTop;
+      const partBTop = partBElement.offsetTop;
+      
+      if (scrollPosition >= partBTop) {
+        setActiveStep('part-b');
+      } else if (scrollPosition >= partATop) {
+        setActiveStep('part-a');
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
     queryKey: ['/api/work-orders', workOrderId, 'context'],
@@ -763,31 +787,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </Sheet>
               <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Work Order Form</h1>
             </div>
-            <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsWorkInstructionsOpen(true)}
-                className="border-gray-300 hover:bg-gray-50"
+                className="border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-blue-50 font-medium px-4"
                 data-testid="button-work-instructions"
               >
-                <FileText className="h-4 w-4 mr-1" />
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Work Instructions
               </Button>
               <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-                className="border-gray-300 hover:bg-gray-50"
-                data-testid="button-export"
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Export
-              </Button>
-              <Button
                 onClick={handleSave}
-                size="sm"
-                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-medium"
+                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-10 py-2 h-auto text-sm shadow-md"
                 data-testid="button-save"
               >
                 Save
@@ -833,9 +846,18 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         <div className="flex-1 px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
-            {/* Section: Work Order Information */}
+            {/* Part A - Work Order Details */}
+            <PartHeader
+              id="part-a"
+              label="Part A"
+              title="Work Order Details"
+              description="Work details about this work order"
+            />
+            
+            {/* A1. Work Order Information */}
             <SectionBlock 
               id="work-order-info"
+              number="A1"
               title="Work Order Information" 
               description="Basic details and configuration for this work order"
             >
@@ -1057,103 +1079,137 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* Section: Required Spare Parts */}
+          {/* A2. Required Spare Parts */}
           <SectionBlock
             id="spare-parts"
+            number="A2"
             title="Required Spare Parts"
             description="Spare parts needed for this work order"
           >
             <WorkOrderDataTable
               columns={[
-                { key: 'partNumber', label: 'Part Number', width: '15%' },
-                { key: 'description', label: 'Description', width: '30%' },
-                { key: 'quantity', label: 'Qty', width: '10%' },
-                { key: 'unit', label: 'Unit', width: '10%' },
+                { key: 'partNumber', label: 'Part No.', width: '20%' },
+                { key: 'description', label: 'Description', width: '40%' },
+                { key: 'quantity', label: 'Quantity Required', width: '15%' },
+                { key: 'rob', label: 'ROB', width: '10%' },
                 {
                   key: 'status',
                   label: 'Status',
                   width: '15%',
                   render: (value) => <StatusPill status={value} />
-                },
-                { key: 'location', label: 'Location', width: '15%' },
-                { key: 'rob', label: 'ROB', width: '5%' }
+                }
               ]}
               data={templateData.requiredSpareParts.length > 0 ? templateData.requiredSpareParts.map(sp => ({
                 partNumber: sp.partNo,
                 description: sp.description,
                 quantity: sp.quantityRequired,
-                unit: 'EA',
-                status: 'available' as const,
-                location: sp.remarks || '-',
-                rob: '-'
-              })) : sampleSpareParts}
+                rob: '-',
+                status: 'available' as const
+              })) : sampleSpareParts.map(sp => ({
+                partNumber: sp.partNumber,
+                description: sp.description,
+                quantity: sp.quantity,
+                rob: sp.rob,
+                status: sp.status
+              }))}
               showActions={false}
             />
           </SectionBlock>
 
-          {/* Section: Required Tools */}
+          {/* A3. Required Tools & Equipment */}
           <SectionBlock
             id="tools"
+            number="A3"
             title="Required Tools & Equipment"
             description="Tools and equipment needed for this work order"
           >
             <WorkOrderDataTable
               columns={[
-                { key: 'toolId', label: 'Tool ID', width: '15%' },
-                { key: 'description', label: 'Description', width: '40%' },
-                { key: 'quantity', label: 'Qty', width: '10%' },
+                { key: 'description', label: 'Description', width: '50%' },
+                { key: 'quantity', label: 'Quantity Required', width: '20%' },
+                { key: 'required', label: 'Current ROB', width: '15%' },
                 {
                   key: 'status',
                   label: 'Status',
                   width: '15%',
                   render: (value) => <StatusPill status={value} />
-                },
-                { key: 'location', label: 'Location', width: '20%' }
+                }
               ]}
               data={templateData.requiredTools.length > 0 ? templateData.requiredTools.map(tool => ({
-                toolId: '-',
                 description: tool.toolName,
                 quantity: tool.quantity,
-                status: 'available' as const,
-                location: tool.remarks || 'Tool Room'
-              })) : sampleTools}
+                required: tool.quantity,
+                status: 'available' as const
+              })) : sampleTools.map(tool => ({
+                description: tool.description,
+                quantity: tool.quantity,
+                required: tool.quantity,
+                status: tool.status
+              }))}
               showActions={false}
             />
           </SectionBlock>
 
-          {/* Section: Safety Requirements */}
+          {/* A4. Safety Requirements */}
           <SectionBlock
             id="safety"
+            number="A4"
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
-            <WorkOrderDataTable
-              columns={[
-                { key: 'requirement', label: 'Requirement', width: '40%' },
-                { key: 'type', label: 'Type', width: '20%' },
-                { key: 'responsibility', label: 'Responsibility', width: '20%' },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  width: '20%',
-                  render: (value) => <StatusPill status={value} />
-                }
-              ]}
-              data={(() => {
-                const allSafetyReqs = [
-                  ...templateData.safetyRequirements.ppeRequirements.map(req => ({ requirement: req, type: 'PPE', responsibility: '-', status: 'completed' as const })),
-                  ...templateData.safetyRequirements.permitRequirements.map(req => ({ requirement: req, type: 'Permit', responsibility: '-', status: 'active' as const })),
-                  ...templateData.safetyRequirements.otherRequirements.map(req => ({ requirement: req, type: 'Other', responsibility: '-', status: 'active' as const }))
-                ];
-                return allSafetyReqs.length > 0 ? allSafetyReqs : sampleSafetyRequirements;
-              })()}
-              showActions={false}
-            />
+            <div className="space-y-4">
+              {/* PPE Requirements */}
+              {(templateData.safetyRequirements.ppeRequirements.length > 0 || !workOrderContext) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Personal Protective Equipment (PPE):</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                    {templateData.safetyRequirements.ppeRequirements.length > 0 
+                      ? templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
+                          <li key={idx}>{req}</li>
+                        ))
+                      : ['Safety Helmet', 'Safety Gloves', 'Safety Goggles'].map((req, idx) => (
+                          <li key={idx}>{req}</li>
+                        ))
+                    }
+                  </ul>
+                </div>
+              )}
+              
+              {/* Permit Requirements */}
+              {(templateData.safetyRequirements.permitRequirements.length > 0 || !workOrderContext) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Permits Required:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                    {templateData.safetyRequirements.permitRequirements.length > 0
+                      ? templateData.safetyRequirements.permitRequirements.map((req, idx) => (
+                          <li key={idx}>{req}</li>
+                        ))
+                      : ['Enclosed Space Entry Permit', 'Cold Work Permit'].map((req, idx) => (
+                          <li key={idx}>{req}</li>
+                        ))
+                    }
+                  </ul>
+                </div>
+              )}
+              
+              {/* Other Requirements */}
+              {templateData.safetyRequirements.otherRequirements.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Other Requirements:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                    {templateData.safetyRequirements.otherRequirements.map((req, idx) => (
+                      <li key={idx}>{req}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </SectionBlock>
 
-          {/* Section: Work History */}
+          {/* A5. Work History */}
           <SectionBlock
             id="history"
+            number="A5"
             title="Work History"
             description="Previous executions and completion history for this work order"
           >
@@ -1183,11 +1239,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             />
           </SectionBlock>
 
-          {/* Section: Work Completion Record */}
-          <SectionBlock
-            id="completion"
+          {/* Part B - Work Completion Record */}
+          <PartHeader
+            id="part-b"
+            label="Part B"
             title="Work Completion Record"
             description="Record details of work execution and completion"
+          />
+          
+          {/* B1. Work Completion Record */}
+          <SectionBlock
+            id="completion"
+            number="B1"
+            title="Risk Assessment, Checklist & Remarks"
+            description="Safety assessments and checklists completed"
           >
             <div className="space-y-6">
               {/* WO Execution ID */}
