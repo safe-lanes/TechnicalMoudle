@@ -566,7 +566,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Running Hours Validation (frontend pre-check for completions)
       if (isCompleting) {
         // Enforce RH requirement for RH-based maintenance
-        if (workOrderContext?.maintenanceBasis === 'Running Hours' && !executionData.runningHours) {
+        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !executionData.runningHours) {
           toast({
             title: "Validation Error",
             description: "Running hours is required for RH-based maintenance when completing work order",
@@ -576,8 +576,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
         
         // Validate running hours if provided
-        if (executionData.runningHours && workOrderContext) {
-          const { component, parentComponent } = workOrderContext;
+        if (executionData.runningHours && workOrderContext && (workOrderContext as any).component) {
+          const { component, parentComponent } = workOrderContext as any;
           const newRunningHours = parseInt(executionData.runningHours);
           
           if (isNaN(newRunningHours)) {
@@ -1941,7 +1941,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       <WorkInstructionsDialog
         isOpen={isWorkInstructionsOpen}
         onClose={() => setIsWorkInstructionsOpen(false)}
-        workInstructions=""
       />
 
       {/* Safety Requirement Modal */}
