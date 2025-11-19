@@ -834,19 +834,20 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
               <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Maintenance Type</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Initial Next Due</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-500">
+                <td colSpan={6} className="py-8 text-center text-gray-500">
                   Loading jobs...
                 </td>
               </tr>
             ) : jobs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-500">
+                <td colSpan={6} className="py-8 text-center text-gray-500">
                   No jobs found for this component
                 </td>
               </tr>
@@ -862,7 +863,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                   <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
                   <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
                   <td className="py-3 px-3 text-gray-900">{job.frequencyValue} {job.frequencyUnit}</td>
-                  <td className="py-3 px-3 text-gray-900">{job.initialNextDue || '-'}</td>
+                  <td className="py-3 px-3 text-gray-900">{job.lastDoneDate || '-'}</td>
+                  <td className="py-3 px-3 text-gray-900">{job.nextDueDate || '-'}</td>
                 </tr>
               ))
             )}
