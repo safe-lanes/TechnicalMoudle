@@ -373,7 +373,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Component Name', key: 'componentName', width: 30 },
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
     { header: 'Interval Value', key: 'intervalValue', width: 15 },
-    { header: 'Internal Running Hour Number', key: 'internalRunningHourNumber', width: 28 },
+    { header: 'Interval Running Hours', key: 'intervalRunningHours', width: 25 },
     { header: 'Unit', key: 'unit', width: 12 },
     { header: 'Task Type', key: 'taskType', width: 20 },
     { header: 'Assigned To', key: 'assignedTo', width: 20 },
@@ -1901,9 +1901,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Internal Running Hour Number is optional
-      if (row['Internal Running Hour Number']) {
-        normalized['Internal Running Hour Number'] = String(row['Internal Running Hour Number']).trim();
+      // Interval Running Hours is optional
+      if (row['Interval Running Hours']) {
+        normalized['Interval Running Hours'] = String(row['Interval Running Hours']).trim();
       }
 
       // Unit validation depends on Maintenance Basis
@@ -2666,7 +2666,7 @@ async function performImport(
         intervalRunningHour: (row['Maintenance Basis'] === 'Running Hours' && row['Interval Value']) 
           ? parseInt(String(row['Interval Value'])) 
           : null,
-        internalRunningHourNumber: row['Internal Running Hour Number'] || null,
+        internalRunningHourNumber: row['Interval Running Hours'] || null,
         jobDescription: row['Brief Work Description'] || null,
         assignedTo: row['Assigned To'] || null,
         approver: row['Approver'] || null,
