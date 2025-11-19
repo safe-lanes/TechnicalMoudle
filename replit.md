@@ -75,6 +75,23 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
         *   CONSUME entries created for increases (with ROB validation), ADJUST entries for decreases/removals.
         *   Prevents double-consumption and maintains accurate ROB across all updates.
         *   Full audit trail with work order reference linking in `sparesHistory`.
+*   **Calendar-Based Job Automation**:
+    *   **Next Due Date Calculation**: Automatic calculation of `nextDueDate` for Calendar-based jobs using `lastDoneDate + intervalValue + unit`.
+        *   Date normalization utility (`normalizeDateToDDMMMYYYY`) handles Excel serial numbers, ISO strings, Date objects, and locale strings.
+        *   Converts all date formats to standardized DD-MMM-YYYY format before calculation.
+        *   Calculation logic in `shared/dateUtils.ts` using `date-fns` library.
+    *   **Bulk Upload Integration**: Jobs template import (21-column format) automatically calculates and persists `nextDueDate` for Calendar jobs with `Last Done` dates.
+        *   Column 16: "Last Done" (normalized from various Excel formats)
+        *   Column 8: "Interval Value" (e.g., "3", "6", "12")
+        *   Column 10: "Unit" (Days/Weeks/Months/Years)
+        *   Storage persistence updated: `createJob`, `bulkCreateJobs`, `bulkUpsertJobs` all persist both fields.
+    *   **Auto-Generation Endpoint** (`POST /api/work-orders/auto-generate`):
+        *   Checks all active Calendar-based jobs for the specified vessel.
+        *   Generates work orders when `nextDueDate` is reached (today or past).
+        *   O(n) performance using Set-based duplicate prevention (`componentCode|jobTitle` keys).
+        *   Status whitelist: Active, Due, Due (Grace P), Overdue, Pending Approval.
+        *   Prevents duplicates within same invocation by updating Set after each creation.
+        *   Returns statistics: `{checked, generated, workOrders[]}`.
 *   **Running Hours Module with Automatic Work Order Generation**:
     *   **Cascade Update System** (`POST /api/running-hours/cascade`):
         *   Updates parent component running hours, then automatically cascades delta to ALL child components.
