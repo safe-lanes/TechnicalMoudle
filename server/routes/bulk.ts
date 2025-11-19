@@ -380,7 +380,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Approver', key: 'approver', width: 20 },
     { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Class Related', key: 'classRelated', width: 15 },
-    { header: 'Next Due Date', key: 'nextDueDate', width: 18 },
+    { header: 'Last Done', key: 'lastDone', width: 15 },
     { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
@@ -1964,9 +1964,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Next Due Date is optional
-      if (row['Next Due Date']) {
-        normalized['Next Due Date'] = String(row['Next Due Date']).trim();
+      // Last Done is optional
+      if (row['Last Done']) {
+        normalized['Last Done'] = String(row['Last Done']).trim();
       }
       
       // Brief Work Description is optional
@@ -2672,7 +2672,7 @@ async function performImport(
         approver: row['Approver'] || null,
         jobPriority: row['Job Priority'] || null,
         classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes') : null,
-        nextDueDate: row['Next Due Date'] || null,
+        nextDueDate: row['Last Done'] || null,
         department: row['Department'] || null,
         criticality: row['Criticality'] ? (row['Criticality'].toString().toLowerCase() === 'yes') : null,
         isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true
