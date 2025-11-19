@@ -730,13 +730,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Tab Navigation - Two tabs with subtitles */}
+      {/* Horizontal Tab Navigation - Single line tabs with inline subtitles */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveSection('partA')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex flex-col items-start ${
+              className={`py-3 px-1 border-b-2 text-sm transition-colors ${
                 activeSection === 'partA'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -744,13 +744,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               data-testid="tab-part-a"
             >
               <span className="font-medium">Part A - Work Order Details</span>
-              <span className="text-xs text-gray-400 font-normal mt-1">
+              <span className="text-xs text-gray-400 font-normal ml-2">
                 Work details about the work that needs to be done
               </span>
             </button>
             <button
               onClick={() => setActiveSection('partB')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex flex-col items-start ${
+              className={`py-3 px-1 border-b-2 text-sm transition-colors ${
                 activeSection === 'partB'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -758,7 +758,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               data-testid="tab-part-b"
             >
               <span className="font-medium">Part B - Work Completion Record</span>
-              <span className="text-xs text-gray-400 font-normal mt-1">
+              <span className="text-xs text-gray-400 font-normal ml-2">
                 Enter work completion details, risk assessments, checklists, consumed parts
               </span>
             </button>
