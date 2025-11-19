@@ -37,7 +37,8 @@ export function registerRunningHoursRoutes(app: Express) {
       const parents: any[] = [];
       
       for (const parentId of Array.from(parentIds)) {
-        const parent = allComponents.find(c => c.id === parentId);
+        // parentId contains componentCode, not database ID
+        const parent = allComponents.find(c => c.componentCode === parentId);
         // Only include if parent exists (show immediate parents regardless of hierarchy)
         if (!parent) continue;
 
