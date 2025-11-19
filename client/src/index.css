@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -6,10 +9,6 @@
     all: unset;
   }
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* Modify Mode Styles */
 .modify-mode [data-field-label],
@@ -50,8 +49,8 @@
     --card: transparent;
     --card-foreground: 222.2 47.4% 11.2%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -65,6 +64,17 @@
     --ring: 215 20.2% 65.1%;
 
     --radius: 0.5rem;
+    
+    --status-available: 142 71% 45%;
+    --status-available-foreground: 0 0% 100%;
+    --status-reserved: 45 93% 47%;
+    --status-reserved-foreground: 0 0% 0%;
+    --status-order-required: 0 84% 60%;
+    --status-order-required-foreground: 0 0% 100%;
+    
+    --section-accent: 217 91% 60%;
+    --table-header-bg: 210 40% 96.1%;
+    --table-row-alt: 210 40% 98%;
   }
 
   .dark {
@@ -86,8 +96,8 @@
     --card: transparent;
     --card-foreground: 213 31% 91%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
@@ -98,6 +108,17 @@
     --ring: 216 34% 17%;
 
     --radius: 0.5rem;
+    
+    --status-available: 142 71% 45%;
+    --status-available-foreground: 0 0% 100%;
+    --status-reserved: 45 93% 47%;
+    --status-reserved-foreground: 0 0% 0%;
+    --status-order-required: 0 84% 60%;
+    --status-order-required-foreground: 0 0% 100%;
+    
+    --section-accent: 217 91% 60%;
+    --table-header-bg: 223 47% 11%;
+    --table-row-alt: 216 34% 17%;
   }
 }
 
@@ -108,6 +129,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
