@@ -645,13 +645,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           })
         });
       } else {
-        // Use regular update for draft saves
+        // Use regular update for draft saves - include both Part A (template) and Part B (execution) data
         response = await fetch(`/api/work-orders/${workOrderId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(executionData)
+          body: JSON.stringify({
+            ...templateData,
+            ...executionData
+          })
         });
       }
       
