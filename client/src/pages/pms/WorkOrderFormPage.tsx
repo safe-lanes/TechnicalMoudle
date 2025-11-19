@@ -684,86 +684,88 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={handleBack}
-                className="text-gray-600 hover:text-gray-900"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back
-              </Button>
-              <div className="h-6 w-px bg-gray-300" />
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Work Order Form</h1>
-                <p className="text-sm text-gray-500">{templateData.woTemplateCode || "New Work Order"}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {activeSection === 'partA' && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setIsWorkInstructionsOpen(true)}
-                  data-testid="button-work-instructions"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Work Instructions
-                </Button>
-              )}
-              <Button
-                onClick={handleSave}
-                className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
-                data-testid="button-save"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save
-              </Button>
-            </div>
-          </div>
+    <div className="flex h-screen bg-white">
+      {/* Left Sidebar Navigation */}
+      <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <Button
+            variant="ghost"
+            onClick={handleBack}
+            className="w-full justify-start text-gray-600 hover:text-gray-900"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Work Orders
+          </Button>
         </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-6">
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-4">
+          <div className="space-y-1">
             <button
               onClick={() => setActiveSection('partA')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`w-full text-left px-4 py-3 rounded-lg font-medium text-sm transition-colors ${
                 activeSection === 'partA'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-700 hover:bg-gray-100'
               }`}
-              data-testid="tab-part-a"
+              data-testid="nav-work-order-details"
             >
-              Part A - Work Order Details
+              Work Order Details
             </button>
             <button
               onClick={() => setActiveSection('partB')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              className={`w-full text-left px-4 py-3 rounded-lg font-medium text-sm transition-colors ${
                 activeSection === 'partB'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-700 hover:bg-gray-100'
               }`}
-              data-testid="tab-part-b"
+              data-testid="nav-work-completion-record"
             >
-              Part B - Work Completion Record
+              Work Completion Record
             </button>
           </div>
+        </nav>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          {activeSection === 'partA' && (
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setIsWorkInstructionsOpen(true)}
+              data-testid="button-work-instructions"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Work Instructions
+            </Button>
+          )}
+          <Button
+            onClick={handleSave}
+            className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
+            data-testid="button-save"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Work Order
+          </Button>
         </div>
       </div>
 
-      {/* Form Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <div className="bg-white border-b border-gray-200 px-8 py-6">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {activeSection === 'partA' ? 'Work Order Details' : 'Work Completion Record'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">{templateData.woTemplateCode || "New Work Order"}</p>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-8">
+            <div className="max-w-6xl mx-auto space-y-6">
             {activeSection === 'partA' ? (
               <div className="space-y-6">
                 {/* Header Section */}
@@ -793,7 +795,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* A1. Work Order Information */}
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>A1. Work Order Information</h4>
+                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A1. Work Order Information</h4>
                   
                   <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-2">
@@ -981,7 +983,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* A2. Required Spare Parts */}
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A2. Required Spare Parts</h4>
+                    <h4 className="text-md font-medium text-[#3B82F6]">A2. Required Spare Parts</h4>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1205,7 +1207,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* A4. Safety Requirements */}
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A4. Safety Requirements</h4>
+                    <h4 className="text-md font-medium text-[#3B82F6]">A4. Safety Requirements</h4>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1296,7 +1298,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* A5. Work History */}
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>A5. Work History</h4>
+                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A5. Work History</h4>
                   
                   <div className="border border-gray-200 rounded">
                     <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
@@ -1350,7 +1352,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* B1. Risk Assessment, Checklists & Records */}
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B1. Risk Assessment, Checklists & Records</h4>
+                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B1. Risk Assessment, Checklists & Records</h4>
                   
                   <div className="space-y-4">
                     <div className="grid grid-cols-12 gap-4 items-center">
@@ -1534,7 +1536,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 {/* B2. Details of Work Carried Out */}
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B2. Details of Work Carried Out</h4>
+                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B2. Details of Work Carried Out</h4>
                   
                   <div className="space-y-4">
                     {/* NEW FIELDS: Date of Completion and Running Hours */}
@@ -1663,7 +1665,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* B3. Running Hours (Conditional) */}
                 {templateData.maintenanceBasis === "Running Hours" && (
                   <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-md font-medium mb-4" style={{ color: '#16569e' }}>B3. Running Hours</h4>
+                    <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B3. Running Hours</h4>
                     
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
@@ -1693,7 +1695,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* B4. Spare Parts Consumed */}
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium" style={{ color: '#16569e' }}>B4. Spare Parts Consumed</h4>
+                    <h4 className="text-md font-medium text-[#3B82F6]">B4. Spare Parts Consumed</h4>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1930,6 +1932,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
