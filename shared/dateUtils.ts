@@ -29,6 +29,14 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
       // Try DD-MMM-YYYY format first (target format)
       parsedDate = parse(dateString, 'dd-MMM-yyyy', new Date());
       if (!isValid(parsedDate)) {
+        // Try DD/MM/YYYY format (European format with slashes)
+        parsedDate = parse(dateString, 'dd/MM/yyyy', new Date());
+      }
+      if (!isValid(parsedDate)) {
+        // Try DD-MM-YYYY format (European format with dashes)
+        parsedDate = parse(dateString, 'dd-MM-yyyy', new Date());
+      }
+      if (!isValid(parsedDate)) {
         // Try ISO format (YYYY-MM-DD)
         parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
       }
