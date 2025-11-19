@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
+import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { z } from "zod";
 import multer from "multer";
 import Papa from "papaparse";
@@ -716,6 +717,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to delete work order" });
+    }
+  });
+  
+  // Auto-generate work orders for Calendar-based jobs that have reached their Next Due Date
+  app.post("/api/work-orders/auto-generate", async (req, res) => {
+    try {
+      const vesselId = req.body.vesselId as string;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+      
+      // Get all Calendar-based jobs for the vessel
+      const allJobs = await storage.getJobs(vesselId);
+      const calendarJobs = allJobs.filter(job => 
+        job.maintenanceBasis === 'Calendar' && 
+        job.nextDueDate && 
+        job.isActive !== false
+      );
+      
+      // Fetch all work orders ONCE to avoid O(n²) performance
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+      
+      // Build a Set of active work order keys for fast lookup
+      // Key format: "componentCode|jobNo" to uniquely identify a job's work order
+      const activeWorkOrderKeys = new Set(
+        allWorkOrders
+          .filter(wo => ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval'].includes(wo.status))
+          .map(wo => `${wo.componentCode}|${wo.jobTitle}`)
+      );
+      
+      const results = {
+        checked: calendarJobs.length,
+        generated: 0,
+        workOrders: [] as any[]
+      };
+      
+      // Check each job to see if it should generate a work order
+      for (const job of calendarJobs) {
+        const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate);
+        
+        if (shouldGenerate) {
+          // O(1) duplicate check using Set
+          const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
+          
+          if (!activeWorkOrderKeys.has(workOrderKey)) {
+            // Generate work order
+            const { nanoid } = await import('nanoid');
+            const workOrderNo = `WO-${job.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
+            
+            const workOrderData = {
+              vesselId: job.vesselId,
+              component: job.componentId,
+              componentCode: job.componentCode,
+              workOrderNo: workOrderNo,
+              templateCode: workOrderNo,
+              jobTitle: job.jobTitle,
+              assignedTo: job.assignedTo || 'Unassigned',
+              dueDate: job.nextDueDate,
+              status: 'Active',
+              taskType: job.maintenanceType,
+              maintenanceBasis: job.maintenanceBasis,
+              frequencyValue: job.frequencyValue?.toString(),
+              frequencyUnit: job.frequencyUnit,
+              jobPriority: job.jobPriority,
+              classRelated: job.classRelated,
+              briefWorkDescription: job.briefWorkDescription,
+              department: job.department,
+              requiredSpareParts: job.requiredSpareParts || [],
+              requiredTools: job.requiredTools || [],
+              safetyRequirements: job.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []}
+            };
+            
+            const createdWO = await storage.createWorkOrder(workOrderData);
+            results.generated++;
+            results.workOrders.push(createdWO);
+            
+            // Add to Set to prevent duplicate generation in same run
+            activeWorkOrderKeys.add(workOrderKey);
+            
+            console.log(`✅ Auto-generated work order ${workOrderNo} for job ${job.jobNo} (${job.jobTitle})`);
+          }
+        }
+      }
+      
+      res.json(results);
+    } catch (error: any) {
+      console.error('Auto-generation error:', error);
+      res.status(500).json({ error: "Failed to auto-generate work orders" });
     }
   });
 

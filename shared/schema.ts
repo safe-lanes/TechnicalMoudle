@@ -573,6 +573,8 @@ export const jobs = pgTable("jobs", {
   frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days'
   intervalRunningHour: integer("interval_running_hour"),
   initialNextDue: text("initial_next_due"), // Initial due date for calendar-based jobs
+  lastDoneDate: text("last_done_date"), // Last completion date (DD-MMM-YYYY format)
+  nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   classRelated: text("class_related"), // 'Yes' | 'No'
   briefWorkDescription: text("brief_work_description"),
@@ -598,6 +600,7 @@ export const jobs = pgTable("jobs", {
   componentIdIdx: index("idx_job_component").on(table.componentId),
   componentCodeIdx: index("idx_job_component_code").on(table.componentCode),
   dataScopeIdx: index("idx_job_data_scope").on(table.dataScope),
+  nextDueDateIdx: index("idx_job_next_due").on(table.nextDueDate),
   jobNoUniqueIdx: unique("unique_job_no").on(table.jobNo),
 }));
 

@@ -9,6 +9,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
+import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dateUtils';
 
 const router = Router();
 const upload = multer({ 
@@ -2649,6 +2650,19 @@ async function performImport(
       const canonicalVesselId = vesselId || vesselCodeFromExcel;
       
       // Map Excel columns to job schema fields (21-column specification)
+      // Normalize Last Done date from Excel (handles various formats including Excel serials)
+      const rawLastDone = row['Last Done'];
+      const lastDoneDate = rawLastDone ? normalizeDateToDDMMMYYYY(rawLastDone) : null;
+      const frequencyValue = row['Interval Value'] ? String(row['Interval Value']).trim() : null;
+      const frequencyUnit = row['Unit'] ? String(row['Unit']).trim() : null;
+      const maintenanceBasis = row['Maintenance Basis'];
+      
+      // Calculate Next Due Date for Calendar-based jobs
+      let nextDueDate = null;
+      if (maintenanceBasis === 'Calendar' && lastDoneDate && frequencyValue && frequencyUnit) {
+        nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);
+      }
+      
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
         vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
@@ -2659,12 +2673,12 @@ async function performImport(
         fleetEquipmentName: row['Fleet Equipment Name'] || null,
         jobTitle: row['WO Title'],          // Job title from WO Title column
         maintenanceType: row['Task Type'],  // maintenanceType from Task Type column
-        maintenanceBasis: row['Maintenance Basis'],
-        frequencyValue: row['Interval Value'] ? parseFloat(row['Interval Value']) : null,
-        frequencyUnit: row['Unit'] || null,
+        maintenanceBasis: maintenanceBasis,
+        frequencyValue: frequencyValue ? parseFloat(frequencyValue) : null,
+        frequencyUnit: frequencyUnit,
         // For Running Hours jobs: store interval in both fields for compatibility
-        intervalRunningHour: (row['Maintenance Basis'] === 'Running Hours' && row['Interval Value']) 
-          ? parseInt(String(row['Interval Value'])) 
+        intervalRunningHour: (maintenanceBasis === 'Running Hours' && frequencyValue) 
+          ? parseInt(frequencyValue) 
           : null,
         internalRunningHourNumber: row['Interval Running Hours'] || null,
         jobDescription: row['Brief Work Description'] || null,
@@ -2672,7 +2686,8 @@ async function performImport(
         approver: row['Approver'] || null,
         jobPriority: row['Job Priority'] || null,
         classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes') : null,
-        nextDueDate: row['Last Done'] || null,
+        lastDoneDate: lastDoneDate,         // Store Last Done date
+        nextDueDate: nextDueDate,           // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar jobs)
         department: row['Department'] || null,
         criticality: row['Criticality'] ? (row['Criticality'].toString().toLowerCase() === 'yes') : null,
         isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true
