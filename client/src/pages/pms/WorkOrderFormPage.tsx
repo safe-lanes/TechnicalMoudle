@@ -685,10 +685,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Header Bar */}
+      {/* Top Header Bar - Clean white header with border-bottom */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
+            {/* Left side: Back button + title */}
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -702,6 +703,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </Button>
               <h1 className="text-lg font-semibold text-gray-900">Work Order Form</h1>
             </div>
+            {/* Right side: Work Instructions button (outline) + Save button (blue) */}
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
@@ -725,35 +727,35 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Tab Navigation */}
+      {/* Horizontal Tab Navigation - Two tabs with subtitles */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveSection('partA')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex flex-col items-start ${
                 activeSection === 'partA'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               data-testid="tab-part-a"
             >
-              Part A - Work Order Details
-              <span className="ml-2 text-xs text-gray-400">
+              <span className="font-medium">Part A - Work Order Details</span>
+              <span className="text-xs text-gray-400 font-normal mt-1">
                 Work details about the work that needs to be done
               </span>
             </button>
             <button
               onClick={() => setActiveSection('partB')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex flex-col items-start ${
                 activeSection === 'partB'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               data-testid="tab-part-b"
             >
-              Part B - Work Completion Record
-              <span className="ml-2 text-xs text-gray-400">
+              <span className="font-medium">Part B - Work Completion Record</span>
+              <span className="text-xs text-gray-400 font-normal mt-1">
                 Enter work completion details, risk assessments, checklists, consumed parts
               </span>
             </button>
@@ -761,40 +763,42 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="px-6 py-6">
         <div className="max-w-7xl mx-auto">
-            {activeSection === 'partA' ? (
-              <div className="space-y-6">
-                {/* Header Section */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">WO Title *</Label>
-                      <Input 
-                        value={templateData.woTitle} 
-                        onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
-                        className="text-sm"
-                        placeholder="Enter work order title"
-                        disabled={isReadOnly}
-                        data-testid="input-wo-title"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Component</Label>
-                      <div className="text-sm text-gray-900 p-2 bg-gray-100 rounded">{templateData.component || "-"}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Component Code</Label>
-                      <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">{templateData.componentCode || "-"}</div>
-                    </div>
+          {activeSection === 'partA' ? (
+            <div className="space-y-6">
+              {/* Top Section - Three Column Grid (light gray background) */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">WO Title *</Label>
+                    <Input 
+                      value={templateData.woTitle} 
+                      onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
+                      className="text-sm bg-white"
+                      placeholder="Enter work order title"
+                      disabled={isReadOnly}
+                      data-testid="input-wo-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Component</Label>
+                    <div className="text-sm text-gray-900 p-2 bg-white border border-gray-200 rounded">{templateData.component || "-"}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                    <div className="text-sm text-gray-600 p-2 bg-white border border-gray-200 rounded">{templateData.componentCode || "-"}</div>
                   </div>
                 </div>
+              </div>
 
-                {/* A1. Work Order Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A1. Work Order Information</h4>
-                  
+              {/* A1. Work Order Information */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A1. Work Order Information</h4>
+                
+                <div className="space-y-6">
+                  {/* Row 1: Maintenance Basis*, Every*, Unit* */}
                   <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Maintenance Basis *</Label>
@@ -803,7 +807,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-maintenance-basis">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -836,7 +840,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
                           disabled={isReadOnly}
                         >
-                          <SelectTrigger className="text-sm">
+                          <SelectTrigger className="text-sm" data-testid="select-frequency-unit">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -848,7 +852,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </Select>
                       </div>
                     )}
+                  </div>
 
+                  {/* Row 2: Task Type*, Assigned To*, Approver */}
+                  <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Task Type *</Label>
                       <Select 
@@ -856,7 +863,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('taskType', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-task-type">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -875,7 +882,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('assignedTo', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-assigned-to">
                           <SelectValue placeholder="Select rank" />
                         </SelectTrigger>
                         <SelectContent>
@@ -893,7 +900,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('approver', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-approver">
                           <SelectValue placeholder="Select rank (optional)" />
                         </SelectTrigger>
                         <SelectContent>
@@ -903,7 +910,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
+                  {/* Row 3: Job Priority, Class Related, Next Due Date (Optional) */}
+                  <div className="grid grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Job Priority</Label>
                       <Select 
@@ -911,7 +921,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('jobPriority', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-job-priority">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -929,7 +939,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onValueChange={(value) => handleTemplateChange('classRelated', value)}
                         disabled={isReadOnly}
                       >
-                        <SelectTrigger className="text-sm">
+                        <SelectTrigger className="text-sm" data-testid="select-class-related">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -949,1025 +959,1044 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           value={templateData.nextDueDate}
                           onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
                           className="text-sm"
-                          placeholder="Leave empty to auto-calculate"
                           disabled={isReadOnly}
+                          data-testid="input-next-due-date"
                         />
                       ) : (
                         <Input
-                          type="text"
+                          type="number"
                           value={templateData.nextDueReading}
                           onChange={(e) => handleTemplateChange('nextDueReading', e.target.value)}
                           className="text-sm"
-                          placeholder="Leave empty to auto-calculate"
+                          placeholder="Running hours"
                           disabled={isReadOnly}
+                          data-testid="input-next-due-reading"
                         />
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-6">
+                  {/* Row 4 (full width): Brief Work Description */}
+                  <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
-                    <Textarea 
-                      value={templateData.briefWorkDescription} 
+                    <Textarea
+                      value={templateData.briefWorkDescription}
                       onChange={(e) => handleTemplateChange('briefWorkDescription', e.target.value)}
-                      className="mt-2 text-sm"
-                      rows={3}
-                      placeholder="Enter work description..."
+                      className="text-sm min-h-[80px]"
+                      placeholder="Describe what this job is to do for the manufacturer/builder guidance (e.g. Lubricate, Clean, Change Oil, etc.)"
                       disabled={isReadOnly}
+                      data-testid="textarea-brief-work-description"
                     />
                   </div>
                 </div>
-
-                {/* A2. Required Spare Parts */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium text-[#3B82F6]">A2. Required Spare Parts</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-800"
-                      onClick={handleAddSparePart}
-                      disabled={isReadOnly}
-                      data-testid="button-add-spare-part-a2"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Spare Part
-                    </Button>
-                  </div>
-                  
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
-                        <div>Part No</div>
-                        <div>Description</div>
-                        <div>Quantity Required</div>
-                        <div>Remarks</div>
-                        <div className="w-20">Actions</div>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {templateData.requiredSpareParts.length > 0 ? (
-                        templateData.requiredSpareParts.map((part, index) => (
-                          <div key={index} className="px-4 py-3">
-                            {editingSparePart === index ? (
-                              <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <Input
-                                  value={part.partNo}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
-                                  placeholder="Part No"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  value={part.description}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
-                                  placeholder="Description"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  value={part.quantityRequired}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
-                                  placeholder="Qty"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  value={part.remarks}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'remarks', e.target.value)}
-                                  placeholder="Remarks"
-                                  className="text-sm"
-                                />
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSaveSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <Check className="h-4 w-4 text-green-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleCancelEditSparePart}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.description || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.quantityRequired || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.remarks || '-'}</div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                    disabled={isReadOnly}
-                                  >
-                                    <Pencil className="h-4 w-4 text-blue-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                    disabled={isReadOnly}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                          No spare parts required yet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* A3. Required Tools & Equipment */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A3. Required Tools & Equipment</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-800"
-                      onClick={handleAddTool}
-                      disabled={isReadOnly}
-                      data-testid="button-add-tool-a3"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Tool
-                    </Button>
-                  </div>
-                  
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
-                        <div>Tool Name</div>
-                        <div>Quantity</div>
-                        <div>Remarks</div>
-                        <div className="w-20">Actions</div>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {templateData.requiredTools.length > 0 ? (
-                        templateData.requiredTools.map((tool, index) => (
-                          <div key={index} className="px-4 py-3">
-                            {editingTool === index ? (
-                              <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <Input
-                                  value={tool.toolName}
-                                  onChange={(e) => handleUpdateToolField(index, 'toolName', e.target.value)}
-                                  placeholder="Tool Name"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  value={tool.quantity}
-                                  onChange={(e) => handleUpdateToolField(index, 'quantity', e.target.value)}
-                                  placeholder="Qty"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  value={tool.remarks}
-                                  onChange={(e) => handleUpdateToolField(index, 'remarks', e.target.value)}
-                                  placeholder="Remarks"
-                                  className="text-sm"
-                                />
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSaveTool(index)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <Check className="h-4 w-4 text-green-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleCancelEditTool}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <div className="text-sm text-gray-900">{tool.toolName || '-'}</div>
-                                <div className="text-sm text-gray-900">{tool.quantity || '-'}</div>
-                                <div className="text-sm text-gray-900">{tool.remarks || '-'}</div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditTool(index)}
-                                    className="h-8 w-8 p-0"
-                                    disabled={isReadOnly}
-                                  >
-                                    <Pencil className="h-4 w-4 text-blue-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteTool(index)}
-                                    className="h-8 w-8 p-0"
-                                    disabled={isReadOnly}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                          No tools required yet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* A4. Safety Requirements */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium text-[#3B82F6]">A4. Safety Requirements</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-800"
-                      onClick={() => setIsSafetyModalOpen(true)}
-                      disabled={isReadOnly}
-                      data-testid="button-add-requirement-a4"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Requirement
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="border border-gray-200 rounded p-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">PPE Requirements</h5>
-                      {templateData.safetyRequirements.ppeRequirements.length > 0 ? (
-                        <div className="space-y-2">
-                          {templateData.safetyRequirements.ppeRequirements.map((req, index) => (
-                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                              <span className="text-sm text-gray-900">{req}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
-                                className="h-6 w-6 p-0"
-                                disabled={isReadOnly}
-                              >
-                                <Trash2 className="h-3 w-3 text-red-600" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">No PPE requirements specified yet</div>
-                      )}
-                    </div>
-                    
-                    <div className="border border-gray-200 rounded p-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Permit Requirements</h5>
-                      {templateData.safetyRequirements.permitRequirements.length > 0 ? (
-                        <div className="space-y-2">
-                          {templateData.safetyRequirements.permitRequirements.map((req, index) => (
-                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                              <span className="text-sm text-gray-900">{req}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
-                                className="h-6 w-6 p-0"
-                                disabled={isReadOnly}
-                              >
-                                <Trash2 className="h-3 w-3 text-red-600" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">No permit requirements specified yet</div>
-                      )}
-                    </div>
-                    
-                    <div className="border border-gray-200 rounded p-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Other Safety Requirements</h5>
-                      {templateData.safetyRequirements.otherRequirements.length > 0 ? (
-                        <div className="space-y-2">
-                          {templateData.safetyRequirements.otherRequirements.map((req, index) => (
-                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                              <span className="text-sm text-gray-900">{req}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
-                                className="h-6 w-6 p-0"
-                                disabled={isReadOnly}
-                              >
-                                <Trash2 className="h-3 w-3 text-red-600" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">No other safety requirements specified yet</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* A5. Work History */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A5. Work History</h4>
-                  
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-7 gap-4 text-sm font-medium text-gray-700">
-                        <div>WO Execution ID</div>
-                        <div>Assigned To</div>
-                        <div>Performed By</div>
-                        <div>Total Time (Hrs)</div>
-                        <div>{templateData.maintenanceBasis === "Calendar" ? "Due Date" : "Due Reading"}</div>
-                        <div>Completion Date</div>
-                        <div>Status</div>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {templateData.workHistory && templateData.workHistory.length > 0 ? (
-                        templateData.workHistory.map((execution: any, index: number) => (
-                          <div key={index} className="px-4 py-3 cursor-pointer hover:bg-gray-50">
-                            <div className="grid grid-cols-7 gap-4 text-sm items-center">
-                              <div className="text-gray-900">{execution.woNo}</div>
-                              <div className="text-gray-900">{execution.assignedTo}</div>
-                              <div className="text-gray-900">{execution.performedBy}</div>
-                              <div className="text-gray-900">{execution.workDate}</div>
-                              <div className="text-gray-900">{execution.runDate}</div>
-                              <div className="text-gray-900">{execution.completionDate}</div>
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                                  {execution.status}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                          No work history for this template yet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
-            ) : (
-              <div className="space-y-6">
-                {/* WO Execution ID Header */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <Label className="text-sm text-[#8798ad]">WO Execution ID</Label>
-                  <div className="text-sm font-medium text-gray-900 p-2 bg-gray-100 rounded inline-block">
-                    {executionData.woExecutionId}
-                  </div>
+
+              {/* A2. Required Spare Parts */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-md font-medium text-[#3B82F6]">A2. Required Spare Parts</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={handleAddSparePart}
+                    disabled={isReadOnly}
+                    data-testid="button-add-spare-part-a2"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Spare Part
+                  </Button>
                 </div>
-
-                {/* B1. Risk Assessment, Checklists & Records */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B1. Risk Assessment, Checklists & Records</h4>
-                  
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-6">
-                        <Label className="text-sm text-gray-900">B1.1 Risk Assessment Completed / Reviewed:</Label>
-                      </div>
-                      <div className="col-span-3 flex items-center gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="riskAssessment" value="yes" defaultChecked className="text-blue-600" />
-                          <span className="text-sm">Yes</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="riskAssessment" value="no" className="text-blue-600" />
-                          <span className="text-sm">No</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="riskAssessment" value="na" className="text-blue-600" />
-                          <span className="text-sm">NA</span>
-                        </label>
-                      </div>
-                      <div className="col-span-3 flex gap-2 justify-end">
-                        <input
-                          ref={riskAssessmentFileRef}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => handleFileSelected(e, 'riskAssessment')}
-                          className="hidden"
-                        />
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs"
-                          onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
-                          data-testid="button-upload-risk-assessment"
-                        >
-                          <Upload className="h-3 w-3 mr-1" />
-                          Upload
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleViewDocument('riskAssessment')}
-                          disabled={!getUploadedDocument('riskAssessment')}
-                          data-testid="button-view-risk-assessment"
-                        >
-                          <Eye className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleDeleteDocumentClick('riskAssessment')}
-                          disabled={!getUploadedDocument('riskAssessment')}
-                          data-testid="button-delete-risk-assessment"
-                        >
-                          <Trash2 className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-red-600' : 'text-gray-400'}`} />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-6">
-                        <Label className="text-sm text-gray-900">B1.2 Safety Checklists Completed (Approvals):</Label>
-                      </div>
-                      <div className="col-span-3 flex items-center gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="safetyChecklists" value="yes" defaultChecked className="text-blue-600" />
-                          <span className="text-sm">Yes</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="safetyChecklists" value="no" className="text-blue-600" />
-                          <span className="text-sm">No</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="safetyChecklists" value="na" className="text-blue-600" />
-                          <span className="text-sm">NA</span>
-                        </label>
-                      </div>
-                      <div className="col-span-3 flex gap-2 justify-end">
-                        <input
-                          ref={safetyChecklistFileRef}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
-                          className="hidden"
-                        />
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs"
-                          onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
-                          data-testid="button-upload-safety-checklist"
-                        >
-                          <Upload className="h-3 w-3 mr-1" />
-                          Upload
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleViewDocument('safetyChecklist')}
-                          disabled={!getUploadedDocument('safetyChecklist')}
-                          data-testid="button-view-safety-checklist"
-                        >
-                          <Eye className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleDeleteDocumentClick('safetyChecklist')}
-                          disabled={!getUploadedDocument('safetyChecklist')}
-                          data-testid="button-delete-safety-checklist"
-                        >
-                          <Trash2 className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-red-600' : 'text-gray-400'}`} />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-6">
-                        <Label className="text-sm text-gray-900">B1.3 Operational Forms Completed (Approvals):</Label>
-                      </div>
-                      <div className="col-span-3 flex items-center gap-4">
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="operationalForms" value="yes" defaultChecked className="text-blue-600" />
-                          <span className="text-sm">Yes</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="operationalForms" value="no" className="text-blue-600" />
-                          <span className="text-sm">No</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="radio" name="operationalForms" value="na" className="text-blue-600" />
-                          <span className="text-sm">NA</span>
-                        </label>
-                      </div>
-                      <div className="col-span-3 flex gap-2 justify-end">
-                        <input
-                          ref={operationalFormFileRef}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => handleFileSelected(e, 'operationalForm')}
-                          className="hidden"
-                        />
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs"
-                          onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
-                          data-testid="button-upload-operational-form"
-                        >
-                          <Upload className="h-3 w-3 mr-1" />
-                          Upload
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleViewDocument('operationalForm')}
-                          disabled={!getUploadedDocument('operationalForm')}
-                          data-testid="button-view-operational-form"
-                        >
-                          <Eye className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleDeleteDocumentClick('operationalForm')}
-                          disabled={!getUploadedDocument('operationalForm')}
-                          data-testid="button-delete-operational-form"
-                        >
-                          <Trash2 className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-red-600' : 'text-gray-400'}`} />
-                        </Button>
-                      </div>
+                
+                <div className="border border-[#E5E7EB] rounded">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-[#E5E7EB]">
+                    <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
+                      <div>Part No</div>
+                      <div>Description</div>
+                      <div>Quantity Required</div>
+                      <div>Remarks</div>
+                      <div className="w-20">Actions</div>
                     </div>
                   </div>
-                </div>
-
-                {/* B2. Details of Work Carried Out */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B2. Details of Work Carried Out</h4>
-                  
-                  <div className="space-y-4">
-                    {/* NEW FIELDS: Date of Completion and Running Hours */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">Date of Completion *</Label>
-                        <Input
-                          type="datetime-local"
-                          value={executionData.dateOfCompletion}
-                          onChange={(e) => handleExecutionChange('dateOfCompletion', e.target.value)}
-                          className="text-sm"
-                          data-testid="input-date-of-completion"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">
-                          Running Hours {templateData.maintenanceBasis === "Running Hours" ? "*" : ""}
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={executionData.runningHours}
-                          onChange={(e) => handleExecutionChange('runningHours', e.target.value)}
-                          placeholder="Enter running hours"
-                          className="text-sm"
-                          data-testid="input-running-hours"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Work Carried Out with Quick Input and Smart Suggestions */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowQuickInputs(!showQuickInputs)}
-                            className="text-xs text-[#52BAF3] border-[#52BAF3] hover:bg-blue-50 h-6 px-2"
-                          >
-                            Quick Input {showQuickInputs ? '▲' : '▼'}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={toggleSmartSuggestions}
-                            className="text-xs text-[#52BAF3] border-[#52BAF3] hover:bg-blue-50 h-6 px-2"
-                          >
-                            Smart Suggestions {showSmartSuggestions ? '▲' : '▼'}
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {showQuickInputs && (
-                        <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
-                          <p className="text-xs text-gray-600 mb-2">Click to insert common phrases:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {quickAnswers.map((answer, index) => (
-                              <button
-                                key={index}
-                                type="button"
-                                onClick={() => insertQuickText(answer)}
-                                className="inline-flex items-center px-2 py-1 text-xs bg-white border border-gray-300 rounded-full text-gray-700 hover:bg-[#52BAF3] hover:text-white hover:border-[#52BAF3] transition-colors duration-150 cursor-pointer"
-                              >
-                                {answer}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {showSmartSuggestions && (
-                        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-xs text-blue-700 mb-2 font-medium">🧠 Smart Suggestions (based on work order details):</p>
-                          <div className="space-y-2">
-                            {smartSuggestions.length > 0 ? (
-                              smartSuggestions.map((suggestion, index) => (
-                                <div 
-                                  key={index}
-                                  onClick={() => insertSuggestion(suggestion)}
-                                  className="p-2 bg-white border border-blue-200 rounded cursor-pointer hover:bg-blue-100 hover:border-blue-300 transition-colors duration-150"
-                                  title={suggestion}
+                  <div className="divide-y divide-[#E5E7EB]">
+                    {templateData.requiredSpareParts.length > 0 ? (
+                      templateData.requiredSpareParts.map((part, index) => (
+                        <div key={index} className="px-4 py-3">
+                          {editingSparePart === index ? (
+                            <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <Input
+                                value={part.partNo}
+                                onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
+                                placeholder="Part No"
+                                className="text-sm"
+                                data-testid={`input-part-no-${index}`}
+                              />
+                              <Input
+                                value={part.description}
+                                onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
+                                placeholder="Description"
+                                className="text-sm"
+                                data-testid={`input-part-description-${index}`}
+                              />
+                              <Input
+                                type="number"
+                                value={part.quantityRequired}
+                                onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
+                                placeholder="Qty"
+                                className="text-sm"
+                                data-testid={`input-part-quantity-${index}`}
+                              />
+                              <Input
+                                value={part.remarks}
+                                onChange={(e) => handleUpdateSparePartField(index, 'remarks', e.target.value)}
+                                placeholder="Remarks"
+                                className="text-sm"
+                                data-testid={`input-part-remarks-${index}`}
+                              />
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSaveSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-save-part-${index}`}
                                 >
-                                  <p className="text-sm text-gray-800 leading-relaxed">
-                                    {suggestion.length > 140 ? `${suggestion.substring(0, 140)}...` : suggestion}
-                                  </p>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="p-2 text-sm text-gray-500 italic">
-                                No smart suggestions for this job yet.
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEditSparePart}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-cancel-part-${index}`}
+                                >
+                                  <X className="h-4 w-4 text-red-600" />
+                                </Button>
                               </div>
-                            )}
-                          </div>
-                          {smartSuggestions.length > 0 && (
-                            <p className="text-xs text-blue-600 mt-2 italic">💡 Click any suggestion to insert at cursor position</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.description || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.quantityRequired || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.remarks || '-'}</div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  disabled={isReadOnly}
+                                  data-testid={`button-edit-part-${index}`}
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  disabled={isReadOnly}
+                                  data-testid={`button-delete-part-${index}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      )}
-                      
-                      <Textarea 
-                        ref={workCarriedOutRef}
-                        value={executionData.workCarriedOut}
-                        onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
-                        className="w-full min-h-[80px]" 
-                        placeholder="Describe work carried out..."
-                      />
-                    </div>
-                    
-                    {/* Job Experience / Notes */}
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Job Experience / Notes (to be retained for future)</Label>
-                      <Textarea 
-                        value={executionData.jobExperienceNotes}
-                        onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
-                        className="w-full min-h-[80px]" 
-                        placeholder="Enter job experience notes..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* B3. Running Hours (Conditional) */}
-                {templateData.maintenanceBasis === "Running Hours" && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B3. Running Hours</h4>
-                    
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">Previous reading *</Label>
-                        <Input 
-                          type="number" 
-                          value={executionData.previousReading}
-                          onChange={(e) => handleExecutionChange('previousReading', e.target.value)}
-                          placeholder="Enter previous hours reading"
-                          className="w-full" 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-[#8798ad]">Current Reading *</Label>
-                        <Input 
-                          type="number" 
-                          value={executionData.currentReading}
-                          onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                          placeholder="Enter current hours reading"
-                          className="w-full" 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* B4. Spare Parts Consumed */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-md font-medium text-[#3B82F6]">B4. Spare Parts Consumed</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-600 hover:text-blue-800"
-                      onClick={handleAddConsumedSparePart}
-                      data-testid="button-add-spare-part-b4"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Spare Part
-                    </Button>
-                  </div>
-                  
-                  <div className="border border-gray-200 rounded">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
-                        <div>Part No</div>
-                        <div>Description</div>
-                        <div>Quantity Consumed</div>
-                        <div>Comments</div>
-                        <div className="w-20">Actions</div>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {executionData.consumedSpareParts.length > 0 ? (
-                        executionData.consumedSpareParts.map((part, index) => (
-                          <div key={index} className="px-4 py-3">
-                            {editingConsumedSparePart === index ? (
-                              <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <Input
-                                  value={part.partNo}
-                                  onChange={(e) => handleUpdateConsumedSparePartField(index, 'partNo', e.target.value)}
-                                  placeholder="Part No"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  value={part.description}
-                                  onChange={(e) => handleUpdateConsumedSparePartField(index, 'description', e.target.value)}
-                                  placeholder="Description"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  value={part.quantityConsumed}
-                                  onChange={(e) => handleUpdateConsumedSparePartField(index, 'quantityConsumed', e.target.value)}
-                                  placeholder="Qty"
-                                  className="text-sm"
-                                />
-                                <Input
-                                  value={part.comments}
-                                  onChange={(e) => handleUpdateConsumedSparePartField(index, 'comments', e.target.value)}
-                                  placeholder="Comments"
-                                  className="text-sm"
-                                />
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSaveConsumedSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <Check className="h-4 w-4 text-green-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleCancelEditConsumedSparePart}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.description || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.quantityConsumed || '-'}</div>
-                                <div className="text-sm text-gray-900">{part.comments || '-'}</div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditConsumedSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <Pencil className="h-4 w-4 text-blue-600" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteConsumedSparePart(index)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                          No spare parts consumed yet
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* B5. IHM Update */}
-                {FEATURES.IHM && (
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-md font-medium flex items-center gap-2" style={{ color: '#16569e' }}>
-                        B5. IHM Update 
-                        <AlertCircle className="h-4 w-4 text-blue-500" />
-                      </h4>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={executionData.ihmUpdate.enabled}
-                          onChange={(e) => setExecutionData(prev => ({
-                            ...prev,
-                            ihmUpdate: { ...prev.ihmUpdate, enabled: e.target.checked }
-                          }))}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm text-gray-600">Update IHM Status</span>
-                      </label>
-                    </div>
-                    
-                    {executionData.ihmUpdate.enabled && (
-                      <div className="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-sm text-gray-700">IHM Action</Label>
-                            <Select
-                              value={executionData.ihmUpdate.action}
-                              onValueChange={(value) => setExecutionData(prev => ({
-                                ...prev,
-                                ihmUpdate: { ...prev.ihmUpdate, action: value }
-                              }))}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select action" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {IHM_ACTIONS.map(action => (
-                                  <SelectItem key={action} value={action}>
-                                    {action}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div>
-                            <Label className="text-sm text-gray-700">Target Component/Equipment</Label>
-                            <Input
-                              type="text"
-                              value={executionData.ihmUpdate.targetComponent}
-                              onChange={(e) => setExecutionData(prev => ({
-                                ...prev,
-                                ihmUpdate: { ...prev.ihmUpdate, targetComponent: e.target.value }
-                              }))}
-                              placeholder="Component code or name"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <Label className="text-sm text-gray-700">Material/Spare Part</Label>
-                            <Input
-                              type="text"
-                              value={executionData.ihmUpdate.targetSpare}
-                              onChange={(e) => setExecutionData(prev => ({
-                                ...prev,
-                                ihmUpdate: { ...prev.ihmUpdate, targetSpare: e.target.value }
-                              }))}
-                              placeholder="Part code"
-                            />
-                          </div>
-                          
-                          <div>
-                            <Label className="text-sm text-gray-700">Quantity</Label>
-                            <Input
-                              type="text"
-                              value={executionData.ihmUpdate.quantity}
-                              onChange={(e) => setExecutionData(prev => ({
-                                ...prev,
-                                ihmUpdate: { ...prev.ihmUpdate, quantity: e.target.value }
-                              }))}
-                              placeholder="kg/units"
-                            />
-                          </div>
-                          
-                          <div>
-                            <Label className="text-sm text-gray-700">Location</Label>
-                            <Input
-                              type="text"
-                              value={executionData.ihmUpdate.location}
-                              onChange={(e) => setExecutionData(prev => ({
-                                ...prev,
-                                ihmUpdate: { ...prev.ihmUpdate, location: e.target.value }
-                              }))}
-                              placeholder="Location on ship"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <Label className="text-sm text-gray-700">Remarks</Label>
-                          <Textarea
-                            value={executionData.ihmUpdate.remarks}
-                            onChange={(e) => setExecutionData(prev => ({
-                              ...prev,
-                              ihmUpdate: { ...prev.ihmUpdate, remarks: e.target.value }
-                            }))}
-                            placeholder="Additional notes about IHM change..."
-                            className="min-h-[60px]"
-                          />
-                        </div>
-                        
-                        <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                          <p className="text-xs text-yellow-800">
-                            <strong>Note:</strong> IHM updates made during work order completion will be logged to the IHM maintenance log 
-                            and require approval before updating the main IHM register.
-                          </p>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No spare parts required yet
                       </div>
                     )}
                   </div>
-                )}
-
-                {/* Complete Work Order Button - Only show in Part B */}
-                {activeSection === 'partB' && (
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      onClick={handleSave}
-                      className="bg-green-600 hover:bg-green-700 text-white px-8"
-                      data-testid="button-complete-work-order"
-                    >
-                      Complete Work Order
-                    </Button>
-                  </div>
-                )}
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* A3. Required Tools & Equipment */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-md font-medium text-[#3B82F6]">A3. Required Tools & Equipment</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={handleAddTool}
+                    disabled={isReadOnly}
+                    data-testid="button-add-tool-a3"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Tool
+                  </Button>
+                </div>
+                
+                <div className="border border-[#E5E7EB] rounded">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-[#E5E7EB]">
+                    <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
+                      <div>Tool Name</div>
+                      <div>Quantity</div>
+                      <div>Remarks</div>
+                      <div className="w-20">Actions</div>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#E5E7EB]">
+                    {templateData.requiredTools.length > 0 ? (
+                      templateData.requiredTools.map((tool, index) => (
+                        <div key={index} className="px-4 py-3">
+                          {editingTool === index ? (
+                            <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <Input
+                                value={tool.toolName}
+                                onChange={(e) => handleUpdateToolField(index, 'toolName', e.target.value)}
+                                placeholder="Tool Name"
+                                className="text-sm"
+                                data-testid={`input-tool-name-${index}`}
+                              />
+                              <Input
+                                type="number"
+                                value={tool.quantity}
+                                onChange={(e) => handleUpdateToolField(index, 'quantity', e.target.value)}
+                                placeholder="Qty"
+                                className="text-sm"
+                                data-testid={`input-tool-quantity-${index}`}
+                              />
+                              <Input
+                                value={tool.remarks}
+                                onChange={(e) => handleUpdateToolField(index, 'remarks', e.target.value)}
+                                placeholder="Remarks"
+                                className="text-sm"
+                                data-testid={`input-tool-remarks-${index}`}
+                              />
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSaveTool(index)}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-save-tool-${index}`}
+                                >
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEditTool}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-cancel-tool-${index}`}
+                                >
+                                  <X className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <div className="text-sm text-gray-900">{tool.toolName || '-'}</div>
+                              <div className="text-sm text-gray-900">{tool.quantity || '-'}</div>
+                              <div className="text-sm text-gray-900">{tool.remarks || '-'}</div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditTool(index)}
+                                  className="h-8 w-8 p-0"
+                                  disabled={isReadOnly}
+                                  data-testid={`button-edit-tool-${index}`}
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTool(index)}
+                                  className="h-8 w-8 p-0"
+                                  disabled={isReadOnly}
+                                  data-testid={`button-delete-tool-${index}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No tools required yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* A4. Safety Requirements */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-md font-medium text-[#3B82F6]">A4. Safety Requirements</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={() => setIsSafetyModalOpen(true)}
+                    disabled={isReadOnly}
+                    data-testid="button-add-requirement-a4"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Requirement
+                  </Button>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* PPE Requirements */}
+                  <div className="border border-gray-200 rounded p-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-3">PPE Requirements</h5>
+                    {templateData.safetyRequirements.ppeRequirements.length > 0 ? (
+                      <div className="space-y-2">
+                        {templateData.safetyRequirements.ppeRequirements.map((req, index) => (
+                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <span className="text-sm text-gray-900">{req}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
+                              className="h-6 w-6 p-0"
+                              disabled={isReadOnly}
+                              data-testid={`button-delete-ppe-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">No PPE requirements specified yet</div>
+                    )}
+                  </div>
+                  
+                  {/* Permit Requirements */}
+                  <div className="border border-gray-200 rounded p-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-3">Permit Requirements</h5>
+                    {templateData.safetyRequirements.permitRequirements.length > 0 ? (
+                      <div className="space-y-2">
+                        {templateData.safetyRequirements.permitRequirements.map((req, index) => (
+                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <span className="text-sm text-gray-900">{req}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
+                              className="h-6 w-6 p-0"
+                              disabled={isReadOnly}
+                              data-testid={`button-delete-permit-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">No permit requirements specified yet</div>
+                    )}
+                  </div>
+                  
+                  {/* Other Safety Requirements */}
+                  <div className="border border-gray-200 rounded p-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-3">Other Safety Requirements</h5>
+                    {templateData.safetyRequirements.otherRequirements.length > 0 ? (
+                      <div className="space-y-2">
+                        {templateData.safetyRequirements.otherRequirements.map((req, index) => (
+                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                            <span className="text-sm text-gray-900">{req}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
+                              className="h-6 w-6 p-0"
+                              disabled={isReadOnly}
+                              data-testid={`button-delete-other-${index}`}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">No other safety requirements specified yet</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* A5. Work History */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">A5. Work History</h4>
+                
+                <div className="border border-[#E5E7EB] rounded">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-[#E5E7EB]">
+                    <div className="grid grid-cols-7 gap-4 text-sm font-medium text-gray-700">
+                      <div>Work Done No</div>
+                      <div>Completed On</div>
+                      <div>By</div>
+                      <div>Approved By</div>
+                      <div>Last Done Date</div>
+                      <div>Next Due</div>
+                      <div>Completion Status</div>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#E5E7EB]">
+                    {templateData.workHistory && templateData.workHistory.length > 0 ? (
+                      templateData.workHistory.map((execution: any, index: number) => (
+                        <div key={index} className="px-4 py-3 cursor-pointer hover:bg-gray-50" data-testid={`work-history-row-${index}`}>
+                          <div className="grid grid-cols-7 gap-4 text-sm items-center">
+                            <div className="text-gray-900">{execution.woNo || '-'}</div>
+                            <div className="text-gray-900">{execution.workDate || '-'}</div>
+                            <div className="text-gray-900">{execution.performedBy || '-'}</div>
+                            <div className="text-gray-900">{execution.assignedTo || '-'}</div>
+                            <div className="text-gray-900">{execution.completionDate || '-'}</div>
+                            <div className="text-gray-900">{execution.runDate || '-'}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                                {execution.status || 'Completed'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No work history for this template yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Part B - Work Completion Record */
+            <div className="space-y-6">
+              {/* WO Execution ID Header */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <Label className="text-sm text-[#8798ad]">WO Execution ID</Label>
+                <div className="text-sm font-medium text-gray-900 mt-1">
+                  {executionData.woExecutionId}
+                </div>
+              </div>
+
+              {/* B1. Risk Assessment, Checklists & Records */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B1. Risk Assessment, Checklists & Records</h4>
+                
+                <div className="space-y-4">
+                  {/* B1.1 Risk Assessment */}
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-6">
+                      <Label className="text-sm text-gray-900">B1.1 Risk Assessment Completed / Reviewed:</Label>
+                    </div>
+                    <div className="col-span-3 flex items-center gap-4">
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="riskAssessment" 
+                          value="Yes" 
+                          checked={executionData.riskAssessment === "Yes"}
+                          onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-risk-assessment-yes"
+                        />
+                        <span className="text-sm">Yes</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="riskAssessment" 
+                          value="No" 
+                          checked={executionData.riskAssessment === "No"}
+                          onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-risk-assessment-no"
+                        />
+                        <span className="text-sm">No</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="riskAssessment" 
+                          value="NA" 
+                          checked={executionData.riskAssessment === "NA"}
+                          onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-risk-assessment-na"
+                        />
+                        <span className="text-sm">NA</span>
+                      </label>
+                    </div>
+                    <div className="col-span-3 flex gap-2 justify-end">
+                      <input
+                        ref={riskAssessmentFileRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileSelected(e, 'riskAssessment')}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs"
+                        onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
+                        data-testid="button-upload-risk-assessment"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Upload
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleViewDocument('riskAssessment')}
+                        disabled={!getUploadedDocument('riskAssessment')}
+                        data-testid="button-view-risk-assessment"
+                      >
+                        <Eye className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-blue-600' : 'text-gray-400'}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleDeleteDocumentClick('riskAssessment')}
+                        disabled={!getUploadedDocument('riskAssessment')}
+                        data-testid="button-delete-risk-assessment"
+                      >
+                        <Trash2 className={`h-4 w-4 ${getUploadedDocument('riskAssessment') ? 'text-red-600' : 'text-gray-400'}`} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* B1.2 Safety Checklists */}
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-6">
+                      <Label className="text-sm text-gray-900">B1.2 Safety Checklists Completed (As applicable):</Label>
+                    </div>
+                    <div className="col-span-3 flex items-center gap-4">
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="safetyChecklists" 
+                          value="Yes" 
+                          checked={executionData.safetyChecklists === "Yes"}
+                          onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-safety-checklists-yes"
+                        />
+                        <span className="text-sm">Yes</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="safetyChecklists" 
+                          value="No" 
+                          checked={executionData.safetyChecklists === "No"}
+                          onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-safety-checklists-no"
+                        />
+                        <span className="text-sm">No</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="safetyChecklists" 
+                          value="NA" 
+                          checked={executionData.safetyChecklists === "NA"}
+                          onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-safety-checklists-na"
+                        />
+                        <span className="text-sm">NA</span>
+                      </label>
+                    </div>
+                    <div className="col-span-3 flex gap-2 justify-end">
+                      <input
+                        ref={safetyChecklistFileRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileSelected(e, 'safetyChecklist')}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs"
+                        onClick={() => handleUploadDocument('safetyChecklist', safetyChecklistFileRef)}
+                        data-testid="button-upload-safety-checklist"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Upload
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleViewDocument('safetyChecklist')}
+                        disabled={!getUploadedDocument('safetyChecklist')}
+                        data-testid="button-view-safety-checklist"
+                      >
+                        <Eye className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-blue-600' : 'text-gray-400'}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleDeleteDocumentClick('safetyChecklist')}
+                        disabled={!getUploadedDocument('safetyChecklist')}
+                        data-testid="button-delete-safety-checklist"
+                      >
+                        <Trash2 className={`h-4 w-4 ${getUploadedDocument('safetyChecklist') ? 'text-red-600' : 'text-gray-400'}`} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* B1.3 Operational Forms */}
+                  <div className="grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-6">
+                      <Label className="text-sm text-gray-900">B1.3 Operational Forms Completed (As applicable):</Label>
+                    </div>
+                    <div className="col-span-3 flex items-center gap-4">
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="operationalForms" 
+                          value="Yes" 
+                          checked={executionData.operationalForms === "Yes"}
+                          onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-operational-forms-yes"
+                        />
+                        <span className="text-sm">Yes</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="operationalForms" 
+                          value="No" 
+                          checked={executionData.operationalForms === "No"}
+                          onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-operational-forms-no"
+                        />
+                        <span className="text-sm">No</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input 
+                          type="radio" 
+                          name="operationalForms" 
+                          value="NA" 
+                          checked={executionData.operationalForms === "NA"}
+                          onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                          className="text-blue-600" 
+                          data-testid="radio-operational-forms-na"
+                        />
+                        <span className="text-sm">NA</span>
+                      </label>
+                    </div>
+                    <div className="col-span-3 flex gap-2 justify-end">
+                      <input
+                        ref={operationalFormFileRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileSelected(e, 'operationalForm')}
+                        className="hidden"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs"
+                        onClick={() => handleUploadDocument('operationalForm', operationalFormFileRef)}
+                        data-testid="button-upload-operational-form"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Upload
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleViewDocument('operationalForm')}
+                        disabled={!getUploadedDocument('operationalForm')}
+                        data-testid="button-view-operational-form"
+                      >
+                        <Eye className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-blue-600' : 'text-gray-400'}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleDeleteDocumentClick('operationalForm')}
+                        disabled={!getUploadedDocument('operationalForm')}
+                        data-testid="button-delete-operational-form"
+                      >
+                        <Trash2 className={`h-4 w-4 ${getUploadedDocument('operationalForm') ? 'text-red-600' : 'text-gray-400'}`} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* B2. Details of Work Carried Out */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B2. Details of Work Carried Out</h4>
+                
+                <div className="space-y-6">
+                  {/* Row 1: Start Date/Time, Completion Date/Time, Assigned To */}
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Start Date/Time</Label>
+                      <Input
+                        type="datetime-local"
+                        value={executionData.startDateTime}
+                        onChange={(e) => handleExecutionChange('startDateTime', e.target.value)}
+                        className="text-sm"
+                        data-testid="input-start-datetime"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Completion Date/Time</Label>
+                      <Input
+                        type="datetime-local"
+                        value={executionData.completionDateTime}
+                        onChange={(e) => handleExecutionChange('completionDateTime', e.target.value)}
+                        className="text-sm"
+                        data-testid="input-completion-datetime"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Assigned To</Label>
+                      <Select 
+                        value={executionData.assignedTo} 
+                        onValueChange={(value) => handleExecutionChange('assignedTo', value)}
+                      >
+                        <SelectTrigger className="text-sm" data-testid="select-execution-assigned-to">
+                          <SelectValue placeholder="Select rank" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ranks.map(rank => (
+                            <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Performed By, No of Persons, Total Time Hours */}
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Performed By</Label>
+                      <Select 
+                        value={executionData.performedBy} 
+                        onValueChange={(value) => handleExecutionChange('performedBy', value)}
+                      >
+                        <SelectTrigger className="text-sm" data-testid="select-performed-by">
+                          <SelectValue placeholder="Select rank" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ranks.map(rank => (
+                            <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">No of Persons</Label>
+                      <Input
+                        type="number"
+                        value={executionData.noOfPersons}
+                        onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
+                        className="text-sm"
+                        placeholder="0"
+                        data-testid="input-no-of-persons"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-[#8798ad]">Total Time (Hrs)</Label>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={executionData.totalTimeHours}
+                        onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
+                        className="text-sm"
+                        placeholder="0.0"
+                        data-testid="input-total-time-hours"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Work Carried Out textarea with Quick Input and Smart Suggestions */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowQuickInputs(!showQuickInputs)}
+                          className="text-xs"
+                          data-testid="button-quick-input"
+                        >
+                          Quick Input ▼
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={toggleSmartSuggestions}
+                          className="text-xs"
+                          data-testid="button-smart-suggestions"
+                        >
+                          Smart Suggestions ▼
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Quick Input Dropdown */}
+                    {showQuickInputs && (
+                      <div className="border border-gray-200 rounded bg-white p-2 shadow-sm max-h-60 overflow-y-auto">
+                        {quickAnswers.map((answer, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              insertQuickText(answer);
+                              setShowQuickInputs(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                            data-testid={`quick-input-${index}`}
+                          >
+                            {answer}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Smart Suggestions Dropdown */}
+                    {showSmartSuggestions && (
+                      <div className="border border-gray-200 rounded bg-white p-2 shadow-sm max-h-60 overflow-y-auto">
+                        {smartSuggestions.length > 0 ? (
+                          smartSuggestions.map((suggestion, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                insertSuggestion(suggestion);
+                                setShowSmartSuggestions(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                              data-testid={`smart-suggestion-${index}`}
+                            >
+                              {suggestion}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">No suggestions available</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <Textarea
+                      ref={workCarriedOutRef}
+                      value={executionData.workCarriedOut}
+                      onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
+                      className="text-sm min-h-[100px]"
+                      placeholder="Describe work carried out..."
+                      data-testid="textarea-work-carried-out"
+                    />
+                  </div>
+
+                  {/* Job Experience / Notes */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Job Experience / Notes</Label>
+                    <Textarea
+                      value={executionData.jobExperienceNotes}
+                      onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
+                      className="text-sm min-h-[80px]"
+                      placeholder="Any notes or experiences..."
+                      data-testid="textarea-job-experience-notes"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* B3. Running Hours */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B3. Running Hours</h4>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Previous Reading</Label>
+                    <Input
+                      type="number"
+                      value={executionData.previousReading}
+                      onChange={(e) => handleExecutionChange('previousReading', e.target.value)}
+                      className="text-sm"
+                      placeholder="Previous running hours"
+                      data-testid="input-previous-reading"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Current Reading</Label>
+                    <Input
+                      type="number"
+                      value={executionData.currentReading}
+                      onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                      className="text-sm"
+                      placeholder="Current running hours"
+                      data-testid="input-current-reading"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* B4. Spare Parts Consumed */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h4 className="text-md font-medium mb-4 text-[#3B82F6]">B4. Spare Parts Consumed</h4>
+                
+                <div className="border border-[#E5E7EB] rounded">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-[#E5E7EB]">
+                    <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
+                      <div>Part No</div>
+                      <div>Description</div>
+                      <div>Quantity Consumed</div>
+                      <div>Consumable Cost</div>
+                      <div className="w-20">Actions</div>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#E5E7EB]">
+                    {executionData.consumedSpareParts.length > 0 ? (
+                      executionData.consumedSpareParts.map((part, index) => (
+                        <div key={index} className="px-4 py-3">
+                          {editingConsumedSparePart === index ? (
+                            <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <Input
+                                value={part.partNo}
+                                onChange={(e) => handleUpdateConsumedSparePartField(index, 'partNo', e.target.value)}
+                                placeholder="Part No"
+                                className="text-sm"
+                                data-testid={`input-consumed-part-no-${index}`}
+                              />
+                              <Input
+                                value={part.description}
+                                onChange={(e) => handleUpdateConsumedSparePartField(index, 'description', e.target.value)}
+                                placeholder="Description"
+                                className="text-sm"
+                                data-testid={`input-consumed-description-${index}`}
+                              />
+                              <Input
+                                type="number"
+                                value={part.quantityConsumed}
+                                onChange={(e) => handleUpdateConsumedSparePartField(index, 'quantityConsumed', e.target.value)}
+                                placeholder="Qty"
+                                className="text-sm"
+                                data-testid={`input-consumed-quantity-${index}`}
+                              />
+                              <Input
+                                value={part.comments}
+                                onChange={(e) => handleUpdateConsumedSparePartField(index, 'comments', e.target.value)}
+                                placeholder="Comments"
+                                className="text-sm"
+                                data-testid={`input-consumed-comments-${index}`}
+                              />
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSaveConsumedSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-save-consumed-${index}`}
+                                >
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEditConsumedSparePart}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-cancel-consumed-${index}`}
+                                >
+                                  <X className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.description || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.quantityConsumed || '-'}</div>
+                              <div className="text-sm text-gray-900">{part.comments || '-'}</div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditConsumedSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-edit-consumed-${index}`}
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteConsumedSparePart(index)}
+                                  className="h-8 w-8 p-0"
+                                  data-testid={`button-delete-consumed-${index}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                        No spare parts consumed yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* B5. + Add Spare Part button (green at bottom) */}
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    onClick={handleAddConsumedSparePart}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="button-add-consumed-spare-part"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Spare Part
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Work Instructions Dialog */}
-        <WorkInstructionsDialog
-          isOpen={isWorkInstructionsOpen}
-          onClose={() => setIsWorkInstructionsOpen(false)}
-        />
+      {/* Work Instructions Dialog */}
+      <WorkInstructionsDialog
+        isOpen={isWorkInstructionsOpen}
+        onClose={() => setIsWorkInstructionsOpen(false)}
+      />
 
-        {/* Safety Requirement Modal */}
-        <AlertDialog open={isSafetyModalOpen} onOpenChange={setIsSafetyModalOpen}>
+      {/* Safety Requirement Modal */}
+      <AlertDialog open={isSafetyModalOpen} onOpenChange={setIsSafetyModalOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Add Safety Requirement</AlertDialogTitle>
             <AlertDialogDescription>
-              Select category and enter the safety requirement
+              Select the category and enter the safety requirement details.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label className="text-sm text-gray-700">Category</Label>
-              <Select 
-                value={safetyRequirementCategory}
-                onValueChange={(value: any) => setSafetyRequirementCategory(value)}
-              >
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={safetyRequirementCategory} onValueChange={(value: any) => setSafetyRequirementCategory(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1978,12 +2007,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-sm text-gray-700">Requirement</Label>
-              <Input
+            <div className="space-y-2">
+              <Label>Requirement</Label>
+              <Textarea
                 value={newSafetyRequirement}
                 onChange={(e) => setNewSafetyRequirement(e.target.value)}
                 placeholder="Enter safety requirement..."
+                className="min-h-[80px]"
               />
             </div>
           </div>
