@@ -2652,12 +2652,16 @@ async function performImport(
       // Map Excel columns to job schema fields (21-column specification)
       // Normalize Last Done date from Excel (handles various formats including Excel serials)
       const rawLastDone = row['Last Done Date'];
+      console.log(`📅 [${componentCode}] Raw Last Done Date from Excel:`, rawLastDone, typeof rawLastDone);
       let lastDoneDate = rawLastDone ? normalizeDateToDDMMMYYYY(rawLastDone) : null;
+      console.log(`📅 [${componentCode}] Normalized lastDoneDate:`, lastDoneDate);
       
       // If Last Done Date is not provided, use component's installation date as fallback
       if (!lastDoneDate && component.installationDate) {
+        console.log(`📅 [${componentCode}] Using installation date fallback:`, component.installationDate);
         try {
           lastDoneDate = normalizeDateToDDMMMYYYY(component.installationDate);
+          console.log(`📅 [${componentCode}] Fallback normalized to:`, lastDoneDate);
         } catch (error) {
           console.warn(`⚠️ Could not normalize installation date for component ${componentCode}: ${component.installationDate}`);
           lastDoneDate = null;
