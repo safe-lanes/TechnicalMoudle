@@ -360,62 +360,58 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   console.log(`🌿 Filtered to ${leafComponents.length} leaf node components (actual equipment)`);
   console.log(`🚫 Excluded ${validComponents.length - leafComponents.length} parent components from template`);
   
-  // Create main "jobs" sheet with all 23 Vessel_Job Sheet columns
+  // Create main "jobs" sheet with correct 21-column structure
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the Vessel_Job Sheet structure (23 columns)
+  // Add headers matching the correct 21-column specification
   jobsSheet.columns = [
-    { header: 'Vessel Code', key: 'vesselCode', width: 15 },
-    { header: 'Component Code', key: 'componentCode', width: 25 },
+    { header: 'Job Code', key: 'jobCode', width: 18 },
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
+    { header: 'WO Title', key: 'woTitle', width: 35 },
+    { header: 'Component Code', key: 'componentCode', width: 20 },
     { header: 'Component Name', key: 'componentName', width: 30 },
-    { header: 'Job Code', key: 'jobCode', width: 15 },
-    { header: 'Job Category', key: 'jobCategory', width: 20 },
-    { header: 'Maintenance Task', key: 'maintenanceTask', width: 35 },
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
-    { header: 'Frequency Value', key: 'frequencyValue', width: 15 },
-    { header: 'Frequency Unit', key: 'frequencyUnit', width: 15 },
+    { header: 'Interval Value', key: 'intervalValue', width: 15 },
+    { header: 'Internal Running Hour Number', key: 'internalRunningHourNumber', width: 28 },
+    { header: 'Unit', key: 'unit', width: 12 },
     { header: 'Task Type', key: 'taskType', width: 20 },
-    { header: 'Brief Job Description', key: 'briefJobDescription', width: 50 },
-    { header: 'Required Spare Parts', key: 'requiredSpareParts', width: 30 },
-    { header: 'Required Tools', key: 'requiredTools', width: 30 },
-    { header: 'Required Safety Items', key: 'requiredSafetyItems', width: 30 },
-    { header: 'Job Priority', key: 'jobPriority', width: 12 },
-    { header: 'Planned Duration', key: 'plannedDuration', width: 15 },
-    { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
-    { header: 'Initial Next Due', key: 'initialNextDue', width: 15 },
-    { header: 'Person In Charge', key: 'personInCharge', width: 20 },
-    { header: 'Responsible Department', key: 'responsibleDepartment', width: 20 },
-    { header: 'Dept Code', key: 'deptCode', width: 12 },
+    { header: 'Assigned To', key: 'assignedTo', width: 20 },
+    { header: 'Approver', key: 'approver', width: 20 },
+    { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Class Related', key: 'classRelated', width: 15 },
-    { header: 'Critical', key: 'critical', width: 12 }
+    { header: 'Next Due Date', key: 'nextDueDate', width: 18 },
+    { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
+    { header: 'Department', key: 'department', width: 20 },
+    { header: 'Criticality', key: 'criticality', width: 15 },
+    { header: 'Is Active', key: 'isActive', width: 12 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 15 }
   ];
   
   // Pre-populate only leaf node components in the template
   leafComponents.forEach(component => {
     jobsSheet.addRow({
-      vesselCode: vesselId,
+      jobCode: '',
+      fleetEquipmentCode: component.fleetEquipmentCode || '',
+      fleetEquipmentName: '',
+      woTitle: '',
       componentCode: component.componentCode,
       componentName: component.name,
-      jobCode: '',
-      jobCategory: '',
-      maintenanceTask: '',
       maintenanceBasis: '',
-      frequencyValue: '',
-      frequencyUnit: '',
+      intervalValue: '',
+      internalRunningHourNumber: '',
+      unit: '',
       taskType: '',
-      briefJobDescription: '',
-      requiredSpareParts: '',
-      requiredTools: '',
-      requiredSafetyItems: '',
+      assignedTo: '',
+      approver: '',
       jobPriority: '',
-      plannedDuration: '',
-      lastDoneDate: '',
-      initialNextDue: '',
-      personInCharge: '',
-      responsibleDepartment: '',
-      deptCode: '',
       classRelated: '',
-      critical: ''
+      nextDueDate: '',
+      briefWorkDescription: '',
+      department: '',
+      criticality: '',
+      isActive: 'Yes',
+      vesselCode: vesselId
     });
   });
   
@@ -425,28 +421,28 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   const listsSheet = workbook.addWorksheet('Lists');
   listsSheet.columns = [
     { header: 'Maintenance_Basis', key: 'maintenanceBasis', width: 18 },
-    { header: 'Frequency_Unit', key: 'frequencyUnit', width: 15 },
+    { header: 'Interval_Unit', key: 'intervalUnit', width: 15 },
     { header: 'Task_Type', key: 'taskType', width: 20 },
     { header: 'Job_Priority', key: 'jobPriority', width: 12 },
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Yes_No', key: 'yesNo', width: 10 }
   ];
   
-  // Add dropdown values (Only Calendar and Running Hours - frequency is REQUIRED for PMS)
+  // Add dropdown values (Only Calendar and Running Hours - interval is REQUIRED for PMS)
   const listValues = [
-    { maintenanceBasis: 'Calendar', frequencyUnit: 'Days', taskType: 'Inspection', jobPriority: 'Low', department: 'Engine', yesNo: 'Yes' },
-    { maintenanceBasis: 'Running Hours', frequencyUnit: 'Weeks', taskType: 'Overhaul', jobPriority: 'Medium', department: 'Deck', yesNo: 'No' },
-    { maintenanceBasis: '', frequencyUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
-    { maintenanceBasis: '', frequencyUnit: 'Years', taskType: 'Testing', jobPriority: 'Critical', department: 'C/E', yesNo: '' },
-    { maintenanceBasis: '', frequencyUnit: 'Hours', taskType: 'Repair', jobPriority: '', department: '2/E', yesNo: '' },
-    { maintenanceBasis: '', frequencyUnit: '', taskType: 'Replacement', jobPriority: '', department: '3/E', yesNo: '' },
-    { maintenanceBasis: '', frequencyUnit: '', taskType: 'Cleaning', jobPriority: '', department: '4/E', yesNo: '' },
-    { maintenanceBasis: '', frequencyUnit: '', taskType: 'Calibration', jobPriority: '', department: 'ETO', yesNo: '' }
+    { maintenanceBasis: 'Calendar', intervalUnit: 'Days', taskType: 'Inspection', jobPriority: 'Low', department: 'Engine', yesNo: 'Yes' },
+    { maintenanceBasis: 'Running Hours', intervalUnit: 'Weeks', taskType: 'Overhaul', jobPriority: 'Medium', department: 'Deck', yesNo: 'No' },
+    { maintenanceBasis: '', intervalUnit: 'Months', taskType: 'Service', jobPriority: 'High', department: 'Electrical', yesNo: '' },
+    { maintenanceBasis: '', intervalUnit: 'Years', taskType: 'Testing', jobPriority: 'Critical', department: 'C/E', yesNo: '' },
+    { maintenanceBasis: '', intervalUnit: 'Hours', taskType: 'Repair', jobPriority: '', department: '2/E', yesNo: '' },
+    { maintenanceBasis: '', intervalUnit: '', taskType: 'Replacement', jobPriority: '', department: '3/E', yesNo: '' },
+    { maintenanceBasis: '', intervalUnit: '', taskType: 'Cleaning', jobPriority: '', department: '4/E', yesNo: '' },
+    { maintenanceBasis: '', intervalUnit: '', taskType: 'Calibration', jobPriority: '', department: 'ETO', yesNo: '' }
   ];
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Add data validations to jobs sheet
+  // Add data validations to jobs sheet (21-column layout)
   // Column G (Maintenance Basis) - row 2 onwards (Only Calendar and Running Hours allowed)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
@@ -458,8 +454,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column I (Frequency Unit)
-  jobsSheet.getColumn(9).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column J (Unit - formerly Frequency Unit)
+  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -469,8 +465,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column J (Task Type)
-  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column K (Task Type)
+  jobsSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -480,8 +476,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column O (Job Priority)
-  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column N (Job Priority)
+  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -491,19 +487,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column T (Responsible Department)
-  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-    if (rowNumber > 1) {
-      cell.dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['=Lists!$E$2:$E$9']
-      };
-    }
-  });
-  
-  // Column V (Class Related) - Yes/No
-  jobsSheet.getColumn(22).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column O (Class Related) - Yes/No
+  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -513,8 +498,30 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column W (Critical) - Yes/No
-  jobsSheet.getColumn(23).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column R (Department)
+  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$E$2:$E$9']
+      };
+    }
+  });
+  
+  // Column S (Criticality) - Yes/No
+  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+    if (rowNumber > 1) {
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['=Lists!$F$2:$F$3']
+      };
+    }
+  });
+  
+  // Column T (Is Active) - Yes/No
+  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1822,15 +1829,15 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
     } else if (type === 'jobs') {
-      // Validate jobs (23-field Vessel_Job Sheet format)
-      // Skip rows that don't have Maintenance Task - user only fills in components they want jobs for
-      if (!row['Maintenance Task'] || String(row['Maintenance Task']).trim() === '') {
+      // Validate jobs (21-column specification format)
+      // Skip rows that don't have WO Title - user only fills in components they want jobs for
+      if (!row['WO Title'] || String(row['WO Title']).trim() === '') {
         // Skip empty rows (component without job) - don't add to results
         continue;
       }
       
-      // If Maintenance Task is provided, then this is a real job - validate it
-      normalized['Maintenance Task'] = String(row['Maintenance Task']).trim();
+      // If WO Title is provided, then this is a real job - validate it
+      normalized['WO Title'] = String(row['WO Title']).trim();
       
       // Vessel Code - required
       if (!row['Vessel Code']) {
@@ -1852,14 +1859,19 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Component Name'] = String(row['Component Name']).trim();
       }
 
-      // Job Code is optional (will be auto-generated as JOB-XXXXXXX)
+      // Job Code is optional (will be auto-generated)
       if (row['Job Code']) {
         normalized['Job Code'] = String(row['Job Code']).trim();
       }
       
-      // Job Category is optional
-      if (row['Job Category']) {
-        normalized['Job Category'] = String(row['Job Category']).trim();
+      // Fleet Equipment Code is optional
+      if (row['Fleet Equipment Code']) {
+        normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
+      }
+      
+      // Fleet Equipment Name is optional
+      if (row['Fleet Equipment Name']) {
+        normalized['Fleet Equipment Name'] = String(row['Fleet Equipment Name']).trim();
       }
 
       // Maintenance Basis - required (Calendar or Running Hours only)
@@ -1873,40 +1885,45 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Maintenance Basis'] = row['Maintenance Basis'];
       }
 
-      // Validate Frequency Value and Frequency Unit - ALWAYS REQUIRED
-      // The entire planned maintenance system depends on frequency data
+      // Validate Interval Value and Unit - ALWAYS REQUIRED
+      // The entire planned maintenance system depends on interval data
       const maintenanceBasis = row['Maintenance Basis'];
       
-      // Frequency Value is always required
-      if (!row['Frequency Value']) {
-        errors.push(`Row ${rowNum}: Frequency Value is REQUIRED - this drives the entire PMS scheduling system`);
+      // Interval Value is always required
+      if (!row['Interval Value']) {
+        errors.push(`Row ${rowNum}: Interval Value is REQUIRED - this drives the entire PMS scheduling system`);
       } else {
-        const frequency = parseFloat(row['Frequency Value']);
-        if (isNaN(frequency) || frequency <= 0) {
-          errors.push(`Row ${rowNum}: Frequency Value must be a positive number (got: '${row['Frequency Value']}')`);
+        const interval = parseFloat(row['Interval Value']);
+        if (isNaN(interval) || interval <= 0) {
+          errors.push(`Row ${rowNum}: Interval Value must be a positive number (got: '${row['Interval Value']}')`);
         } else {
-          normalized['Frequency Value'] = String(frequency);
+          normalized['Interval Value'] = String(interval);
         }
       }
+      
+      // Internal Running Hour Number is optional
+      if (row['Internal Running Hour Number']) {
+        normalized['Internal Running Hour Number'] = String(row['Internal Running Hour Number']).trim();
+      }
 
-      // Frequency Unit validation depends on Maintenance Basis
+      // Unit validation depends on Maintenance Basis
       if (maintenanceBasis === 'Calendar') {
-        const validFrequencyUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
-        if (!row['Frequency Unit']) {
-          errors.push(`Row ${rowNum}: Frequency Unit is REQUIRED for Calendar maintenance (allowed: ${validFrequencyUnits.join(', ')})`);
-        } else if (!validFrequencyUnits.includes(row['Frequency Unit'])) {
-          errors.push(`Row ${rowNum}: Invalid Frequency Unit '${row['Frequency Unit']}'. Allowed: ${validFrequencyUnits.join(', ')}`);
+        const validUnits = ['Hours', 'Days', 'Weeks', 'Months', 'Years'];
+        if (!row['Unit']) {
+          errors.push(`Row ${rowNum}: Unit is REQUIRED for Calendar maintenance (allowed: ${validUnits.join(', ')})`);
+        } else if (!validUnits.includes(row['Unit'])) {
+          errors.push(`Row ${rowNum}: Invalid Unit '${row['Unit']}'. Allowed: ${validUnits.join(', ')}`);
         } else {
-          normalized['Frequency Unit'] = row['Frequency Unit'];
+          normalized['Unit'] = row['Unit'];
         }
       } else if (maintenanceBasis === 'Running Hours') {
-        // Running Hours - Frequency Unit defaults to Hours
-        if (row['Frequency Unit']) {
-          if (row['Frequency Unit'] !== 'Hours') {
-            warnings.push(`Row ${rowNum}: Frequency Unit for Running Hours should be 'Hours' (will be set to Hours)`);
+        // Running Hours - Unit defaults to Hours
+        if (row['Unit']) {
+          if (row['Unit'] !== 'Hours') {
+            warnings.push(`Row ${rowNum}: Unit for Running Hours should be 'Hours' (will be set to Hours)`);
           }
         }
-        normalized['Frequency Unit'] = 'Hours';
+        normalized['Unit'] = 'Hours';
       }
 
       // Task Type - required
@@ -1919,24 +1936,14 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Task Type'] = row['Task Type'];
       }
 
-      // Brief Job Description is optional
-      if (row['Brief Job Description']) {
-        normalized['Brief Job Description'] = String(row['Brief Job Description']).trim();
+      // Assigned To is optional
+      if (row['Assigned To']) {
+        normalized['Assigned To'] = String(row['Assigned To']).trim();
       }
-
-      // Required Spare Parts is optional
-      if (row['Required Spare Parts']) {
-        normalized['Required Spare Parts'] = String(row['Required Spare Parts']).trim();
-      }
-
-      // Required Tools is optional
-      if (row['Required Tools']) {
-        normalized['Required Tools'] = String(row['Required Tools']).trim();
-      }
-
-      // Required Safety Items is optional
-      if (row['Required Safety Items']) {
-        normalized['Required Safety Items'] = String(row['Required Safety Items']).trim();
+      
+      // Approver is optional
+      if (row['Approver']) {
+        normalized['Approver'] = String(row['Approver']).trim();
       }
 
       // Job Priority is optional
@@ -1945,43 +1952,6 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         errors.push(`Row ${rowNum}: Invalid Job Priority. Allowed: ${validJobPriorities.join(', ')}`);
       } else if (row['Job Priority']) {
         normalized['Job Priority'] = row['Job Priority'];
-      }
-
-      // Planned Duration is optional
-      if (row['Planned Duration']) {
-        const duration = parseFloat(row['Planned Duration']);
-        if (isNaN(duration) || duration < 0) {
-          errors.push(`Row ${rowNum}: Planned Duration must be a non-negative number`);
-        } else {
-          normalized['Planned Duration'] = String(duration);
-        }
-      }
-
-      // Date fields are optional
-      if (row['Last Done Date']) {
-        normalized['Last Done Date'] = String(row['Last Done Date']).trim();
-      }
-
-      if (row['Initial Next Due']) {
-        normalized['Initial Next Due'] = String(row['Initial Next Due']).trim();
-      }
-
-      // Person In Charge is optional
-      if (row['Person In Charge']) {
-        normalized['Person In Charge'] = String(row['Person In Charge']).trim();
-      }
-
-      // Responsible Department is optional
-      const validDepartmentsJobs = ['Engine', 'Deck', 'Electrical', 'C/E', '2/E', '3/E', '4/E', 'ETO'];
-      if (row['Responsible Department'] && !validDepartmentsJobs.includes(row['Responsible Department'])) {
-        errors.push(`Row ${rowNum}: Invalid Responsible Department. Allowed: ${validDepartmentsJobs.join(', ')}`);
-      } else if (row['Responsible Department']) {
-        normalized['Responsible Department'] = row['Responsible Department'];
-      }
-
-      // Dept Code is optional
-      if (row['Dept Code']) {
-        normalized['Dept Code'] = String(row['Dept Code']).trim();
       }
 
       // Class Related - optional yes/no
@@ -1993,15 +1963,45 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           normalized['Class Related'] = value;
         }
       }
+      
+      // Next Due Date is optional
+      if (row['Next Due Date']) {
+        normalized['Next Due Date'] = String(row['Next Due Date']).trim();
+      }
+      
+      // Brief Work Description is optional
+      if (row['Brief Work Description']) {
+        normalized['Brief Work Description'] = String(row['Brief Work Description']).trim();
+      }
 
-      // Critical - optional yes/no
-      if (row['Critical']) {
-        const value = row['Critical'].toString().toLowerCase();
+      // Department is optional
+      const validDepartmentsJobs = ['Engine', 'Deck', 'Electrical', 'C/E', '2/E', '3/E', '4/E', 'ETO'];
+      if (row['Department'] && !validDepartmentsJobs.includes(row['Department'])) {
+        errors.push(`Row ${rowNum}: Invalid Department. Allowed: ${validDepartmentsJobs.join(', ')}`);
+      } else if (row['Department']) {
+        normalized['Department'] = row['Department'];
+      }
+      
+      // Criticality - optional yes/no
+      if (row['Criticality']) {
+        const value = row['Criticality'].toString().toLowerCase();
         if (!['yes', 'no'].includes(value)) {
-          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
+          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
         } else {
-          normalized['Critical'] = value;
+          normalized['Criticality'] = value;
         }
+      }
+      
+      // Is Active - optional yes/no (defaults to Yes if not provided)
+      if (row['Is Active']) {
+        const value = row['Is Active'].toString().toLowerCase();
+        if (!['yes', 'no'].includes(value)) {
+          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+        } else {
+          normalized['Is Active'] = value;
+        }
+      } else {
+        normalized['Is Active'] = 'yes';  // Default to active
       }
 
       // Copy other fields
@@ -2648,43 +2648,34 @@ async function performImport(
       // vesselCode is for display/tracking only
       const canonicalVesselId = vesselId || vesselCodeFromExcel;
       
-      // Map Excel columns to job schema fields
+      // Map Excel columns to job schema fields (21-column specification)
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
         vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
         componentId: component.id,          // FK reference to component (UUID)
         componentCode: componentCode,       // Display/tracking field (SFI code)
         componentName: row['Component Name'] || component.name || null,
-        jobCategory: row['Job Category'] || null,
-        jobTitle: row['Maintenance Task'],  // Job title from Maintenance Task column
-        maintenanceType: row['Task Type'],   // maintenanceType from Task Type column
+        fleetEquipmentCode: row['Fleet Equipment Code'] || null,
+        fleetEquipmentName: row['Fleet Equipment Name'] || null,
+        jobTitle: row['WO Title'],          // Job title from WO Title column
+        maintenanceType: row['Task Type'],  // maintenanceType from Task Type column
         maintenanceBasis: row['Maintenance Basis'],
-        frequencyValue: row['Frequency Value'] ? parseFloat(row['Frequency Value']) : null,
-        frequencyUnit: row['Frequency Unit'] || null,
+        frequencyValue: row['Interval Value'] ? parseFloat(row['Interval Value']) : null,
+        frequencyUnit: row['Unit'] || null,
         // For Running Hours jobs: store interval in both fields for compatibility
-        intervalRunningHour: (row['Maintenance Basis'] === 'Running Hours' && row['Frequency Value']) 
-          ? parseInt(String(row['Frequency Value'])) 
+        intervalRunningHour: (row['Maintenance Basis'] === 'Running Hours' && row['Interval Value']) 
+          ? parseInt(String(row['Interval Value'])) 
           : null,
-        jobDescription: row['Brief Job Description'] || null,
-        // JSON array fields - split comma-separated lists (normalize null to [] for consistent checksums)
-        requiredSpareParts: row['Required Spare Parts'] 
-          ? row['Required Spare Parts'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : [],
-        requiredTools: row['Required Tools']
-          ? row['Required Tools'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : [],
-        safetyRequirements: row['Required Safety Items']
-          ? row['Required Safety Items'].split(',').map((s: string) => s.trim()).filter((s: string) => s)
-          : [],
+        internalRunningHourNumber: row['Internal Running Hour Number'] || null,
+        jobDescription: row['Brief Work Description'] || null,
+        assignedTo: row['Assigned To'] || null,
+        approver: row['Approver'] || null,
         jobPriority: row['Job Priority'] || null,
-        plannedDuration: row['Planned Duration'] ? parseFloat(row['Planned Duration']) : null,
-        lastDoneDate: row['Last Done Date'] || null,
-        initialNextDue: row['Initial Next Due'] || null,
-        personInCharge: row['Person In Charge'] || null,
-        responsibleDepartment: row['Responsible Department'] || null,
-        deptCode: row['Dept Code'] || null,
         classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes') : null,
-        critical: row['Critical'] ? (row['Critical'].toString().toLowerCase() === 'yes') : null
+        nextDueDate: row['Next Due Date'] || null,
+        department: row['Department'] || null,
+        criticality: row['Criticality'] ? (row['Criticality'].toString().toLowerCase() === 'yes') : null,
+        isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true
       };
       
       // Auto-generate job number if not provided (format: JOB-XXXXXXX)

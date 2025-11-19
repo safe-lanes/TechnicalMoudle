@@ -422,6 +422,15 @@ export interface IStorage {
   createMasterList(list: InsertMasterList): Promise<MasterList>;
   updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList>;
   deleteMasterList(id: number): Promise<void>;
+  
+  // Data Purge methods
+  purgeJobsAndLinkedData(vesselId?: string): Promise<{
+    deletedWorkOrderExecutions: number;
+    deletedWorkOrders: number;
+    deletedJobs: number;
+    deletedRunningHoursAudits: number;
+    componentsReset: number;
+  }>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -5141,6 +5150,16 @@ export class PostgresStorage implements IStorage {
 
   async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
     throw new Error("Create vessel not yet migrated to PostgreSQL");
+  }
+  
+  async purgeJobsAndLinkedData(vesselId?: string): Promise<{
+    deletedWorkOrderExecutions: number;
+    deletedWorkOrders: number;
+    deletedJobs: number;
+    deletedRunningHoursAudits: number;
+    componentsReset: number;
+  }> {
+    throw new Error("Purge jobs and linked data not yet migrated to PostgreSQL");
   }
 }
 

@@ -4732,4 +4732,117 @@ export class PersistentFileStorage implements IStorage {
     this.data.masterLists = this.data.masterLists.filter(m => m.id !== id);
     this.persistData();
   }
+  
+  async purgeJobsAndLinkedData(vesselId?: string): Promise<{
+    deletedWorkOrderExecutions: number;
+    deletedWorkOrders: number;
+    deletedJobs: number;
+    deletedRunningHoursAudits: number;
+    componentsReset: number;
+  }> {
+    console.log('🧹 Starting jobs and linked data purge...');
+    
+    // Track deletion counts
+    let deletedWorkOrderExecutions = 0;
+    let deletedWorkOrders = 0;
+    let deletedJobs = 0;
+    let deletedRunningHoursAudits = 0;
+    let componentsReset = 0;
+    
+    // Step 1: Delete work order executions
+    const initialExecutionCount = this.data.workOrderExecutions?.length || 0;
+    if (vesselId) {
+      this.data.workOrderExecutions = (this.data.workOrderExecutions || []).filter(
+        exe => exe.vesselId !== vesselId
+      );
+    } else {
+      this.data.workOrderExecutions = [];
+    }
+    deletedWorkOrderExecutions = initialExecutionCount - (this.data.workOrderExecutions?.length || 0);
+    console.log(`  ✓ Deleted ${deletedWorkOrderExecutions} work order executions`);
+    
+    // Step 2: Delete work orders
+    const initialWorkOrderCount = this.data.workOrders?.length || 0;
+    if (vesselId) {
+      this.data.workOrders = (this.data.workOrders || []).filter(
+        wo => wo.vesselId !== vesselId
+      );
+    } else {
+      this.data.workOrders = [];
+    }
+    deletedWorkOrders = initialWorkOrderCount - (this.data.workOrders?.length || 0);
+    console.log(`  ✓ Deleted ${deletedWorkOrders} work orders`);
+    
+    // Step 3: Delete jobs (stored as object/record, not array)
+    const initialJobsCount = Object.keys(this.data.jobs || {}).length;
+    if (vesselId) {
+      // Filter out jobs for specific vessel
+      const jobEntries = Object.entries(this.data.jobs || {});
+      const filteredJobs: Record<string, any> = {};
+      for (const [id, job] of jobEntries) {
+        if (job && job.vesselId !== vesselId) {
+          filteredJobs[id] = job;
+        }
+      }
+      this.data.jobs = filteredJobs;
+    } else {
+      this.data.jobs = {};
+    }
+    deletedJobs = initialJobsCount - Object.keys(this.data.jobs || {}).length;
+    console.log(`  ✓ Deleted ${deletedJobs} jobs`);
+    
+    // Step 4: Delete running hours audits
+    const initialAuditsCount = this.data.runningHoursAudits?.length || 0;
+    if (vesselId) {
+      // Get all component IDs for this vessel
+      const vesselComponentIds = new Set(
+        Object.values(this.data.components || {})
+          .filter(c => c && c.vesselId === vesselId)
+          .map(c => c!.id)
+      );
+      this.data.runningHoursAudits = (this.data.runningHoursAudits || []).filter(
+        audit => !vesselComponentIds.has(audit.componentId)
+      );
+    } else {
+      this.data.runningHoursAudits = [];
+    }
+    deletedRunningHoursAudits = initialAuditsCount - (this.data.runningHoursAudits?.length || 0);
+    console.log(`  ✓ Deleted ${deletedRunningHoursAudits} running hours audit entries`);
+    
+    // Step 5: Reset component running hours
+    const components = Object.values(this.data.components || {}).filter(c => c !== undefined);
+    for (const component of components) {
+      if (!component) continue;
+      if (vesselId && component.vesselId !== vesselId) continue;
+      
+      if (component.currentCumulativeRH && component.currentCumulativeRH !== '0.00') {
+        component.currentCumulativeRH = '0.00';
+        componentsReset++;
+      }
+    }
+    console.log(`  ✓ Reset running hours for ${componentsReset} components`);
+    
+    // Step 6: Clear job-related import history (keep other import types)
+    const initialImportHistoryCount = this.data.importHistory?.length || 0;
+    if (this.data.importHistory) {
+      this.data.importHistory = this.data.importHistory.filter(
+        history => history.type !== 'jobs'
+      );
+    }
+    const deletedImportHistory = initialImportHistoryCount - (this.data.importHistory?.length || 0);
+    console.log(`  ✓ Cleared ${deletedImportHistory} job import history records`);
+    
+    // Persist the changes
+    this.persistData();
+    
+    console.log('✅ Jobs and linked data purge completed successfully');
+    
+    return {
+      deletedWorkOrderExecutions,
+      deletedWorkOrders,
+      deletedJobs,
+      deletedRunningHoursAudits,
+      componentsReset
+    };
+  }
 }

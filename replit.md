@@ -102,6 +102,17 @@ The application uses a modern full-stack architecture with React (TypeScript, Vi
     *   **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (with SFI hierarchy, validation, duplicate detection, multi-vessel support), Jobs, and Spares.
         *   **Multi-Vessel Support**: Explicit vessel selection for bulk uploads.
         *   **Error Viewing & Partial Import**: Enhanced UX for handling validation errors, allowing viewing of errors and selective import of valid rows.
+        *   **Jobs Template Format (21 columns)**: Job Code, Fleet Equipment Code, Fleet Equipment Name, WO Title, Component Code, Component Name, Maintenance Basis, Interval Value, Internal Running Hour Number, Unit, Task Type, Assigned To, Approver, Job Priority, Class Related, Next Due Date, Brief Work Description, Department, Criticality, Is Active, Vessel Code.
+            *   Pre-populated with 100 leaf node components (actual equipment) for data entry convenience.
+            *   Dropdown validations for Maintenance Basis, Interval Value, Unit, Task Type, Job Priority, Department, Criticality.
+            *   Field mapping: "WO Title" (was "Maintenance Task"), "Interval Value" (was "Frequency Value"), "Assigned To" (was "Person In Charge"), "Brief Work Description" (was "Brief Job Description").
+    *   **Data Purge Functionality** (`POST /api/admin/purge-jobs`): Admin endpoint for safe deletion of all jobs and linked data for a specific vessel or entire system.
+        *   Deletes in dependency order: workOrderExecutions → workOrders → jobs → runningHoursAudits.
+        *   Resets all component `currentCumulativeRH` to '0.00'.
+        *   Clears job-related import history (preserves other import types).
+        *   Returns detailed statistics: deletedWorkOrderExecutions, deletedWorkOrders, deletedJobs, deletedRunningHoursAudits, componentsReset.
+        *   Supports optional `vesselId` parameter for targeted purge (omit for system-wide purge).
+        *   Complete audit trail logged to console with total records affected.
     *   **Alerts Tab**: Alert policy management.
     *   **Forms Tab**: Form configuration.
     *   **Fleet Admin Dashboard**: Master data management for makers, master lists, fleet components (hierarchical SFI), fleet jobs, and fleet spares. Uses a federated schema design with a `dataScope` discriminator.

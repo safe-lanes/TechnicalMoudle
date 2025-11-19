@@ -2510,6 +2510,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin endpoint: Purge all jobs and linked data
+  app.post("/api/admin/purge-jobs", async (req, res) => {
+    try {
+      const { vesselId } = req.body;
+      
+      console.log(`🧹 Admin purge request received${vesselId ? ` for vessel: ${vesselId}` : ' for ALL vessels'}`);
+      
+      // Execute the purge
+      const result = await storage.purgeJobsAndLinkedData(vesselId);
+      
+      // Log this operation in import history
+      const importHistory = {
+        id: Date.now().toString(),
+        type: 'jobs' as const,
+        fileName: 'PURGE_OPERATION',
+        uploadedBy: 'admin',
+        uploadedAt: new Date().toISOString(),
+        status: 'success' as const,
+        recordsProcessed: result.deletedJobs,
+        recordsSuccess: result.deletedJobs,
+        recordsFailed: 0,
+        vesselId: vesselId || 'ALL_VESSELS',
+        errors: []
+      };
+      
+      // Note: We don't save this to importHistory since we just purged it
+      // But we log it to console for audit trail
+      console.log('✅ Purge operation completed:', {
+        ...result,
+        totalRecordsAffected: 
+          result.deletedWorkOrderExecutions + 
+          result.deletedWorkOrders + 
+          result.deletedJobs + 
+          result.deletedRunningHoursAudits
+      });
+      
+      res.json({
+        success: true,
+        message: `Successfully purged jobs and linked data${vesselId ? ` for vessel ${vesselId}` : ' for all vessels'}`,
+        statistics: result
+      });
+    } catch (error: any) {
+      console.error("❌ Purge operation failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to purge jobs and linked data: " + error.message 
+      });
+    }
+  });
+  
   const httpServer = createServer(app);
   
   // Recalculate recurring defects on startup (don't await - let it run in background)
