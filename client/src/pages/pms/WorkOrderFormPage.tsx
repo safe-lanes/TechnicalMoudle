@@ -1206,28 +1206,48 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Required Spare Parts"
             description="Spare parts needed for this work order"
           >
-            <WorkOrderDataTable
-              columns={[
-                { key: 'partNumber', label: 'Part No.', width: '20%' },
-                { key: 'description', label: 'Description', width: '40%' },
-                { key: 'quantity', label: 'Qty Required', width: '15%' },
-                { key: 'rob', label: 'ROB', width: '10%' },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  width: '15%',
-                  render: (value) => <StatusPill status={value} />
-                }
-              ]}
-              data={(templateData.requiredSpareParts || []).map(sp => ({
-                partNumber: sp.partNo,
-                description: sp.description,
-                quantity: sp.quantityRequired,
-                rob: '-',
-                status: 'available' as const
-              }))}
-              showActions={false}
-            />
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                  onClick={() => {
+                    const newPart = { partNo: '', description: '', quantityRequired: '', remarks: '' };
+                    setTemplateData(prev => ({
+                      ...prev,
+                      requiredSpareParts: [...(prev.requiredSpareParts || []), newPart]
+                    }));
+                  }}
+                  disabled={isReadOnly}
+                  data-testid="button-add-spare"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add spares
+                </Button>
+              </div>
+              <WorkOrderDataTable
+                columns={[
+                  { key: 'partNumber', label: 'Part No.', width: '20%' },
+                  { key: 'description', label: 'Description', width: '40%' },
+                  { key: 'quantity', label: 'Qty Required', width: '15%' },
+                  { key: 'rob', label: 'ROB', width: '10%' },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    width: '15%',
+                    render: (value) => <StatusPill status={value} />
+                  }
+                ]}
+                data={(templateData.requiredSpareParts || []).map(sp => ({
+                  partNumber: sp.partNo,
+                  description: sp.description,
+                  quantity: sp.quantityRequired,
+                  rob: '-',
+                  status: 'available' as const
+                }))}
+                showActions={false}
+              />
+            </div>
           </SectionBlock>
 
           {/* A3. Required Tools & Equipment */}
@@ -1237,26 +1257,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Required Tools & Equipment"
             description="Tools and equipment needed for this work order"
           >
-            <WorkOrderDataTable
-              columns={[
-                { key: 'description', label: 'Description', width: '50%' },
-                { key: 'quantity', label: 'Qty Required', width: '20%' },
-                { key: 'rob', label: 'ROB', width: '15%' },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  width: '15%',
-                  render: (value) => <StatusPill status={value} />
-                }
-              ]}
-              data={(templateData.requiredTools || []).map(tool => ({
-                description: tool.toolName,
-                quantity: tool.quantity,
-                rob: tool.quantity,
-                status: 'available' as const
-              }))}
-              showActions={false}
-            />
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                  onClick={() => {
+                    const newTool = { toolName: '', quantity: '', remarks: '' };
+                    setTemplateData(prev => ({
+                      ...prev,
+                      requiredTools: [...(prev.requiredTools || []), newTool]
+                    }));
+                  }}
+                  disabled={isReadOnly}
+                  data-testid="button-add-tool"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add tools
+                </Button>
+              </div>
+              <WorkOrderDataTable
+                columns={[
+                  { key: 'description', label: 'Description', width: '50%' },
+                  { key: 'quantity', label: 'Qty Required', width: '20%' },
+                  { key: 'rob', label: 'ROB', width: '15%' },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    width: '15%',
+                    render: (value) => <StatusPill status={value} />
+                  }
+                ]}
+                data={(templateData.requiredTools || []).map(tool => ({
+                  description: tool.toolName,
+                  quantity: tool.quantity,
+                  rob: tool.quantity,
+                  status: 'available' as const
+                }))}
+                showActions={false}
+              />
+            </div>
           </SectionBlock>
 
           {/* A4. Safety Requirements */}
