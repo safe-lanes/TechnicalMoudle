@@ -9,8 +9,8 @@ interface SectionBlockProps {
 
 export function SectionBlock({ id, number, title, description, children, className = '' }: SectionBlockProps) {
   return (
-    <section id={id} className={`bg-blue-50 rounded-md border border-gray-200 ${className}`}>
-      <div className="px-6 py-4">
+    <section id={id} className={`bg-blue-50 rounded-md border border-blue-100 p-1 ${className}`}>
+      <div className="bg-white rounded-t-sm px-6 py-3">
         <h2 className="text-sm font-bold text-[hsl(var(--primary))] flex items-start gap-1.5">
           {number && <span>{number}.</span>}
           <span>{title}</span>
@@ -18,7 +18,7 @@ export function SectionBlock({ id, number, title, description, children, classNa
         {description && <p className="text-xs text-gray-600 mt-1 ml-6">{description}</p>}
         <div className="mt-2 h-0.5 bg-[hsl(var(--primary))]"></div>
       </div>
-      <div className="px-6 py-4 bg-white rounded-b-md">
+      <div className="px-6 py-4 bg-white rounded-b-sm">
         {children}
       </div>
     </section>

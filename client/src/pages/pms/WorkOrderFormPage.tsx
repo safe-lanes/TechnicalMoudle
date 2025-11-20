@@ -73,27 +73,53 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   
   const [activeStep, setActiveStep] = useState('part-a');
   
-  // Scroll tracking for navigation
+  // Scroll tracking for navigation with IntersectionObserver
   useEffect(() => {
-    const handleScroll = () => {
-      const partAElement = document.getElementById('part-a');
-      const partBElement = document.getElementById('part-b');
-      
-      if (!partAElement || !partBElement) return;
-      
-      const scrollPosition = window.scrollY + 200; // Offset for header
+    const partAElement = document.getElementById('part-a');
+    const partBElement = document.getElementById('part-b');
+    
+    if (!partAElement || !partBElement) return;
+    
+    // Check initial position on mount
+    const checkInitialPosition = () => {
+      const scrollPosition = window.scrollY + 200;
       const partATop = partAElement.offsetTop;
       const partBTop = partBElement.offsetTop;
       
       if (scrollPosition >= partBTop) {
         setActiveStep('part-b');
-      } else if (scrollPosition >= partATop) {
+      } else {
         setActiveStep('part-a');
       }
     };
     
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    // IntersectionObserver for continuous tracking
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const id = entry.target.getAttribute('id');
+            if (id === 'part-a' || id === 'part-b') {
+              setActiveStep(id);
+            }
+          }
+        });
+      },
+      {
+        rootMargin: '-200px 0px -50% 0px',
+        threshold: 0
+      }
+    );
+    
+    observer.observe(partAElement);
+    observer.observe(partBElement);
+    
+    // Check initial position after a short delay to ensure layout is ready
+    setTimeout(checkInitialPosition, 100);
+    
+    return () => {
+      observer.disconnect();
+    };
   }, []);
   
   const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
@@ -787,20 +813,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </Sheet>
               <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Work Order Form</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsWorkInstructionsOpen(true)}
-                className="border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-blue-50 font-medium px-4"
+                className="border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-blue-50 font-medium px-4 h-9"
                 data-testid="button-work-instructions"
               >
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Work Instructions
               </Button>
+              <div className="border-l border-gray-300 h-8"></div>
               <Button
                 onClick={handleSave}
-                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-10 py-2 h-auto text-sm shadow-md"
+                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
                 data-testid="button-save"
               >
                 Save
@@ -862,7 +889,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               description="Basic details and configuration for this work order"
             >
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]">WO Title</Label>
                   <Input
@@ -1090,7 +1117,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               columns={[
                 { key: 'partNumber', label: 'Part No.', width: '20%' },
                 { key: 'description', label: 'Description', width: '40%' },
-                { key: 'quantity', label: 'Quantity Required', width: '15%' },
+                { key: 'quantity', label: 'Qty Required', width: '15%' },
                 { key: 'rob', label: 'ROB', width: '10%' },
                 {
                   key: 'status',
@@ -1126,8 +1153,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <WorkOrderDataTable
               columns={[
                 { key: 'description', label: 'Description', width: '50%' },
-                { key: 'quantity', label: 'Quantity Required', width: '20%' },
-                { key: 'required', label: 'Current ROB', width: '15%' },
+                { key: 'quantity', label: 'Qty Required', width: '20%' },
+                { key: 'rob', label: 'ROB', width: '15%' },
                 {
                   key: 'status',
                   label: 'Status',
@@ -1138,12 +1165,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               data={templateData.requiredTools.length > 0 ? templateData.requiredTools.map(tool => ({
                 description: tool.toolName,
                 quantity: tool.quantity,
-                required: tool.quantity,
+                rob: tool.quantity,
                 status: 'available' as const
               })) : sampleTools.map(tool => ({
                 description: tool.description,
                 quantity: tool.quantity,
-                required: tool.quantity,
+                rob: tool.quantity,
                 status: tool.status
               }))}
               showActions={false}
@@ -1157,18 +1184,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* PPE Requirements */}
               {(templateData.safetyRequirements.ppeRequirements.length > 0 || !workOrderContext) && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Personal Protective Equipment (PPE):</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
+                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
                     {templateData.safetyRequirements.ppeRequirements.length > 0 
                       ? templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
-                          <li key={idx}>{req}</li>
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
                         ))
                       : ['Safety Helmet', 'Safety Gloves', 'Safety Goggles'].map((req, idx) => (
-                          <li key={idx}>{req}</li>
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
                         ))
                     }
                   </ul>
@@ -1178,14 +1211,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               {/* Permit Requirements */}
               {(templateData.safetyRequirements.permitRequirements.length > 0 || !workOrderContext) && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Permits Required:</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
+                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
                     {templateData.safetyRequirements.permitRequirements.length > 0
                       ? templateData.safetyRequirements.permitRequirements.map((req, idx) => (
-                          <li key={idx}>{req}</li>
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
                         ))
                       : ['Enclosed Space Entry Permit', 'Cold Work Permit'].map((req, idx) => (
-                          <li key={idx}>{req}</li>
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                            <span>{req}</span>
+                          </li>
                         ))
                     }
                   </ul>
@@ -1195,10 +1234,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               {/* Other Requirements */}
               {templateData.safetyRequirements.otherRequirements.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Other Requirements:</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Other Requirements:</h3>
+                  <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
                     {templateData.safetyRequirements.otherRequirements.map((req, idx) => (
-                      <li key={idx}>{req}</li>
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                        <span>{req}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -1409,9 +1451,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* Section: Document Management */}
+          {/* B2. Document Management */}
           <SectionBlock
             id="documents"
+            number="B2"
             title="Document Management"
             description="Upload and manage risk assessments, checklists, and operational forms"
           >
