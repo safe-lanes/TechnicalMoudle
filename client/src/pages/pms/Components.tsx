@@ -20,6 +20,7 @@ import { queryClient } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { VESSELS } from "@/lib/vessels";
+import { formatProfessionalDate } from "@/lib/dateUtils";
 import {
   Select,
   SelectContent,
@@ -880,8 +881,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                   <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
                   <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
                   <td className="py-3 px-3 text-gray-900">{job.frequencyValue} {job.frequencyUnit}</td>
-                  <td className="py-3 px-3 text-gray-900">{job.lastDoneDate || '-'}</td>
-                  <td className="py-3 px-3 text-gray-900">{job.nextDueDate || '-'}</td>
+                  <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
+                  <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.nextDueDate) || '-'}</td>
                 </tr>
               ))
             )}
