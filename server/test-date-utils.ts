@@ -42,14 +42,15 @@ console.log('\n🧪 Testing Date Utilities\n');
 console.log('📋 Testing normalizeDateToDDMMMYYYY:\n');
 
 console.log('  Excel Serial Numbers:');
-assertEquals(normalizeDateToDDMMMYYYY(45610), '13-Nov-2024', 'Excel 45610 → 13-Nov-2024');
-assertEquals(normalizeDateToDDMMMYYYY(45430), '17-May-2024', 'Excel 45430 → 17-May-2024');
-assertEquals(normalizeDateToDDMMMYYYY(45339), '16-Feb-2024', 'Excel 45339 → 16-Feb-2024');
+assertEquals(normalizeDateToDDMMMYYYY(45610), '14-Nov-2024', 'Excel 45610 → 14-Nov-2024');
+assertEquals(normalizeDateToDDMMMYYYY(45430), '18-May-2024', 'Excel 45430 → 18-May-2024');
+assertEquals(normalizeDateToDDMMMYYYY(45339), '17-Feb-2024', 'Excel 45339 → 17-Feb-2024');
 
-console.log('\n  Excel 1900 Leap Year Bug Fix:');
-assertEquals(normalizeDateToDDMMMYYYY(59), '27-Feb-1900', 'Serial 59 (before Mar 1, 1900)');
-assertEquals(normalizeDateToDDMMMYYYY(60), '27-Feb-1900', 'Serial 60 → 27-Feb-1900 (60-1=59 after fix)');
-assertEquals(normalizeDateToDDMMMYYYY(61), '28-Feb-1900', 'Serial 61 → 28-Feb-1900');
+console.log('\n  Excel 1900 Leap Year Bug Fix (>= 60 gets -1 adjustment):');
+assertEquals(normalizeDateToDDMMMYYYY(59), '28-Feb-1900', 'Serial 59 → 28-Feb-1900 (no adjustment)');
+assertEquals(normalizeDateToDDMMMYYYY(60), '28-Feb-1900', 'Serial 60 → 28-Feb-1900 (60-1=59, skip phantom Feb 29)');
+assertEquals(normalizeDateToDDMMMYYYY(61), '01-Mar-1900', 'Serial 61 → 01-Mar-1900 (61-1=60, Excel Mar 1 → real Mar 1)');
+assertEquals(normalizeDateToDDMMMYYYY(62), '02-Mar-1900', 'Serial 62 → 02-Mar-1900 (62-1=61, correction applied)');
 
 console.log('\n  DD-MMM-YYYY format (already normalized):');
 assertEquals(normalizeDateToDDMMMYYYY('13-Nov-2024'), '13-Nov-2024', 'Already normalized');
@@ -68,10 +69,10 @@ assertEquals(normalizeDateToDDMMMYYYY(''), null, 'empty string → null');
 console.log('\n\n📋 Testing calculateNextDueDate:\n');
 
 console.log('  Input Format Flexibility:');
-assertEquals(calculateNextDueDate('13-Nov-2024', '12', 'Months'), '13-Nov-2025', 'DD-MMM-YYYY format');
-assertEquals(calculateNextDueDate('2024-11-13', '12', 'Months'), '13-Nov-2025', 'ISO format');
-assertEquals(calculateNextDueDate(45610, '12', 'Months'), '13-Nov-2025', 'Excel serial');
-assertEquals(calculateNextDueDate('13-Nov-2024', 12, 'Months'), '13-Nov-2025', 'Numeric interval');
+assertEquals(calculateNextDueDate('14-Nov-2024', '12', 'Months'), '14-Nov-2025', 'DD-MMM-YYYY format');
+assertEquals(calculateNextDueDate('2024-11-14', '12', 'Months'), '14-Nov-2025', 'ISO format');
+assertEquals(calculateNextDueDate(45610, '12', 'Months'), '14-Nov-2025', 'Excel serial (45610 → 14-Nov-2024)');
+assertEquals(calculateNextDueDate('14-Nov-2024', 12, 'Months'), '14-Nov-2025', 'Numeric interval');
 
 console.log('\n  Frequency Units:');
 const baseDate = '01-Jan-2024';
@@ -87,12 +88,12 @@ assertEquals(calculateNextDueDate(baseDate, '1', 'months'), '01-Feb-2024', 'lowe
 assertEquals(calculateNextDueDate(baseDate, '1', 'MONTHS'), '01-Feb-2024', 'UPPERCASE');
 
 console.log('\n  Real-world Maritime Examples:');
-assertEquals(calculateNextDueDate('16-Feb-2024', '3', 'Months'), '16-May-2024', 'Quarterly');
-assertEquals(calculateNextDueDate('17-May-2024', '6', 'Months'), '17-Nov-2024', 'Semi-annual');
-assertEquals(calculateNextDueDate('13-Nov-2024', '12', 'Months'), '13-Nov-2025', 'Annual');
-assertEquals(calculateNextDueDate('08-Nov-2025', '24', 'Months'), '08-Nov-2027', 'Biennial');
-assertEquals(calculateNextDueDate('18-May-2024', '1', 'Months'), '18-Jun-2024', 'Monthly');
-assertEquals(calculateNextDueDate('17-Jan-2024', '2', 'Months'), '17-Mar-2024', 'Bi-monthly');
+assertEquals(calculateNextDueDate('17-Feb-2024', '3', 'Months'), '17-May-2024', 'Quarterly');
+assertEquals(calculateNextDueDate('18-May-2024', '6', 'Months'), '18-Nov-2024', 'Semi-annual');
+assertEquals(calculateNextDueDate('14-Nov-2024', '12', 'Months'), '14-Nov-2025', 'Annual');
+assertEquals(calculateNextDueDate('09-Nov-2025', '24', 'Months'), '09-Nov-2027', 'Biennial');
+assertEquals(calculateNextDueDate('19-May-2024', '1', 'Months'), '19-Jun-2024', 'Monthly');
+assertEquals(calculateNextDueDate('18-Jan-2024', '2', 'Months'), '18-Mar-2024', 'Bi-monthly');
 
 console.log('\n  Invalid Inputs:');
 assertEquals(calculateNextDueDate(null, '12', 'Months'), null, 'null date');
