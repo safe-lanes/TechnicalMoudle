@@ -94,23 +94,35 @@ export class ComponentService {
 
   /**
    * Get component hierarchy (tree structure)
+   * Returns root components with children recursively attached
    */
-  async getComponentHierarchy(vesselId: string): Promise<Component[]> {
+  async getComponentHierarchy(vesselId: string): Promise<(Component & { children?: Component[] })[]> {
     const components = await this.getComponents(vesselId);
     
     // Build a map for quick lookups
-    const componentMap = new Map<string, Component>();
+    const componentMap = new Map<string, Component & { children?: Component[] }>();
     for (const component of components) {
       if (component.componentCode) {
-        componentMap.set(component.componentCode, component);
+        componentMap.set(component.componentCode, { ...component, children: [] });
       }
     }
     
     // Attach children to their parents
-    const rootComponents: Component[] = [];
+    const rootComponents: (Component & { children?: Component[] })[] = [];
+    
     for (const component of components) {
+      const componentWithChildren = componentMap.get(component.componentCode || '');
+      if (!componentWithChildren) continue;
+      
       if (!component.parentId || component.parentId === '0') {
-        rootComponents.push(component);
+        // This is a root component
+        rootComponents.push(componentWithChildren);
+      } else {
+        // This is a child - attach to parent
+        const parent = componentMap.get(component.parentId);
+        if (parent && parent.children) {
+          parent.children.push(componentWithChildren);
+        }
       }
     }
     

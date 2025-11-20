@@ -13,6 +13,15 @@ The application employs a modern full-stack architecture. The frontend is built 
 - Primary storage currently uses `PersistentFileStorage` for file-based JSON persistence (`/home/runner/workspace/test-data.json`).
 - `PostgresStorage` is implemented and will be activated upon resolution of environment variable loading.
 
+**Service Layer Architecture** (November 2025):
+- Created dedicated service layer in `server/services/` to organize business logic by domain
+- **jobService.ts**: Job CRUD operations, validation, next due date calculation, bulk operations, and Calendar-based job filtering
+- **workOrderService.ts**: Work order operations, status computation, auto-generation from due jobs, duplicate prevention
+- **runningHoursService.ts**: Running hours tracking, cascade updates delegation, validation helpers
+- **componentService.ts**: Hierarchical component queries with full tree assembly, navigation, parent-child relationships
+- **index.ts**: Central export point for all services
+- **Current Architecture Note**: Service layer provides a clean API and validation layer but currently delegates core business logic to storage layer. Future enhancement would move orchestration logic (cascade updates, work order generation) fully into services for better separation of concerns.
+
 **Component Hierarchy Design**:
 - Components are structured hierarchically using a `parentId` field, which stores **component codes** (e.g., "411") for establishing parent-child relationships, not database IDs.
 

@@ -41,14 +41,18 @@ export class WorkOrderService {
    * Create a new work order
    */
   async createWorkOrder(workOrderData: InsertWorkOrder): Promise<WorkOrder> {
+    // Validate required fields
+    if (!workOrderData.vesselId) {
+      throw new Error('Vessel ID is required');
+    }
+    
+    if (!workOrderData.jobTitle) {
+      throw new Error('Job title is required');
+    }
+
     // Auto-generate work order number if not provided
-    if (!workOrderData.workOrderNo && workOrderData.component) {
-      const component = await storage.getComponent(workOrderData.component);
-      if (!component) {
-        throw new Error(`Component ${workOrderData.component} not found`);
-      }
-      
-      workOrderData.workOrderNo = `WO-${component.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
+    if (!workOrderData.workOrderNo && workOrderData.componentCode) {
+      workOrderData.workOrderNo = `WO-${workOrderData.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
       workOrderData.templateCode = workOrderData.workOrderNo;
     }
 
