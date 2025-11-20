@@ -170,7 +170,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [templateData, setTemplateData] = useState({
     woTitle: "",
     component: "",
-    sfiCode: "",
     componentCode: "",
     woTemplateCode: "",
     maintenanceBasis: "Calendar",
@@ -1001,30 +1000,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     disabled={isReadOnly}
                     data-testid="input-component"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">SFI Code</Label>
-                  {templateData.sfiCode ? (
-                    <div className="flex items-center h-9 px-3 border border-gray-200 rounded-md bg-gray-50">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!templateData.componentCode) return;
-                          sessionStorage.setItem('targetComponentCode', templateData.componentCode);
-                          navigate('/pms/components');
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 rounded"
-                        data-testid="link-sfi-code"
-                      >
-                        {templateData.sfiCode}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center h-9 px-3 border border-gray-200 rounded-md bg-gray-50">
-                      <span className="text-sm text-gray-400">—</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-2">

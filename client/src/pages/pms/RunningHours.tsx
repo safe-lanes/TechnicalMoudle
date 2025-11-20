@@ -13,11 +13,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
+import { useLocation } from "wouter";
 
 interface RunningHoursData {
   id: string;
   component: string;
   componentCode?: string;
+  sfiCode?: string;
   componentCategory: string;
   runningHours: string;
   lastUpdated: string;
@@ -25,6 +27,7 @@ interface RunningHoursData {
 }
 
 const RunningHours = () => {
+  const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<RunningHoursData | null>(null);
@@ -74,6 +77,7 @@ const RunningHours = () => {
     id: parent.id,
     component: parent.name || '',
     componentCode: parent.componentCode || '',
+    sfiCode: parent.sfiCode || '',
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: parent.latestUpdate || parent.lastUpdated || '',
@@ -409,8 +413,9 @@ const RunningHours = () => {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
-          <div className="grid grid-cols-7 gap-4 text-sm font-medium">
+          <div className="grid grid-cols-8 gap-4 text-sm font-medium">
             <div>Component</div>
+            <div>SFI Code</div>
             <div>Component Category</div>
             <div>Running Hours</div>
             <div>last Updated</div>
@@ -448,8 +453,25 @@ const RunningHours = () => {
             
             return filteredData.map((item) => (
               <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-              <div className="grid grid-cols-7 gap-4 text-sm items-center">
+              <div className="grid grid-cols-8 gap-4 text-sm items-center">
                 <div className="text-gray-900">{item.component}</div>
+                <div>
+                  {item.sfiCode && item.componentCode ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sessionStorage.setItem('targetComponentCode', item.componentCode!);
+                        navigate('/pms/components');
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 rounded"
+                      data-testid={`link-sfi-code-${item.id}`}
+                    >
+                      {item.sfiCode}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
+                </div>
                 <div className="text-gray-700">{item.componentCategory}</div>
                 <div className="text-gray-900 font-medium">{item.runningHours}</div>
                 <div className="text-gray-700">{item.lastUpdated}</div>

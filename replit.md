@@ -30,12 +30,11 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Single Scrollable Page Layout**: Part A (Work Order Details) and Part B (Work Completion Record) sections on one continuous page
     - **Minimal A/B Navigation**: Circular step indicators with IntersectionObserver-based scroll tracking for automatic active step highlighting
     - **Numbered Subsections**: Part A sections (A1-A5): Work Order Information, Required Spare Parts, Required Tools & Equipment, Safety Requirements, Work History; Part B sections (B1-B2): Risk Assessment/Checklist/Remarks, Document Management
-    - **Professional Maritime Styling**: Light-blue framing (`bg-blue-50`) with white inner headers, blue horizontal rules, 3-column responsive field layouts for A1 Work Order Information section (WO Title, Component, SFI Code | Component Code, WO Template Code, Maintenance Basis | Frequency, Task Type, Assigned To), simplified tables (exact column matching), blue bullet lists for safety requirements
+    - **Professional Maritime Styling**: Light-blue framing (`bg-blue-50`) with white inner headers, blue horizontal rules, 3-column responsive field layouts for A1 Work Order Information section, simplified tables (exact column matching), blue bullet lists for safety requirements
     - **Enhanced Header**: Work Instructions access button only, Save button relocated to bottom after Document Management section
     - **Document Management Integration**: Fully integrated into Part B (B2) with upload/view/delete for risk assessments, safety checklists, and operational forms
     - **Mobile-First Responsive**: Adapts seamlessly from desktop (20px sidebar) to mobile (sheet menu) with preserved functionality
     - **Maintenance Basis & Frequency Validation**: Only Calendar and Running Hours options; frequency requires positive integers; dynamic unit dropdown (Hours for Running Hours, Days/Weeks/Months/Years for Calendar) with preservation of Calendar unit selection when toggling
-    - **SFI Code Navigation**: Clickable SFI Code hyperlink (blue with hover effects) that navigates to Components page with auto-selection of the corresponding component via sessionStorage
 - **Modify PMS - Change Requests**: Manages change requests from draft to approved/rejected status, including target selection and impact previews.
 - **Defects Module**: Tracks Condition of Class, identifies recurring defects, integrates with SIRE VIQ 7, features a multi-step reporting form, and streamlined closure workflow.
 - **Spares Module**:
@@ -53,6 +52,7 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Automatic Work Order Generation**: Triggers new work order generation when child component running hours exceed job `intervalRunningHour` thresholds.
     - **Backend Validation**: Enforces checks against decreasing running hours, realistic hourly deltas, and maintains an audit trail.
     - **Work Order Integration**: Full-page Work Order form with fields for completion date and running hours, including comprehensive frontend and backend validation for atomic updates and recursive delta cascading.
+    - **SFI Code Navigation**: Table includes SFI Code column (between Component and Component Category) with clickable blue hyperlinks that navigate to Components page with auto-selection of the corresponding component via sessionStorage.
 - **Admin Module**:
     - **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (SFI hierarchy, validation, multi-vessel support), Jobs, and Spares with enhanced error viewing and partial import capabilities.
     - **Data Purge Functionality**: Admin endpoint for safe deletion of jobs and linked data for a specific vessel or the entire system, adhering to dependency order.
