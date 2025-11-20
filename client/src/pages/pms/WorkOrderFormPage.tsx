@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2 } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -160,6 +160,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   
   const [editingSparePart, setEditingSparePart] = useState<number | null>(null);
   const [editingTool, setEditingTool] = useState<number | null>(null);
+  const [originalSparePart, setOriginalSparePart] = useState<{partNo: string, description: string, quantityRequired: string, remarks: string} | null>(null);
+  const [originalTool, setOriginalTool] = useState<{toolName: string, quantity: string, remarks: string} | null>(null);
   const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
   const [newSafetyRequirement, setNewSafetyRequirement] = useState("");
   const [safetyRequirementCategory, setSafetyRequirementCategory] = useState<'ppeRequirements' | 'permitRequirements' | 'otherRequirements'>('ppeRequirements');
@@ -439,25 +441,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ...prev,
       requiredSpareParts: [...prev.requiredSpareParts, newPart]
     }));
+    setOriginalSparePart(null); // New parts have no original state
     setEditingSparePart(templateData.requiredSpareParts.length);
   };
 
   const handleEditSparePart = (index: number) => {
+    // Store original values before editing
+    setOriginalSparePart({...templateData.requiredSpareParts[index]});
     setEditingSparePart(index);
   };
 
   const handleSaveSparePart = (index: number) => {
+    const part = templateData.requiredSpareParts[index];
+    if (!part.partNo || !part.quantityRequired) {
+      toast({
+        title: "Validation Error",
+        description: "Part Number and Quantity are required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
     setEditingSparePart(null);
   };
 
   const handleCancelEditSparePart = () => {
-    const currentPart = templateData.requiredSpareParts[editingSparePart!];
-    if (!currentPart.partNo && !currentPart.description && !currentPart.quantityRequired) {
+    if (originalSparePart) {
+      // Restore original values for existing parts
+      setTemplateData(prev => ({
+        ...prev,
+        requiredSpareParts: prev.requiredSpareParts.map((part, i) => 
+          i === editingSparePart ? originalSparePart : part
+        )
+      }));
+    } else {
+      // Remove new parts that were never saved
       setTemplateData(prev => ({
         ...prev,
         requiredSpareParts: prev.requiredSpareParts.filter((_, i) => i !== editingSparePart)
       }));
     }
+    setOriginalSparePart(null);
     setEditingSparePart(null);
   };
 
@@ -483,25 +506,46 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       ...prev,
       requiredTools: [...prev.requiredTools, newTool]
     }));
+    setOriginalTool(null); // New tools have no original state
     setEditingTool(templateData.requiredTools.length);
   };
 
   const handleEditTool = (index: number) => {
+    // Store original values before editing
+    setOriginalTool({...templateData.requiredTools[index]});
     setEditingTool(index);
   };
 
   const handleSaveTool = (index: number) => {
+    const tool = templateData.requiredTools[index];
+    if (!tool.toolName || !tool.quantity) {
+      toast({
+        title: "Validation Error",
+        description: "Tool Name and Quantity are required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
     setEditingTool(null);
   };
 
   const handleCancelEditTool = () => {
-    const currentTool = templateData.requiredTools[editingTool!];
-    if (!currentTool.toolName && !currentTool.quantity) {
+    if (originalTool) {
+      // Restore original values for existing tools
+      setTemplateData(prev => ({
+        ...prev,
+        requiredTools: prev.requiredTools.map((tool, i) => 
+          i === editingTool ? originalTool : tool
+        )
+      }));
+    } else {
+      // Remove new tools that were never saved
       setTemplateData(prev => ({
         ...prev,
         requiredTools: prev.requiredTools.filter((_, i) => i !== editingTool)
       }));
     }
+    setOriginalTool(null);
     setEditingTool(null);
   };
 
@@ -1221,13 +1265,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <Button
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                  onClick={() => {
-                    const newPart = { partNo: '', description: '', quantityRequired: '', remarks: '' };
-                    setTemplateData(prev => ({
-                      ...prev,
-                      requiredSpareParts: [...(prev.requiredSpareParts || []), newPart]
-                    }));
-                  }}
+                  onClick={handleAddSparePart}
                   disabled={isReadOnly}
                   data-testid="button-add-spare"
                 >
@@ -1235,28 +1273,129 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   Add spares
                 </Button>
               </div>
-              <WorkOrderDataTable
-                columns={[
-                  { key: 'partNumber', label: 'Part No.', width: '20%' },
-                  { key: 'description', label: 'Description', width: '40%' },
-                  { key: 'quantity', label: 'Qty Required', width: '15%' },
-                  { key: 'rob', label: 'ROB', width: '10%' },
-                  {
-                    key: 'status',
-                    label: 'Status',
-                    width: '15%',
-                    render: (value) => <StatusPill status={value} />
-                  }
-                ]}
-                data={(templateData.requiredSpareParts || []).map(sp => ({
-                  partNumber: sp.partNo,
-                  description: sp.description,
-                  quantity: sp.quantityRequired,
-                  rob: '-',
-                  status: 'available' as const
-                }))}
-                showActions={false}
-              />
+              
+              {/* Editable Spare Parts Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]">ACTIONS</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(templateData.requiredSpareParts || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={isReadOnly ? 5 : 6} className="text-center p-4 text-gray-500 italic">
+                          No spare parts added yet
+                        </td>
+                      </tr>
+                    ) : (
+                      (templateData.requiredSpareParts || []).map((part, index) => (
+                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                          {editingSparePart === index ? (
+                            <>
+                              <td className="p-2">
+                                <Input
+                                  value={part.partNo}
+                                  onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
+                                  placeholder="Part number"
+                                  className="text-sm"
+                                  data-testid={`input-spare-part-no-${index}`}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={part.description}
+                                  onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
+                                  placeholder="Description"
+                                  className="text-sm"
+                                  data-testid={`input-spare-description-${index}`}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={part.quantityRequired}
+                                  onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
+                                  placeholder="Qty"
+                                  className="text-sm"
+                                  data-testid={`input-spare-quantity-${index}`}
+                                />
+                              </td>
+                              <td className="p-2 text-center text-gray-500">-</td>
+                              <td className="p-2">
+                                <StatusPill status="available" />
+                              </td>
+                              <td className="p-2">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleSaveSparePart(index)}
+                                    className="h-7 px-2"
+                                    data-testid={`button-save-spare-${index}`}
+                                  >
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleCancelEditSparePart}
+                                    className="h-7 px-2"
+                                    data-testid={`button-cancel-spare-${index}`}
+                                  >
+                                    <X className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
+                              <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
+                              <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
+                              <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>-</td>
+                              <td className="p-2">
+                                <span data-testid={`status-spare-${index}`}>
+                                  <StatusPill status="available" />
+                                </span>
+                              </td>
+                              {!isReadOnly && (
+                                <td className="p-2">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEditSparePart(index)}
+                                      className="h-7 px-2"
+                                      data-testid={`button-edit-spare-${index}`}
+                                    >
+                                      <Edit2 className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteSparePart(index)}
+                                      className="h-7 px-2"
+                                      data-testid={`button-delete-spare-${index}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
+                            </>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </SectionBlock>
 
@@ -1272,13 +1411,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <Button
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                  onClick={() => {
-                    const newTool = { toolName: '', quantity: '', remarks: '' };
-                    setTemplateData(prev => ({
-                      ...prev,
-                      requiredTools: [...(prev.requiredTools || []), newTool]
-                    }));
-                  }}
+                  onClick={handleAddTool}
                   disabled={isReadOnly}
                   data-testid="button-add-tool"
                 >
@@ -1286,26 +1419,118 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   Add tools
                 </Button>
               </div>
-              <WorkOrderDataTable
-                columns={[
-                  { key: 'description', label: 'Description', width: '50%' },
-                  { key: 'quantity', label: 'Qty Required', width: '20%' },
-                  { key: 'rob', label: 'ROB', width: '15%' },
-                  {
-                    key: 'status',
-                    label: 'Status',
-                    width: '15%',
-                    render: (value) => <StatusPill status={value} />
-                  }
-                ]}
-                data={(templateData.requiredTools || []).map(tool => ({
-                  description: tool.toolName,
-                  quantity: tool.quantity,
-                  rob: tool.quantity,
-                  status: 'available' as const
-                }))}
-                showActions={false}
-              />
+              
+              {/* Editable Tools Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]">ACTIONS</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(templateData.requiredTools || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={isReadOnly ? 4 : 5} className="text-center p-4 text-gray-500 italic">
+                          No tools added yet
+                        </td>
+                      </tr>
+                    ) : (
+                      (templateData.requiredTools || []).map((tool, index) => (
+                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                          {editingTool === index ? (
+                            <>
+                              <td className="p-2">
+                                <Input
+                                  value={tool.toolName}
+                                  onChange={(e) => handleUpdateToolField(index, 'toolName', e.target.value)}
+                                  placeholder="Tool description"
+                                  className="text-sm"
+                                  data-testid={`input-tool-name-${index}`}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={tool.quantity}
+                                  onChange={(e) => handleUpdateToolField(index, 'quantity', e.target.value)}
+                                  placeholder="Quantity"
+                                  className="text-sm"
+                                  data-testid={`input-tool-quantity-${index}`}
+                                />
+                              </td>
+                              <td className="p-2 text-center text-gray-500">{tool.quantity || '-'}</td>
+                              <td className="p-2">
+                                <StatusPill status="available" />
+                              </td>
+                              <td className="p-2">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleSaveTool(index)}
+                                    className="h-7 px-2"
+                                    data-testid={`button-save-tool-${index}`}
+                                  >
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleCancelEditTool}
+                                    className="h-7 px-2"
+                                    data-testid={`button-cancel-tool-${index}`}
+                                  >
+                                    <X className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="p-2" data-testid={`text-tool-name-${index}`}>{tool.toolName || '-'}</td>
+                              <td className="p-2" data-testid={`text-tool-quantity-${index}`}>{tool.quantity || '-'}</td>
+                              <td className="p-2 text-center" data-testid={`text-tool-rob-${index}`}>{tool.quantity || '-'}</td>
+                              <td className="p-2">
+                                <span data-testid={`status-tool-${index}`}>
+                                  <StatusPill status="available" />
+                                </span>
+                              </td>
+                              {!isReadOnly && (
+                                <td className="p-2">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEditTool(index)}
+                                      className="h-7 px-2"
+                                      data-testid={`button-edit-tool-${index}`}
+                                    >
+                                      <Edit2 className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteTool(index)}
+                                      className="h-7 px-2"
+                                      data-testid={`button-delete-tool-${index}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
+                            </>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </SectionBlock>
 
