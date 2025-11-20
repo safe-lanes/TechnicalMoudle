@@ -50,6 +50,7 @@ export function registerRunningHoursRoutes(app: Express) {
 
         parents.push({
           ...parent,
+          sfiCode: parent.componentCode || '', // Use componentCode as SFI Code
           childCount: childrenWithRHJobs.length,
           latestUpdate: undefined
         });
