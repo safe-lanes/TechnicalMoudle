@@ -758,7 +758,24 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     queryKey: ['/api/jobs'],
   });
   
-  const jobs = allJobs.filter(job => job.componentCode === componentCode);
+  // Get all components to find children
+  const { data: allComponents = [] } = useQuery<any[]>({
+    queryKey: ['/api/components'],
+  });
+  
+  // Find all child component codes recursively
+  const getAllChildCodes = (parentCode: string): string[] => {
+    const children = allComponents.filter(c => c.parentId === parentCode);
+    const childCodes = children.map(c => c.componentCode);
+    const descendantCodes = children.flatMap(c => getAllChildCodes(c.componentCode));
+    return [...childCodes, ...descendantCodes];
+  };
+  
+  // Get component codes to include (parent + all children)
+  const relevantComponentCodes = [componentCode, ...getAllChildCodes(componentCode)];
+  
+  // Filter jobs for this component AND all its children
+  const jobs = allJobs.filter(job => relevantComponentCodes.includes(job.componentCode));
   
   // Check URL parameter to navigate to job page when returning from Maintenance Records
   React.useEffect(() => {
