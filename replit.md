@@ -26,7 +26,14 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Components Module Filtering**: Supports combined critical status and real-time search filtering, preserving tree hierarchy for relevant parent categories.
 - **Jobs vs. Work Orders Architecture**: `Jobs` define maintenance task templates, while `Work Orders` are active/historical execution records. This ensures type-safe separation and clear distinction between planned tasks and their execution.
 - **Work Order Automation**: Real-time status computation (Active/Due/Due (Grace P)/Overdue/Completed) and strict filtering by `vesselId` across all modules.
-- **Work Order Form Enhancements**: Comprehensive forms supporting inline editing, document management with Replit Object Storage integration, and distinct template vs. execution workflows.
+- **Work Order Form Redesign (November 2025)**: Complete UI/UX overhaul matching maritime industry reference designs:
+    - **Single Scrollable Page Layout**: Part A (Work Order Details) and Part B (Work Completion Record) sections on one continuous page
+    - **Minimal A/B Navigation**: Circular step indicators with IntersectionObserver-based scroll tracking for automatic active step highlighting
+    - **Numbered Subsections**: Part A sections (A1-A5): Work Order Information, Required Spare Parts, Required Tools & Equipment, Safety Requirements, Work History; Part B sections (B1-B2): Risk Assessment/Checklist/Remarks, Document Management
+    - **Professional Maritime Styling**: Light-blue framing (`bg-blue-50`) with white inner headers, blue horizontal rules, 2-column responsive field layouts, simplified tables (exact column matching), blue bullet lists for safety requirements
+    - **Enhanced Header**: Prominent Save button with visual separator, Work Instructions access, mobile-responsive sheet menu
+    - **Document Management Integration**: Fully integrated into Part B (B2) with upload/view/delete for risk assessments, safety checklists, and operational forms
+    - **Mobile-First Responsive**: Adapts seamlessly from desktop (20px sidebar) to mobile (sheet menu) with preserved functionality
 - **Modify PMS - Change Requests**: Manages change requests from draft to approved/rejected status, including target selection and impact previews.
 - **Defects Module**: Tracks Condition of Class, identifies recurring defects, integrates with SIRE VIQ 7, features a multi-step reporting form, and streamlined closure workflow.
 - **Spares Module**:
