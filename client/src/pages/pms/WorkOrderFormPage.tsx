@@ -977,7 +977,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               description="Basic details and configuration for this work order"
             >
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]">WO Title</Label>
                   <Input
