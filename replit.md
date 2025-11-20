@@ -12,6 +12,7 @@ The application employs a modern full-stack architecture. The frontend is built 
 **Storage Configuration**:
 - Primary storage currently uses `PersistentFileStorage` for file-based JSON persistence (`/home/runner/workspace/test-data.json`).
 - `PostgresStorage` is implemented and will be activated upon resolution of environment variable loading.
+- **Database Migration Configuration**: Created `drizzle.postgres.config.ts` for PostgreSQL migrations to complement immutable `drizzle.config.ts` (MySQL). Run migrations with: `npx drizzle-kit push --config drizzle.postgres.config.ts`
 
 **Service Layer Architecture** (November 2025):
 - Created dedicated service layer in `server/services/` to organize business logic by domain
@@ -73,6 +74,30 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (SFI hierarchy, validation, multi-vessel support), Jobs, and Spares with enhanced error viewing and partial import capabilities.
     - **Data Purge Functionality**: Admin endpoint for safe deletion of jobs and linked data for a specific vessel or the entire system, adhering to dependency order.
     - **Fleet Admin Dashboard**: Manages master data for makers, fleet components, jobs, and spares using a federated schema design.
+
+## Database Schema Enhancements for 100% PMS Specification Compliance (November 2025)
+
+**New Tables Added** (defined in `shared/schema.ts`):
+1. **fleet_equipment_master** - Fleet-level master data for equipment codes, makers, models, and descriptions with full audit trail (created_by, created_at, updated_by, updated_at)
+2. **component_running_hours_log** - Detailed audit trail for ALL running hours updates capturing vessel_code, component_code, previous_rh, new_rh, delta_rh, updated_by, update_source (manual/cascade/bulk_import/work_order)
+3. **audit_log** - System-wide audit logging for ALL data changes across entities (components, jobs, work_orders, spares, documents, surveys, maintenance_history) with timestamp, user_id, vessel_code, entity_type, action_type, old_value, new_value, source
+4. **component_documents** - Drawings, manuals, and technical documents with role-based access control (can_ship_view, can_ship_download), fleet_equipment_code linking, file_type categorization, version tracking
+5. **component_class_regulatory** - Classification society and regulatory survey data supporting MULTIPLE survey rows per component with classification_society dropdown (DNV, ABS, Lloyd's Register, ClassNK, RINA, IRS), survey_type dropdown (Annual/5-Year/Intermediate/Damage/OEM Test/Statutory/Internal), certificate tracking, and expiry management
+6. **component_maintenance_history** - Immutable maintenance records (NO EDITS/DELETES ALLOWED) auto-populated from approved work orders with work_description, spares_used, component replacement flag, and approval workflow integration
+
+**Enhanced Tables**:
+- **jobs**: Added `frequencyType`, `leadTimeValue`, `leadTimeUnit`, `createdBy`, `updatedBy` fields for lead time configuration and full audit trail
+- **components**: Already contains required fields (componentCategory, makerCode, modelCode, conditionBased, isParent, createdAt, updatedAt)
+
+**Database Immutability Constraints** (Pending Implementation - Task 8):
+- PostgreSQL trigger/policy to prevent UPDATE/DELETE operations on component_maintenance_history table after row creation
+- Ensures maintenance history integrity - not even PMS Admin can modify historical records
+
+**Migration Status**:
+- Schema definitions complete in `shared/schema.ts`
+- Migration config created: `drizzle.postgres.config.ts` (PostgreSQL-specific)
+- Awaiting DATABASE_URL environment variable availability in npm script context
+- To sync: `npx drizzle-kit push --config drizzle.postgres.config.ts`
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

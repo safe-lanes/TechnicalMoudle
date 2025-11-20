@@ -569,9 +569,12 @@ export const jobs = pgTable("jobs", {
   assignedTo: text("assigned_to"),
   maintenanceType: text("maintenance_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
   maintenanceBasis: text("maintenance_basis"), // 'Calendar' | 'Running Hours'
+  frequencyType: text("frequency_type"), // Alias for maintenanceBasis for compliance
   frequencyValue: text("frequency_value"),
-  frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days'
+  frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days' | 'Hours'
   intervalRunningHour: integer("interval_running_hour"),
+  leadTimeValue: integer("lead_time_value"), // Lead time before job becomes due
+  leadTimeUnit: text("lead_time_unit"), // 'Days' | 'Weeks' | 'Months'
   initialNextDue: text("initial_next_due"), // Initial due date for calendar-based jobs
   lastDoneDate: text("last_done_date"), // Last completion date (DD-MMM-YYYY format)
   nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
@@ -593,7 +596,9 @@ export const jobs = pgTable("jobs", {
   criticality: text("criticality"),
   isActive: boolean("is_active").default(true),
   
+  createdBy: text("created_by"), // User who created the job
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"), // User who last updated the job
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   vesselIdIdx: index("idx_job_vessel").on(table.vesselId),
@@ -1081,3 +1086,203 @@ export const insertMasterListSchema = createInsertSchema(masterLists).omit({
 
 export type InsertMasterList = z.infer<typeof insertMasterListSchema>;
 export type MasterList = typeof masterLists.$inferSelect;
+
+// Fleet Equipment Master Table - Normalized master data for fleet equipment
+export const fleetEquipmentMaster = pgTable("fleet_equipment_master", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull().unique(), // Unique identifier (XXX.XXX.XX format)
+  fleetEquipmentName: text("fleet_equipment_name").notNull(), // General name from SFI booklet
+  maker: text("maker"), // Manufacturer name
+  makerCode: text("maker_code"), // Unique code for maker
+  model: text("model"), // Equipment model
+  modelCode: text("model_code"), // Combination of Maker Code + Model
+  description: text("description"), // Additional description
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  fleetEquipmentCodeIdx: index("idx_fleet_equipment_code").on(table.fleetEquipmentCode),
+  makerCodeIdx: index("idx_fleet_maker_code").on(table.makerCode),
+  modelCodeIdx: index("idx_fleet_model_code").on(table.modelCode),
+}));
+
+export const insertFleetEquipmentMasterSchema = createInsertSchema(fleetEquipmentMaster).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleetEquipmentMaster = z.infer<typeof insertFleetEquipmentMasterSchema>;
+export type FleetEquipmentMaster = typeof fleetEquipmentMaster.$inferSelect;
+
+// Component Running Hours Log - Detailed audit trail for all running hours updates
+export const componentRunningHoursLog = pgTable("component_running_hours_log", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselCode: text("vessel_code").notNull(),
+  componentCode: text("component_code").notNull(),
+  componentId: text("component_id").notNull(),
+  previousRh: decimal("previous_rh", { precision: 10, scale: 2 }).notNull(),
+  newRh: decimal("new_rh", { precision: 10, scale: 2 }).notNull(),
+  deltaRh: decimal("delta_rh", { precision: 10, scale: 2 }).notNull(), // Change in running hours (can be negative for corrections)
+  updatedBy: text("updated_by").notNull(), // User ID who made the change
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updateSource: text("update_source").notNull(), // 'manual' | 'cascade' | 'bulk_import' | 'work_order'
+  notes: text("notes"), // Optional notes for the update
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  componentCodeIdx: index("idx_rh_log_component_code").on(table.componentCode),
+  vesselCodeIdx: index("idx_rh_log_vessel_code").on(table.vesselCode),
+  updatedAtIdx: index("idx_rh_log_updated_at").on(table.updatedAt),
+  updateSourceIdx: index("idx_rh_log_update_source").on(table.updateSource),
+}));
+
+export const insertComponentRunningHoursLogSchema = createInsertSchema(componentRunningHoursLog).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertComponentRunningHoursLog = z.infer<typeof insertComponentRunningHoursLogSchema>;
+export type ComponentRunningHoursLog = typeof componentRunningHoursLog.$inferSelect;
+
+// Audit Log - System-wide audit trail for all data changes
+export const auditLog = pgTable("audit_log", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  userId: text("user_id").notNull(), // User who made the change
+  vesselCode: text("vessel_code"), // Vessel context (nullable for fleet-level changes)
+  componentCode: text("component_code"), // Component context (nullable)
+  entityType: text("entity_type").notNull(), // 'component' | 'job' | 'work_order' | 'spare' | 'document' | 'survey' | 'maintenance_history'
+  entityId: text("entity_id").notNull(), // ID of the affected entity
+  actionType: text("action_type").notNull(), // 'create' | 'update' | 'delete' | 'approve' | 'reject'
+  fieldName: text("field_name"), // Specific field changed (nullable for create/delete)
+  oldValue: text("old_value"), // Previous value (JSON string for complex objects)
+  newValue: text("new_value"), // New value (JSON string for complex objects)
+  source: text("source").notNull(), // 'web_ui' | 'api' | 'bulk_import' | 'system' | 'modify_pms'
+  payload: json("payload"), // Additional context (e.g., full snapshot, metadata)
+}, (table) => ({
+  timestampIdx: index("idx_audit_timestamp").on(table.timestamp),
+  userIdIdx: index("idx_audit_user_id").on(table.userId),
+  vesselCodeIdx: index("idx_audit_vessel_code").on(table.vesselCode),
+  entityTypeIdx: index("idx_audit_entity_type").on(table.entityType),
+  entityIdIdx: index("idx_audit_entity_id").on(table.entityId),
+  actionTypeIdx: index("idx_audit_action_type").on(table.actionType),
+}));
+
+export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLog.$inferSelect;
+
+// Component Documents Table - Drawings, manuals, and technical documents
+export const componentDocuments = pgTable("component_documents", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  componentId: text("component_id").notNull(),
+  componentCode: text("component_code").notNull(),
+  vesselCode: text("vessel_code").notNull(),
+  fleetEquipmentCode: text("fleet_equipment_code"), // Link to fleet equipment for auto-preloading
+  fileName: text("file_name").notNull(),
+  fileKey: text("file_key").notNull(), // Object storage key
+  fileType: text("file_type").notNull(), // 'Manual' | 'Drawing' | 'OEM Doc' | 'Catalogue' | 'Certificate' | 'Other'
+  fileSize: integer("file_size"), // File size in bytes
+  version: text("version").notNull().default("1.0"), // Document version for future versioning support
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  canShipView: boolean("can_ship_view").notNull().default(true), // Ship users can view
+  canShipDownload: boolean("can_ship_download").notNull().default(false), // Ship users can download
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"), // Additional notes about the document
+}, (table) => ({
+  componentIdIdx: index("idx_doc_component_id").on(table.componentId),
+  componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
+  vesselCodeIdx: index("idx_doc_vessel_code").on(table.vesselCode),
+  fleetEquipmentCodeIdx: index("idx_doc_fleet_equipment_code").on(table.fleetEquipmentCode),
+  fileTypeIdx: index("idx_doc_file_type").on(table.fileType),
+}));
+
+export const insertComponentDocumentSchema = createInsertSchema(componentDocuments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertComponentDocument = z.infer<typeof insertComponentDocumentSchema>;
+export type ComponentDocument = typeof componentDocuments.$inferSelect;
+
+// Component Class Regulatory Table - Classification and regulatory survey data (multiple rows per component)
+export const componentClassRegulatory = pgTable("component_class_regulatory", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  componentId: text("component_id").notNull(),
+  componentCode: text("component_code").notNull(),
+  vesselCode: text("vessel_code").notNull(),
+  classificationSociety: text("classification_society").notNull(), // 'DNV' | 'ABS' | 'Lloyd\'s Register' | 'ClassNK' | 'RINA' | 'IRS'
+  surveyType: text("survey_type").notNull(), // 'Annual Survey' | '5-Year Survey' | 'Intermediate Survey' | 'Damage Survey' | 'OEM Test' | 'Statutory Requirement' | 'Internal Company Requirement'
+  certificateNumber: text("certificate_number"),
+  issueDate: text("issue_date"), // DD-MMM-YYYY format
+  expiryDate: text("expiry_date"), // DD-MMM-YYYY format
+  lastClassSurvey: text("last_class_survey"), // DD-MMM-YYYY format
+  nextSurveyDue: text("next_survey_due"), // DD-MMM-YYYY format
+  classRequirements: text("class_requirements"), // Text description of requirements
+  surveyStatus: text("survey_status").notNull().default("Active"), // 'Active' | 'Expired' | 'Pending' | 'Cancelled'
+  remarks: text("remarks"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  componentIdIdx: index("idx_class_component_id").on(table.componentId),
+  componentCodeIdx: index("idx_class_component_code").on(table.componentCode),
+  vesselCodeIdx: index("idx_class_vessel_code").on(table.vesselCode),
+  surveyTypeIdx: index("idx_class_survey_type").on(table.surveyType),
+  expiryDateIdx: index("idx_class_expiry_date").on(table.expiryDate),
+}));
+
+export const insertComponentClassRegulatorySchema = createInsertSchema(componentClassRegulatory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertComponentClassRegulatory = z.infer<typeof insertComponentClassRegulatorySchema>;
+export type ComponentClassRegulatory = typeof componentClassRegulatory.$inferSelect;
+
+// Component Maintenance History Table - Immutable maintenance records (NO EDITS/DELETES ALLOWED)
+export const componentMaintenanceHistory = pgTable("component_maintenance_history", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  componentId: text("component_id").notNull(),
+  componentCode: text("component_code").notNull(),
+  vesselCode: text("vessel_code").notNull(),
+  workOrderId: text("work_order_id").notNull(), // Link to completed work order
+  workOrderNo: text("work_order_no").notNull(),
+  jobTitle: text("job_title").notNull(),
+  maintenanceType: text("maintenance_type").notNull(), // 'Inspection' | 'Overhaul' | 'Servicing' | 'Testing' | 'Cleaning' | 'Lubrication' | 'Replacement'
+  dateCompleted: text("date_completed").notNull(), // DD-MMM-YYYY format
+  runningHoursAtCompletion: decimal("running_hours_at_completion", { precision: 10, scale: 2 }),
+  performedBy: text("performed_by").notNull(),
+  approvedBy: text("approved_by"),
+  approvalDate: text("approval_date"), // DD-MMM-YYYY format
+  status: text("status").notNull().default("Approved"), // Only 'Approved' entries shown in history
+  workDescription: text("work_description"),
+  sparesUsed: json("spares_used"), // [{partCode, partName, quantity}]
+  remarks: text("remarks"),
+  isComponentReplaced: boolean("is_component_replaced").notNull().default(false), // Special flag for component replacement
+  createdAt: timestamp("created_at").notNull().defaultNow(), // IMMUTABLE - no updates/deletes allowed
+}, (table) => ({
+  componentIdIdx: index("idx_history_component_id").on(table.componentId),
+  componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
+  vesselCodeIdx: index("idx_history_vessel_code").on(table.vesselCode),
+  workOrderIdIdx: index("idx_history_work_order_id").on(table.workOrderId),
+  dateCompletedIdx: index("idx_history_date_completed").on(table.dateCompleted),
+}));
+
+export const insertComponentMaintenanceHistorySchema = createInsertSchema(componentMaintenanceHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertComponentMaintenanceHistory = z.infer<typeof insertComponentMaintenanceHistorySchema>;
+export type ComponentMaintenanceHistory = typeof componentMaintenanceHistory.$inferSelect;
