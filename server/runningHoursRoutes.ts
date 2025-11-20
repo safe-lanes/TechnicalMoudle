@@ -52,7 +52,7 @@ export function registerRunningHoursRoutes(app: Express) {
           ...parent,
           sfiCode: parent.componentCode || '', // Use componentCode as SFI Code
           childCount: childrenWithRHJobs.length,
-          latestUpdate: undefined
+          latestUpdate: parent.lastUpdated || parent.updatedAt || new Date().toISOString()
         });
       }
       

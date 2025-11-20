@@ -22,6 +22,7 @@ import { WorkOrder, InsertWorkOrder } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { VESSELS } from "@/lib/vessels";
+import { formatProfessionalDate } from "@/lib/dateUtils";
 
 // Extend WorkOrder type to include computedStatus from backend
 type WorkOrderWithComputedStatus = WorkOrder & {
@@ -459,8 +460,8 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4 text-gray-900">{workOrder.assignedTo}</td>
                 <td className="py-3 px-4 text-gray-900">
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
-                    ? workOrder.submittedDate 
-                    : workOrder.dueDate}
+                    ? formatProfessionalDate(workOrder.submittedDate)
+                    : formatProfessionalDate(workOrder.dueDate)}
                 </td>
                 <td className="py-3 px-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
@@ -468,7 +469,7 @@ const WorkOrders: React.FC = () => {
                   </span>
                 </td>
                 {activeTab !== "Pending Approval" && (
-                  <td className="py-3 px-4 text-gray-900">{workOrder.dateCompleted || ""}</td>
+                  <td className="py-3 px-4 text-gray-900">{formatProfessionalDate(workOrder.dateCompleted)}</td>
                 )}
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-center gap-2">

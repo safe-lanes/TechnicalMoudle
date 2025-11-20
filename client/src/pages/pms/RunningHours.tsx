@@ -14,6 +14,7 @@ import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
+import { formatProfessionalDateTime } from "@/lib/dateUtils";
 
 interface RunningHoursData {
   id: string;
@@ -80,7 +81,7 @@ const RunningHours = () => {
     sfiCode: parent.sfiCode || '',
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
-    lastUpdated: parent.latestUpdate || parent.lastUpdated || '',
+    lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
     utilizationRate: null
   })) : [];
 

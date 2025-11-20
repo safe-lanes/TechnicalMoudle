@@ -3,7 +3,8 @@ import { format, parseISO, parse, isValid } from 'date-fns';
 /**
  * Date utility functions for consistent date formatting across the system
  * System standard: ISO 8601 format (YYYY-MM-DD) for storage
- * Display format: DD-MM-YYYY for user interface
+ * Professional display format: DD-MMM-YYYY (e.g., 20-Nov-2025)
+ * Legacy display format: DD-MM-YYYY
  */
 
 /**
@@ -92,6 +93,44 @@ export function formatDateTimeForDisplay(date: Date | string | null | undefined,
   
   try {
     return format(dateObj, 'dd-MM-yyyy HH:mm');
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Format a date professionally with month name (DD-MMM-YYYY)
+ * @param date - Date to format (Date object or string)
+ * @param fallback - Fallback value if date is invalid (default: '—')
+ * @returns Professional formatted date string (e.g., "20-Nov-2025")
+ */
+export function formatProfessionalDate(date: Date | string | null | undefined, fallback: string = '—'): string {
+  if (!date) return fallback;
+  
+  const dateObj = typeof date === 'string' ? parseDate(date) : date;
+  if (!dateObj) return fallback;
+  
+  try {
+    return format(dateObj, 'dd-MMM-yyyy');
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Format a date and time professionally (DD-MMM-YYYY HH:mm)
+ * @param date - Date to format (Date object or string)
+ * @param fallback - Fallback value if date is invalid (default: '—')
+ * @returns Professional formatted datetime string (e.g., "20-Nov-2025 05:30")
+ */
+export function formatProfessionalDateTime(date: Date | string | null | undefined, fallback: string = '—'): string {
+  if (!date) return fallback;
+  
+  const dateObj = typeof date === 'string' ? parseDate(date) : date;
+  if (!dateObj) return fallback;
+  
+  try {
+    return format(dateObj, 'dd-MMM-yyyy HH:mm');
   } catch {
     return fallback;
   }
