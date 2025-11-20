@@ -20,6 +20,52 @@ const upload = multer({
 // Store dry-run results temporarily (in production, use Redis or similar)
 const dryRunCache = new Map<string, any>();
 
+/**
+ * Extract data from Excel worksheet while preserving raw numeric values for dates
+ * This prevents Excel serial numbers from being auto-formatted into strings like "01-Jan-45610"
+ */
+function extractRawExcelData(worksheet: XLSX.WorkSheet): any[] {
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+  const data: any[] = [];
+  
+  // Extract headers from first row
+  const headers: string[] = [];
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+    const cell = worksheet[cellAddress];
+    headers[col] = cell ? String(cell.v) : '';
+  }
+  
+  // Extract data rows
+  for (let row = range.s.r + 1; row <= range.e.r; row++) {
+    const rowData: any = {};
+    let hasData = false;
+    
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+      const cell = worksheet[cellAddress];
+      const header = headers[col];
+      
+      if (!header) continue;
+      
+      if (cell) {
+        // Preserve raw numeric values (including Excel date serials)
+        // instead of letting XLSX auto-format them
+        rowData[header] = cell.v;
+        hasData = true;
+      } else {
+        rowData[header] = undefined;
+      }
+    }
+    
+    if (hasData) {
+      data.push(rowData);
+    }
+  }
+  
+  return data;
+}
+
 // Component categories from existing system (8 main categories)
 const COMPONENT_CATEGORIES = [
   "1 Ship General",
@@ -1164,7 +1210,8 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
         });
       }
       
-      data = XLSX.utils.sheet_to_json(targetSheet);
+      // Use custom extractor to preserve raw numeric date values
+      data = extractRawExcelData(targetSheet);
     } else {
       return res.status(400).json({ error: 'Unsupported file format' });
     }

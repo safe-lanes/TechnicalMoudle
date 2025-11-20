@@ -21,6 +21,32 @@ export function parseDate(dateStr: string | null | undefined): Date | null {
     if (isValid(date)) return date;
   } catch {}
   
+  // Try DD-MMM-YYYY format (professional format)
+  try {
+    const date = parse(dateStr, 'dd-MMM-yyyy', new Date());
+    if (isValid(date)) return date;
+  } catch {}
+  
+  // Handle corrupted Excel dates: "01-Jan-45610" where 45610 is the Excel serial number
+  // This happens when Excel serial numbers get incorrectly formatted as years
+  try {
+    const corruptedMatch = dateStr.match(/^\d{1,2}-[A-Za-z]{3}-(\d{5,})$/);
+    if (corruptedMatch) {
+      const excelSerial = parseInt(corruptedMatch[1]);
+      if (excelSerial > 10000) {
+        // Convert Excel serial to date (Excel epoch: Dec 30, 1899)
+        // Excel incorrectly treats 1900 as a leap year, so subtract 1 day for serial >= 60
+        let adjustedSerial = excelSerial;
+        if (excelSerial >= 60) {
+          adjustedSerial = excelSerial - 1;
+        }
+        const excelEpoch = new Date(1899, 11, 30);
+        const date = new Date(excelEpoch.getTime() + adjustedSerial * 24 * 60 * 60 * 1000);
+        if (isValid(date)) return date;
+      }
+    }
+  } catch {}
+  
   // Try DD-MM-YYYY format (legacy data)
   try {
     const date = parse(dateStr, 'dd-MM-yyyy', new Date());

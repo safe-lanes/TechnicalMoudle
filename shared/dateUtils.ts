@@ -15,8 +15,14 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
     // Handle Excel serial number (number of days since 1900-01-01)
     if (typeof dateInput === 'number') {
       // Excel serial date: days since 1900-01-01 (with 1900 leap year bug)
+      // Excel incorrectly treats 1900 as a leap year, so we need to account for this
+      // For serial >= 60 (dates from Mar 1, 1900 onwards), subtract 1 day
+      let adjustedSerial = dateInput;
+      if (dateInput >= 60) {
+        adjustedSerial = dateInput - 1;
+      }
       const excelEpoch = new Date(1899, 11, 30); // Excel's epoch is Dec 30, 1899
-      parsedDate = new Date(excelEpoch.getTime() + dateInput * 24 * 60 * 60 * 1000);
+      parsedDate = new Date(excelEpoch.getTime() + adjustedSerial * 24 * 60 * 60 * 1000);
     }
     // Handle Date object
     else if (dateInput instanceof Date) {
