@@ -8179,6 +8179,56 @@
       "submittedAt": null,
       "reviewedByUserId": null,
       "reviewedAt": null
+    },
+    "3": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Modify Component: 220.066 FO storage tanks",
+      "reason": "Component modification request",
+      "targetType": "component",
+      "targetId": "1763482267505_nzmmsrl4t",
+      "snapshotBeforeJson": {
+        "displayKey": "220.066",
+        "displayName": "FO storage tanks",
+        "displayPath": "220.066 FO storage tanks",
+        "fields": {
+          "id": "1763482267505_nzmmsrl4t",
+          "code": "220.066",
+          "name": "FO storage tanks",
+          "maker": "",
+          "model": "",
+          "serialNo": "",
+          "department": "",
+          "location": "",
+          "critical": "",
+          "classItem": "",
+          "commissionedDate": "",
+          "installationDate": "",
+          "rating": "",
+          "conditionBased": "",
+          "noOfUnits": "",
+          "eqptSystemDept": "",
+          "parentComponent": "",
+          "dimensionsSize": "",
+          "notes": ""
+        }
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.serialNo",
+          "oldValue": "SN-3784",
+          "newValue": "SN-37842"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "current_user",
+      "id": 3,
+      "createdAt": "2025-11-20T08:53:15.198Z",
+      "updatedAt": "2025-11-20T08:53:15.198Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
     }
   },
   "changeRequestAttachments": [],
@@ -522900,7 +522950,7 @@
     "auditId": 129,
     "spareId": 2,
     "historyId": 7,
-    "changeRequestId": 3,
+    "changeRequestId": 4,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
