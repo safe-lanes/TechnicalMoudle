@@ -67,14 +67,15 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
 
 /**
  * Calculate next due date from last done date + interval
- * @param lastDoneDate - Date in DD-MMM-YYYY format (e.g., "15-Jan-2025")
+ * ROBUSTNESS: Accepts any date format (DD-MMM-YYYY, ISO, Excel serial) and normalizes before calculation
+ * @param lastDoneDate - Date in any format (DD-MMM-YYYY, ISO, Excel serial, etc.)
  * @param intervalValue - Numeric interval (e.g., "3", "6", "12")
  * @param intervalUnit - Unit: 'Days' | 'Weeks' | 'Months' | 'Years'
  * @returns Next due date in DD-MMM-YYYY format, or null if calculation fails
  */
 export function calculateNextDueDate(
-  lastDoneDate: string | null | undefined,
-  intervalValue: string | null | undefined,
+  lastDoneDate: string | number | null | undefined,
+  intervalValue: string | number | null | undefined,
   intervalUnit: string | null | undefined
 ): string | null {
   if (!lastDoneDate || !intervalValue || !intervalUnit) {
@@ -82,12 +83,27 @@ export function calculateNextDueDate(
   }
 
   try {
-    // Parse the last done date (DD-MMM-YYYY format)
-    const parsedDate = parse(lastDoneDate, 'dd-MMM-yyyy', new Date());
+    // CRITICAL FIX: Normalize input date to DD-MMM-YYYY first
+    // This handles Excel serials, ISO dates, and any other format
+    const normalizedDate = normalizeDateToDDMMMYYYY(lastDoneDate);
+    if (!normalizedDate) {
+      console.error('Failed to normalize lastDoneDate:', lastDoneDate);
+      return null;
+    }
+
+    // Parse the normalized date (DD-MMM-YYYY format)
+    const parsedDate = parse(normalizedDate, 'dd-MMM-yyyy', new Date());
+    if (!isValid(parsedDate)) {
+      console.error('Failed to parse normalized date:', normalizedDate);
+      return null;
+    }
     
     // Parse interval value as number
-    const numericInterval = parseInt(intervalValue, 10);
+    const numericInterval = typeof intervalValue === 'number' 
+      ? intervalValue 
+      : parseInt(String(intervalValue), 10);
     if (isNaN(numericInterval) || numericInterval <= 0) {
+      console.error('Invalid interval value:', intervalValue);
       return null;
     }
 
@@ -107,6 +123,7 @@ export function calculateNextDueDate(
         durationKey = 'years';
         break;
       default:
+        console.error('Invalid interval unit:', intervalUnit);
         return null;
     }
 
@@ -116,7 +133,7 @@ export function calculateNextDueDate(
     // Format back to DD-MMM-YYYY
     return format(nextDue, 'dd-MMM-yyyy');
   } catch (error) {
-    console.error('Error calculating next due date:', error);
+    console.error('Error calculating next due date:', { lastDoneDate, intervalValue, intervalUnit, error });
     return null;
   }
 }

@@ -54,8 +54,12 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Work Order Integration**: Implements a differential reconciliation system for consumed spares within work orders, ensuring accurate inventory adjustments and audit trails.
 - **Calendar-Based Job Automation**:
     - **Next Due Date Calculation**: Automatic calculation of `nextDueDate` for Calendar-based jobs based on `lastDoneDate + interval`, with robust date normalization.
+    - **CRITICAL BUSINESS RULE**: Calendar-based jobs MUST ALWAYS have `nextDueDate` calculated as `lastDoneDate + frequencyValue + frequencyUnit`. This field is automatically computed and MUST NOT be null for Calendar jobs.
+    - **Input Format Flexibility**: `calculateNextDueDate()` function accepts any date format (DD-MMM-YYYY, ISO strings, Excel serials) and normalizes before calculation to prevent errors.
+    - **Guard Logic**: Service layer validates and preserves existing `nextDueDate` values when recalculation fails, preventing null overwrites.
     - **Bulk Upload Integration**: Jobs template import automatically calculates and persists `nextDueDate`, using component `installationDate` as a fallback.
     - **Auto-Generation Endpoint**: Generates work orders for active Calendar-based jobs when `nextDueDate` is reached.
+    - **Date Format Handling**: All dates use DD-MMM-YYYY format (e.g., "13-Nov-2024") with Excel 1900 leap year bug fix applied (serials >= 60 require -1 day adjustment).
 - **Running Hours Module with Automatic Work Order Generation**:
     - **Cascade Update System**: Updates parent component running hours and automatically cascades deltas to all child components.
     - **Automatic Work Order Generation**: Triggers new work order generation when child component running hours exceed job `intervalRunningHour` thresholds.

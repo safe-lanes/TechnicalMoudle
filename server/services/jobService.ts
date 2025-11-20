@@ -53,6 +53,7 @@ export class JobService {
     }
 
     // Calculate nextDueDate for Calendar-based jobs
+    // CRITICAL: Always recalculate to ensure consistency after date normalization
     if (jobData.maintenanceBasis === 'Calendar' && jobData.lastDoneDate) {
       const nextDue = calculateNextDueDate(
         jobData.lastDoneDate,
@@ -61,6 +62,12 @@ export class JobService {
       );
       if (nextDue) {
         jobData.nextDueDate = nextDue;
+      } else {
+        console.error(`Failed to calculate nextDueDate for job`, {
+          lastDoneDate: jobData.lastDoneDate,
+          frequencyValue: jobData.frequencyValue,
+          frequencyUnit: jobData.frequencyUnit
+        });
       }
     }
 
@@ -77,6 +84,7 @@ export class JobService {
     }
 
     // Recalculate nextDueDate if Calendar-based and relevant fields changed
+    // CRITICAL: Guard against overwriting valid nextDueDate with null
     if (
       (updates.maintenanceBasis === 'Calendar' || existingJob.maintenanceBasis === 'Calendar') &&
       (updates.lastDoneDate || updates.frequencyValue || updates.frequencyUnit)
@@ -89,6 +97,14 @@ export class JobService {
         const nextDue = calculateNextDueDate(lastDone, freqValue, freqUnit);
         if (nextDue) {
           updates.nextDueDate = nextDue;
+        } else {
+          // GUARD: Don't overwrite existing nextDueDate with null if calculation fails
+          console.error(`Failed to recalculate nextDueDate for job ${id}`, {
+            lastDone,
+            freqValue,
+            freqUnit,
+            preservingExisting: existingJob.nextDueDate
+          });
         }
       }
     }
