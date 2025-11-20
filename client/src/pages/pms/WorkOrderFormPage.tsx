@@ -162,6 +162,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
   
+  // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
+  const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
+  
   const isReadOnly = false;
 
   const [templateData, setTemplateData] = useState({
@@ -256,15 +259,60 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   }, []);
 
+  // Normalize frequency value to ensure it's a valid positive integer
+  const normalizeFrequencyValue = (value: string): string => {
+    if (value === '' || value === null || value === undefined) return '';
+    // Only accept positive integers: 1, 2, 10, 100, etc.
+    if (/^[1-9]\d*$/.test(value)) {
+      return value;
+    }
+    // If invalid, return empty string (will be handled by validation)
+    return '';
+  };
+
   // Load work order data when workOrderContext is fetched
   useEffect(() => {
     if (workOrderContext) {
       const context = workOrderContext as any;
       if (context.templateData) {
+        // Determine the correct frequency unit based on maintenance basis
+        let normalizedFrequencyUnit = context.templateData.frequencyUnit;
+        if (context.templateData.maintenanceBasis === 'Running Hours') {
+          // Running Hours must always use Hours
+          normalizedFrequencyUnit = 'Hours';
+        } else if (!normalizedFrequencyUnit || normalizedFrequencyUnit === 'Hours') {
+          // Calendar basis with missing or Hours unit → default to Months
+          normalizedFrequencyUnit = 'Months';
+        }
+        
+        const normalizedTemplateData = {
+          ...context.templateData,
+          // Normalize frequency value from backend to ensure it's valid
+          frequencyValue: normalizeFrequencyValue(context.templateData.frequencyValue || ''),
+          // Ensure frequency unit matches maintenance basis
+          frequencyUnit: normalizedFrequencyUnit
+        };
+        
         setTemplateData(prev => ({
           ...prev,
-          ...context.templateData
+          ...normalizedTemplateData
         }));
+        
+        // Cache the original calendar unit from backend data (preserve even if currently Running Hours)
+        // This ensures we restore the correct unit when toggling from Running Hours back to Calendar
+        const originalCalendarUnit = context.templateData.frequencyUnit;
+        if (originalCalendarUnit && originalCalendarUnit !== 'Hours' && 
+            ['Days', 'Weeks', 'Months', 'Years'].includes(originalCalendarUnit)) {
+          setLastCalendarUnit(originalCalendarUnit);
+        } else if (normalizedTemplateData.maintenanceBasis === 'Calendar') {
+          // Only default to Months if we're in Calendar mode and have no valid unit to preserve
+          setLastCalendarUnit(normalizedFrequencyUnit);
+        }
+        
+        // Set Modify Mode snapshot if enabled
+        if (isModifyMode && setOriginalSnapshot) {
+          setOriginalSnapshot(normalizedTemplateData);
+        }
       }
       if (context.executionData) {
         setExecutionData(prev => ({
@@ -273,20 +321,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
         }));
       }
-      
-      // Set Modify Mode snapshot if enabled
-      if (isModifyMode && setOriginalSnapshot && context.templateData) {
-        setOriginalSnapshot(context.templateData);
-      }
     }
   }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
 
   const handleTemplateChange = (field: string, value: string) => {
     setTemplateData(prev => {
-      const newData = { ...prev, [field]: value };
+      let finalValue = value;
+      
+      // Validate frequency value - only accept positive integers (no decimals, no scientific notation)
+      if (field === 'frequencyValue') {
+        if (value !== '') {
+          // Only accept strings that are positive integers: 1, 2, 10, 100, etc.
+          if (!/^[1-9]\d*$/.test(value)) {
+            toast({
+              title: "Invalid Frequency",
+              description: "Frequency must be a positive whole number (no decimals or negative values)",
+              variant: "destructive"
+            });
+            return prev; // Don't update if invalid
+          }
+        }
+      }
+      
+      const newData = { ...prev, [field]: finalValue };
+      
+      // Auto-update frequency unit when maintenance basis changes
+      if (field === 'maintenanceBasis') {
+        if (value === 'Running Hours') {
+          newData.frequencyUnit = 'Hours';
+        } else if (prev.frequencyUnit === 'Hours') {
+          // Restore the last Calendar unit (fallback to Months if cache is empty)
+          newData.frequencyUnit = lastCalendarUnit || 'Months';
+        }
+      }
+      
+      // Cache the calendar unit when it changes (but not when it's Hours)
+      if (field === 'frequencyUnit' && value !== 'Hours' && newData.maintenanceBasis === 'Calendar') {
+        setLastCalendarUnit(value);
+      }
       
       if (isModifyMode && trackFieldChange) {
-        trackFieldChange(field, value, (prev as any)[field]);
+        trackFieldChange(field, finalValue, (prev as any)[field]);
       }
       
       return newData;
@@ -631,6 +706,27 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   const handleSave = async () => {
     try {
+      // Validate frequency value before saving using the normalization helper
+      const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
+      if (!normalizedFrequency) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency value is required. Please enter a positive whole number (no decimals, negative values, or zero).",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate frequency unit
+      if (!templateData.frequencyUnit || templateData.frequencyUnit.trim() === '') {
+        toast({
+          title: "Validation Error",
+          description: "Frequency unit is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const isCompleting = !!(executionData.completionDateTime || executionData.dateOfCompletion);
       
       if (isCompleting) {
@@ -943,7 +1039,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <SelectContent>
                       <SelectItem value="Calendar">Calendar</SelectItem>
                       <SelectItem value="Running Hours">Running Hours</SelectItem>
-                      <SelectItem value="Condition">Condition</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -953,6 +1048,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <div className="flex gap-2">
                     <Input
                       type="number"
+                      min="1"
                       value={templateData.frequencyValue}
                       onChange={(e) => handleTemplateChange('frequencyValue', e.target.value)}
                       className="text-sm flex-1"
@@ -961,19 +1057,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       data-testid="input-frequency-value"
                     />
                     <Select
-                      value={templateData.frequencyUnit}
+                      value={templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit}
                       onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
-                      disabled={isReadOnly}
+                      disabled={isReadOnly || templateData.maintenanceBasis === 'Running Hours'}
                     >
                       <SelectTrigger className="text-sm w-32" data-testid="select-frequency-unit">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Days">Days</SelectItem>
-                        <SelectItem value="Weeks">Weeks</SelectItem>
-                        <SelectItem value="Months">Months</SelectItem>
-                        <SelectItem value="Years">Years</SelectItem>
-                        <SelectItem value="Hours">Hours</SelectItem>
+                        {templateData.maintenanceBasis === 'Running Hours' ? (
+                          <SelectItem value="Hours">Hours</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="Days">Days</SelectItem>
+                            <SelectItem value="Weeks">Weeks</SelectItem>
+                            <SelectItem value="Months">Months</SelectItem>
+                            <SelectItem value="Years">Years</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
