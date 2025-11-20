@@ -67,7 +67,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   
   // Minimal A/B navigation matching reference design
   const navSteps = [
-    { id: 'part-a', label: 'A', title: 'Work Order Details' },
+    { id: 'part-a', label: 'A', title: 'Job Details' },
     { id: 'part-b', label: 'B', title: 'Work Completion Record' }
   ];
   
@@ -961,30 +961,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         <div className="flex-1 px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
-            {/* Part A - Work Order Details */}
+            {/* Part A - Job Details */}
             <PartHeader
               id="part-a"
               label="Part A"
-              title="Work Order Details"
+              title="Job Details"
               description="Work details about this work order"
             />
             
-            {/* A1. Work Order Information */}
+            {/* A1. Job Information */}
             <SectionBlock 
               id="work-order-info"
               number="A1"
-              title="Work Order Information" 
+              title="Job Information" 
               description="Basic details and configuration for this work order"
             >
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">WO Title</Label>
+                  <Label className="text-sm text-[#8798ad]">Job Title</Label>
                   <Input
                     value={templateData.woTitle}
                     onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
                     className="text-sm"
-                    placeholder="Enter work order title"
+                    placeholder="Enter job title"
                     disabled={isReadOnly}
                     data-testid="input-wo-title"
                   />
@@ -1003,19 +1003,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                  <Label className="text-sm text-[#8798ad]">SFI Code</Label>
                   <Input
                     value={templateData.componentCode}
                     onChange={(e) => handleTemplateChange('componentCode', e.target.value)}
                     className="text-sm"
-                    placeholder="Enter component code"
+                    placeholder="Enter SFI code"
                     disabled={isReadOnly}
                     data-testid="input-component-code"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">WO Template Code</Label>
+                  <Label className="text-sm text-[#8798ad]">Job Template Code</Label>
                   <Input
                     value={templateData.woTemplateCode}
                     onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
