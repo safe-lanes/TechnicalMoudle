@@ -813,7 +813,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </Sheet>
               <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Work Order Form</h1>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center">
               <Button
                 variant="outline"
                 size="sm"
@@ -823,14 +823,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               >
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Work Instructions
-              </Button>
-              <div className="border-l border-gray-300 h-8"></div>
-              <Button
-                onClick={handleSave}
-                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
-                data-testid="button-save"
-              >
-                Save
               </Button>
             </div>
           </div>
@@ -1126,18 +1118,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   render: (value) => <StatusPill status={value} />
                 }
               ]}
-              data={templateData.requiredSpareParts.length > 0 ? templateData.requiredSpareParts.map(sp => ({
+              data={(templateData.requiredSpareParts || []).map(sp => ({
                 partNumber: sp.partNo,
                 description: sp.description,
                 quantity: sp.quantityRequired,
                 rob: '-',
                 status: 'available' as const
-              })) : sampleSpareParts.map(sp => ({
-                partNumber: sp.partNumber,
-                description: sp.description,
-                quantity: sp.quantity,
-                rob: sp.rob,
-                status: sp.status
               }))}
               showActions={false}
             />
@@ -1162,16 +1148,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   render: (value) => <StatusPill status={value} />
                 }
               ]}
-              data={templateData.requiredTools.length > 0 ? templateData.requiredTools.map(tool => ({
+              data={(templateData.requiredTools || []).map(tool => ({
                 description: tool.toolName,
                 quantity: tool.quantity,
                 rob: tool.quantity,
                 status: 'available' as const
-              })) : sampleTools.map(tool => ({
-                description: tool.description,
-                quantity: tool.quantity,
-                rob: tool.quantity,
-                status: tool.status
               }))}
               showActions={false}
             />
@@ -1186,53 +1167,41 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             <div className="space-y-3">
               {/* PPE Requirements */}
-              {(templateData.safetyRequirements.ppeRequirements.length > 0 || !workOrderContext) && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
+                {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
                   <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
-                    {templateData.safetyRequirements.ppeRequirements.length > 0 
-                      ? templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                            <span>{req}</span>
-                          </li>
-                        ))
-                      : ['Safety Helmet', 'Safety Gloves', 'Safety Goggles'].map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                            <span>{req}</span>
-                          </li>
-                        ))
-                    }
+                    {templateData.safetyRequirements.ppeRequirements.map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
                   </ul>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-gray-500 italic ml-4">No PPE requirements specified</p>
+                )}
+              </div>
               
               {/* Permit Requirements */}
-              {(templateData.safetyRequirements.permitRequirements.length > 0 || !workOrderContext) && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Permits Required:</h3>
+                {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
                   <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
-                    {templateData.safetyRequirements.permitRequirements.length > 0
-                      ? templateData.safetyRequirements.permitRequirements.map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                            <span>{req}</span>
-                          </li>
-                        ))
-                      : ['Enclosed Space Entry Permit', 'Cold Work Permit'].map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
-                            <span>{req}</span>
-                          </li>
-                        ))
-                    }
+                    {templateData.safetyRequirements.permitRequirements.map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[hsl(var(--primary))] mt-1.5">•</span>
+                        <span>{req}</span>
+                      </li>
+                    ))}
                   </ul>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-gray-500 italic ml-4">No permits required</p>
+                )}
+              </div>
               
               {/* Other Requirements */}
-              {templateData.safetyRequirements.otherRequirements.length > 0 && (
+              {(templateData.safetyRequirements?.otherRequirements || []).length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Other Requirements:</h3>
                   <ul className="space-y-0.5 text-sm text-gray-700 ml-4">
@@ -1269,14 +1238,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 },
                 { key: 'remarks', label: 'Remarks', width: '20%' }
               ]}
-              data={templateData.workHistory.length > 0 ? templateData.workHistory.map(history => ({
+              data={(templateData.workHistory || []).map(history => ({
                 date: history.completionDate || history.workDate,
                 workOrder: history.woNo,
                 description: '-',
                 performedBy: history.performedBy,
                 status: history.status?.toLowerCase() === 'completed' ? ('completed' as const) : ('postponed' as const),
                 remarks: '-'
-              })) : sampleWorkHistory}
+              }))}
               showActions={false}
             />
           </SectionBlock>
@@ -1691,6 +1660,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
             </div>
           </SectionBlock>
+
+          {/* Save Button at Bottom */}
+          <div className="flex justify-end mt-6 pb-6">
+            <Button
+              onClick={handleSave}
+              className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
+              data-testid="button-save-bottom"
+            >
+              Save
+            </Button>
+          </div>
           </div>
         </div>
       </div>
