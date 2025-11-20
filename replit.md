@@ -53,6 +53,9 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Backend Validation**: Enforces checks against decreasing running hours, realistic hourly deltas, and maintains an audit trail.
     - **Work Order Integration**: Full-page Work Order form with fields for completion date and running hours, including comprehensive frontend and backend validation for atomic updates and recursive delta cascading.
     - **SFI Code Navigation**: Table includes SFI Code column (between Component and Component Category) with clickable blue hyperlinks that navigate to Components page with auto-selection of the corresponding component via sessionStorage.
+    - **SFI Code Display**: Backend endpoint explicitly maps `componentCode` as `sfiCode` in API responses to ensure proper display in Running Hours table.
+- **Components Module Job Display**:
+    - **Hierarchical Job Loading**: WorkOrdersSection recursively finds all child component codes and displays jobs from both parent and descendant components, ensuring parent components (shown in Running Hours for having children with RH jobs) correctly display all relevant maintenance tasks.
 - **Admin Module**:
     - **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (SFI hierarchy, validation, multi-vessel support), Jobs, and Spares with enhanced error viewing and partial import capabilities.
     - **Data Purge Functionality**: Admin endpoint for safe deletion of jobs and linked data for a specific vessel or the entire system, adhering to dependency order.
