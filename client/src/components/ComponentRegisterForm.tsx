@@ -175,9 +175,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     modelNumber: "",
     modelCode: "",
     department: "",
-    critical: "No",
-    classItem: "No",
-    conditionBased: "No",
+    critical: "",
+    classItem: "",
+    conditionBased: "",
     dimensionsSize: "",
     notes: "",
     commissionedDate: "",
@@ -186,8 +186,8 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     fleetEquipmentCode: "",
     fleetEquipmentName: "",
     vesselCode: "",
-    isActive: "Yes",
-    isParent: "No",
+    isActive: "",
+    isParent: "",
     // Section B: Running Hours
     runningHours: "",
     dateUpdated: "",
@@ -389,9 +389,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       modelNumber: "",
       modelCode: "",
       department: "",
-      critical: "No",
-      classItem: "No",
-      conditionBased: "No",
+      critical: "",
+      classItem: "",
+      conditionBased: "",
       dimensionsSize: "",
       notes: "",
       commissionedDate: "",
@@ -400,8 +400,8 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       fleetEquipmentCode: "",
       fleetEquipmentName: "",
       vesselCode: "",
-      isActive: "Yes",
-      isParent: "No",
+      isActive: "",
+      isParent: "",
       // Section B: Running Hours
       runningHours: "",
       dateUpdated: "",
@@ -877,7 +877,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Fleet Equipment Code</Label>
                       <Input 
-                        value={componentData.fleetEquipmentCode}
+                        value={componentData.fleetEquipmentCode || ''}
                         onChange={(e) => handleInputChange('fleetEquipmentCode', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-fleet-equipment-code"
@@ -886,7 +886,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Fleet Equipment Name</Label>
                       <Input 
-                        value={componentData.fleetEquipmentName}
+                        value={componentData.fleetEquipmentName || ''}
                         onChange={(e) => handleInputChange('fleetEquipmentName', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-fleet-equipment-name"
@@ -895,7 +895,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Parent Component Code</Label>
                       <Input 
-                        value={componentData.parentComponent}
+                        value={componentData.parentComponent || ''}
                         onChange={(e) => handleInputChange('parentComponent', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-parent-component-code"
@@ -904,7 +904,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Component Code</Label>
                       <Input 
-                        value={componentData.componentCode}
+                        value={componentData.componentCode || ''}
                         readOnly
                         className="border-gray-300 bg-gray-50"
                         title="Component Code is auto-generated based on tree position"
@@ -914,12 +914,11 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Component Name *</Label>
+                      <Label className="text-sm text-[#8798ad]">Component Name</Label>
                       <Input 
                         value={componentData.componentName || ''}
                         onChange={(e) => handleInputChange('componentName', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        required
                         data-testid="input-component-name"
                       />
                     </div>
@@ -934,9 +933,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="maker" />
+                      <Label className="text-sm text-[#8798ad]">Maker</Label>
                       <Input 
-                        value={componentData.maker}
+                        value={componentData.maker || ''}
                         onChange={(e) => handleInputChange('maker', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-maker"
@@ -945,7 +944,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Maker Code</Label>
                       <Input 
-                        value={componentData.makerCode}
+                        value={componentData.makerCode || ''}
                         onChange={(e) => handleInputChange('makerCode', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-maker-code"
@@ -954,9 +953,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Row 3: Model, Model Code, Serial No, Drawing No */}
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="model" />
+                      <Label className="text-sm text-[#8798ad]">Model</Label>
                       <Input 
-                        value={componentData.model}
+                        value={componentData.model || ''}
                         onChange={(e) => handleInputChange('model', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-model"
@@ -965,25 +964,25 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Model Code</Label>
                       <Input 
-                        value={componentData.modelCode}
+                        value={componentData.modelCode || ''}
                         onChange={(e) => handleInputChange('modelCode', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-model-code"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="serialNo" />
+                      <Label className="text-sm text-[#8798ad]">Serial No</Label>
                       <Input 
-                        value={componentData.serialNo}
+                        value={componentData.serialNo || ''}
                         onChange={(e) => handleInputChange('serialNo', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-serial-no"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="drawingNo" />
+                      <Label className="text-sm text-[#8798ad]">Drawing No</Label>
                       <Input 
-                        value={componentData.drawingNo}
+                        value={componentData.drawingNo || ''}
                         onChange={(e) => handleInputChange('drawingNo', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-drawing-no"
@@ -992,18 +991,18 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Row 4: Location, Critical, Condition Based, Installation Date */}
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="location" />
+                      <Label className="text-sm text-[#8798ad]">Location</Label>
                       <Input 
-                        value={componentData.location}
+                        value={componentData.location || ''}
                         onChange={(e) => handleInputChange('location', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-location"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="critical" />
+                      <Label className="text-sm text-[#8798ad]">Critical</Label>
                       <Select 
-                        value={componentData.critical}
+                        value={componentData.critical || ''}
                         onValueChange={(value) => handleInputChange('critical', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-critical">
@@ -1016,9 +1015,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="conditionBased" />
+                      <Label className="text-sm text-[#8798ad]">Condition Based</Label>
                       <Select 
-                        value={componentData.conditionBased}
+                        value={componentData.conditionBased || ''}
                         onValueChange={(value) => handleInputChange('conditionBased', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-condition-based">
@@ -1031,11 +1030,11 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="installation" />
+                      <Label className="text-sm text-[#8798ad]">Installation Date</Label>
                       <Input 
                         type="date"
-                        value={componentData.installation}
-                        onChange={(e) => handleInputChange('installation', e.target.value)}
+                        value={componentData.installationDate || ''}
+                        onChange={(e) => handleInputChange('installationDate', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-installation-date"
                       />
@@ -1043,29 +1042,29 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="commissionedDate" />
+                      <Label className="text-sm text-[#8798ad]">Commissioning Date</Label>
                       <Input 
                         type="date"
-                        value={componentData.commissionedDate}
+                        value={componentData.commissionedDate || ''}
                         onChange={(e) => handleInputChange('commissionedDate', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-commissioned-date"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="rating" />
+                      <Label className="text-sm text-[#8798ad]">Rating</Label>
                       <Input 
-                        value={componentData.rating}
+                        value={componentData.rating || ''}
                         onChange={(e) => handleInputChange('rating', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-rating"
                       />
                     </div>
                     <div className="space-y-2">
-                      <EditableLabel fieldKey="eqptSystemDept" />
+                      <Label className="text-sm text-[#8798ad]">Equip/System Department</Label>
                       <Input 
-                        value={componentData.equipmentDepartment}
-                        onChange={(e) => handleInputChange('equipmentDepartment', e.target.value)}
+                        value={componentData.eqptSystemDept || ''}
+                        onChange={(e) => handleInputChange('eqptSystemDept', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-eqpt-system-dept"
                       />
@@ -1081,7 +1080,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         type="number"
                         min="0"
                         step="0.01"
-                        value={componentData.runningHours}
+                        value={componentData.runningHours || ''}
                         onChange={(e) => handleInputChange('runningHours', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-running-hours"
@@ -1090,7 +1089,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">IS Active</Label>
                       <Select 
-                        value={componentData.isActive}
+                        value={componentData.isActive || ''}
                         onValueChange={(value) => handleInputChange('isActive', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-active">
@@ -1105,7 +1104,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Vessel Code</Label>
                       <Input 
-                        value={componentData.vesselCode}
+                        value={componentData.vesselCode || ''}
                         onChange={(e) => handleInputChange('vesselCode', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         data-testid="input-vessel-code"
@@ -1114,7 +1113,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">IS Parent</Label>
                       <Select 
-                        value={componentData.isParent}
+                        value={componentData.isParent || ''}
                         onValueChange={(value) => handleInputChange('isParent', value)}
                       >
                         <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-is-parent">
@@ -1129,9 +1128,9 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Row 7: Notes (full width) */}
                     <div className="space-y-2 col-span-4">
-                      <EditableLabel fieldKey="notes" />
+                      <Label className="text-sm text-[#8798ad]">Notes</Label>
                       <Textarea 
-                        value={componentData.notes}
+                        value={componentData.notes || ''}
                         onChange={(e) => handleInputChange('notes', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         rows={3}
