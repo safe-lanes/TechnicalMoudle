@@ -62,19 +62,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [, params] = useRoute("/pms/work-order/:id");
   const workOrderId = params?.id;
   
+  // Check for mode query parameter (e.g., ?mode=template)
+  const urlParams = new URLSearchParams(window.location.search);
+  const modeFromUrl = urlParams.get('mode') as 'template' | 'execution' | null;
+  const resolvedMode = modeFromUrl || mode;
+  
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   
-  // Minimal A/B navigation matching reference design
-  const navSteps = [
-    { id: 'part-a', label: 'A', title: 'Job Details' },
-    { id: 'part-b', label: 'B', title: 'Work Completion Record' }
-  ];
+  // Minimal A/B navigation matching reference design (hide Part B in template mode)
+  const navSteps = resolvedMode === 'template'
+    ? [{ id: 'part-a', label: 'A', title: 'Job Details' }]
+    : [
+        { id: 'part-a', label: 'A', title: 'Job Details' },
+        { id: 'part-b', label: 'B', title: 'Work Completion Record' }
+      ];
   
   const [activeStep, setActiveStep] = useState('part-a');
   
-  // Scroll tracking for navigation with IntersectionObserver
+  // Scroll tracking for navigation with IntersectionObserver (only if Part B exists)
   useEffect(() => {
+    // Skip scroll tracking in template mode (no Part B)
+    if (resolvedMode === 'template') return;
+    
     const partAElement = document.getElementById('part-a');
     const partBElement = document.getElementById('part-b');
     
@@ -120,7 +130,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [resolvedMode]);
   
   const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
     queryKey: ['/api/work-orders', workOrderId, 'context'],
@@ -1391,13 +1401,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             />
           </SectionBlock>
 
-          {/* Part B - Work Completion Record */}
-          <PartHeader
-            id="part-b"
-            label="Part B"
-            title="Work Completion Record"
-            description="Record details of work execution and completion"
-          />
+          {/* Part B - Work Completion Record (hidden for template mode) */}
+          {resolvedMode !== 'template' && (
+            <>
+              <PartHeader
+                id="part-b"
+                label="Part B"
+                title="Work Completion Record"
+                description="Record details of work execution and completion"
+              />
           
           {/* B1. Work Completion Record */}
           <SectionBlock
@@ -1812,6 +1824,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               Save
             </Button>
           </div>
+            </>
+          )}
           </div>
         </div>
       </div>
