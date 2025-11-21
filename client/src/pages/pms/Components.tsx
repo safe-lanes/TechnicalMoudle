@@ -1244,179 +1244,43 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   );
 };
 
-const ClassificationRegulatorySection: React.FC = () => {
-  const { isChangeRequestMode } = useChangeRequest();
-  const { isModifyMode } = useModifyMode();
-  
-  // Empty until populated from database
-  const [classData, setClassData] = useState({
-    classificationSociety: "",
-    certificateNo: "",
-    lastClassSurvey: "",
-    nextClassSurvey: ""
-  });
-  
-  const [originalClassData] = useState(classData);
-  
-  const handleFieldChange = (field: string, value: string) => {
-    setClassData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
+  // Backend endpoint not yet implemented (Task 38 pending)
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view classification & regulatory data</div>;
+  }
   
   return (
-    <div className="space-y-4">
-      {/* First row */}
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Classification Society</label>
-          {isModifyMode ? (
-            <ModifyFieldWrapper
-              originalValue={originalClassData.classificationSociety}
-              currentValue={classData.classificationSociety}
-              fieldName="classificationSociety"
-              isModifyMode={isModifyMode}
-              onFieldChange={(field, value) => handleFieldChange('classificationSociety', value)}
-            >
-              <input
-                type="text"
-                value={classData.classificationSociety}
-                onChange={(e) => handleFieldChange('classificationSociety', e.target.value)}
-                className="text-sm w-full px-2 py-1 border rounded"
-              />
-            </ModifyFieldWrapper>
-          ) : (
-            <div className="text-sm text-gray-900">{classData.classificationSociety}</div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Certificate No.</label>
-          {isModifyMode ? (
-            <ModifyFieldWrapper
-              originalValue={originalClassData.certificateNo}
-              currentValue={classData.certificateNo}
-              fieldName="certificateNo"
-              isModifyMode={isModifyMode}
-              onFieldChange={(field, value) => handleFieldChange('certificateNo', value)}
-            >
-              <input
-                type="text"
-                value={classData.certificateNo}
-                onChange={(e) => handleFieldChange('certificateNo', e.target.value)}
-                className="text-sm w-full px-2 py-1 border rounded"
-              />
-            </ModifyFieldWrapper>
-          ) : (
-            <div className="text-sm text-gray-900">{classData.certificateNo}</div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Last Class Survey</label>
-          {isModifyMode ? (
-            <ModifyFieldWrapper
-              originalValue={originalClassData.lastClassSurvey}
-              currentValue={classData.lastClassSurvey}
-              fieldName="lastClassSurvey"
-              isModifyMode={isModifyMode}
-              onFieldChange={(field, value) => handleFieldChange('lastClassSurvey', value)}
-            >
-              <input
-                type="text"
-                value={classData.lastClassSurvey}
-                onChange={(e) => handleFieldChange('lastClassSurvey', e.target.value)}
-                className="text-sm w-full px-2 py-1 border rounded"
-              />
-            </ModifyFieldWrapper>
-          ) : (
-            <div className="text-sm text-gray-900">{classData.lastClassSurvey}</div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Next Class Survey</label>
-          {isModifyMode ? (
-            <ModifyFieldWrapper
-              originalValue={originalClassData.nextClassSurvey}
-              currentValue={classData.nextClassSurvey}
-              fieldName="nextClassSurvey"
-              isModifyMode={isModifyMode}
-              onFieldChange={(field, value) => handleFieldChange('nextClassSurvey', value)}
-            >
-              <input
-                type="text"
-                value={classData.nextClassSurvey}
-                onChange={(e) => handleFieldChange('nextClassSurvey', e.target.value)}
-                className="text-sm w-full px-2 py-1 border rounded"
-              />
-            </ModifyFieldWrapper>
-          ) : (
-            <div className="text-sm text-gray-900">{classData.nextClassSurvey}</div>
-          )}
-        </div>
+    <div className="text-center py-8">
+      <div className="text-gray-400 text-sm">
+        ⚙️ Backend endpoint not yet implemented
       </div>
-
-      {/* Second row - empty until populated from database */}
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Survey Type</label>
-          <div className="text-sm text-gray-900"></div>
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Class Requirements</label>
-          <div className="text-sm text-gray-900"></div>
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Class Code</label>
-          <div className="text-sm text-gray-900"></div>
-        </div>
-        <div>
-          <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Information</label>
-          <div className="text-sm text-gray-900"></div>
-        </div>
-      </div>
+      <AdminOnly>
+        <p className="text-xs text-gray-500 mt-2">
+          Task 38: Implement component_class_regulatory CRUD endpoints
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Supports MULTIPLE survey rows per component with classification society dropdown (DNV, ABS, Lloyd's Register, ClassNK, RINA, IRS)
+        </p>
+      </AdminOnly>
     </div>
   );
 };
 
-const RequisitionsSection: React.FC = () => {
-  // Empty until populated from database
-  const requisitions: any[] = [];
-
+const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
+  // Future enhancement - component-related requisitions
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view requisitions</div>;
+  }
+  
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Req. ID</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Req. Date</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Title / Description</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Requested Date</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Remarks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {requisitions.map((req, index) => (
-            <tr key={index} className="border-b border-gray-100">
-              <td className="py-3 px-3 text-gray-900">{req.reqId}</td>
-              <td className="py-3 px-3 text-gray-900">{req.reqDate}</td>
-              <td className="py-3 px-3 text-gray-900">{req.titleDescription}</td>
-              <td className="py-3 px-3 text-gray-900">{req.requestedDate}</td>
-              <td className="py-3 px-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  req.status === "Approved" ? "bg-green-100 text-green-800" :
-                  req.status === "Ordered" ? "bg-blue-100 text-blue-800" :
-                  req.status === "Open" ? "bg-yellow-100 text-yellow-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
-                  {req.status}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-gray-900">{req.remarks}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="text-center py-8">
+      <div className="text-gray-400 text-sm">
+        Requisitions section - future enhancement
+      </div>
+      <p className="text-xs text-gray-500 mt-2">
+        Will display component-related purchase and service requisitions
+      </p>
     </div>
   );
 };
@@ -2147,9 +2011,9 @@ const Components: React.FC = () => {
                           ) : section.id === "F" ? (
                             <DrawingsAndManualsSection selectedComponent={selectedComponent} />
                           ) : section.id === "G" ? (
-                            <ClassificationRegulatorySection />
+                            <ClassificationRegulatorySection selectedComponent={selectedComponent} />
                           ) : section.id === "H" ? (
-                            <RequisitionsSection />
+                            <RequisitionsSection selectedComponent={selectedComponent} />
                           ) : (
                             <p className="text-sm text-gray-500">
                               {section.title} content will be added here
