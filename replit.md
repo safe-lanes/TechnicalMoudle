@@ -74,6 +74,14 @@ The application employs a modern full-stack architecture. The frontend is built 
     - **Bulk Data Import**: Supports CSV/Excel import for Machinery Components (SFI hierarchy, validation, multi-vessel support), Jobs, and Spares with enhanced error viewing and partial import capabilities.
     - **Data Purge Functionality**: Admin endpoint for safe deletion of jobs and linked data for a specific vessel or the entire system, adhering to dependency order.
     - **Fleet Admin Dashboard**: Manages master data for makers, fleet components, jobs, and spares using a federated schema design.
+- **Role-Based Access Control (RBAC)** (November 2025):
+    - **Three User Roles**: Ship (vessel-based), Office (shore-based), PMS Admin (full system access)
+    - **User Schema Enhancement**: Enhanced `users` table with role enum, vesselId, fullName, email, isActive, and audit timestamps
+    - **Security**: PublicUser type (password excluded) for client-side use with runtime sanitization to prevent credential leakage
+    - **AuthContext**: Provides role checking (hasRole, isShipUser, isOfficeUser, isPMSAdmin), document access control (canViewDocument, canDownloadDocument), and data modification permissions
+    - **RoleGuard Components**: Generic RoleGuard with requireAll support (AND/OR semantics), AdminOnly, OfficeOrAdmin, ShipOnly convenience components
+    - **Backend Middleware**: requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess for route authorization
+    - **Vessel Data Isolation**: Ship users can only access data for their assigned vessel; Office/Admin have fleet-wide access
 
 ## Database Schema Enhancements for 100% PMS Specification Compliance (November 2025)
 
