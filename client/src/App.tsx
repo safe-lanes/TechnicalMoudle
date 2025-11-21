@@ -3,6 +3,7 @@ import { queryClient } from "@/lib/queryClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Switch, Route, useLocation } from "wouter";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
@@ -16,11 +17,12 @@ import NotFound from "./pages/not-found";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <VesselProvider>
-        <ChangeRequestProvider>
-          <ChangeModeProvider>
-            <TooltipProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <VesselProvider>
+          <ChangeRequestProvider>
+            <ChangeModeProvider>
+              <TooltipProvider>
             <div className="min-h-screen bg-gray-50">
               <Switch>
                 <Route path="/" component={TechnicalModule} />
@@ -71,6 +73,7 @@ function App() {
         </ChangeRequestProvider>
       </VesselProvider>
     </QueryClientProvider>
+    </AuthProvider>
   );
 }
 

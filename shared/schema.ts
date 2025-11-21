@@ -1,21 +1,35 @@
 
-import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, decimal, index, json, numeric, primaryKey, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// User roles enum - Ship (vessel-based user), Office (shore-based user), PMS Admin (full system access)
+export const userRoleEnum = pgEnum("user_role", ["Ship", "Office", "PMS Admin"]);
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  fullName: text("full_name").notNull(),
+  email: text("email"),
+  role: userRoleEnum("role").notNull().default("Ship"),
+  vesselId: text("vessel_id"), // Required for Ship role, null for Office/PMS Admin
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UserRole = "Ship" | "Office" | "PMS Admin";
+
+export type PublicUser = Omit<User, "password">;
 
 // Running Hours Audit Table
 export const runningHoursAudit = pgTable("running_hours_audit", {
