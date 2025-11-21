@@ -1346,16 +1346,16 @@ const Components: React.FC = () => {
     // Create a fresh clone of fetched components to avoid mutating React Query cache
     const clonedComponents = fetchedComponents.map(comp => ({ ...comp }));
     
-    // Start with the 8 hardcoded main categories
+    // Start with the 8 hardcoded main categories (specification-compliant names)
     const mainCategories: ComponentNode[] = [
-      { id: "1", code: "1", name: "Ship General", children: [] },
-      { id: "2", code: "2", name: "Hull", children: [] },
-      { id: "3", code: "3", name: "Equipment for Cargo", children: [] },
-      { id: "4", code: "4", name: "Ship's Equipment", children: [] },
-      { id: "5", code: "5", name: "Equipment for Crew & Passengers", children: [] },
-      { id: "6", code: "6", name: "Machinery Main Components", children: [] },
-      { id: "7", code: "7", name: "Systems for Machinery Main Components", children: [] },
-      { id: "8", code: "8", name: "Ship Common Systems", children: [] }
+      { id: "1", code: "1", name: "1 Ship General", children: [] },
+      { id: "2", code: "2", name: "2 Hull", children: [] },
+      { id: "3", code: "3", name: "3 Equipment for Cargo", children: [] },
+      { id: "4", code: "4", name: "4 Ship's Equipment", children: [] },
+      { id: "5", code: "5", name: "5 Equipment for Crew & Passengers", children: [] },
+      { id: "6", code: "6", name: "6 Machinery Main Components", children: [] },
+      { id: "7", code: "7", name: "7 Systems for Machinery Main Components", children: [] },
+      { id: "8", code: "8", name: "8 Ship Common Systems", children: [] }
     ];
     
     if (!clonedComponents || clonedComponents.length === 0) {
@@ -1431,10 +1431,14 @@ const Components: React.FC = () => {
         // First, recursively filter children
         const filteredChildren = node.children ? filterTree(node.children) : [];
         
-        // Check if this node matches the filters
+        // Check if this node matches the filters - smart search across multiple fields
+        const searchLower = searchTerm.toLowerCase();
         const matchesSearch = !searchTerm || 
-          node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          node.code.toLowerCase().includes(searchTerm.toLowerCase());
+          node.name.toLowerCase().includes(searchLower) ||
+          node.code.toLowerCase().includes(searchLower) ||
+          ((node as any).fleetEquipmentCode ?? "").toLowerCase().includes(searchLower) ||
+          ((node as any).maker ?? "").toLowerCase().includes(searchLower) ||
+          ((node as any).serialNo ?? "").toLowerCase().includes(searchLower);
         
         const matchesCritical = 
           criticalFilter === 'all' ||
@@ -1690,7 +1694,7 @@ const Components: React.FC = () => {
               )}
             </button>
             <span className="text-sm text-gray-700">
-              {node.code} {node.name}
+              {node.name.startsWith(node.code + " ") ? node.name : `${node.code} ${node.name}`}
             </span>
           </div>
           {hasChildren && isExpanded && (
@@ -1900,7 +1904,7 @@ const Components: React.FC = () => {
               <SelectContent>
                 {VESSELS.map(vessel => (
                   <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.id} - {vessel.name}
+                    {vessel.id} – MV {vessel.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1923,7 +1927,7 @@ const Components: React.FC = () => {
           
           <div className="flex items-center gap-2 flex-1">
             <Input
-              placeholder="Search Components..."
+              placeholder="Search by Name, SFI Code, Fleet Equipment Code, Maker, or Serial Number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`max-w-md ${isChangeRequestMode ? 'border-white bg-white/10 text-white placeholder:text-white/70' : ''}`}

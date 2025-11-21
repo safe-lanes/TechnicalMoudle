@@ -8182,6 +8182,61 @@
       "submittedAt": null,
       "reviewedByUserId": null,
       "reviewedAt": null
+    },
+    "4": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Modify Component: 33 DECK CRANES FOR CARGO",
+      "reason": "Component modification request",
+      "targetType": "component",
+      "targetId": "1763482264891_arf6siehc",
+      "snapshotBeforeJson": {
+        "displayKey": "33",
+        "displayName": "DECK CRANES FOR CARGO",
+        "displayPath": "33 DECK CRANES FOR CARGO",
+        "fields": {
+          "id": "1763482264891_arf6siehc",
+          "code": "33",
+          "name": "DECK CRANES FOR CARGO",
+          "maker": "",
+          "model": "",
+          "serialNo": "",
+          "department": "",
+          "location": "",
+          "critical": "",
+          "classItem": "",
+          "commissionedDate": "",
+          "installationDate": "",
+          "rating": "",
+          "conditionBased": "",
+          "noOfUnits": "",
+          "eqptSystemDept": "",
+          "parentComponent": "",
+          "dimensionsSize": "",
+          "notes": ""
+        }
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.makerCode",
+          "oldValue": "g",
+          "newValue": ""
+        },
+        {
+          "field": "componentInfo.isActive",
+          "oldValue": "Yes",
+          "newValue": "No"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "current_user",
+      "id": 4,
+      "createdAt": "2025-11-21T04:22:15.254Z",
+      "updatedAt": "2025-11-21T04:22:15.254Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
     }
   },
   "changeRequestAttachments": [],
@@ -559473,7 +559528,7 @@
     "auditId": 129,
     "spareId": 2,
     "historyId": 7,
-    "changeRequestId": 4,
+    "changeRequestId": 5,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
