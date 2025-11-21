@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock } from "lucide-react";
 import { useVessel } from "@/contexts/VesselContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { AdminOnly } from "@/components/RoleGuard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -923,28 +925,24 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
 };
 
 const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Fetch maintenance history for the selected component
-  const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/component-maintenance-history', selectedComponent?.id],
-    enabled: !!selectedComponent?.id,
-  });
+  // Backend endpoint not yet implemented (Task 39 pending)
+  const maintenanceHistory: any[] = [];
 
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
-  }
-
-  if (isLoading) {
-    return <div className="text-sm text-gray-500">Loading maintenance history...</div>;
   }
 
   if (maintenanceHistory.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="text-gray-400 text-sm">
-          No maintenance history records found for this component
+          ⚙️ Backend endpoint not yet implemented
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          History records are automatically created when work orders are approved and completed
+          Task 39: Implement component_maintenance_history read-only endpoints
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          History records will be automatically created when work orders are approved and completed
         </p>
       </div>
     );
@@ -1014,21 +1012,40 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   );
 };
 
-const SparesSection: React.FC = () => {
+const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { isModifyMode } = useModifyMode();
   
-  // Empty until populated from database
-  const [spares, setSpares] = useState<any[]>([]);
+  // Fetch existing spares data from current API
+  const { data: allSpares = [] } = useQuery<any[]>({
+    queryKey: ['/api/spares'],
+  });
+  
+  // Filter spares by component ID
+  const spares = selectedComponent 
+    ? allSpares.filter(s => s.componentId === selectedComponent.id)
+    : [];
   
   const [originalSpares] = useState(JSON.parse(JSON.stringify(spares)));
   
   const handleFieldChange = (index: number, field: string, value: string) => {
-    const updatedSpares = [...spares];
-    updatedSpares[index] = {
-      ...updatedSpares[index],
-      [field]: value
-    };
-    setSpares(updatedSpares);
+    // ModifyFieldWrapper handles change tracking
+  };
+  
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
+  }
+  
+  if (spares.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-gray-400 text-sm">
+          No spare parts linked to this component
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Navigate to the Spares module to manage spare parts inventory
+        </p>
+      </div>
+    );
   };
 
   return (
@@ -1202,21 +1219,27 @@ const SparesSection: React.FC = () => {
   );
 };
 
-const DrawingsAndManualsSection: React.FC = () => {
-  // Empty until populated from database
+const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
+  // Backend endpoint not yet implemented (Task 37 pending)
   const documents: any[] = [];
-
+  
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view documents</div>;
+  }
+  
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {documents.map((doc, index) => (
-        <div
-          key={index}
-          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer rounded-md"
-        >
-          <doc.icon className="h-5 w-5 text-gray-600" />
-          <span className="text-sm text-gray-700">{doc.name}</span>
-        </div>
-      ))}
+    <div className="text-center py-8">
+      <div className="text-gray-400 text-sm">
+        ⚙️ Backend endpoint not yet implemented
+      </div>
+      <AdminOnly>
+        <p className="text-xs text-gray-500 mt-2">
+          Task 37: Implement component_documents CRUD endpoints with file upload/download
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Will integrate with object storage for technical documents
+        </p>
+      </AdminOnly>
     </div>
   );
 };
@@ -2120,9 +2143,9 @@ const Components: React.FC = () => {
                           ) : section.id === "D" ? (
                             <MaintenanceHistorySection selectedComponent={selectedComponent} />
                           ) : section.id === "E" ? (
-                            <SparesSection />
+                            <SparesSection selectedComponent={selectedComponent} />
                           ) : section.id === "F" ? (
-                            <DrawingsAndManualsSection />
+                            <DrawingsAndManualsSection selectedComponent={selectedComponent} />
                           ) : section.id === "G" ? (
                             <ClassificationRegulatorySection />
                           ) : section.id === "H" ? (
