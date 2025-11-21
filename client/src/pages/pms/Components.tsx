@@ -675,15 +675,34 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   );
 };
 
-const RunningHoursConditionSection: React.FC = () => {
+const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { isChangeRequestMode } = useChangeRequest();
   const { isModifyMode } = useModifyMode();
   
-  // State for running hours data - empty until populated from database
-  const [runningHoursData, setRunningHoursData] = useState({
-    currentHours: "",
-    updatedDate: ""
+  // Fetch running hours audit data for the selected component
+  const { data: runningHoursAudit = [] } = useQuery<any[]>({
+    queryKey: ['/api/running-hours-audit', selectedComponent?.id],
+    enabled: !!selectedComponent?.id,
   });
+  
+  // Get the latest running hours update
+  const latestUpdate = runningHoursAudit.length > 0 ? runningHoursAudit[0] : null;
+  
+  // State for running hours data - initialized from selectedComponent
+  const [runningHoursData, setRunningHoursData] = useState({
+    currentHours: selectedComponent?.currentCumulativeRH || "0.00",
+    updatedDate: selectedComponent?.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
+  });
+  
+  // Update data when selectedComponent changes
+  React.useEffect(() => {
+    if (selectedComponent) {
+      setRunningHoursData({
+        currentHours: selectedComponent.currentCumulativeRH || "0.00",
+        updatedDate: selectedComponent.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
+      });
+    }
+  }, [selectedComponent, latestUpdate]);
   
   const [originalData] = useState(runningHoursData);
   
@@ -692,6 +711,10 @@ const RunningHoursConditionSection: React.FC = () => {
       ...prev,
       [field]: value
     }));
+  };
+  
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view running hours</div>;
   };
   
   return (
@@ -704,7 +727,7 @@ const RunningHoursConditionSection: React.FC = () => {
         </div>
         <div className="flex gap-12 pl-2">
           <div>
-            <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Current</label>
+            <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Current</label>
             {isModifyMode ? (
               <ModifyFieldWrapper
                 originalValue={originalData.currentHours}
@@ -718,14 +741,17 @@ const RunningHoursConditionSection: React.FC = () => {
                   value={runningHoursData.currentHours}
                   onChange={(e) => handleFieldChange('currentHours', e.target.value)}
                   className="text-sm w-full px-2 py-1 border rounded"
+                  data-testid="input-current-hours"
                 />
               </ModifyFieldWrapper>
             ) : (
-              <div className="text-sm font-semibold text-gray-900">{runningHoursData.currentHours}</div>
+              <div className="text-sm font-semibold text-gray-900" data-testid="text-current-hours">
+                {runningHoursData.currentHours}
+              </div>
             )}
           </div>
           <div>
-            <label className="text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1">Updated</label>
+            <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Updated</label>
             {isModifyMode ? (
               <ModifyFieldWrapper
                 originalValue={originalData.updatedDate}
@@ -739,10 +765,13 @@ const RunningHoursConditionSection: React.FC = () => {
                   value={runningHoursData.updatedDate}
                   onChange={(e) => handleFieldChange('updatedDate', e.target.value)}
                   className="text-sm w-full px-2 py-1 border rounded"
+                  data-testid="input-updated-date"
                 />
               </ModifyFieldWrapper>
             ) : (
-              <div className="text-sm font-semibold text-gray-900">{runningHoursData.updatedDate}</div>
+              <div className="text-sm font-semibold text-gray-900" data-testid="text-updated-date">
+                {runningHoursData.updatedDate}
+              </div>
             )}
           </div>
         </div>
@@ -2026,7 +2055,7 @@ const Components: React.FC = () => {
                               }}
                             />
                           ) : section.id === "B" ? (
-                            <RunningHoursConditionSection />
+                            <RunningHoursConditionSection selectedComponent={selectedComponent} />
                           ) : section.id === "C" ? (
                             <WorkOrdersSection 
                               componentCode={selectedComponent?.code || ""} 

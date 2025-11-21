@@ -181,7 +181,7 @@ export const formVersions = pgTable("form_versions", {
   schemaJson: text("schema_json").notNull(), // JSON string
 }, (table) => ({
   formIdIdx: index("idx_form_id").on(table.formId),
-  statusIdx: index("idx_status").on(table.status),
+  statusIdx: index("idx_form_version_status").on(table.status),
 }));
 
 export const insertFormVersionSchema = createInsertSchema(formVersions).omit({
@@ -418,7 +418,7 @@ export const changeRequest = pgTable("change_request", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({
   vesselCategoryIdx: index("idx_vessel_category").on(table.vesselId, table.category),
-  statusIdx: index("idx_status").on(table.status),
+  statusIdx: index("idx_change_request_status").on(table.status),
 }));
 
 export const insertChangeRequestSchema = createInsertSchema(changeRequest).omit({
