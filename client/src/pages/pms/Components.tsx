@@ -922,38 +922,94 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   );
 };
 
-const MaintenanceHistorySection: React.FC = () => {
-  // Empty until populated from database
-  const maintenanceHistory: any[] = [];
+const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
+  // Fetch maintenance history for the selected component
+  const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/component-maintenance-history', selectedComponent?.id],
+    enabled: !!selectedComponent?.id,
+  });
+
+  if (!selectedComponent) {
+    return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
+  }
+
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading maintenance history...</div>;
+  }
+
+  if (maintenanceHistory.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-gray-400 text-sm">
+          No maintenance history records found for this component
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          History records are automatically created when work orders are approved and completed
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Title</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Work Order No</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Assigned to</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Date Completed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {maintenanceHistory.map((record, index) => (
-            <tr key={index} className="border-b border-gray-100">
-              <td className="py-3 px-3 text-gray-900">{record.title}</td>
-              <td className="py-3 px-3 text-gray-900">{record.workOrderNo}</td>
-              <td className="py-3 px-3 text-gray-900">{record.assignedTo}</td>
-              <td className="py-3 px-3">
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {record.status}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-gray-900">{record.dateCompleted}</td>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
+        </div>
+        <div className="text-xs text-gray-500 italic">
+          ⚠️ Records are immutable and cannot be edited or deleted
+        </div>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b-2 border-gray-200">
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">WO No</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Job Title</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Type</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Date Completed</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Running Hours</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Performed By</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Approved By</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700">Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {maintenanceHistory.map((record, index) => (
+              <tr 
+                key={index} 
+                className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
+                data-testid={`maintenance-record-${record.workOrderNo}`}
+              >
+                <td className="py-3 px-3 text-gray-900 font-medium" data-testid={`wo-no-${record.workOrderNo}`}>
+                  {record.workOrderNo}
+                </td>
+                <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${record.workOrderNo}`}>
+                  {record.jobTitle}
+                </td>
+                <td className="py-3 px-3 text-gray-900">{record.maintenanceType}</td>
+                <td className="py-3 px-3 text-gray-900">{record.dateCompleted}</td>
+                <td className="py-3 px-3 text-gray-900">
+                  {record.runningHoursAtCompletion || '-'}
+                </td>
+                <td className="py-3 px-3 text-gray-900">{record.performedBy}</td>
+                <td className="py-3 px-3 text-gray-900">{record.approvedBy || '-'}</td>
+                <td className="py-3 px-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {record.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Expandable Details Section - Future Enhancement */}
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+        💡 Click on a record to view full details including work description, spares used, and remarks (feature coming soon)
+      </div>
     </div>
   );
 };
@@ -2062,7 +2118,7 @@ const Components: React.FC = () => {
                               componentName={selectedComponent?.name || ""} 
                             />
                           ) : section.id === "D" ? (
-                            <MaintenanceHistorySection />
+                            <MaintenanceHistorySection selectedComponent={selectedComponent} />
                           ) : section.id === "E" ? (
                             <SparesSection />
                           ) : section.id === "F" ? (
