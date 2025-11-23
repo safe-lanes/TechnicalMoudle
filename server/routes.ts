@@ -343,6 +343,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Component Documents API routes
+  app.get("/api/component-documents/:componentId", async (req, res) => {
+    try {
+      const documents = await storage.getComponentDocuments(req.params.componentId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Failed to get component documents:", error);
+      res.status(500).json({ error: "Failed to get component documents" });
+    }
+  });
+  
+  app.post("/api/component-documents", async (req, res) => {
+    try {
+      const document = await storage.createComponentDocument(req.body);
+      res.json(document);
+    } catch (error) {
+      console.error("Failed to create component document:", error);
+      res.status(500).json({ error: "Failed to create component document" });
+    }
+  });
+  
+  app.put("/api/component-documents/:id", async (req, res) => {
+    try {
+      const document = await storage.updateComponentDocument(parseInt(req.params.id), req.body);
+      res.json(document);
+    } catch (error) {
+      console.error("Failed to update component document:", error);
+      res.status(500).json({ error: "Failed to update component document" });
+    }
+  });
+  
+  app.delete("/api/component-documents/:id", async (req, res) => {
+    try {
+      await storage.deleteComponentDocument(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete component document:", error);
+      res.status(500).json({ error: "Failed to delete component document" });
+    }
+  });
+  
+  // Component Class Regulatory API routes
+  app.get("/api/component-class-regulatory/:componentId", async (req, res) => {
+    try {
+      const items = await storage.getComponentClassRegulatory(req.params.componentId);
+      res.json(items);
+    } catch (error) {
+      console.error("Failed to get component class regulatory data:", error);
+      res.status(500).json({ error: "Failed to get component class regulatory data" });
+    }
+  });
+  
+  app.post("/api/component-class-regulatory", async (req, res) => {
+    try {
+      const item = await storage.createComponentClassRegulatory(req.body);
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to create component class regulatory:", error);
+      res.status(500).json({ error: "Failed to create component class regulatory" });
+    }
+  });
+  
+  app.put("/api/component-class-regulatory/:id", async (req, res) => {
+    try {
+      const item = await storage.updateComponentClassRegulatory(parseInt(req.params.id), req.body);
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to update component class regulatory:", error);
+      res.status(500).json({ error: "Failed to update component class regulatory" });
+    }
+  });
+  
+  app.delete("/api/component-class-regulatory/:id", async (req, res) => {
+    try {
+      await storage.deleteComponentClassRegulatory(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete component class regulatory:", error);
+      res.status(500).json({ error: "Failed to delete component class regulatory" });
+    }
+  });
+  
+  // Component Maintenance History API routes (read-only)
+  app.get("/api/component-maintenance-history/:componentId", async (req, res) => {
+    try {
+      const history = await storage.getComponentMaintenanceHistory(req.params.componentId);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get component maintenance history:", error);
+      res.status(500).json({ error: "Failed to get component maintenance history" });
+    }
+  });
+  
+  app.get("/api/component-maintenance-history/item/:id", async (req, res) => {
+    try {
+      const item = await storage.getComponentMaintenanceHistoryItem(parseInt(req.params.id));
+      if (!item) {
+        return res.status(404).json({ error: "Maintenance history item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to get maintenance history item:", error);
+      res.status(500).json({ error: "Failed to get maintenance history item" });
+    }
+  });
+  
   // Work Orders API routes
   
   // Get all work orders with optional vessel filter

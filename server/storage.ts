@@ -82,7 +82,15 @@ import {
   type InsertMaker,
   masterLists,
   type MasterList,
-  type InsertMasterList
+  type InsertMasterList,
+  componentDocuments,
+  type ComponentDocument,
+  insertComponentDocumentSchema,
+  componentClassRegulatory,
+  type ComponentClassRegulatory,
+  insertComponentClassRegulatorySchema,
+  componentMaintenanceHistory,
+  type ComponentMaintenanceHistory
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -300,6 +308,24 @@ export interface IStorage {
   getIhmMaintenanceLog(filters: any): Promise<any[]>;
   createIhmMaintenanceLogEntry(entry: any): Promise<any>;
   getIhmStatusReport(vesselId: string): Promise<any[]>;
+  
+  // Component Documents methods
+  getComponentDocuments(componentId: string): Promise<any[]>;
+  getComponentDocument(id: number): Promise<any | undefined>;
+  createComponentDocument(doc: any): Promise<any>;
+  updateComponentDocument(id: number, data: any): Promise<any>;
+  deleteComponentDocument(id: number): Promise<void>;
+  
+  // Component Class Regulatory methods
+  getComponentClassRegulatory(componentId: string): Promise<any[]>;
+  getComponentClassRegulatoryItem(id: number): Promise<any | undefined>;
+  createComponentClassRegulatory(item: any): Promise<any>;
+  updateComponentClassRegulatory(id: number, data: any): Promise<any>;
+  deleteComponentClassRegulatory(id: number): Promise<void>;
+  
+  // Component Maintenance History methods (read-only)
+  getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
+  getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
   
   // Jobs methods (Templates for maintenance jobs linked to components)
   getJobs(vesselId?: string, componentId?: string): Promise<Job[]>;
@@ -2671,6 +2697,95 @@ export class MemStorage implements IStorage {
     }
     
     return report;
+  }
+  
+  // Component Documents implementation
+  private componentDocuments: any[] = [];
+  private currentComponentDocumentId = 1;
+  
+  async getComponentDocuments(componentId: string): Promise<any[]> {
+    return this.componentDocuments.filter(doc => doc.componentId === componentId && !doc.deleted);
+  }
+  
+  async getComponentDocument(id: number): Promise<any | undefined> {
+    return this.componentDocuments.find(doc => doc.id === id && !doc.deleted);
+  }
+  
+  async createComponentDocument(doc: any): Promise<any> {
+    const newDoc = {
+      id: this.currentComponentDocumentId++,
+      ...doc,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deleted: false
+    };
+    this.componentDocuments.push(newDoc);
+    return newDoc;
+  }
+  
+  async updateComponentDocument(id: number, data: any): Promise<any> {
+    const doc = this.componentDocuments.find(d => d.id === id);
+    if (!doc) throw new Error('Document not found');
+    Object.assign(doc, data, { updatedAt: new Date() });
+    return doc;
+  }
+  
+  async deleteComponentDocument(id: number): Promise<void> {
+    const doc = this.componentDocuments.find(d => d.id === id);
+    if (doc) {
+      doc.deleted = true;
+      doc.updatedAt = new Date();
+    }
+  }
+  
+  // Component Class Regulatory implementation
+  private componentClassRegulatory: any[] = [];
+  private currentClassRegulatoryId = 1;
+  
+  async getComponentClassRegulatory(componentId: string): Promise<any[]> {
+    return this.componentClassRegulatory.filter(item => item.componentId === componentId && !item.deleted);
+  }
+  
+  async getComponentClassRegulatoryItem(id: number): Promise<any | undefined> {
+    return this.componentClassRegulatory.find(item => item.id === id && !item.deleted);
+  }
+  
+  async createComponentClassRegulatory(item: any): Promise<any> {
+    const newItem = {
+      id: this.currentClassRegulatoryId++,
+      ...item,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deleted: false
+    };
+    this.componentClassRegulatory.push(newItem);
+    return newItem;
+  }
+  
+  async updateComponentClassRegulatory(id: number, data: any): Promise<any> {
+    const item = this.componentClassRegulatory.find(i => i.id === id);
+    if (!item) throw new Error('Class regulatory item not found');
+    Object.assign(item, data, { updatedAt: new Date() });
+    return item;
+  }
+  
+  async deleteComponentClassRegulatory(id: number): Promise<void> {
+    const item = this.componentClassRegulatory.find(i => i.id === id);
+    if (item) {
+      item.deleted = true;
+      item.updatedAt = new Date();
+    }
+  }
+  
+  // Component Maintenance History implementation (read-only, populated from work orders)
+  private componentMaintenanceHistory: any[] = [];
+  
+  async getComponentMaintenanceHistory(componentId: string): Promise<any[]> {
+    return this.componentMaintenanceHistory.filter(item => item.componentId === componentId);
+  }
+  
+  async getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined> {
+    return this.componentMaintenanceHistory.find(item => item.id === id);
   }
   
   private initializeWorkOrders() {

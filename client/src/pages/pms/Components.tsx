@@ -925,24 +925,28 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
 };
 
 const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Backend endpoint not yet implemented (Task 39 pending)
-  const maintenanceHistory: any[] = [];
+  // Fetch maintenance history for the selected component
+  const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/component-maintenance-history', selectedComponent?.id],
+    enabled: !!selectedComponent?.id,
+  });
 
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
+  }
+  
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading maintenance history...</div>;
   }
 
   if (maintenanceHistory.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="text-gray-400 text-sm">
-          ⚙️ Backend endpoint not yet implemented
+          No maintenance history records found for this component
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          Task 39: Implement component_maintenance_history read-only endpoints
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          History records will be automatically created when work orders are approved and completed
+          History records are automatically created when work orders are approved and completed
         </p>
       </div>
     );
@@ -1220,49 +1224,199 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
 };
 
 const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Backend endpoint not yet implemented (Task 37 pending)
-  const documents: any[] = [];
+  const { canViewDocument, canDownloadDocument } = useAuth();
+  
+  // Fetch documents for the selected component
+  const { data: documents = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/component-documents', selectedComponent?.id],
+    enabled: !!selectedComponent?.id,
+  });
+  
+  const getFileTypeIcon = (fileType: string) => {
+    switch (fileType) {
+      case 'Manual': return FileText;
+      case 'Drawing': return FileImage;
+      case 'Certificate': return FileCheck;
+      default: return File;
+    }
+  };
   
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view documents</div>;
   }
   
-  return (
-    <div className="text-center py-8">
-      <div className="text-gray-400 text-sm">
-        ⚙️ Backend endpoint not yet implemented
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading documents...</div>;
+  }
+  
+  // Filter documents based on role permissions
+  const viewableDocuments = documents.filter(doc => canViewDocument(doc));
+  
+  if (viewableDocuments.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-gray-400 text-sm">
+          No drawings or manuals available for this component
+        </div>
+        <AdminOnly>
+          <p className="text-xs text-gray-500 mt-2">
+            Upload technical documents using object storage integration
+          </p>
+        </AdminOnly>
       </div>
-      <AdminOnly>
-        <p className="text-xs text-gray-500 mt-2">
-          Task 37: Implement component_documents CRUD endpoints with file upload/download
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Will integrate with object storage for technical documents
-        </p>
-      </AdminOnly>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold">{viewableDocuments.length}</span> document(s) available
+        </div>
+        <AdminOnly>
+          <Button size="sm" variant="outline" className="text-xs" data-testid="button-upload-document">
+            <Upload className="h-3 w-3 mr-1" />
+            Upload Document
+          </Button>
+        </AdminOnly>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        {viewableDocuments.map((doc, index) => {
+          const IconComponent = getFileTypeIcon(doc.fileType);
+          const hasDownloadAccess = canDownloadDocument(doc);
+          
+          return (
+            <div
+              key={index}
+              className={`flex items-center gap-3 p-3 rounded-md border ${
+                hasDownloadAccess 
+                  ? 'hover:bg-blue-50 cursor-pointer border-gray-200' 
+                  : 'bg-gray-50 border-gray-100 cursor-not-allowed'
+              }`}
+              data-testid={`document-${doc.fileName || index}`}
+              onClick={() => {
+                if (hasDownloadAccess) {
+                  console.log('Download document:', doc.fileName);
+                }
+              }}
+            >
+              <IconComponent className={`h-5 w-5 ${hasDownloadAccess ? 'text-blue-600' : 'text-gray-400'}`} />
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium truncate ${hasDownloadAccess ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {doc.fileName}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-gray-500">{doc.fileType}</span>
+                  {doc.version && (
+                    <>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-gray-500">v{doc.version}</span>
+                    </>
+                  )}
+                  {!hasDownloadAccess && (
+                    <>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-amber-600 flex items-center gap-1">
+                        <Lock className="h-3 w-3" /> View Only
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {hasDownloadAccess && (
+                <Download className="h-4 w-4 text-gray-400" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+        💡 Document access is controlled by role-based permissions
+      </div>
     </div>
   );
 };
 
 const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Backend endpoint not yet implemented (Task 38 pending)
+  // Fetch class regulatory data for the selected component
+  const { data: classRegData = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/component-class-regulatory', selectedComponent?.id],
+    enabled: !!selectedComponent?.id,
+  });
+  
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view classification & regulatory data</div>;
   }
   
-  return (
-    <div className="text-center py-8">
-      <div className="text-gray-400 text-sm">
-        ⚙️ Backend endpoint not yet implemented
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading classification & regulatory data...</div>;
+  }
+  
+  if (classRegData.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-gray-400 text-sm">
+          No classification & regulatory data found for this component
+        </div>
+        <AdminOnly>
+          <p className="text-xs text-gray-500 mt-2">
+            Add survey records to track classification society requirements
+          </p>
+        </AdminOnly>
       </div>
-      <AdminOnly>
-        <p className="text-xs text-gray-500 mt-2">
-          Task 38: Implement component_class_regulatory CRUD endpoints
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Supports MULTIPLE survey rows per component with classification society dropdown (DNV, ABS, Lloyd's Register, ClassNK, RINA, IRS)
-        </p>
-      </AdminOnly>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold">{classRegData.length}</span> survey record(s)
+        </div>
+        <AdminOnly>
+          <Button size="sm" variant="outline" className="text-xs" data-testid="button-add-survey">
+            <Plus className="h-3 w-3 mr-1" />
+            Add Survey
+          </Button>
+        </AdminOnly>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Classification Society</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Survey Type</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Certificate No.</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Survey</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {classRegData.map((item, index) => (
+              <tr key={index} className="border-b border-gray-100">
+                <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
+                <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
+                <td className="py-3 px-3 text-gray-900">{item.certificateNo}</td>
+                <td className="py-3 px-3 text-gray-900">{item.lastSurveyDate}</td>
+                <td className="py-3 px-3 text-gray-900">{item.nextDueDate}</td>
+                <td className="py-3 px-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    item.status === 'Valid' ? 'bg-green-100 text-green-800' :
+                    item.status === 'Due Soon' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {item.status || 'Valid'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
