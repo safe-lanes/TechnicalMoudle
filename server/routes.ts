@@ -1345,6 +1345,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to auto-generate work orders" });
     }
   });
+  
+  // Backfill jobId for legacy work orders (Task 33)
+  app.post("/api/work-orders/backfill-job-ids", async (req, res) => {
+    try {
+      const vesselId = req.body.vesselId as string | undefined;
+      
+      // Get all work orders (optionally filtered by vessel)
+      const allWorkOrders = await storage.getWorkOrders(vesselId);
+      const workOrdersNeedingJobId = allWorkOrders.filter(wo => !wo.jobId && wo.component && wo.jobTitle);
+      
+      if (workOrdersNeedingJobId.length === 0) {
+        return res.json({
+          checked: allWorkOrders.length,
+          updated: 0,
+          message: "All work orders already have jobId or lack required fields (component, jobTitle)"
+        });
+      }
+      
+      // Get all jobs for efficient lookup
+      const allJobs = await storage.getJobs(vesselId);
+      
+      let updated = 0;
+      const updateResults: Array<{ workOrderId: string; jobId: string | null; reason: string }> = [];
+      
+      for (const wo of workOrdersNeedingJobId) {
+        // Try to match job by component and jobTitle
+        const matchingJob = allJobs.find(j => 
+          j.componentId === wo.component && 
+          j.jobTitle === wo.jobTitle &&
+          (!vesselId || j.vesselId === wo.vesselId)
+        );
+        
+        if (matchingJob) {
+          await storage.updateWorkOrder(wo.id, { jobId: matchingJob.id });
+          updated++;
+          updateResults.push({
+            workOrderId: wo.id,
+            jobId: matchingJob.id,
+            reason: `Matched by component (${wo.component}) + jobTitle ("${wo.jobTitle}")`
+          });
+          console.log(`✅ Backfilled jobId ${matchingJob.id} for work order ${wo.id}`);
+        } else {
+          updateResults.push({
+            workOrderId: wo.id,
+            jobId: null,
+            reason: `No matching job found for component (${wo.component}) + jobTitle ("${wo.jobTitle}")`
+          });
+        }
+      }
+      
+      res.json({
+        checked: allWorkOrders.length,
+        needingBackfill: workOrdersNeedingJobId.length,
+        updated,
+        skipped: workOrdersNeedingJobId.length - updated,
+        details: updateResults.slice(0, 100) // Return first 100 for review
+      });
+    } catch (error: any) {
+      console.error('Backfill jobId error:', error);
+      res.status(500).json({ error: "Failed to backfill jobId" });
+    }
+  });
 
   // Work Order Execution API routes
   
