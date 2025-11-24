@@ -36,9 +36,12 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **PMS Submodules**: Includes CRUD operations for Components (hierarchical tree), Work Orders (automatic status computation), Running Hours, Spares, Reports, Modify PMS, and Admin functionalities.
 - **Jobs vs. Work Orders Architecture**: `Jobs` define maintenance task templates, while `Work Orders` are active/historical execution records, ensuring clear separation.
 - **Work Order Automation**: Real-time status computation and strict filtering by `vesselId`.
+- **Lead Time Warnings**: Color-coded indicators (red ≤3 days, orange ≤7 days, yellow >7 days) display days until work order due date. All work order creation paths (manual, auto-generation, bulk import) persist `jobId` for reliable job linkage. Backend automatically hydrates work orders with `leadTimeValue` and `leadTimeUnit` from linked jobs.
+- **Auto-Calculated Next Due Date**: Work order completion automatically updates parent job's `lastDoneDate` and recalculates `nextDueDate` using `calculateNextDueDate` utility (formula: lastDoneDate + frequencyValue × frequencyUnit) for calendar-based maintenance.
+- **Legacy Data Migration**: Backfill endpoint (`POST /api/work-orders/backfill-job-ids`) safely migrates legacy work orders by matching component + jobTitle to link them with parent jobs.
 - **Defects Module**: Tracks Condition of Class, identifies recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management (dual locations, ROB/Min/Max levels), quick quantity adjustments, bulk upload, transaction history, and work order integration for consumption reconciliation.
-- **Calendar-Based Job Automation**: Automatic `nextDueDate` calculation based on `lastDoneDate + interval`, with robust date normalization and guard logic. Work order completion automatically updates parent job's `lastDoneDate` and recalculates `nextDueDate` for calendar-based maintenance.
+- **Calendar-Based Job Automation**: Automatic `nextDueDate` calculation based on `lastDoneDate + interval`, with robust date normalization and guard logic.
 - **Running Hours Module**: Cascade update system for parent/child components, automatic work order generation, backend validation, and SFI Code navigation.
 - **Components Module Job Display**: Hierarchical job loading to display relevant maintenance tasks from parent and descendant components.
 - **Admin Module**: Bulk data import for various entities, data purge functionality, and a Fleet Admin Dashboard for master data management.
