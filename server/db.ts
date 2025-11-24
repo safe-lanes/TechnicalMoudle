@@ -2,14 +2,47 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
+import { resolvePostgres, getPostgresClient } from './postgresClient';
 
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+/**
+ * DEPRECATED: Use getDb() or getPool() instead
+ * Legacy eager initialization kept for backward compatibility
+ * Will be removed once all importers are updated to use lazy helpers
+ */
+let pool: Pool | undefined;
+let db: ReturnType<typeof drizzle> | undefined;
+
+if (process.env.DATABASE_URL) {
+  // Only initialize if DATABASE_URL is available
+  // This allows the module to be imported without crashing in file-storage mode
+  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  db = drizzle({ client: pool, schema });
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export { pool, db };
+
+/**
+ * Get PostgreSQL database client (lazy, cached)
+ * Preferred over importing db directly
+ */
+export async function getDb() {
+  const postgres = await resolvePostgres();
+  if (!postgres) {
+    throw new Error('PostgreSQL is not available (DATABASE_URL not configured)');
+  }
+  return postgres.db;
+}
+
+/**
+ * Get PostgreSQL connection pool (lazy, cached)
+ * Preferred over importing pool directly
+ */
+export async function getPool() {
+  const postgres = await resolvePostgres();
+  if (!postgres) {
+    throw new Error('PostgreSQL is not available (DATABASE_URL not configured)');
+  }
+  return postgres.pool;
+}

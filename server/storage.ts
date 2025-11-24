@@ -323,9 +323,10 @@ export interface IStorage {
   updateComponentClassRegulatory(id: number, data: any): Promise<any>;
   deleteComponentClassRegulatory(id: number): Promise<void>;
   
-  // Component Maintenance History methods (read-only)
+  // Component Maintenance History methods
   getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
+  createComponentMaintenanceHistory(history: any): Promise<any>;
   
   // Jobs methods (Templates for maintenance jobs linked to components)
   getJobs(vesselId?: string, componentId?: string): Promise<Job[]>;
@@ -2788,6 +2789,21 @@ export class MemStorage implements IStorage {
     return this.componentMaintenanceHistory.find(item => item.id === id);
   }
   
+  async createComponentMaintenanceHistory(history: any): Promise<any> {
+    const id = this.componentMaintenanceHistory.length > 0 
+      ? Math.max(...this.componentMaintenanceHistory.map(h => h.id)) + 1 
+      : 1;
+    
+    const newHistory = {
+      ...history,
+      id,
+      createdAt: new Date()
+    };
+    
+    this.componentMaintenanceHistory.push(newHistory);
+    return newHistory;
+  }
+  
   private initializeWorkOrders() {
     const initialWorkOrders = [
       {
@@ -5061,6 +5077,113 @@ export class PostgresStorage implements IStorage {
       throw new Error(`WorkOrder not found: ${id}`);
     }
     return result[0];
+  }
+
+  // ============= COMPONENT SECTION H - MAINTENANCE HISTORY =============
+  async getComponentMaintenanceHistory(componentId: string): Promise<any[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.componentId, componentId))
+      .orderBy(componentMaintenanceHistory.dateCompleted);
+  }
+
+  async getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.id, id));
+    return result[0];
+  }
+
+  async createComponentMaintenanceHistory(history: any): Promise<any> {
+    const db = await this.getDb();
+    const result = await db.insert(componentMaintenanceHistory)
+      .values(history)
+      .returning();
+    return result[0];
+  }
+
+  // ============= COMPONENT SECTION H - DOCUMENTS =============
+  async getComponentDocuments(componentId: string): Promise<any[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(componentDocuments)
+      .where(eq(componentDocuments.componentId, componentId));
+  }
+
+  async getComponentDocument(id: number): Promise<any | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(componentDocuments)
+      .where(eq(componentDocuments.id, id));
+    return result[0];
+  }
+
+  async createComponentDocument(doc: any): Promise<any> {
+    const db = await this.getDb();
+    const result = await db.insert(componentDocuments)
+      .values(doc)
+      .returning();
+    return result[0];
+  }
+
+  async updateComponentDocument(id: number, data: any): Promise<any> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(componentDocuments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(componentDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComponentDocument(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(componentDocuments)
+      .where(eq(componentDocuments.id, id));
+  }
+
+  // ============= COMPONENT SECTION H - CLASS/REGULATORY =============
+  async getComponentClassRegulatory(componentId: string): Promise<any[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(componentClassRegulatory)
+      .where(eq(componentClassRegulatory.componentId, componentId));
+  }
+
+  async getComponentClassRegulatoryItem(id: number): Promise<any | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(componentClassRegulatory)
+      .where(eq(componentClassRegulatory.id, id));
+    return result[0];
+  }
+
+  async createComponentClassRegulatory(item: any): Promise<any> {
+    const db = await this.getDb();
+    const result = await db.insert(componentClassRegulatory)
+      .values(item)
+      .returning();
+    return result[0];
+  }
+
+  async updateComponentClassRegulatory(id: number, data: any): Promise<any> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(componentClassRegulatory)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(componentClassRegulatory.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComponentClassRegulatory(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(componentClassRegulatory)
+      .where(eq(componentClassRegulatory.id, id));
   }
 
   async getAlertPolicies(): Promise<AlertPolicy[]> {

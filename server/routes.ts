@@ -1103,6 +1103,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'Completed'
       });
       
+      // Auto-populate component_maintenance_history when work order is completed
+      try {
+        // Normalize date to ISO format (YYYY-MM-DD) for proper chronological sorting
+        const normalizeToISO = (isoDate: string | undefined): string => {
+          if (!isoDate) {
+            return new Date().toISOString().split('T')[0];
+          }
+          // Ensure ISO format
+          const date = new Date(isoDate);
+          return date.toISOString().split('T')[0];
+        };
+
+        // Use schema validation for type safety and defaults
+        const historyPayload = {
+          componentId: workOrder.component,
+          componentCode: workOrder.componentCode || component.componentCode,
+          vesselCode: workOrder.vesselId,
+          workOrderId: workOrder.id,
+          workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
+          jobTitle: workOrder.jobTitle || workOrder.jobNo,
+          maintenanceType: workOrder.taskType || 'Servicing',
+          dateCompleted: normalizeToISO(dateOfCompletion),
+          runningHoursAtCompletion: runningHours || null,
+          performedBy: executionData.performedBy || 'Unknown',
+          approvedBy: executionData.approver || null,
+          approvalDate: executionData.approvalDate ? normalizeToISO(executionData.approvalDate) : null,
+          status: 'Approved' as const,
+          workDescription: executionData.workDone || workOrder.jobInstructions || null,
+          sparesUsed: executionData.sparesUsed || null,
+          remarks: executionData.remarks || null,
+          isComponentReplaced: false
+        };
+
+        await storage.createComponentMaintenanceHistory(historyPayload);
+        console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id}`);
+      } catch (historyError) {
+        console.error('Failed to create maintenance history record:', historyError);
+        // Don't fail the work order completion if history creation fails
+      }
+      
       res.json({
         success: true,
         workOrder: updatedWorkOrder,

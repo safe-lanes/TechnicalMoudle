@@ -1274,11 +1274,11 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   workOrderNo: text("work_order_no").notNull(),
   jobTitle: text("job_title").notNull(),
   maintenanceType: text("maintenance_type").notNull(), // 'Inspection' | 'Overhaul' | 'Servicing' | 'Testing' | 'Cleaning' | 'Lubrication' | 'Replacement'
-  dateCompleted: text("date_completed").notNull(), // DD-MMM-YYYY format
+  dateCompleted: text("date_completed").notNull(), // Stored as ISO (YYYY-MM-DD) for sorting, displayed as DD-MMM-YYYY
   runningHoursAtCompletion: decimal("running_hours_at_completion", { precision: 10, scale: 2 }),
   performedBy: text("performed_by").notNull(),
   approvedBy: text("approved_by"),
-  approvalDate: text("approval_date"), // DD-MMM-YYYY format
+  approvalDate: text("approval_date"), // Stored as ISO (YYYY-MM-DD) for sorting, displayed as DD-MMM-YYYY
   status: text("status").notNull().default("Approved"), // Only 'Approved' entries shown in history
   workDescription: text("work_description"),
   sparesUsed: json("spares_used"), // [{partCode, partName, quantity}]
