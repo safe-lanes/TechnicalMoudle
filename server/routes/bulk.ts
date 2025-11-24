@@ -2978,13 +2978,34 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
   const componentCode = String(row['Generated_Component_Code']).trim();
   const component = await storage.getComponent(componentCode);
   
+  // Auto-resolve jobId by matching component and jobTitle
+  let jobId = null;
+  const jobTitle = row['Job_Title'] || '';
+  if (component && jobTitle && vesselId) {
+    try {
+      const jobs = await storage.getJobs(vesselId);
+      const matchingJob = jobs.find(j => 
+        j.componentId === component.id && 
+        j.jobTitle === jobTitle
+      );
+      if (matchingJob) {
+        jobId = matchingJob.id;
+        console.log(`Auto-resolved jobId: ${matchingJob.id} for imported work order with component ${componentCode} and job "${jobTitle}"`);
+      }
+    } catch (error) {
+      console.error('Failed to auto-resolve jobId during bulk import:', error);
+      // Continue without jobId if resolution fails
+    }
+  }
+  
   const workOrderData = {
     vesselId: vesselId || 'V001',
     component: component?.name || row['Component_Name'] || componentCode,
     componentCode: componentCode,
+    jobId: jobId, // Store resolved jobId for reliable lead time hydration
     workOrderNo: row['Job_Code'] || `WO-${Date.now()}`, // Use Job_Code if provided, else temporary
     templateCode: templateCode,
-    jobTitle: row['Job_Title'] || '',
+    jobTitle: jobTitle,
     assignedTo: row['Responsible_Rank'] || '',
     approver: null,
     dueDate: new Date().toISOString(),

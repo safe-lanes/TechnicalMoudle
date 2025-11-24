@@ -895,6 +895,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Converted dueDate from ISO to DD-MM-YYYY: ${workOrderData.dueDate}`);
       }
       
+      // Auto-resolve jobId if not provided but component and jobTitle are available
+      if (!workOrderData.jobId && workOrderData.component && workOrderData.jobTitle && workOrderData.vesselId) {
+        try {
+          const jobs = await storage.getJobs(workOrderData.vesselId);
+          const matchingJob = jobs.find(j => 
+            j.componentId === workOrderData.component && 
+            j.jobTitle === workOrderData.jobTitle
+          );
+          if (matchingJob) {
+            workOrderData = {
+              ...workOrderData,
+              jobId: matchingJob.id
+            };
+            console.log(`Auto-resolved jobId: ${matchingJob.id} for component ${workOrderData.component} and job "${workOrderData.jobTitle}"`);
+          }
+        } catch (error) {
+          console.error('Failed to auto-resolve jobId:', error);
+          // Continue without jobId if resolution fails
+        }
+      }
+      
       // Auto-generate template code if not provided (format: WO-{ComponentCode}-{Year}-{Sequence})
       if (!workOrderData.templateCode && workOrderData.componentCode) {
         const currentYear = new Date().getFullYear().toString();
@@ -1154,7 +1175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           vesselCode: workOrder.vesselId,
           workOrderId: workOrder.id,
           workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
-          jobTitle: workOrder.jobTitle || workOrder.jobNo,
+          jobTitle: workOrder.jobTitle,
           maintenanceType: workOrder.taskType || 'Servicing',
           dateCompleted: normalizeToISO(dateOfCompletion),
           runningHoursAtCompletion: runningHours || null,
@@ -1162,7 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           approvedBy: executionData.approver || null,
           approvalDate: executionData.approvalDate ? normalizeToISO(executionData.approvalDate) : null,
           status: 'Approved' as const,
-          workDescription: executionData.workDone || workOrder.jobInstructions || null,
+          workDescription: executionData.workDone || workOrder.briefWorkDescription || null,
           sparesUsed: executionData.sparesUsed || null,
           remarks: executionData.remarks || null,
           isComponentReplaced: false
@@ -1173,6 +1194,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (historyError) {
         console.error('Failed to create maintenance history record:', historyError);
         // Don't fail the work order completion if history creation fails
+      }
+      
+      // Auto-update parent job's lastDoneDate and recalculate nextDueDate (Task 32)
+      if (workOrder.jobId && workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
+        try {
+          const { calculateNextDueDate } = await import('@shared/dateUtils');
+          const job = await storage.getJob(workOrder.jobId);
+          
+          if (job) {
+            const updates: any = {
+              lastDoneDate: dateOfCompletion // Store completion date as last done
+            };
+            
+            // Recalculate nextDueDate based on lastDoneDate + interval
+            if (job.frequencyValue && job.frequencyUnit) {
+              const nextDue = calculateNextDueDate(
+                dateOfCompletion,
+                job.frequencyValue,
+                job.frequencyUnit
+              );
+              
+              if (nextDue) {
+                updates.nextDueDate = nextDue;
+                console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
+              }
+            }
+            
+            await storage.updateJob(job.id, updates);
+            console.log(`✅ Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+          }
+        } catch (jobUpdateError) {
+          console.error('Failed to update job lastDoneDate and nextDueDate:', jobUpdateError);
+          // Don't fail the work order completion if job update fails
+        }
       }
       
       res.json({

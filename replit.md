@@ -38,7 +38,7 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Work Order Automation**: Real-time status computation and strict filtering by `vesselId`.
 - **Defects Module**: Tracks Condition of Class, identifies recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management (dual locations, ROB/Min/Max levels), quick quantity adjustments, bulk upload, transaction history, and work order integration for consumption reconciliation.
-- **Calendar-Based Job Automation**: Automatic `nextDueDate` calculation based on `lastDoneDate + interval`, with robust date normalization and guard logic.
+- **Calendar-Based Job Automation**: Automatic `nextDueDate` calculation based on `lastDoneDate + interval`, with robust date normalization and guard logic. Work order completion automatically updates parent job's `lastDoneDate` and recalculates `nextDueDate` for calendar-based maintenance.
 - **Running Hours Module**: Cascade update system for parent/child components, automatic work order generation, backend validation, and SFI Code navigation.
 - **Components Module Job Display**: Hierarchical job loading to display relevant maintenance tasks from parent and descendant components.
 - **Admin Module**: Bulk data import for various entities, data purge functionality, and a Fleet Admin Dashboard for master data management.
