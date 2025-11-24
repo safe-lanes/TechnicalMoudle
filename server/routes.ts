@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import formRouter from "./routes/forms";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
+import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, type AuthenticatedRequest } from "./middleware/auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register Running Hours routes from dedicated file
@@ -344,37 +345,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Component Documents API routes
-  app.get("/api/component-documents/:componentId", async (req, res) => {
+  // Component Documents API routes (with file upload support)
+  app.get("/api/component-documents/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
+      // First, verify the component exists and check vessel access
+      const component = await storage.getComponent(req.params.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (component.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access documents for components from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: component.vesselCode
+          });
+        }
+      }
+      
       const documents = await storage.getComponentDocuments(req.params.componentId);
-      res.json(documents);
+      
+      // Filter documents based on user role and permissions
+      const filteredDocuments = documents.filter(doc => {
+        if (!req.user) return false;
+        
+        // PMS Admin and Office can see all documents
+        if (req.user.role === "PMS Admin" || req.user.role === "Office") {
+          return true;
+        }
+        
+        // Ship users can only see documents with canShipView=true (already vessel-scoped above)
+        if (req.user.role === "Ship") {
+          return doc.canShipView;
+        }
+        
+        return false;
+      });
+      
+      res.json(filteredDocuments);
     } catch (error) {
       console.error("Failed to get component documents:", error);
       res.status(500).json({ error: "Failed to get component documents" });
     }
   });
   
-  app.post("/api/component-documents", async (req, res) => {
+  // Upload component document with file (PMS Admin only)
+  app.post("/api/component-documents", requirePMSAdmin, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     try {
-      const document = await storage.createComponentDocument(req.body);
-      res.json(document);
-    } catch (error) {
+      // Enforce file presence - document uploads must include a file
+      if (!req.file) {
+        return res.status(400).json({ error: "File upload required - cannot create document without a file" });
+      }
+      
+      // Validate componentId exists and componentCode matches before processing upload
+      const component = await storage.getComponent(req.body.componentId);
+      if (!component) {
+        return res.status(400).json({ error: "Invalid componentId - component not found" });
+      }
+      
+      // Verify componentCode matches the component
+      if (component.componentCode !== req.body.componentCode) {
+        return res.status(400).json({ 
+          error: "componentCode mismatch - does not match component's code",
+          componentCode: component.componentCode,
+          providedCode: req.body.componentCode
+        });
+      }
+      
+      // Verify vesselCode matches component
+      if (component.vesselCode !== req.body.vesselCode) {
+        return res.status(400).json({ 
+          error: "vesselCode mismatch - does not match component's vessel",
+          componentVessel: component.vesselCode,
+          providedVessel: req.body.vesselCode
+        });
+      }
+      
+      // Upload file to object storage first
+      const timestamp = Date.now();
+      const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileKey = `.private/documents/${component.componentCode}/${timestamp}_${safeFileName}`;
+      const fileSize = req.file.size; // Already a number from multer
+      
+      // Upload to object storage using Google Cloud Storage client
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) {
+        return res.status(500).json({ error: "Object storage not configured" });
+      }
+      
+      try {
+        const bucket = objectStorageClient.bucket(bucketId);
+        const file = bucket.file(fileKey);
+        await file.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype
+          }
+        });
+      } catch (storageError) {
+        console.error("Failed to upload file to object storage:", storageError);
+        return res.status(500).json({ error: "Failed to upload file to object storage" });
+      }
+      
+      // Multer leaves all form fields as strings, so coerce types explicitly
+      // Use validated component data to ensure consistency
+      const coercedBody = {
+        componentId: component.id, // Use validated component data
+        componentCode: component.componentCode, // Use validated component data
+        vesselCode: component.vesselCode, // Use validated component data
+        fleetEquipmentCode: req.body.fleetEquipmentCode || null,
+        fileName: req.body.fileName,
+        fileType: req.body.fileType,
+        version: req.body.version || "1.0",
+        canShipView: req.body.canShipView === 'true' || req.body.canShipView === true,
+        canShipDownload: req.body.canShipDownload === 'true' || req.body.canShipDownload === true,
+        isActive: req.body.isActive === 'true' || req.body.isActive === true || req.body.isActive === undefined,
+        notes: req.body.notes || null,
+        uploadedBy: req.user!.username,
+        fileKey, // Already set from upload
+        fileSize // Already a number from multer
+      };
+      
+      // Now validate with complete, properly-typed data
+      const validatedData = insertComponentDocumentSchema.parse(coercedBody);
+      
+      // Create document in storage atomically
+      try {
+        const document = await storage.createComponentDocument(validatedData);
+        res.json(document);
+      } catch (dbError) {
+        // Rollback: delete uploaded file if DB insert fails
+        console.error("Failed to create document in database, rolling back file upload:", dbError);
+        try {
+          const bucket = objectStorageClient.bucket(bucketId);
+          const file = bucket.file(fileKey);
+          await file.delete();
+        } catch (deleteError) {
+          console.error("Failed to cleanup uploaded file after DB error:", deleteError);
+        }
+        return res.status(500).json({ error: "Failed to create document record" });
+      }
+    } catch (error: any) {
       console.error("Failed to create component document:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid document data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to create component document" });
     }
   });
   
-  app.put("/api/component-documents/:id", async (req, res) => {
+  // Update component document metadata (PMS Admin only)
+  // Note: File replacement not supported - create new document version instead
+  app.put("/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const document = await storage.updateComponentDocument(parseInt(req.params.id), req.body);
+      // Create update schema that excludes immutable fields
+      const updateSchema = insertComponentDocumentSchema.pick({
+        version: true,
+        canShipView: true,
+        canShipDownload: true,
+        isActive: true,
+        notes: true
+      }).partial();
+      
+      // Helper to parse boolean from string/boolean, preserving undefined
+      const parseBoolean = (value: any): boolean | undefined => {
+        if (value === undefined || value === null) return undefined;
+        if (value === true || value === 'true') return true;
+        if (value === false || value === 'false') return false;
+        return undefined; // Invalid value
+      };
+      
+      // Build update object with only provided fields to preserve existing values
+      const updateData: any = {};
+      
+      if (req.body.version !== undefined) {
+        updateData.version = req.body.version;
+      }
+      const parsedCanShipView = parseBoolean(req.body.canShipView);
+      if (parsedCanShipView !== undefined) {
+        updateData.canShipView = parsedCanShipView;
+      }
+      const parsedCanShipDownload = parseBoolean(req.body.canShipDownload);
+      if (parsedCanShipDownload !== undefined) {
+        updateData.canShipDownload = parsedCanShipDownload;
+      }
+      const parsedIsActive = parseBoolean(req.body.isActive);
+      if (parsedIsActive !== undefined) {
+        updateData.isActive = parsedIsActive;
+      }
+      if (req.body.notes !== undefined) {
+        updateData.notes = req.body.notes;
+      }
+      
+      // Validate only the provided fields
+      const validatedData = updateSchema.parse(updateData);
+      
+      const document = await storage.updateComponentDocument(parseInt(req.params.id), validatedData);
       res.json(document);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update component document:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid document data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to update component document" });
     }
   });
   
-  app.delete("/api/component-documents/:id", async (req, res) => {
+  // Soft delete component document (PMS Admin only)
+  app.delete("/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       await storage.deleteComponentDocument(parseInt(req.params.id));
       res.json({ success: true });
@@ -384,9 +563,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Component Class Regulatory API routes
-  app.get("/api/component-class-regulatory/:componentId", async (req, res) => {
+  // Download component document file
+  app.get("/api/component-documents/:id/download", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
+      // Get document by ID using proper storage method
+      const document = await storage.getComponentDocument(parseInt(req.params.id));
+      
+      // Guard: Return 404 immediately if document not found
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Now safely access document properties after existence verified
+      // Verify vessel access for Ship users
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (req.user!.vesselId !== document.vesselCode) {
+          return res.status(403).json({ error: "Cannot access documents from other vessels" });
+        }
+      }
+      
+      // Check download permissions for Ship users
+      if (req.user!.role === "Ship" && !document.canShipDownload) {
+        return res.status(403).json({ error: "Insufficient permissions to download this document" });
+      }
+      
+      // Download from object storage using Google Cloud Storage client
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) {
+        return res.status(500).json({ error: "Object storage not configured" });
+      }
+      
+      const bucket = objectStorageClient.bucket(bucketId);
+      const file = bucket.file(document.fileKey);
+      const [fileBuffer] = await file.download();
+      
+      // Set headers for file download
+      res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Failed to download document:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "Document file not found in storage" });
+      }
+      res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+  
+  // Component Class Regulatory API routes (Read: all authenticated users, Write: Admin only)
+  app.get("/api/component-class-regulatory/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // First, verify the component exists and check vessel access
+      const component = await storage.getComponent(req.params.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping (read-only access)
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (component.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access classification data for components from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: component.vesselCode
+          });
+        }
+      }
+      
       const items = await storage.getComponentClassRegulatory(req.params.componentId);
       res.json(items);
     } catch (error) {
@@ -395,27 +638,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/component-class-regulatory", async (req, res) => {
+  app.post("/api/component-class-regulatory", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const item = await storage.createComponentClassRegulatory(req.body);
+      // insertComponentClassRegulatorySchema already omits id, createdAt, updatedAt
+      const validatedData = insertComponentClassRegulatorySchema.parse({
+        ...req.body,
+        createdBy: req.user!.username,
+        updatedBy: req.user!.username
+      });
+      
+      const item = await storage.createComponentClassRegulatory(validatedData);
       res.json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create component class regulatory:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid class regulatory data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to create component class regulatory" });
     }
   });
   
-  app.put("/api/component-class-regulatory/:id", async (req, res) => {
+  app.put("/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
-      const item = await storage.updateComponentClassRegulatory(parseInt(req.params.id), req.body);
+      // Use partial validation for updates - only validate provided fields
+      const validatedData = insertComponentClassRegulatorySchema.partial().parse({
+        ...req.body,
+        updatedBy: req.user!.username
+      });
+      
+      const item = await storage.updateComponentClassRegulatory(parseInt(req.params.id), validatedData);
       res.json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update component class regulatory:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid class regulatory data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to update component class regulatory" });
     }
   });
   
-  app.delete("/api/component-class-regulatory/:id", async (req, res) => {
+  app.delete("/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       await storage.deleteComponentClassRegulatory(parseInt(req.params.id));
       res.json({ success: true });
@@ -425,9 +687,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Component Maintenance History API routes (read-only)
-  app.get("/api/component-maintenance-history/:componentId", async (req, res) => {
+  // Component Maintenance History API routes (read-only, immutable records)
+  app.get("/api/component-maintenance-history/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
+      // First, verify the component exists and check vessel access
+      const component = await storage.getComponent(req.params.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (component.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access maintenance history for components from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: component.vesselCode
+          });
+        }
+      }
+      
       const history = await storage.getComponentMaintenanceHistory(req.params.componentId);
       res.json(history);
     } catch (error) {
@@ -436,12 +715,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/component-maintenance-history/item/:id", async (req, res) => {
+  app.get("/api/component-maintenance-history/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const item = await storage.getComponentMaintenanceHistoryItem(parseInt(req.params.id));
       if (!item) {
         return res.status(404).json({ error: "Maintenance history item not found" });
       }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (item.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access maintenance history from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: item.vesselCode
+          });
+        }
+      }
+      
       res.json(item);
     } catch (error) {
       console.error("Failed to get maintenance history item:", error);
