@@ -1,8 +1,102 @@
-import { db } from './db';
 import { sql } from 'drizzle-orm';
+import { resolvePostgres } from './postgresClient';
+
+/**
+ * Ensure immutability trigger exists for component_maintenance_history
+ * This function is idempotent and can be called multiple times safely
+ * 
+ * Behavior:
+ * - File-storage mode (no DATABASE_URL): Skips trigger creation, returns void
+ * - PostgreSQL mode: Creates/verifies triggers, throws on failure
+ * 
+ * IMPORTANT: This function throws if trigger creation fails in PostgreSQL mode
+ * to ensure immutability is enforced before serving traffic.
+ */
+export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
+  console.log('🔒 Ensuring immutability trigger for component_maintenance_history...');
+  
+  // Attempt to resolve PostgreSQL client
+  const postgres = await resolvePostgres();
+  
+  // File-storage mode - skip trigger creation
+  if (!postgres) {
+    console.log('⏭️  Skipping immutability trigger setup - DATABASE_URL not configured (using file-based storage)');
+    return;
+  }
+  
+  const { db } = postgres;
+  
+  try {
+    // Create trigger function to prevent modifications
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION prevent_maintenance_history_modification()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        RAISE EXCEPTION 'Maintenance history records are immutable - cannot modify or delete existing records';
+        RETURN NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    
+    // Create BEFORE UPDATE trigger
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS prevent_maintenance_history_update ON component_maintenance_history;
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER prevent_maintenance_history_update
+        BEFORE UPDATE ON component_maintenance_history
+        FOR EACH ROW
+        EXECUTE FUNCTION prevent_maintenance_history_modification();
+    `);
+    
+    // Create BEFORE DELETE trigger
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS prevent_maintenance_history_delete ON component_maintenance_history;
+    `);
+    await db.execute(sql`
+      CREATE TRIGGER prevent_maintenance_history_delete
+        BEFORE DELETE ON component_maintenance_history
+        FOR EACH ROW
+        EXECUTE FUNCTION prevent_maintenance_history_modification();
+    `);
+    
+    // Verify triggers were created successfully
+    const verifyResult = await db.execute(sql`
+      SELECT trigger_name 
+      FROM information_schema.triggers 
+      WHERE event_object_table = 'component_maintenance_history'
+      AND trigger_name IN ('prevent_maintenance_history_update', 'prevent_maintenance_history_delete')
+    `);
+    
+    const triggerCount = (verifyResult.rows as any[]).length;
+    if (triggerCount !== 2) {
+      throw new Error(
+        `Immutability trigger verification failed: Expected 2 triggers, found ${triggerCount}. ` +
+        `Triggers 'prevent_maintenance_history_update' and 'prevent_maintenance_history_delete' must exist.`
+      );
+    }
+    
+    console.log('✅ Immutability triggers verified: component_maintenance_history is now immutable (INSERT-only)');
+  } catch (error: any) {
+    // Throw with context - startup must fail if trigger creation fails
+    throw new Error(
+      `Failed to ensure maintenance history immutability: ${error.message}. ` +
+      `Possible causes: Missing component_maintenance_history table, insufficient database permissions, ` +
+      `or trigger creation error. Server cannot start without immutability enforcement.`
+    );
+  }
+}
 
 export async function initializeDatabase() {
   try {
+    // Lazy load database client using resolver
+    const postgres = await resolvePostgres();
+    if (!postgres) {
+      console.log('⏭️  Skipping database initialization - DATABASE_URL not configured');
+      return false;
+    }
+    
+    const { db } = postgres;
     console.log('🔧 Initializing database tables...');
     
     // Check if tables exist
@@ -491,6 +585,9 @@ export async function initializeDatabase() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_alert_policy ON alert_history(policy_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_alert_triggered ON alert_history(triggered_at)`);
     console.log('✓ Created alert_history table');
+    
+    // Ensure immutability trigger for component_maintenance_history
+    await ensureMaintenanceHistoryImmutability();
     
     console.log('✅ Database initialization complete! All tables created successfully.');
     return true;

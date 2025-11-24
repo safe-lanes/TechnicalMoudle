@@ -15,8 +15,21 @@ import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
 import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, type AuthenticatedRequest } from "./middleware/auth";
+import { ensureMaintenanceHistoryImmutability } from "./initDb";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
+  // In PostgreSQL mode, this will fail fast if trigger creation fails
+  // In file-storage mode, this will skip trigger setup
+  try {
+    await ensureMaintenanceHistoryImmutability();
+  } catch (error: any) {
+    console.error('❌ FATAL: Failed to ensure maintenance history immutability');
+    console.error(error);
+    console.error('Server cannot start without immutability enforcement for component_maintenance_history table');
+    process.exit(1); // Fail fast - do not serve traffic without immutability
+  }
+  
   // Register Running Hours routes from dedicated file
   registerRunningHoursRoutes(app);
   // Set up multer for file uploads
