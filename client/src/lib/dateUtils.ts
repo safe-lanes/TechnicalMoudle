@@ -193,3 +193,91 @@ export function convertLegacyToISO(legacyDate: string | null | undefined): strin
   const date = parseDate(legacyDate);
   return date ? formatForStorage(date) : null;
 }
+
+/**
+ * Calculate lead time warning status for a job
+ * @param nextDueDate - Next due date of the job (ISO format or DD-MMM-YYYY)
+ * @param leadTimeValue - Lead time value (e.g., 7)
+ * @param leadTimeUnit - Lead time unit ('Days' | 'Weeks' | 'Months')
+ * @returns Object with status and details
+ */
+export function calculateLeadTimeStatus(
+  nextDueDate: string | null | undefined,
+  leadTimeValue: number | null | undefined,
+  leadTimeUnit: string | null | undefined
+): {
+  status: 'normal' | 'warning' | 'overdue';
+  daysUntilDue: number | null;
+  daysUntilLeadTime: number | null;
+  isInLeadTimePeriod: boolean;
+} {
+  // Parse the next due date
+  const dueDate = parseDate(nextDueDate);
+  if (!dueDate) {
+    return {
+      status: 'normal',
+      daysUntilDue: null,
+      daysUntilLeadTime: null,
+      isInLeadTimePeriod: false
+    };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+
+  // Calculate days until due
+  const daysUntilDue = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  // If already overdue
+  if (daysUntilDue < 0) {
+    return {
+      status: 'overdue',
+      daysUntilDue,
+      daysUntilLeadTime: null,
+      isInLeadTimePeriod: false
+    };
+  }
+
+  // If no lead time specified, return normal
+  if (!leadTimeValue || !leadTimeUnit) {
+    return {
+      status: 'normal',
+      daysUntilDue,
+      daysUntilLeadTime: null,
+      isInLeadTimePeriod: false
+    };
+  }
+
+  // Convert lead time to days
+  let leadTimeDays = leadTimeValue;
+  switch (leadTimeUnit.toLowerCase()) {
+    case 'weeks':
+      leadTimeDays = leadTimeValue * 7;
+      break;
+    case 'months':
+      leadTimeDays = leadTimeValue * 30; // Approximate
+      break;
+    case 'days':
+    default:
+      leadTimeDays = leadTimeValue;
+  }
+
+  // Calculate lead time threshold date
+  const leadTimeDate = new Date(dueDate);
+  leadTimeDate.setDate(leadTimeDate.getDate() - leadTimeDays);
+  leadTimeDate.setHours(0, 0, 0, 0);
+
+  // Calculate days until lead time
+  const daysUntilLeadTime = Math.floor((leadTimeDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Check if we're in the lead time period
+  const isInLeadTimePeriod = today >= leadTimeDate && today < dueDate;
+
+  return {
+    status: isInLeadTimePeriod ? 'warning' : 'normal',
+    daysUntilDue,
+    daysUntilLeadTime,
+    isInLeadTimePeriod
+  };
+}

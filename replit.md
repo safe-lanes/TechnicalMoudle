@@ -10,10 +10,15 @@ Preferred communication style: Simple, everyday language.
 The application employs a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), ensuring a mobile-first and responsive user experience. The backend is powered by Express.js (TypeScript).
 
 **Storage Configuration**:
-- Primary storage currently uses `PersistentFileStorage` for file-based JSON persistence.
-- `PostgresStorage` is implemented and will be activated upon resolution of environment variable loading.
-- Database migrations are configured using Drizzle ORM.
-- **PostgreSQL Runtime Resolver**: `server/postgresClient.ts` provides cached connection pooling with lazy initialization, preventing socket leaks and supporting dual-mode operation (file-storage vs PostgreSQL).
+- **Development Mode**: Uses `PersistentFileStorage` for file-based JSON persistence (`test-data.json`).
+- **Production Mode**: Will automatically switch to `PostgresStorage` when deployed/published.
+- **Dual-Storage Architecture**: `server/storage.ts` conditionally selects storage based on `DATABASE_URL` availability:
+  - If `process.env.DATABASE_URL` is present → `PostgresStorage` (PostgreSQL)
+  - If `process.env.DATABASE_URL` is absent → `PersistentFileStorage` (JSON file)
+- **Known Limitation**: Replit secrets (including DATABASE_URL) are only available in deployed/published apps, not during local development (`npm run dev`). This is why development mode uses file-based storage.
+- **PostgresStorage Readiness**: Fully implemented with all Component Section H methods (Maintenance History, Documents, Class/Regulatory) ready for production activation.
+- Database migrations are configured using Drizzle ORM (`npm run db:push`).
+- **PostgreSQL Runtime Resolver**: `server/postgresClient.ts` provides cached connection pooling with lazy initialization, preventing socket leaks and supporting dual-mode operation.
 
 **Service Layer Architecture**:
 - A dedicated service layer in `server/services/` organizes business logic by domain, including `jobService`, `workOrderService`, `runningHoursService`, and `componentService`. This layer provides a clean API and validation, with future plans to move orchestration logic fully into services.
@@ -41,8 +46,12 @@ The application employs a modern full-stack architecture. The frontend is built 
 
 **Database Schema Enhancements**:
 - **New Tables**: `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`.
-- **Enhanced Tables**: `jobs` (frequencyType, lead time fields, audit), `components` (componentCategory, makerCode, modelCode, conditionBased, isParent, audit).
+- **Enhanced Tables**: 
+  - `jobs`: frequencyType, lead time fields (leadTimeValue, leadTimeUnit), audit tracking
+  - `components`: componentCategory, makerCode, modelCode, conditionBased, isParent, audit tracking
+  - `work_orders`: jobId field for reliable job linkage and lead time hydration
 - **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only behavior for `component_maintenance_history` table (UPDATE/DELETE operations blocked with error message). Triggers are automatically created/verified on server startup when DATABASE_URL is configured.
+- **Backend Hydration**: Work order API endpoints (`/api/work-orders`) automatically enrich responses with `leadTimeValue` and `leadTimeUnit` from linked jobs, using `jobId` for reliable matching (fallback to `templateCode === jobNo` for legacy data).
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`

@@ -638,6 +638,7 @@ export const workOrders = pgTable("work_orders", {
   vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
   component: text("component").notNull(),
   componentCode: text("component_code"),
+  jobId: text("job_id"), // Reference to jobs.id for reliable lead time hydration
   workOrderNo: text("work_order_no").notNull(),
   templateCode: text("template_code"),
   executionId: text("execution_id"),
@@ -707,6 +708,13 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
 
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
 export type WorkOrder = typeof workOrders.$inferSelect;
+
+// Work Order with hydrated lead time fields from jobs table
+// Used by backend API endpoints that enrich work orders with job metadata
+export type WorkOrderWithLeadTime = WorkOrder & {
+  leadTimeValue?: number | null;
+  leadTimeUnit?: string | null;
+};
 
 // Work Order Executions Table - for tracking historical maintenance records
 export const workOrderExecutions = pgTable("work_order_executions", {

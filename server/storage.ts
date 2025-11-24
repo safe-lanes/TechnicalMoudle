@@ -5401,11 +5401,23 @@ export class PostgresStorage implements IStorage {
   }
 }
 
-// Use file-based storage for Technical Module
-// PostgreSQL migration pending (DATABASE_URL environment variable issue)
+// Dynamic storage selection based on DATABASE_URL availability
 import { PersistentFileStorage } from "./persistentStorage";
 
-const storage: IStorage = new PersistentFileStorage('test-data.json');
-console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
+let storage: IStorage;
+
+// Debug: Check if DATABASE_URL is available
+console.log(`🔍 DATABASE_URL check: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
+if (process.env.DATABASE_URL) {
+  console.log(`📊 DATABASE_URL length: ${process.env.DATABASE_URL.length} characters`);
+}
+
+if (process.env.DATABASE_URL) {
+  storage = new PostgresStorage();
+  console.log("✅ Application configured with PostgresStorage - connected to PostgreSQL database");
+} else {
+  storage = new PersistentFileStorage('test-data.json');
+  console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
+}
 
 export { storage };

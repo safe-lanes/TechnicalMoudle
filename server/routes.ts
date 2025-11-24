@@ -761,18 +761,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselId = req.query.vesselId as string;
       const workOrders = await storage.getWorkOrders(vesselId);
       
-      // Augment each work order with computed status
-      const workOrdersWithComputedStatus = workOrders.map(wo => ({
-        ...wo,
-        computedStatus: computeWorkOrderStatus({
-          dueDate: wo.dueDate,
-          isExecution: wo.isExecution,
-          status: wo.status,
-          completionDateTime: wo.dateCompleted
-        })
-      }));
+      // Fetch jobs to hydrate lead time data
+      const jobs = await storage.getJobs(vesselId);
+      const jobsMap = new Map(jobs.map(job => [job.id, job]));
       
-      res.json(workOrdersWithComputedStatus);
+      // Augment each work order with computed status and lead time data
+      const enrichedWorkOrders = workOrders.map(wo => {
+        // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
+        const job = wo.jobId 
+          ? jobsMap.get(wo.jobId)
+          : wo.templateCode 
+            ? jobs.find(j => j.jobNo === wo.templateCode)
+            : null;
+        
+        return {
+          ...wo,
+          computedStatus: computeWorkOrderStatus({
+            dueDate: wo.dueDate,
+            isExecution: wo.isExecution,
+            status: wo.status,
+            completionDateTime: wo.dateCompleted
+          }),
+          leadTimeValue: job?.leadTimeValue ?? null,
+          leadTimeUnit: job?.leadTimeUnit ?? null
+        };
+      });
+      
+      res.json(enrichedWorkOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work orders" });
     }
@@ -786,18 +801,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      // Augment with computed status
-      const workOrderWithComputedStatus = {
+      // Fetch job to hydrate lead time data
+      let leadTimeValue = null;
+      let leadTimeUnit = null;
+      if (workOrder.vesselId) {
+        const jobs = await storage.getJobs(workOrder.vesselId);
+        // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
+        const job = workOrder.jobId
+          ? jobs.find(j => j.id === workOrder.jobId)
+          : workOrder.templateCode
+            ? jobs.find(j => j.jobNo === workOrder.templateCode)
+            : null;
+        leadTimeValue = job?.leadTimeValue ?? null;
+        leadTimeUnit = job?.leadTimeUnit ?? null;
+      }
+      
+      // Augment with computed status and lead time data
+      const enrichedWorkOrder = {
         ...workOrder,
         computedStatus: computeWorkOrderStatus({
           dueDate: workOrder.dueDate,
           isExecution: workOrder.isExecution,
           status: workOrder.status,
           completionDateTime: workOrder.dateCompleted
-        })
+        }),
+        leadTimeValue,
+        leadTimeUnit
       };
       
-      res.json(workOrderWithComputedStatus);
+      res.json(enrichedWorkOrder);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work order" });
     }
@@ -1220,6 +1252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               vesselId: job.vesselId,
               component: job.componentId,
               componentCode: job.componentCode,
+              jobId: job.id, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
               templateCode: workOrderNo,
               jobTitle: job.jobTitle,

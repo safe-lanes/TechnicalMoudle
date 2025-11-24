@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus, Pen, Timer } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -18,14 +18,14 @@ import UnplannedWorkOrderForm from "@/components/UnplannedWorkOrderForm";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
-import { WorkOrder, InsertWorkOrder } from "@shared/schema";
+import { WorkOrder, InsertWorkOrder, WorkOrderWithLeadTime } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { VESSELS } from "@/lib/vessels";
-import { formatProfessionalDate } from "@/lib/dateUtils";
+import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 
-// Extend WorkOrder type to include computedStatus from backend
-type WorkOrderWithComputedStatus = WorkOrder & {
+// Extend WorkOrderWithLeadTime to include computed status from backend
+type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   computedStatus?: ComputedWorkOrderStatus;
 };
 
@@ -72,13 +72,13 @@ const WorkOrders: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   
-  // Fetch work orders using React Query (includes computedStatus from backend)
-  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithComputedStatus[]>({
+  // Fetch work orders using React Query (includes computedStatus and lead time from backend)
+  const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithHydratedData[]>({
     queryKey: ['/api/work-orders', vesselId],
     queryFn: async () => {
       const response = await fetch(`/api/work-orders?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch work orders');
-      return await response.json() as WorkOrderWithComputedStatus[];
+      return await response.json() as WorkOrderWithHydratedData[];
     },
     enabled: !!vesselId, // Only fetch when vesselId is available
   });
@@ -458,10 +458,40 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className="py-3 px-4 text-gray-900">{workOrder.jobTitle}</td>
                 <td className="py-3 px-4 text-gray-900">{workOrder.assignedTo}</td>
-                <td className="py-3 px-4 text-gray-900">
-                  {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
-                    ? formatProfessionalDate(workOrder.submittedDate)
-                    : formatProfessionalDate(workOrder.dueDate)}
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-900">
+                      {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
+                        ? formatProfessionalDate(workOrder.submittedDate)
+                        : formatProfessionalDate(workOrder.dueDate)}
+                    </span>
+                    {activeTab !== "Pending Approval" && activeTab !== "Completed" && workOrder.dueDate && workOrder.leadTimeValue && workOrder.leadTimeUnit && (() => {
+                      const leadTimeStatus = calculateLeadTimeStatus(
+                        workOrder.dueDate,
+                        workOrder.leadTimeValue,
+                        workOrder.leadTimeUnit
+                      );
+                      
+                      if (leadTimeStatus.isInLeadTimePeriod) {
+                        return (
+                          <div className="relative group">
+                            <AlertTriangle 
+                              className={`h-4 w-4 ${
+                                leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 3 ? 'text-red-600' : 
+                                leadTimeStatus.daysUntilDue !== null && leadTimeStatus.daysUntilDue <= 7 ? 'text-orange-500' : 
+                                'text-yellow-500'
+                              }`}
+                              data-testid={`icon-lead-time-warning-${workOrder.id}`}
+                            />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                              {leadTimeStatus.daysUntilDue} day{leadTimeStatus.daysUntilDue !== 1 ? 's' : ''} until due
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </td>
                 <td className="py-3 px-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
