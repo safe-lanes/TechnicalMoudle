@@ -592,6 +592,8 @@ export const jobs = pgTable("jobs", {
   initialNextDue: text("initial_next_due"), // Initial due date for calendar-based jobs
   lastDoneDate: text("last_done_date"), // Last completion date (DD-MMM-YYYY format)
   nextDueDate: text("next_due_date"), // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar-based jobs)
+  lastDoneRH: text("last_done_rh"), // Last completion running hours (for RH-based jobs)
+  nextDueRH: text("next_due_rh"), // Calculated: lastDoneRH + frequencyValue (for RH-based jobs)
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   classRelated: text("class_related"), // 'Yes' | 'No'
   briefWorkDescription: text("brief_work_description"),

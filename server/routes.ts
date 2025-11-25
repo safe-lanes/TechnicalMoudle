@@ -765,6 +765,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobs = await storage.getJobs(vesselId);
       const jobsMap = new Map(jobs.map(job => [job.id, job]));
       
+      // Fetch all components to hydrate currentRH for RH-based status computation
+      const components = await storage.getComponents(vesselId);
+      const componentsMap = new Map(components.map(comp => [comp.id, comp]));
+      
       // Augment each work order with computed status and lead time data
       const enrichedWorkOrders = workOrders.map(wo => {
         // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
@@ -774,23 +778,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? jobs.find(j => j.jobNo === wo.templateCode)
             : null;
         
+        // Get component to fetch currentCumulativeRH
+        const component = wo.component ? componentsMap.get(wo.component) : null;
+        
+        // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
+        // Robust numeric parsing: handle strings, decimals, empty values
+        const parseRH = (value: string | number | null | undefined): number | undefined => {
+          if (value == null || value === '') return undefined;
+          const num = Number(value);
+          return isNaN(num) ? undefined : num;
+        };
+        
+        const dueRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
+        const currentRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+        
         return {
           ...wo,
           computedStatus: computeWorkOrderStatus({
             dueDate: wo.dueDate,
-            dueRH: wo.dueRH || null,
-            currentRH: null, // Will need component data for RH status - enhance in future
+            dueRH,
+            currentRH,
             isExecution: wo.isExecution,
             status: wo.status,
             completionDateTime: wo.dateCompleted,
-            maintenanceBasis: wo.maintenanceBasis
+            maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined
           }),
           leadTimeValue: job?.leadTimeValue ?? null,
           leadTimeUnit: job?.leadTimeUnit ?? null
         };
       });
       
-      res.json(enrichedWorkOrders);
+      // Sort by spec-compliant priority: Overdue → Grace P → Due → Postponed → Pending Approval → Completed
+      // Then by nearest due date within each status group
+      const statusPriority: Record<string, number> = {
+        'Overdue': 1,
+        'Due (Grace P)': 2,
+        'Due': 3,
+        'Postponed': 4,
+        'Pending Approval': 5,
+        'Active': 6,
+        'Completed': 7,
+        'Rejected': 8
+      };
+      
+      const sortedWorkOrders = enrichedWorkOrders.sort((a, b) => {
+        // First, sort by status priority
+        const aPriority = statusPriority[a.computedStatus] ?? 99;
+        const bPriority = statusPriority[b.computedStatus] ?? 99;
+        
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority;
+        }
+        
+        // Within same status, sort by due date (nearest first) only if both have dates
+        // If one or both lack dates, maintain status priority order (don't demote)
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        
+        // Both have no due date OR one has date and other doesn't - maintain original order
+        // This preserves status priority for RH-based overdue jobs without calendar dates
+        return 0;
+      });
+      
+      res.json(sortedWorkOrders);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch work orders" });
     }
@@ -804,13 +855,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      // Fetch job to hydrate lead time data
+      // Fetch job to hydrate lead time data and RH fields
       let leadTimeValue = null;
       let leadTimeUnit = null;
+      let job = null;
       if (workOrder.vesselId) {
         const jobs = await storage.getJobs(workOrder.vesselId);
         // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
-        const job = workOrder.jobId
+        job = workOrder.jobId
           ? jobs.find(j => j.id === workOrder.jobId)
           : workOrder.templateCode
             ? jobs.find(j => j.jobNo === workOrder.templateCode)
@@ -819,17 +871,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leadTimeUnit = job?.leadTimeUnit ?? null;
       }
       
+      // Fetch component to hydrate currentRH for RH-based status computation
+      const component = workOrder.component ? await storage.getComponent(workOrder.component) : null;
+      
+      // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
+      // Robust numeric parsing: handle strings, decimals, empty values
+      const parseRH = (value: string | number | null | undefined): number | undefined => {
+        if (value == null || value === '') return undefined;
+        const num = Number(value);
+        return isNaN(num) ? undefined : num;
+      };
+      
+      const dueRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
+      const currentRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+      
       // Augment with computed status and lead time data
       const enrichedWorkOrder = {
         ...workOrder,
         computedStatus: computeWorkOrderStatus({
           dueDate: workOrder.dueDate,
-          dueRH: workOrder.dueRH || null,
-          currentRH: null, // Will need component data for RH status - enhance in future
+          dueRH,
+          currentRH,
           isExecution: workOrder.isExecution,
           status: workOrder.status,
           completionDateTime: workOrder.dateCompleted,
-          maintenanceBasis: workOrder.maintenanceBasis
+          maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined
         }),
         leadTimeValue,
         leadTimeUnit
@@ -1273,8 +1339,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Running Hours-based job cycle update
-            if (workOrder.maintenanceBasis === 'Running Hours' && executionData.currentReading) {
-              const currentRH = parseInt(executionData.currentReading);
+            if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
+              const currentRH = parseInt(runningHours);
               if (!isNaN(currentRH)) {
                 updates.lastDoneRH = currentRH;
                 
@@ -1293,6 +1359,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (jobUpdateError) {
           console.error('Failed to update job cycle fields:', jobUpdateError);
           // Don't fail the work order completion if job update fails
+        }
+      }
+      
+      // Auto-deduct consumed spares from inventory and create transaction records
+      if (workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
+        const consumedSpares = workOrder.consumedSpareParts as Array<{
+          partNo: string;
+          description?: string;
+          quantityConsumed: number;
+          comments?: string;
+        }>;
+        
+        for (const consumedSpare of consumedSpares) {
+          if (consumedSpare.quantityConsumed && consumedSpare.quantityConsumed > 0) {
+            try {
+              // Get spare from inventory (match by partNo which corresponds to partCode)
+              const spares = await storage.getSpares(workOrder.vesselId || 'V001');
+              const spare = spares.find(s => s.partCode === consumedSpare.partNo);
+              
+              if (spare) {
+                // Deduct from ROB
+                const newROB = spare.rob - consumedSpare.quantityConsumed;
+                
+                // Update spare inventory
+                await storage.updateSpare(spare.id, {
+                  rob: newROB
+                });
+                
+                console.log(`✅ Deducted ${consumedSpare.quantityConsumed} units of ${consumedSpare.partNo} from inventory (${spare.rob} → ${newROB})`);
+                
+                // Check for low stock alert
+                if (spare.min && newROB < spare.min) {
+                  console.warn(`⚠️  LOW STOCK ALERT: ${consumedSpare.partNo} is below minimum (${newROB} < ${spare.min})`);
+                  // TODO: Complete spare transaction persistence and alert notification system
+                  // Requirements: 1) Create transaction record in spares_transactions table
+                  //               2) Trigger alert notification via alert service
+                  //               3) Ensure atomic ROB updates per WO completion
+                  // Current implementation: ROB deduction is working, transaction/alert stubs pending
+                }
+              } else {
+                console.warn(`⚠️  Spare ${consumedSpare.partNo} not found in inventory - skipping deduction`);
+              }
+            } catch (spareError) {
+              console.error(`Failed to deduct spare ${consumedSpare.partNo}:`, spareError);
+              // Don't fail the work order completion if spare deduction fails
+            }
+          }
         }
       }
       
@@ -1323,7 +1436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Auto-generate work orders for Calendar-based jobs that have reached their Next Due Date
+  // Auto-generate work orders for Calendar-based and RH-based jobs that have reached their lead time threshold
   app.post("/api/work-orders/auto-generate", async (req, res) => {
     try {
       const vesselId = req.body.vesselId as string;
@@ -1331,11 +1444,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "vesselId is required" });
       }
       
-      // Get all Calendar-based jobs for the vessel
+      // Get all active jobs for the vessel
       const allJobs = await storage.getJobs(vesselId);
       const calendarJobs = allJobs.filter(job => 
         job.maintenanceBasis === 'Calendar' && 
         job.nextDueDate && 
+        job.isActive !== false
+      );
+      const rhJobs = allJobs.filter(job =>
+        job.maintenanceBasis === 'Running Hours' &&
+        job.nextDueRH &&
         job.isActive !== false
       );
       
@@ -1351,12 +1469,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       const results = {
-        checked: calendarJobs.length,
+        checked: calendarJobs.length + rhJobs.length,
         generated: 0,
         workOrders: [] as any[]
       };
       
-      // Check each job to see if it should generate a work order
+      // Fetch all components to get currentRH for RH-based jobs
+      const allComponents = await storage.getComponents(vesselId);
+      const componentsMap = new Map(allComponents.map(c => [c.id, c]));
+      
+      // Process Calendar-based jobs
       for (const job of calendarJobs) {
         const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate);
         
@@ -1403,6 +1525,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
             activeWorkOrderKeys.add(workOrderKey);
             
             console.log(`✅ Auto-generated work order ${workOrderNo} for job ${job.jobNo} (${job.jobTitle})`);
+          }
+        }
+      }
+      
+      // Process Running Hours-based jobs
+      for (const job of rhJobs) {
+        // Get component to check current RH
+        const component = componentsMap.get(job.componentId);
+        if (!component) {
+          console.warn(`⚠️  Component ${job.componentId} not found for RH job ${job.jobNo} - skipping`);
+          continue;
+        }
+        
+        const currentRH = parseInt(component.currentCumulativeRH || '0');
+        const dueRH = parseInt(job.nextDueRH || '0');
+        const leadTime = job.leadTimeValue || 0; // Lead time in hours for RH jobs
+        
+        // Check if we should generate (current RH >= due RH - lead time)
+        const shouldGenerate = currentRH >= (dueRH - leadTime);
+        
+        if (shouldGenerate) {
+          // O(1) duplicate check using Set
+          const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
+          
+          if (!activeWorkOrderKeys.has(workOrderKey)) {
+            // Generate spec-compliant work order number
+            const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
+            const jobCode = job.jobNo || 'JOB-UNKNOWN';
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, vesselId);
+            
+            const workOrderData = {
+              vesselId: job.vesselId,
+              component: job.componentId,
+              componentCode: job.componentCode,
+              jobId: job.id, // Store job ID for reliable lead time hydration
+              workOrderNo: workOrderNo,
+              workOrderType: 'Planned' as const,
+              templateCode: workOrderNo,
+              jobTitle: job.jobTitle,
+              assignedTo: job.assignedTo || 'Unassigned',
+              dueDate: null, // RH-based jobs don't have calendar due dates
+              status: 'Active',
+              taskType: job.maintenanceType,
+              maintenanceBasis: job.maintenanceBasis,
+              frequencyValue: job.frequencyValue?.toString(),
+              frequencyUnit: 'Hours', // RH-based jobs use hours
+              jobPriority: job.jobPriority,
+              classRelated: job.classRelated,
+              briefWorkDescription: job.briefWorkDescription,
+              department: job.department,
+              requiredSpareParts: job.requiredSpareParts || [],
+              requiredTools: job.requiredTools || [],
+              safetyRequirements: job.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []}
+            };
+            
+            const createdWO = await storage.createWorkOrder(workOrderData);
+            results.generated++;
+            results.workOrders.push(createdWO);
+            
+            // Add to Set to prevent duplicate generation in same run
+            activeWorkOrderKeys.add(workOrderKey);
+            
+            console.log(`✅ Auto-generated RH-based work order ${workOrderNo} for job ${job.jobNo} (${job.jobTitle}) - Current RH: ${currentRH}, Due RH: ${dueRH}`);
           }
         }
       }
