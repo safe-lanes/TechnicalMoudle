@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ComponentRegisterForm from "@/components/ComponentRegisterForm";
 import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
+import AddEditComponentForm from "@/components/AddEditComponentForm";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
@@ -2226,7 +2227,7 @@ const Components: React.FC = () => {
       </div>
 
       {/* Component Register Form */}
-      {/* Use CR form when in change request mode, regular form otherwise */}
+      {/* Use CR form when in change request mode, AddEditComponentForm otherwise */}
       {isChangeRequestMode ? (
         <ComponentRegisterFormCR
           isOpen={isComponentFormOpen}
@@ -2241,8 +2242,30 @@ const Components: React.FC = () => {
           selectedComponent={selectedComponent}
         />
       ) : (
-        <ComponentRegisterForm 
+        <AddEditComponentForm 
           isOpen={isComponentFormOpen}
+          onClose={() => {
+            setIsComponentFormOpen(false);
+            // If in change mode and closing without submitting, go back to ModifyPMS
+            if (isChangeMode) {
+              exitChangeRequestMode();
+              reset();
+              setLocation("/pms/modify-pms");
+            }
+          }}
+          componentId={null}
+          parentComponent={selectedComponent ? { 
+            code: selectedComponent.code, 
+            id: selectedComponent.id, 
+            name: selectedComponent.name 
+          } : undefined}
+        />
+      )}
+
+      {/* OLD FORM CODE KEPT FOR REFERENCE - TO BE REMOVED AFTER TESTING */}
+      {false && (
+        <ComponentRegisterForm 
+          isOpen={false}
           onClose={() => {
             setIsComponentFormOpen(false);
             // If in change mode and closing without submitting, go back to ModifyPMS
