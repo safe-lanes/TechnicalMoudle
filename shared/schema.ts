@@ -397,6 +397,51 @@ export const insertStoresLedgerSchema = createInsertSchema(storesLedger).omit({
 export type InsertStoresLedger = z.infer<typeof insertStoresLedgerSchema>;
 export type StoresLedger = typeof storesLedger.$inferSelect;
 
+// Stores Items Table - ZERO PMS LINKAGES (no componentId, workOrderId, jobId)
+// Stores module is completely isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2
+export const storesItems = pgTable("stores_items", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  itemType: text("item_type").notNull(), // 'stores' | 'lubricants' | 'chemicals' | 'others'
+  itemCode: text("item_code").notNull(), // Unique item identifier
+  itemName: text("item_name").notNull(),
+  specification: text("specification"), // Technical specs (size, dimensions, material)
+  uom: text("uom"), // Unit of measurement
+  rob: decimal("rob", { precision: 10, scale: 2 }).notNull().default("0"), // Remaining on Board (total)
+  robLocationA: decimal("rob_location_a", { precision: 10, scale: 2 }).notNull().default("0"), // ROB at Location A
+  robLocationB: decimal("rob_location_b", { precision: 10, scale: 2 }).notNull().default("0"), // ROB at Location B
+  locationA: text("location_a"), // Primary storage location name
+  locationB: text("location_b"), // Secondary storage location name
+  min: decimal("min", { precision: 10, scale: 2 }).notNull().default("0"), // Minimum stock level
+  max: decimal("max", { precision: 10, scale: 2 }), // Maximum stock level
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // Cost per unit
+  supplier: text("supplier"), // Supplier name
+  lastOrderDate: text("last_order_date"), // Last procurement date (DD-MMM-YYYY)
+  leadTime: text("lead_time"), // Procurement lead time
+  ihm: boolean("ihm").notNull().default(false), // Inventory of Hazardous Materials flag
+  ihmDetails: text("ihm_details"), // IHM related information
+  remarks: text("remarks"), // User notes
+  deleted: boolean("deleted").notNull().default(false), // Soft delete flag
+  isActive: boolean("is_active").notNull().default(true), // Active status
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdIdx: index("idx_stores_vessel").on(table.vesselId),
+  itemTypeIdx: index("idx_stores_item_type").on(table.itemType),
+  itemCodeIdx: index("idx_stores_item_code").on(table.vesselId, table.itemCode),
+  deletedIdx: index("idx_stores_deleted").on(table.deleted),
+}));
+
+export const insertStoresItemSchema = createInsertSchema(storesItems).omit({
+  id: true,
+  deleted: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertStoresItem = z.infer<typeof insertStoresItemSchema>;
+export type StoresItem = typeof storesItems.$inferSelect;
+
 // Change Request Tables for Modify PMS module
 export const changeRequest = pgTable("change_request", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

@@ -2546,12 +2546,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Stores endpoints (mirroring spares structure)
+  // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   app.get("/api/stores/:vesselId", async (req, res) => {
     try {
-      // Note: stores are stored in the same table as spares
-      // For now, return all spares - filtering can be done on frontend if needed
-      const stores = await storage.getSpares(req.params.vesselId);
+      const { itemType } = req.query;
+      const stores = await storage.getStoresItems(
+        req.params.vesselId,
+        itemType as string | undefined
+      );
       res.json(stores);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores" });
@@ -2561,11 +2563,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stores/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      // getSpareHistory only takes vesselId as parameter
-      const history = await storage.getSpareHistory(vesselId);
+      const { itemType } = req.query;
+      const history = await storage.getStoresTransactionHistory(
+        vesselId,
+        itemType as string | undefined
+      );
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stores history" });
+    }
+  });
+  
+  app.get("/api/stores/item/:id/history", async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      const history = await storage.getStoresItemHistory(itemId);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch item history" });
+    }
+  });
+  
+  app.post("/api/stores/:vesselId/create", async (req, res) => {
+    try {
+      const item = await storage.createStoresItem(req.body);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to create stores item" });
+    }
+  });
+  
+  app.put("/api/stores/item/:id", async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      const item = await storage.updateStoresItem(itemId, req.body);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to update stores item" });
+    }
+  });
+  
+  app.delete("/api/stores/item/:id", async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      await storage.deleteStoresItem(itemId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to delete stores item" });
     }
   });
   
@@ -2580,12 +2624,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const results = [];
       for (const item of items) {
-        // consumeSpare signature: (id, quantity, userId, remarks?, place?, dateLocal?, tz?)
-        const result = await storage.consumeSpare(
-          item.spareId,
+        const result = await storage.consumeStoresItem(
+          item.itemId,
           item.quantity,
-          consumedBy || 'System', // userId parameter
-          item.notes // remarks parameter
+          item.location || 'A',
+          consumedBy || 'System',
+          item.notes,
+          item.place,
+          item.dateLocal,
+          item.tz
         );
         results.push(result);
       }
@@ -2607,13 +2654,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const results = [];
       for (const item of items) {
-        const result = await storage.receiveSpare(
-          item.spareId,
+        const result = await storage.receiveStoresItem(
+          item.itemId,
           item.quantity,
-          item.unitCost,
-          purchaseOrderRef,
+          item.location || 'A',
           receivedBy || 'System',
-          item.notes
+          item.notes,
+          purchaseOrderRef,
+          item.place,
+          item.dateLocal,
+          item.tz
         );
         results.push(result);
       }

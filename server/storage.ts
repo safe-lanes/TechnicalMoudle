@@ -90,7 +90,13 @@ import {
   type ComponentClassRegulatory,
   insertComponentClassRegulatorySchema,
   componentMaintenanceHistory,
-  type ComponentMaintenanceHistory
+  type ComponentMaintenanceHistory,
+  storesItems,
+  type StoresItem,
+  type InsertStoresItem,
+  storesLedger,
+  type StoresLedger,
+  type InsertStoresLedger
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -458,6 +464,17 @@ export interface IStorage {
     deletedRunningHoursAudits: number;
     componentsReset: number;
   }>;
+  
+  // Stores methods - ZERO PMS linkages (no componentId, workOrderId, jobId)
+  getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]>;
+  getStoresItem(id: number): Promise<StoresItem | undefined>;
+  createStoresItem(item: InsertStoresItem): Promise<StoresItem>;
+  updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem>;
+  deleteStoresItem(id: number): Promise<void>;
+  consumeStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  receiveStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
+  getStoresItemHistory(itemId: number): Promise<StoresLedger[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -544,6 +561,10 @@ export class MemStorage implements IStorage {
   private currentMakerId: number;
   private masterLists: Map<number, MasterList>;
   private currentMasterListId: number;
+  private storesItems: Map<number, StoresItem>;
+  private currentStoresItemId: number;
+  private storesLedger: StoresLedger[];
+  private currentStoresLedgerId: number;
 
   constructor() {
     this.users = new Map();
@@ -593,6 +614,10 @@ export class MemStorage implements IStorage {
     this.currentMakerId = 1;
     this.masterLists = new Map();
     this.currentMasterListId = 1;
+    this.storesItems = new Map();
+    this.currentStoresItemId = 1;
+    this.storesLedger = [];
+    this.currentStoresLedgerId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -3984,6 +4009,207 @@ export class MemStorage implements IStorage {
   async deleteMasterList(id: number): Promise<void> {
     this.masterLists.delete(id);
   }
+
+  // ============= STORES METHODS - ZERO PMS LINKAGES =============
+  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+    const items = Array.from(this.storesItems.values()).filter(
+      (item) => item.vesselId === vesselId && !item.deleted && (itemType ? item.itemType === itemType : true)
+    );
+    return items;
+  }
+
+  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+    return this.storesItems.get(id);
+  }
+
+  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+    const id = this.currentStoresItemId++;
+    const now = new Date();
+    const newItem: StoresItem = {
+      id,
+      ...item,
+      rob: item.rob || "0",
+      robLocationA: item.robLocationA || "0",
+      robLocationB: item.robLocationB || "0",
+      min: item.min || "0",
+      deleted: false,
+      isActive: item.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.storesItems.set(id, newItem);
+    return newItem;
+  }
+
+  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+    const existing = this.storesItems.get(id);
+    if (!existing) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    const updated: StoresItem = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.storesItems.set(id, updated);
+    return updated;
+  }
+
+  async deleteStoresItem(id: number): Promise<void> {
+    const existing = this.storesItems.get(id);
+    if (existing) {
+      existing.deleted = true;
+      existing.updatedAt = new Date();
+      this.storesItems.set(id, existing);
+    }
+  }
+
+  async consumeStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const item = this.storesItems.get(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA) : Number(item.robLocationB);
+    
+    if (qtyNum > locationRob) {
+      console.warn(`Insufficient stock at location ${location}. Consuming all available.`);
+    }
+
+    const actualConsumed = Math.min(qtyNum, locationRob);
+    const newLocationRob = Math.max(0, locationRob - qtyNum);
+    const newTotalRob = Number(item.rob) - actualConsumed;
+
+    const updated: StoresItem = {
+      ...item,
+      rob: String(Math.max(0, newTotalRob)),
+      robLocationA: location === 'A' ? String(newLocationRob) : item.robLocationA,
+      robLocationB: location === 'B' ? String(newLocationRob) : item.robLocationB,
+      updatedAt: new Date(),
+    };
+
+    this.storesItems.set(id, updated);
+
+    // Create ledger entry
+    const ledgerEntry: StoresLedger = {
+      id: this.currentStoresLedgerId++,
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom || '',
+      eventType: 'CONSUME',
+      qtyChangeBase: String(-actualConsumed),
+      qtyDisplay: String(-actualConsumed),
+      uomDisplay: item.uom || '',
+      robAfterBase: updated.rob,
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || '',
+      userId,
+      remarks: remarks || '',
+    };
+    this.storesLedger.push(ledgerEntry);
+
+    return updated;
+  }
+
+  async receiveStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    ref?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const item = this.storesItems.get(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA) : Number(item.robLocationB);
+    const newLocationRob = locationRob + qtyNum;
+    const newTotalRob = Number(item.rob) + qtyNum;
+
+    const updated: StoresItem = {
+      ...item,
+      rob: String(newTotalRob),
+      robLocationA: location === 'A' ? String(newLocationRob) : item.robLocationA,
+      robLocationB: location === 'B' ? String(newLocationRob) : item.robLocationB,
+      updatedAt: new Date(),
+    };
+
+    this.storesItems.set(id, updated);
+
+    // Create ledger entry
+    const ledgerEntry: StoresLedger = {
+      id: this.currentStoresLedgerId++,
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom || '',
+      eventType: 'RECEIVE',
+      qtyChangeBase: String(qtyNum),
+      qtyDisplay: String(qtyNum),
+      uomDisplay: item.uom || '',
+      robAfterBase: updated.rob,
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || '',
+      ref: ref || '',
+      userId,
+      remarks: remarks || '',
+    };
+    this.storesLedger.push(ledgerEntry);
+
+    return updated;
+  }
+
+  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+    return this.storesLedger.filter(
+      (entry) => entry.vesselId === vesselId && (itemType ? entry.section === itemType : true)
+    );
+  }
+
+  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+    return this.storesLedger.filter((entry) => entry.itemId === itemId);
+  }
+
+  async purgeJobsAndLinkedData(vesselId?: string): Promise<{
+    deletedWorkOrderExecutions: number;
+    deletedWorkOrders: number;
+    deletedJobs: number;
+    deletedRunningHoursAudits: number;
+    componentsReset: number;
+  }> {
+    // Not implemented in MemStorage
+    return {
+      deletedWorkOrderExecutions: 0,
+      deletedWorkOrders: 0,
+      deletedJobs: 0,
+      deletedRunningHoursAudits: 0,
+      componentsReset: 0,
+    };
+  }
 }
 
 export class PostgresStorage implements IStorage {
@@ -5388,6 +5614,223 @@ export class PostgresStorage implements IStorage {
 
   async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
     throw new Error("Create vessel not yet migrated to PostgreSQL");
+  }
+
+  // ============= STORES METHODS - ZERO PMS LINKAGES =============
+  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const { storesItems } = await import('@shared/schema');
+    
+    let query = db.select().from(storesItems)
+      .where(
+        and(
+          eq(storesItems.vesselId, vesselId),
+          eq(storesItems.deleted, false),
+          itemType ? eq(storesItems.itemType, itemType) : undefined
+        )
+      );
+    
+    return await query;
+  }
+
+  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesItems } = await import('@shared/schema');
+    
+    const result = await db.select().from(storesItems)
+      .where(eq(storesItems.id, id));
+    return result[0];
+  }
+
+  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+    const db = await this.getDb();
+    const { storesItems } = await import('@shared/schema');
+    
+    const result = await db.insert(storesItems)
+      .values({
+        ...item,
+        rob: item.rob || "0",
+        robLocationA: item.robLocationA || "0",
+        robLocationB: item.robLocationB || "0",
+        min: item.min || "0",
+      })
+      .returning();
+    return result[0];
+  }
+
+  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesItems } = await import('@shared/schema');
+    
+    const result = await db.update(storesItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(storesItems.id, id))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteStoresItem(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesItems } = await import('@shared/schema');
+    
+    await db.update(storesItems)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(eq(storesItems.id, id));
+  }
+
+  async consumeStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesItems, storesLedger } = await import('@shared/schema');
+    
+    const [item] = await db.select().from(storesItems).where(eq(storesItems.id, id));
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA) : Number(item.robLocationB);
+    
+    if (qtyNum > locationRob) {
+      console.warn(`Insufficient stock at location ${location}. Consuming all available.`);
+    }
+
+    const actualConsumed = Math.min(qtyNum, locationRob);
+    const newLocationRob = Math.max(0, locationRob - qtyNum);
+    const newTotalRob = Number(item.rob) - actualConsumed;
+
+    const [updated] = await db.update(storesItems)
+      .set({
+        rob: String(Math.max(0, newTotalRob)),
+        robLocationA: location === 'A' ? String(newLocationRob) : item.robLocationA,
+        robLocationB: location === 'B' ? String(newLocationRob) : item.robLocationB,
+        updatedAt: new Date(),
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    // Create ledger entry
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom || '',
+      eventType: 'CONSUME',
+      qtyChangeBase: String(-actualConsumed),
+      qtyDisplay: String(-actualConsumed),
+      uomDisplay: item.uom || '',
+      robAfterBase: updated.rob,
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || '',
+      userId,
+      remarks: remarks || '',
+    });
+
+    return updated;
+  }
+
+  async receiveStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    ref?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesItems, storesLedger } = await import('@shared/schema');
+    
+    const [item] = await db.select().from(storesItems).where(eq(storesItems.id, id));
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA) : Number(item.robLocationB);
+    const newLocationRob = locationRob + qtyNum;
+    const newTotalRob = Number(item.rob) + qtyNum;
+
+    const [updated] = await db.update(storesItems)
+      .set({
+        rob: String(newTotalRob),
+        robLocationA: location === 'A' ? String(newLocationRob) : item.robLocationA,
+        robLocationB: location === 'B' ? String(newLocationRob) : item.robLocationB,
+        updatedAt: new Date(),
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    // Create ledger entry
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom || '',
+      eventType: 'RECEIVE',
+      qtyChangeBase: String(qtyNum),
+      qtyDisplay: String(qtyNum),
+      uomDisplay: item.uom || '',
+      robAfterBase: updated.rob,
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || '',
+      ref: ref || '',
+      userId,
+      remarks: remarks || '',
+    });
+
+    return updated;
+  }
+
+  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const { storesLedger } = await import('@shared/schema');
+    
+    return await db.select().from(storesLedger)
+      .where(
+        and(
+          eq(storesLedger.vesselId, vesselId),
+          itemType ? eq(storesLedger.section, itemType) : undefined
+        )
+      );
+  }
+
+  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const { storesLedger } = await import('@shared/schema');
+    
+    return await db.select().from(storesLedger)
+      .where(eq(storesLedger.itemId, itemId));
   }
   
   async purgeJobsAndLinkedData(vesselId?: string): Promise<{
