@@ -1447,6 +1447,7 @@ const Components: React.FC = () => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H"]));
   const [isComponentFormOpen, setIsComponentFormOpen] = useState(false);
+  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
   const [showReviewDrawer, setShowReviewDrawer] = useState(false);
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [modifiedComponentData, setModifiedComponentData] = useState<any>(null);
@@ -2013,9 +2014,13 @@ const Components: React.FC = () => {
           {!isChangeRequestMode && !isChangeMode && (
             <Button 
               className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
-              onClick={() => setIsComponentFormOpen(true)}
+              onClick={() => {
+                setEditingComponentId(null);
+                setIsComponentFormOpen(true);
+              }}
+              data-testid="button-add-component"
             >
-              + Add / Edit Component
+              + Add Component
             </Button>
           )}
         </div>
@@ -2083,9 +2088,26 @@ const Components: React.FC = () => {
           {selectedComponent ? (
             <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
-                <h3 className="text-lg font-semibold text-[#15569e]">
-                  {selectedComponent.code} {selectedComponent.name}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-[#15569e]">
+                    {selectedComponent.code} {selectedComponent.name}
+                  </h3>
+                  {!isChangeRequestMode && !isChangeMode && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
+                      onClick={() => {
+                        setEditingComponentId(selectedComponent.id);
+                        setIsComponentFormOpen(true);
+                      }}
+                      data-testid="button-edit-component"
+                    >
+                      <Edit2 className="h-4 w-4 mr-1" />
+                      Edit Component
+                    </Button>
+                  )}
+                </div>
                 
                 {/* Preview Mode Banner */}
                 {isPreviewMode && changeRequestData && (
@@ -2246,6 +2268,7 @@ const Components: React.FC = () => {
           isOpen={isComponentFormOpen}
           onClose={() => {
             setIsComponentFormOpen(false);
+            setEditingComponentId(null);
             // If in change mode and closing without submitting, go back to ModifyPMS
             if (isChangeMode) {
               exitChangeRequestMode();
@@ -2253,8 +2276,8 @@ const Components: React.FC = () => {
               setLocation("/pms/modify-pms");
             }
           }}
-          componentId={null}
-          parentComponent={selectedComponent ? { 
+          componentId={editingComponentId}
+          parentComponent={!editingComponentId && selectedComponent ? { 
             code: selectedComponent.code, 
             id: selectedComponent.id, 
             name: selectedComponent.name 
@@ -2262,161 +2285,6 @@ const Components: React.FC = () => {
         />
       )}
 
-      {/* OLD FORM CODE KEPT FOR REFERENCE - TO BE REMOVED AFTER TESTING */}
-      {false && (
-        <ComponentRegisterForm 
-          isOpen={false}
-          onClose={() => {
-            setIsComponentFormOpen(false);
-            // If in change mode and closing without submitting, go back to ModifyPMS
-            if (isChangeMode) {
-              exitChangeRequestMode();
-              reset();
-              setLocation("/pms/modify-pms");
-            }
-          }}
-          parentComponent={selectedComponent ? { 
-            code: selectedComponent.code, 
-            id: selectedComponent.id, 
-            name: selectedComponent.name 
-          } : undefined}
-          onSubmit={async (componentData) => {
-          console.log('Component data submitted:', componentData);
-          
-          // If in change mode, create a change request
-          if (isChangeMode) {
-            try {
-              // Create the change request with proper structure
-              const changeRequest = {
-                category: 'components',
-                title: changeRequestTitle || `New Component: ${componentData.componentName}`,
-                reason: `Adding new component ${componentData.componentName} with code ${componentData.componentCode}`,
-                targetType: 'component',
-                targetId: componentData.componentCode,
-                snapshotBeforeJson: {
-                  displayKey: componentData.componentCode,
-                  displayName: componentData.componentName,
-                  displayPath: `${componentData.componentCode} ${componentData.componentName}`,
-                  fields: {
-                    componentCode: componentData.componentCode,
-                    componentName: componentData.componentName,
-                    maker: componentData.maker || '',
-                    model: componentData.model || '',
-                    serialNo: componentData.serialNo || '',
-                    category: componentData.equipmentCategory || '',
-                    location: componentData.location || '',
-                    critical: componentData.critical || 'No',
-                    classItem: componentData.classItem || 'No'
-                  }
-                },
-                proposedChangesJson: [{
-                  field: 'New Component',
-                  oldValue: null,
-                  newValue: componentData.componentName,
-                  description: `Create new component ${componentData.componentCode} - ${componentData.componentName}`
-                }],
-                status: 'submitted',
-                vesselId: 'MV Test Vessel',
-                requestedByUserId: 'current_user'
-              };
-
-              // Submit to API
-              const response = await fetch('/api/change-requests', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(changeRequest)
-              });
-
-              if (response.ok) {
-                const result = await response.json();
-                toast({
-                  title: "Success",
-                  description: `Change request CR${String(result.id).padStart(4, '0')} created and submitted successfully`
-                });
-                
-                // Exit change mode and navigate back to ModifyPMS
-                exitChangeRequestMode();
-                reset();
-                setLocation("/pms/modify-pms");
-              } else {
-                throw new Error('Failed to create change request');
-              }
-            } catch (error) {
-              console.error('Error creating change request:', error);
-              toast({
-                title: "Error",
-                description: "Failed to create change request",
-                variant: "destructive"
-              });
-            }
-          } else {
-            // Normal mode - submit component data to API
-            try {
-              // Helper function to convert "Yes"/"No" strings to boolean
-              const toBool = (val: any) => {
-                if (typeof val === 'boolean') return val;
-                if (typeof val === 'string') return val.toLowerCase() === 'yes';
-                return false;
-              };
-
-              // Prepare component data with proper boolean conversion and field name mapping
-              const componentPayload = {
-                ...componentData,
-                // Map frontend field names to backend schema names
-                eqptSystemDept: (componentData as any).equipmentDepartment || componentData.eqptSystemDept || null,
-                critical: toBool(componentData.critical),
-                classItem: toBool(componentData.classItem),
-                conditionBased: toBool(componentData.conditionBased),
-                isActive: toBool(componentData.isActive),
-              };
-              
-              // Remove the frontend-only field
-              delete (componentPayload as any).equipmentDepartment;
-
-              // Determine if this is create or update
-              const isEditing = selectedComponent && !isComponentFormOpen;
-              const url = isEditing 
-                ? `/api/components/${selectedComponent.id}` 
-                : '/api/components';
-              const method = isEditing ? 'PATCH' : 'POST';
-
-              const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(componentPayload)
-              });
-
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save component');
-              }
-
-              const result = await response.json();
-
-              toast({
-                title: "Success",
-                description: isEditing 
-                  ? "Component updated successfully" 
-                  : "Component created successfully"
-              });
-              
-              // Invalidate components cache to refresh the tree
-              queryClient.invalidateQueries({ queryKey: ['/api/components'] });
-              
-              setIsComponentFormOpen(false);
-            } catch (error: any) {
-              console.error('Error saving component:', error);
-              toast({
-                title: "Error",
-                description: error.message || "Failed to save component",
-                variant: "destructive"
-              });
-            }
-          }
-        }}
-      />
-      )}
-      
       {/* Review Changes Drawer */}
       {(isChangeMode || isModifyMode) && selectedComponent && (
         <ReviewChangesDrawer
