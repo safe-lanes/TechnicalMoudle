@@ -333,6 +333,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
         }));
       }
+      
+      // Auto-populate previousReading from component's current running hours (Part B Section B3)
+      // Only set previousReading if it's not already set (avoid overwriting saved data when editing WOs)
+      // Use null/undefined check instead of truthiness to allow 0-hour readings (common after meter replacement)
+      if (context.component?.currentCumulativeRH != null) {
+        setExecutionData(prev => {
+          // Only populate if previousReading hasn't been set yet
+          if (prev.previousReading === '' || prev.previousReading == null) {
+            return {
+              ...prev,
+              previousReading: context.component.currentCumulativeRH
+            };
+          }
+          return prev;
+        });
+      }
     }
   }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
 
@@ -2035,6 +2051,315 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     />
                   </div>
                 )}
+              </div>
+            </div>
+          </SectionBlock>
+
+          {/* B3. Running Hours */}
+          <SectionBlock
+            id="running-hours"
+            number="B3"
+            title="Running Hours"
+            description="Component running hours at time of work completion"
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]">Previous Reading (RH)</Label>
+                  <Input
+                    value={executionData.previousReading}
+                    className="text-sm bg-gray-50"
+                    placeholder="Auto-filled from component"
+                    disabled
+                    data-testid="input-previous-reading"
+                  />
+                  <p className="text-xs text-gray-500">Last recorded running hours for this component</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]">Current Reading (RH)</Label>
+                  <Input
+                    type="number"
+                    value={executionData.currentReading}
+                    onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                    className="text-sm"
+                    placeholder="Enter current running hours"
+                    data-testid="input-current-reading"
+                  />
+                  <p className="text-xs text-gray-500">Enter running hours at work completion</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Note:</strong> Upon work order approval, the component's running hours will be automatically updated. 
+                  For parent components, the running hours will be set to the current reading. 
+                  For child components, the delta (current - previous) will be propagated to maintain hierarchy consistency.
+                </p>
+              </div>
+            </div>
+          </SectionBlock>
+
+          {/* B4. Spare Parts Consumed */}
+          <SectionBlock
+            id="spare-parts-consumed"
+            number="B4"
+            title="Spare Parts Consumed"
+            description="Record spare parts used during work order execution"
+          >
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                  onClick={() => {
+                    setExecutionData(prev => ({
+                      ...prev,
+                      consumedSpareParts: [
+                        ...prev.consumedSpareParts,
+                        { partNo: '', description: '', quantityConsumed: '', comments: '' }
+                      ]
+                    }));
+                  }}
+                  data-testid="button-add-consumed-spare"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Spare
+                </Button>
+              </div>
+
+              {/* Spare Parts Consumed Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[35%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY CONSUMED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]">COMMENTS</th>
+                      <th className="text-center p-2 font-medium text-gray-700 w-[10%]">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Pre-loaded spares from Part A (requiredSpareParts) */}
+                    {templateData.requiredSpareParts.map((spare, index) => {
+                      const consumedIndex = executionData.consumedSpareParts.findIndex(c => c.partNo === spare.partNo);
+                      const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
+                      
+                      return (
+                        <tr key={`preloaded-${index}`} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="p-2 text-gray-900">{spare.partNo}</td>
+                          <td className="p-2 text-gray-700">{spare.description}</td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              value={consumedData?.quantityConsumed || ''}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                setExecutionData(prev => {
+                                  const consumed = [...prev.consumedSpareParts];
+                                  if (consumedIndex >= 0) {
+                                    consumed[consumedIndex] = {
+                                      ...consumed[consumedIndex],
+                                      quantityConsumed: newValue
+                                    };
+                                  } else {
+                                    consumed.push({
+                                      partNo: spare.partNo,
+                                      description: spare.description,
+                                      quantityConsumed: newValue,
+                                      comments: ''
+                                    });
+                                  }
+                                  return { ...prev, consumedSpareParts: consumed };
+                                });
+                              }}
+                              placeholder="0"
+                              className="text-sm h-8"
+                              data-testid={`input-consumed-qty-${spare.partNo}`}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              value={consumedData?.comments || ''}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                setExecutionData(prev => {
+                                  const consumed = [...prev.consumedSpareParts];
+                                  if (consumedIndex >= 0) {
+                                    consumed[consumedIndex] = {
+                                      ...consumed[consumedIndex],
+                                      comments: newValue
+                                    };
+                                  } else {
+                                    consumed.push({
+                                      partNo: spare.partNo,
+                                      description: spare.description,
+                                      quantityConsumed: '',
+                                      comments: newValue
+                                    });
+                                  }
+                                  return { ...prev, consumedSpareParts: consumed };
+                                });
+                              }}
+                              placeholder="Optional notes..."
+                              className="text-sm h-8"
+                              data-testid={`input-consumed-comments-${spare.partNo}`}
+                            />
+                          </td>
+                          <td className="p-2 text-center text-gray-400 italic">Pre-loaded</td>
+                        </tr>
+                      );
+                    })}
+
+                    {/* Manually added consumed spare parts (not from Part A) */}
+                    {executionData.consumedSpareParts
+                      .filter(consumed => !templateData.requiredSpareParts.some(s => s.partNo === consumed.partNo))
+                      .map((consumed, index) => {
+                        const actualIndex = executionData.consumedSpareParts.findIndex(c => c === consumed);
+                        const isEditing = editingConsumedSparePart === actualIndex;
+                        
+                        return (
+                          <tr key={`manual-${actualIndex}`} className="border-b border-gray-200 hover:bg-gray-50">
+                            {isEditing ? (
+                              <>
+                                <td className="p-2">
+                                  <Input
+                                    value={consumed.partNo}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], partNo: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    placeholder="Part number"
+                                    className="text-sm h-8"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    value={consumed.description}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], description: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    placeholder="Description"
+                                    className="text-sm h-8"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    type="number"
+                                    value={consumed.quantityConsumed}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    placeholder="0"
+                                    className="text-sm h-8"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    value={consumed.comments}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], comments: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    placeholder="Optional notes..."
+                                    className="text-sm h-8"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setEditingConsumedSparePart(null)}
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setExecutionData(prev => ({
+                                          ...prev,
+                                          consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== actualIndex)
+                                        }));
+                                        setEditingConsumedSparePart(null);
+                                      }}
+                                      className="h-7 w-7 p-0 text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="p-2 text-gray-900">{consumed.partNo}</td>
+                                <td className="p-2 text-gray-700">{consumed.description}</td>
+                                <td className="p-2 text-gray-900">{consumed.quantityConsumed}</td>
+                                <td className="p-2 text-gray-700">{consumed.comments}</td>
+                                <td className="p-2">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setEditingConsumedSparePart(actualIndex)}
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setExecutionData(prev => ({
+                                          ...prev,
+                                          consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== actualIndex)
+                                        }));
+                                      }}
+                                      className="h-7 w-7 p-0 text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+
+                    {templateData.requiredSpareParts.length === 0 && executionData.consumedSpareParts.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center p-4 text-gray-500 italic">
+                          No spare parts consumed yet. Click "Add Spare" to record consumption.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
+                <p className="text-sm text-amber-900">
+                  <strong>Note:</strong> Upon work order approval, spare parts consumed will be automatically deducted from inventory. 
+                  ROB (Remaining on Board) will be updated, and low-stock alerts will be triggered if inventory falls below minimum levels.
+                </p>
               </div>
             </div>
           </SectionBlock>

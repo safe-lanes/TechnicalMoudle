@@ -640,6 +640,7 @@ export const workOrders = pgTable("work_orders", {
   componentCode: text("component_code"),
   jobId: text("job_id"), // Reference to jobs.id for reliable lead time hydration
   workOrderNo: text("work_order_no").notNull(),
+  workOrderType: text("work_order_type").notNull().default("Planned"), // 'Planned' | 'Unplanned'
   templateCode: text("template_code"),
   executionId: text("execution_id"),
   jobTitle: text("job_title").notNull(),

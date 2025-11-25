@@ -916,6 +916,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Generate spec-compliant work order number if not provided
+      if (!workOrderData.workOrderNo) {
+        const { 
+          generatePlannedWorkOrderNumber, 
+          generateUnplannedWorkOrderNumber, 
+          determineWorkOrderType 
+        } = await import('./utils/workOrderNumbering');
+        
+        // Determine work order type based on job linkage
+        const woType = determineWorkOrderType(workOrderData.jobId, workOrderData.templateCode);
+        workOrderData.workOrderType = woType;
+        
+        if (woType === 'Planned') {
+          // Get job code for planned WO numbering
+          let jobCode = 'JOB-UNKNOWN';
+          if (workOrderData.jobId) {
+            const job = await storage.getJob(workOrderData.jobId);
+            if (job?.jobNo) {
+              jobCode = job.jobNo;
+            }
+          }
+          workOrderData.workOrderNo = await generatePlannedWorkOrderNumber(
+            storage, 
+            jobCode, 
+            workOrderData.vesselId || undefined
+          );
+        } else {
+          // Unplanned WO requires vesselId
+          const vesselId = workOrderData.vesselId || 'V001';
+          workOrderData.workOrderNo = await generateUnplannedWorkOrderNumber(
+            storage, 
+            vesselId
+          );
+        }
+        
+        console.log(`Generated ${woType} WO number: ${workOrderData.workOrderNo}`);
+      }
+      
       // Auto-generate template code if not provided (format: WO-{ComponentCode}-{Year}-{Sequence})
       if (!workOrderData.templateCode && workOrderData.componentCode) {
         const currentYear = new Date().getFullYear().toString();
@@ -1299,9 +1337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
           
           if (!activeWorkOrderKeys.has(workOrderKey)) {
-            // Generate work order
-            const { nanoid } = await import('nanoid');
-            const workOrderNo = `WO-${job.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
+            // Generate spec-compliant work order number
+            const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
+            const jobCode = job.jobNo || 'JOB-UNKNOWN';
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, vesselId);
             
             const workOrderData = {
               vesselId: job.vesselId,
@@ -1309,6 +1348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               componentCode: job.componentCode,
               jobId: job.id, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
+              workOrderType: 'Planned' as const,
               templateCode: workOrderNo,
               jobTitle: job.jobTitle,
               assignedTo: job.assignedTo || 'Unassigned',
