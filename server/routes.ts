@@ -778,9 +778,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...wo,
           computedStatus: computeWorkOrderStatus({
             dueDate: wo.dueDate,
+            dueRH: wo.dueRH || null,
+            currentRH: null, // Will need component data for RH status - enhance in future
             isExecution: wo.isExecution,
             status: wo.status,
-            completionDateTime: wo.dateCompleted
+            completionDateTime: wo.dateCompleted,
+            maintenanceBasis: wo.maintenanceBasis
           }),
           leadTimeValue: job?.leadTimeValue ?? null,
           leadTimeUnit: job?.leadTimeUnit ?? null
@@ -821,9 +824,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...workOrder,
         computedStatus: computeWorkOrderStatus({
           dueDate: workOrder.dueDate,
+          dueRH: workOrder.dueRH || null,
+          currentRH: null, // Will need component data for RH status - enhance in future
           isExecution: workOrder.isExecution,
           status: workOrder.status,
-          completionDateTime: workOrder.dateCompleted
+          completionDateTime: workOrder.dateCompleted,
+          maintenanceBasis: workOrder.maintenanceBasis
         }),
         leadTimeValue,
         leadTimeUnit
@@ -1234,36 +1240,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the work order completion if history creation fails
       }
       
-      // Auto-update parent job's lastDoneDate and recalculate nextDueDate (Task 32)
-      if (workOrder.jobId && workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
+      // Auto-update parent job's cycle fields (Calendar: lastDoneDate/nextDueDate, RH: lastDoneRH/nextDueRH)
+      // Use work order's maintenanceBasis (not job's) since jobs don't have this field
+      if (workOrder.jobId) {
         try {
-          const { calculateNextDueDate } = await import('@shared/dateUtils');
           const job = await storage.getJob(workOrder.jobId);
           
           if (job) {
-            const updates: any = {
-              lastDoneDate: dateOfCompletion // Store completion date as last done
-            };
+            const updates: any = {};
             
-            // Recalculate nextDueDate based on lastDoneDate + interval
-            if (job.frequencyValue && job.frequencyUnit) {
-              const nextDue = calculateNextDueDate(
-                dateOfCompletion,
-                job.frequencyValue,
-                job.frequencyUnit
-              );
+            // Calendar-based job cycle update
+            if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
+              const { calculateNextDueDate } = await import('@shared/dateUtils');
+              updates.lastDoneDate = dateOfCompletion;
               
-              if (nextDue) {
-                updates.nextDueDate = nextDue;
-                console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
+              // Recalculate nextDueDate based on lastDoneDate + interval
+              if (job.frequencyValue && job.frequencyUnit) {
+                const nextDue = calculateNextDueDate(
+                  dateOfCompletion,
+                  job.frequencyValue,
+                  job.frequencyUnit
+                );
+                
+                if (nextDue) {
+                  updates.nextDueDate = nextDue;
+                  console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
+                }
               }
+              
+              await storage.updateJob(job.id, updates);
+              console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
             }
             
-            await storage.updateJob(job.id, updates);
-            console.log(`✅ Updated job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+            // Running Hours-based job cycle update
+            if (workOrder.maintenanceBasis === 'Running Hours' && executionData.currentReading) {
+              const currentRH = parseInt(executionData.currentReading);
+              if (!isNaN(currentRH)) {
+                updates.lastDoneRH = currentRH;
+                
+                // Recalculate nextDueRH based on lastDoneRH + interval
+                if (job.frequencyValue) {
+                  const nextDueRH = currentRH + parseInt(job.frequencyValue);
+                  updates.nextDueRH = nextDueRH;
+                  console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${job.frequencyValue} hours)`);
+                }
+                
+                await storage.updateJob(job.id, updates);
+                console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
+              }
+            }
           }
         } catch (jobUpdateError) {
-          console.error('Failed to update job lastDoneDate and nextDueDate:', jobUpdateError);
+          console.error('Failed to update job cycle fields:', jobUpdateError);
           // Don't fail the work order completion if job update fails
         }
       }

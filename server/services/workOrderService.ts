@@ -23,9 +23,12 @@ export class WorkOrderService {
       ...wo,
       computedStatus: computeWorkOrderStatus({
         dueDate: wo.dueDate,
+        dueRH: (wo as any).dueRH || null,
+        currentRH: null, // Will need component data for RH status - enhance in future
         isExecution: wo.isExecution,
         status: wo.status,
-        completionDateTime: wo.dateCompleted
+        completionDateTime: wo.dateCompleted,
+        maintenanceBasis: wo.maintenanceBasis || undefined
       })
     }));
   }
