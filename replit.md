@@ -53,13 +53,16 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Admin Module**: Bulk data import for various entities, data purge functionality, and a Fleet Admin Dashboard for master data management.
 - **Role-Based Access Control (RBAC)**: Implements three user roles (Ship, Office, PMS Admin) with enhanced user schema, security measures, `AuthContext` for permission checking, `RoleGuard` components, and backend middleware for route authorization and vessel data isolation.
 
-**Global Business Rules Compliance**:
-- **Parent vs Sub-Component RH Authority** (Sections 5.5, 8.1, 8.2): Work Order completion handler enforces sub-component-only RH updates with strict validation. Parent component RH updates are exclusively reserved for the Running Hours module. WO completion validates component has `parentId` (rejects parent components) and ensures sub-component RH ≤ parent RH.
-- **Jobs Belong to Sub-Components** (Section 3.3): Job creation/update endpoints validate that jobs can only be assigned to sub-components (components with `parentId`). Parent components cannot have jobs directly assigned.
-- **Stores Module Isolation** (Section 7.2): CURRENT STATE - Stores endpoints reuse `spares` table/functions which include `componentId` linkage. This violates isolation requirement. FUTURE REQUIREMENT: Separate stores data completely from components/jobs/work orders using dedicated `storesLedger` table schema.
+**Global Business Rules Compliance** (4/4 Rules Enforced):
+- **Parent vs Sub-Component RH Authority** (Sections 5.5, 8.1, 8.2): ✅ Work Order completion handler enforces sub-component-only RH updates with strict validation. Parent component RH updates are exclusively reserved for the Running Hours module. WO completion validates component has `parentId` (rejects parent components) and ensures sub-component RH ≤ parent RH.
+- **Jobs Belong to Sub-Components** (Section 3.3): ✅ Job creation/update endpoints validate that jobs can only be assigned to sub-components (components with `parentId`). Parent components cannot have jobs directly assigned.
+- **Stores Module Isolation** (Section 7.2): ✅ 100% COMPLIANT - Dedicated `storesItems` and `storesLedger` tables with ZERO PMS linkages (no componentId, workOrderId, jobId fields). Complete architectural isolation from Components/Jobs/Work Orders modules. All Stores endpoints use dedicated storage methods operating exclusively on Stores tables.
 
 **Database Schema Enhancements**:
-- **New Tables**: `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`.
+- **New Tables**: `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`.
+- **Stores Tables** (Global Business Rule Section 7.2 Compliance):
+  - `stores_items`: Vessel stores inventory (itemCode, itemName, itemType, ROB/locations, IHM flag) - ZERO PMS linkages
+  - `stores_ledger`: Transaction history for all stores movements (RECEIVE/CONSUME/ADJUST/TRANSFER) - Complete isolation from Components/Jobs/Work Orders
 - **Enhanced Tables**: 
   - `jobs`: frequencyType, lead time fields (leadTimeValue, leadTimeUnit), RH cycle tracking (lastDoneRH, nextDueRH), audit tracking
   - `components`: componentCategory, makerCode, modelCode, conditionBased, isParent, audit tracking
