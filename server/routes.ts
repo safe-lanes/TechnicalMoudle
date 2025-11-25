@@ -314,6 +314,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { insertJobSchema } = await import("@shared/schema");
       let jobData = insertJobSchema.parse(req.body);
       
+      // GLOBAL BUSINESS RULES COMPLIANCE (Section 3.3):
+      // Jobs belong to sub-components, not parent components
+      // Validate that the component is a sub-component (has a parent)
+      if (jobData.componentId) {
+        const component = await storage.getComponent(jobData.componentId);
+        if (!component) {
+          return res.status(400).json({ 
+            error: "Component not found" 
+          });
+        }
+        if (!component.parentId) {
+          return res.status(400).json({ 
+            error: "Jobs can only be assigned to sub-components. Parent components cannot have jobs directly assigned to them. Please select a sub-component." 
+          });
+        }
+      }
+      
       // Auto-generate job number if not provided (format: JOB-XXXXXXX)
       if (!jobData.jobNo) {
         const { nanoid } = await import('nanoid');
@@ -338,6 +355,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update job
   app.patch("/api/jobs/:id", async (req, res) => {
     try {
+      // GLOBAL BUSINESS RULES COMPLIANCE (Section 3.3):
+      // Jobs belong to sub-components, not parent components
+      // Validate component change if componentId is being updated
+      if (req.body.componentId) {
+        const component = await storage.getComponent(req.body.componentId);
+        if (!component) {
+          return res.status(400).json({ 
+            error: "Component not found" 
+          });
+        }
+        if (!component.parentId) {
+          return res.status(400).json({ 
+            error: "Jobs can only be assigned to sub-components. Parent components cannot have jobs directly assigned to them. Please select a sub-component." 
+          });
+        }
+      }
+      
       const job = await storage.updateJob(req.params.id, req.body);
       res.json(job);
     } catch (error) {
@@ -1143,6 +1177,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (runningHours) {
         const newRH = parseInt(runningHours);
         
+        // GLOBAL BUSINESS RULES COMPLIANCE (Section 5.5, 8.2):
+        // Work Orders update ONLY sub-component RH
+        // Work Orders NEVER update parent RH
+        // Work Orders NEVER cascade to children
+        // Only Running Hours module has authority over parent RH
+        
+        // CRITICAL: Validate this is a sub-component, not a parent
+        if (!component.parentId) {
+          return res.status(400).json({
+            error: 'Work orders can only update sub-component running hours. Parent component RH must be updated through the Running Hours module.'
+          });
+        }
+        
         // CRITICAL: Capture original RH BEFORE updating (parse from string)
         const previousRH = parseInt(component.currentCumulativeRH);
         
@@ -1150,20 +1197,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const componentVesselId = workOrder.vesselId || component.vesselId || 'V001';
         const componentCode = workOrder.componentCode || component.componentCode;
         
-        // Validate against parent if exists
-        if (component.parentId) {
-          const parentComponent = await storage.getComponent(component.parentId);
-          if (parentComponent) {
-            const parentRH = parseInt(parentComponent.currentCumulativeRH);
-            if (newRH > parentRH) {
-              return res.status(400).json({
-                error: `Running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`
-              });
-            }
+        // Validate against parent (sub-component RH must never exceed parent RH)
+        const parentComponent = await storage.getComponent(component.parentId);
+        if (parentComponent) {
+          const parentRH = parseInt(parentComponent.currentCumulativeRH);
+          if (newRH > parentRH) {
+            return res.status(400).json({
+              error: `Sub-component running hours (${newRH}) cannot exceed parent component's running hours (${parentRH})`
+            });
           }
         }
         
-        // Validate no decrease
+        // Validate no decrease (sub-component RH cannot go backward)
         if (newRH < previousRH) {
           return res.status(400).json({
             error: `Running hours cannot decrease from ${previousRH} to ${newRH}`
@@ -1185,10 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Calculate delta for cascading
-        const delta = newRH - previousRH;
-        
-        // Update component running hours (convert back to string for storage)
+        // Update ONLY this sub-component's running hours (NO cascade, NO parent update)
         await storage.updateComponent(component.id, {
           currentCumulativeRH: newRH.toString(),
           lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
@@ -1205,57 +1247,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateUpdatedTZ: 'UTC',
           enteredAtUTC: new Date(),
           userId: executionData.performedBy || 'System',
-          source: 'single',
+          source: 'workorder',
           notes: `Updated via work order completion: ${workOrder.templateCode}`,
           meterReplaced: false
         });
-        
-        // Cascade delta to all children
-        if (delta > 0) {
-          const vesselId = componentVesselId;
-          const allComponents = await storage.getComponents(vesselId);
-          
-          // Find all children recursively
-          const getAllChildren = (parentId: string): typeof allComponents => {
-            const directChildren = allComponents.filter(c => c.parentId === parentId);
-            const allDescendants = [...directChildren];
-            directChildren.forEach(child => {
-              allDescendants.push(...getAllChildren(child.id));
-            });
-            return allDescendants;
-          };
-          
-          const children = getAllChildren(component.id);
-          
-          // Update each child with the delta
-          for (const child of children) {
-            const childPreviousRH = child.currentCumulativeRH;
-            const childNewRH = childPreviousRH + delta;
-            const childVesselId = child.vesselId || componentVesselId;
-            const childComponentCode = child.componentCode;
-            
-            await storage.updateComponent(child.id, {
-              currentCumulativeRH: childNewRH,
-              lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
-            });
-            
-            // Record audit for each child with complete metadata
-            await storage.createRunningHoursAudit({
-              componentId: child.id,
-              vesselId: childVesselId,
-              previousRH: childPreviousRH.toString(),
-              newRH: childNewRH.toString(),
-              cumulativeRH: childNewRH.toString(),
-              dateUpdatedLocal: dateOfCompletion || new Date().toISOString().split('T')[0],
-              dateUpdatedTZ: 'UTC',
-              enteredAtUTC: new Date(),
-              userId: executionData.performedBy || 'System',
-              source: 'single',
-              notes: `Cascaded from parent ${componentCode} via work order: ${workOrder.templateCode}`,
-              meterReplaced: false
-            });
-          }
-        }
       }
       
       // Update work order execution data
