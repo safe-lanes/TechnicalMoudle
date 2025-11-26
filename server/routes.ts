@@ -1171,6 +1171,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const components = await storage.getComponents(vesselId);
       const componentsMap = new Map(components.map(comp => [comp.id, comp]));
       
+      // Fetch vessel-specific grace settings for status calculation
+      const vesselSettings = vesselId ? await storage.getPmsVesselSettings(vesselId) : null;
+      const vesselGraceSettings = vesselSettings ? {
+        calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+        calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
+        rhGraceHours: vesselSettings.rhGraceHours ?? 168
+      } : undefined;
+      
       // Augment each work order with computed status and lead time data
       const enrichedWorkOrders = workOrders.map(wo => {
         // Try to match by jobId first (more reliable), then fall back to templateCode === jobNo
@@ -1203,7 +1211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isExecution: wo.isExecution,
             status: wo.status,
             completionDateTime: wo.dateCompleted,
-            maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined
+            maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
+            vesselGraceSettings
           }),
           leadTimeValue: job?.leadTimeValue ?? null,
           leadTimeUnit: job?.leadTimeUnit ?? null
@@ -1287,6 +1296,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
       const currentRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
       
+      // Fetch vessel-specific grace settings for status calculation
+      const vesselSettings = workOrder.vesselId ? await storage.getPmsVesselSettings(workOrder.vesselId) : null;
+      const vesselGraceSettings = vesselSettings ? {
+        calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+        calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
+        rhGraceHours: vesselSettings.rhGraceHours ?? 168
+      } : undefined;
+      
       // Augment with computed status and lead time data
       const enrichedWorkOrder = {
         ...workOrder,
@@ -1297,7 +1314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isExecution: workOrder.isExecution,
           status: workOrder.status,
           completionDateTime: workOrder.dateCompleted,
-          maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined
+          maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined,
+          vesselGraceSettings
         }),
         leadTimeValue,
         leadTimeUnit
