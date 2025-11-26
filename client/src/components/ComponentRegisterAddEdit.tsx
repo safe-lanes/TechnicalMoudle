@@ -41,7 +41,7 @@ export default function ComponentRegisterAddEdit({
   const { vesselId, setVesselId } = useVessel();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["sfi-6"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
   const [isSaving, setIsSaving] = useState(false);
   const [criticalityFilter, setCriticalityFilter] = useState("all");
 
@@ -69,11 +69,6 @@ export default function ComponentRegisterAddEdit({
     dateUpdated: "",
   });
 
-  const [conditionMetrics, setConditionMetrics] = useState([
-    { id: "1", metric: "Vibration", value: "", alertThreshold: "" },
-    { id: "2", metric: "Temperature", value: "", alertThreshold: "" },
-    { id: "3", metric: "Pressure", value: "", alertThreshold: "" },
-  ]);
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [maintenanceHistory, setMaintenanceHistory] = useState<any[]>([]);
@@ -195,56 +190,149 @@ export default function ComponentRegisterAddEdit({
     const vesselComponents = components.filter(c => c.vesselId === vesselId);
     const filteredIds = new Set(filterComponents(vesselComponents).map(c => c.id));
     
-    const sfiGroups = [
-      { id: "sfi-1", code: "1", name: "Ship General" },
-      { id: "sfi-2", code: "2", name: "Hull" },
-      { id: "sfi-3", code: "3", name: "Equipment for Cargo" },
-      { id: "sfi-4", code: "4", name: "Ship's Equipment" },
-      { id: "sfi-5", code: "5", name: "Equipment for Crew & Passengers" },
-      { id: "sfi-6", code: "6", name: "Machinery Main Components" },
-      { id: "sfi-7", code: "7", name: "Systems for Machinery Main Components" },
-      { id: "sfi-8", code: "8", name: "Ship Common Systems" },
+    const mainCategories: ComponentNode[] = [
+      { id: "1", code: "1", name: "1 Ship General", children: [] },
+      { id: "2", code: "2", name: "2 Hull", children: [] },
+      { id: "3", code: "3", name: "3 Equipment for Cargo", children: [] },
+      { id: "4", code: "4", name: "4 Ship's Equipment", children: [] },
+      { id: "5", code: "5", name: "5 Equipment for Crew & Passengers", children: [] },
+      { id: "6", code: "6", name: "6 Machinery Main Components", children: [] },
+      { id: "7", code: "7", name: "7 Systems for Machinery Main Components", children: [] },
+      { id: "8", code: "8", name: "8 Ship Common Systems", children: [] },
     ];
 
-    const buildChildren = (parentId: string): ComponentNode[] => {
-      return vesselComponents
-        .filter(c => c.parentId === parentId)
-        .filter(c => filteredIds.size === 0 || filteredIds.has(c.id) || hasMatchingDescendant(c, filteredIds, vesselComponents))
-        .map(c => ({
-          ...c,
-          id: c.id,
-          code: c.componentCode,
-          name: c.name,
-          children: buildChildren(c.id),
-        }));
-    };
+    if (!vesselComponents || vesselComponents.length === 0) {
+      return mainCategories;
+    }
 
-    const hasMatchingDescendant = (comp: any, matchedIds: Set<string>, allComps: any[]): boolean => {
-      const children = allComps.filter(c => c.parentId === comp.id);
-      for (const child of children) {
+    const componentMap = new Map<string, ComponentNode>();
+    
+    mainCategories.forEach(cat => {
+      componentMap.set(cat.code, cat);
+    });
+
+    vesselComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      if (code.match(/^[1-8]$/)) {
+        return;
+      }
+      const node: ComponentNode = {
+        id: comp.id,
+        code: code,
+        name: comp.name,
+        ...comp,
+        critical: comp.critical === "Yes" || comp.critical === true,
+        children: []
+      };
+      componentMap.set(code, node);
+    });
+
+    vesselComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      const node = componentMap.get(code);
+      
+      if (!node) return;
+      
+      if (comp.parentId) {
+        const parentComp = vesselComponents.find(c => c.id === comp.parentId);
+        if (parentComp) {
+          const parentCode = parentComp.componentCode || parentComp.id;
+          const parent = componentMap.get(parentCode);
+          if (parent) {
+            parent.children = parent.children || [];
+            parent.children.push(node);
+          }
+        }
+      } else {
+        const prefix = code.charAt(0);
+        const mainCategory = mainCategories.find(cat => cat.code === prefix);
+        if (mainCategory) {
+          mainCategory.children = mainCategory.children || [];
+          mainCategory.children.push(node);
+        }
+      }
+    });
+
+    const hasMatchingDescendant = (node: ComponentNode, matchedIds: Set<string>): boolean => {
+      if (!node.children) return false;
+      for (const child of node.children) {
         if (matchedIds.has(child.id)) return true;
-        if (hasMatchingDescendant(child, matchedIds, allComps)) return true;
+        if (hasMatchingDescendant(child, matchedIds)) return true;
       }
       return false;
     };
 
-    return sfiGroups.map(group => {
-      const groupChildren = vesselComponents
-        .filter(c => c.componentCode?.startsWith(group.code) && !c.parentId)
-        .filter(c => filteredIds.size === 0 || filteredIds.has(c.id) || hasMatchingDescendant(c, filteredIds, vesselComponents))
-        .map(c => ({
-          ...c,
-          id: c.id,
-          code: c.componentCode,
-          name: c.name,
-          children: buildChildren(c.id),
-        }));
+    const filterTree = (nodes: ComponentNode[]): ComponentNode[] => {
+      if (filteredIds.size === 0) return nodes;
+      return nodes.filter(node => 
+        filteredIds.has(node.id) || hasMatchingDescendant(node, filteredIds)
+      ).map(node => ({
+        ...node,
+        children: node.children ? filterTree(node.children) : []
+      }));
+    };
+
+    if (searchQuery.trim() || criticalityFilter !== 'all') {
+      return mainCategories.map(cat => ({
+        ...cat,
+        children: filterTree(cat.children || [])
+      })).filter(cat => cat.children && cat.children.length > 0);
+    }
+
+    return mainCategories;
+  };
+
+  const generateNextComponentCode = (selectedId: string | null, isCategory: boolean = false): string => {
+    if (!selectedId) return "";
+    
+    if (isCategory) {
+      const categoryPrefix = selectedId;
+      const categoryComponents = components.filter(c => 
+        c.vesselId === vesselId && 
+        !c.parentId && 
+        c.componentCode?.startsWith(categoryPrefix)
+      );
       
-      return {
-        ...group,
-        children: groupChildren,
-      };
-    }).filter(group => group.children.length > 0 || !searchQuery.trim());
+      if (categoryComponents.length === 0) {
+        return `${categoryPrefix}01`;
+      }
+      
+      const codes = categoryComponents
+        .map(c => c.componentCode || "")
+        .map(code => {
+          const numPart = code.substring(categoryPrefix.length);
+          const num = parseInt(numPart, 10);
+          return isNaN(num) ? 0 : num;
+        });
+      
+      const maxNum = Math.max(0, ...codes);
+      const nextNum = maxNum + 1;
+      return `${categoryPrefix}${nextNum.toString().padStart(2, '0')}`;
+    }
+    
+    const parentComp = components.find(c => c.id === selectedId);
+    if (!parentComp) return "";
+    
+    const parentCode = parentComp.componentCode || "";
+    
+    const children = components.filter(c => c.parentId === selectedId && c.vesselId === vesselId);
+    
+    if (children.length === 0) {
+      return `${parentCode}.001`;
+    }
+    
+    const childCodes = children
+      .map(c => c.componentCode || "")
+      .filter(code => code.startsWith(parentCode + "."))
+      .map(code => {
+        const suffix = code.substring(parentCode.length + 1);
+        const num = parseInt(suffix, 10);
+        return isNaN(num) ? 0 : num;
+      });
+    
+    const maxNum = Math.max(0, ...childCodes);
+    const nextNum = maxNum + 1;
+    return `${parentCode}.${nextNum.toString().padStart(3, '0')}`;
   };
 
   const componentTree = buildComponentTree(components);
@@ -316,8 +404,12 @@ export default function ComponentRegisterAddEdit({
     }
   };
 
+  const isMainCategory = (id: string): boolean => {
+    return /^[1-8]$/.test(id);
+  };
+
   const loadComponentDataFromTree = (comp: any) => {
-    if (!comp || comp.id.startsWith('sfi-')) return;
+    if (!comp || isMainCategory(comp.id)) return;
     
     setComponentData({
       maker: comp.maker || "",
@@ -443,12 +535,16 @@ export default function ComponentRegisterAddEdit({
             size="sm"
             className="bg-white text-sky-600 hover:bg-sky-50 border-white"
             onClick={() => {
+              const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
+              const parentId = selectedTreeNode && !isCategory ? selectedTreeNode : "";
+              const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
+              
               setComponentData({
                 maker: "",
                 model: "",
                 serialNo: "",
                 drawingNo: "",
-                componentCode: "",
+                componentCode: nextCode,
                 eqptSystemCategory: "",
                 location: "",
                 critical: "",
@@ -458,17 +554,12 @@ export default function ComponentRegisterAddEdit({
                 conditionBased: "",
                 noOfUnits: "",
                 eqptSystemDept: "",
-                parentComponent: selectedTreeNode && !selectedTreeNode.startsWith('sfi-') ? selectedTreeNode : "",
+                parentComponent: parentId,
                 dimensionsSize: "",
                 notes: "",
                 runningHours: "",
                 dateUpdated: new Date().toISOString().split('T')[0],
               });
-              setConditionMetrics([
-                { id: "1", metric: "Vibration", value: "", alertThreshold: "" },
-                { id: "2", metric: "Temperature", value: "", alertThreshold: "" },
-                { id: "3", metric: "Pressure", value: "", alertThreshold: "" },
-              ]);
               setWorkOrders([]);
               setMaintenanceHistory([]);
               setSpares([]);
@@ -490,7 +581,7 @@ export default function ComponentRegisterAddEdit({
               });
               toast({
                 title: "New Component",
-                description: "Form cleared for adding a new component.",
+                description: selectedTreeNode ? `Form cleared. Component code auto-generated: ${nextCode}` : "Form cleared for adding a new component. Select a location in the tree first.",
               });
             }}
             data-testid="button-add-edit-component"
@@ -583,10 +674,6 @@ export default function ComponentRegisterAddEdit({
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-5xl">
-            <div className="text-xl font-semibold text-gray-800 mb-6">
-              {componentData.componentCode || "601. 003 XXX"}
-            </div>
-
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">A. Component Information</h3>
@@ -785,58 +872,6 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-500">Condition Monitoring Metrics</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-metric"
-                  >
-                    + Add Metric
-                  </Button>
-                </div>
-                <div className="border rounded">
-                  <div className="grid grid-cols-3 gap-4 bg-gray-50 px-3 py-2 border-b text-xs font-medium text-gray-600">
-                    <div>Metric</div>
-                    <div></div>
-                    <div>Alerts/ Thresholds</div>
-                  </div>
-                  {conditionMetrics.map((metric) => (
-                    <div key={metric.id} className="grid grid-cols-3 gap-4 px-3 py-2 border-b last:border-b-0">
-                      <Input
-                        value={metric.metric}
-                        onChange={(e) => {
-                          setConditionMetrics(prev => prev.map(m => 
-                            m.id === metric.id ? { ...m, metric: e.target.value } : m
-                          ));
-                        }}
-                        className="h-7 text-xs bg-yellow-50"
-                        data-testid={`input-metric-${metric.id}`}
-                      />
-                      <Input
-                        value={metric.value}
-                        onChange={(e) => {
-                          setConditionMetrics(prev => prev.map(m => 
-                            m.id === metric.id ? { ...m, value: e.target.value } : m
-                          ));
-                        }}
-                        className="h-7 text-xs"
-                        data-testid={`input-metric-value-${metric.id}`}
-                      />
-                      <Input
-                        value={metric.alertThreshold}
-                        onChange={(e) => {
-                          setConditionMetrics(prev => prev.map(m => 
-                            m.id === metric.id ? { ...m, alertThreshold: e.target.value } : m
-                          ));
-                        }}
-                        className="h-7 text-xs"
-                        data-testid={`input-metric-threshold-${metric.id}`}
-                      />
-                    </div>
-                  ))}
-                </div>
               </div>
 
               <div>
