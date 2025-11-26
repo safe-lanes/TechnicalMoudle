@@ -3101,7 +3101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
-  app.get("/api/stores/:vesselId", async (req, res) => {
+  // All stores endpoints require authentication for security
+  app.get("/api/stores/:vesselId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { itemType } = req.query;
       const stores = await storage.getStoresItems(
@@ -3114,7 +3115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/:vesselId/history", async (req, res) => {
+  app.get("/api/stores/:vesselId/history", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { vesselId } = req.params;
       const { itemType } = req.query;
@@ -3128,7 +3129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/item/:id/history", async (req, res) => {
+  app.get("/api/stores/item/:id/history", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const history = await storage.getStoresItemHistory(itemId);
@@ -3138,16 +3139,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/stores/:vesselId/create", async (req, res) => {
+  app.post("/api/stores/:vesselId/create", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const item = await storage.createStoresItem(req.body);
+      const { vesselId } = req.params;
+      const itemData = { ...req.body, vesselId };
+      const item = await storage.createStoresItem(itemData);
       res.json(item);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to create stores item" });
     }
   });
   
-  app.put("/api/stores/item/:id", async (req, res) => {
+  app.put("/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const item = await storage.updateStoresItem(itemId, req.body);
@@ -3157,7 +3160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/stores/item/:id", async (req, res) => {
+  app.delete("/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
       await storage.deleteStoresItem(itemId);
@@ -3168,9 +3171,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch consume stores
-  app.post("/api/stores/:vesselId/batch-consume", async (req, res) => {
+  app.post("/api/stores/:vesselId/batch-consume", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { items, consumedBy } = req.body;
+      const userId = req.user?.id?.toString() || consumedBy || 'System';
       
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "Items array is required" });
@@ -3178,11 +3182,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const results = [];
       for (const item of items) {
+        if (!item.itemId || !item.quantity || item.quantity <= 0) {
+          return res.status(400).json({ error: "Each item must have a valid itemId and positive quantity" });
+        }
         const result = await storage.consumeStoresItem(
           item.itemId,
           item.quantity,
           item.location || 'A',
-          consumedBy || 'System',
+          userId,
           item.notes,
           item.place,
           item.dateLocal,
@@ -3198,9 +3205,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch receive stores
-  app.post("/api/stores/:vesselId/batch-receive", async (req, res) => {
+  app.post("/api/stores/:vesselId/batch-receive", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { items, purchaseOrderRef, receivedBy } = req.body;
+      const userId = req.user?.id?.toString() || receivedBy || 'System';
       
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "Items array is required" });
@@ -3208,11 +3216,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const results = [];
       for (const item of items) {
+        if (!item.itemId || !item.quantity || item.quantity <= 0) {
+          return res.status(400).json({ error: "Each item must have a valid itemId and positive quantity" });
+        }
         const result = await storage.receiveStoresItem(
           item.itemId,
           item.quantity,
           item.location || 'A',
-          receivedBy || 'System',
+          userId,
           item.notes,
           purchaseOrderRef,
           item.place,
