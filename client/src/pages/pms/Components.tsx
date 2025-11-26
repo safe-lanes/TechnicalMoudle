@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ComponentRegisterForm from "@/components/ComponentRegisterForm";
 import ComponentRegisterFormCR from "@/components/ComponentRegisterFormCR";
 import AddEditComponentForm from "@/components/AddEditComponentForm";
+import ComponentRegisterAddEdit from "@/components/ComponentRegisterAddEdit";
 import { ReviewChangesDrawer } from "@/components/ReviewChangesDrawer";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
@@ -1452,6 +1453,7 @@ const Components: React.FC = () => {
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [modifiedComponentData, setModifiedComponentData] = useState<any>(null);
   const [originalComponentData, setOriginalComponentData] = useState<any>(null);
+  const [showAddEditFullPage, setShowAddEditFullPage] = useState(false);
   
   // Preview changes mode state
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -1958,6 +1960,23 @@ const Components: React.FC = () => {
     }
   };
 
+  if (showAddEditFullPage) {
+    return (
+      <ComponentRegisterAddEdit
+        onBack={() => {
+          setShowAddEditFullPage(false);
+          setEditingComponentId(null);
+        }}
+        componentId={editingComponentId}
+        parentComponent={!editingComponentId && selectedComponent ? {
+          code: selectedComponent.code,
+          id: selectedComponent.id,
+          name: selectedComponent.name
+        } : undefined}
+      />
+    );
+  }
+
   return (
     <div className={`h-full p-6 ${isModifyMode ? '' : isChangeMode ? 'bg-orange-50' : isChangeRequestMode ? 'bg-[#52baf3]' : 'bg-[#fafafa]'}`}>
       {/* Change Mode Banner */}
@@ -2016,11 +2035,11 @@ const Components: React.FC = () => {
               className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
               onClick={() => {
                 setEditingComponentId(null);
-                setIsComponentFormOpen(true);
+                setShowAddEditFullPage(true);
               }}
               data-testid="button-add-component"
             >
-              + Add Component
+              + Add / Edit Component
             </Button>
           )}
         </div>
@@ -2099,7 +2118,7 @@ const Components: React.FC = () => {
                       className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
                       onClick={() => {
                         setEditingComponentId(selectedComponent.id);
-                        setIsComponentFormOpen(true);
+                        setShowAddEditFullPage(true);
                       }}
                       data-testid="button-edit-component"
                     >
