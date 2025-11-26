@@ -1,0 +1,356 @@
+Yes, this is exactly the right place to park **lead time + grace** — in Admin, as the “brain” that controls *when* WOs are created from jobs.
+
+I’ll do two things:
+
+1. **Design the logic + data model** in simple terms.
+2. **Give you a ready-to-use Replit prompt** to implement the screen + backend.
+
+---
+
+## 1️⃣ What this setting is & what we want to achieve
+
+**Goal:**
+Give each client/company a place in **Admin** to define:
+
+* **Lead time** → how early a Work Order should be generated **before** a job is actually due.
+* **Grace period** → how far **beyond** due we allow for escalation (NOT for status; status still becomes overdue as soon as due is reached).
+
+This will control **automatic WO generation** for:
+
+* **Calendar-based jobs** (weekly/monthly/annual)
+* **Running-hour–based jobs** (e.g., every 500 RH)
+
+These values become the **key driver** in the WO generation logic instead of hard-coded numbers.
+
+---
+
+## 2️⃣ From where it will get the data
+
+Data sources:
+
+* **Jobs table**
+
+  * `job_id`, `component_id`, `job_type` (CALENDAR / RH), `frequency_value`, `frequency_unit` (days/weeks/months/hours), `critical_flag`, `last_done_date`, `last_done_rh`, etc.
+
+* **Running Hours module**
+
+  * For RH jobs:
+
+    * Parent component `current_rh`.
+
+* **Admin → PMS Settings (new screen)**
+
+  * Global / per-vessel **Lead Time + Grace configuration**, e.g.:
+
+  **For calendar jobs:**
+
+  * `calendar_lead_days_critical`
+  * `calendar_lead_days_noncritical`
+  * `calendar_grace_mode`:
+
+    * `COMPANY_STANDARD` (end-of-month / 1 week rule)
+    * or `CUSTOM_DAYS`
+  * `calendar_grace_days` (used if CUSTOM)
+
+  **For RH jobs:**
+
+  * `rh_lead_hours_critical`
+  * `rh_lead_hours_noncritical`
+  * `rh_grace_hours` (default 168h, configurable)
+
+We can also support **per-vessel override** later, but first version can be **global for the company**.
+
+---
+
+## 3️⃣ How the functionality will work
+
+### 3.1 Calendar-based jobs – Lead Time & Grace
+
+For each calendar job:
+
+* `due_date = last_done_date + frequency`
+* From Admin settings:
+
+  * `lead_days = calendar_lead_days_critical` if job is critical
+    else `calendar_lead_days_noncritical`
+  * `grace_window`:
+
+    * If `calendar_grace_mode = COMPANY_STANDARD`
+
+      * We apply your company rule (end-of-month / 1 week).
+      * Can be implemented internally as:
+
+        * If due date is in last week of month → `due_date + 7 days`
+        * Else → `end of that month`.
+    * If `CUSTOM_DAYS` → `due_date + calendar_grace_days`
+
+**When to generate WO:**
+
+* When `today >= due_date - lead_days`
+  → **Generate WO** if no active WO exists.
+
+**Status:**
+
+* If `today < due_date` → WO status: **DUE** (future-due)
+* If `today >= due_date` → WO status: **OVERDUE**
+  (Grace does NOT change status; only escalation logic.)
+
+---
+
+### 3.2 Running-hour jobs – Lead Time & Grace
+
+For RH jobs:
+
+* `due_rh = last_done_rh + frequency_hours`
+* Current RH from parent component: `current_rh`
+* From Admin:
+
+  * `lead_hours = rh_lead_hours_critical` if job critical
+    else `rh_lead_hours_noncritical`
+  * `grace_hours = rh_grace_hours` (default 168h, configurable)
+
+**When to generate WO:**
+
+* When `current_rh >= due_rh - lead_hours`
+  → **Generate WO** if no active WO exists.
+
+**Status:**
+
+* If `current_rh < due_rh` → WO status: **DUE**
+* If `current_rh >= due_rh` → WO status: **OVERDUE**
+  (Grace hours only used for escalation & alerts to office.)
+
+---
+
+### 3.3 Where it lives in UI
+
+New Admin screen, e.g.:
+
+> **Admin → PMS Settings → Lead Time & Grace Configuration**
+
+Sections:
+
+1. **Calendar-Based Jobs Settings**
+
+   * Lead Time (days):
+
+     * Critical jobs: [input number]
+     * Non-critical jobs: [input number]
+   * Grace Period:
+
+     * Mode: [ Company Standard | Custom days ]
+     * If Custom: [input number of days]
+
+2. **Running-Hour Jobs Settings**
+
+   * Lead Time (hours):
+
+     * Critical jobs: [input number]
+     * Non-critical jobs: [input number]
+   * Grace Period:
+
+     * [input number of hours] (default 168)
+
+3. **Preview / Help box**
+
+   * “Based on these values, WOs will be generated this early and escalated after this grace period.”
+
+All values stored in a `PmsSettings` table and read by:
+
+* **WO generation service** (calendar scheduler or trigger).
+* **RH update handler** (for RH-based jobs).
+
+---
+
+## 4️⃣ Prompt for Replit – you can paste this directly
+
+Here’s a concise but detailed prompt you can give to your Replit AI/devs:
+
+---
+
+**Prompt to Replit (Lead Time + Grace Settings for PMS)**
+
+> You are implementing a new **Admin configuration screen** and backend logic for a shipboard PMS software.
+>
+> We already have:
+>
+> * Components module
+> * Jobs module (CALENDAR-based and RUNNING-HOURS–based jobs)
+> * Work Orders module (auto-generated from jobs)
+> * Running Hours module (storing current RH of parent components)
+>
+> We now need a **central Admin setting for Lead Time and Grace Period** which will drive Work Order auto-generation for both calendar-based jobs and RH-based jobs.
+>
+> ### 1. New Data Model / Settings
+>
+> Add a `PmsSettings` configuration (per company, for now global; later can be per vessel).
+> It must store at least:
+>
+> **Calendar-based jobs:**
+>
+> * `calendar_lead_days_critical` (int, >= 0)
+> * `calendar_lead_days_noncritical` (int, >= 0)
+> * `calendar_grace_mode` (enum: `COMPANY_STANDARD` | `CUSTOM_DAYS`)
+> * `calendar_grace_days` (int, >= 0, used only when mode = CUSTOM_DAYS)
+>
+> **Running-hour–based jobs:**
+>
+> * `rh_lead_hours_critical` (int, >= 0)
+> * `rh_lead_hours_noncritical` (int, >= 0)
+> * `rh_grace_hours` (int, >= 0, default 168)
+>
+> Create appropriate DB migration and a simple storage API:
+>
+> * `GET /admin/pms-settings` → returns current settings
+> * `PUT /admin/pms-settings` → updates settings (with validation)
+>
+> ### 2. Admin UI – “PMS Lead Time & Grace Settings”
+>
+> In the Admin module, create a new screen:
+>
+> Path: `Admin → PMS Settings → Lead Time & Grace`
+>
+> Layout:
+>
+> **Section A: Calendar-Based Jobs**
+>
+> * Group title: “Calendar-Based Jobs (Date-driven)”
+> * Fields:
+>
+>   * “Lead time before due date (Critical jobs)” → number input (days)
+>   * “Lead time before due date (Non-critical jobs)” → number input (days)
+>   * “Grace Period Mode” → radio/select:
+>
+>     * Option 1: Company Standard (end-of-month / 1 week rule)
+>     * Option 2: Custom (days)
+>   * If “Custom” selected → show:
+>
+>     * “Grace period (days after due date)” → number input
+>
+> **Section B: Running-Hours–Based Jobs**
+>
+> * Group title: “Running-Hour–Based Jobs”
+> * Fields:
+>
+>   * “Lead time before due hours (Critical jobs)” → number input (hours)
+>   * “Lead time before due hours (Non-critical jobs)” → number input (hours)
+>   * “Grace period (hours beyond due hours for escalation)” → number input (default 168)
+>
+> **Section C: Actions**
+>
+> * “Save Settings” button
+> * Show success/error toasts.
+>
+> All fields must:
+>
+> * Be non-negative integers.
+> * Use sensible defaults if empty (0 where applicable, 168 for RH grace).
+>
+> ### 3. Business Logic – Use Settings in WO Generation
+>
+> Integrate these settings into the WO generation logic as follows:
+>
+> #### 3.1 Calendar-based jobs
+>
+> Each calendar job has:
+>
+> * `frequency_value` + `frequency_unit` (days/weeks/months)
+> * `last_done_date`
+> * `critical_flag`
+>
+> Compute:
+>
+> * `due_date = last_done_date + frequency`
+>
+> From settings:
+>
+> * If `critical_flag = true` → `lead_days = calendar_lead_days_critical`
+> * Else → `lead_days = calendar_lead_days_noncritical`
+>
+> **WO generation rule:**
+>
+> * When `today >= (due_date - lead_days)`:
+>
+>   * If no active WO exists for that job+component:
+>
+>     * Auto-create a Work Order with status `DUE`.
+>
+> **Status rule:**
+>
+> * If `today < due_date` → WO status remains `DUE`.
+> * If `today >= due_date` → status becomes `OVERDUE`.
+>   (Grace period does NOT delay “overdue”; it is only for escalation/alerts.)
+>
+> **Grace period handling:**
+>
+> * If `calendar_grace_mode = COMPANY_STANDARD`:
+>
+>   * Implement company rule internally (end-of-month / 1-week rule) for escalation thresholds.
+> * If `CUSTOM_DAYS`:
+>
+>   * Use `calendar_grace_days` for escalation threshold.
+> * This escalation logic will be used by Alerts/Office dashboards, not to change WO status.
+>
+> #### 3.2 Running-hour–based jobs
+>
+> Each RH job has:
+>
+> * `frequency_hours`
+> * `last_done_rh`
+> * `critical_flag`
+>
+> From settings:
+>
+> * If `critical_flag = true` → `lead_hours = rh_lead_hours_critical`
+> * Else → `lead_hours = rh_lead_hours_noncritical`
+> * `grace_hours = rh_grace_hours`
+>
+> Compute:
+>
+> * `due_rh = last_done_rh + frequency_hours`
+> * `current_rh` from Running Hours module (parent component RH)
+>
+> **WO generation rule:**
+>
+> * When `current_rh >= (due_rh - lead_hours)`:
+>
+>   * If no active WO exists for that job+component:
+>
+>     * Auto-create a Work Order with status `DUE`.
+>
+> **Status rule:**
+>
+> * If `current_rh < due_rh` → WO status: `DUE`.
+> * If `current_rh >= due_rh` → WO status: `OVERDUE`.
+>   (Grace in hours is again for escalation only, not for status.)
+>
+> **Escalation:**
+>
+> * Alerts module may use:
+>
+>   * `current_rh >= due_rh + grace_hours` to trigger office escalation.
+>
+> ### 4. Validation & Testing
+>
+> Add tests to cover:
+>
+> * Changing settings updates WO generation thresholds without code changes.
+> * Calendar job with lead_days = 7:
+>
+>   * last_done_date = 01-Jan, frequency = 1 month → due 01-Feb.
+>   * WO should be created when `today >= 25-Jan`.
+> * RH job with lead_hours = 50:
+>
+>   * last_done_rh = 1000, frequency = 500 → due at 1500.
+>   * WO should be created when `current_rh >= 1450`.
+> * Grace does not affect DUE/OVERDUE status, only escalation triggers.
+>
+> Focus on:
+>
+> * Clean UI for Admin.
+> * Centralized use of settings in WO generation logic.
+> * No hard-coded lead/grace values anywhere in the code.
+
+---
+
+If you want, next we can plug this **Lead Time & Grace** logic into your **Maintenance Planner view** (next 30/60/90 days, next 250/500/1000 hours) so everything is consistent.
