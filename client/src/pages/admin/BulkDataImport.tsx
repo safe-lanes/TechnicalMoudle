@@ -15,7 +15,7 @@ import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import { VESSELS, type VesselId } from "@/lib/vessels";
 
-type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs' | 'template5' | 'template6';
+type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 
 export default function BulkDataImport() {
@@ -26,11 +26,9 @@ export default function BulkDataImport() {
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
-    { id: 'stores' as VesselTemplateType, number: 2, name: 'Stores' },
+    { id: 'jobs' as VesselTemplateType, number: 2, name: 'Jobs' },
     { id: 'spares' as VesselTemplateType, number: 3, name: 'Spares' },
-    { id: 'jobs' as VesselTemplateType, number: 4, name: 'Jobs' },
-    { id: 'template5' as VesselTemplateType, number: 5, name: 'Template 5' },
-    { id: 'template6' as VesselTemplateType, number: 6, name: 'Template 6' },
+    { id: 'stores' as VesselTemplateType, number: 4, name: 'Stores' },
   ];
 
   const fleetTemplates = [
