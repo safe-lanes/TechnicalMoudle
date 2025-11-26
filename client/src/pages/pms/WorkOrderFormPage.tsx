@@ -224,7 +224,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', comments: string}>,
     ihmUpdate: {
       enabled: false,
       action: "",
@@ -2117,7 +2117,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ...prev,
                       consumedSpareParts: [
                         ...prev.consumedSpareParts,
-                        { partNo: '', description: '', quantityConsumed: '', comments: '' }
+                        { partNo: '', description: '', quantityConsumed: '', location: '' as const, comments: '' }
                       ]
                     }));
                   }}
@@ -2134,9 +2134,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left p-2 font-medium text-gray-700 w-[15%]">PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[35%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY CONSUMED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]">COMMENTS</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]">DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">QTY CONSUMED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">LOCATION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">COMMENTS</th>
                       <th className="text-center p-2 font-medium text-gray-700 w-[10%]">ACTIONS</th>
                     </tr>
                   </thead>
@@ -2168,6 +2169,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       partNo: spare.partNo,
                                       description: spare.description,
                                       quantityConsumed: newValue,
+                                      location: '' as const,
                                       comments: ''
                                     });
                                   }
@@ -2178,6 +2180,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               className="text-sm h-8"
                               data-testid={`input-consumed-qty-${spare.partNo}`}
                             />
+                          </td>
+                          <td className="p-2">
+                            <select
+                              value={consumedData?.location || ''}
+                              onChange={(e) => {
+                                const newValue = e.target.value as 'Location A' | 'Location B' | '';
+                                setExecutionData(prev => {
+                                  const consumed = [...prev.consumedSpareParts];
+                                  if (consumedIndex >= 0) {
+                                    consumed[consumedIndex] = {
+                                      ...consumed[consumedIndex],
+                                      location: newValue
+                                    };
+                                  } else {
+                                    consumed.push({
+                                      partNo: spare.partNo,
+                                      description: spare.description,
+                                      quantityConsumed: '',
+                                      location: newValue,
+                                      comments: ''
+                                    });
+                                  }
+                                  return { ...prev, consumedSpareParts: consumed };
+                                });
+                              }}
+                              className="w-full h-8 text-sm border border-gray-200 rounded px-2 bg-white"
+                              data-testid={`select-consumed-location-${spare.partNo}`}
+                            >
+                              <option value="">Select Location</option>
+                              <option value="Location A">Location A</option>
+                              <option value="Location B">Location B</option>
+                            </select>
                           </td>
                           <td className="p-2">
                             <Input
@@ -2196,6 +2230,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       partNo: spare.partNo,
                                       description: spare.description,
                                       quantityConsumed: '',
+                                      location: '' as const,
                                       comments: newValue
                                     });
                                   }
@@ -2267,6 +2302,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   />
                                 </td>
                                 <td className="p-2">
+                                  <select
+                                    value={consumed.location || ''}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], location: e.target.value as 'Location A' | 'Location B' | '' };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    className="w-full h-8 text-sm border border-gray-200 rounded px-2 bg-white"
+                                  >
+                                    <option value="">Select Location</option>
+                                    <option value="Location A">Location A</option>
+                                    <option value="Location B">Location B</option>
+                                  </select>
+                                </td>
+                                <td className="p-2">
                                   <Input
                                     value={consumed.comments}
                                     onChange={(e) => {
@@ -2312,6 +2364,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 <td className="p-2 text-gray-900">{consumed.partNo}</td>
                                 <td className="p-2 text-gray-700">{consumed.description}</td>
                                 <td className="p-2 text-gray-900">{consumed.quantityConsumed}</td>
+                                <td className="p-2 text-gray-700">{consumed.location || '-'}</td>
                                 <td className="p-2 text-gray-700">{consumed.comments}</td>
                                 <td className="p-2">
                                   <div className="flex items-center justify-center gap-1">
@@ -2346,7 +2399,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                     {templateData.requiredSpareParts.length === 0 && executionData.consumedSpareParts.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="text-center p-4 text-gray-500 italic">
+                        <td colSpan={6} className="text-center p-4 text-gray-500 italic">
                           No spare parts consumed yet. Click "Add Spare" to record consumption.
                         </td>
                       </tr>

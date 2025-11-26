@@ -475,6 +475,27 @@ export interface IStorage {
   receiveStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
   getStoresItemHistory(itemId: number): Promise<StoresLedger[]>;
+  
+  // Fleet Vessel Mapping methods (Rule #16)
+  getFleetVesselMappings(): Promise<any[]>;
+  createFleetVesselMappings(data: {
+    fleetEntityType: 'component' | 'job' | 'spare';
+    fleetEntityIds: string[];
+    vesselId: string;
+    vesselComponentCode?: string;
+    mappedBy: string;
+  }): Promise<any[]>;
+  deleteFleetVesselMapping(id: string): Promise<void>;
+  getVessels(): Promise<Array<{id: string, name: string, code: string}>>;
+  
+  // On-Demand Work Order Generation (Rule #4)
+  generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other'): Promise<WorkOrder>;
+  
+  // Postponed WO Reappearance (Rule #5)
+  checkAndRevertPostponedWorkOrders(vesselId?: string): Promise<{
+    revertedCount: number;
+    revertedWorkOrders: WorkOrder[];
+  }>;
 }
 
 // Helper function to normalize and validate immediateCause structure

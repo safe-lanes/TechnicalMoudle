@@ -41,7 +41,7 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Grace Period Logic**: Fully implemented spec-compliant grace periods in `shared/workOrders/status.ts` with proper data hydration: Calendar jobs get grace until end of month OR 7 days after due date (whichever is longer). Running Hours jobs get 168-hour grace. Backend endpoints hydrate component currentRH, job dueRH/nextDueRH, and maintenanceBasis with robust numeric parsing (handles strings, decimals, empty values).
 - **Job Cycle Updates on WO Approval**: Fully working automatic updates to parent job fields when work orders are completed. Calendar jobs: `lastDoneDate` and recalculated `nextDueDate` using `calculateNextDueDate` utility (formula: lastDoneDate + frequencyValue × frequencyUnit). Running Hours jobs: `lastDoneRH` and recalculated `nextDueRH` using currentReading from `runningHours` field.
 - **Part B Section B3 (Running Hours)**: Work Order form displays Previous Reading (read-only, auto-filled from component's currentCumulativeRH) and Current Reading (editable). **GLOBAL BUSINESS RULES COMPLIANT**: WO completion updates ONLY sub-component RH (never parent RH). Only the Running Hours module has authority to update parent component RH. Sub-component RH must never exceed parent RH and cannot go backward.
-- **Part B Section B4 (Spare Parts Consumed)**: Table pre-loads required spares from Part A with editable Quantity Consumed and Comments columns. Supports manual spare entry with Add Spare button. Includes caption explaining automatic inventory deduction on approval with ROB update and low-stock alerts.
+- **Part B Section B4 (Spare Parts Consumed)**: Table pre-loads required spares from Part A with editable Quantity Consumed, Location (A/B), and Comments columns. Supports manual spare entry with Add Spare button. Location tracking enables dual-location inventory deduction. Includes caption explaining automatic inventory deduction on approval with ROB update and low-stock alerts.
 - **Legacy Data Migration**: Backfill endpoint (`POST /api/work-orders/backfill-job-ids`) safely migrates legacy work orders by matching component + jobTitle to link them with parent jobs.
 - **Defects Module**: Tracks Condition of Class, identifies recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management (dual locations, ROB/Min/Max levels), quick quantity adjustments, bulk upload, transaction history, and work order integration for consumption reconciliation. Automatic ROB deduction on work order completion with low-stock alerts.
@@ -62,6 +62,11 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Offline Mode** (Rule #20): ⏸️ PARKED FOR FUTURE - Current version does not support offline editing or queued sync. All write operations require active connection. Infrastructure exists (IndexedDB, OfflineContext) but is not wired into mutation flows. Forms will error out with "No network" if request fails. Full offline design (sync queue + conflict resolution) is parked for a future phase.
 - **RH Correction → WO Re-trigger** (Rule #3): ✅ IMPLEMENTED - When running hours are updated (via cascadeRunningHoursUpdate), system automatically scans all RH-based jobs on affected components, identifies jobs that now meet due criteria (currentRH >= nextDueRH - leadTime), and auto-generates work orders for newly-due jobs with correct status (Due/Overdue/Grace P).
 
+**Fleet Admin Workflow Enhancements**:
+- **Fleet Vessel Mapping (Rule #16)**: ✅ IMPLEMENTED - Fleet Admin Dashboard has 4-tab interface for mapping fleet equipment codes, equipment-to-component mappings, jobs, and spares to individual vessels. API endpoints: `GET/POST/DELETE /api/fleet/vessel-mappings`.
+- **On-Demand WO Generation (Rule #4)**: ✅ IMPLEMENTED - Jobs can generate work orders on-demand with reason tracking (Planning/Breakdown/Other). API endpoint: `POST /api/jobs/:id/generate-wo`. Generated WOs inherit job settings with auto-incremented WO numbers.
+- **Postponed WO Reappearance (Rule #5)**: ✅ IMPLEMENTED - Postponement dialog calculates end date based on duration selection (1 Day, 3 Days, 5 Days, 1 Week, 2 Weeks, 1 Month). Work orders store `postponementEndDate`, `postponementReason`, `postponementAuthorizedBy`. API endpoint `POST /api/work-orders/check-postponements` reverts expired postponements to Due status.
+
 **Database Schema Enhancements**:
 - **New Tables**: `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`.
 - **Stores Tables** (Global Business Rule Section 7.2 Compliance):
@@ -70,7 +75,8 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Enhanced Tables**: 
   - `jobs`: frequencyType, lead time fields (leadTimeValue, leadTimeUnit), RH cycle tracking (lastDoneRH, nextDueRH), audit tracking
   - `components`: componentCategory, makerCode, modelCode, conditionBased, isParent, audit tracking
-  - `work_orders`: jobId field for reliable job linkage and lead time hydration
+  - `work_orders`: jobId field for reliable job linkage and lead time hydration, postponementEndDate, postponementReason, postponementAuthorizedBy, onDemandReason
+  - `consumedSpareParts`: Added location field (Location A/B) for dual-location spare consumption tracking
 - **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only behavior for `component_maintenance_history` table (UPDATE/DELETE operations blocked with error message). Triggers are automatically created/verified on server startup when DATABASE_URL is configured.
 - **Backend Hydration**: Work order API endpoints (`/api/work-orders`) automatically enrich responses with `leadTimeValue` and `leadTimeUnit` from linked jobs, using `jobId` for reliable matching (fallback to `templateCode === jobNo` for legacy data).
 

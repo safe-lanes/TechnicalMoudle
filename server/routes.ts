@@ -3761,6 +3761,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =====================================================
+  // Fleet Admin - Vessel Mapping Routes (Rule #16)
+  // =====================================================
+
+  // Get all vessel mappings
+  app.get("/api/fleet/vessel-mappings", async (req, res) => {
+    try {
+      const mappings = await storage.getFleetVesselMappings();
+      res.json(mappings);
+    } catch (error) {
+      console.error("Error fetching vessel mappings:", error);
+      res.status(500).json({ error: "Failed to fetch vessel mappings" });
+    }
+  });
+
+  // Create vessel mappings (batch)
+  app.post("/api/fleet/vessel-mappings", async (req, res) => {
+    try {
+      const { fleetEntityType, fleetEntityIds, vesselId, vesselComponentCode } = req.body;
+      
+      if (!fleetEntityType || !fleetEntityIds?.length || !vesselId) {
+        return res.status(400).json({ error: "Missing required fields: fleetEntityType, fleetEntityIds, vesselId" });
+      }
+
+      const mappings = await storage.createFleetVesselMappings({
+        fleetEntityType,
+        fleetEntityIds,
+        vesselId,
+        vesselComponentCode,
+        mappedBy: 'admin'
+      });
+      
+      res.status(201).json(mappings);
+    } catch (error: any) {
+      console.error("Error creating vessel mappings:", error);
+      res.status(500).json({ error: error.message || "Failed to create vessel mappings" });
+    }
+  });
+
+  // Delete vessel mapping
+  app.delete("/api/fleet/vessel-mappings/:id", async (req, res) => {
+    try {
+      await storage.deleteFleetVesselMapping(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting vessel mapping:", error);
+      res.status(500).json({ error: error.message || "Failed to delete vessel mapping" });
+    }
+  });
+
+  // Get vessels list (for dropdown)
+  app.get("/api/vessels", async (req, res) => {
+    try {
+      const vessels = await storage.getVessels();
+      res.json(vessels);
+    } catch (error) {
+      console.error("Error fetching vessels:", error);
+      res.status(500).json({ error: "Failed to fetch vessels" });
+    }
+  });
+
+  // =====================================================
+  // On-Demand Work Order Generation (Rule #4)
+  // =====================================================
+
+  // Generate work order on demand from job
+  app.post("/api/jobs/:id/generate-wo", async (req, res) => {
+    try {
+      const jobId = req.params.id;
+      const { reason } = req.body; // 'Planning' | 'Breakdown' | 'Other'
+      
+      if (!reason || !['Planning', 'Breakdown', 'Other'].includes(reason)) {
+        return res.status(400).json({ error: "Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'" });
+      }
+
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Generate work order from job with on-demand reason
+      const workOrder = await storage.generateOnDemandWorkOrder(jobId, reason);
+      
+      res.status(201).json(workOrder);
+    } catch (error: any) {
+      console.error("Error generating on-demand work order:", error);
+      res.status(500).json({ error: error.message || "Failed to generate work order" });
+    }
+  });
+
+  // =====================================================
+  // Postponed WO Reappearance Check (Rule #5)
+  // =====================================================
+
+  // Check and revert expired postponements
+  app.post("/api/work-orders/check-postponements", async (req, res) => {
+    try {
+      const { vesselId } = req.body;
+      const result = await storage.checkAndRevertPostponedWorkOrders(vesselId);
+      
+      res.json({
+        success: true,
+        revertedCount: result.revertedCount,
+        revertedWorkOrders: result.revertedWorkOrders
+      });
+    } catch (error: any) {
+      console.error("Error checking postponements:", error);
+      res.status(500).json({ error: error.message || "Failed to check postponements" });
+    }
+  });
+
   // Document Management API routes for Work Orders
   // Upload document to object storage using SDK
   app.post("/api/upload-document", upload.single('file'), async (req, res) => {

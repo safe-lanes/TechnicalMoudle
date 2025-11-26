@@ -729,13 +729,19 @@ export const workOrders = pgTable("work_orders", {
   isActive: boolean("is_active").default(true), // Active status for fleet jobs
   applicableVesselIds: text("applicable_vessel_ids").array(), // Vessels that can use this fleet job
   scopeNotes: text("scope_notes"), // Notes about scope applicability
+  // Postponement fields (Rule #5 - Postponed WO Reappearance)
+  postponementEndDate: text("postponement_end_date"), // When postponement expires, WO should revert to Due status
+  postponementReason: text("postponement_reason"), // Reason for postponement
+  postponementAuthorizedBy: text("postponement_authorized_by"), // Who authorized the postponement
+  // On-demand WO generation fields (Rule #4)
+  onDemandReason: text("on_demand_reason"), // 'Planning' | 'Breakdown' | 'Other' - for WOs generated before frequency reached
   // Work Order Form Arrays (Part A - Template)
   requiredSpareParts: json("required_spare_parts").notNull().default([]), // [{partNo, description, quantityRequired, remarks}]
   requiredTools: json("required_tools").notNull().default([]), // [{toolName, quantity, remarks}]
   safetyRequirements: json("safety_requirements").notNull().default({ppeRequirements: [], permitRequirements: [], otherRequirements: []}), // {ppeRequirements: [], permitRequirements: [], otherRequirements: []}
   // Work Order Form Arrays (Part B - Execution)
   uploadedDocuments: json("uploaded_documents").notNull().default([]), // [{type: 'riskAssessment'|'safetyChecklist'|'operationalForm', fileName, fileKey, uploadedAt, uploadedBy}]
-  consumedSpareParts: json("consumed_spare_parts").notNull().default([]), // [{partNo, description, quantityConsumed, comments}]
+  consumedSpareParts: json("consumed_spare_parts").notNull().default([]), // [{partNo, description, quantityConsumed, comments, location: 'A'|'B'}]
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({

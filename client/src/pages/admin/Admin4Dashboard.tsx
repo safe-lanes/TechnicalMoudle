@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package } from "lucide-react";
+import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import FleetComponentsManagement from "./FleetComponentsManagement";
 import FleetJobsManagement from "./FleetJobsManagement";
 import FleetSparesManagement from "./FleetSparesManagement";
+import FleetVesselMapping from "./FleetVesselMapping";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'components' | 'jobs' | 'spares';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'components' | 'jobs' | 'spares' | 'vessel-mapping';
 
 export default function Admin4Dashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -141,6 +142,27 @@ export default function Admin4Dashboard() {
           <h1 className="text-xl font-semibold text-gray-900">Fleet Spares Management</h1>
         </div>
         <FleetSparesManagement />
+      </div>
+    );
+  }
+
+  if (currentView === 'vessel-mapping') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Fleet Vessel Mapping</h1>
+        </div>
+        <FleetVesselMapping />
       </div>
     );
   }
@@ -410,6 +432,19 @@ export default function Admin4Dashboard() {
               <div className="text-left">
                 <div className="font-medium">Fleet Spares</div>
                 <div className="text-sm text-gray-500">Spare parts catalog</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('vessel-mapping')}
+              data-testid="link-vessel-mapping"
+            >
+              <Ship className="mr-3 h-5 w-5 text-indigo-600" />
+              <div className="text-left">
+                <div className="font-medium">Vessel Mapping</div>
+                <div className="text-sm text-gray-500">Map fleet data to vessels</div>
               </div>
             </Button>
           </div>

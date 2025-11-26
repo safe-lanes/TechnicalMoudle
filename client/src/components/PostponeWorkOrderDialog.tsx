@@ -22,13 +22,13 @@ interface PostponeWorkOrderDialogProps {
   isOpen: boolean;
   onClose: () => void;
   workOrder: {
-    id?: string;
-    workOrderNo?: string;
-    templateCode?: string;
-    component: string;
+    id?: string | null;
+    workOrderNo?: string | null;
+    templateCode?: string | null;
+    component?: string | null;
     jobTitle: string;
-    dueDate: string;
-    assignedTo?: string;
+    dueDate?: string | null;
+    assignedTo?: string | null;
   } | null;
   onConfirm?: (workOrderId: string, postponeData: any) => void;
 }
@@ -57,9 +57,9 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     if (workOrder) {
       setFormData({
         workOrderId: workOrder.templateCode || workOrder.workOrderNo || "",
-        component: workOrder.component,
+        component: workOrder.component || "",
         jobTitle: workOrder.jobTitle,
-        originalDueDate: workOrder.dueDate,
+        originalDueDate: workOrder.dueDate || "",
         reasonForPostponement: "",
         authorizedBy: "Chief Engineer",
         approvalRemarks: "",
@@ -71,15 +71,49 @@ const PostponeWorkOrderDialog: React.FC<PostponeWorkOrderDialogProps> = ({
     }
   }, [workOrder]);
 
+  const calculatePostponementEndDate = (duration: string): string => {
+    const today = new Date();
+    let endDate = new Date(today);
+    
+    switch (duration) {
+      case '1 Day':
+        endDate.setDate(today.getDate() + 1);
+        break;
+      case '3 Days':
+        endDate.setDate(today.getDate() + 3);
+        break;
+      case '5 Days':
+        endDate.setDate(today.getDate() + 5);
+        break;
+      case '1 Week':
+        endDate.setDate(today.getDate() + 7);
+        break;
+      case '2 Weeks':
+        endDate.setDate(today.getDate() + 14);
+        break;
+      case '1 Month':
+        endDate.setMonth(today.getMonth() + 1);
+        break;
+      default:
+        endDate.setDate(today.getDate() + 5);
+    }
+    
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${String(endDate.getDate()).padStart(2, '0')}-${months[endDate.getMonth()]}-${endDate.getFullYear()}`;
+  };
+
   const handleSubmit = () => {
     if (onConfirm && workOrder) {
+      const postponementEndDate = calculatePostponementEndDate(formData.durationOfPostponement);
+      
       onConfirm(workOrder.id || "", {
         nextDueDate: formData.nextDueDate,
         reason: formData.reasonForPostponement,
         authorizedBy: formData.authorizedBy,
         duration: formData.durationOfPostponement,
         approvalRemarks: formData.approvalRemarks,
-        attachDocument: formData.attachDocument
+        attachDocument: formData.attachDocument,
+        postponementEndDate: postponementEndDate
       });
     }
     onClose();

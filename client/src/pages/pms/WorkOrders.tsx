@@ -286,7 +286,10 @@ const WorkOrders: React.FC = () => {
   const handlePostponeConfirm = (workOrderId: string, postponeData: any) => {
     const updateData = {
       status: "Postponed",
-      dueDate: postponeData.nextDueDate
+      dueDate: postponeData.nextDueDate,
+      postponementEndDate: postponeData.postponementEndDate,
+      postponementReason: postponeData.reason,
+      postponementAuthorizedBy: postponeData.authorizedBy
     };
     
     updateWorkOrderMutation.mutate({ id: workOrderId, data: updateData });

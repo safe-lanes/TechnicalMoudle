@@ -5304,4 +5304,272 @@ export class PersistentFileStorage implements IStorage {
       componentsReset
     };
   }
+
+  // =====================================================
+  // Fleet Vessel Mapping Methods (Rule #16)
+  // =====================================================
+
+  async getFleetVesselMappings(): Promise<any[]> {
+    if (!this.data.fleetVesselMappings) {
+      this.data.fleetVesselMappings = [];
+    }
+    return this.data.fleetVesselMappings;
+  }
+
+  async createFleetVesselMappings(data: {
+    fleetEntityType: 'component' | 'job' | 'spare';
+    fleetEntityIds: string[];
+    vesselId: string;
+    vesselComponentCode?: string;
+    mappedBy: string;
+  }): Promise<any[]> {
+    if (!this.data.fleetVesselMappings) {
+      this.data.fleetVesselMappings = [];
+    }
+    if (!this.data.counters.fleetVesselMappingId) {
+      this.data.counters.fleetVesselMappingId = 1;
+    }
+
+    const mappings: any[] = [];
+    const now = new Date().toISOString();
+
+    for (const entityId of data.fleetEntityIds) {
+      let fleetEntity: any = null;
+      let fleetCode = '';
+      let fleetName = '';
+
+      if (data.fleetEntityType === 'component') {
+        fleetEntity = Object.values(this.data.components || {}).find(
+          c => c && c.id === entityId && c.dataScope === 'fleet'
+        );
+        fleetCode = fleetEntity?.fleetEquipmentCode || fleetEntity?.componentCode || entityId;
+        fleetName = fleetEntity?.fleetEquipmentName || fleetEntity?.name || '';
+      } else if (data.fleetEntityType === 'job') {
+        fleetEntity = Object.values(this.data.jobs || {}).find(
+          j => j && j.id === entityId && j.dataScope === 'fleet'
+        );
+        fleetCode = fleetEntity?.jobNo || entityId;
+        fleetName = fleetEntity?.jobTitle || '';
+      } else if (data.fleetEntityType === 'spare') {
+        fleetEntity = Object.values(this.data.spares || {}).find(
+          s => s && String(s.id) === entityId && s.dataScope === 'fleet'
+        );
+        fleetCode = fleetEntity?.partCode || entityId;
+        fleetName = fleetEntity?.partName || '';
+      }
+
+      const mapping = {
+        id: `FVM-${this.data.counters.fleetVesselMappingId++}`,
+        fleetEntityType: data.fleetEntityType,
+        fleetEntityId: entityId,
+        fleetEntityCode: fleetCode,
+        fleetEntityName: fleetName,
+        vesselId: data.vesselId,
+        vesselComponentCode: data.vesselComponentCode || null,
+        mappedAt: now,
+        mappedBy: data.mappedBy
+      };
+
+      this.data.fleetVesselMappings.push(mapping);
+      mappings.push(mapping);
+    }
+
+    this.persistData();
+    return mappings;
+  }
+
+  async deleteFleetVesselMapping(id: string): Promise<void> {
+    if (!this.data.fleetVesselMappings) return;
+    
+    this.data.fleetVesselMappings = this.data.fleetVesselMappings.filter(m => m.id !== id);
+    this.persistData();
+  }
+
+  async getVessels(): Promise<Array<{id: string, name: string, code: string}>> {
+    const vesselIds = new Set<string>();
+    const vessels: Array<{id: string, name: string, code: string}> = [];
+    
+    Object.values(this.data.components || {}).forEach(c => {
+      if (c && c.vesselId && c.dataScope !== 'fleet' && !vesselIds.has(c.vesselId)) {
+        vesselIds.add(c.vesselId);
+        vessels.push({
+          id: c.vesselId,
+          name: c.vesselId,
+          code: c.vesselCode || c.vesselId
+        });
+      }
+    });
+    
+    return vessels;
+  }
+
+  // =====================================================
+  // On-Demand Work Order Generation (Rule #4)
+  // =====================================================
+
+  async generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other'): Promise<WorkOrder> {
+    const job = this.data.jobs[jobId];
+    if (!job) {
+      throw new Error(`Job with id ${jobId} not found`);
+    }
+
+    const component = Object.values(this.data.components || {}).find(
+      c => c && c.id === job.componentId
+    );
+
+    const currentYear = new Date().getFullYear();
+    const jobCode = job.jobNo || jobId;
+    
+    const existingWOs = (this.data.workOrders || []).filter(wo => {
+      const pattern = new RegExp(`^${jobCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.WO-${currentYear}-(\\d+)$`);
+      return pattern.test(wo.workOrderNo);
+    });
+    
+    let maxNum = 0;
+    existingWOs.forEach(wo => {
+      const match = wo.workOrderNo.match(/-(\d+)$/);
+      if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+    });
+    
+    const workOrderNo = `${jobCode}.WO-${currentYear}-${String(maxNum + 1).padStart(3, '0')}`;
+    const workOrderId = `WO-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    const today = new Date();
+    const dueDate = `${String(today.getDate()).padStart(2, '0')}-${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][today.getMonth()]}-${today.getFullYear()}`;
+
+    const newWorkOrder: WorkOrder = {
+      id: workOrderId,
+      vesselId: job.vesselId || null,
+      component: component?.name || job.componentId || '',
+      componentCode: job.componentCode || null,
+      jobId: jobId,
+      workOrderNo: workOrderNo,
+      workOrderType: 'Planned',
+      templateCode: workOrderNo,
+      executionId: null,
+      jobTitle: job.jobTitle,
+      assignedTo: job.rankAssigned || 'Unassigned',
+      dueDate: dueDate,
+      status: 'Active',
+      dateCompleted: null,
+      submittedDate: null,
+      formData: null,
+      taskType: job.taskType || null,
+      maintenanceBasis: job.maintenanceBasis || 'Calendar',
+      frequencyValue: job.frequencyValue || null,
+      frequencyUnit: job.frequencyUnit || null,
+      approverRemarks: null,
+      isExecution: false,
+      templateId: null,
+      approver: null,
+      approvalDate: null,
+      rejectionDate: null,
+      nextDueDate: null,
+      nextDueReading: null,
+      currentReading: null,
+      classRelated: job.classRelated || null,
+      jobPriority: job.jobPriority || null,
+      briefWorkDescription: job.scopeNotes || null,
+      dataScope: 'vessel',
+      fleetEquipmentCode: null,
+      fleetJobCode: null,
+      jobGroup: null,
+      jobCategory: null,
+      sfiCode: null,
+      maintenanceIntervalValue: null,
+      maintenanceIntervalUnit: null,
+      intervalRunningHour: null,
+      department: null,
+      criticality: null,
+      isActive: true,
+      applicableVesselIds: null,
+      scopeNotes: null,
+      postponementEndDate: null,
+      postponementReason: null,
+      postponementAuthorizedBy: null,
+      onDemandReason: reason,
+      requiredSpareParts: job.requiredSpares || [],
+      requiredTools: [],
+      safetyRequirements: { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+      uploadedDocuments: [],
+      consumedSpareParts: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    if (!this.data.workOrders) {
+      this.data.workOrders = [];
+    }
+    this.data.workOrders.push(newWorkOrder);
+    this.persistData();
+    
+    console.log(`[On-Demand WO] Created ${workOrderNo} from job ${jobCode} with reason: ${reason}`);
+    
+    return newWorkOrder;
+  }
+
+  // =====================================================
+  // Postponed WO Reappearance Check (Rule #5)
+  // =====================================================
+
+  async checkAndRevertPostponedWorkOrders(vesselId?: string): Promise<{
+    revertedCount: number;
+    revertedWorkOrders: WorkOrder[];
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const revertedWorkOrders: WorkOrder[] = [];
+    
+    if (!this.data.workOrders) {
+      return { revertedCount: 0, revertedWorkOrders: [] };
+    }
+
+    for (let i = 0; i < this.data.workOrders.length; i++) {
+      const wo = this.data.workOrders[i];
+      
+      if (wo.status !== 'Postponed') continue;
+      if (vesselId && wo.vesselId !== vesselId) continue;
+      if (!wo.postponementEndDate) continue;
+      
+      const endDateParts = wo.postponementEndDate.split('-');
+      if (endDateParts.length !== 3) continue;
+      
+      const monthMap: { [key: string]: number } = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      
+      let postponeEndDate: Date;
+      if (endDateParts[1] in monthMap) {
+        const day = parseInt(endDateParts[0], 10);
+        const month = monthMap[endDateParts[1]];
+        const year = parseInt(endDateParts[2], 10);
+        postponeEndDate = new Date(year, month, day);
+      } else {
+        postponeEndDate = new Date(wo.postponementEndDate);
+      }
+      
+      postponeEndDate.setHours(0, 0, 0, 0);
+      
+      if (today >= postponeEndDate) {
+        this.data.workOrders[i] = {
+          ...wo,
+          status: 'Due',
+          updatedAt: new Date()
+        };
+        revertedWorkOrders.push(this.data.workOrders[i]);
+        console.log(`[Postponement Check] Reverted WO ${wo.workOrderNo} from Postponed to Due (end date: ${wo.postponementEndDate})`);
+      }
+    }
+
+    if (revertedWorkOrders.length > 0) {
+      this.persistData();
+    }
+
+    return {
+      revertedCount: revertedWorkOrders.length,
+      revertedWorkOrders
+    };
+  }
 }
