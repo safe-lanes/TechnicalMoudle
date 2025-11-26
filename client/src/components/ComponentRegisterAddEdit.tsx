@@ -504,7 +504,7 @@ export default function ComponentRegisterAddEdit({
             <span className="w-4 mr-1" />
           )}
           <span className="text-xs text-gray-700 truncate">
-            {node.code}. {node.name}
+            {node.name}
           </span>
         </div>
         {isExpanded && hasChildren && (
