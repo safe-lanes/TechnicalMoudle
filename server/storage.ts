@@ -100,7 +100,10 @@ import {
   ihmItems,
   type IhmItem,
   ihmMaintenanceLog,
-  type IhmMaintenanceLog
+  type IhmMaintenanceLog,
+  pmsVesselSettings,
+  type PmsVesselSettings,
+  type InsertPmsVesselSettings
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -515,6 +518,12 @@ export interface IStorage {
     revertedCount: number;
     revertedWorkOrders: WorkOrder[];
   }>;
+  
+  // PMS Vessel Settings - Lead Time & Grace Period Configuration
+  getPmsVesselSettings(vesselId: string): Promise<PmsVesselSettings | undefined>;
+  getAllPmsVesselSettings(): Promise<PmsVesselSettings[]>;
+  createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings>;
+  deletePmsVesselSettings(vesselId: string): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -605,6 +614,8 @@ export class MemStorage implements IStorage {
   private currentStoresItemId: number;
   private storesLedger: StoresLedger[];
   private currentStoresLedgerId: number;
+  private pmsVesselSettings: Map<string, PmsVesselSettings>;
+  private currentPmsVesselSettingsId: number;
 
   constructor() {
     this.users = new Map();
@@ -658,6 +669,8 @@ export class MemStorage implements IStorage {
     this.currentStoresItemId = 1;
     this.storesLedger = [];
     this.currentStoresLedgerId = 1;
+    this.pmsVesselSettings = new Map();
+    this.currentPmsVesselSettingsId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -5078,6 +5091,50 @@ export class MemStorage implements IStorage {
       componentsReset: 0,
     };
   }
+
+  // ============= PMS VESSEL SETTINGS =============
+  async getPmsVesselSettings(vesselId: string): Promise<PmsVesselSettings | undefined> {
+    return this.pmsVesselSettings.get(vesselId);
+  }
+
+  async getAllPmsVesselSettings(): Promise<PmsVesselSettings[]> {
+    return Array.from(this.pmsVesselSettings.values());
+  }
+
+  async createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings> {
+    const existing = this.pmsVesselSettings.get(settings.vesselId);
+    
+    if (existing) {
+      const updated: PmsVesselSettings = {
+        ...existing,
+        ...settings,
+        updatedAt: new Date(),
+      };
+      this.pmsVesselSettings.set(settings.vesselId, updated);
+      return updated;
+    } else {
+      const newSettings: PmsVesselSettings = {
+        id: this.currentPmsVesselSettingsId++,
+        vesselId: settings.vesselId,
+        calendarLeadDaysCritical: settings.calendarLeadDaysCritical ?? 7,
+        calendarLeadDaysNonCritical: settings.calendarLeadDaysNonCritical ?? 14,
+        calendarGraceMode: settings.calendarGraceMode ?? 'COMPANY_STANDARD',
+        calendarGraceDays: settings.calendarGraceDays ?? 7,
+        rhLeadHoursCritical: settings.rhLeadHoursCritical ?? 50,
+        rhLeadHoursNonCritical: settings.rhLeadHoursNonCritical ?? 100,
+        rhGraceHours: settings.rhGraceHours ?? 168,
+        updatedBy: settings.updatedBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.pmsVesselSettings.set(settings.vesselId, newSettings);
+      return newSettings;
+    }
+  }
+
+  async deletePmsVesselSettings(vesselId: string): Promise<void> {
+    this.pmsVesselSettings.delete(vesselId);
+  }
 }
 
 export class PostgresStorage implements IStorage {
@@ -7651,6 +7708,50 @@ export class PostgresStorage implements IStorage {
     
     console.log(`[PURGE] Jobs and linked data purged: ${JSON.stringify(result)}`);
     return result;
+  }
+
+  // ============= PMS VESSEL SETTINGS =============
+  async getPmsVesselSettings(vesselId: string): Promise<PmsVesselSettings | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(pmsVesselSettings).where(eq(pmsVesselSettings.vesselId, vesselId));
+    return result[0];
+  }
+
+  async getAllPmsVesselSettings(): Promise<PmsVesselSettings[]> {
+    const db = await this.getDb();
+    return await db.select().from(pmsVesselSettings);
+  }
+
+  async createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const existing = await db.select().from(pmsVesselSettings).where(eq(pmsVesselSettings.vesselId, settings.vesselId));
+    
+    if (existing.length > 0) {
+      const result = await db.update(pmsVesselSettings)
+        .set({
+          ...settings,
+          updatedAt: new Date()
+        })
+        .where(eq(pmsVesselSettings.vesselId, settings.vesselId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(pmsVesselSettings).values({
+        ...settings,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+      return result[0];
+    }
+  }
+
+  async deletePmsVesselSettings(vesselId: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(pmsVesselSettings).where(eq(pmsVesselSettings.vesselId, vesselId));
   }
 }
 

@@ -55,7 +55,9 @@ import {
   type MasterList,
   type InsertMasterList,
   type AuditLog,
-  type InsertAuditLog
+  type InsertAuditLog,
+  type PmsVesselSettings,
+  type InsertPmsVesselSettings
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -99,6 +101,7 @@ interface PersistentData {
   makers: Maker[];
   masterLists: MasterList[];
   auditLogs: AuditLog[];
+  pmsVesselSettings: Record<string, PmsVesselSettings>;
   
   // Counter state
   counters: {
@@ -122,6 +125,7 @@ interface PersistentData {
     defectAttachmentId: number;
     recurringDefectId: number;
     auditLogId: number;
+    pmsVesselSettingsId: number;
   };
 }
 
@@ -301,6 +305,7 @@ export class PersistentFileStorage implements IStorage {
           makers: loadedData.makers || [],
           masterLists: loadedData.masterLists || [],
           auditLogs: loadedData.auditLogs || [],
+          pmsVesselSettings: loadedData.pmsVesselSettings || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -321,7 +326,8 @@ export class PersistentFileStorage implements IStorage {
             defectActionId: loadedData.counters?.defectActionId || 1,
             defectAttachmentId: loadedData.counters?.defectAttachmentId || 1,
             recurringDefectId: loadedData.counters?.recurringDefectId || 1,
-            auditLogId: loadedData.counters?.auditLogId || 1
+            auditLogId: loadedData.counters?.auditLogId || 1,
+            pmsVesselSettingsId: loadedData.counters?.pmsVesselSettingsId || 1
           }
         };
         
@@ -366,6 +372,7 @@ export class PersistentFileStorage implements IStorage {
       makers: [],
       masterLists: [],
       auditLogs: [],
+      pmsVesselSettings: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -386,7 +393,8 @@ export class PersistentFileStorage implements IStorage {
         defectActionId: 1,
         defectAttachmentId: 1,
         recurringDefectId: 1,
-        auditLogId: 1
+        auditLogId: 1,
+        pmsVesselSettingsId: 1
       }
     };
     
@@ -5825,5 +5833,55 @@ export class PersistentFileStorage implements IStorage {
       revertedCount: revertedWorkOrders.length,
       revertedWorkOrders
     };
+  }
+
+  // =====================================================
+  // PMS Vessel Settings - Lead Time & Grace Period
+  // =====================================================
+
+  async getPmsVesselSettings(vesselId: string): Promise<PmsVesselSettings | undefined> {
+    return this.data.pmsVesselSettings[vesselId];
+  }
+
+  async getAllPmsVesselSettings(): Promise<PmsVesselSettings[]> {
+    return Object.values(this.data.pmsVesselSettings);
+  }
+
+  async createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings> {
+    const existing = this.data.pmsVesselSettings[settings.vesselId];
+    
+    if (existing) {
+      const updated: PmsVesselSettings = {
+        ...existing,
+        ...settings,
+        updatedAt: new Date(),
+      };
+      this.data.pmsVesselSettings[settings.vesselId] = updated;
+      this.persistData();
+      return updated;
+    } else {
+      const newSettings: PmsVesselSettings = {
+        id: this.data.counters.pmsVesselSettingsId++,
+        vesselId: settings.vesselId,
+        calendarLeadDaysCritical: settings.calendarLeadDaysCritical ?? 7,
+        calendarLeadDaysNonCritical: settings.calendarLeadDaysNonCritical ?? 14,
+        calendarGraceMode: settings.calendarGraceMode ?? 'COMPANY_STANDARD',
+        calendarGraceDays: settings.calendarGraceDays ?? 7,
+        rhLeadHoursCritical: settings.rhLeadHoursCritical ?? 50,
+        rhLeadHoursNonCritical: settings.rhLeadHoursNonCritical ?? 100,
+        rhGraceHours: settings.rhGraceHours ?? 168,
+        updatedBy: settings.updatedBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.data.pmsVesselSettings[settings.vesselId] = newSettings;
+      this.persistData();
+      return newSettings;
+    }
+  }
+
+  async deletePmsVesselSettings(vesselId: string): Promise<void> {
+    delete this.data.pmsVesselSettings[vesselId];
+    this.persistData();
   }
 }

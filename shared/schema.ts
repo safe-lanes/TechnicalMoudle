@@ -1373,3 +1373,37 @@ export const insertComponentMaintenanceHistorySchema = createInsertSchema(compon
 
 export type InsertComponentMaintenanceHistory = z.infer<typeof insertComponentMaintenanceHistorySchema>;
 export type ComponentMaintenanceHistory = typeof componentMaintenanceHistory.$inferSelect;
+
+// PMS Vessel Settings - Per-vessel Lead Time & Grace Period configuration
+// Controls WO auto-generation timing and status transitions
+export const pmsVesselSettings = pgTable("pms_vessel_settings", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull().unique(), // Unique per vessel
+
+  // Calendar-based jobs settings
+  calendarLeadDaysCritical: integer("calendar_lead_days_critical").notNull().default(7), // Days before due for critical jobs
+  calendarLeadDaysNonCritical: integer("calendar_lead_days_non_critical").notNull().default(14), // Days before due for non-critical jobs
+  calendarGraceMode: text("calendar_grace_mode").notNull().default("COMPANY_STANDARD"), // 'COMPANY_STANDARD' | 'CUSTOM_DAYS'
+  calendarGraceDays: integer("calendar_grace_days").notNull().default(7), // Custom grace period days (used when mode = CUSTOM_DAYS)
+
+  // Running-hour based jobs settings  
+  rhLeadHoursCritical: integer("rh_lead_hours_critical").notNull().default(50), // Hours before due for critical RH jobs
+  rhLeadHoursNonCritical: integer("rh_lead_hours_non_critical").notNull().default(100), // Hours before due for non-critical RH jobs
+  rhGraceHours: integer("rh_grace_hours").notNull().default(168), // Grace period hours for escalation (default 168 = 1 week)
+
+  // Audit fields
+  updatedBy: text("updated_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdIdx: index("idx_pms_settings_vessel_id").on(table.vesselId),
+}));
+
+export const insertPmsVesselSettingsSchema = createInsertSchema(pmsVesselSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPmsVesselSettings = z.infer<typeof insertPmsVesselSettingsSchema>;
+export type PmsVesselSettings = typeof pmsVesselSettings.$inferSelect;
