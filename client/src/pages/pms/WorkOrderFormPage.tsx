@@ -136,6 +136,49 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     queryKey: ['/api/work-orders', workOrderId, 'context'],
     enabled: !!workOrderId
   });
+
+  // Extract vesselId from context for spares query
+  const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
+  
+  // Fetch spares inventory for location auto-selection in Part B4
+  const { data: sparesInventory = [] } = useQuery<Array<{
+    id: number;
+    partCode: string;
+    partName: string;
+    rob: string;
+    robLocationA: string;
+    robLocationB: string;
+    locationA: string | null;
+    locationB: string | null;
+  }>>({
+    queryKey: ['/api/spares', vesselId],
+    enabled: !!vesselId
+  });
+
+  // Helper function to get available locations for a spare part
+  const getAvailableLocationsForSpare = (partNo: string): Array<'Location A' | 'Location B'> => {
+    const spare = sparesInventory.find(s => s.partCode === partNo);
+    if (!spare) return ['Location A', 'Location B']; // Default if not found
+    
+    const locations: Array<'Location A' | 'Location B'> = [];
+    const robA = parseFloat(spare.robLocationA || '0');
+    const robB = parseFloat(spare.robLocationB || '0');
+    
+    if (robA > 0) locations.push('Location A');
+    if (robB > 0) locations.push('Location B');
+    
+    // If no stock anywhere, allow both locations for manual entry
+    if (locations.length === 0) return ['Location A', 'Location B'];
+    
+    return locations;
+  };
+
+  // Helper to check if auto-selection should be applied
+  const getAutoSelectedLocation = (partNo: string): 'Location A' | 'Location B' | null => {
+    const locations = getAvailableLocationsForSpare(partNo);
+    if (locations.length === 1) return locations[0];
+    return null;
+  };
   
   const workCarriedOutRef = useRef<HTMLTextAreaElement>(null);
   const [showQuickInputs, setShowQuickInputs] = useState(false);
@@ -792,6 +835,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         toast({
           title: "Validation Error",
           description: "Frequency unit is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate spare parts consumed - location must be selected for items with quantity
+      const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
+        const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
+        const autoLocation = getAutoSelectedLocation(spare.partNo);
+        const hasLocation = spare.location || autoLocation;
+        return hasQuantity && !hasLocation;
+      });
+
+      if (sparesWithMissingLocation.length > 0) {
+        const missingParts = sparesWithMissingLocation.map(s => s.partNo).join(', ');
+        toast({
+          title: "Validation Error",
+          description: `Please select a location for consumed spare parts: ${missingParts}`,
           variant: "destructive",
         });
         return;
@@ -2146,9 +2207,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     {templateData.requiredSpareParts.map((spare, index) => {
                       const consumedIndex = executionData.consumedSpareParts.findIndex(c => c.partNo === spare.partNo);
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
+                      const availableLocations = getAvailableLocationsForSpare(spare.partNo);
+                      const autoSelectedLocation = getAutoSelectedLocation(spare.partNo);
+                      const currentLocation = consumedData?.location || autoSelectedLocation || '';
+                      const hasQuantityConsumed = consumedData?.quantityConsumed && parseFloat(consumedData.quantityConsumed) > 0;
+                      const needsLocationSelection = hasQuantityConsumed && !currentLocation && availableLocations.length > 1;
                       
                       return (
-                        <tr key={`preloaded-${index}`} className="border-b border-gray-200 hover:bg-gray-50">
+                        <tr key={`preloaded-${index}`} className={`border-b border-gray-200 hover:bg-gray-50 ${needsLocationSelection ? 'bg-amber-50' : ''}`}>
                           <td className="p-2 text-gray-900">{spare.partNo}</td>
                           <td className="p-2 text-gray-700">{spare.description}</td>
                           <td className="p-2">
@@ -2162,14 +2228,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   if (consumedIndex >= 0) {
                                     consumed[consumedIndex] = {
                                       ...consumed[consumedIndex],
-                                      quantityConsumed: newValue
+                                      quantityConsumed: newValue,
+                                      // Auto-select location if only one available
+                                      location: consumed[consumedIndex].location || autoSelectedLocation || ''
                                     };
                                   } else {
                                     consumed.push({
                                       partNo: spare.partNo,
                                       description: spare.description,
                                       quantityConsumed: newValue,
-                                      location: '' as const,
+                                      location: autoSelectedLocation || '',
                                       comments: ''
                                     });
                                   }
@@ -2182,36 +2250,52 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                             />
                           </td>
                           <td className="p-2">
-                            <select
-                              value={consumedData?.location || ''}
-                              onChange={(e) => {
-                                const newValue = e.target.value as 'Location A' | 'Location B' | '';
-                                setExecutionData(prev => {
-                                  const consumed = [...prev.consumedSpareParts];
-                                  if (consumedIndex >= 0) {
-                                    consumed[consumedIndex] = {
-                                      ...consumed[consumedIndex],
-                                      location: newValue
-                                    };
-                                  } else {
-                                    consumed.push({
-                                      partNo: spare.partNo,
-                                      description: spare.description,
-                                      quantityConsumed: '',
-                                      location: newValue,
-                                      comments: ''
-                                    });
-                                  }
-                                  return { ...prev, consumedSpareParts: consumed };
-                                });
-                              }}
-                              className="w-full h-8 text-sm border border-gray-200 rounded px-2 bg-white"
-                              data-testid={`select-consumed-location-${spare.partNo}`}
-                            >
-                              <option value="">Select Location</option>
-                              <option value="Location A">Location A</option>
-                              <option value="Location B">Location B</option>
-                            </select>
+                            <div className="space-y-1">
+                              <select
+                                value={currentLocation}
+                                onChange={(e) => {
+                                  const newValue = e.target.value as 'Location A' | 'Location B' | '';
+                                  setExecutionData(prev => {
+                                    const consumed = [...prev.consumedSpareParts];
+                                    if (consumedIndex >= 0) {
+                                      consumed[consumedIndex] = {
+                                        ...consumed[consumedIndex],
+                                        location: newValue
+                                      };
+                                    } else {
+                                      consumed.push({
+                                        partNo: spare.partNo,
+                                        description: spare.description,
+                                        quantityConsumed: '',
+                                        location: newValue,
+                                        comments: ''
+                                      });
+                                    }
+                                    return { ...prev, consumedSpareParts: consumed };
+                                  });
+                                }}
+                                className={`w-full h-8 text-sm border rounded px-2 bg-white ${needsLocationSelection ? 'border-amber-400 ring-1 ring-amber-200' : 'border-gray-200'}`}
+                                disabled={autoSelectedLocation !== null}
+                                data-testid={`select-consumed-location-${spare.partNo}`}
+                              >
+                                {autoSelectedLocation ? (
+                                  <option value={autoSelectedLocation}>{autoSelectedLocation} (only stock)</option>
+                                ) : (
+                                  <>
+                                    <option value="">Select Location</option>
+                                    {availableLocations.map(loc => (
+                                      <option key={loc} value={loc}>{loc}</option>
+                                    ))}
+                                  </>
+                                )}
+                              </select>
+                              {needsLocationSelection && (
+                                <p className="text-xs text-amber-600">Location required</p>
+                              )}
+                              {autoSelectedLocation && (
+                                <p className="text-xs text-gray-500">Auto-selected (single location)</p>
+                              )}
+                            </div>
                           </td>
                           <td className="p-2">
                             <Input

@@ -3779,7 +3779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create vessel mappings (batch)
   app.post("/api/fleet/vessel-mappings", async (req, res) => {
     try {
-      const { fleetEntityType, fleetEntityIds, vesselId, vesselComponentCode } = req.body;
+      const { fleetEntityType, fleetEntityIds, vesselId, vesselEntityId, vesselEntityCode } = req.body;
       
       if (!fleetEntityType || !fleetEntityIds?.length || !vesselId) {
         return res.status(400).json({ error: "Missing required fields: fleetEntityType, fleetEntityIds, vesselId" });
@@ -3789,7 +3789,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fleetEntityType,
         fleetEntityIds,
         vesselId,
-        vesselComponentCode,
+        vesselEntityId,
+        vesselEntityCode,
         mappedBy: 'admin'
       });
       
@@ -4033,6 +4034,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('✅ Recurring defects recalculated successfully');
   }).catch(err => {
     console.error('⚠️ Error recalculating recurring defects:', err);
+  });
+  
+  // Check and revert expired postponed work orders on startup
+  (async () => {
+    try {
+      const result = await storage.checkAndRevertPostponedWorkOrders();
+      if (result.revertedCount > 0) {
+        console.log(`✅ Reverted ${result.revertedCount} expired postponed work orders to Due status`);
+        result.revertedWorkOrders.forEach(wo => {
+          console.log(`   - WO ${wo.workOrderNo} (${wo.jobTitle})`);
+        });
+      } else {
+        console.log('✅ No expired postponed work orders to revert');
+      }
+    } catch (err) {
+      console.error('⚠️ Error checking postponed work orders on startup:', err);
+    }
+  })();
+  
+  // Set up hourly check for expired postponed work orders
+  const POSTPONEMENT_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  const postponementCheckInterval = setInterval(async () => {
+    try {
+      const result = await storage.checkAndRevertPostponedWorkOrders();
+      if (result.revertedCount > 0) {
+        console.log(`[Scheduled] Reverted ${result.revertedCount} expired postponed work orders`);
+      }
+    } catch (err) {
+      console.error('[Scheduled] Error checking postponed work orders:', err);
+    }
+  }, POSTPONEMENT_CHECK_INTERVAL_MS);
+  console.log(`📅 Scheduled hourly check for expired postponed work orders`);
+  
+  // Cleanup on server shutdown
+  process.on('SIGTERM', () => {
+    console.log('Cleaning up scheduled tasks...');
+    clearInterval(postponementCheckInterval);
+  });
+  process.on('SIGINT', () => {
+    console.log('Cleaning up scheduled tasks...');
+    clearInterval(postponementCheckInterval);
   });
   
   return httpServer;

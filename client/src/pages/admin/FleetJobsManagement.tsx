@@ -4,10 +4,20 @@ import { type WorkOrder, type Component } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, Trash2, Upload, Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Plus, Search, Pencil, Trash2, Download, PlayCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetJobForm from "./FleetJobForm";
@@ -20,6 +30,11 @@ export default function FleetJobsManagement() {
   const [selectedJob, setSelectedJob] = useState<WorkOrder | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<WorkOrder | null>(null);
+  
+  // On-demand WO generation state
+  const [generateWODialogOpen, setGenerateWODialogOpen] = useState(false);
+  const [jobForWO, setJobForWO] = useState<WorkOrder | null>(null);
+  const [woReason, setWoReason] = useState<'Planning' | 'Breakdown' | 'Other'>('Planning');
 
   // Fetch fleet jobs
   const { data: jobs, isLoading, error } = useQuery<WorkOrder[]>({
@@ -49,6 +64,60 @@ export default function FleetJobsManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete job",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Generate WO on-demand mutation - use raw fetch to preserve JSON error body
+  const generateWOMutation = useMutation({
+    mutationFn: async ({ jobId, reason }: { jobId: string; reason: 'Planning' | 'Breakdown' | 'Other' }) => {
+      const response = await fetch(`/api/jobs/${jobId}/generate-wo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+        credentials: 'include',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // Throw error with the backend message preserved
+        const error = new Error(data.error || 'Failed to generate work order');
+        (error as any).status = response.status;
+        (error as any).isDuplicate = response.status === 409 || 
+                                      (data.error && (
+                                        data.error.toLowerCase().includes('duplicate') ||
+                                        data.error.toLowerCase().includes('already exists') ||
+                                        data.error.toLowerCase().includes('pending')
+                                      ));
+        throw error;
+      }
+      
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'], exact: false });
+      toast({
+        title: "Work Order Created",
+        description: `Work Order ${data.workOrderNo || data.id || 'N/A'} has been created successfully.`,
+      });
+      setGenerateWODialogOpen(false);
+      setJobForWO(null);
+      setWoReason('Planning');
+    },
+    onError: (error: any) => {
+      const isDuplicateError = error?.isDuplicate || 
+                               (error?.message && (
+                                 error.message.toLowerCase().includes('duplicate') || 
+                                 error.message.toLowerCase().includes('already exists') ||
+                                 error.message.toLowerCase().includes('pending')
+                               ));
+      toast({
+        title: "Error",
+        description: isDuplicateError 
+          ? "A pending work order already exists for this job. Please complete or cancel the existing work order first."
+          : (error?.message || "Failed to generate work order"),
         variant: "destructive",
       });
     },
@@ -89,6 +158,18 @@ export default function FleetJobsManagement() {
   const handleDeleteConfirm = () => {
     if (jobToDelete) {
       deleteMutation.mutate(jobToDelete.id);
+    }
+  };
+
+  const handleGenerateWOClick = (job: WorkOrder) => {
+    setJobForWO(job);
+    setWoReason('Planning');
+    setGenerateWODialogOpen(true);
+  };
+
+  const handleGenerateWOConfirm = () => {
+    if (jobForWO) {
+      generateWOMutation.mutate({ jobId: jobForWO.id, reason: woReason });
     }
   };
 
@@ -233,6 +314,17 @@ export default function FleetJobsManagement() {
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleGenerateWOClick(job)}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                title="Create Work Order Now"
+                                data-testid={`button-generate-wo-${job.id}`}
+                              >
+                                <PlayCircle className="h-4 w-4 mr-1" />
+                                Create WO
+                              </Button>
+                              <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(job)}
@@ -291,6 +383,76 @@ export default function FleetJobsManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Generate Work Order Dialog */}
+      <Dialog open={generateWODialogOpen} onOpenChange={setGenerateWODialogOpen}>
+        <DialogContent data-testid="dialog-generate-wo">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-green-600" />
+              Create Work Order Now
+            </DialogTitle>
+            <DialogDescription>
+              Generate a new work order for job "{jobForWO?.jobTitle}" immediately.
+              This will create an on-demand work order outside the normal schedule.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Reason for On-Demand Work Order *</Label>
+              <RadioGroup
+                value={woReason}
+                onValueChange={(value) => setWoReason(value as 'Planning' | 'Breakdown' | 'Other')}
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="Planning" id="reason-planning" data-testid="radio-planning" />
+                  <Label htmlFor="reason-planning" className="flex-1 cursor-pointer">
+                    <div className="font-medium">Planning</div>
+                    <div className="text-sm text-gray-500">Scheduled or planned maintenance ahead of due date</div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="Breakdown" id="reason-breakdown" data-testid="radio-breakdown" />
+                  <Label htmlFor="reason-breakdown" className="flex-1 cursor-pointer">
+                    <div className="font-medium">Breakdown</div>
+                    <div className="text-sm text-gray-500">Equipment failure requiring immediate repair</div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="Other" id="reason-other" data-testid="radio-other" />
+                  <Label htmlFor="reason-other" className="flex-1 cursor-pointer">
+                    <div className="font-medium">Other</div>
+                    <div className="text-sm text-gray-500">Other reason (will be documented in work order)</div>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> The work order will be created with today's date as the due date.
+                If a pending work order already exists for this job, creation will be blocked.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGenerateWODialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateWOConfirm}
+              disabled={generateWOMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              data-testid="button-confirm-generate-wo"
+            >
+              {generateWOMutation.isPending ? "Creating..." : "Create Work Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

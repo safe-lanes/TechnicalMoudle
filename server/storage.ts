@@ -482,7 +482,8 @@ export interface IStorage {
     fleetEntityType: 'component' | 'job' | 'spare';
     fleetEntityIds: string[];
     vesselId: string;
-    vesselComponentCode?: string;
+    vesselEntityId?: string;
+    vesselEntityCode?: string;
     mappedBy: string;
   }): Promise<any[]>;
   deleteFleetVesselMapping(id: string): Promise<void>;

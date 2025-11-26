@@ -5320,7 +5320,8 @@ export class PersistentFileStorage implements IStorage {
     fleetEntityType: 'component' | 'job' | 'spare';
     fleetEntityIds: string[];
     vesselId: string;
-    vesselComponentCode?: string;
+    vesselEntityId?: string;
+    vesselEntityCode?: string;
     mappedBy: string;
   }): Promise<any[]> {
     if (!this.data.fleetVesselMappings) {
@@ -5365,7 +5366,8 @@ export class PersistentFileStorage implements IStorage {
         fleetEntityCode: fleetCode,
         fleetEntityName: fleetName,
         vesselId: data.vesselId,
-        vesselComponentCode: data.vesselComponentCode || null,
+        vesselEntityId: data.vesselEntityId || null,
+        vesselEntityCode: data.vesselEntityCode || null,
         mappedAt: now,
         mappedBy: data.mappedBy
       };
