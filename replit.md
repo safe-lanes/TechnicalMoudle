@@ -44,7 +44,9 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Admin Module**: Bulk data import, data purging, and a Fleet Admin Dashboard for master data management.
 - **Role-Based Access Control (RBAC)**: Implements three user roles (Ship, Office, PMS Admin) with enhanced user schema, `AuthContext`, `RoleGuard` components, and backend middleware for authorization and data isolation.
 - **Global Business Rules Compliance**:
-    - Enforces rules for Parent vs Sub-Component RH Authority, Jobs Belong to Sub-Components, Stores Module Isolation, Component Code Cascade Updates, Component Cascade Inactivate, RH Correction → WO Re-trigger, Grace Period → Overdue Transition, and Job Frequency Change Impact.
+    - Enforces rules for Parent vs Sub-Component RH Authority, Jobs Belong to Sub-Components, Stores Module Isolation, Component Code Cascade Updates, Component Cascade Inactivate, RH Correction → WO Re-trigger, Grace Period → Overdue Transition, Job Frequency Change Impact, Spare Consumption Warning (Rule #9), and Multi-Department Approver Validation (Rule #19).
+    - Rule #9: Toast warning displayed when spare quantity consumed is 0 or blank, informing user no ROB deduction will occur.
+    - Rule #19: Backend validation ensures approver's department matches the job's assigned department during work order completion.
     - Offline Mode is currently parked for future development.
 - **Fleet Admin Workflow Enhancements**: Includes Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
 - **Database Schema Enhancements**: Introduction of new tables (`fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`) and enhancements to existing tables (`jobs`, `components`, `work_orders`, `consumedSpareParts`).
