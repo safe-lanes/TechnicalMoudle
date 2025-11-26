@@ -390,6 +390,374 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete job" });
     }
   });
+
+  // ============================================================================
+  // MAINTENANCE PLANNER API - Read-only aggregation view for planning
+  // ============================================================================
+  
+  app.get("/api/maintenance-planner", async (req, res) => {
+    try {
+      const {
+        vesselId,
+        jobType, // 'CALENDAR' | 'RH' | 'BOTH'
+        fromDate, // ISO date string for calendar jobs
+        toDate,
+        remainingHoursMin, // For RH jobs
+        remainingHoursMax,
+        includeOverdue, // boolean string
+        ranks, // comma-separated ranks
+        department,
+        criticalOnly // boolean string
+      } = req.query;
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      // Fetch all active jobs for the vessel
+      const allJobs = await storage.getJobs(vesselId as string);
+      const activeJobs = allJobs.filter(j => j.isActive !== false && j.dataScope === 'vessel');
+
+      // Fetch all components for RH lookup
+      const components = await storage.getComponents(vesselId as string);
+      const componentMap = new Map(components.map(c => [c.id, c]));
+      const componentCodeMap = new Map(components.map(c => [c.componentCode, c]));
+
+      // Fetch all work orders to check for open WOs
+      const allWorkOrders = await storage.getWorkOrders(vesselId as string);
+      
+      // Fetch spares for spare status calculation
+      const allSpares = await storage.getSpares(vesselId as string);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Process each job and compute planning data
+      const plannerItems: any[] = [];
+
+      for (const job of activeJobs) {
+        // Get component data
+        const component = componentMap.get(job.componentId) || componentCodeMap.get(job.componentCode);
+        
+        // Determine job type (Calendar vs Running Hours)
+        const isCalendarJob = job.maintenanceBasis === 'Calendar' || job.frequencyType === 'Calendar';
+        const isRHJob = job.maintenanceBasis === 'Running Hours' || job.frequencyType === 'Running Hours';
+        
+        // Apply job type filter
+        const jobTypeFilter = (jobType as string)?.toUpperCase();
+        if (jobTypeFilter === 'CALENDAR' && !isCalendarJob) continue;
+        if (jobTypeFilter === 'RH' && !isRHJob) continue;
+
+        // Apply department filter
+        if (department && department !== 'all' && job.department !== department) continue;
+
+        // Apply rank filter
+        if (ranks) {
+          const rankList = (ranks as string).split(',').map(r => r.trim().toLowerCase());
+          const assignedRank = (job.assignedTo || '').toLowerCase();
+          if (rankList.length > 0 && !rankList.some(r => assignedRank.includes(r))) continue;
+        }
+
+        // Apply criticality filter
+        if (criticalOnly === 'true') {
+          const isCritical = job.criticality === 'Yes' || job.jobPriority === 'Critical' || component?.critical;
+          if (!isCritical) continue;
+        }
+
+        // Calculate status and dates
+        let nextDueDate: Date | null = null;
+        let remainingHours: number | null = null;
+        let status: 'OVERDUE' | 'DUE_SOON' | 'FUTURE' = 'FUTURE';
+        let parentRH: number | null = null;
+
+        if (isCalendarJob) {
+          // Parse next due date
+          if (job.nextDueDate) {
+            nextDueDate = new Date(job.nextDueDate);
+          } else if (job.lastDoneDate && job.frequencyValue && job.frequencyUnit) {
+            // Calculate from last done
+            const lastDone = new Date(job.lastDoneDate);
+            const freqVal = parseInt(job.frequencyValue) || 0;
+            nextDueDate = new Date(lastDone);
+            switch (job.frequencyUnit) {
+              case 'Days': nextDueDate.setDate(nextDueDate.getDate() + freqVal); break;
+              case 'Weeks': nextDueDate.setDate(nextDueDate.getDate() + freqVal * 7); break;
+              case 'Months': nextDueDate.setMonth(nextDueDate.getMonth() + freqVal); break;
+              case 'Years': nextDueDate.setFullYear(nextDueDate.getFullYear() + freqVal); break;
+            }
+          }
+
+          if (nextDueDate) {
+            const daysUntilDue = Math.floor((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilDue < 0) {
+              status = 'OVERDUE';
+            } else if (daysUntilDue <= 30) {
+              status = 'DUE_SOON';
+            } else {
+              status = 'FUTURE';
+            }
+
+            // Apply date range filter
+            if (fromDate || toDate) {
+              const from = fromDate ? new Date(fromDate as string) : new Date(0);
+              const to = toDate ? new Date(toDate as string) : new Date('2099-12-31');
+              
+              // Skip overdue items only if includeOverdue is false
+              if (status === 'OVERDUE' && includeOverdue !== 'true') continue;
+              if (status !== 'OVERDUE' && (nextDueDate < from || nextDueDate > to)) continue;
+            }
+          }
+        } else if (isRHJob) {
+          // Find parent component for RH
+          let parentComponent = component;
+          if (component?.parentId) {
+            parentComponent = componentCodeMap.get(component.parentId) || component;
+          }
+          
+          parentRH = parseFloat(parentComponent?.currentCumulativeRH || '0') || 0;
+          const lastDoneRH = parseFloat(job.lastDoneRH || '0') || 0;
+          const frequencyRH = parseInt(job.frequencyValue || '0') || job.intervalRunningHour || 0;
+          
+          // Calculate remaining hours
+          const usedSinceLastDone = parentRH - lastDoneRH;
+          remainingHours = Math.max(0, frequencyRH - usedSinceLastDone);
+
+          // Determine status
+          if (remainingHours <= 0) {
+            status = 'OVERDUE';
+          } else if (remainingHours <= (job.leadTimeValue || 168)) {
+            status = 'DUE_SOON';
+          } else {
+            status = 'FUTURE';
+          }
+
+          // Apply RH range filter
+          if (remainingHoursMin || remainingHoursMax) {
+            const minRH = parseFloat(remainingHoursMin as string) || 0;
+            const maxRH = parseFloat(remainingHoursMax as string) || Infinity;
+            
+            // Skip overdue items only if includeOverdue is false
+            if (status === 'OVERDUE' && includeOverdue !== 'true') continue;
+            if (status !== 'OVERDUE' && (remainingHours < minRH || remainingHours > maxRH)) continue;
+          }
+        }
+
+        // Skip if not overdue and includeOverdue is true but no date/RH filter applied
+        if (includeOverdue !== 'true' && status === 'OVERDUE') {
+          // Include overdue by default unless explicitly filtered out
+        }
+
+        // Find open work order for this job
+        const openWO = allWorkOrders.find(wo => 
+          wo.jobId === job.id && 
+          wo.status !== 'Completed' && 
+          wo.status !== 'Rejected'
+        );
+
+        // Calculate spare status
+        let spareStatus: 'OK' | 'LOW' | 'ZERO' | 'NOT_SET' = 'NOT_SET';
+        const requiredSpares = job.requiredSpareParts as any[] || [];
+        
+        if (requiredSpares.length > 0) {
+          let hasZero = false;
+          let hasLow = false;
+          
+          for (const reqSpare of requiredSpares) {
+            const spare = allSpares.find(s => 
+              s.partCode === reqSpare.partNo || 
+              s.partName === reqSpare.description
+            );
+            if (spare) {
+              if (spare.rob === 0) hasZero = true;
+              else if (spare.rob < spare.min) hasLow = true;
+            }
+          }
+          
+          if (hasZero) spareStatus = 'ZERO';
+          else if (hasLow) spareStatus = 'LOW';
+          else spareStatus = 'OK';
+        }
+
+        // Build planner item
+        plannerItems.push({
+          jobId: job.id,
+          jobCode: job.jobNo,
+          jobTitle: job.jobTitle,
+          jobType: isCalendarJob ? 'CALENDAR' : 'RH',
+          componentId: job.componentId,
+          componentCode: job.componentCode,
+          componentName: job.componentName,
+          department: job.department || component?.department || 'N/A',
+          assignedRank: job.assignedTo || 'Unassigned',
+          criticalFlag: job.criticality === 'Yes' || job.jobPriority === 'Critical' || component?.critical || false,
+          classRelatedFlag: job.classRelated === 'Yes',
+          estimatedManHours: parseFloat(job.estimatedManHours || '0') || 0,
+          nextDueDate: nextDueDate ? nextDueDate.toISOString().split('T')[0] : null,
+          remainingHours: remainingHours,
+          parentRH: parentRH,
+          status: status,
+          woId: openWO?.id || null,
+          woNo: openWO?.workOrderNo || null,
+          woStatus: openWO?.status || null,
+          spareStatus: spareStatus,
+          frequencyValue: job.frequencyValue,
+          frequencyUnit: job.frequencyUnit,
+          lastDoneDate: job.lastDoneDate,
+          lastDoneRH: job.lastDoneRH
+        });
+      }
+
+      // Sort by status priority and due date/remaining hours
+      const statusPriority: Record<string, number> = {
+        'OVERDUE': 0,
+        'DUE_SOON': 1,
+        'FUTURE': 2
+      };
+
+      plannerItems.sort((a, b) => {
+        // First by status
+        const statusDiff = statusPriority[a.status] - statusPriority[b.status];
+        if (statusDiff !== 0) return statusDiff;
+        
+        // Then by due date (nearest first) for calendar jobs
+        if (a.jobType === 'CALENDAR' && b.jobType === 'CALENDAR') {
+          if (a.nextDueDate && b.nextDueDate) {
+            return new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+          }
+        }
+        
+        // By remaining hours (lowest first) for RH jobs
+        if (a.jobType === 'RH' && b.jobType === 'RH') {
+          return (a.remainingHours || 0) - (b.remainingHours || 0);
+        }
+        
+        return 0;
+      });
+
+      // Calculate summary metrics
+      const totalManHours = plannerItems.reduce((sum, item) => sum + item.estimatedManHours, 0);
+      
+      const byRank: Record<string, { jobs: number; manHours: number }> = {};
+      for (const item of plannerItems) {
+        const rank = item.assignedRank || 'Unassigned';
+        if (!byRank[rank]) byRank[rank] = { jobs: 0, manHours: 0 };
+        byRank[rank].jobs++;
+        byRank[rank].manHours += item.estimatedManHours;
+      }
+
+      const byDepartment: Record<string, { jobs: number; manHours: number }> = {};
+      for (const item of plannerItems) {
+        const dept = item.department || 'N/A';
+        if (!byDepartment[dept]) byDepartment[dept] = { jobs: 0, manHours: 0 };
+        byDepartment[dept].jobs++;
+        byDepartment[dept].manHours += item.estimatedManHours;
+      }
+
+      const byStatus: Record<string, number> = { OVERDUE: 0, DUE_SOON: 0, FUTURE: 0 };
+      for (const item of plannerItems) {
+        byStatus[item.status]++;
+      }
+
+      res.json({
+        summary: {
+          totalJobs: plannerItems.length,
+          totalManHours: Math.round(totalManHours * 10) / 10,
+          byRank: Object.entries(byRank).map(([rank, data]) => ({
+            rank,
+            jobs: data.jobs,
+            manHours: Math.round(data.manHours * 10) / 10
+          })),
+          byDepartment: Object.entries(byDepartment).map(([dept, data]) => ({
+            department: dept,
+            jobs: data.jobs,
+            manHours: Math.round(data.manHours * 10) / 10
+          })),
+          byStatus
+        },
+        jobs: plannerItems
+      });
+    } catch (error: any) {
+      console.error("Maintenance planner error:", error);
+      res.status(500).json({ error: "Failed to fetch maintenance planner data: " + error.message });
+    }
+  });
+
+  // Maintenance Planner Export endpoint
+  app.get("/api/maintenance-planner/export", async (req, res) => {
+    try {
+      const format = req.query.format as string || 'excel';
+      const vesselId = req.query.vesselId as string;
+
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+
+      // Reuse the same logic - call the planner endpoint internally
+      const plannerResponse = await fetch(`http://localhost:${process.env.PORT || 5000}/api/maintenance-planner?${new URLSearchParams(req.query as Record<string, string>).toString()}`);
+      const plannerData = await plannerResponse.json();
+
+      if (format === 'excel') {
+        // Generate Excel file
+        const wb = XLSX.utils.book_new();
+        
+        // Jobs sheet
+        const jobsData = plannerData.jobs.map((job: any) => ({
+          'Job Code': job.jobCode,
+          'Job Title': job.jobTitle,
+          'Component Code': job.componentCode,
+          'Component Name': job.componentName,
+          'Department': job.department,
+          'Assigned Rank': job.assignedRank,
+          'Job Type': job.jobType,
+          'Next Due Date': job.nextDueDate || '-',
+          'Remaining Hours': job.remainingHours !== null ? job.remainingHours : '-',
+          'Status': job.status,
+          'Est. Man-Hours': job.estimatedManHours,
+          'Spare Status': job.spareStatus,
+          'WO No.': job.woNo || '-',
+          'WO Status': job.woStatus || '-',
+          'Critical': job.criticalFlag ? 'Yes' : 'No',
+          'Class Related': job.classRelatedFlag ? 'Yes' : 'No'
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(jobsData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Maintenance Planner');
+
+        // Summary sheet
+        const summaryData = [
+          { 'Metric': 'Total Jobs', 'Value': plannerData.summary.totalJobs },
+          { 'Metric': 'Total Man-Hours', 'Value': plannerData.summary.totalManHours },
+          { 'Metric': 'Overdue Jobs', 'Value': plannerData.summary.byStatus.OVERDUE },
+          { 'Metric': 'Due Soon Jobs', 'Value': plannerData.summary.byStatus.DUE_SOON },
+          { 'Metric': 'Future Jobs', 'Value': plannerData.summary.byStatus.FUTURE }
+        ];
+        const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+
+        // Workload by Rank sheet
+        const rankData = plannerData.summary.byRank.map((r: any) => ({
+          'Rank': r.rank,
+          'Jobs': r.jobs,
+          'Man-Hours': r.manHours
+        }));
+        const rankWs = XLSX.utils.json_to_sheet(rankData);
+        XLSX.utils.book_append_sheet(wb, rankWs, 'Workload by Rank');
+
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=maintenance-planner-${new Date().toISOString().split('T')[0]}.xlsx`);
+        res.send(buffer);
+      } else {
+        // Return JSON for PDF generation (frontend will handle PDF rendering)
+        res.json(plannerData);
+      }
+    } catch (error: any) {
+      console.error("Export error:", error);
+      res.status(500).json({ error: "Failed to export maintenance planner: " + error.message });
+    }
+  });
   
   // Component Documents API routes
   // Component Documents API routes (with file upload support)

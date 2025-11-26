@@ -30,6 +30,7 @@ import ComplianceReports from "./ComplianceReports";
 import IhmReports from "./IhmReports";
 import ChangeRequestReports from "./ChangeRequestReports";
 import AlertsApprovalsAdminReports from "./AlertsApprovalsAdminReports";
+import MaintenancePlanner from "./MaintenancePlanner";
 import GlobalFilters, { FilterValues } from "@/components/reports/GlobalFilters";
 
 interface ReportCategory {
@@ -65,6 +66,17 @@ const ReportsModule = () => {
   });
 
   const reportCategories: ReportCategory[] = [
+    {
+      id: "planner",
+      title: "Maintenance Planner",
+      description: "Consolidated planning view with calendar and RH-based jobs, workload by rank, and exports",
+      icon: Calendar,
+      reportCount: 1,
+      lastGenerated: "Live",
+      color: "border-cyan-500",
+      iconBg: "bg-cyan-500",
+      iconBgLight: "bg-cyan-100 text-cyan-600"
+    },
     {
       id: "maintenance",
       title: "Maintenance & Work Orders",
@@ -234,6 +246,10 @@ const ReportsModule = () => {
   };
 
   // Render category-specific views
+  if (selectedCategory === "planner") {
+    return <MaintenancePlanner />;
+  }
+
   if (selectedCategory === "maintenance") {
     return <MaintenanceReports onBack={handleBackToMain} globalFilters={globalFilters} />;
   }
