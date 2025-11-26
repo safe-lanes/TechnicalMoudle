@@ -656,6 +656,7 @@ export const jobs = pgTable("jobs", {
   sfiCode: text("sfi_code"),
   criticality: text("criticality"),
   isActive: boolean("is_active").default(true),
+  estimatedManHours: decimal("estimated_man_hours", { precision: 6, scale: 2 }), // Estimated man-hours for workload planning
   
   createdBy: text("created_by"), // User who created the job
   createdAt: timestamp("created_at").notNull().defaultNow(),
