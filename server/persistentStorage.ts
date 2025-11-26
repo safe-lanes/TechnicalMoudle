@@ -53,7 +53,9 @@ import {
   type Maker,
   type InsertMaker,
   type MasterList,
-  type InsertMasterList
+  type InsertMasterList,
+  type AuditLog,
+  type InsertAuditLog
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -96,6 +98,7 @@ interface PersistentData {
   importHistory: ImportHistory[];
   makers: Maker[];
   masterLists: MasterList[];
+  auditLogs: AuditLog[];
   
   // Counter state
   counters: {
@@ -118,6 +121,7 @@ interface PersistentData {
     defectActionId: number;
     defectAttachmentId: number;
     recurringDefectId: number;
+    auditLogId: number;
   };
 }
 
@@ -296,25 +300,28 @@ export class PersistentFileStorage implements IStorage {
           importHistory: loadedData.importHistory || [],
           makers: loadedData.makers || [],
           masterLists: loadedData.masterLists || [],
-          counters: loadedData.counters || {
-            userId: 1,
-            auditId: 1,
-            spareId: 1,
-            historyId: 1,
-            changeRequestId: 1,
-            attachmentId: 1,
-            commentId: 1,
-            alertPolicyId: 1,
-            alertEventId: 1,
-            alertDeliveryId: 1,
-            alertConfigId: 1,
-            formDefinitionId: 1,
-            formVersionId: 1,
-            workOrderId: 1,
-            defectId: 1,
-            defectActionId: 1,
-            defectAttachmentId: 1,
-            recurringDefectId: 1
+          auditLogs: loadedData.auditLogs || [],
+          counters: {
+            userId: loadedData.counters?.userId || 1,
+            auditId: loadedData.counters?.auditId || 1,
+            spareId: loadedData.counters?.spareId || 1,
+            historyId: loadedData.counters?.historyId || 1,
+            changeRequestId: loadedData.counters?.changeRequestId || 1,
+            attachmentId: loadedData.counters?.attachmentId || 1,
+            commentId: loadedData.counters?.commentId || 1,
+            alertPolicyId: loadedData.counters?.alertPolicyId || 1,
+            alertEventId: loadedData.counters?.alertEventId || 1,
+            alertDeliveryId: loadedData.counters?.alertDeliveryId || 1,
+            alertConfigId: loadedData.counters?.alertConfigId || 1,
+            formDefinitionId: loadedData.counters?.formDefinitionId || 1,
+            formVersionId: loadedData.counters?.formVersionId || 1,
+            workOrderId: loadedData.counters?.workOrderId || 1,
+            executionId: loadedData.counters?.executionId || 1,
+            defectId: loadedData.counters?.defectId || 1,
+            defectActionId: loadedData.counters?.defectActionId || 1,
+            defectAttachmentId: loadedData.counters?.defectAttachmentId || 1,
+            recurringDefectId: loadedData.counters?.recurringDefectId || 1,
+            auditLogId: loadedData.counters?.auditLogId || 1
           }
         };
         
@@ -358,6 +365,7 @@ export class PersistentFileStorage implements IStorage {
       importHistory: [],
       makers: [],
       masterLists: [],
+      auditLogs: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -377,7 +385,8 @@ export class PersistentFileStorage implements IStorage {
         defectId: 1,
         defectActionId: 1,
         defectAttachmentId: 1,
-        recurringDefectId: 1
+        recurringDefectId: 1,
+        auditLogId: 1
       }
     };
     
@@ -918,7 +927,7 @@ export class PersistentFileStorage implements IStorage {
     );
   }
 
-  async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+  async updateComponent(id: string, data: Partial<Component>, userId: string = 'system'): Promise<Component> {
     const component = this.data.components[id];
     if (!component) {
       throw new Error(`Component ${id} not found`);
@@ -927,6 +936,28 @@ export class PersistentFileStorage implements IStorage {
     const oldComponentCode = component.componentCode;
     const newComponentCode = data.componentCode;
     const componentCodeChanged = newComponentCode !== undefined && newComponentCode !== oldComponentCode;
+    
+    // C1 VALIDATION: Block if new componentCode conflicts (duplicate) for same vessel
+    if (componentCodeChanged && newComponentCode) {
+      const targetVesselId = data.vesselId ?? component.vesselId;
+      const vesselKey = targetVesselId || 'global';
+      const vesselIndex = this.componentCodeIndex.get(vesselKey);
+      
+      if (vesselIndex) {
+        const existingId = vesselIndex.get(newComponentCode);
+        if (existingId && existingId !== id) {
+          throw new Error(`Component code '${newComponentCode}' already exists for vessel '${targetVesselId || 'global'}'. Cannot create duplicate.`);
+        }
+      }
+      
+      // Also check via linear search in case index is stale
+      const duplicateComponent = Object.values(this.data.components).find(
+        c => c && c.id !== id && c.componentCode === newComponentCode && c.vesselId === targetVesselId
+      );
+      if (duplicateComponent) {
+        throw new Error(`Component code '${newComponentCode}' already exists for vessel '${targetVesselId || 'global'}'. Cannot create duplicate.`);
+      }
+    }
     
     // If componentCode or vesselId changed, update index
     if (data.componentCode && data.componentCode !== component.componentCode) {
@@ -970,10 +1001,96 @@ export class PersistentFileStorage implements IStorage {
         updated.name || oldComponentCode
       );
       console.log(`[CASCADE] Component code changed from ${oldComponentCode} to ${newComponentCode}:`, cascadeResult);
+      
+      // C1 AUDIT: Log component code change with all required fields
+      await this.createAuditLog({
+        userId: userId,
+        vesselCode: vesselKey,
+        componentCode: newComponentCode,
+        entityType: 'component',
+        entityId: id,
+        actionType: 'update',
+        fieldName: 'componentCode',
+        oldValue: oldComponentCode,
+        newValue: newComponentCode,
+        source: 'system',
+        payload: {
+          cascadeResult,
+          componentName: updated.name,
+          timestamp: new Date().toISOString()
+        }
+      });
     }
     
     this.persistData();
     return updated;
+  }
+  
+  /**
+   * Create audit log entry (C1, C2, C4 compliance)
+   */
+  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+    const auditLogId = this.data.counters.auditLogId++;
+    const auditLog: AuditLog = {
+      id: auditLogId,
+      timestamp: new Date(),
+      userId: data.userId,
+      vesselCode: data.vesselCode ?? null,
+      componentCode: data.componentCode ?? null,
+      entityType: data.entityType,
+      entityId: data.entityId,
+      actionType: data.actionType,
+      fieldName: data.fieldName ?? null,
+      oldValue: data.oldValue ?? null,
+      newValue: data.newValue ?? null,
+      source: data.source,
+      payload: data.payload ?? null
+    };
+    this.data.auditLogs.push(auditLog);
+    // Note: persistData is called by the caller, not here to avoid multiple writes
+    return auditLog;
+  }
+  
+  /**
+   * Get audit logs with optional filtering
+   */
+  async getAuditLogs(filters?: {
+    vesselCode?: string;
+    componentCode?: string;
+    entityType?: string;
+    entityId?: string;
+    actionType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<AuditLog[]> {
+    let logs = [...this.data.auditLogs];
+    
+    if (filters) {
+      if (filters.vesselCode) {
+        logs = logs.filter(l => l.vesselCode === filters.vesselCode);
+      }
+      if (filters.componentCode) {
+        logs = logs.filter(l => l.componentCode === filters.componentCode);
+      }
+      if (filters.entityType) {
+        logs = logs.filter(l => l.entityType === filters.entityType);
+      }
+      if (filters.entityId) {
+        logs = logs.filter(l => l.entityId === filters.entityId);
+      }
+      if (filters.actionType) {
+        logs = logs.filter(l => l.actionType === filters.actionType);
+      }
+      if (filters.startDate) {
+        logs = logs.filter(l => new Date(l.timestamp) >= filters.startDate!);
+      }
+      if (filters.endDate) {
+        logs = logs.filter(l => new Date(l.timestamp) <= filters.endDate!);
+      }
+    }
+    
+    // Sort by timestamp descending (most recent first)
+    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   /**
@@ -1136,142 +1253,174 @@ export class PersistentFileStorage implements IStorage {
     return newComponent;
   }
 
-  async deleteComponent(id: string): Promise<void> {
+  /**
+   * C2 INACTIVATE COMPONENT (Rule #14)
+   * Sets component status to INACTIVE instead of hard delete.
+   * Option A (default): Block if any child is ACTIVE
+   * Option B (cascadeInactivate=true): Cascade inactivate all descendants
+   */
+  async inactivateComponent(
+    id: string, 
+    userId: string = 'system',
+    options: { cascadeInactivate?: boolean } = {}
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    componentsInactivated: number;
+    jobsInactivated: number;
+    activeChildrenCount?: number;
+  }> {
     const component = this.data.components[id];
     if (!component) {
-      return; // Component already deleted or doesn't exist
+      return { 
+        success: false, 
+        message: `Component ${id} not found`,
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
     }
     
-    // CASCADE DELETE (Rule #14): Recursively delete all descendants
-    const cascadeResult = await this.cascadeDeleteComponent(component);
-    console.log(`[CASCADE DELETE] Component ${id} deleted with cascade:`, cascadeResult);
-    
-    this.persistData();
-  }
-
-  /**
-   * CASCADE DELETE: Recursively deletes component and all descendants (Rule #14)
-   * Also handles linked Jobs (soft delete), Work Orders (keep for history), and Spares
-   */
-  private async cascadeDeleteComponent(
-    component: Component
-  ): Promise<{ 
-    componentsDeleted: number; 
-    jobsDeleted: number; 
-    workOrdersAffected: number; 
-    sparesDeleted: number 
-  }> {
-    let componentsDeleted = 0;
-    let jobsDeleted = 0;
-    let workOrdersAffected = 0;
-    let sparesDeleted = 0;
+    if (component.isActive === false) {
+      return {
+        success: true,
+        message: 'Component is already inactive',
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
+    }
     
     const componentCode = component.componentCode;
     const componentId = component.id;
     const vesselId = component.vesselId || 'global';
     
-    // 1. Find all descendants (children, grandchildren, etc.) by traversing parentId chain
-    const descendantIds: string[] = [];
-    const descendantCodes: string[] = [];
-    
+    // Find all descendants
+    const descendants: Component[] = [];
     const findDescendants = (parentCode: string | null) => {
       if (!parentCode) return;
-      
       for (const childId of Object.keys(this.data.components)) {
         const child = this.data.components[childId];
         if (child && child.parentId === parentCode && childId !== componentId) {
-          descendantIds.push(childId);
-          if (child.componentCode) {
-            descendantCodes.push(child.componentCode);
-          }
-          // Recursively find grandchildren
+          descendants.push(child);
           if (child.componentCode) {
             findDescendants(child.componentCode);
           }
         }
       }
     };
-    
-    // Start finding descendants from this component's code
     if (componentCode) {
       findDescendants(componentCode);
     }
     
-    // 2. Delete all descendant components first
-    for (const descendantId of descendantIds) {
-      const descendant = this.data.components[descendantId];
-      if (descendant) {
-        // Remove from index
-        if (descendant.componentCode) {
-          const descVesselId = descendant.vesselId || 'global';
-          const vesselIndex = this.componentCodeIndex.get(descVesselId);
-          if (vesselIndex) {
-            vesselIndex.delete(descendant.componentCode);
+    // C2 Option A: Block if any child is ACTIVE (default behavior)
+    if (!options.cascadeInactivate) {
+      const activeChildren = descendants.filter(d => d.isActive !== false);
+      if (activeChildren.length > 0) {
+        return {
+          success: false,
+          message: `Component has ${activeChildren.length} active children. Inactivate or reassign them first.`,
+          componentsInactivated: 0,
+          jobsInactivated: 0,
+          activeChildrenCount: activeChildren.length
+        };
+      }
+    }
+    
+    // Proceed with inactivation
+    let componentsInactivated = 0;
+    let jobsInactivated = 0;
+    
+    // Collect all component codes/ids to process
+    const allCodesToProcess: string[] = componentCode ? [componentCode] : [];
+    const allIdsToProcess: string[] = [componentId];
+    
+    // C2 Option B: Cascade inactivate all descendants
+    if (options.cascadeInactivate) {
+      for (const descendant of descendants) {
+        if (descendant.isActive !== false) {
+          this.data.components[descendant.id] = {
+            ...descendant,
+            isActive: false,
+            updatedAt: new Date()
+          };
+          componentsInactivated++;
+          if (descendant.componentCode) {
+            allCodesToProcess.push(descendant.componentCode);
           }
+          allIdsToProcess.push(descendant.id);
         }
-        delete this.data.components[descendantId];
-        componentsDeleted++;
       }
     }
     
-    // 3. Delete the target component itself
-    if (componentCode) {
-      const vesselIndex = this.componentCodeIndex.get(vesselId);
-      if (vesselIndex) {
-        vesselIndex.delete(componentCode);
-      }
-    }
-    delete this.data.components[componentId];
-    componentsDeleted++;
+    // Inactivate the target component
+    this.data.components[id] = {
+      ...component,
+      isActive: false,
+      updatedAt: new Date()
+    };
+    componentsInactivated++;
     
-    // 4. Collect all component codes to process (target + descendants)
-    const allCodesToProcess = componentCode ? [componentCode, ...descendantCodes] : descendantCodes;
-    const allIdsToProcess = [componentId, ...descendantIds];
-    
-    // 5. Soft-delete all linked Jobs (set isActive = false)
+    // Inactivate all linked Jobs (don't generate new WOs)
     for (const jobId of Object.keys(this.data.jobs)) {
       const job = this.data.jobs[jobId];
-      if (job && (allIdsToProcess.includes(job.componentId) || 
-          (job.componentCode && allCodesToProcess.includes(job.componentCode)))) {
+      if (job && job.isActive !== false && (
+        allIdsToProcess.includes(job.componentId) || 
+        (job.componentCode && allCodesToProcess.includes(job.componentCode))
+      )) {
         this.data.jobs[jobId] = {
           ...job,
           isActive: false,
           updatedAt: new Date()
         };
-        jobsDeleted++;
+        jobsInactivated++;
       }
     }
     
-    // 6. Mark Work Orders as affected (keep for history, but update status note)
-    for (let i = 0; i < this.data.workOrders.length; i++) {
-      const wo = this.data.workOrders[i];
-      if (wo && wo.componentCode && allCodesToProcess.includes(wo.componentCode)) {
-        // Only update if not already completed
-        if (wo.status !== 'Completed' && wo.status !== 'Rejected') {
-          this.data.workOrders[i] = {
-            ...wo,
-            approverRemarks: (wo.approverRemarks || '') + ' [Component deleted]'
-          };
-          workOrdersAffected++;
-        }
-      }
-    }
+    // Note: Work Orders remain in history (no changes needed per C2 spec)
+    // "WOs → allow existing to remain in history; no new WOs."
     
-    // 7. Soft-delete all linked Spares (with timestamp)
-    for (const spareId of Object.keys(this.data.spares)) {
-      const spare = this.data.spares[Number(spareId)];
-      if (spare && (allIdsToProcess.includes(spare.componentId || '') ||
-          (spare.componentCode && allCodesToProcess.includes(spare.componentCode)))) {
-        this.data.spares[Number(spareId)] = {
-          ...spare,
-          deleted: true,
-          updatedAt: new Date()
-        };
-        sparesDeleted++;
+    // C2 AUDIT: Log inactivation with all required fields
+    await this.createAuditLog({
+      userId: userId,
+      vesselCode: vesselId,
+      componentCode: componentCode ?? undefined,
+      entityType: 'component',
+      entityId: id,
+      actionType: 'update',
+      fieldName: 'isActive',
+      oldValue: 'true',
+      newValue: 'false',
+      source: 'system',
+      payload: {
+        action: 'inactivate',
+        cascadeUsed: options.cascadeInactivate ?? false,
+        componentsInactivated,
+        jobsInactivated,
+        descendantsAffected: allIdsToProcess.length - 1,
+        timestamp: new Date().toISOString()
       }
-    }
+    });
     
-    return { componentsDeleted, jobsDeleted, workOrdersAffected, sparesDeleted };
+    this.persistData();
+    
+    console.log(`[INACTIVATE] Component ${id} inactivated:`, { componentsInactivated, jobsInactivated });
+    
+    return {
+      success: true,
+      message: `Component inactivated successfully. ${componentsInactivated} component(s) and ${jobsInactivated} job(s) affected.`,
+      componentsInactivated,
+      jobsInactivated
+    };
+  }
+  
+  /**
+   * @deprecated Use inactivateComponent instead for C2 compliance
+   * Legacy deleteComponent - now internally calls inactivateComponent with cascade option
+   */
+  async deleteComponent(id: string): Promise<void> {
+    const result = await this.inactivateComponent(id, 'system', { cascadeInactivate: true });
+    if (!result.success) {
+      console.warn(`[DELETE->INACTIVATE] Warning: ${result.message}`);
+    }
   }
 
   async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
@@ -1622,6 +1771,7 @@ export class PersistentFileStorage implements IStorage {
     auditsCreated: number; 
     workOrdersGenerated: number;
     workOrders: any[];
+    jobsEvaluated: number;
   }> {
     // Helper function to normalize frequency to hours
     const normalizeFrequencyToHours = (job: Job): number | null => {
@@ -1924,16 +2074,86 @@ export class PersistentFileStorage implements IStorage {
       }
     }
 
-    // 10. Save working set to disk (single atomic write)
+    // 10. Count jobs evaluated for WO re-trigger
+    let jobsEvaluated = 0;
+    for (const child of children) {
+      const childRHJobs = Object.values(workingData.jobs).filter(
+        job => job && 
+               job.componentId === child.id && 
+               job.maintenanceBasis === "Running Hours" &&
+               job.isActive !== false
+      );
+      jobsEvaluated += childRHJobs.length;
+    }
+
+    // 11. C4 AUDIT: Log WO re-evaluation in RH audit trail (per C4 spec requirement)
+    // The spec says: "Log in RH audit: 'WO re-evaluation triggered for X jobs, Y WOs generated.'"
+    if (jobsEvaluated > 0 || workOrdersGenerated > 0) {
+      const woReEvalMessage = `WO re-evaluation triggered for ${jobsEvaluated} jobs, ${workOrdersGenerated} WOs generated.`;
+      
+      // Add to RH audit trail (runningHoursAudits) as required by spec
+      const rhAuditEntry: RunningHoursAudit = {
+        id: workingData.counters.auditId++,
+        vesselId: parent.vesselId || '',
+        componentId: parent.id,
+        previousRH: currentParentRH.toFixed(2),
+        newRH: delta.toFixed(2),
+        cumulativeRH: newParentRH.toFixed(2),
+        dateUpdatedLocal: params.dateUpdated,
+        dateUpdatedTZ: dateUpdatedTZ,
+        enteredAtUTC: enteredAtUTC,
+        userId: userId,
+        source: 'wo_reeval',
+        notes: woReEvalMessage,
+        meterReplaced: false,
+        oldMeterFinal: null,
+        newMeterStart: null,
+        version: 1
+      };
+      workingData.runningHoursAudits.push(rhAuditEntry);
+      auditsCreated++;
+      
+      // Also log to general auditLogs for broader visibility
+      const auditLogId = workingData.counters.auditLogId++;
+      const auditLog: AuditLog = {
+        id: auditLogId,
+        timestamp: new Date(),
+        userId: userId,
+        vesselCode: parent.vesselId || 'global',
+        componentCode: parent.componentCode ?? null,
+        entityType: 'running_hours',
+        entityId: params.parentComponentId,
+        actionType: 'update',
+        fieldName: 'currentCumulativeRH',
+        oldValue: currentParentRH.toFixed(2),
+        newValue: newParentRH.toFixed(2),
+        source: 'system',
+        payload: {
+          action: 'cascade_rh_update',
+          delta: delta.toFixed(2),
+          jobsEvaluated,
+          workOrdersGenerated,
+          componentsUpdated: updatedComponents,
+          auditsCreated,
+          message: woReEvalMessage,
+          timestamp: new Date().toISOString()
+        }
+      };
+      workingData.auditLogs.push(auditLog);
+      console.log(`[C4 AUDIT] ${woReEvalMessage}`);
+    }
+
+    // 12. Save working set to disk (single atomic write)
     this.data = workingData;
     this.persistData();
 
-    // 11. Return stats
+    // 13. Return stats (now includes jobsEvaluated per C4 spec)
     return {
       updatedComponents,
       auditsCreated,
       workOrdersGenerated,
-      workOrders: generatedWorkOrders
+      workOrders: generatedWorkOrders,
+      jobsEvaluated
     };
   }
 
