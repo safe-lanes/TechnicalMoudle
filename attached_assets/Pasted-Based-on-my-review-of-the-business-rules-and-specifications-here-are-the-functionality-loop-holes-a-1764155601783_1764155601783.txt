@@ -1,0 +1,52 @@
+Based on my review of the business rules and specifications, here are the functionality loop-holes and areas that need clarification:
+Running Hours Module
+1.	Meter Replacement Edge Cases: What happens if a parent meter is replaced AND a child component was replaced earlier in the same period? Does the child reset to 0 along with the parent, or maintain its post-replacement RH?
+Whenever the meter is replaced, the logic remains same, child always gets the change in rh of the parent. delta is the core logic here.
+2.	Concurrent Updates: If two users update parent RH simultaneously, how is delta propagation handled? Is there locking or optimistic concurrency?
+no simultaneous changes are allowed only one user usually login
+
+3.	Historical RH Corrections: The spec says office/admin can do backward corrections, but what happens to already-completed Work Orders that used the incorrect RH values?
+even if they do correction the correction is logged, it doesnot overwrite the data, also the work orders will be triggered again as per the new rh
+Work Orders Module
+4.	Unplanned WO Without Job: If an unplanned WO is created for a component that has NO existing job, does it create a new job? Or can unplanned WOs exist without any job linkage?
+Usually all sub-components will have job. even if there is unplanned work-order just assign it the next running number as per the nomenclature. It will also include work order generation on demand even when the frequency is not reached, reason could be planning or breakdown etc.
+5.	Multiple WOs for Same Job: Can multiple Work Orders exist simultaneously for the same job (e.g., one postponed, one new)? What's the conflict resolution?
+yes jobs are blueprint and the work-orders are the executions based on the frequency. if a work order is postponed it will again reappear after the period of postponement is over. 
+
+6.	Grace Period Overlap: If a WO enters grace period but then RH jumps significantly, does it immediately become Overdue or wait for the grace period to expire?
+if it jumps over grace period, it will become overdue
+7.	Part B RH vs Parent RH Race Condition: If someone updates parent RH in RH module WHILE another user is filling Part B with Current Reading, which takes precedence?
+The parent RH will be updated, user will be anyways filling rh for a subcomponent in work order form part B
+Spares Module
+8.	Spare Linked to Inactive Component: What happens to a spare if ALL its linked components are made inactive? Does the spare become orphaned?
+No spare will be always linked to it’s component
+9.	Consumption Exceeds ROB Warning: The spec says "allow WO completion" with warning, but what's logged? Is there any reconciliation workflow for negative consumption?
+If the user doesnot enter a value what is the point of reducing it from the ROB? There will not be any negative consumption, the logic is he might not have used the spare for the work
+10.	Multi-Location Consumption: When consuming from a WO, must the user specify Location A or B? Or is there a default consumption order?
+Ya must specify which location
+Stores Module
+11.	Stores vs Spares Boundary: Some items could arguably be either (e.g., generic O-rings, gaskets). What's the definitive criteria for categorization?
+Spares will be always linked to the components while stores will not
+Components Module
+12.	Component Code Modification: What happens to existing Work Orders, Jobs, and Spares if a component code is modified? Are references updated or orphaned?
+Ya all references will be updated as all need to be linked in backend
+13.	Parent-to-Sub Conversion: Can a parent component (with RH) be converted to a sub-component? What happens to its RH history?
+
+Why would this be? What is the logic?
+14.	Orphan Sub-Components: What if a parent component is deleted/inactivated while children exist? Are children cascaded or blocked?
+They wil be deleted too
+Cross-Module
+15.	Job Frequency Change Mid-Cycle: If a job's frequency is changed (e.g., 6 months → 3 months) while a WO is active, does the active WO recalculate its due date?
+It will be effective from next cycle onwards if work order is already created, else it will be generated basis new frequency
+16.	Fleet Admin Re-Sync: The spec says "changes don't auto-reflect" after import. Is there a manual re-sync mechanism? What's the workflow?
+Did not get the question, rephrase it.
+17.	Modify PMS Rejection: When Office rejects a Modify PMS request, what state does the proposed item return to? Is there a revision/resubmit flow?
+It returns to original flow only, if approved, it wil come with revision
+18.	Audit Trail for Bulk Operations: For bulk imports affecting 1000+ records, how granular is the audit trail? Per-row or per-batch?
+Per row, very detailed
+Permissions & Workflow
+19.	HoD Multi-Department: Can an HoD approve WOs for departments outside their own? What defines department scope?
+No, the approver is already mentioned in the jobs then why this confusion?
+20.	Offline Mode: Is there any offline capability for ships with intermittent connectivity? How do sync conflicts resolve?
+Yes data must be saved offline also for break in connectivity, then it can by sync
+
