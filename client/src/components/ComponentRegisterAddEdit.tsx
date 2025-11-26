@@ -205,11 +205,7 @@ export default function ComponentRegisterAddEdit({
       return mainCategories;
     }
 
-    const componentMap = new Map<string, ComponentNode>();
-    
-    mainCategories.forEach(cat => {
-      componentMap.set(cat.code, cat);
-    });
+    const nodeMap = new Map<string, ComponentNode>();
 
     vesselComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
@@ -220,62 +216,67 @@ export default function ComponentRegisterAddEdit({
         id: comp.id,
         code: code,
         name: comp.name,
-        ...comp,
+        parentId: comp.parentId,
         critical: comp.critical === "Yes" || comp.critical === true,
         children: []
       };
-      componentMap.set(code, node);
+      nodeMap.set(comp.id, node);
     });
 
     vesselComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
-      const node = componentMap.get(code);
+      if (code.match(/^[1-8]$/)) return;
       
+      const node = nodeMap.get(comp.id);
       if (!node) return;
       
-      if (comp.parentId) {
-        const parentComp = vesselComponents.find(c => c.id === comp.parentId);
-        if (parentComp) {
-          const parentCode = parentComp.componentCode || parentComp.id;
-          const parent = componentMap.get(parentCode);
-          if (parent) {
-            parent.children = parent.children || [];
+      if (comp.parentId && comp.parentId !== comp.id) {
+        const parent = nodeMap.get(comp.parentId);
+        if (parent) {
+          parent.children = parent.children || [];
+          if (!parent.children.some(c => c.id === node.id)) {
             parent.children.push(node);
           }
         }
-      } else {
+      } else if (!comp.parentId) {
         const prefix = code.charAt(0);
         const mainCategory = mainCategories.find(cat => cat.code === prefix);
         if (mainCategory) {
           mainCategory.children = mainCategory.children || [];
-          mainCategory.children.push(node);
+          if (!mainCategory.children.some(c => c.id === node.id)) {
+            mainCategory.children.push(node);
+          }
         }
       }
     });
 
-    const hasMatchingDescendant = (node: ComponentNode, matchedIds: Set<string>): boolean => {
+    const hasMatchingDescendant = (node: ComponentNode, matchedIds: Set<string>, visited: Set<string> = new Set()): boolean => {
+      if (visited.has(node.id)) return false;
+      visited.add(node.id);
       if (!node.children) return false;
       for (const child of node.children) {
         if (matchedIds.has(child.id)) return true;
-        if (hasMatchingDescendant(child, matchedIds)) return true;
+        if (hasMatchingDescendant(child, matchedIds, visited)) return true;
       }
       return false;
     };
 
-    const filterTree = (nodes: ComponentNode[]): ComponentNode[] => {
+    const filterTree = (nodes: ComponentNode[], visited: Set<string> = new Set()): ComponentNode[] => {
       if (filteredIds.size === 0) return nodes;
-      return nodes.filter(node => 
-        filteredIds.has(node.id) || hasMatchingDescendant(node, filteredIds)
-      ).map(node => ({
+      return nodes.filter(node => {
+        if (visited.has(node.id)) return false;
+        visited.add(node.id);
+        return filteredIds.has(node.id) || hasMatchingDescendant(node, filteredIds, new Set());
+      }).map(node => ({
         ...node,
-        children: node.children ? filterTree(node.children) : []
+        children: node.children ? filterTree(node.children, visited) : []
       }));
     };
 
     if (searchQuery.trim() || criticalityFilter !== 'all') {
       return mainCategories.map(cat => ({
         ...cat,
-        children: filterTree(cat.children || [])
+        children: filterTree(cat.children || [], new Set())
       })).filter(cat => cat.children && cat.children.length > 0);
     }
 
