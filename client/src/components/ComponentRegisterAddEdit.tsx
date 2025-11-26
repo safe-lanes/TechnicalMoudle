@@ -91,7 +91,7 @@ export default function ComponentRegisterAddEdit({
   });
 
   const { data: components = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: ['/api/components', vesselId],
+    queryKey: [`/api/components/${vesselId}`],
   });
 
   const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
@@ -187,8 +187,9 @@ export default function ComponentRegisterAddEdit({
   };
 
   const buildComponentTree = (components: any[]): ComponentNode[] => {
-    const vesselComponents = components.filter(c => c.vesselId === vesselId);
-    const filteredIds = new Set(filterComponents(vesselComponents).map(c => c.id));
+    const clonedComponents = components
+      .filter(c => c.vesselId === vesselId)
+      .map(comp => ({ ...comp }));
     
     const mainCategories: ComponentNode[] = [
       { id: "1", code: "1", name: "1 Ship General", children: [] },
@@ -201,83 +202,90 @@ export default function ComponentRegisterAddEdit({
       { id: "8", code: "8", name: "8 Ship Common Systems", children: [] },
     ];
 
-    if (!vesselComponents || vesselComponents.length === 0) {
+    if (!clonedComponents || clonedComponents.length === 0) {
       return mainCategories;
     }
 
-    const nodeMap = new Map<string, ComponentNode>();
+    const componentMap = new Map<string, ComponentNode>();
+    
+    mainCategories.forEach(cat => {
+      componentMap.set(cat.code, cat);
+    });
 
-    vesselComponents.forEach((comp: any) => {
+    clonedComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
       if (code.match(/^[1-8]$/)) {
         return;
       }
       const node: ComponentNode = {
-        id: comp.id,
+        id: code,
         code: code,
         name: comp.name,
-        parentId: comp.parentId,
+        ...comp,
         critical: comp.critical === "Yes" || comp.critical === true,
         children: []
       };
-      nodeMap.set(comp.id, node);
+      componentMap.set(node.code, node);
     });
 
-    vesselComponents.forEach((comp: any) => {
+    clonedComponents.forEach((comp: any) => {
       const code = comp.componentCode || comp.id;
-      if (code.match(/^[1-8]$/)) return;
+      const node = componentMap.get(code);
       
-      const node = nodeMap.get(comp.id);
       if (!node) return;
       
-      if (comp.parentId && comp.parentId !== comp.id) {
-        const parent = nodeMap.get(comp.parentId);
+      if (comp.parentId) {
+        const parent = componentMap.get(comp.parentId);
         if (parent) {
-          parent.children = parent.children || [];
-          if (!parent.children.some(c => c.id === node.id)) {
-            parent.children.push(node);
+          if (!parent.children) {
+            parent.children = [];
           }
+          parent.children.push(node);
         }
-      } else if (!comp.parentId) {
-        const prefix = code.charAt(0);
-        const mainCategory = mainCategories.find(cat => cat.code === prefix);
-        if (mainCategory) {
-          mainCategory.children = mainCategory.children || [];
-          if (!mainCategory.children.some(c => c.id === node.id)) {
-            mainCategory.children.push(node);
+      } else {
+        const categoryCode = code.charAt(0);
+        const category = componentMap.get(categoryCode);
+        if (category && !code.match(/^[1-8]$/)) {
+          if (!category.children) {
+            category.children = [];
           }
+          category.children.push(node);
         }
       }
     });
 
-    const hasMatchingDescendant = (node: ComponentNode, matchedIds: Set<string>, visited: Set<string> = new Set()): boolean => {
-      if (visited.has(node.id)) return false;
-      visited.add(node.id);
-      if (!node.children) return false;
-      for (const child of node.children) {
-        if (matchedIds.has(child.id)) return true;
-        if (hasMatchingDescendant(child, matchedIds, visited)) return true;
-      }
-      return false;
-    };
-
-    const filterTree = (nodes: ComponentNode[], visited: Set<string> = new Set()): ComponentNode[] => {
-      if (filteredIds.size === 0) return nodes;
-      return nodes.filter(node => {
-        if (visited.has(node.id)) return false;
-        visited.add(node.id);
-        return filteredIds.has(node.id) || hasMatchingDescendant(node, filteredIds, new Set());
-      }).map(node => ({
-        ...node,
-        children: node.children ? filterTree(node.children, visited) : []
-      }));
-    };
-
     if (searchQuery.trim() || criticalityFilter !== 'all') {
-      return mainCategories.map(cat => ({
-        ...cat,
-        children: filterTree(cat.children || [], new Set())
-      })).filter(cat => cat.children && cat.children.length > 0);
+      const filterTree = (nodes: ComponentNode[]): ComponentNode[] => {
+        const filtered: ComponentNode[] = [];
+        
+        for (const node of nodes) {
+          const filteredChildren = node.children ? filterTree(node.children) : [];
+          
+          const searchLower = searchQuery.toLowerCase();
+          const matchesSearch = !searchQuery.trim() || 
+            node.name.toLowerCase().includes(searchLower) ||
+            node.code.toLowerCase().includes(searchLower);
+          
+          const matchesCritical = 
+            criticalityFilter === 'all' ||
+            (criticalityFilter === 'critical' && node.critical === true) ||
+            (criticalityFilter === 'non-critical' && node.critical !== true);
+          
+          const nodeMatches = matchesSearch && matchesCritical;
+          const hasMatchingChildren = filteredChildren.length > 0;
+          
+          if (nodeMatches || hasMatchingChildren) {
+            filtered.push({
+              ...node,
+              children: filteredChildren
+            });
+          }
+        }
+        
+        return filtered;
+      };
+      
+      return filterTree(mainCategories);
     }
 
     return mainCategories;
