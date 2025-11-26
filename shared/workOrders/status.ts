@@ -1,5 +1,42 @@
 import { parseDDMMYYYY } from '@shared/utils/dateCalculations';
 
+const MONTH_NAMES: { [key: string]: number } = {
+  'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+  'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+};
+
+/**
+ * Parse date in DD-MMM-YYYY format (e.g., "15-Jan-2024")
+ */
+function parseDDMMMYYYY(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  
+  const day = parseInt(parts[0], 10);
+  const month = MONTH_NAMES[parts[1]];
+  const year = parseInt(parts[2], 10);
+  
+  if (isNaN(day) || month === undefined || isNaN(year)) return null;
+  
+  return new Date(year, month, day);
+}
+
+/**
+ * Parse date - handles both DD-MMM-YYYY (15-Jan-2024) and DD-MM-YYYY (15-01-2024) formats
+ */
+function parseDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  
+  // Try DD-MMM-YYYY first (more common in this app)
+  const dmmyResult = parseDDMMMYYYY(dateStr);
+  if (dmmyResult) return dmmyResult;
+  
+  // Fall back to DD-MM-YYYY
+  return parseDDMMYYYY(dateStr);
+}
+
 export const GRACE_PERIOD_CONSTANTS = {
   DUE_HORIZON_DAYS: 30,
   GRACE_PERIOD_DAYS: 7, // Minimum grace period for calendar jobs
@@ -108,8 +145,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     // Calendar-based status calculation (default)
     if (!dueDate) return 'Active';
     
-    // Parse due date (DD-MM-YYYY format)
-    const dueDateObj = parseDDMMYYYY(dueDate);
+    // Parse due date - supports both DD-MMM-YYYY and DD-MM-YYYY formats
+    const dueDateObj = parseDate(dueDate);
     if (!dueDateObj) return 'Active';
     
     const today = new Date();

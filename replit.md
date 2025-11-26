@@ -31,7 +31,8 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Jobs vs. Work Orders**: `Jobs` define maintenance task templates; `Work Orders` are execution records.
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, and spec-compliant numbering.
 - **Lead Time Warnings**: Color-coded indicators for work order due dates.
-- **Grace Period Logic**: Fully implemented grace period calculations for Calendar and Running Hours jobs.
+- **Grace Period Logic**: Fully implemented grace period calculations for Calendar and Running Hours jobs. Supports Company Standard rule (end-of-month or 7-day grace depending on due date position) and Custom Days mode per vessel.
+- **Per-Vessel PMS Settings**: Configurable lead times and grace periods per vessel via `pms_vessel_settings` table. Includes Calendar lead times (Critical/Non-Critical), Running Hours lead times, and grace period modes.
 - **Job Cycle Updates**: Automatic updates to job fields (`lastDoneDate`, `nextDueDate`, `lastDoneRH`, `nextDueRH`) upon work order completion.
 - **Running Hours Module**: Handles previous and current readings for sub-components, with strict business rules for updating Running Hours (sub-components only, never exceeding parent, no backward movement).
 - **Spare Parts Consumed**: Pre-loads required spares from jobs, allows manual entry, tracks consumption by location, and triggers automatic inventory deduction and low-stock alerts.
@@ -49,7 +50,7 @@ The application utilizes a modern full-stack architecture. The frontend is built
     - Rule #19: Backend validation ensures approver's department matches the job's assigned department during work order completion.
     - Offline Mode is currently parked for future development.
 - **Fleet Admin Workflow Enhancements**: Includes Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
-- **Database Schema Enhancements**: Introduction of new tables (`fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`) and enhancements to existing tables (`jobs`, `components`, `work_orders`, `consumedSpareParts`).
+- **Database Schema Enhancements**: Introduction of new tables (`fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`, `pms_vessel_settings`) and enhancements to existing tables (`jobs`, `components`, `work_orders`, `consumedSpareParts`).
 - **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only behavior for `component_maintenance_history`.
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values from linked jobs.
 
