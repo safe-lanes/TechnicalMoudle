@@ -96,7 +96,11 @@ import {
   type InsertStoresItem,
   storesLedger,
   type StoresLedger,
-  type InsertStoresLedger
+  type InsertStoresLedger,
+  ihmItems,
+  type IhmItem,
+  ihmMaintenanceLog,
+  type IhmMaintenanceLog
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -165,6 +169,13 @@ export interface IStorage {
   createComponent(component: InsertComponent): Promise<Component>;
   updateComponent(id: string, data: Partial<Component>): Promise<Component>;
   deleteComponent(id: string): Promise<void>;
+  inactivateComponent(id: string, userId?: string, options?: { cascadeInactivate?: boolean }): Promise<{
+    success: boolean;
+    message: string;
+    componentsInactivated: number;
+    jobsInactivated: number;
+    activeChildrenCount?: number;
+  }>;
   createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit>;
   getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]>;
   getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]>;
@@ -203,6 +214,12 @@ export interface IStorage {
   updateSpare(id: number, data: Partial<Spare>): Promise<Spare>;
   deleteSpare(id: number): Promise<void>;
   consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
+  consumeSpareFromLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string): Promise<{
+    spare: Spare;
+    deducted: number;
+    requested: number;
+    shortageQty: number;
+  }>;
   receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
   bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
   adjustSpareQuantity(
@@ -1314,6 +1331,137 @@ export class MemStorage implements IStorage {
     return { componentsDeleted, jobsDeleted, workOrdersAffected, sparesDeleted };
   }
 
+  /**
+   * C2 INACTIVATE COMPONENT (Rule #14)
+   * Sets component status to INACTIVE instead of hard delete.
+   * Option A (default): Block if any child is ACTIVE
+   * Option B (cascadeInactivate=true): Cascade inactivate all descendants
+   */
+  async inactivateComponent(
+    id: string, 
+    userId: string = 'system',
+    options: { cascadeInactivate?: boolean } = {}
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    componentsInactivated: number;
+    jobsInactivated: number;
+    activeChildrenCount?: number;
+  }> {
+    const component = this.components.get(id);
+    if (!component) {
+      return { 
+        success: false, 
+        message: `Component ${id} not found`,
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
+    }
+    
+    if (component.isActive === false) {
+      return {
+        success: true,
+        message: 'Component is already inactive',
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
+    }
+    
+    const componentCode = component.componentCode;
+    const componentId = component.id;
+    
+    // Find all descendants
+    const descendants: Component[] = [];
+    const findDescendants = (parentCode: string | null) => {
+      if (!parentCode) return;
+      for (const [childId, child] of this.components) {
+        if (child.parentId === parentCode && childId !== componentId) {
+          descendants.push(child);
+          if (child.componentCode) {
+            findDescendants(child.componentCode);
+          }
+        }
+      }
+    };
+    if (componentCode) {
+      findDescendants(componentCode);
+    }
+    
+    // C2 Option A: Block if any child is ACTIVE (default behavior)
+    if (!options.cascadeInactivate) {
+      const activeChildren = descendants.filter(d => d.isActive !== false);
+      if (activeChildren.length > 0) {
+        return {
+          success: false,
+          message: `Component has ${activeChildren.length} active children. Inactivate or reassign them first.`,
+          componentsInactivated: 0,
+          jobsInactivated: 0,
+          activeChildrenCount: activeChildren.length
+        };
+      }
+    }
+    
+    // Proceed with inactivation
+    let componentsInactivated = 0;
+    let jobsInactivated = 0;
+    
+    // Collect all component codes/ids to process
+    const allCodesToProcess: string[] = componentCode ? [componentCode] : [];
+    const allIdsToProcess: string[] = [componentId];
+    
+    // C2 Option B: Cascade inactivate all descendants
+    if (options.cascadeInactivate) {
+      for (const descendant of descendants) {
+        if (descendant.isActive !== false) {
+          this.components.set(descendant.id, {
+            ...descendant,
+            isActive: false,
+            updatedAt: new Date()
+          });
+          componentsInactivated++;
+          if (descendant.componentCode) {
+            allCodesToProcess.push(descendant.componentCode);
+          }
+          allIdsToProcess.push(descendant.id);
+        }
+      }
+    }
+    
+    // Inactivate the target component
+    this.components.set(id, {
+      ...component,
+      isActive: false,
+      updatedAt: new Date()
+    });
+    componentsInactivated++;
+    
+    // Inactivate all linked Jobs (don't generate new WOs)
+    for (const [jobId, job] of this.jobs) {
+      if (job.isActive !== false && (
+        allIdsToProcess.includes(job.componentId) || 
+        (job.componentCode && allCodesToProcess.includes(job.componentCode))
+      )) {
+        this.jobs.set(jobId, {
+          ...job,
+          isActive: false,
+          updatedAt: new Date()
+        });
+        jobsInactivated++;
+      }
+    }
+    
+    // Note: Work Orders remain in history (no changes needed per C2 spec)
+    
+    console.log(`[INACTIVATE] Component ${id} inactivated:`, { componentsInactivated, jobsInactivated });
+    
+    return {
+      success: true,
+      message: `Component inactivated successfully. ${componentsInactivated} component(s) and ${jobsInactivated} job(s) affected.`,
+      componentsInactivated,
+      jobsInactivated
+    };
+  }
+
   // Fleet Components methods
   async getFleetComponents(): Promise<Component[]> {
     return Array.from(this.components.values()).filter(c => c.dataScope === 'fleet');
@@ -1565,6 +1713,28 @@ export class MemStorage implements IStorage {
     
     if (!meterReplaced && newParentRH < oldParentRH) {
       throw new Error('Running hours cannot decrease without meter replacement');
+    }
+    
+    // Rule A2: RH backward correction validation
+    // Prevent RH from going below the last completed WO's RH value
+    if (!meterReplaced) {
+      const parentComponentCode = parent.componentCode || parent.id;
+      let maxCompletedRH = 0;
+      
+      // Find the highest RH at which a work order was completed for this component
+      for (const [woId, wo] of this.workOrders) {
+        if (wo.status === 'Completed' && 
+            (wo.component === parentComponentId || wo.componentCode === parentComponentCode)) {
+          const completedRH = wo.runningHoursAtCompletion ? parseFloat(String(wo.runningHoursAtCompletion)) : 0;
+          if (!isNaN(completedRH) && completedRH > maxCompletedRH) {
+            maxCompletedRH = completedRH;
+          }
+        }
+      }
+      
+      if (maxCompletedRH > 0 && newParentRH < maxCompletedRH) {
+        throw new Error(`Running hours cannot be set below ${maxCompletedRH.toFixed(2)} (last completed work order RH value). Use meter replacement for corrections.`);
+      }
     }
     
     let updatedComponents = 0;
@@ -2103,6 +2273,93 @@ export class MemStorage implements IStorage {
     });
     
     return spare;
+  }
+
+  /**
+   * Rule A3: Location-aware spare consumption with negative prevention
+   * Deducts from specified location, never goes negative, logs shortage if any
+   */
+  async consumeSpareFromLocation(
+    id: number, 
+    quantity: number, 
+    location: 'A' | 'B', 
+    userId: string, 
+    remarks?: string, 
+    workOrderRef?: string
+  ): Promise<{
+    spare: Spare;
+    deducted: number;
+    requested: number;
+    shortageQty: number;
+  }> {
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    // Get the location-specific ROB
+    const locationRobField = location === 'A' ? 'robLocationA' : 'robLocationB';
+    const currentLocationRob = parseFloat(String(spare[locationRobField] || 0));
+    
+    // Rule A3: ROB never goes negative - deduct only what's available
+    const deducted = Math.min(quantity, currentLocationRob);
+    const shortageQty = quantity - deducted;
+    
+    if (deducted > 0) {
+      // Update location-specific ROB
+      const newLocationRob = currentLocationRob - deducted;
+      
+      // Update total ROB as well
+      const currentTotalRob = parseFloat(String(spare.rob || 0));
+      const newTotalRob = Math.max(0, currentTotalRob - deducted);
+      
+      const updatedSpare = {
+        ...spare,
+        [locationRobField]: newLocationRob,
+        rob: newTotalRob,
+        updatedAt: new Date()
+      };
+      this.spares.set(id, updatedSpare);
+      
+      // Create history entry
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId,
+        spareId: id,
+        partCode: spare.partCode,
+        partName: spare.partName,
+        componentId: spare.componentId,
+        componentCode: spare.componentCode || null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode || null,
+        eventType: 'CONSUME',
+        qtyChange: -deducted,
+        robAfter: newTotalRob,
+        userId,
+        remarks: shortageQty > 0 
+          ? `${remarks || ''} [SHORTAGE: Requested ${quantity}, only ${deducted} available at Location ${location}]`.trim()
+          : remarks || null,
+        reference: workOrderRef || null,
+        place: `Location ${location}`,
+        dateLocal: new Date().toISOString().split('T')[0],
+        tz: 'UTC'
+      });
+      
+      return {
+        spare: updatedSpare,
+        deducted,
+        requested: quantity,
+        shortageQty
+      };
+    }
+    
+    // Nothing to deduct - location has 0 stock
+    return {
+      spare,
+      deducted: 0,
+      requested: quantity,
+      shortageQty: quantity
+    };
   }
 
   async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
@@ -4967,6 +5224,139 @@ export class PostgresStorage implements IStorage {
     await db.delete(components).where(eq(components.id, id));
   }
 
+  /**
+   * C2 INACTIVATE COMPONENT (Rule #14) - PostgreSQL version
+   * Sets component status to INACTIVE instead of hard delete.
+   * Option A (default): Block if any child is ACTIVE
+   * Option B (cascadeInactivate=true): Cascade inactivate all descendants
+   */
+  async inactivateComponent(
+    id: string, 
+    userId: string = 'system',
+    options: { cascadeInactivate?: boolean } = {}
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    componentsInactivated: number;
+    jobsInactivated: number;
+    activeChildrenCount?: number;
+  }> {
+    const db = await this.getDb();
+    const { eq, and, or, inArray } = await import('drizzle-orm');
+    
+    const component = await this.getComponent(id);
+    if (!component) {
+      return { 
+        success: false, 
+        message: `Component ${id} not found`,
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
+    }
+    
+    if (component.isActive === false) {
+      return {
+        success: true,
+        message: 'Component is already inactive',
+        componentsInactivated: 0,
+        jobsInactivated: 0
+      };
+    }
+    
+    const componentCode = component.componentCode;
+    const componentId = component.id;
+    
+    // Find all descendants recursively
+    const descendants: Component[] = [];
+    const findDescendants = async (parentCode: string | null) => {
+      if (!parentCode) return;
+      const children = await db.select().from(components)
+        .where(eq(components.parentId, parentCode));
+      for (const child of children) {
+        if (child.id !== componentId) {
+          descendants.push(child);
+          if (child.componentCode) {
+            await findDescendants(child.componentCode);
+          }
+        }
+      }
+    };
+    if (componentCode) {
+      await findDescendants(componentCode);
+    }
+    
+    // C2 Option A: Block if any child is ACTIVE (default behavior)
+    if (!options.cascadeInactivate) {
+      const activeChildren = descendants.filter(d => d.isActive !== false);
+      if (activeChildren.length > 0) {
+        return {
+          success: false,
+          message: `Component has ${activeChildren.length} active children. Inactivate or reassign them first.`,
+          componentsInactivated: 0,
+          jobsInactivated: 0,
+          activeChildrenCount: activeChildren.length
+        };
+      }
+    }
+    
+    // Proceed with inactivation
+    let componentsInactivated = 0;
+    let jobsInactivated = 0;
+    
+    // Collect all component codes/ids to process
+    const allCodesToProcess: string[] = componentCode ? [componentCode] : [];
+    const allIdsToProcess: string[] = [componentId];
+    
+    // C2 Option B: Cascade inactivate all descendants
+    if (options.cascadeInactivate) {
+      for (const descendant of descendants) {
+        if (descendant.isActive !== false) {
+          await db.update(components)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(components.id, descendant.id));
+          componentsInactivated++;
+          if (descendant.componentCode) {
+            allCodesToProcess.push(descendant.componentCode);
+          }
+          allIdsToProcess.push(descendant.id);
+        }
+      }
+    }
+    
+    // Inactivate the target component
+    await db.update(components)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(components.id, id));
+    componentsInactivated++;
+    
+    // Inactivate all linked Jobs if we have any codes/ids to process
+    if (allCodesToProcess.length > 0 || allIdsToProcess.length > 0) {
+      const jobsToUpdate = await db.select().from(jobs)
+        .where(or(
+          inArray(jobs.componentId, allIdsToProcess),
+          inArray(jobs.componentCode, allCodesToProcess)
+        ));
+      
+      for (const job of jobsToUpdate) {
+        if (job.isActive !== false) {
+          await db.update(jobs)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(jobs.id, job.id));
+          jobsInactivated++;
+        }
+      }
+    }
+    
+    console.log(`[INACTIVATE] Component ${id} inactivated:`, { componentsInactivated, jobsInactivated });
+    
+    return {
+      success: true,
+      message: `Component inactivated successfully. ${componentsInactivated} component(s) and ${jobsInactivated} job(s) affected.`,
+      componentsInactivated,
+      jobsInactivated
+    };
+  }
+
   // ============= FLEET COMPONENTS =============
   async getFleetComponents(): Promise<Component[]> {
     const db = await this.getDb();
@@ -5160,6 +5550,96 @@ export class PostgresStorage implements IStorage {
     });
 
     return updated[0];
+  }
+
+  /**
+   * Rule A3: Location-aware spare consumption with negative prevention (PostgreSQL)
+   * Deducts from specified location, never goes negative, logs shortage if any
+   */
+  async consumeSpareFromLocation(
+    id: number, 
+    quantity: number, 
+    location: 'A' | 'B', 
+    userId: string, 
+    remarks?: string, 
+    workOrderRef?: string
+  ): Promise<{
+    spare: Spare;
+    deducted: number;
+    requested: number;
+    shortageQty: number;
+  }> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    // Get the location-specific ROB
+    const currentLocationRob = location === 'A' 
+      ? parseFloat(String(spare.robLocationA || 0))
+      : parseFloat(String(spare.robLocationB || 0));
+    
+    // Rule A3: ROB never goes negative - deduct only what's available
+    const deducted = Math.min(quantity, currentLocationRob);
+    const shortageQty = quantity - deducted;
+    
+    if (deducted > 0) {
+      // Update location-specific ROB and total ROB
+      const newLocationRob = currentLocationRob - deducted;
+      const currentTotalRob = parseFloat(String(spare.rob || 0));
+      const newTotalRob = Math.max(0, currentTotalRob - deducted);
+      
+      const updateData = location === 'A'
+        ? { robLocationA: String(newLocationRob), rob: newTotalRob, updatedAt: new Date() }
+        : { robLocationB: String(newLocationRob), rob: newTotalRob, updatedAt: new Date() };
+      
+      const updated = await db.update(spares)
+        .set(updateData)
+        .where(eq(spares.id, id))
+        .returning();
+      
+      // Create history entry
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || '',
+        spareId: id,
+        partCode: spare.partCode,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode || '',
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode || '',
+        eventType: 'CONSUME',
+        qtyChange: -deducted,
+        robAfter: newTotalRob,
+        userId,
+        remarks: shortageQty > 0 
+          ? `${remarks || ''} [SHORTAGE: Requested ${quantity}, only ${deducted} available at Location ${location}]`.trim()
+          : remarks || undefined,
+        reference: workOrderRef,
+        place: `Location ${location}`,
+        dateLocal: new Date().toISOString().split('T')[0],
+        tz: 'UTC'
+      });
+      
+      return {
+        spare: updated[0],
+        deducted,
+        requested: quantity,
+        shortageQty
+      };
+    }
+    
+    // Nothing to deduct - location has 0 stock
+    return {
+      spare,
+      deducted: 0,
+      requested: quantity,
+      shortageQty: quantity
+    };
   }
 
   async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
@@ -5734,86 +6214,345 @@ export class PostgresStorage implements IStorage {
     await db.delete(masterLists).where(eq(masterLists.id, id));
   }
 
-  // ============= STUBS FOR NON-PRIORITY METHODS =============
+  // ============= CHANGE REQUEST OPERATIONS (PostgreSQL) =============
   
   async bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]> {
-    throw new Error("Bulk update spares not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const updatedSpares: Spare[] = [];
+    
+    for (const update of updates) {
+      const spare = await this.getSpare(update.id);
+      if (!spare) continue;
+      
+      let netChange = 0;
+      if (update.consumed) {
+        netChange -= update.consumed;
+      }
+      if (update.received) {
+        netChange += update.received;
+      }
+      
+      if (netChange !== 0) {
+        const newRob = Math.max(0, spare.rob + netChange);
+        const updated = await db.update(spares)
+          .set({ rob: newRob, updatedAt: new Date() })
+          .where(eq(spares.id, update.id))
+          .returning();
+        
+        await this.createSpareHistory({
+          timestampUTC: new Date(),
+          vesselId: spare.vesselId || '',
+          spareId: update.id,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: spare.componentId || '',
+          componentCode: spare.componentCode || '',
+          componentName: spare.componentName,
+          componentSpareCode: spare.componentSpareCode || '',
+          eventType: netChange > 0 ? 'RECEIVE' : 'CONSUME',
+          qtyChange: netChange,
+          robAfter: newRob,
+          userId,
+          remarks,
+          place: update.receivedPlace,
+          dateLocal: update.receivedDate,
+          tz: 'UTC'
+        });
+        
+        if (updated[0]) updatedSpares.push(updated[0]);
+      }
+    }
+    
+    return updatedSpares;
   }
 
   async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
-    throw new Error("Update change request target not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(changeRequests)
+      .set({ targetType, targetId, snapshotBeforeJson, updatedAt: new Date() })
+      .where(eq(changeRequests.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Change request ${id} not found`);
+    return result[0];
   }
 
   async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest> {
-    throw new Error("Update change request proposed not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const updateData: any = { proposedChangesJson, updatedAt: new Date() };
+    if (movePreviewJson !== undefined) {
+      updateData.movePreviewJson = movePreviewJson;
+    }
+    const result = await db.update(changeRequests)
+      .set(updateData)
+      .where(eq(changeRequests.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Change request ${id} not found`);
+    return result[0];
   }
 
   async deleteChangeRequest(id: number): Promise<void> {
-    throw new Error("Delete change request not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(changeRequests).where(eq(changeRequests.id, id));
   }
 
   async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
-    throw new Error("Submit change request not yet migrated to PostgreSQL");
+    return this.updateChangeRequest(id, { 
+      status: 'submitted', 
+      submittedAt: new Date(), 
+      requestedByUserId: userId 
+    });
   }
 
   async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    throw new Error("Approve change request not yet migrated to PostgreSQL");
+    const existing = await this.getChangeRequest(id);
+    if (!existing) throw new Error(`Change request ${id} not found`);
+    
+    const now = new Date();
+    
+    // Rule #17: Increment revision number and add to history
+    const newRevisionNumber = (existing.revisionNumber || 0) + 1;
+    const revisionHistoryEntry = {
+      revisionNumber: newRevisionNumber,
+      approvedBy: reviewerId,
+      approvedAt: now.toISOString(),
+      appliedChanges: existing.proposedChangesJson || [],
+      comments: comment
+    };
+    const updatedHistory = [...(existing.revisionHistory as any[] || []), revisionHistoryEntry];
+    
+    console.log(`[RULE #17] Change request ${id} approved - Revision #${newRevisionNumber}`);
+    
+    return this.updateChangeRequest(id, { 
+      status: 'approved', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: now,
+      revisionNumber: newRevisionNumber,
+      revisionHistory: updatedHistory
+    });
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    throw new Error("Reject change request not yet migrated to PostgreSQL");
+    return this.updateChangeRequest(id, { 
+      status: 'rejected', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: new Date() 
+    });
   }
 
   async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    throw new Error("Return change request not yet migrated to PostgreSQL");
+    return this.updateChangeRequest(id, { 
+      status: 'returned', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: new Date() 
+    });
   }
 
   async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
-    throw new Error("Change request attachments not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(changeRequestAttachments)
+      .where(eq(changeRequestAttachments.changeRequestId, changeRequestId));
   }
 
   async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
-    throw new Error("Create change request attachment not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(changeRequestAttachments)
+      .values({ ...attachment, uploadedAt: new Date() })
+      .returning();
+    return result[0];
   }
 
   async getChangeRequestComments(changeRequestId: number): Promise<ChangeRequestComment[]> {
-    throw new Error("Change request comments not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(changeRequestComments)
+      .where(eq(changeRequestComments.changeRequestId, changeRequestId));
   }
 
   async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
-    throw new Error("Create change request comment not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(changeRequestComments)
+      .values({ ...comment, createdAt: new Date() })
+      .returning();
+    return result[0];
   }
 
-  async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
-    throw new Error("Bulk create components not yet migrated to PostgreSQL");
+  // ============= BULK OPERATIONS (PostgreSQL) =============
+
+  async bulkCreateComponents(inputComponents: InsertComponent[]): Promise<Component[]> {
+    const db = await this.getDb();
+    if (inputComponents.length === 0) return [];
+    
+    const componentsWithDefaults = inputComponents.map(c => ({
+      ...c,
+      isActive: c.isActive ?? true,
+      critical: c.critical ?? false,
+      classItem: c.classItem ?? false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+    
+    const result = await db.insert(components).values(componentsWithDefaults).returning();
+    
+    // Update index
+    for (const comp of result) {
+      if (comp.componentCode) {
+        const vesselKey = comp.vesselId || 'global';
+        if (!this.componentCodeIndex.has(vesselKey)) {
+          this.componentCodeIndex.set(vesselKey, new Map());
+        }
+        this.componentCodeIndex.get(vesselKey)!.set(comp.componentCode, comp.id);
+      }
+    }
+    
+    return result;
   }
 
-  async bulkUpdateComponents(components: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
-    throw new Error("Bulk update components not yet migrated to PostgreSQL");
+  async bulkUpdateComponents(updates: Array<{ id: string; data: Partial<Component> }>): Promise<Component[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const results: Component[] = [];
+    
+    for (const { id, data } of updates) {
+      const result = await db.update(components)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(components.id, id))
+        .returning();
+      if (result[0]) results.push(result[0]);
+    }
+    
+    return results;
   }
 
-  async bulkUpsertComponents(components: InsertComponent[]): Promise<{ created: number; updated: number }> {
-    throw new Error("Bulk upsert components not yet migrated to PostgreSQL");
+  async bulkUpsertComponents(inputComponents: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    let created = 0;
+    let updated = 0;
+    
+    for (const comp of inputComponents) {
+      if (comp.id) {
+        const existing = await this.getComponent(comp.id);
+        if (existing) {
+          await db.update(components)
+            .set({ ...comp, updatedAt: new Date() })
+            .where(eq(components.id, comp.id));
+          updated++;
+          continue;
+        }
+      }
+      
+      await db.insert(components).values({
+        ...comp,
+        isActive: comp.isActive ?? true,
+        critical: comp.critical ?? false,
+        classItem: comp.classItem ?? false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      created++;
+    }
+    
+    return { created, updated };
   }
 
-  async bulkCreateSpares(spares: InsertSpare[]): Promise<Spare[]> {
-    throw new Error("Bulk create spares not yet migrated to PostgreSQL");
+  async bulkCreateSpares(inputSpares: InsertSpare[]): Promise<Spare[]> {
+    const db = await this.getDb();
+    if (inputSpares.length === 0) return [];
+    
+    const sparesWithDefaults = inputSpares.map(s => ({
+      ...s,
+      rob: s.rob ?? 0,
+      robLocationA: s.robLocationA ?? '0',
+      robLocationB: s.robLocationB ?? '0',
+      min: s.min ?? '0',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+    
+    return await db.insert(spares).values(sparesWithDefaults).returning();
   }
 
-  async bulkUpdateSparesByROB(spares: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
-    throw new Error("Bulk update spares by ROB not yet migrated to PostgreSQL");
+  async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const results: Spare[] = [];
+    
+    for (const { robId, data } of updates) {
+      const existingSpares = await db.select().from(spares).where(eq(spares.robId, robId));
+      if (existingSpares[0]) {
+        const result = await db.update(spares)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(spares.robId, robId))
+          .returning();
+        if (result[0]) results.push(result[0]);
+      }
+    }
+    
+    return results;
   }
 
-  async bulkUpsertSpares(spares: InsertSpare[]): Promise<{ created: number; updated: number }> {
-    throw new Error("Bulk upsert spares not yet migrated to PostgreSQL");
+  async bulkUpsertSpares(inputSpares: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    let created = 0;
+    let updated = 0;
+    
+    for (const spare of inputSpares) {
+      if (spare.robId) {
+        const existingByRobId = await db.select().from(spares).where(eq(spares.robId, spare.robId));
+        if (existingByRobId[0]) {
+          await db.update(spares)
+            .set({ ...spare, updatedAt: new Date() })
+            .where(eq(spares.robId, spare.robId));
+          updated++;
+          continue;
+        }
+      }
+      
+      await db.insert(spares).values({
+        ...spare,
+        rob: spare.rob ?? 0,
+        robLocationA: spare.robLocationA ?? '0',
+        robLocationB: spare.robLocationB ?? '0',
+        min: spare.min ?? '0',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      created++;
+    }
+    
+    return { created, updated };
   }
 
   async archiveComponentsByIds(ids: string[]): Promise<number> {
-    throw new Error("Archive components not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { inArray } = await import('drizzle-orm');
+    if (ids.length === 0) return 0;
+    
+    const result = await db.update(components)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(inArray(components.id, ids))
+      .returning();
+    
+    return result.length;
   }
 
   async archiveSparesByIds(ids: number[]): Promise<number> {
-    throw new Error("Archive spares not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { inArray } = await import('drizzle-orm');
+    if (ids.length === 0) return 0;
+    
+    const result = await db.update(spares)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(inArray(spares.id, ids))
+      .returning();
+    
+    return result.length;
   }
 
   async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
@@ -6029,208 +6768,577 @@ export class PostgresStorage implements IStorage {
       .where(eq(componentClassRegulatory.id, id));
   }
 
+  // ============= ALERT POLICIES (PostgreSQL) =============
   async getAlertPolicies(): Promise<AlertPolicy[]> {
-    throw new Error("Alert policies not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    return await db.select().from(alertPolicies);
   }
 
   async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
-    throw new Error("Alert policy not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(alertPolicies).where(eq(alertPolicies.id, id));
+    return result[0];
   }
 
   async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
-    throw new Error("Create alert policy not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(alertPolicies).values(policy).returning();
+    return result[0];
   }
 
   async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
-    throw new Error("Update alert policy not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(alertPolicies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(alertPolicies.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Alert policy ${id} not found`);
+    return result[0];
   }
 
   async deleteAlertPolicy(id: number): Promise<void> {
-    throw new Error("Delete alert policy not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(alertPolicies).where(eq(alertPolicies.id, id));
   }
 
   async getAlertEvents(filters?: { startDate?: Date; endDate?: Date; alertType?: string; priority?: string; status?: string; vesselId?: string }): Promise<AlertEvent[]> {
-    throw new Error("Alert events not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and, gte, lte } = await import('drizzle-orm');
+    
+    const conditions = [];
+    if (filters?.alertType) conditions.push(eq(alertEvents.alertType, filters.alertType));
+    if (filters?.priority) conditions.push(eq(alertEvents.priority, filters.priority));
+    if (filters?.status) conditions.push(eq(alertEvents.status, filters.status));
+    if (filters?.vesselId) conditions.push(eq(alertEvents.vesselId, filters.vesselId));
+    if (filters?.startDate) conditions.push(gte(alertEvents.triggeredAt, filters.startDate));
+    if (filters?.endDate) conditions.push(lte(alertEvents.triggeredAt, filters.endDate));
+    
+    if (conditions.length === 0) {
+      return await db.select().from(alertEvents);
+    }
+    return await db.select().from(alertEvents).where(and(...conditions));
   }
 
   async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
-    throw new Error("Alert event not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    return result[0];
   }
 
   async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
-    throw new Error("Create alert event not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(alertEvents).values(event).returning();
+    return result[0];
   }
 
   async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
-    throw new Error("Acknowledge alert event not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(alertEvents)
+      .set({ status: 'acknowledged', acknowledgedAt: new Date(), acknowledgedBy: userId })
+      .where(eq(alertEvents.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Alert event ${id} not found`);
+    return result[0];
   }
 
   async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
-    throw new Error("Alert deliveries not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(alertDeliveries).where(eq(alertDeliveries.alertEventId, eventId));
   }
 
   async createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery> {
-    throw new Error("Create alert delivery not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(alertDeliveries).values(delivery).returning();
+    return result[0];
   }
 
   async updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery> {
-    throw new Error("Update alert delivery status not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const updateData: any = { status };
+    if (errorMessage) updateData.errorMessage = errorMessage;
+    if (status === 'sent') updateData.sentAt = new Date();
+    
+    const result = await db.update(alertDeliveries)
+      .set(updateData)
+      .where(eq(alertDeliveries.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Alert delivery ${id} not found`);
+    return result[0];
   }
 
   async getAlertConfig(vesselId: string): Promise<AlertConfig | undefined> {
-    throw new Error("Alert config not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(alertConfigs).where(eq(alertConfigs.vesselId, vesselId));
+    return result[0];
   }
 
   async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
-    throw new Error("Create/update alert config not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const existing = await this.getAlertConfig(config.vesselId);
+    if (existing) {
+      const result = await db.update(alertConfigs)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(alertConfigs.vesselId, config.vesselId))
+        .returning();
+      return result[0];
+    }
+    
+    const result = await db.insert(alertConfigs).values(config).returning();
+    return result[0];
   }
 
+  // ============= FORM DEFINITIONS (PostgreSQL) =============
   async getFormDefinitions(): Promise<FormDefinition[]> {
-    throw new Error("Form definitions not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    return await db.select().from(formDefinitions);
   }
 
   async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
-    throw new Error("Form definition not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(formDefinitions).where(eq(formDefinitions.id, id));
+    return result[0];
   }
 
   async getFormDefinitionByName(name: string): Promise<FormDefinition | undefined> {
-    throw new Error("Form definition by name not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(formDefinitions).where(eq(formDefinitions.name, name));
+    return result[0];
   }
 
   async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
-    throw new Error("Create form definition not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(formDefinitions).values(form).returning();
+    return result[0];
   }
 
   async getFormVersions(formId: number): Promise<FormVersion[]> {
-    throw new Error("Form versions not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(formVersions).where(eq(formVersions.formDefinitionId, formId));
   }
 
   async getFormVersion(id: number): Promise<FormVersion | undefined> {
-    throw new Error("Form version not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(formVersions).where(eq(formVersions.id, id));
+    return result[0];
   }
 
   async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
-    throw new Error("Latest published version not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and, desc } = await import('drizzle-orm');
+    const result = await db.select().from(formVersions)
+      .where(and(eq(formVersions.formDefinitionId, formId), eq(formVersions.status, 'published')))
+      .orderBy(desc(formVersions.versionNumber))
+      .limit(1);
+    return result[0];
   }
 
   async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
-    throw new Error("Latest published version by name not yet migrated to PostgreSQL");
+    const definition = await this.getFormDefinitionByName(name);
+    if (!definition) return undefined;
+    return await this.getLatestPublishedVersion(definition.id);
   }
 
   async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
-    throw new Error("Create form version not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(formVersions).values(version).returning();
+    return result[0];
   }
 
   async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
-    throw new Error("Update form version not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(formVersions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(formVersions.id, id))
+      .returning();
+    if (!result[0]) throw new Error(`Form version ${id} not found`);
+    return result[0];
   }
 
   async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
-    throw new Error("Publish form version not yet migrated to PostgreSQL");
+    return this.updateFormVersion(id, {
+      status: 'published',
+      publishedAt: new Date(),
+      publishedBy: userId,
+      changelog
+    });
   }
 
   async discardFormVersion(id: number): Promise<void> {
-    throw new Error("Discard form version not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.delete(formVersions).where(eq(formVersions.id, id));
   }
 
   async createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage> {
-    throw new Error("Create form version usage not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(formVersionUsages).values(usage).returning();
+    return result[0];
   }
 
   async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
-    throw new Error("Form version usage not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(formVersionUsages).where(eq(formVersionUsages.formVersionId, formVersionId));
   }
 
   async seedForms(): Promise<void> {
-    throw new Error("Seed forms not yet migrated to PostgreSQL");
+    // Seed default form definitions if needed
+    const workOrderForm = await this.getFormDefinitionByName('work_order');
+    if (!workOrderForm) {
+      await this.createFormDefinition({
+        name: 'work_order',
+        displayName: 'Work Order Form',
+        description: 'Standard work order form for maritime PMS',
+        category: 'pms'
+      });
+    }
   }
 
+  // ============= IHM ITEMS (PostgreSQL) =============
   async getIhmItem(id: string, type: 'component' | 'spare'): Promise<any | undefined> {
-    throw new Error("IHM items not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const result = await db.select().from(ihmItems)
+      .where(and(eq(ihmItems.itemId, id), eq(ihmItems.itemType, type)));
+    return result[0];
   }
 
   async upsertIhmItem(item: any): Promise<any> {
-    throw new Error("Upsert IHM item not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    const existing = await this.getIhmItem(item.itemId, item.itemType);
+    if (existing) {
+      const result = await db.update(ihmItems)
+        .set({ ...item, updatedAt: new Date() })
+        .where(and(eq(ihmItems.itemId, item.itemId), eq(ihmItems.itemType, item.itemType)))
+        .returning();
+      return result[0];
+    }
+    
+    const result = await db.insert(ihmItems).values(item).returning();
+    return result[0];
   }
 
   async getIhmMaintenanceLog(filters: any): Promise<any[]> {
-    throw new Error("IHM maintenance log not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    const conditions = [];
+    if (filters?.vesselId) conditions.push(eq(ihmMaintenanceLog.vesselId, filters.vesselId));
+    if (filters?.itemType) conditions.push(eq(ihmMaintenanceLog.itemType, filters.itemType));
+    
+    if (conditions.length === 0) {
+      return await db.select().from(ihmMaintenanceLog);
+    }
+    return await db.select().from(ihmMaintenanceLog).where(and(...conditions));
   }
 
   async createIhmMaintenanceLogEntry(entry: any): Promise<any> {
-    throw new Error("Create IHM maintenance log entry not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(ihmMaintenanceLog).values(entry).returning();
+    return result[0];
   }
 
   async getIhmStatusReport(vesselId: string): Promise<any[]> {
-    throw new Error("IHM status report not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(ihmItems).where(eq(ihmItems.vesselId, vesselId));
   }
 
-  async bulkCreateWorkOrders(workOrders: InsertWorkOrder[]): Promise<WorkOrder[]> {
-    throw new Error("Bulk create work orders not yet migrated to PostgreSQL");
+  // ============= BULK WORK ORDERS (PostgreSQL) =============
+  async bulkCreateWorkOrders(inputWorkOrders: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    const db = await this.getDb();
+    if (inputWorkOrders.length === 0) return [];
+    
+    const ordersWithDefaults = inputWorkOrders.map(wo => ({
+      ...wo,
+      status: wo.status || 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+    
+    return await db.insert(workOrders).values(ordersWithDefaults).returning();
   }
 
-  async bulkUpdateWorkOrders(workOrders: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
-    throw new Error("Bulk update work orders not yet migrated to PostgreSQL");
+  async bulkUpdateWorkOrders(updates: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const results: WorkOrder[] = [];
+    
+    for (const { templateCode, data } of updates) {
+      const existing = await db.select().from(workOrders).where(eq(workOrders.templateCode, templateCode));
+      if (existing[0]) {
+        const result = await db.update(workOrders)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(workOrders.templateCode, templateCode))
+          .returning();
+        if (result[0]) results.push(result[0]);
+      }
+    }
+    
+    return results;
   }
 
-  async bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
-    throw new Error("Bulk upsert work orders not yet migrated to PostgreSQL");
+  async bulkUpsertWorkOrders(inputWorkOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    let created = 0;
+    let updated = 0;
+    
+    for (const wo of inputWorkOrders) {
+      if (wo.id) {
+        const existing = await this.getWorkOrder(wo.id);
+        if (existing) {
+          await db.update(workOrders)
+            .set({ ...wo, updatedAt: new Date() })
+            .where(eq(workOrders.id, wo.id));
+          updated++;
+          continue;
+        }
+      }
+      
+      await db.insert(workOrders).values({
+        ...wo,
+        status: wo.status || 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      created++;
+    }
+    
+    return { created, updated };
   }
 
+  // ============= FLEET JOBS (PostgreSQL) =============
   async getFleetJobs(): Promise<WorkOrder[]> {
-    throw new Error("Fleet jobs not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(workOrders).where(eq(workOrders.isFleetTemplate, true));
   }
 
   async getFleetJob(id: string): Promise<WorkOrder | undefined> {
-    throw new Error("Fleet job not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const result = await db.select().from(workOrders)
+      .where(and(eq(workOrders.id, id), eq(workOrders.isFleetTemplate, true)));
+    return result[0];
   }
 
   async createFleetJob(job: InsertWorkOrder): Promise<WorkOrder> {
-    throw new Error("Create fleet job not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const result = await db.insert(workOrders)
+      .values({ ...job, isFleetTemplate: true, createdAt: new Date(), updatedAt: new Date() })
+      .returning();
+    return result[0];
   }
 
   async updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder> {
-    throw new Error("Update fleet job not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const result = await db.update(workOrders)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(workOrders.id, id), eq(workOrders.isFleetTemplate, true)))
+      .returning();
+    if (!result[0]) throw new Error(`Fleet job ${id} not found`);
+    return result[0];
   }
 
   async deleteFleetJob(id: string): Promise<void> {
-    throw new Error("Delete fleet job not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    await db.delete(workOrders).where(and(eq(workOrders.id, id), eq(workOrders.isFleetTemplate, true)));
   }
 
+  // ============= DEFECT OPERATIONS (PostgreSQL) =============
   async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string; }): Promise<Defect> {
-    throw new Error("Add defect note not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const defect = await this.getDefect(defectId);
+    if (!defect) throw new Error(`Defect ${defectId} not found`);
+    
+    const existingNotes = (defect.notes as any[]) || [];
+    const newNote = {
+      id: `note_${Date.now()}`,
+      noteText: note.noteText,
+      attachments: note.attachments,
+      createdBy: note.createdBy,
+      createdAt: new Date().toISOString()
+    };
+    
+    const result = await db.update(defects)
+      .set({ notes: [...existingNotes, newNote], updatedAt: new Date() })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    return result[0];
   }
 
   async linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect> {
-    throw new Error("Link defects not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const defect = await this.getDefect(defectId);
+    if (!defect) throw new Error(`Defect ${defectId} not found`);
+    
+    const existingLinks = (defect.linkedDefects as string[]) || [];
+    const uniqueLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
+    
+    const result = await db.update(defects)
+      .set({ linkedDefects: uniqueLinks, updatedAt: new Date() })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    return result[0];
   }
 
   async closeDefect(defectId: string, closure: { closedBy: string; closureComment: string; closureFiles?: string[] }): Promise<Defect> {
-    throw new Error("Close defect not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const result = await db.update(defects)
+      .set({
+        status: 'closed',
+        closedBy: closure.closedBy,
+        closedAt: new Date(),
+        closureComment: closure.closureComment,
+        closureFiles: closure.closureFiles || [],
+        updatedAt: new Date()
+      })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    if (!result[0]) throw new Error(`Defect ${defectId} not found`);
+    return result[0];
   }
 
-  async calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths?: number): Promise<RecurringDefect | null> {
-    throw new Error("Calculate recurring defects not yet migrated to PostgreSQL");
+  async calculateAndUpdateRecurringDefects(equipmentKey: string, windowMonths: number = 12): Promise<RecurringDefect | null> {
+    const db = await this.getDb();
+    const { eq, and, gte } = await import('drizzle-orm');
+    
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - windowMonths);
+    
+    // Find defects for this equipment within the window
+    const equipmentDefects = await db.select().from(defects)
+      .where(and(
+        eq(defects.equipmentKey, equipmentKey),
+        gte(defects.reportedDate, cutoffDate)
+      ));
+    
+    // Need at least 2 defects to be considered recurring
+    if (equipmentDefects.length < 2) {
+      return null;
+    }
+    
+    // Check if recurring defect record exists
+    const existingRecurring = await db.select().from(recurringDefects)
+      .where(eq(recurringDefects.equipmentKey, equipmentKey));
+    
+    const recurringData = {
+      equipmentKey,
+      occurrenceCount: equipmentDefects.length,
+      firstOccurrence: equipmentDefects[0]?.reportedDate || new Date(),
+      lastOccurrence: equipmentDefects[equipmentDefects.length - 1]?.reportedDate || new Date(),
+      status: 'active' as const,
+      updatedAt: new Date()
+    };
+    
+    if (existingRecurring[0]) {
+      const result = await db.update(recurringDefects)
+        .set(recurringData)
+        .where(eq(recurringDefects.id, existingRecurring[0].id))
+        .returning();
+      return result[0];
+    }
+    
+    const result = await db.insert(recurringDefects)
+      .values({ ...recurringData, createdAt: new Date() })
+      .returning();
+    return result[0];
   }
 
   async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
-    throw new Error("Get defects for recurring not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    
+    const recurring = await db.select().from(recurringDefects).where(eq(recurringDefects.id, recurringId));
+    if (!recurring[0]) return [];
+    
+    return await db.select().from(defects).where(eq(defects.equipmentKey, recurring[0].equipmentKey));
   }
 
   async recalculateAllRecurringDefects(): Promise<void> {
-    throw new Error("Recalculate all recurring defects not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    
+    // Get all unique equipment keys
+    const allDefects = await db.select({ equipmentKey: defects.equipmentKey }).from(defects);
+    const uniqueKeys = [...new Set(allDefects.map(d => d.equipmentKey).filter(Boolean))];
+    
+    console.log(`🔄 Starting recalculation of all recurring defects...`);
+    console.log(`📊 Total defects to check: ${allDefects.length}`);
+    console.log(`🔧 Found ${uniqueKeys.length} unique equipment keys`);
+    
+    let groupsCreated = 0;
+    for (const key of uniqueKeys) {
+      if (key) {
+        const result = await this.calculateAndUpdateRecurringDefects(key);
+        if (result) groupsCreated++;
+      }
+    }
+    
+    console.log(`✅ Recalculation complete: ${groupsCreated} recurring defect groups created from ${uniqueKeys.length} equipment keys`);
   }
 
   async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
-    throw new Error("Get defect by seed ID not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(defects).where(eq(defects.seedId, seedId));
+    return result[0];
   }
 
+  // ============= VESSEL OPERATIONS (PostgreSQL) =============
+  // Vessels are managed as static list in the frontend, these methods provide
+  // compatibility with the storage interface using component vesselId lookups
   async getVesselIdByName(vesselName: string): Promise<string | undefined> {
-    throw new Error("Get vessel ID by name not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    // Look up vessel ID from components that have this vessel name
+    const result = await db.select({ vesselId: components.vesselId })
+      .from(components)
+      .where(eq(components.vesselId, vesselName))
+      .limit(1);
+    
+    if (result[0]?.vesselId) return result[0].vesselId;
+    
+    // Try matching common patterns
+    const commonVessels: Record<string, string> = {
+      'MV SEAFARER': 'V001',
+      'MV VOYAGER': 'V002', 
+      'MV EXPLORER': 'V003'
+    };
+    return commonVessels[vesselName.toUpperCase()];
   }
 
   async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
-    throw new Error("Create vessel not yet migrated to PostgreSQL");
+    // Vessels are static in this system - this is a no-op for compatibility
+    console.log(`[VESSEL] Vessel creation skipped (static list): ${vessel.id} - ${vessel.name}`);
   }
 
   // ============= STORES METHODS - ZERO PMS LINKAGES =============
@@ -6457,7 +7565,92 @@ export class PostgresStorage implements IStorage {
     deletedRunningHoursAudits: number;
     componentsReset: number;
   }> {
-    throw new Error("Purge jobs and linked data not yet migrated to PostgreSQL");
+    const db = await this.getDb();
+    const { eq, inArray } = await import('drizzle-orm');
+    
+    let result = {
+      deletedWorkOrderExecutions: 0,
+      deletedWorkOrders: 0,
+      deletedJobs: 0,
+      deletedRunningHoursAudits: 0,
+      componentsReset: 0
+    };
+    
+    if (vesselId) {
+      // Get jobs for this vessel
+      const vesselJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.vesselId, vesselId));
+      const jobIds = vesselJobs.map(j => j.id);
+      
+      if (jobIds.length > 0) {
+        // Get work orders for these jobs
+        const vesselWorkOrders = await db.select({ id: workOrders.id })
+          .from(workOrders)
+          .where(inArray(workOrders.jobId, jobIds));
+        const woIds = vesselWorkOrders.map(wo => wo.id);
+        
+        if (woIds.length > 0) {
+          // Delete work order executions
+          const deletedExecs = await db.delete(workOrderExecutions)
+            .where(inArray(workOrderExecutions.workOrderId, woIds))
+            .returning();
+          result.deletedWorkOrderExecutions = deletedExecs.length;
+          
+          // Delete work orders
+          const deletedWOs = await db.delete(workOrders)
+            .where(inArray(workOrders.id, woIds))
+            .returning();
+          result.deletedWorkOrders = deletedWOs.length;
+        }
+        
+        // Delete jobs
+        const deletedJobs = await db.delete(jobs)
+          .where(inArray(jobs.id, jobIds))
+          .returning();
+        result.deletedJobs = deletedJobs.length;
+      }
+      
+      // Delete running hours audits for vessel
+      const deletedRHA = await db.delete(runningHoursAudit)
+        .where(eq(runningHoursAudit.vesselId, vesselId))
+        .returning();
+      result.deletedRunningHoursAudits = deletedRHA.length;
+      
+      // Reset components - clear running hours fields
+      const updatedComps = await db.update(components)
+        .set({ 
+          runningHours: null, 
+          previousRunningHours: null,
+          updatedAt: new Date() 
+        })
+        .where(eq(components.vesselId, vesselId))
+        .returning();
+      result.componentsReset = updatedComps.length;
+    } else {
+      // Purge all - dangerous operation
+      const allExecs = await db.delete(workOrderExecutions).returning();
+      result.deletedWorkOrderExecutions = allExecs.length;
+      
+      const allWOs = await db.delete(workOrders).returning();
+      result.deletedWorkOrders = allWOs.length;
+      
+      const allJobs = await db.delete(jobs).returning();
+      result.deletedJobs = allJobs.length;
+      
+      const allRHA = await db.delete(runningHoursAudit).returning();
+      result.deletedRunningHoursAudits = allRHA.length;
+      
+      const allComps = await db.update(components)
+        .set({ 
+          runningHours: null, 
+          previousRunningHours: null,
+          updatedAt: new Date() 
+        })
+        .returning();
+      result.componentsReset = allComps.length;
+    }
+    
+    console.log(`[PURGE] Jobs and linked data purged: ${JSON.stringify(result)}`);
+    return result;
   }
 }
 

@@ -2759,6 +2759,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Rule #14: Component Inactivation (preferred over delete)
+  // Option A (default): Block if any child is ACTIVE
+  // Option B: Cascade inactivate with cascadeInactivate=true
+  app.post("/api/components/:id/inactivate", async (req, res) => {
+    try {
+      const { cascadeInactivate, userId } = req.body;
+      const result = await storage.inactivateComponent(
+        req.params.id,
+        userId || 'system',
+        { cascadeInactivate: cascadeInactivate === true }
+      );
+      
+      if (!result.success) {
+        // If blocking due to active children, return 400 with details
+        if (result.activeChildrenCount && result.activeChildrenCount > 0) {
+          return res.status(400).json({
+            success: false,
+            error: result.message,
+            code: 'ACTIVE_CHILDREN',
+            activeChildrenCount: result.activeChildrenCount
+          });
+        }
+        return res.status(400).json({ success: false, error: result.message });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error inactivating component:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || "Failed to inactivate component" 
+      });
+    }
+  });
+  
   // Spares routes...
   
   // Get spares for a vessel

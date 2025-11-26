@@ -1863,6 +1863,31 @@ export class PersistentFileStorage implements IStorage {
 
     // 4. Update parent.currentCumulativeRH by applying delta
     const newParentRH = currentParentRH + delta;
+    
+    // VALIDATION 3 (Rule A2): RH backward correction validation
+    // Prevent RH from going below the last completed WO's RH value (unless meter replaced)
+    if (!params.meterReplaced) {
+      const parentComponentCode = parent.componentCode || parent.id;
+      let maxCompletedRH = 0;
+      
+      // Find the highest RH at which a work order was completed for this component
+      for (const wo of workingData.workOrders) {
+        if (wo && wo.status === 'Completed' && 
+            (wo.component === params.parentComponentId || wo.componentCode === parentComponentCode)) {
+          const completedRH = wo.runningHoursAtCompletion ? parseFloat(String(wo.runningHoursAtCompletion)) : 0;
+          if (!isNaN(completedRH) && completedRH > maxCompletedRH) {
+            maxCompletedRH = completedRH;
+          }
+        }
+      }
+      
+      if (maxCompletedRH > 0 && newParentRH < maxCompletedRH) {
+        throw new Error(
+          `Running hours cannot be set below ${maxCompletedRH.toFixed(2)} (last completed work order RH value). ` +
+          `Use meter replacement for corrections.`
+        );
+      }
+    }
     parent.currentCumulativeRH = newParentRH.toFixed(2);
 
     // 5. Get all children of parent (parentId contains component code, not database ID)
@@ -2372,6 +2397,94 @@ export class PersistentFileStorage implements IStorage {
     this.data.sparesHistory.push(history);
     this.persistData();
     return spare;
+  }
+
+  /**
+   * Rule A3: Location-aware spare consumption with negative prevention
+   * Deducts from specified location, never goes negative, logs shortage if any
+   */
+  async consumeSpareFromLocation(
+    id: number, 
+    quantity: number, 
+    location: 'A' | 'B', 
+    userId: string, 
+    remarks?: string, 
+    workOrderRef?: string
+  ): Promise<{
+    spare: Spare;
+    deducted: number;
+    requested: number;
+    shortageQty: number;
+  }> {
+    const spare = this.data.spares[id];
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    // Get the location-specific ROB
+    const locationRobField = location === 'A' ? 'robLocationA' : 'robLocationB';
+    const currentLocationRob = parseFloat(String(spare[locationRobField] || 0));
+    
+    // Rule A3: ROB never goes negative - deduct only what's available
+    const deducted = Math.min(quantity, currentLocationRob);
+    const shortageQty = quantity - deducted;
+    
+    if (deducted > 0) {
+      // Update location-specific ROB
+      const newLocationRob = currentLocationRob - deducted;
+      
+      // Update total ROB as well
+      const currentTotalRob = parseFloat(String(spare.rob || 0));
+      const newTotalRob = Math.max(0, currentTotalRob - deducted);
+      
+      // Apply updates
+      (spare as any)[locationRobField] = newLocationRob;
+      spare.rob = newTotalRob;
+      spare.updatedAt = new Date();
+      
+      // Create history entry
+      const history: SpareHistory = {
+        id: this.data.counters.historyId++,
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId ?? "V001",
+        spareId: id,
+        partCode: spare.partCode,
+        partName: spare.partName,
+        componentId: spare.componentId ?? "",
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'CONSUME',
+        qtyChange: -deducted,
+        robAfter: newTotalRob,
+        userId,
+        remarks: shortageQty > 0 
+          ? `${remarks || ''} [SHORTAGE: Requested ${quantity}, only ${deducted} available at Location ${location}]`.trim()
+          : remarks ?? null,
+        reference: workOrderRef ?? null,
+        place: `Location ${location}`,
+        dateLocal: new Date().toISOString().split('T')[0],
+        tz: 'UTC'
+      };
+      
+      this.data.sparesHistory.push(history);
+      this.persistData();
+      
+      return {
+        spare,
+        deducted,
+        requested: quantity,
+        shortageQty
+      };
+    }
+    
+    // Nothing to deduct - location has 0 stock
+    return {
+      spare,
+      deducted: 0,
+      requested: quantity,
+      shortageQty: quantity
+    };
   }
 
   async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
