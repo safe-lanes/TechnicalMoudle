@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   email: text("email"),
   role: userRoleEnum("role").notNull().default("Ship"),
   vesselId: text("vessel_id"), // Required for Ship role, null for Office/PMS Admin
+  department: text("department"), // Rule #19: User's department for approver validation (e.g., 'Deck', 'Engine', 'Electrical')
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

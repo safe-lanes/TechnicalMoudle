@@ -774,7 +774,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddConsumedSparePart = () => {
-    const newPart = { partNo: "", description: "", quantityConsumed: "", comments: "" };
+    const newPart = { partNo: "", description: "", quantityConsumed: "", location: "" as const, comments: "" };
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: [...prev.consumedSpareParts, newPart]
@@ -787,6 +787,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleSaveConsumedSparePart = (index: number) => {
+    // Rule #9: Show warning toast when quantity consumed is 0 or blank
+    const part = executionData.consumedSpareParts[index];
+    const quantityValue = parseFloat(part.quantityConsumed || '0');
+    
+    if (!part.quantityConsumed || part.quantityConsumed.trim() === '' || quantityValue === 0) {
+      toast({
+        title: "Spare Consumption Notice",
+        description: `No deduction will be made from ROB for "${part.partNo || part.description || 'this spare part'}" since quantity consumed is zero or blank.`,
+        variant: "default",
+        duration: 5000
+      });
+    }
+    
     setEditingConsumedSparePart(null);
   };
 

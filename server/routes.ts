@@ -1533,6 +1533,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Component not found" });
       }
       
+      // Rule #19: Multi-Department Approver Validation
+      // If an approverUserId is provided and the job has a department, validate the match
+      const { approverUserId } = req.body;
+      if (approverUserId && workOrder.jobId) {
+        try {
+          const job = await storage.getJob(workOrder.jobId);
+          if (job && job.department) {
+            const approver = await storage.getUser(approverUserId);
+            if (approver && approver.department && approver.department !== job.department) {
+              return res.status(400).json({
+                error: `Approver department mismatch: Approver belongs to "${approver.department}" but job requires "${job.department}" department authorization.`,
+                code: 'DEPARTMENT_MISMATCH'
+              });
+            }
+            console.log(`[RULE #19] Department validation passed: Approver (${approver?.department || 'no dept'}) can approve job in ${job.department} department`);
+          }
+        } catch (deptError) {
+          console.warn('[RULE #19] Department validation skipped due to error:', deptError);
+          // Don't block completion if validation lookup fails - log and continue
+        }
+      }
+      
       // This endpoint is ONLY for completing work orders
       // Enforce running hours requirement for RH-based maintenance
       if (workOrder.maintenanceBasis === 'Running Hours' && !runningHours) {
