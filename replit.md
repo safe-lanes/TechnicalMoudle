@@ -53,10 +53,14 @@ The application employs a modern full-stack architecture. The frontend is built 
 - **Admin Module**: Bulk data import for various entities, data purge functionality, and a Fleet Admin Dashboard for master data management.
 - **Role-Based Access Control (RBAC)**: Implements three user roles (Ship, Office, PMS Admin) with enhanced user schema, security measures, `AuthContext` for permission checking, `RoleGuard` components, and backend middleware for route authorization and vessel data isolation.
 
-**Global Business Rules Compliance** (4/4 Rules Enforced):
+**Global Business Rules Compliance** (8/8 Rules Enforced):
 - **Parent vs Sub-Component RH Authority** (Sections 5.5, 8.1, 8.2): ✅ Work Order completion handler enforces sub-component-only RH updates with strict validation. Parent component RH updates are exclusively reserved for the Running Hours module. WO completion validates component has `parentId` (rejects parent components) and ensures sub-component RH ≤ parent RH.
 - **Jobs Belong to Sub-Components** (Section 3.3): ✅ Job creation/update endpoints validate that jobs can only be assigned to sub-components (components with `parentId`). Parent components cannot have jobs directly assigned.
 - **Stores Module Isolation** (Section 7.2): ✅ 100% COMPLIANT - Dedicated `storesItems` and `storesLedger` tables with ZERO PMS linkages (no componentId, workOrderId, jobId fields). Complete architectural isolation from Components/Jobs/Work Orders modules. All Stores endpoints use dedicated storage methods operating exclusively on Stores tables.
+- **Component Code Cascade Updates** (Rule #12): ✅ IMPLEMENTED - When componentCode is modified, system automatically updates all references in Jobs (componentCode, componentId), Work Orders (componentCode), Spares (componentCode, componentSpareCode), and child components (parentId). Creates audit entries for code renumbering in spares history.
+- **Component Cascade Delete** (Rule #14): ✅ IMPLEMENTED - When a parent component is deleted, system recursively finds and deletes all descendants. Linked Jobs are soft-deleted (isActive=false), linked Spares are soft-deleted (deleted=true), and Work Orders are marked with "[Component deleted]" note.
+- **Offline Mode with Sync** (Rule #20): ✅ IMPLEMENTED - Full offline data persistence using IndexedDB via `idb` package. Includes sync queue for pending mutations, conflict detection and resolution UI (SyncConflictDialog), online/offline state tracking (OfflineContext), and SyncStatusIndicator in top menu bar.
+- **RH Correction → WO Re-trigger** (Rule #3): ✅ IMPLEMENTED - When running hours are updated (via cascadeRunningHoursUpdate), system automatically scans all RH-based jobs on affected components, identifies jobs that now meet due criteria (currentRH >= nextDueRH - leadTime), and auto-generates work orders for newly-due jobs with correct status (Due/Overdue/Grace P).
 
 **Database Schema Enhancements**:
 - **New Tables**: `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `component_documents`, `component_class_regulatory`, `component_maintenance_history`, `stores_items`, `stores_ledger`.

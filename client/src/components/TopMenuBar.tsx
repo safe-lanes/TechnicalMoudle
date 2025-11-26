@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
+import { SyncStatusIndicator } from "./SyncStatusIndicator";
 
 interface TopMenuBarProps {
   selectedSubModule: string;
@@ -105,6 +106,14 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
             </button>
           );
         })}
+        
+        {/* Right side spacer */}
+        <div className="flex-1" />
+        
+        {/* Sync Status Indicator */}
+        <div className="flex items-center px-4">
+          <SyncStatusIndicator />
+        </div>
       </div>
       {/* Blue line at bottom border matching SAIL Phase 2 design */}
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#52baf3]" />

@@ -1023,6 +1023,10 @@ export class MemStorage implements IStorage {
       throw new Error(`Component ${id} not found`);
     }
     
+    const oldComponentCode = component.componentCode;
+    const newComponentCode = data.componentCode;
+    const componentCodeChanged = newComponentCode !== undefined && newComponentCode !== oldComponentCode;
+    
     // Remove old index entry if componentCode or vesselId changed
     if (component.componentCode && (data.componentCode !== undefined || data.vesselId !== undefined)) {
       const oldVesselId = component.vesselId || 'global';
@@ -1032,7 +1036,7 @@ export class MemStorage implements IStorage {
       }
     }
     
-    const updated = { ...component, ...data };
+    const updated = { ...component, ...data, updatedAt: new Date() };
     this.components.set(id, updated);
     
     // Add new index entry
@@ -1044,20 +1048,247 @@ export class MemStorage implements IStorage {
       this.componentCodeIndex.get(vesselId)!.set(updated.componentCode, updated.id);
     }
     
+    // CASCADE UPDATE: When componentCode changes, update all linked records (Rule #12)
+    if (componentCodeChanged && oldComponentCode && newComponentCode) {
+      const cascadeResult = await this.cascadeComponentCodeUpdate(
+        id,
+        oldComponentCode, 
+        newComponentCode, 
+        component.vesselId || 'V001',
+        updated.name || oldComponentCode
+      );
+      console.log(`[CASCADE] Component code changed from ${oldComponentCode} to ${newComponentCode}:`, cascadeResult);
+    }
+    
     return updated;
+  }
+  
+  /**
+   * CASCADE UPDATE: Updates all linked records when component code changes (Rule #12)
+   * Updates: Jobs, Work Orders, Spares, and child components' parentId
+   */
+  private async cascadeComponentCodeUpdate(
+    componentId: string,
+    oldCode: string,
+    newCode: string,
+    vesselId: string,
+    componentName: string
+  ): Promise<{ jobsUpdated: number; workOrdersUpdated: number; sparesUpdated: number; childrenUpdated: number }> {
+    let jobsUpdated = 0;
+    let workOrdersUpdated = 0;
+    let sparesUpdated = 0;
+    let childrenUpdated = 0;
+    
+    // 1. Update all Jobs linked to this component
+    for (const [jobId, job] of this.jobs) {
+      if (job.componentCode === oldCode || job.componentId === componentId) {
+        const updatedJob = {
+          ...job,
+          componentCode: newCode,
+          componentId: componentId,
+          updatedAt: new Date()
+        };
+        this.jobs.set(jobId, updatedJob);
+        jobsUpdated++;
+      }
+    }
+    
+    // 2. Update all Work Orders linked to this component
+    for (const [woId, wo] of this.workOrders) {
+      if (wo.componentCode === oldCode) {
+        const updatedWO = {
+          ...wo,
+          componentCode: newCode
+        };
+        this.workOrders.set(woId, updatedWO);
+        workOrdersUpdated++;
+      }
+    }
+    
+    // 3. Update all Spares linked to this component
+    for (const [spareId, spare] of this.spares) {
+      if (spare.componentCode === oldCode || spare.componentId === componentId) {
+        const newComponentSpareCode = spare.componentSpareCode 
+          ? spare.componentSpareCode.replace(oldCode, newCode)
+          : null;
+        const updatedSpare = {
+          ...spare,
+          componentCode: newCode,
+          componentId: componentId,
+          componentSpareCode: newComponentSpareCode
+        };
+        this.spares.set(spareId, updatedSpare);
+        sparesUpdated++;
+        
+        // Create history entry for code renumbering
+        await this.createSpareHistory({
+          timestampUTC: new Date(),
+          vesselId: vesselId,
+          spareId: spareId,
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: componentId,
+          componentCode: newCode,
+          componentName: componentName,
+          componentSpareCode: newComponentSpareCode,
+          eventType: 'CODE_RENUMBERED',
+          qtyChange: 0,
+          robAfter: spare.rob || 0,
+          userId: 'system',
+          remarks: `Component code changed from ${oldCode} to ${newCode}`,
+          reference: null
+        });
+      }
+    }
+    
+    // 4. Update all child components whose parentId references the old code
+    for (const [childId, child] of this.components) {
+      if (child.parentId === oldCode) {
+        const updatedChild = {
+          ...child,
+          parentId: newCode,
+          updatedAt: new Date()
+        };
+        this.components.set(childId, updatedChild);
+        childrenUpdated++;
+      }
+    }
+    
+    return { jobsUpdated, workOrdersUpdated, sparesUpdated, childrenUpdated };
   }
 
   async deleteComponent(id: string): Promise<void> {
     const component = this.components.get(id);
-    if (component && component.componentCode) {
-      // Remove from index
-      const vesselId = component.vesselId || 'global';
-      const vesselIndex = this.componentCodeIndex.get(vesselId);
-      if (vesselIndex) {
-        vesselIndex.delete(component.componentCode);
+    if (!component) {
+      return; // Component already deleted or doesn't exist
+    }
+    
+    // CASCADE DELETE (Rule #14): Recursively delete all descendants
+    const cascadeResult = await this.cascadeDeleteComponent(component);
+    console.log(`[CASCADE DELETE] Component ${id} deleted with cascade:`, cascadeResult);
+  }
+  
+  /**
+   * CASCADE DELETE: Recursively deletes component and all descendants (Rule #14)
+   * Also handles linked Jobs (soft delete), Work Orders (keep for history), and Spares
+   */
+  private async cascadeDeleteComponent(
+    component: Component
+  ): Promise<{ 
+    componentsDeleted: number; 
+    jobsDeleted: number; 
+    workOrdersAffected: number; 
+    sparesDeleted: number 
+  }> {
+    let componentsDeleted = 0;
+    let jobsDeleted = 0;
+    let workOrdersAffected = 0;
+    let sparesDeleted = 0;
+    
+    const componentCode = component.componentCode;
+    const componentId = component.id;
+    const vesselId = component.vesselId || 'global';
+    
+    // 1. Find all descendants (children, grandchildren, etc.) by traversing parentId chain
+    const descendantIds: string[] = [];
+    const descendantCodes: string[] = [];
+    
+    const findDescendants = (parentCode: string | null) => {
+      if (!parentCode) return;
+      
+      for (const [childId, child] of this.components) {
+        if (child.parentId === parentCode && childId !== componentId) {
+          descendantIds.push(childId);
+          if (child.componentCode) {
+            descendantCodes.push(child.componentCode);
+          }
+          // Recursively find grandchildren
+          if (child.componentCode) {
+            findDescendants(child.componentCode);
+          }
+        }
+      }
+    };
+    
+    // Start finding descendants from this component's code
+    if (componentCode) {
+      findDescendants(componentCode);
+    }
+    
+    // 2. Delete all descendant components first (bottom-up would be ideal, but order doesn't matter for Maps)
+    for (const descendantId of descendantIds) {
+      const descendant = this.components.get(descendantId);
+      if (descendant) {
+        // Remove from index
+        if (descendant.componentCode) {
+          const descVesselId = descendant.vesselId || 'global';
+          const vesselIndex = this.componentCodeIndex.get(descVesselId);
+          if (vesselIndex) {
+            vesselIndex.delete(descendant.componentCode);
+          }
+        }
+        this.components.delete(descendantId);
+        componentsDeleted++;
       }
     }
-    this.components.delete(id);
+    
+    // 3. Delete the target component itself
+    if (componentCode) {
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(componentCode);
+      }
+    }
+    this.components.delete(componentId);
+    componentsDeleted++;
+    
+    // 4. Collect all component codes to process (target + descendants)
+    const allCodesToProcess = componentCode ? [componentCode, ...descendantCodes] : descendantCodes;
+    const allIdsToProcess = [componentId, ...descendantIds];
+    
+    // 5. Soft-delete all linked Jobs (set isActive = false)
+    for (const [jobId, job] of this.jobs) {
+      if (allIdsToProcess.includes(job.componentId) || 
+          (job.componentCode && allCodesToProcess.includes(job.componentCode))) {
+        const updatedJob = {
+          ...job,
+          isActive: false,
+          updatedAt: new Date()
+        };
+        this.jobs.set(jobId, updatedJob);
+        jobsDeleted++;
+      }
+    }
+    
+    // 6. Mark Work Orders as affected (keep for history, but update status note)
+    for (const [woId, wo] of this.workOrders) {
+      if (wo.componentCode && allCodesToProcess.includes(wo.componentCode)) {
+        // Only update if not already completed
+        if (wo.status !== 'Completed' && wo.status !== 'Rejected') {
+          const updatedWO = {
+            ...wo,
+            approverRemarks: (wo.approverRemarks || '') + ' [Component deleted]'
+          };
+          this.workOrders.set(woId, updatedWO);
+          workOrdersAffected++;
+        }
+      }
+    }
+    
+    // 7. Soft-delete all linked Spares
+    for (const [spareId, spare] of this.spares) {
+      if (allIdsToProcess.includes(spare.componentId || '') ||
+          (spare.componentCode && allCodesToProcess.includes(spare.componentCode))) {
+        const updatedSpare = {
+          ...spare,
+          deleted: true
+        };
+        this.spares.set(spareId, updatedSpare);
+        sparesDeleted++;
+      }
+    }
+    
+    return { componentsDeleted, jobsDeleted, workOrdersAffected, sparesDeleted };
   }
 
   // Fleet Components methods
@@ -1241,6 +1472,259 @@ export class MemStorage implements IStorage {
       const auditDate = new Date(a.dateUpdatedLocal);
       return auditDate >= startDate && auditDate <= endDate;
     });
+  }
+
+  /**
+   * Get parent components that have running-hour based child jobs
+   */
+  async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
+    const components = Array.from(this.components.values())
+      .filter(c => c.vesselId === vesselId && !c.parentId && c.dataScope !== 'fleet');
+    
+    const result = components.map(parent => {
+      const children = Array.from(this.components.values())
+        .filter(c => c.parentId === parent.componentCode && c.vesselId === vesselId);
+      
+      const audits = this.runningHoursAudits
+        .filter(a => a.componentId === parent.id)
+        .sort((a, b) => b.enteredAtUTC.getTime() - a.enteredAtUTC.getTime());
+      
+      return {
+        ...parent,
+        childCount: children.length,
+        latestUpdate: audits[0]?.dateUpdatedLocal
+      };
+    });
+    
+    return result;
+  }
+
+  /**
+   * CASCADE RUNNING HOURS UPDATE with WO Re-trigger (Rule #3)
+   * Updates parent RH, cascades delta to children, and auto-generates work orders for due jobs
+   */
+  async cascadeRunningHoursUpdate(params: {
+    parentComponentId: string;
+    mode: 'setTotal' | 'addDelta';
+    value: number;
+    dateUpdated: string;
+    comments?: string;
+    meterReplaced?: boolean;
+    oldMeterFinal?: string;
+    newMeterStart?: string;
+  }): Promise<{ 
+    updatedComponents: number; 
+    auditsCreated: number; 
+    workOrdersGenerated: number;
+    workOrders: any[];
+  }> {
+    const { parentComponentId, mode, value, dateUpdated, comments, meterReplaced, oldMeterFinal, newMeterStart } = params;
+    
+    const parent = this.components.get(parentComponentId);
+    if (!parent) {
+      throw new Error(`Parent component ${parentComponentId} not found`);
+    }
+    
+    const oldParentRH = parseFloat(parent.currentCumulativeRH || '0');
+    let newParentRH: number;
+    let delta: number;
+    
+    if (meterReplaced) {
+      newParentRH = parseFloat(newMeterStart || '0');
+      delta = 0;
+    } else if (mode === 'setTotal') {
+      newParentRH = value;
+      delta = value - oldParentRH;
+    } else {
+      delta = value;
+      newParentRH = oldParentRH + delta;
+    }
+    
+    if (!meterReplaced && newParentRH < oldParentRH) {
+      throw new Error('Running hours cannot decrease without meter replacement');
+    }
+    
+    let updatedComponents = 0;
+    let auditsCreated = 0;
+    const workOrdersGenerated: WorkOrder[] = [];
+    
+    const updatedParent = {
+      ...parent,
+      currentCumulativeRH: String(newParentRH),
+      lastUpdated: dateUpdated,
+      updatedAt: new Date()
+    };
+    this.components.set(parentComponentId, updatedParent);
+    updatedComponents++;
+    
+    const parentAudit: InsertRunningHoursAudit = {
+      componentId: parentComponentId,
+      componentCode: parent.componentCode || parent.id,
+      previousReading: String(oldParentRH),
+      newReading: String(newParentRH),
+      deltaValue: String(delta),
+      dateUpdatedLocal: dateUpdated,
+      dateUpdatedTZ: 'UTC',
+      updateSource: meterReplaced ? 'Meter Replacement' : 'Running Hours Module',
+      userId: 'system',
+      notes: comments,
+      enteredAtUTC: new Date(),
+      meterReplaced: meterReplaced || false,
+      oldMeterFinal: oldMeterFinal || null,
+      newMeterStart: newMeterStart || null
+    };
+    await this.createRunningHoursAudit(parentAudit);
+    auditsCreated++;
+    
+    const children = Array.from(this.components.values())
+      .filter(c => c.parentId === parent.componentCode && c.vesselId === parent.vesselId);
+    
+    for (const child of children) {
+      const oldChildRH = parseFloat(child.currentCumulativeRH || '0');
+      let newChildRH: number;
+      
+      if (meterReplaced) {
+        newChildRH = 0;
+      } else {
+        newChildRH = oldChildRH + delta;
+        if (newChildRH > newParentRH) {
+          newChildRH = newParentRH;
+        }
+      }
+      
+      const updatedChild = {
+        ...child,
+        currentCumulativeRH: String(newChildRH),
+        lastUpdated: dateUpdated,
+        updatedAt: new Date()
+      };
+      this.components.set(child.id, updatedChild);
+      updatedComponents++;
+      
+      const childAudit: InsertRunningHoursAudit = {
+        componentId: child.id,
+        componentCode: child.componentCode || child.id,
+        previousReading: String(oldChildRH),
+        newReading: String(newChildRH),
+        deltaValue: String(newChildRH - oldChildRH),
+        dateUpdatedLocal: dateUpdated,
+        dateUpdatedTZ: 'UTC',
+        updateSource: 'Cascade from Parent',
+        userId: 'system',
+        notes: `Cascaded from parent: ${parent.componentCode}`,
+        enteredAtUTC: new Date(),
+        meterReplaced: meterReplaced || false
+      };
+      await this.createRunningHoursAudit(childAudit);
+      auditsCreated++;
+      
+      const childNewWOs = await this.checkAndGenerateRHWorkOrders(child, newChildRH, parent.vesselId || 'V001');
+      workOrdersGenerated.push(...childNewWOs);
+    }
+    
+    const parentNewWOs = await this.checkAndGenerateRHWorkOrders(parent, newParentRH, parent.vesselId || 'V001');
+    workOrdersGenerated.push(...parentNewWOs);
+    
+    console.log(`[RH CASCADE] Updated ${updatedComponents} components, created ${auditsCreated} audits, generated ${workOrdersGenerated.length} work orders`);
+    
+    return {
+      updatedComponents,
+      auditsCreated,
+      workOrdersGenerated: workOrdersGenerated.length,
+      workOrders: workOrdersGenerated
+    };
+  }
+
+  /**
+   * RH CORRECTION → WO RE-TRIGGER (Rule #3)
+   * Checks RH-based jobs and generates work orders for any that are now due
+   */
+  private async checkAndGenerateRHWorkOrders(
+    component: Component,
+    currentRH: number,
+    vesselId: string
+  ): Promise<WorkOrder[]> {
+    const generatedWOs: WorkOrder[] = [];
+    
+    const rhJobs = Array.from(this.jobs.values()).filter(job => 
+      job.componentId === component.id && 
+      job.maintenanceBasis === 'Running Hours' &&
+      job.isActive !== false
+    );
+    
+    for (const job of rhJobs) {
+      const nextDueRH = parseFloat(job.nextDueRH || '0');
+      const leadTimeRH = (job.leadTimeValue || 0) * (job.leadTimeUnit === 'Hours' ? 1 : 0);
+      const leadTimeValue = job.leadTimeValue || 0;
+      
+      let triggerRH = nextDueRH;
+      if (job.leadTimeUnit === 'Hours' && leadTimeValue > 0) {
+        triggerRH = nextDueRH - leadTimeValue;
+      }
+      
+      if (currentRH >= triggerRH && triggerRH > 0) {
+        const existingWO = Array.from(this.workOrders.values()).find(wo =>
+          wo.jobId === job.id &&
+          wo.componentCode === component.componentCode &&
+          wo.status !== 'Completed' &&
+          wo.status !== 'Rejected'
+        );
+        
+        if (!existingWO) {
+          const year = new Date().getFullYear();
+          const existingJobWOs = Array.from(this.workOrders.values())
+            .filter(wo => wo.jobId === job.id && wo.workOrderNo?.includes(`${year}`));
+          const runningNumber = String(existingJobWOs.length + 1).padStart(3, '0');
+          
+          const workOrderNo = `${job.jobNo}.WO-${year}-${runningNumber}`;
+          const woId = `wo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          let status = 'Due';
+          if (currentRH >= nextDueRH) {
+            status = 'Overdue';
+          } else if (currentRH >= triggerRH) {
+            status = 'Due (Grace P)';
+          }
+          
+          const newWO: WorkOrder = {
+            id: woId,
+            vesselId: vesselId,
+            component: component.name || component.componentCode || component.id,
+            componentCode: component.componentCode || null,
+            jobId: job.id,
+            workOrderNo,
+            workOrderType: 'Planned',
+            templateCode: job.jobNo,
+            jobTitle: job.jobTitle,
+            assignedTo: job.assignedTo || 'Chief Engineer',
+            dueDate: null,
+            status,
+            maintenanceBasis: 'Running Hours',
+            frequencyValue: job.frequencyValue,
+            frequencyUnit: job.frequencyUnit,
+            intervalRunningHour: job.intervalRunningHour,
+            nextDueReading: String(nextDueRH),
+            currentReading: String(currentRH),
+            requiredSpareParts: job.requiredSpareParts || [],
+            requiredTools: job.requiredTools || [],
+            safetyRequirements: job.safetyRequirements || {},
+            dataScope: 'vessel',
+            isActive: true,
+            briefWorkDescription: job.briefWorkDescription || null,
+            classRelated: job.classRelated || null,
+            jobPriority: job.jobPriority || null,
+            department: job.department || null
+          };
+          
+          this.workOrders.set(woId, newWO);
+          generatedWOs.push(newWO);
+          
+          console.log(`[WO RE-TRIGGER] Generated WO ${workOrderNo} for job ${job.jobNo} at RH ${currentRH} (due at ${nextDueRH})`);
+        }
+      }
+    }
+    
+    return generatedWOs;
   }
 
   // Generate Component Spare Code

@@ -924,6 +924,10 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Component ${id} not found`);
     }
     
+    const oldComponentCode = component.componentCode;
+    const newComponentCode = data.componentCode;
+    const componentCodeChanged = newComponentCode !== undefined && newComponentCode !== oldComponentCode;
+    
     // If componentCode or vesselId changed, update index
     if (data.componentCode && data.componentCode !== component.componentCode) {
       const vesselKey = component.vesselId || 'global';
@@ -952,10 +956,122 @@ export class PersistentFileStorage implements IStorage {
       this.componentCodeIndex.get(newVesselKey)!.set(component.componentCode, id);
     }
     
-    const updated = { ...component, ...data };
+    const updated = { ...component, ...data, updatedAt: new Date() };
     this.data.components[id] = updated;
+    
+    // CASCADE UPDATE: When componentCode changes, update all linked records (Rule #12)
+    if (componentCodeChanged && oldComponentCode && newComponentCode) {
+      const vesselKey = updated.vesselId ?? component.vesselId ?? 'global';
+      const cascadeResult = await this.cascadeComponentCodeUpdate(
+        id,
+        oldComponentCode, 
+        newComponentCode, 
+        vesselKey,
+        updated.name || oldComponentCode
+      );
+      console.log(`[CASCADE] Component code changed from ${oldComponentCode} to ${newComponentCode}:`, cascadeResult);
+    }
+    
     this.persistData();
     return updated;
+  }
+
+  /**
+   * CASCADE UPDATE: When componentCode changes, update all linked records (Rule #12)
+   * Updates: Jobs, Work Orders, Spares, and child component parentIds
+   */
+  private async cascadeComponentCodeUpdate(
+    componentId: string,
+    oldCode: string,
+    newCode: string,
+    vesselId: string,
+    componentName: string
+  ): Promise<{ jobsUpdated: number; workOrdersUpdated: number; sparesUpdated: number; childrenUpdated: number }> {
+    let jobsUpdated = 0;
+    let workOrdersUpdated = 0;
+    let sparesUpdated = 0;
+    let childrenUpdated = 0;
+    
+    // 1. Update all Jobs linked to this component
+    for (const jobId of Object.keys(this.data.jobs)) {
+      const job = this.data.jobs[jobId];
+      if (job && (job.componentCode === oldCode || job.componentId === componentId)) {
+        this.data.jobs[jobId] = {
+          ...job,
+          componentCode: newCode,
+          componentId: componentId,
+          updatedAt: new Date()
+        };
+        jobsUpdated++;
+      }
+    }
+    
+    // 2. Update all Work Orders linked to this component
+    for (let i = 0; i < this.data.workOrders.length; i++) {
+      const wo = this.data.workOrders[i];
+      if (wo && wo.componentCode === oldCode) {
+        this.data.workOrders[i] = {
+          ...wo,
+          componentCode: newCode
+        };
+        workOrdersUpdated++;
+      }
+    }
+    
+    // 3. Update all Spares linked to this component
+    for (const spareId of Object.keys(this.data.spares)) {
+      const spare = this.data.spares[Number(spareId)];
+      if (spare && (spare.componentCode === oldCode || spare.componentId === componentId)) {
+        const newComponentSpareCode = spare.componentSpareCode 
+          ? spare.componentSpareCode.replace(oldCode, newCode)
+          : null;
+        this.data.spares[Number(spareId)] = {
+          ...spare,
+          componentCode: newCode,
+          componentId: componentId,
+          componentSpareCode: newComponentSpareCode,
+          updatedAt: new Date()
+        };
+        sparesUpdated++;
+        
+        // Create history entry for code renumbering (inline to avoid nested persistData)
+        const historyId = this.data.counters.historyId++;
+        const historyEntry: SpareHistory = {
+          id: historyId,
+          timestampUTC: new Date(),
+          vesselId: vesselId,
+          spareId: Number(spareId),
+          partCode: spare.partCode,
+          partName: spare.partName,
+          componentId: componentId,
+          componentCode: newCode,
+          componentName: componentName,
+          componentSpareCode: newComponentSpareCode,
+          eventType: 'CODE_RENUMBERED',
+          qtyChange: 0,
+          robAfter: spare.rob || 0,
+          userId: 'system',
+          remarks: `Component code changed from ${oldCode} to ${newCode}`,
+          reference: null
+        };
+        this.data.sparesHistory.push(historyEntry);
+      }
+    }
+    
+    // 4. Update all child components whose parentId references the old code
+    for (const childId of Object.keys(this.data.components)) {
+      const child = this.data.components[childId];
+      if (child && child.parentId === oldCode) {
+        this.data.components[childId] = {
+          ...child,
+          parentId: newCode,
+          updatedAt: new Date()
+        };
+        childrenUpdated++;
+      }
+    }
+    
+    return { jobsUpdated, workOrdersUpdated, sparesUpdated, childrenUpdated };
   }
 
   async createComponent(component: InsertComponent): Promise<Component> {
@@ -1023,20 +1139,139 @@ export class PersistentFileStorage implements IStorage {
   async deleteComponent(id: string): Promise<void> {
     const component = this.data.components[id];
     if (!component) {
-      throw new Error(`Component ${id} not found`);
+      return; // Component already deleted or doesn't exist
     }
     
-    // Remove from index
-    if (component.componentCode) {
-      const vesselKey = component.vesselId || 'global';
-      const vesselIndex = this.componentCodeIndex.get(vesselKey);
-      if (vesselIndex) {
-        vesselIndex.delete(component.componentCode);
+    // CASCADE DELETE (Rule #14): Recursively delete all descendants
+    const cascadeResult = await this.cascadeDeleteComponent(component);
+    console.log(`[CASCADE DELETE] Component ${id} deleted with cascade:`, cascadeResult);
+    
+    this.persistData();
+  }
+
+  /**
+   * CASCADE DELETE: Recursively deletes component and all descendants (Rule #14)
+   * Also handles linked Jobs (soft delete), Work Orders (keep for history), and Spares
+   */
+  private async cascadeDeleteComponent(
+    component: Component
+  ): Promise<{ 
+    componentsDeleted: number; 
+    jobsDeleted: number; 
+    workOrdersAffected: number; 
+    sparesDeleted: number 
+  }> {
+    let componentsDeleted = 0;
+    let jobsDeleted = 0;
+    let workOrdersAffected = 0;
+    let sparesDeleted = 0;
+    
+    const componentCode = component.componentCode;
+    const componentId = component.id;
+    const vesselId = component.vesselId || 'global';
+    
+    // 1. Find all descendants (children, grandchildren, etc.) by traversing parentId chain
+    const descendantIds: string[] = [];
+    const descendantCodes: string[] = [];
+    
+    const findDescendants = (parentCode: string | null) => {
+      if (!parentCode) return;
+      
+      for (const childId of Object.keys(this.data.components)) {
+        const child = this.data.components[childId];
+        if (child && child.parentId === parentCode && childId !== componentId) {
+          descendantIds.push(childId);
+          if (child.componentCode) {
+            descendantCodes.push(child.componentCode);
+          }
+          // Recursively find grandchildren
+          if (child.componentCode) {
+            findDescendants(child.componentCode);
+          }
+        }
+      }
+    };
+    
+    // Start finding descendants from this component's code
+    if (componentCode) {
+      findDescendants(componentCode);
+    }
+    
+    // 2. Delete all descendant components first
+    for (const descendantId of descendantIds) {
+      const descendant = this.data.components[descendantId];
+      if (descendant) {
+        // Remove from index
+        if (descendant.componentCode) {
+          const descVesselId = descendant.vesselId || 'global';
+          const vesselIndex = this.componentCodeIndex.get(descVesselId);
+          if (vesselIndex) {
+            vesselIndex.delete(descendant.componentCode);
+          }
+        }
+        delete this.data.components[descendantId];
+        componentsDeleted++;
       }
     }
     
-    delete this.data.components[id];
-    this.persistData();
+    // 3. Delete the target component itself
+    if (componentCode) {
+      const vesselIndex = this.componentCodeIndex.get(vesselId);
+      if (vesselIndex) {
+        vesselIndex.delete(componentCode);
+      }
+    }
+    delete this.data.components[componentId];
+    componentsDeleted++;
+    
+    // 4. Collect all component codes to process (target + descendants)
+    const allCodesToProcess = componentCode ? [componentCode, ...descendantCodes] : descendantCodes;
+    const allIdsToProcess = [componentId, ...descendantIds];
+    
+    // 5. Soft-delete all linked Jobs (set isActive = false)
+    for (const jobId of Object.keys(this.data.jobs)) {
+      const job = this.data.jobs[jobId];
+      if (job && (allIdsToProcess.includes(job.componentId) || 
+          (job.componentCode && allCodesToProcess.includes(job.componentCode)))) {
+        this.data.jobs[jobId] = {
+          ...job,
+          isActive: false,
+          updatedAt: new Date()
+        };
+        jobsDeleted++;
+      }
+    }
+    
+    // 6. Mark Work Orders as affected (keep for history, but update status note)
+    for (let i = 0; i < this.data.workOrders.length; i++) {
+      const wo = this.data.workOrders[i];
+      if (wo && wo.componentCode && allCodesToProcess.includes(wo.componentCode)) {
+        // Only update if not already completed
+        if (wo.status !== 'Completed' && wo.status !== 'Rejected') {
+          this.data.workOrders[i] = {
+            ...wo,
+            approverRemarks: (wo.approverRemarks || '') + ' [Component deleted]'
+          };
+          workOrdersAffected++;
+        }
+      }
+    }
+    
+    // 7. Soft-delete all linked Spares (with timestamp)
+    for (const spareId of Object.keys(this.data.spares)) {
+      const spare = this.data.spares[Number(spareId)];
+      if (spare && (allIdsToProcess.includes(spare.componentId || '') ||
+          (spare.componentCode && allCodesToProcess.includes(spare.componentCode)))) {
+        this.data.spares[Number(spareId)] = {
+          ...spare,
+          deleted: true,
+          updatedAt: new Date()
+        };
+        sparesDeleted++;
+      }
+    }
+    
+    return { componentsDeleted, jobsDeleted, workOrdersAffected, sparesDeleted };
   }
 
   async bulkCreateComponents(components: InsertComponent[]): Promise<Component[]> {
