@@ -3973,6 +3973,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =====================================================
+  // PMS Vessel Settings - Lead Time & Grace Period (Task 9)
+  // =====================================================
+
+  // Get all PMS vessel settings 
+  app.get("/api/pms-vessel-settings", async (req, res) => {
+    try {
+      const settings = await storage.getAllPmsVesselSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching all PMS vessel settings:", error);
+      res.status(500).json({ error: "Failed to fetch PMS vessel settings" });
+    }
+  });
+
+  // Get PMS vessel settings by vessel ID
+  app.get("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+    try {
+      const settings = await storage.getPmsVesselSettings(req.params.vesselId);
+      if (!settings) {
+        return res.status(404).json({ error: "PMS vessel settings not found" });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching PMS vessel settings:", error);
+      res.status(500).json({ error: "Failed to fetch PMS vessel settings" });
+    }
+  });
+
+  // Create or update PMS vessel settings
+  app.put("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const settings = await storage.createOrUpdatePmsVesselSettings({
+        vesselId,
+        ...req.body
+      });
+      res.json(settings);
+    } catch (error) {
+      console.error("Error saving PMS vessel settings:", error);
+      res.status(500).json({ error: "Failed to save PMS vessel settings" });
+    }
+  });
+
+  // Delete PMS vessel settings
+  app.delete("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+    try {
+      await storage.deletePmsVesselSettings(req.params.vesselId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting PMS vessel settings:", error);
+      res.status(500).json({ error: "Failed to delete PMS vessel settings" });
+    }
+  });
+
+  // =====================================================
   // On-Demand Work Order Generation (Rule #4)
   // =====================================================
 
