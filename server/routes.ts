@@ -2970,6 +2970,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message || "Failed to receive spares" });
     }
   });
+
+  // Rule A3: Location-aware spare consumption with negative prevention
+  // Deducts from specified location, never goes negative, returns shortage info
+  const consumeFromLocationBodySchema = z.object({
+    quantity: z.coerce.number().positive('Quantity must be a positive number'),
+    location: z.enum(['A', 'B'], { errorMap: () => ({ message: 'Location must be "A" or "B"' }) }),
+    userId: z.string().optional(),
+    remarks: z.string().optional(),
+    workOrderRef: z.string().optional()
+  });
+  
+  const consumeFromLocationParamsSchema = z.object({
+    id: z.coerce.number().int().positive('Spare ID must be a positive integer')
+  });
+  
+  app.post("/api/spares/:id/consume-from-location", async (req, res) => {
+    try {
+      // Validate params
+      const paramsResult = consumeFromLocationParamsSchema.safeParse(req.params);
+      if (!paramsResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: paramsResult.error.errors[0]?.message || 'Invalid spare ID',
+            field: 'id'
+          }
+        });
+      }
+      
+      // Validate body
+      const bodyResult = consumeFromLocationBodySchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({
+          success: false,
+          errors: bodyResult.error.errors.map(err => ({
+            code: 'VALIDATION_ERROR',
+            message: err.message,
+            field: err.path.join('.')
+          }))
+        });
+      }
+      
+      const { id: spareId } = paramsResult.data;
+      const { quantity, location, userId, remarks, workOrderRef } = bodyResult.data;
+      
+      const result = await storage.consumeSpareFromLocation(
+        spareId,
+        quantity,
+        location,
+        userId || 'system',
+        remarks,
+        workOrderRef
+      );
+      
+      // Rule #9: Warn if shortage occurred
+      if (result.shortageQty > 0) {
+        return res.json({
+          success: true,
+          data: result,
+          warning: {
+            code: 'PARTIAL_CONSUMPTION',
+            message: `Requested ${result.requested} but only ${result.deducted} available at Location ${location}`,
+            shortageQty: result.shortageQty
+          }
+        });
+      }
+      
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("Error consuming spare from location:", error);
+      
+      // Map specific error types to appropriate HTTP status codes
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: error.message
+          }
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error.message || "Failed to consume spare from location"
+        }
+      });
+    }
+  });
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   app.get("/api/stores/:vesselId", async (req, res) => {
