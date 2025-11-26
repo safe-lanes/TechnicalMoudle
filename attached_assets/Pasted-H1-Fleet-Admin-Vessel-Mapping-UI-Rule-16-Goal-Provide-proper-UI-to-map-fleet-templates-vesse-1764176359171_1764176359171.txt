@@ -1,0 +1,161 @@
+H1. Fleet Admin Vessel Mapping UI (Rule #16)
+
+Goal: Provide proper UI to map fleet templates → vessel instances.
+
+Backend tasks:
+
+APIs to:
+
+List fleet components / jobs / spares.
+
+List vessel components / jobs / spares.
+
+Save mappings:
+
+fleet_equipment_id → vessel_component_id
+
+fleet_job_id → vessel_job_id
+
+fleet_spare_id → vessel_spare_id
+
+Optionally support auto-matching by:
+
+Matching codes (e.g., same SFI + model).
+
+But always require confirmation by office user.
+
+Frontend tasks:
+
+Create a Fleet Admin Dashboard with tabs:
+
+Components Mapping
+
+Left table: Fleet equipment
+
+Right table: Vessel components
+
+Middle: mapping status (Mapped / Not Mapped / Conflicting)
+
+Jobs Mapping
+
+Spares Mapping
+
+Allow:
+
+Filter by vessel.
+
+Bulk/manual mapping.
+
+“Re-sync from fleet” feature using mapping.
+
+H2. Spare Location Selection on Consumption (Rule #10)
+
+Goal: Force the user to choose which location stock comes from.
+
+Backend tasks:
+
+Update WO Part B save API:
+
+Require location field when spare has multiple locations.
+
+Validate:
+
+If spare has Location A and Location B:
+
+location must be one of the valid ones.
+
+Deduct from that specific location’s ROB.
+
+Frontend tasks:
+
+In WO Part B → Spares section:
+
+For each consumed spare line:
+
+Add Location dropdown.
+
+If only 1 location → auto-selected.
+
+If >1 → user must choose.
+
+Validation:
+
+If location not selected and >1 exists → show error, block save.
+
+H3. On-Demand WO Generation (Rule #4)
+
+Goal: Allow user to generate a WO before due date.
+
+Backend tasks:
+
+New endpoint:
+
+POST /work-orders/generate-on-demand
+
+Inputs:
+
+job_id
+
+component_id
+
+Optional: reason (Planning / Breakdown / Other + free text)
+
+Logic:
+
+Check there is no existing active WO for same (job, component).
+
+Create WO with:
+
+Status DUE or PLANNED (your choice – I’d say DUE with a “Manual / Early” flag).
+
+Due date = user-selected or job next due (business decision).
+
+Flag as on_demand = true.
+
+Frontend tasks:
+
+Add button on Job detail (in Components section C):
+
+Label: Create Work Order Now
+
+On click:
+
+Open small modal:
+
+Fields: Reason dropdown + comments.
+
+Call the endpoint, then:
+
+Show WO number.
+
+Provide “Open WO” quick link.
+
+H4. Postponed WO Reappearance (Rule #5)
+
+Goal: After postponed date passes, WO must come back as DUE.
+
+Backend tasks:
+
+Schema:
+
+Ensure WOs with postponed state store:
+
+postponed_until (date / RH / both).
+
+Scheduled job / cron (e.g., hourly or daily):
+
+Find WOs with:
+
+status = POSTPONED
+
+postponed_until <= now()
+
+Update:
+
+Status → DUE (or OVERDUE if already past due logic).
+
+Also trigger:
+
+Any alert logic for office/ship dashboards.
+
+No front-end change needed except ensuring list shows them correctly.
