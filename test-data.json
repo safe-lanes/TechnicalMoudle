@@ -571121,15 +571121,16 @@
     "V001": {
       "id": 1,
       "vesselId": "V001",
-      "calendarLeadDaysCritical": 7,
-      "calendarLeadDaysNonCritical": 14,
-      "calendarGraceMode": "COMPANY_STANDARD",
-      "calendarGraceDays": 7,
-      "rhLeadHoursCritical": 50,
-      "rhLeadHoursNonCritical": 100,
-      "rhGraceHours": 168,
+      "calendarLeadDaysCritical": 10,
+      "calendarLeadDaysNonCritical": 21,
+      "calendarGraceMode": "CUSTOM_DAYS",
+      "calendarGraceDays": 5,
+      "rhLeadHoursCritical": 75,
+      "rhLeadHoursNonCritical": 150,
+      "rhGraceHours": 200,
       "createdAt": "2025-11-26T21:19:16.745Z",
-      "updatedAt": "2025-11-26T21:19:16.745Z"
+      "updatedAt": "2025-11-26T21:28:52.071Z",
+      "updatedBy": "test-user"
     }
   },
   "counters": {
