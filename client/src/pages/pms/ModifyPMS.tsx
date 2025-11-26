@@ -55,6 +55,14 @@ import { useEffect } from "react";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useToast } from "@/hooks/use-toast";
 
+interface RevisionHistoryEntry {
+  revisionNumber: number;
+  approvedBy: string;
+  approvedAt: string;
+  appliedChanges: any[];
+  comments?: string;
+}
+
 interface ChangeRequest {
   id: number;
   vesselId: string;
@@ -71,6 +79,8 @@ interface ChangeRequest {
   submittedAt: Date | null;
   reviewedByUserId: string | null;
   reviewedAt: Date | null;
+  revisionNumber?: number;
+  revisionHistory?: RevisionHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
   attachments?: ChangeRequestAttachment[];
@@ -519,7 +529,7 @@ export default function ModifyPMS() {
                           )}
                           {request.status === 'approved' && (
                             <Badge className="bg-green-500 text-white px-3 py-1 text-xs rounded-full">
-                              Approved
+                              Approved {request.revisionNumber ? `(Rev ${request.revisionNumber})` : ''}
                             </Badge>
                           )}
                           {request.status === 'rejected' && (
@@ -884,6 +894,43 @@ export default function ModifyPMS() {
                   <div>
                     <Label>Reviewed By</Label>
                     <p>{viewingRequest.reviewedByUserId}</p>
+                  </div>
+                )}
+
+                {/* Rule #17: Revision History Display */}
+                {viewingRequest.revisionHistory && viewingRequest.revisionHistory.length > 0 && (
+                  <div className="mt-4">
+                    <Label className="text-base font-semibold">Revision History</Label>
+                    <div className="mt-2 space-y-2">
+                      {viewingRequest.revisionHistory.map((rev, idx) => (
+                        <Card key={idx} className="bg-gray-50">
+                          <CardContent className="pt-3 pb-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="font-medium text-blue-600">Revision {rev.revisionNumber}</span>
+                                <p className="text-sm text-gray-600">
+                                  Approved by {rev.approvedBy} on {new Date(rev.approvedAt).toLocaleString()}
+                                </p>
+                                {rev.comments && (
+                                  <p className="text-sm mt-1 text-gray-700 italic">"{rev.comments}"</p>
+                                )}
+                              </div>
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                Rev {rev.revisionNumber}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {viewingRequest.revisionNumber && viewingRequest.revisionNumber > 0 && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                    <p className="text-sm text-blue-700">
+                      <strong>Current Revision:</strong> {viewingRequest.revisionNumber}
+                    </p>
                   </div>
                 )}
               </TabsContent>

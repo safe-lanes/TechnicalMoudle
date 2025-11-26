@@ -75,12 +75,50 @@ export class JobService {
   }
 
   /**
-   * Update an existing job
+   * Update an existing job with Rule #15 - Job Frequency Change Impact
+   * 
+   * When frequency is changed:
+   * - If active WO exists: keep current due date, apply new frequency from next cycle
+   * - If no active WO: apply new frequency immediately for next WO generation
    */
   async updateJob(id: string, updates: Partial<InsertJob>): Promise<Job> {
     const existingJob = await this.getJob(id);
     if (!existingJob) {
       throw new Error(`Job ${id} not found`);
+    }
+
+    // Rule #15: Check if frequency-related fields are being changed
+    const isFrequencyChange = 
+      (updates.frequencyValue !== undefined && updates.frequencyValue !== existingJob.frequencyValue) ||
+      (updates.frequencyUnit !== undefined && updates.frequencyUnit !== existingJob.frequencyUnit) ||
+      (updates.intervalRunningHour !== undefined && updates.intervalRunningHour !== existingJob.intervalRunningHour);
+
+    if (isFrequencyChange) {
+      // Check for active work orders linked to this job
+      const activeWorkOrders = await storage.getWorkOrdersByJobId(id);
+      const hasActiveWO = activeWorkOrders.some(wo => 
+        wo.status !== 'Completed' && 
+        wo.status !== 'Rejected'
+      );
+
+      if (hasActiveWO) {
+        // Rule #15: Active WO exists - keep current due date, apply new frequency from next cycle
+        // Store new frequency but DON'T recalculate nextDueDate now
+        console.log(`[RULE #15] Job ${id} frequency changed with active WO - preserving current due date, new frequency takes effect on next cycle`);
+        
+        // Remove lastDoneDate from updates to prevent nextDueDate recalculation
+        // The new frequency will only be used after the current WO is completed
+        if (updates.lastDoneDate === undefined) {
+          delete updates.lastDoneDate;
+        }
+        
+        // Don't recalculate nextDueDate - it will be recalculated when the current WO is completed
+        // The job stores the new frequency, but keeps the old nextDueDate until WO completion
+        return storage.updateJob(id, updates);
+      } else {
+        // Rule #15: No active WO - apply new frequency immediately
+        console.log(`[RULE #15] Job ${id} frequency changed with no active WO - recalculating next due date immediately`);
+      }
     }
 
     // Recalculate nextDueDate if Calendar-based and relevant fields changed
@@ -106,6 +144,19 @@ export class JobService {
             preservingExisting: existingJob.nextDueDate
           });
         }
+      }
+    }
+
+    // For Running Hours jobs, recalculate nextDueRH if interval changed and no active WO
+    if (
+      (updates.maintenanceBasis === 'Running Hours' || existingJob.maintenanceBasis === 'Running Hours') &&
+      updates.intervalRunningHour
+    ) {
+      const lastDoneRH = parseFloat(existingJob.lastDoneRH || '0');
+      const newInterval = updates.intervalRunningHour;
+      if (lastDoneRH > 0 && newInterval > 0) {
+        updates.nextDueRH = String(lastDoneRH + newInterval);
+        console.log(`[RULE #15] Job ${id} RH interval changed - new nextDueRH: ${updates.nextDueRH}`);
       }
     }
 

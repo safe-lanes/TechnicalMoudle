@@ -2023,6 +2023,7 @@ export class PersistentFileStorage implements IStorage {
               executionId: null,
               jobTitle: job.jobTitle ?? '',
               jobNo: job.jobNo ?? '',
+              jobId: job.id, // Rule #6/#15: Link WO to job for status recalculation and frequency change detection
               assignedTo: job.assignedTo ?? null,
               dueDate: today,
               status: 'Active',
@@ -2141,6 +2142,103 @@ export class PersistentFileStorage implements IStorage {
       };
       workingData.auditLogs.push(auditLog);
       console.log(`[C4 AUDIT] ${woReEvalMessage}`);
+    }
+
+    // 11.5 RULE #6: Update existing work order statuses (Grace P → Overdue transition)
+    // When RH exceeds the next due threshold, immediately promote "Due (Grace P)" → "Overdue"
+    let woStatusesUpdated = 0;
+    
+    // Check parent component's work orders
+    const parentActiveWOs = workingData.workOrders.filter(wo =>
+      wo.componentCode === parent.componentCode &&
+      wo.maintenanceBasis === 'Running Hours' &&
+      wo.status !== 'Completed' &&
+      wo.status !== 'Rejected' &&
+      wo.status !== 'Postponed'
+    );
+    
+    for (const wo of parentActiveWOs) {
+      // Find job by jobId first, fallback to jobNo for legacy WOs
+      let job = wo.jobId ? Object.values(workingData.jobs).find(j => j && j.id === wo.jobId) : undefined;
+      if (!job && wo.jobNo) {
+        job = Object.values(workingData.jobs).find(j => j && j.jobNo === wo.jobNo);
+      }
+      if (!job) continue;
+      
+      const nextDueRH = parseFloat(job.nextDueRH || wo.nextDueReading || '0');
+      if (nextDueRH <= 0) continue;
+      
+      const leadTimeValue = job.leadTimeValue || 0;
+      let triggerRH = nextDueRH;
+      if (job.leadTimeUnit === 'Hours' && leadTimeValue > 0) {
+        triggerRH = nextDueRH - leadTimeValue;
+      }
+      
+      let newStatus = wo.status;
+      if (newParentRH >= nextDueRH) {
+        newStatus = 'Overdue';
+      } else if (newParentRH >= triggerRH && triggerRH > 0) {
+        newStatus = 'Due (Grace P)';
+      }
+      
+      if (newStatus !== wo.status) {
+        const prevStatus = wo.status;
+        wo.status = newStatus;
+        wo.currentReading = String(newParentRH);
+        wo.updatedAt = new Date();
+        woStatusesUpdated++;
+        console.log(`[RULE #6] WO ${wo.workOrderNo} status updated: ${prevStatus} → ${newStatus} (RH: ${newParentRH}, Due RH: ${nextDueRH})`);
+      }
+    }
+    
+    // Check child component's work orders
+    for (const child of children) {
+      const childRH = parseFloat(child.currentCumulativeRH);
+      const childActiveWOs = workingData.workOrders.filter(wo =>
+        wo.componentCode === child.componentCode &&
+        wo.maintenanceBasis === 'Running Hours' &&
+        wo.status !== 'Completed' &&
+        wo.status !== 'Rejected' &&
+        wo.status !== 'Postponed'
+      );
+      
+      for (const wo of childActiveWOs) {
+        // Find job by jobId first, fallback to jobNo for legacy WOs
+        let job = wo.jobId ? Object.values(workingData.jobs).find(j => j && j.id === wo.jobId) : undefined;
+        if (!job && wo.jobNo) {
+          job = Object.values(workingData.jobs).find(j => j && j.jobNo === wo.jobNo);
+        }
+        if (!job) continue;
+        
+        const nextDueRH = parseFloat(job.nextDueRH || wo.nextDueReading || '0');
+        if (nextDueRH <= 0) continue;
+        
+        const leadTimeValue = job.leadTimeValue || 0;
+        let triggerRH = nextDueRH;
+        if (job.leadTimeUnit === 'Hours' && leadTimeValue > 0) {
+          triggerRH = nextDueRH - leadTimeValue;
+        }
+        
+        let newStatus = wo.status;
+        if (childRH >= nextDueRH) {
+          newStatus = 'Overdue';
+        } else if (childRH >= triggerRH && triggerRH > 0) {
+          newStatus = 'Due (Grace P)';
+        }
+        
+        if (newStatus !== wo.status) {
+          const prevStatus = wo.status;
+          wo.status = newStatus;
+          wo.currentReading = String(childRH);
+          wo.updatedAt = new Date();
+          woStatusesUpdated++;
+          console.log(`[RULE #6] WO ${wo.workOrderNo} status updated: ${prevStatus} → ${newStatus} (RH: ${childRH}, Due RH: ${nextDueRH})`);
+        }
+      }
+    }
+    
+    if (woStatusesUpdated > 0) {
+      console.log(`[RULE #6] Updated ${woStatusesUpdated} work order statuses during RH cascade`);
     }
 
     // 12. Save working set to disk (single atomic write)
@@ -2846,6 +2944,23 @@ export class PersistentFileStorage implements IStorage {
 
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
     return this.data.workOrders.find(wo => wo && wo.id === id);
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
+    // Rule #15: Get work orders for a job - must check both jobId AND jobNo for legacy data
+    const job = this.data.jobs[jobId];
+    const jobNo = job?.jobNo;
+    
+    // Search by both jobId match OR jobNo match (for legacy WOs without jobId)
+    // Important: The OR condition must work even if one side is undefined
+    return (this.data.workOrders || []).filter(wo => {
+      if (!wo) return false;
+      // Primary: Match by jobId
+      if (wo.jobId === jobId) return true;
+      // Fallback: Match by jobNo (for legacy WOs created before jobId was added)
+      if (jobNo && wo.jobNo === jobNo) return true;
+      return false;
+    });
   }
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
@@ -3780,7 +3895,31 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
-    return this.updateChangeRequest(id, { status: 'approved', reviewedByUserId: reviewerId, reviewedAt: new Date() });
+    const existing = await this.getChangeRequest(id);
+    if (!existing) throw new Error('Change request not found');
+    
+    const now = new Date();
+    
+    // Rule #17: Increment revision number and add to history
+    const newRevisionNumber = (existing.revisionNumber || 0) + 1;
+    const revisionHistoryEntry = {
+      revisionNumber: newRevisionNumber,
+      approvedBy: reviewerId,
+      approvedAt: now.toISOString(),
+      appliedChanges: existing.proposedChangesJson || [],
+      comments: comment
+    };
+    const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
+    
+    console.log(`[RULE #17] Change request ${id} approved - Revision #${newRevisionNumber}`);
+    
+    return this.updateChangeRequest(id, { 
+      status: 'approved', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: now,
+      revisionNumber: newRevisionNumber,
+      revisionHistory: updatedHistory
+    });
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {

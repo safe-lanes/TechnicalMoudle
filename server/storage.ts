@@ -347,6 +347,7 @@ export interface IStorage {
   // Work Order methods
   getWorkOrders(vesselId?: string): Promise<WorkOrder[]>;
   getWorkOrder(id: string): Promise<WorkOrder | undefined>;
+  getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]>;
   createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder>;
   updateWorkOrder(id: string, updates: Partial<InsertWorkOrder>): Promise<WorkOrder>;
   deleteWorkOrder(id: string): Promise<void>;
@@ -1647,7 +1648,14 @@ export class MemStorage implements IStorage {
     const parentNewWOs = await this.checkAndGenerateRHWorkOrders(parent, newParentRH, parent.vesselId || 'V001');
     workOrdersGenerated.push(...parentNewWOs);
     
-    console.log(`[RH CASCADE] Updated ${updatedComponents} components, created ${auditsCreated} audits, generated ${workOrdersGenerated.length} work orders`);
+    // Rule #6: Update existing WO statuses for Grace P → Overdue transition
+    const updatedWOStatuses = await this.updateExistingRHWorkOrderStatuses(parent, newParentRH);
+    for (const child of children) {
+      const childRH = parseFloat(child.currentCumulativeRH || '0');
+      await this.updateExistingRHWorkOrderStatuses(child, childRH);
+    }
+    
+    console.log(`[RH CASCADE] Updated ${updatedComponents} components, created ${auditsCreated} audits, generated ${workOrdersGenerated.length} work orders, updated ${updatedWOStatuses} WO statuses`);
     
     return {
       updatedComponents,
@@ -1655,6 +1663,72 @@ export class MemStorage implements IStorage {
       workOrdersGenerated: workOrdersGenerated.length,
       workOrders: workOrdersGenerated
     };
+  }
+
+  /**
+   * RULE #6: GRACE PERIOD → OVERDUE TRANSITION
+   * Updates existing RH-based work order statuses when running hours change
+   * Promotes "Due (Grace P)" → "Overdue" immediately when RH exceeds threshold
+   */
+  private async updateExistingRHWorkOrderStatuses(
+    component: Component,
+    currentRH: number
+  ): Promise<number> {
+    let updatedCount = 0;
+    
+    // Find all active RH-based work orders for this component
+    const activeWOs = Array.from(this.workOrders.values()).filter(wo =>
+      wo.componentCode === component.componentCode &&
+      wo.maintenanceBasis === 'Running Hours' &&
+      wo.status !== 'Completed' &&
+      wo.status !== 'Rejected' &&
+      wo.status !== 'Postponed'
+    );
+    
+    for (const wo of activeWOs) {
+      // Get the linked job to determine thresholds - fallback to jobNo for legacy WOs
+      let job = wo.jobId ? this.jobs.get(wo.jobId) : undefined;
+      if (!job && wo.jobNo) {
+        job = Array.from(this.jobs.values()).find(j => j.jobNo === wo.jobNo);
+      }
+      if (!job) continue;
+      
+      const nextDueRH = parseFloat(job.nextDueRH || wo.nextDueReading || '0');
+      if (nextDueRH <= 0) continue;
+      
+      // Calculate lead time trigger point (grace period starts here)
+      const leadTimeValue = job.leadTimeValue || 0;
+      let triggerRH = nextDueRH;
+      if (job.leadTimeUnit === 'Hours' && leadTimeValue > 0) {
+        triggerRH = nextDueRH - leadTimeValue;
+      }
+      
+      // Determine the correct status based on current RH
+      let newStatus = wo.status;
+      if (currentRH >= nextDueRH) {
+        // Past due date - should be Overdue
+        newStatus = 'Overdue';
+      } else if (currentRH >= triggerRH && triggerRH > 0) {
+        // Within grace period - should be Grace P (Due)
+        newStatus = 'Due (Grace P)';
+      }
+      
+      // Update if status changed
+      if (newStatus !== wo.status) {
+        const prevStatus = wo.status;
+        const updatedWO = {
+          ...wo,
+          status: newStatus,
+          currentReading: String(currentRH),
+          updatedAt: new Date()
+        };
+        this.workOrders.set(wo.id, updatedWO);
+        updatedCount++;
+        console.log(`[RULE #6] WO ${wo.workOrderNo} status updated: ${prevStatus} → ${newStatus} (RH: ${currentRH}, Due RH: ${nextDueRH})`);
+      }
+    }
+    
+    return updatedCount;
   }
 
   /**
@@ -2288,14 +2362,29 @@ export class MemStorage implements IStorage {
     });
     
     const now = new Date();
+    
+    // Rule #17: Increment revision number and add to history
+    const newRevisionNumber = (request.revisionNumber || 0) + 1;
+    const revisionHistoryEntry = {
+      revisionNumber: newRevisionNumber,
+      approvedBy: reviewerId,
+      approvedAt: now.toISOString(),
+      appliedChanges: request.proposedChangesJson || [],
+      comments: comment
+    };
+    const updatedHistory = [...(request.revisionHistory || []), revisionHistoryEntry];
+    
     const updated = {
       ...request,
       status: 'approved' as const,
       reviewedByUserId: reviewerId,
       reviewedAt: now,
+      revisionNumber: newRevisionNumber,
+      revisionHistory: updatedHistory,
       updatedAt: now
     };
     this.changeRequests.set(id, updated);
+    console.log(`[RULE #17] Change request ${id} approved - Revision #${newRevisionNumber}`);
     return updated;
   }
 
@@ -3512,6 +3601,22 @@ export class MemStorage implements IStorage {
   
   async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
     return this.workOrders.get(id);
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
+    // Rule #15: Get work orders for a job - must check both jobId AND jobNo for legacy data
+    const job = this.jobs.get(jobId);
+    const jobNo = job?.jobNo;
+    
+    // Search by both jobId match OR jobNo match (for legacy WOs without jobId)
+    // Important: The OR condition must work even if one side is undefined
+    return Array.from(this.workOrders.values()).filter(wo => {
+      // Primary: Match by jobId
+      if (wo.jobId === jobId) return true;
+      // Fallback: Match by jobNo (for legacy WOs created before jobId was added)
+      if (jobNo && wo.jobNo === jobNo) return true;
+      return false;
+    });
   }
   
   async createWorkOrder(workOrderData: InsertWorkOrder): Promise<WorkOrder> {
@@ -5177,6 +5282,12 @@ export class PostgresStorage implements IStorage {
     const { eq } = await import('drizzle-orm');
     const result = await db.select().from(workOrders).where(eq(workOrders.id, id));
     return result[0];
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(workOrders).where(eq(workOrders.jobId, jobId));
   }
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {

@@ -459,6 +459,15 @@ export const changeRequest = pgTable("change_request", {
   submittedAt: timestamp("submitted_at"),
   reviewedByUserId: text("reviewed_by_user_id"),
   reviewedAt: timestamp("reviewed_at"),
+  // Rule #17: Revision tracking for Modify PMS
+  revisionNumber: integer("revision_number").notNull().default(0), // Incremented on each approval
+  revisionHistory: json("revision_history").$type<Array<{
+    revisionNumber: number;
+    approvedBy: string;
+    approvedAt: string;
+    appliedChanges: any[];
+    comments?: string;
+  }>>().default([]), // History of all revisions
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({
