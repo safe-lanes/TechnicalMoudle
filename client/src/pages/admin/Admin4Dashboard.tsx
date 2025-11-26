@@ -2,15 +2,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship } from "lucide-react";
+import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import FleetComponentsManagement from "./FleetComponentsManagement";
 import FleetJobsManagement from "./FleetJobsManagement";
 import FleetSparesManagement from "./FleetSparesManagement";
 import FleetVesselMapping from "./FleetVesselMapping";
+import PmsVesselSettingsManagement from "./PmsVesselSettingsManagement";
+import type { PmsVesselSettings } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'components' | 'jobs' | 'spares' | 'vessel-mapping';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings';
 
 export default function Admin4Dashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -35,11 +37,21 @@ export default function Admin4Dashboard() {
     queryKey: ['/api/fleet/spares'],
   });
 
+  const { data: pmsSettingsData, isLoading: isPmsSettingsLoading } = useQuery<PmsVesselSettings[]>({
+    queryKey: ['/api/pms-vessel-settings'],
+  });
+
+  const { data: vesselsData, isLoading: isVesselsLoading } = useQuery<{id: string; name: string}[]>({
+    queryKey: ['/api/vessels'],
+  });
+
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;
   const totalMasterLists = Array.isArray(masterListsData) ? masterListsData.length : 0;
   const totalComponents = Array.isArray(componentsData) ? componentsData.length : 0;
   const totalJobs = Array.isArray(jobsData) ? jobsData.length : 0;
   const totalSpares = Array.isArray(sparesData) ? sparesData.length : 0;
+  const totalVessels = Array.isArray(vesselsData) ? vesselsData.length : 0;
+  const configuredPmsSettings = Array.isArray(pmsSettingsData) ? pmsSettingsData.length : 0;
 
   if (currentView === 'makers') {
     return (
@@ -163,6 +175,27 @@ export default function Admin4Dashboard() {
           <h1 className="text-xl font-semibold text-gray-900">Fleet Vessel Mapping</h1>
         </div>
         <FleetVesselMapping />
+      </div>
+    );
+  }
+
+  if (currentView === 'pms-settings') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Lead Time & Grace Period Settings</h1>
+        </div>
+        <PmsVesselSettingsManagement />
       </div>
     );
   }
@@ -365,6 +398,44 @@ export default function Admin4Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Lead Time & Grace Period
+              </CardTitle>
+              <div className="p-2 bg-cyan-100 rounded-lg">
+                <Clock className="h-5 w-5 text-cyan-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end justify-between">
+                <div>
+                  {isPmsSettingsLoading || isVesselsLoading ? (
+                    <div className="h-10 w-20 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    <div 
+                      className="text-3xl font-bold text-gray-900"
+                      data-testid="widget-pms-settings"
+                    >
+                      {configuredPmsSettings}/{totalVessels}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Vessels configured</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentView('pms-settings')}
+                  className="text-cyan-600 hover:text-cyan-700"
+                  data-testid="button-view-pms-settings"
+                >
+                  Configure
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -445,6 +516,19 @@ export default function Admin4Dashboard() {
               <div className="text-left">
                 <div className="font-medium">Vessel Mapping</div>
                 <div className="text-sm text-gray-500">Map fleet data to vessels</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('pms-settings')}
+              data-testid="link-pms-settings"
+            >
+              <Clock className="mr-3 h-5 w-5 text-cyan-600" />
+              <div className="text-left">
+                <div className="font-medium">Lead Time & Grace</div>
+                <div className="text-sm text-gray-500">WO generation settings</div>
               </div>
             </Button>
           </div>
