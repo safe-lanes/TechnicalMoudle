@@ -571212,6 +571212,47 @@
       "updatedAt": "2025-11-26T21:32:12.724Z"
     }
   },
+  "storesItems": {
+    "1": {
+      "id": 1,
+      "itemCode": "ST-TEST-001",
+      "itemName": "Test Welding Electrodes",
+      "itemType": "Stores",
+      "storesCategory": "General Stores",
+      "uom": "kg",
+      "rob": "45",
+      "robLocationA": "25",
+      "robLocationB": "20",
+      "min": "10",
+      "locationA": null,
+      "locationB": null,
+      "applicationArea": null,
+      "remarks": null,
+      "vesselId": "V001",
+      "deleted": false,
+      "isActive": true,
+      "createdAt": "2025-11-26T22:12:37.816Z",
+      "updatedAt": "2025-11-26T22:13:17.430Z"
+    }
+  },
+  "storesLedger": [
+    {
+      "id": 1,
+      "storesItemId": 1,
+      "transactionType": "issue",
+      "quantity": "5",
+      "location": "A",
+      "robAfter": "45",
+      "robLocationAAfter": "25",
+      "robLocationBAfter": "20",
+      "reason": "Consumption",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "test-user",
+      "createdAt": "2025-11-26T22:13:17.430Z"
+    }
+  ],
   "counters": {
     "userId": 1,
     "auditId": 129,
@@ -571233,6 +571274,8 @@
     "defectAttachmentId": 1,
     "recurringDefectId": 87,
     "auditLogId": 1,
-    "pmsVesselSettingsId": 3
+    "pmsVesselSettingsId": 3,
+    "storesItemId": 2,
+    "storesLedgerId": 2
   }
 }

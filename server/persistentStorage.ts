@@ -57,7 +57,11 @@ import {
   type AuditLog,
   type InsertAuditLog,
   type PmsVesselSettings,
-  type InsertPmsVesselSettings
+  type InsertPmsVesselSettings,
+  type StoresItem,
+  type InsertStoresItem,
+  type StoresLedger,
+  type InsertStoresLedger
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -102,6 +106,8 @@ interface PersistentData {
   masterLists: MasterList[];
   auditLogs: AuditLog[];
   pmsVesselSettings: Record<string, PmsVesselSettings>;
+  storesItems: Record<number, StoresItem>;
+  storesLedger: StoresLedger[];
   
   // Counter state
   counters: {
@@ -126,6 +132,8 @@ interface PersistentData {
     recurringDefectId: number;
     auditLogId: number;
     pmsVesselSettingsId: number;
+    storesItemId: number;
+    storesLedgerId: number;
   };
 }
 
@@ -306,6 +314,8 @@ export class PersistentFileStorage implements IStorage {
           masterLists: loadedData.masterLists || [],
           auditLogs: loadedData.auditLogs || [],
           pmsVesselSettings: loadedData.pmsVesselSettings || {},
+          storesItems: loadedData.storesItems || {},
+          storesLedger: loadedData.storesLedger || [],
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -327,7 +337,9 @@ export class PersistentFileStorage implements IStorage {
             defectAttachmentId: loadedData.counters?.defectAttachmentId || 1,
             recurringDefectId: loadedData.counters?.recurringDefectId || 1,
             auditLogId: loadedData.counters?.auditLogId || 1,
-            pmsVesselSettingsId: loadedData.counters?.pmsVesselSettingsId || 1
+            pmsVesselSettingsId: loadedData.counters?.pmsVesselSettingsId || 1,
+            storesItemId: loadedData.counters?.storesItemId || 1,
+            storesLedgerId: loadedData.counters?.storesLedgerId || 1
           }
         };
         
@@ -373,6 +385,8 @@ export class PersistentFileStorage implements IStorage {
       masterLists: [],
       auditLogs: [],
       pmsVesselSettings: {},
+      storesItems: {},
+      storesLedger: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -394,7 +408,9 @@ export class PersistentFileStorage implements IStorage {
         defectAttachmentId: 1,
         recurringDefectId: 1,
         auditLogId: 1,
-        pmsVesselSettingsId: 1
+        pmsVesselSettingsId: 1,
+        storesItemId: 1,
+        storesLedgerId: 1
       }
     };
     
@@ -5883,5 +5899,194 @@ export class PersistentFileStorage implements IStorage {
   async deletePmsVesselSettings(vesselId: string): Promise<void> {
     delete this.data.pmsVesselSettings[vesselId];
     this.persistData();
+  }
+
+  // =====================================================
+  // STORES METHODS - Isolated from PMS per Business Rules
+  // =====================================================
+
+  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+    const items = Object.values(this.data.storesItems).filter(
+      (item) => item.vesselId === vesselId && !item.deleted && (itemType ? item.itemType === itemType : true)
+    );
+    return items;
+  }
+
+  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+    return this.data.storesItems[id];
+  }
+
+  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+    const id = this.data.counters.storesItemId++;
+    const now = new Date();
+    const newItem: StoresItem = {
+      id,
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      itemType: item.itemType || 'Stores',
+      storesCategory: item.storesCategory || null,
+      uom: item.uom || 'pcs',
+      rob: item.rob || '0',
+      robLocationA: item.robLocationA || '0',
+      robLocationB: item.robLocationB || '0',
+      min: item.min || '0',
+      locationA: item.locationA || null,
+      locationB: item.locationB || null,
+      applicationArea: item.applicationArea || null,
+      remarks: item.remarks || null,
+      vesselId: item.vesselId,
+      deleted: false,
+      isActive: item.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.storesItems[id] = newItem;
+    this.persistData();
+    return newItem;
+  }
+
+  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+    const existing = this.data.storesItems[id];
+    if (!existing) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    const updated: StoresItem = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.data.storesItems[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteStoresItem(id: number): Promise<void> {
+    const existing = this.data.storesItems[id];
+    if (existing) {
+      existing.deleted = true;
+      existing.updatedAt = new Date();
+      this.data.storesItems[id] = existing;
+      this.persistData();
+    }
+  }
+
+  async consumeStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const item = this.data.storesItems[id];
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA || 0) : Number(item.robLocationB || 0);
+    
+    const actualConsumed = Math.min(qtyNum, locationRob);
+    const newLocationRob = Math.max(0, locationRob - qtyNum);
+    const newTotalRob = Math.max(0, Number(item.rob || 0) - actualConsumed);
+
+    const updated: StoresItem = {
+      ...item,
+      rob: String(newTotalRob),
+      ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+      updatedAt: new Date()
+    };
+    this.data.storesItems[id] = updated;
+
+    // Create ledger entry
+    const ledgerId = this.data.counters.storesLedgerId++;
+    const ledgerEntry: StoresLedger = {
+      id: ledgerId,
+      storesItemId: id,
+      transactionType: 'issue',
+      quantity: String(actualConsumed),
+      location: location,
+      robAfter: String(newTotalRob),
+      robLocationAAfter: location === 'A' ? String(newLocationRob) : item.robLocationA || '0',
+      robLocationBAfter: location === 'B' ? String(newLocationRob) : item.robLocationB || '0',
+      reason: remarks || 'Consumption',
+      place: place || null,
+      dateLocal: dateLocal || null,
+      tz: tz || null,
+      createdBy: userId,
+      createdAt: new Date()
+    };
+    this.data.storesLedger.push(ledgerEntry);
+
+    this.persistData();
+    return updated;
+  }
+
+  async receiveStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const item = this.data.storesItems[id];
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA || 0) : Number(item.robLocationB || 0);
+    const newLocationRob = locationRob + qtyNum;
+    const newTotalRob = Number(item.rob || 0) + qtyNum;
+
+    const updated: StoresItem = {
+      ...item,
+      rob: String(newTotalRob),
+      ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+      updatedAt: new Date()
+    };
+    this.data.storesItems[id] = updated;
+
+    // Create ledger entry
+    const ledgerId = this.data.counters.storesLedgerId++;
+    const ledgerEntry: StoresLedger = {
+      id: ledgerId,
+      storesItemId: id,
+      transactionType: 'receipt',
+      quantity: String(qtyNum),
+      location: location,
+      robAfter: String(newTotalRob),
+      robLocationAAfter: location === 'A' ? String(newLocationRob) : item.robLocationA || '0',
+      robLocationBAfter: location === 'B' ? String(newLocationRob) : item.robLocationB || '0',
+      reason: remarks || 'Receipt',
+      place: place || null,
+      dateLocal: dateLocal || null,
+      tz: tz || null,
+      createdBy: userId,
+      createdAt: new Date()
+    };
+    this.data.storesLedger.push(ledgerEntry);
+
+    this.persistData();
+    return updated;
+  }
+
+  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+    // Get all item IDs for the vessel first
+    const vesselItemIds = Object.values(this.data.storesItems)
+      .filter(item => item.vesselId === vesselId && (itemType ? item.itemType === itemType : true))
+      .map(item => item.id);
+    
+    // Filter ledger entries for those items
+    return this.data.storesLedger.filter(entry => vesselItemIds.includes(entry.storesItemId));
+  }
+
+  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+    return this.data.storesLedger.filter(entry => entry.storesItemId === itemId);
   }
 }
