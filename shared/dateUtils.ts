@@ -143,11 +143,13 @@ export function calculateNextDueDate(
  * Check if a calendar-based job should generate a work order
  * @param nextDueDate - Next due date in DD-MMM-YYYY format
  * @param currentDate - Current date (defaults to today)
- * @returns true if work order should be generated (next due date has passed)
+ * @param leadTimeDays - Lead time in days before due date (defaults to 0)
+ * @returns true if work order should be generated (within lead time of due date)
  */
 export function shouldGenerateWorkOrder(
   nextDueDate: string | null | undefined,
-  currentDate: Date = new Date()
+  currentDate: Date = new Date(),
+  leadTimeDays: number = 0
 ): boolean {
   if (!nextDueDate) {
     return false;
@@ -155,8 +157,18 @@ export function shouldGenerateWorkOrder(
 
   try {
     const parsedDueDate = parse(nextDueDate, 'dd-MMM-yyyy', new Date());
-    // Generate work order if due date is today or in the past
-    return parsedDueDate <= currentDate;
+    
+    // Normalize current date to midnight for comparison
+    const normalizedCurrent = new Date(currentDate);
+    normalizedCurrent.setHours(0, 0, 0, 0);
+    
+    // Calculate the trigger date (due date minus lead time)
+    const triggerDate = new Date(parsedDueDate);
+    triggerDate.setDate(triggerDate.getDate() - leadTimeDays);
+    triggerDate.setHours(0, 0, 0, 0);
+    
+    // Generate work order if current date is at or past trigger date
+    return normalizedCurrent >= triggerDate;
   } catch (error) {
     console.error('Error checking work order generation criteria:', error);
     return false;

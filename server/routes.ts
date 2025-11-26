@@ -1829,6 +1829,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "vesselId is required" });
       }
       
+      // Fetch vessel-specific PMS settings (lead times & grace periods)
+      const vesselSettings = await storage.getPmsVesselSettings(vesselId);
+      
+      // Default lead times if vessel settings not configured
+      const calendarLeadDaysCritical = vesselSettings?.calendarLeadDaysCritical ?? 7;
+      const calendarLeadDaysNonCritical = vesselSettings?.calendarLeadDaysNonCritical ?? 14;
+      const rhLeadHoursCritical = vesselSettings?.rhLeadHoursCritical ?? 50;
+      const rhLeadHoursNonCritical = vesselSettings?.rhLeadHoursNonCritical ?? 100;
+      
+      console.log(`[AUTO-GEN] Using lead times for vessel ${vesselId}: Calendar (C: ${calendarLeadDaysCritical}d, NC: ${calendarLeadDaysNonCritical}d), RH (C: ${rhLeadHoursCritical}hrs, NC: ${rhLeadHoursNonCritical}hrs)`);
+      
       // Get all active jobs for the vessel
       const allJobs = await storage.getJobs(vesselId);
       const calendarJobs = allJobs.filter(job => 
@@ -1856,7 +1867,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = {
         checked: calendarJobs.length + rhJobs.length,
         generated: 0,
-        workOrders: [] as any[]
+        workOrders: [] as any[],
+        vesselSettingsUsed: vesselSettings ? true : false
       };
       
       // Fetch all components to get currentRH for RH-based jobs
@@ -1865,7 +1877,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Process Calendar-based jobs
       for (const job of calendarJobs) {
-        const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate);
+        // Determine lead time based on job criticality
+        const isCritical = job.criticality === 'Yes' || job.jobPriority === 'Critical';
+        const leadTimeDays = isCritical ? calendarLeadDaysCritical : calendarLeadDaysNonCritical;
+        
+        const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate, new Date(), leadTimeDays);
         
         if (shouldGenerate) {
           // O(1) duplicate check using Set
@@ -1925,10 +1941,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const currentRH = parseInt(component.currentCumulativeRH || '0');
         const dueRH = parseInt(job.nextDueRH || '0');
-        const leadTime = job.leadTimeValue || 0; // Lead time in hours for RH jobs
+        
+        // Determine lead time based on job criticality - use vessel settings
+        const isCritical = job.criticality === 'Yes' || job.jobPriority === 'Critical';
+        const leadTimeHours = isCritical ? rhLeadHoursCritical : rhLeadHoursNonCritical;
         
         // Check if we should generate (current RH >= due RH - lead time)
-        const shouldGenerate = currentRH >= (dueRH - leadTime);
+        const shouldGenerate = currentRH >= (dueRH - leadTimeHours);
         
         if (shouldGenerate) {
           // O(1) duplicate check using Set
