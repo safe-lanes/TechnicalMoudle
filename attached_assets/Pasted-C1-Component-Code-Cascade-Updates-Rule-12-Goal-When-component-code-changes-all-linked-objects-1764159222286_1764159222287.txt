@@ -1,0 +1,156 @@
+C1. Component Code Cascade Updates (Rule #12)
+
+Goal: When component_code changes, all linked objects still work without orphaning.
+
+Backend tasks:
+
+Confirm primary key model
+
+Ensure all relations are by component_id (preferred).
+
+component_code should be treated as a display/lookup field only.
+
+updateComponent() changes
+
+On component_code update:
+
+Update component_code in:
+
+Components table (main).
+
+Jobs table (if component_code stored redundantly).
+
+Work Orders table (if component_code stored in Part A).
+
+Spares link table (if component_code stored there).
+
+Wrap in a single DB transaction.
+
+Audit logging
+
+Log: component_id, old_code, new_code, user, timestamp.
+
+Validation
+
+Block changing code if new code conflicts (duplicate) for same vessel.
+
+Frontend tasks:
+
+Component edit form:
+
+Show warning tooltip: “Component code change will update all linked Jobs/WOs/Spares.”
+
+Allow change only for users with proper permission (Admin / Office).
+
+C2. Component Cascade Delete / Inactivate (Rule #14)
+
+Goal: No orphan sub-components; parent removal handled cleanly.
+
+Backend tasks:
+
+Inactivation logic
+
+When setting component.status = INACTIVE:
+
+Recursively find all descendant components.
+
+Option A (recommended): Block inactivation if any child is ACTIVE.
+
+Return error: “Component has active children. Inactivate or reassign them first.”
+
+OR Option B: Add setting to allow cascade inactivation:
+
+Set all descendants to INACTIVE.
+
+Optionally close/remove their jobs/WOs (business rule: probably keep history, just mark inactive).
+
+Jobs/WOs handling
+
+For inactivated components:
+
+Jobs → mark as INACTIVE (don’t generate new WOs).
+
+WOs → allow existing to remain in history; no new WOs.
+
+Audit
+
+Log which component and how many children were affected.
+
+Frontend tasks:
+
+When user clicks “Inactivate Component”:
+
+Show number of child components and warn about impact.
+
+Require confirmation tick-box (“I understand this will stop PMS for all sub-components”).
+
+C3. Offline Mode + Sync (Rule #20)
+
+Goal: Define minimal v1 behaviour so devs don’t overbuild blindly.
+
+Given your previous inputs, I recommend:
+
+For now: No true offline write mode, only online-first.
+This item stays as future phase, clearly marked.
+
+What to do now (for devs):
+
+Add a note in architecture doc:
+
+“Current version does not support offline editing or queued sync. All write operations require active connection.”
+
+Ensure:
+
+No fake “offline” promises in UI.
+
+Forms clearly error out with “No network” if request fails.
+
+Park full offline design (IndexedDB + sync queue) for later.
+
+If you insist on basic offline, we’d need a separate design doc just for this (too big to bolt in casually).
+
+C4. RH Correction → WO Re-trigger (Rule #3)
+
+Goal: When RH is corrected, jobs that should now be due/overdue get WOs.
+
+Backend tasks:
+
+Extend RH update handler:
+
+On RH update for a parent component (including correction):
+
+Compute delta_rh = new_rh - old_rh.
+
+Update child RH as per agreed logic.
+
+After RH update:
+
+For all RH-based jobs linked to this component:
+
+Recalculate remaining_hours.
+
+If:
+
+remaining_hours <= 0 and no active WO exists:
+
+Generate a new WO with status DUE (or OVERDUE if beyond grace).
+
+Respect:
+
+One active WO per (job, component).
+
+Edge cases:
+
+If RH was corrected downwards (office correction within allowed range):
+
+It may move job back to “Not yet due”.
+
+DO NOT automatically cancel existing WOs.
+
+Just ensure next cycles respect corrected RH.
+
+Logging:
+
+Log in RH audit: “WO re-evaluation triggered for X jobs, Y WOs generated.”
+
+No UI changes needed; this is a backend consistency function.
