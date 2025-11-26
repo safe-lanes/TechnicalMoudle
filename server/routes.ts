@@ -4024,6 +4024,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new PMS vessel settings
+  app.post("/api/pms-vessel-settings", async (req, res) => {
+    try {
+      const { vesselId, ...settingsData } = req.body;
+      if (!vesselId) {
+        return res.status(400).json({ error: "vesselId is required" });
+      }
+      
+      // Check if settings already exist
+      const existing = await storage.getPmsVesselSettings(vesselId);
+      if (existing) {
+        return res.status(409).json({ error: "PMS vessel settings already exist for this vessel. Use PUT to update." });
+      }
+      
+      const settings = await storage.createOrUpdatePmsVesselSettings({
+        vesselId,
+        ...settingsData
+      });
+      res.status(201).json(settings);
+    } catch (error) {
+      console.error("Error creating PMS vessel settings:", error);
+      res.status(500).json({ error: "Failed to create PMS vessel settings" });
+    }
+  });
+
   // Get PMS vessel settings by vessel ID
   app.get("/api/pms-vessel-settings/:vesselId", async (req, res) => {
     try {
