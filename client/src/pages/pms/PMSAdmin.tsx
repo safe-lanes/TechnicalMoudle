@@ -41,9 +41,9 @@ export default function PMSAdmin() {
             <TabsTrigger 
               value="admin-4" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-admin-4"
+              data-testid="tab-master-data"
             >
-              Admin 4
+              Master Data
             </TabsTrigger>
           </TabsList>
 
