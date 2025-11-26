@@ -571116,6 +571116,22 @@
       "createdAt": "2025-11-11T04:49:28.598Z"
     }
   ],
+  "auditLogs": [],
+  "pmsVesselSettings": {
+    "V001": {
+      "id": 1,
+      "vesselId": "V001",
+      "calendarLeadDaysCritical": 7,
+      "calendarLeadDaysNonCritical": 14,
+      "calendarGraceMode": "COMPANY_STANDARD",
+      "calendarGraceDays": 7,
+      "rhLeadHoursCritical": 50,
+      "rhLeadHoursNonCritical": 100,
+      "rhGraceHours": 168,
+      "createdAt": "2025-11-26T21:19:16.745Z",
+      "updatedAt": "2025-11-26T21:19:16.745Z"
+    }
+  },
   "counters": {
     "userId": 1,
     "auditId": 129,
@@ -571131,9 +571147,12 @@
     "formDefinitionId": 1,
     "formVersionId": 1,
     "workOrderId": 268,
+    "executionId": 1,
     "defectId": 50,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 87
+    "recurringDefectId": 87,
+    "auditLogId": 1,
+    "pmsVesselSettingsId": 2
   }
 }
