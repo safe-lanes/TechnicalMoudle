@@ -1,0 +1,87 @@
+--
+
+# ✅ **SECTION 1 — FLEET DATA WORKFLOW**
+
+### **Q1.** Who uploads Fleet Data? (SAIL Admin / Company Office / Both) - sail admin
+
+### **Q2.** What is the correct order of Fleet Data setup? (List steps) - uploading fleet data (all fleet sheets)  - uploading vessel component sheet- uploading vessel jobs sheet- uploading vessel spares sheet. 
+
+### **Q3.** Is Vessel Master Upload mandatory before all other uploads? (Yes/No) - Yes
+
+---
+
+# ✅ **SECTION 2 — MASTER DATA WORKFLOW**
+
+### **Q4.** Should all Master Data be uploaded before vessel PMS data? (Yes/No) yes
+
+### **Q5.** Which Master Data items are optional? none
+
+---
+
+# ✅ **SECTION 3 — VESSEL PMS ONBOARDING**
+
+### **Q6.** What is the correct order to upload vessel PMS files?
+
+(Components → Jobs → Spares → Stores → RH etc.) yes correct
+
+### **Q7.** Should system enforce this order strictly? (Yes/No) yes
+
+---
+
+# ✅ **SECTION 4 — AUTO GENERATION LOGIC**
+
+### **Q8.** When should Planned Work Orders auto-generate?
+
+(Immediately / After “Enable PMS” / After vessel operational mode) immediately after system has all the jobs data and lead time in the admin section. 
+
+### **Q9.** Should system validate Job–Component–Spare mapping during upload?
+
+(Yes/No for each) yes definitely
+
+---
+
+# ✅ **SECTION 5 — DAILY VESSEL WORKFLOW**
+
+### **Q10.** What is the daily operational workflow sequence? there is nothing mandatory daily thing. 
+
+(List steps in order)
+
+---
+
+# ✅ **SECTION 6 — OFFICE WORKFLOW**
+
+### **Q11.** How should office get vessel data?
+
+(Manual sync / Auto sync / Real-time) real time. office has full interface where they have the vessel dropdown enabled where they can see for any vessel or al vessel data in dashboard and further. 
+
+### **Q12.** Which actions can office perform? approve or deny changes made , or requests raised by the ship under "update-pms" sub module, or make any changes required. The do not approve work order - it is done by HOD. 
+
+(Approve WO / Modify PMS / Correct RH / Bulk update spares etc.)
+
+---
+
+# ✅ **SECTION 7 — RECRUITMENT → CREW POOL**
+
+### **Q13.** When candidate becomes recruited, should transfer to Crew Pool be automatic or manual? forget about crewing pool for now. 
+
+### **Q14.** Should recruitment form be locked after transfer? (Yes/No) neglect crewing now. 
+
+---
+
+# ✅ **SECTION 8 — PURCHASE MODULE (Future)**
+
+### **Q15.** Should the final workflow document include Purchase Module placeholders? (Yes/No) use it as placeholder for now
+
+---
+
+# ✅ **SECTION 9 — WORKFLOW DOCUMENT STRUCTURE**
+
+### **Q16.** Do you want: 1 combined
+
+1. One combined workflow document
+   **OR**
+2. Separate workflows for each module?
+
+---
+
+Reply with the answers only (Q1–Q16).

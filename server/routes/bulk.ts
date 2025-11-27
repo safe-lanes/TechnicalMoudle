@@ -3644,6 +3644,49 @@ async function performImport(
         nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);
       }
       
+      // Calculate Next Due RH for Running Hours-based jobs
+      // Per documentation: nextDueRH = lastDoneRH + intervalRunningHour
+      // NOTE: Only use Interval Running Hours column, never fall back to frequencyValue (per schema)
+      // VALIDATION: interval must be a valid number > 0
+      let nextDueRH: string | null = null;
+      let lastDoneRH: string | null = null;
+      const intervalRH = row['Interval Running Hours'] ? Number(String(row['Interval Running Hours']).trim()) : null;
+      
+      if (maintenanceBasis === 'Running Hours') {
+        // Validate intervalRunningHour is present and valid for RH jobs
+        if (intervalRH === null || isNaN(intervalRH) || intervalRH <= 0) {
+          result.skipped++;
+          console.warn(`⚠️ Skipping RH job for component ${componentCode}: Invalid or missing Interval Running Hours (must be > 0)`);
+          continue;
+        }
+        
+        // Get lastDoneRH from Excel or use component's current RH as starting point
+        const rawLastDoneRH = row['Last Done RH'];
+        if (rawLastDoneRH !== undefined && rawLastDoneRH !== null && rawLastDoneRH !== '') {
+          lastDoneRH = String(rawLastDoneRH).trim();
+        } else if (component.runningHours !== undefined && component.runningHours !== null) {
+          // Use component's current running hours as last done RH for new jobs
+          lastDoneRH = String(component.runningHours);
+        }
+        
+        // VALIDATION: RH jobs require lastDoneRH or component.runningHours to calculate nextDueRH
+        if (!lastDoneRH) {
+          result.skipped++;
+          console.warn(`⚠️ Skipping RH job for component ${componentCode}: Missing Last Done RH and component has no runningHours`);
+          continue;
+        }
+        
+        const lastRH = Number(lastDoneRH);
+        if (isNaN(lastRH)) {
+          result.skipped++;
+          console.warn(`⚠️ Skipping RH job for component ${componentCode}: lastDoneRH is not a valid number`);
+          continue;
+        }
+        
+        // Calculate nextDueRH = lastDoneRH + interval (guaranteed to succeed)
+        nextDueRH = String(lastRH + intervalRH);
+      }
+      
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
         vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
@@ -3658,9 +3701,7 @@ async function performImport(
         frequencyValue: frequencyValue ? parseFloat(frequencyValue) : null,
         frequencyUnit: frequencyUnit,
         // For Running Hours jobs: store interval in both fields for compatibility
-        intervalRunningHour: (maintenanceBasis === 'Running Hours' && frequencyValue) 
-          ? parseInt(frequencyValue) 
-          : null,
+        intervalRunningHour: intervalRH,
         internalRunningHourNumber: row['Interval Running Hours'] || null,
         jobDescription: row['Brief Work Description'] || null,
         assignedTo: row['Assigned To'] || null,
@@ -3668,8 +3709,10 @@ async function performImport(
         jobPriority: row['Job Priority'] || null,
         // Schema expects text 'Yes'/'No', not boolean
         classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes' ? 'Yes' : 'No') : null,
-        lastDoneDate: lastDoneDate,         // Store Last Done date
+        lastDoneDate: lastDoneDate,         // Store Last Done date (for Calendar jobs)
         nextDueDate: nextDueDate,           // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar jobs)
+        lastDoneRH: lastDoneRH,             // Store Last Done RH (for RH jobs)
+        nextDueRH: nextDueRH,               // Calculated: lastDoneRH + intervalRunningHour (for RH jobs)
         department: row['Department'] || null,
         // Support both template format (Critical Yes/No) and legacy format (Criticality)
         // Schema expects text 'Yes'/'No', not boolean

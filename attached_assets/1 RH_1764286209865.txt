@@ -1,0 +1,235 @@
+
+
+# **SECTION A — MAIN SCREEN LOGIC**
+
+### **A1. Which components must appear in Running Hours list?**
+
+Choose one:
+
+1. Components with **RH-based jobs only**
+2. **All components with SFI 3-digit parent code**
+3. All components, but show RH column only for those using RH
+4. Custom logic (specify) 
+HERE COMPONENTS WILL BE DISPLAYED WHOSE CHILDREN HAS GOT JOBS BASED ON RUNNING HOURS. 
+
+### **A2. Search Bar Logic**
+
+Should the search bar match:
+
+* Component Name
+* SFI Code
+* Component Category
+* Serial No
+* Model
+* Maker
+
+Tell me exactly. YES IT MUST BE A SMART AI SEARCH BAR
+
+### **A3. Export Button**
+
+Should export format be:
+
+* Excel
+* CSV
+* PDF
+* All three? EXCLE AND PDF
+
+Export scope:
+
+* Current table (filtered)?
+* Full list (all rows)? FILL LIST
+
+### **A4. Clear Button**
+
+Should Clear:
+
+1. Clear only the search text
+2. Reset search + filters + sorting
+3. Reload full table from scratch
+
+Which one?
+Clear only the search text
+---
+
+# **SECTION B — INDIVIDUAL RUNNING HOURS UPDATE MODAL**
+
+### **B1. Mode Selection**
+
+Two modes exist:
+
+* Set Total
+* Add Delta
+
+Questions:
+
+1. Which option is *default*? DEFAULT IS SET TOTAL WHERE USER CAN DIRECTLY ENTER THE PRESENT RUNNING HOURS FROM THE COUNTERS OF MACHINERIES.
+2. In **Add Delta** mode:
+
+   * Should “New Value” be auto-calculated?
+   * Or should a new input field “Delta Value” appear? 
+   * Or user enters Delta manually and system calculates new total? -- YES USER WILL ENTER THE DELTA
+
+### **B2. Validations**
+
+For individual component update:
+
+* If New < Old → error? or allowed only if “meter replaced”? YES
+* If Delta extremely large (e.g., > 2000 hrs) → warning or block? YES GIVE WARNING IF THE RUNNING HOURS ARE NOT PRACTICALLY POSSIBLE , YOU NEED TO CONSIDER 24* NO OF DAYS BETWEEN LAST UPDATED DATE AND THE DATE ON WHICH USER IS ENTERING. some BUFFER CAN BE GIVEN FOR CLOCK RETARTD WHERE 25*NO OF DAYS CAN HAPPEN
+* If Date Updated < Last Updated → block or warn? YES GIVE WARNING AND DONT ALLOW. 
+* Is Comments mandatory for any scenario? NO THEY ARE OPTIONAL
+
+### **B3. Meter Replaced**
+
+When this checkbox is ticked:
+
+Which rule applies? WHEN THE METER REPLACED THE COUNTER WILL START FROM ZERO BUT THE LOGIC OF THE DELTA BEING ADDED TO CHILD COMPONENTS REMAINS SAME
+
+A. Reset RH to ZERO then add new reading
+B. Old value becomes irrelevant, new value = first reading
+C. System writes a special history entry but RH continuity continues
+D. Custom logic (describe)
+
+### **B4. Comments Field**
+
+Should it be:
+
+* Mandatory always?
+* Mandatory only if meter replaced?
+* Mandatory only when new < old?
+* Optional always? YES ALWAYS OPTIONAL
+
+---
+
+# **SECTION C — BULK UPDATE MODAL**
+
+### **C1. Bulk Update Mode**
+
+Default: Set Total or Add Delta? SET TOTAL
+
+### **C2. Which components appear in Bulk Update?**
+
+1. All components with RH jobs
+
+
+### **C3. Bulk "Meter Replaced?"**
+
+Same logic as individual or different? SAME LOGIC BUT THIS WONT BE APPLICABLE HERE
+
+### **C4. “Status” Column meaning**
+
+Currently shown: *No Change*.
+
+Should it change dynamically?
+
+* Show “Updated” after entering values? YES WHEN RH IS ENTERED IT SHOWS CHANGE
+
+
+### **C5. Comments Field in Bulk**
+
+Is this:
+
+OPTIONAL COMMENTS USER CAN ADD LIKE MONTH END ENTRIES OR SO
+
+---
+
+# **SECTION D — PARENT–CHILD RH LOGIC**
+
+This is the **most important** part.
+
+### **D1. Which components have RH?**
+
+* Parent only?
+* Parent + child?
+* Child only when they have RH triggers (like cylinder liners)?
+bOTH PARENTS AND CHILD HAS GOT RUNNING HOURS BUT IN THE RUNNING HOUR MODULE ONLY PARENTS WILL BE AVAILABLE, ANY CHANGE HERE WILL REFLECT IN THE CHILDREN. because THE IN NO CASE CHILDREN RH BE GREATER THAN PARENT. ALSO PARENT IS THE MAIN MACHINERY AND WHEN IT RUNS IT IS OBVIOUS THAT SUB PARTS I.E CHILDREN ARE RUNNING.
+
+### **D2. Propagation Rule**
+
+When parent RH increases by delta, what do we do?
+
+* ChildRH += delta? YES THE CHANGE MUST BE ADDED TO ALL IT'S CHILDREN
+
+
+### **D3. Child Replacement Scenario**
+
+If a child component was replaced and RH reset to 0:
+
+* Should it still receive parent delta? (Yes/No) YES DEFINITELY
+* Should only new delta apply, not total RH? YES WHATEVER CHANGE IS THERE AFTER THE REPLACEMENT THAT WILL APPLY
+* Should parent update skip replaced child for that cycle? NEVER
+
+### **D4. If child is updated individually**
+
+Should parent update automatically?
+
+* Yes
+* No
+* Only if “Link to parent” flag exists
+NO NEED IT WILL NOT MATTER.
+### **D5. Should children appear in Running Hours UI?**
+NO- ONLY PARENT WILL BE AVAILABLE
+* Yes (along with parents)
+* No (only parent-level RH)
+* Show child only when selected from Components module
+
+---
+
+# **SECTION E — WORK ORDER GENERATION TRIGGER**
+
+### **E1. WO Trigger**
+
+When RH crosses threshold:
+
+* Should WO be generated immediately? yes IMMEDIATELY
+* Or only during daily scheduled batch? NO
+* Or allow CE to manually trigger generation? NO
+
+### **E2. Grace Logic (168 hours)**
+
+Should RH jobs follow Grace P = 168 hours?
+
+* Yes
+
+
+### **E3. WO Initial Status**
+
+When system generates WO from RH:
+
+* Should it appear as “Due”?
+APPEAR AS DUE
+
+---
+
+# **SECTION F — HISTORY**
+
+### **F1. Do you want Running Hours History per component?**
+
+Options:
+
+
+* Full “View History” modal
+
+
+### **F2. What fields should history show?** ALL OF THESE
+
+* Old RH
+* New RH
+* Delta
+* Date
+* Meter replaced flag
+* User who updated
+
+---
+
+# **SECTION G — UI BEHAVIOR & PERMISSIONS**
+
+### **G1. Who can update RH?**
+
+ALL USERS
+
+### **G2. Who can bulk update?**
+ALL USERS
+
+### **G3. Who can export RH table?**
+ALL USERS
+

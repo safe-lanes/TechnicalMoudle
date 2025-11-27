@@ -1,0 +1,194 @@
+Perfect.
+Before I generate the **GLOBAL FINAL SPECIFICATION**, I will now restate each conflict **1 to 15** with **your final resolution**, exactly in the clean short format you requested.
+
+This is the list I will use to produce the final unified document.
+
+---
+
+# ✅ **FINAL RESOLUTIONS FOR ALL CONFLICTS (1–15)**
+
+*(Based strictly on your clarifications above)*
+
+---
+
+## **1 — Who updates Running Hours?**
+
+**Resolution:**
+✔ WO updates **sub-component RH only**
+✔ RH module updates **component RH only**
+✔ Parent → child propagation only happens in RH module
+✔ WO RH must **never exceed parent RH**
+
+---
+
+## **2 — RH in Work Orders vs Meter Replace**
+
+**Resolution:**
+✔ WO can reset **sub-component RH**
+✔ RH module handles **component-level meter replaced**
+✔ No mixing between component and sub-component logic
+
+---
+
+## **3 — Spares alerts**
+
+**Resolution:**
+✔ Only **Critical + ROB = 0** triggers alert
+✔ All other mentions were **UI colour changes only**
+
+---
+
+## **4 — Spares consumption when ROB < Required**
+
+**Resolution:**
+✔ Consumption allowed even if ROB insufficient
+✔ Show strong warning
+✔ Do **NOT** block WO execution
+✔ DO NOT allow ROB to go negative
+
+---
+
+## **5 — Stores vs Spares**
+
+**Resolution:**
+✔ Remove all Stores references from WO
+✔ WO links **only** with Spares
+✔ Stores never linked to PMS/Jobs/WOs
+
+---
+
+## **6 — Last Done RH calculation**
+
+**Resolution:**
+✔ WO Part B RH = **sub-component last done RH**
+✔ Components module Last Done RH = **from RH module only**
+✔ These must **never mix**
+
+---
+
+## **7 — Children RH Updates**
+
+**Resolution:**
+✔ Sub-components visible & editable in WO
+✔ Parent shown only in RH module
+✔ Sub-component RH NEVER > parent
+✔ Sub-component RH NEVER updates parent RH
+
+---
+
+## **8 — RH History source**
+
+**Resolution:**
+✔ RH module writes **component RH history**
+✔ WO writes **sub-component RH history**
+✔ These two must remain separate tables
+
+---
+
+## **9 — Component Quick-Edit RH vs WO RH**
+
+**Resolution:**
+✔ Quick-edit = RH module logic
+✔ WO RH updates **only sub-component RH**
+✔ WO RH must validate that child RH ≤ parent RH
+
+---
+
+## **10 — Next Due rules**
+
+**Resolution:**
+✔ RH Jobs: show **Remaining Hours, NOT date**
+✔ Grace = **168 hours**, not a date
+✔ Correct Work Orders doc accordingly
+
+---
+
+## **11 — Stores soft delete behaviour**
+
+**Resolution:**
+✔ Nothing becomes invisible
+✔ Inactive items should appear in dropdowns
+✔ Inactive items must **not be consumed**
+✔ Inactive items still appear in history
+
+---
+
+## **12 — Spare mapping multiplicity**
+
+**Resolution:**
+✔ One spare row only
+✔ List multiple linked components in that one row
+✔ Never create duplicate rows
+
+---
+
+## **13 — Work Order RH Validation**
+
+**Resolution:**
+✔ WO RH = sub-component RH only
+✔ Cannot be > parent RH
+✔ Cannot be < previous RH (backwards not allowed)
+✔ No updates to component RH from WO
+
+---
+
+## **14 — Min Qty / Low Stock**
+
+**Resolution:**
+✔ LOW = yellow
+✔ ZERO = red
+✔ No negative ROB
+✔ Replace older inconsistent wording in WO doc
+
+---
+
+## **15 — Application / Category mismatch**
+
+**Resolution:**
+✔ Remove all “Stores Application”, “Spare Application Area”, etc.
+✔ Use only:
+
+* Stores Category
+* Lube Grade / Type / Application
+* Chemical Application Area
+* Component Code for spares
+
+---
+
+# 🟡 Additional Clarifications (Your Final Inputs)
+
+## **A — Unplanned WO effect on job cycle**
+
+✔ YES — Unplanned WO **must reset cycle**
+✔ It becomes the new Last Done for that job
+
+## **B — Locations for Spares & Stores**
+
+✔ Both modules require **Location A + B**
+✔ UI shows **Total ROB + expandable location details**
+
+## **C — Purchase module linkage**
+
+✔ Not now.
+✔ Placeholder only: “To be integrated later.”
+
+---
+
+# 🔥 READY FOR FINAL ACTION
+
+I will now generate your:
+
+# **GLOBAL BUSINESS RULES & MODULE INTERLINKING — FINAL SPECIFICATION**
+
+This will be:
+
+* 100% conflict-free
+* Covers Components + RH + WO + Spares + Stores
+* Ready for developers
+* Structured exactly like your existing module documents
+
+Just confirm:
+
+### **“Yes, generate the final specification”**
+
+And I will produce it.

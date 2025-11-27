@@ -1,0 +1,113 @@
+FINAL CLARIFICATION CHECKLIST (NEED YES/NO or short answers)
+1. Fleet Equipment Code format
+
+You mentioned:
+
+eg. 601.001.AA (10 characters)
+
+Do we enforce strict 10-character format in the system?
+(YES / NO) 
+Will be 10 usually but no strict rule
+
+2. Component Code auto-generation
+
+When user adds a component under:
+331 Rotating Cranes → creates a new child node
+if he clicks on 331 and add, look for next number like 332, and give the next available 3 digit code. if he goes one step down 331.xxx and then clicks add component , give the next availabt number 331.abc
+Should system generate code as:
+
+331.XXX (increment next available number)? yes
+
+Or 331-XXX (dashes)? no dash. never spoil the format else system may go blind for such things. 
+
+Or follow exact SFI format: 331.831.XX?
+
+Please reply with exact expected format rule.
+
+3. Component addition by ship users
+
+You said:
+
+They can create new subcomponent … but only after office approval.
+
+So:
+Ship user fills form → Saves → Goes to Modify PMS module → Office reviews & Approves → Only then added to tree.
+
+Correct? (YES / NO)
+yes
+4. Running Hours propagation logic
+
+Very important.
+Confirm this exact rule:
+
+If parent running hours increase by +10 hours in RH module
+
+And child (e.g., replaced liner) has current RH = 0
+
+Then: child = child_existing + 10
+
+Correct?
+(YES / NO) yes, suppose it has 5 child, for each of them the rh will be +10. always focus on the change (delta) which must be added to all the children's running hours
+
+5. Running-Hour–based jobs
+
+You said Next Due Date is not shown for RH jobs. yes instead show remaining hours for the job (interval - (change in running hours since last maintenance))
+Instead work order is generated when:
+
+Running Hours >= Last Done + Frequency (in hours)
+
+Confirm: yes generate it 200 
+(YES / NO) Yes the work-order will be generated as per the lead-time specified in the admin section. remind me to add this functionality in admin module. 
+
+6. Jobs table: Can ship users edit?
+he can but not here, there is a separate sub-module "change-pms" where the ship can propose changes. here in components sub-module ship users can not change.
+Ship cannot edit Calendar frequency, Maintenance Type, etc.
+
+Can ship users:
+
+Edit Job Title? (YES / NO)no, not here, there is a separate sub-module "change-pms" where the ship can propose changes.
+
+Edit Frequency? (YES / NO)no,not here, there is a separate sub-module "change-pms" where the ship can propose changes.
+
+Edit Maintenance Type? (YES / NO)no,not here, there is a separate sub-module "change-pms" where the ship can propose changes.
+
+Or everything is locked and editable only from Admin upload? yes
+
+7. Spare linking
+
+You said spares are linked at:
+
+Vessel level
+
+Fleet level
+
+Company level
+
+When viewing Component → Spares:
+
+Should we show only vessel-level spares, or merged (fleet+company+vessel)? show only for the vessel selected in the dropdown menu
+
+8. Drawings & Manuals – files view
+
+You said view only.
+Do you want:
+
+PDF viewer embedded? (YES / NO) yes
+
+Restrict download even for office users? (YES / NO) no
+
+9. Classification & Regulatory
+
+Should each component have multiple class survey rows, or only one row? may have multiple .
+
+(Example: Crane might have Annual + 5-year)
+
+10. Requisitions Section
+
+For now we keep it as placeholder.
+
+Should it show:
+
+Empty table only?yes for now collapse the pane. 
+
+Or allow user to add entries (but they go nowhere yet)? no just collapse the pane

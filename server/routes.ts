@@ -383,13 +383,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/jobs", async (req, res) => {
     try {
       const { insertJobSchema } = await import("@shared/schema");
+      const { calculateNextDueDate } = await import("@shared/dateUtils");
       let jobData = insertJobSchema.parse(req.body);
       
       // GLOBAL BUSINESS RULES COMPLIANCE (Section 3.3):
       // Jobs belong to sub-components, not parent components
       // Validate that the component is a sub-component (has a parent)
+      let component: any = null;
       if (jobData.componentId) {
-        const component = await storage.getComponent(jobData.componentId);
+        component = await storage.getComponent(jobData.componentId);
         if (!component) {
           return res.status(400).json({ 
             error: "Component not found" 
@@ -412,6 +414,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
       
+      // AUTO-CALCULATE nextDueDate for Calendar-based jobs
+      // Per documentation: nextDueDate = lastDoneDate + frequencyValue + frequencyUnit
+      if (jobData.maintenanceBasis === 'Calendar' && !jobData.nextDueDate) {
+        const { normalizeDateToDDMMMYYYY } = await import("@shared/dateUtils");
+        const rawLastDone = jobData.lastDoneDate || (component?.installationDate);
+        if (rawLastDone && jobData.frequencyValue && jobData.frequencyUnit) {
+          // Normalize date before calculation to handle various formats
+          const lastDone = normalizeDateToDDMMMYYYY(rawLastDone);
+          if (lastDone) {
+            const calculatedNextDue = calculateNextDueDate(lastDone, jobData.frequencyValue, jobData.frequencyUnit);
+            if (calculatedNextDue) {
+              jobData = { ...jobData, nextDueDate: calculatedNextDue };
+            }
+          }
+        }
+      }
+      
+      // AUTO-CALCULATE nextDueRH for Running Hours-based jobs
+      // Per documentation: nextDueRH = lastDoneRH + intervalRunningHour
+      // NOTE: Only use intervalRunningHour, never fall back to frequencyValue (per schema)
+      // VALIDATION: intervalRunningHour is required for RH jobs and must be a valid number > 0
+      // VALIDATION: lastDoneRH (or component runningHours) is required to calculate nextDueRH
+      if (jobData.maintenanceBasis === 'Running Hours') {
+        const intervalRH = Number(jobData.intervalRunningHour);
+        if (isNaN(intervalRH) || intervalRH <= 0) {
+          return res.status(400).json({ 
+            error: "Running Hours jobs require a valid numeric intervalRunningHour greater than 0" 
+          });
+        }
+        
+        // Determine lastDoneRH from job data or component
+        const rawLastDoneRH = jobData.lastDoneRH || (component?.runningHours ? String(component.runningHours) : null);
+        
+        if (!rawLastDoneRH) {
+          return res.status(400).json({ 
+            error: "Running Hours jobs require lastDoneRH or component must have runningHours to calculate nextDueRH" 
+          });
+        }
+        
+        const lastRH = Number(rawLastDoneRH);
+        if (isNaN(lastRH)) {
+          return res.status(400).json({ 
+            error: "lastDoneRH must be a valid number" 
+          });
+        }
+        
+        // Always calculate nextDueRH for RH jobs
+        const calculatedNextDueRH = String(lastRH + intervalRH);
+        jobData = { 
+          ...jobData, 
+          nextDueRH: calculatedNextDueRH,
+          lastDoneRH: String(lastRH)
+        };
+      }
+      
       const job = await storage.createJob(jobData);
       res.status(201).json(job);
     } catch (error: any) {
@@ -426,11 +483,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update job
   app.patch("/api/jobs/:id", async (req, res) => {
     try {
+      const { calculateNextDueDate } = await import("@shared/dateUtils");
+      let updateData = { ...req.body };
+      
       // GLOBAL BUSINESS RULES COMPLIANCE (Section 3.3):
       // Jobs belong to sub-components, not parent components
       // Validate component change if componentId is being updated
+      let component: any = null;
       if (req.body.componentId) {
-        const component = await storage.getComponent(req.body.componentId);
+        component = await storage.getComponent(req.body.componentId);
         if (!component) {
           return res.status(400).json({ 
             error: "Component not found" 
@@ -443,7 +504,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const job = await storage.updateJob(req.params.id, req.body);
+      // Get existing job to merge data for calculations
+      const existingJob = await storage.getJob(req.params.id);
+      if (!existingJob) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // Merge existing job data with updates for calculation purposes
+      const mergedData = { ...existingJob, ...updateData };
+      
+      // RECALCULATE nextDueDate if relevant fields changed for Calendar-based jobs
+      // Per documentation: nextDueDate = lastDoneDate + frequencyValue + frequencyUnit
+      const calendarFieldsChanged = 
+        updateData.lastDoneDate !== undefined || 
+        updateData.frequencyValue !== undefined || 
+        updateData.frequencyUnit !== undefined ||
+        updateData.maintenanceBasis !== undefined;
+      
+      if (mergedData.maintenanceBasis === 'Calendar' && calendarFieldsChanged) {
+        const { normalizeDateToDDMMMYYYY } = await import("@shared/dateUtils");
+        // Get component for installation date fallback
+        if (!component && mergedData.componentId) {
+          component = await storage.getComponent(mergedData.componentId);
+        }
+        const rawLastDone = mergedData.lastDoneDate || (component?.installationDate);
+        if (rawLastDone && mergedData.frequencyValue && mergedData.frequencyUnit) {
+          // Normalize date before calculation to handle various formats
+          const lastDone = normalizeDateToDDMMMYYYY(rawLastDone);
+          if (lastDone) {
+            const calculatedNextDue = calculateNextDueDate(lastDone, mergedData.frequencyValue, mergedData.frequencyUnit);
+            if (calculatedNextDue) {
+              updateData.nextDueDate = calculatedNextDue;
+            }
+          }
+        }
+      } else if (updateData.maintenanceBasis === 'Running Hours' && existingJob.maintenanceBasis === 'Calendar') {
+        // Switching from Calendar to RH: clear calendar-specific fields
+        updateData.nextDueDate = null;
+      }
+      
+      // RECALCULATE nextDueRH if relevant fields changed for Running Hours-based jobs
+      // Per documentation: nextDueRH = lastDoneRH + intervalRunningHour
+      // NOTE: Only use intervalRunningHour, never fall back to frequencyValue (per schema)
+      // VALIDATION: When maintenanceBasis is Running Hours, intervalRunningHour must be valid
+      const rhFieldsChanged = 
+        updateData.lastDoneRH !== undefined || 
+        updateData.intervalRunningHour !== undefined || 
+        updateData.maintenanceBasis !== undefined;
+      
+      if (mergedData.maintenanceBasis === 'Running Hours') {
+        const intervalRH = Number(mergedData.intervalRunningHour);
+        
+        // Validate interval is present and a valid number > 0 for RH jobs
+        if (isNaN(intervalRH) || intervalRH <= 0) {
+          return res.status(400).json({ 
+            error: "Running Hours jobs require a valid numeric intervalRunningHour greater than 0" 
+          });
+        }
+        
+        // Get component for running hours fallback
+        if (!component && mergedData.componentId) {
+          component = await storage.getComponent(mergedData.componentId);
+        }
+        
+        // Determine lastDoneRH from job data or component
+        const rawLastDoneRH = mergedData.lastDoneRH || (component?.runningHours ? String(component.runningHours) : null);
+        
+        if (!rawLastDoneRH) {
+          return res.status(400).json({ 
+            error: "Running Hours jobs require lastDoneRH or component must have runningHours to calculate nextDueRH" 
+          });
+        }
+        
+        const lastRH = Number(rawLastDoneRH);
+        if (isNaN(lastRH)) {
+          return res.status(400).json({ 
+            error: "lastDoneRH must be a valid number" 
+          });
+        }
+        
+        // Always recalculate nextDueRH when RH fields change
+        if (rhFieldsChanged) {
+          updateData.nextDueRH = String(lastRH + intervalRH);
+          if (!mergedData.lastDoneRH) {
+            updateData.lastDoneRH = String(lastRH);
+          }
+        }
+      } else if (updateData.maintenanceBasis === 'Calendar' && existingJob.maintenanceBasis === 'Running Hours') {
+        // Switching from RH to Calendar: clear RH-specific fields
+        updateData.nextDueRH = null;
+      }
+      
+      const job = await storage.updateJob(req.params.id, updateData);
       res.json(job);
     } catch (error) {
       console.error("Failed to update job:", error);
@@ -4554,6 +4706,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }).catch(err => {
     console.error('⚠️ Error recalculating recurring defects:', err);
   });
+  
+  // STARTUP BACKFILL: Recalculate nextDueDate/nextDueRH for jobs missing these values
+  // Per documentation: Calendar jobs need nextDueDate = lastDoneDate + frequencyValue + frequencyUnit
+  //                   RH jobs need nextDueRH = lastDoneRH + intervalRunningHour
+  // NOTE: Only use intervalRunningHour for RH jobs, never fall back to frequencyValue (per schema)
+  (async () => {
+    try {
+      const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import("@shared/dateUtils");
+      const allJobs = await storage.getJobs();
+      let updatedCalendar = 0;
+      let updatedRH = 0;
+      
+      for (const job of allJobs) {
+        let updates: any = {};
+        let needsUpdate = false;
+        
+        // Calendar-based jobs: Calculate nextDueDate if missing
+        if (job.maintenanceBasis === 'Calendar' && !job.nextDueDate) {
+          const rawLastDone = job.lastDoneDate;
+          if (rawLastDone && job.frequencyValue && job.frequencyUnit) {
+            // Normalize date before calculation
+            const lastDone = normalizeDateToDDMMMYYYY(rawLastDone);
+            if (lastDone) {
+              const calculatedNextDue = calculateNextDueDate(lastDone, job.frequencyValue, job.frequencyUnit);
+              if (calculatedNextDue) {
+                updates.nextDueDate = calculatedNextDue;
+                needsUpdate = true;
+                updatedCalendar++;
+              }
+            }
+          }
+        }
+        
+        // Running Hours-based jobs: Calculate nextDueRH if missing
+        // Only use intervalRunningHour, not frequencyValue
+        // VALIDATION: interval must be a valid number > 0
+        if (job.maintenanceBasis === 'Running Hours' && !job.nextDueRH) {
+          const lastDoneRH = job.lastDoneRH;
+          const intervalRH = Number(job.intervalRunningHour);
+          if (lastDoneRH && !isNaN(intervalRH) && intervalRH > 0) {
+            const lastRH = Number(lastDoneRH);
+            if (!isNaN(lastRH)) {
+              updates.nextDueRH = String(lastRH + intervalRH);
+              needsUpdate = true;
+              updatedRH++;
+            }
+          }
+        }
+        
+        // Apply updates if needed
+        if (needsUpdate) {
+          await storage.updateJob(job.id, updates);
+        }
+      }
+      
+      if (updatedCalendar > 0 || updatedRH > 0) {
+        console.log(`✅ Job backfill complete: ${updatedCalendar} Calendar jobs (nextDueDate), ${updatedRH} RH jobs (nextDueRH)`);
+      } else {
+        console.log('✅ Job backfill check complete - all jobs already have due dates/RH calculated');
+      }
+    } catch (err) {
+      console.error('⚠️ Error during job nextDueDate/nextDueRH backfill:', err);
+    }
+  })();
   
   // Check and revert expired postponed work orders on startup
   (async () => {
