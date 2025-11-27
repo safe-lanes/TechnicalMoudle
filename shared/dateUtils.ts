@@ -58,6 +58,13 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
       return null;
     }
     
+    // Validate year is within reasonable range (1900-2100)
+    const year = parsedDate.getFullYear();
+    if (year < 1900 || year > 2100) {
+      console.warn(`Invalid year ${year} in date, rejecting:`, dateInput);
+      return null;
+    }
+    
     // Format to DD-MMM-YYYY
     return format(parsedDate, 'dd-MMM-yyyy');
   } catch (error) {
