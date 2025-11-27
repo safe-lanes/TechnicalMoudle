@@ -5486,7 +5486,11 @@ export class PersistentFileStorage implements IStorage {
 
   // Fleet Admin - Makers methods
   async getMakers(search?: string): Promise<Maker[]> {
-    let filtered = this.data.makers || [];
+    // Safety check: ensure makers is an array
+    if (!Array.isArray(this.data.makers)) {
+      this.data.makers = [];
+    }
+    let filtered = this.data.makers;
     
     if (search) {
       const searchLower = search.toLowerCase();
@@ -5500,11 +5504,14 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getMakerById(id: number): Promise<Maker | undefined> {
-    return (this.data.makers || []).find(m => m.id === id);
+    if (!Array.isArray(this.data.makers)) {
+      this.data.makers = [];
+    }
+    return this.data.makers.find(m => m.id === id);
   }
 
   async createMaker(maker: InsertMaker): Promise<Maker> {
-    if (!this.data.makers) this.data.makers = [];
+    if (!Array.isArray(this.data.makers)) this.data.makers = [];
     
     // Generate next ID
     const existingIds = this.data.makers.map(m => m.id);
@@ -5525,7 +5532,7 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
-    if (!this.data.makers) this.data.makers = [];
+    if (!Array.isArray(this.data.makers)) this.data.makers = [];
     
     const index = this.data.makers.findIndex(m => m.id === id);
     if (index === -1) {
@@ -5544,7 +5551,7 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async deleteMaker(id: number): Promise<void> {
-    if (!this.data.makers) return;
+    if (!Array.isArray(this.data.makers)) return;
     
     this.data.makers = this.data.makers.filter(m => m.id !== id);
     this.persistData();

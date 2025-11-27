@@ -3772,6 +3772,17 @@ async function performImport(
 // Helper function to create component from Excel row
 async function createComponentFromRow(row: any, vesselId?: string) {
   const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
+  
+  // Resolve maker name from maker code if not provided directly
+  let makerName = row['Maker'] || null;
+  const makerCode = row['Maker Code'] || null;
+  if (!makerName && makerCode) {
+    const maker = await storage.getMakerByCode(String(makerCode).trim());
+    if (maker) {
+      makerName = maker.makerName;
+    }
+  }
+  
   const componentData = {
     componentCode: componentCode,
     name: row['Component Name'] || '',
@@ -3784,9 +3795,9 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     fleetEquipmentCode: row['Fleet Equipment Code'] || null,
     fleetEquipmentName: row['Fleet Equipment Name'] || null,
     parentFleetEquipmentCode: null, // Not in Excel template, can be added later
-    // Maker and Model fields
-    maker: row['Maker'] || null,
-    makerCode: row['Maker Code'] || null,
+    // Maker and Model fields - resolve name from code if needed
+    maker: makerName,
+    makerCode: makerCode,
     model: row['Model'] || null,
     modelNumber: row['Model Number'] || null,
     modelCode: null, // Can be computed from Maker Code + Model if needed
@@ -3839,8 +3850,16 @@ async function updateComponentFromRow(componentCode: string, row: any) {
   // Fleet Equipment fields
   if (row['Fleet Equipment Code']) updateData.fleetEquipmentCode = row['Fleet Equipment Code'];
   if (row['Fleet Equipment Name']) updateData.fleetEquipmentName = row['Fleet Equipment Name'];
-  // Maker and Model fields
-  if (row['Maker']) updateData.maker = row['Maker'];
+  // Maker and Model fields - resolve name from code if needed
+  if (row['Maker']) {
+    updateData.maker = row['Maker'];
+  } else if (row['Maker Code']) {
+    // Try to resolve maker name from maker code
+    const maker = await storage.getMakerByCode(String(row['Maker Code']).trim());
+    if (maker) {
+      updateData.maker = maker.makerName;
+    }
+  }
   if (row['Maker Code']) updateData.makerCode = row['Maker Code'];
   if (row['Model']) updateData.model = row['Model'];
   if (row['Model Number']) updateData.modelNumber = row['Model Number'];
