@@ -1047,7 +1047,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     });
   });
   
-  console.log(`📝 Pre-populated ${leafComponents.length} leaf node components in jobs template`);
+  console.log(`📝 Pre-populated ${sortedComponents.length} components (all levels) in jobs template`);
   
   // Create "Lists" sheet for dropdown values
   const listsSheet = workbook.addWorksheet('Lists');
