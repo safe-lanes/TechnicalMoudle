@@ -476,7 +476,7 @@ export interface IStorage {
   // Seed helper methods
   getDefectBySeedId(seedId: string): Promise<Defect | undefined>;
   getVesselIdByName(vesselName: string): Promise<string | undefined>;
-  createVessel(vessel: { id: string; name: string; type: string }): Promise<void>;
+  createVessel(vessel: InsertVessel): Promise<Vessel>;
   
   // Import History methods
   createImportHistory(history: InsertImportHistory): Promise<ImportHistory>;
@@ -618,6 +618,18 @@ export interface IStorage {
     totalFleetComponents: number;
     totalMasterLists: number;
   }>;
+  
+  // Fleet Management methods (for organizing vessels into fleets)
+  getAllFleets(): Promise<Fleet[]>;
+  getFleets(): Promise<Fleet[]>;
+  getFleetById(id: string): Promise<Fleet | undefined>;
+  createFleet(fleet: InsertFleet): Promise<Fleet>;
+  updateFleet(id: string, data: Partial<Fleet>): Promise<Fleet>;
+  deleteFleet(id: string): Promise<void>;
+  getVesselsByFleet(fleetId: string): Promise<Vessel[]>;
+  assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
+  getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
+  updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -4827,8 +4839,29 @@ export class MemStorage implements IStorage {
     return undefined;
   }
 
-  async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
-    // Stub implementation
+  async createVessel(vessel: InsertVessel): Promise<Vessel> {
+    // Check if vessel already exists
+    if (this.data.vessels[vessel.id]) {
+      throw new Error(`Vessel with ID ${vessel.id} already exists`);
+    }
+    
+    const now = new Date();
+    const newVessel: Vessel = {
+      id: vessel.id,
+      name: vessel.name,
+      code: vessel.code || vessel.id,
+      fleetId: vessel.fleetId || null,
+      imoNumber: vessel.imoNumber || null,
+      vesselType: vessel.vesselType || null,
+      flag: vessel.flag || null,
+      isActive: vessel.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.data.vessels[vessel.id] = newVessel;
+    await this.persistData();
+    return newVessel;
   }
 
   // Import History methods
@@ -8026,9 +8059,27 @@ export class PostgresStorage implements IStorage {
     return commonVessels[vesselName.toUpperCase()];
   }
 
-  async createVessel(vessel: { id: string; name: string; type: string }): Promise<void> {
-    // Vessels are static in this system - this is a no-op for compatibility
-    console.log(`[VESSEL] Vessel creation skipped (static list): ${vessel.id} - ${vessel.name}`);
+  async createVessel(vessel: InsertVessel): Promise<Vessel> {
+    const db = await this.getDb();
+    const { vessels } = await import('@shared/schema');
+    
+    const now = new Date();
+    const newVessel: Vessel = {
+      id: vessel.id,
+      name: vessel.name,
+      code: vessel.code || vessel.id,
+      fleetId: vessel.fleetId || null,
+      imoNumber: vessel.imoNumber || null,
+      vesselType: vessel.vesselType || null,
+      flag: vessel.flag || null,
+      isActive: vessel.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    await db.insert(vessels).values(newVessel);
+    console.log(`[VESSEL] Created vessel: ${vessel.id} - ${vessel.name}`);
+    return newVessel;
   }
 
   // ============= STORES METHODS - ZERO PMS LINKAGES =============
