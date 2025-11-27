@@ -984,34 +984,13 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '');
   console.log(`✅ ${validComponents.length} components have valid codes`);
   
-  // Filter to include only leaf nodes (actual equipment, not parent categories)
-  const allCodes = validComponents.map(c => c.componentCode);
-  const parentCodes = new Set<string>();
-  
-  allCodes.forEach(code1 => {
-    const cleanCode1 = stripSFISuffix(code1);
-    
-    allCodes.forEach(code2 => {
-      if (code1 === code2) return;
-      
-      const cleanCode2 = stripSFISuffix(code2);
-      
-      // Check if code1 is a parent of code2
-      if (cleanCode2.startsWith(cleanCode1 + '.')) {
-        parentCodes.add(code1);
-        return;
-      }
-      
-      if (cleanCode2.startsWith(cleanCode1) && cleanCode2.length > cleanCode1.length && !cleanCode1.includes('.')) {
-        parentCodes.add(code1);
-        return;
-      }
-    });
+  // Sort components by component code for hierarchical display
+  const sortedComponents = [...validComponents].sort((a, b) => {
+    const codeA = a.componentCode || '';
+    const codeB = b.componentCode || '';
+    return codeA.localeCompare(codeB, undefined, { numeric: true });
   });
-  
-  const leafComponents = validComponents.filter(c => !parentCodes.has(c.componentCode));
-  console.log(`🌿 Filtered to ${leafComponents.length} leaf node components (actual equipment)`);
-  console.log(`🚫 Excluded ${validComponents.length - leafComponents.length} parent components from template`);
+  console.log(`📊 Including all ${sortedComponents.length} components (all levels) in jobs template`);
   
   // Create main "jobs" sheet with correct 21-column structure
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
@@ -1041,8 +1020,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Vessel Code', key: 'vesselCode', width: 15 }
   ];
   
-  // Pre-populate only leaf node components in the template
-  leafComponents.forEach(component => {
+  // Pre-populate ALL components (all levels) in the template - sorted by code for hierarchical display
+  sortedComponents.forEach(component => {
     jobsSheet.addRow({
       jobCode: '',
       fleetEquipmentCode: component.fleetEquipmentCode || '',
