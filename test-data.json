@@ -14,42 +14,8 @@
       "updatedAt": "2025-01-01T00:00:00.000Z"
     }
   },
-  "fleets": {
-    "FLT001": {
-      "id": "FLT001",
-      "code": "FLT001",
-      "name": "Pacific Fleet Updated",
-      "description": "Updated description",
-      "createdAt": "2025-11-27T18:33:29.215Z",
-      "updatedAt": "2025-11-27T18:33:52.222Z"
-    }
-  },
-  "vessels": {
-    "VSL001": {
-      "id": "VSL001",
-      "name": "MV Pacific Star",
-      "code": "VSL001",
-      "fleetId": "FLT001",
-      "imoNumber": "IMO1234567",
-      "vesselType": "Tanker",
-      "flag": "Panama",
-      "isActive": true,
-      "createdAt": "2025-11-27T18:33:41.073Z",
-      "updatedAt": "2025-11-27T18:33:41.073Z"
-    },
-    "VSL002": {
-      "id": "VSL002",
-      "name": "MV Atlantic Wave",
-      "code": "VSL002",
-      "fleetId": "FLT001",
-      "imoNumber": null,
-      "vesselType": null,
-      "flag": null,
-      "isActive": true,
-      "createdAt": "2025-11-27T18:34:02.520Z",
-      "updatedAt": "2025-11-27T18:34:03.877Z"
-    }
-  },
+  "fleets": {},
+  "vessels": {},
   "components": {},
   "runningHoursAudits": [],
   "spares": {},
@@ -120,6 +86,7 @@
     "fleetJobVesselMappingId": 1,
     "fleetSpareVesselMappingId": 1,
     "bulkImportHistoryId": 1,
-    "bulkImportErrorId": 1
+    "bulkImportErrorId": 1,
+    "fleetId": 1
   }
 }
