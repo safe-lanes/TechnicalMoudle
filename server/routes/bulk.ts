@@ -172,6 +172,826 @@ const STORES_CATEGORIES = [
   'Consumables'
 ];
 
+// Departments list for jobs/work orders
+const DEPARTMENTS = ['Engine', 'Deck', 'Electrical'];
+
+// Responsible ranks for work orders
+const RESPONSIBLE_RANKS = [
+  'Master', 'Chief Officer', '2nd Officer', '3rd Officer',
+  'Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer',
+  'Electrician', 'Bosun', 'Fitter'
+];
+
+// Schedule types
+const SCHEDULE_TYPES = ['Running Hours', 'Calendar', 'Both'];
+
+// Interval units for calendar-based schedules
+const INTERVAL_UNITS = ['Days', 'Weeks', 'Months', 'Years'];
+
+// =====================================================
+// COMPREHENSIVE FLEET MASTER DATA TEMPLATE GENERATOR
+// =====================================================
+
+async function generateFleetMasterTemplate(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  
+  // =====================================================
+  // SHEET 1: Master_Sheet (Instructions)
+  // =====================================================
+  const masterSheet = workbook.addWorksheet('Master_Sheet');
+  masterSheet.columns = [
+    { header: 'Section', key: 'section', width: 25 },
+    { header: 'Instructions', key: 'instructions', width: 80 }
+  ];
+  
+  const instructions = [
+    ['Overview', 'This workbook contains template sheets for importing Fleet Master Data and Vessel-specific data.'],
+    ['Fleet vs Vessel', 'FLEET sheets define master templates applied at fleet level. VESSEL sheets contain vessel-specific instance data.'],
+    ['Fleet Equipment Code', 'Links fleet and vessel data. Fleet_Component creates master equipment. Vessel_Component references via Fleet Equipment Code.'],
+    ['Data Entry Order', '1. Maker List (optional) → 2. SFI Details (optional) → 3. Fleet_Component → 4. Fleet_Job → 5. Fleet_Spare'],
+    ['Vessel Data Order', '1. Vessel_Component → 2. Vessel_Job → 3. Vessel_Spare → 4. Vessel_Stores'],
+    ['Date Format', 'Use DD-MMM-YYYY format (e.g., 15-NOV-2024). System will convert automatically.'],
+    ['Yes/No Fields', 'Use "Yes" or "No" (case-insensitive). Do not use TRUE/FALSE or 1/0.'],
+    ['Required Fields', 'Fields marked as Required must have values. Empty required fields will cause validation errors.'],
+    ['Parent Codes', 'Parent Fleet Equipment Code in Fleet_Component establishes hierarchy. Parent Component Code in Vessel_Component is separate.'],
+    ['IS Parent Flag', 'Only Fleet_Component has IS Parent field. Vessel_Component does NOT have IS Parent field.'],
+    ['Running Hours', 'Running Hours (RH) are only entered at vessel level. Fleet templates define job intervals only.'],
+    ['Dual Frequency Jobs', 'Jobs can have BOTH Calendar AND Running Hours intervals. Fill Calendar Interval OR RH Interval OR BOTH.'],
+    ['Spare Parts', 'Fleet_Spare defines master parts. Vessel_Spare has ROB by Location (Deck/Engine/Store1/Store2).'],
+    ['Stores vs Spares', 'Vessel_Stores is for consumables (paint, chemicals). Spares are linked to equipment/components.'],
+    ['IMPA Code', 'Vessel_Stores includes IMPA Code field for international maritime parts standardization.']
+  ];
+  
+  instructions.forEach(([section, text]) => {
+    masterSheet.addRow({ section, instructions: text });
+  });
+  
+  // Style the master sheet
+  masterSheet.getRow(1).font = { bold: true };
+  masterSheet.getColumn(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 2: Maker List
+  // =====================================================
+  const makerSheet = workbook.addWorksheet('Maker List');
+  makerSheet.columns = [
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Maker Name', key: 'makerName', width: 35 },
+    { header: 'Address', key: 'address', width: 50 }
+  ];
+  
+  // Add example row
+  makerSheet.addRow({
+    makerCode: 'MKR-001',
+    makerName: 'Wartsila Corporation',
+    address: 'John Stenbergin ranta 2, FI-00530 Helsinki, Finland'
+  });
+  makerSheet.addRow({
+    makerCode: 'MKR-002',
+    makerName: 'MAN Energy Solutions',
+    address: 'Teglholmsgade 41, 2450 Copenhagen, Denmark'
+  });
+  
+  makerSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 3: SFI Details
+  // =====================================================
+  const sfiSheet = workbook.addWorksheet('SFI Details');
+  sfiSheet.columns = [
+    { header: 'Component Code', key: 'componentCode', width: 20 },
+    { header: 'Component Name', key: 'componentName', width: 50 }
+  ];
+  
+  // Add example SFI entries
+  const sfiExamples = [
+    ['6', 'MACHINERY MAIN COMPONENTS'],
+    ['61', 'DIESEL ENGINES'],
+    ['611', 'MAIN ENGINE'],
+    ['7', 'SYSTEMS FOR MACHINERY MAIN COMPONENTS'],
+    ['71', 'LUBE OIL SYSTEMS'],
+    ['711', 'LO TRANSFER SYSTEM'],
+    ['711.001', 'LO Transfer Pump No.1']
+  ];
+  sfiExamples.forEach(([code, name]) => {
+    sfiSheet.addRow({ componentCode: code, componentName: name });
+  });
+  
+  sfiSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 4: Fleet_Component (13 columns - EXACT HEADERS)
+  // =====================================================
+  const fleetComponentSheet = workbook.addWorksheet('Fleet_Component');
+  fleetComponentSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 35 },
+    { header: 'Parent Fleet Equipment Code', key: 'parentFleetEquipmentCode', width: 25 },
+    { header: 'SFI System', key: 'sfiSystem', width: 15 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'Condition Based Yes/No', key: 'conditionBased', width: 20 },
+    { header: 'Location', key: 'location', width: 20 },
+    { header: 'Rating', key: 'rating', width: 20 },
+    { header: 'Eqpt / System Department', key: 'department', width: 25 },
+    { header: 'Notes', key: 'notes', width: 40 },
+    { header: 'IS Parent Yes/No', key: 'isParent', width: 15 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 }
+  ];
+  
+  // Add example rows
+  fleetComponentSheet.addRow({
+    fleetEquipmentCode: 'FE-711',
+    fleetEquipmentName: 'LO Transfer System',
+    parentFleetEquipmentCode: 'FE-71',
+    sfiSystem: '711',
+    critical: 'Yes',
+    conditionBased: 'No',
+    location: 'Engine Room',
+    rating: '15 m3/h @ 4 bar',
+    department: 'Engine',
+    notes: 'Lube oil transfer and circulation system',
+    isParent: 'Yes',
+    isActive: 'Yes',
+    makerCode: 'MKR-001'
+  });
+  fleetComponentSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    parentFleetEquipmentCode: 'FE-711',
+    sfiSystem: '711.001',
+    critical: 'Yes',
+    conditionBased: 'No',
+    location: 'Engine Room - Port',
+    rating: '15 m3/h',
+    department: 'Engine',
+    notes: 'Primary LO transfer pump',
+    isParent: 'No',
+    isActive: 'Yes',
+    makerCode: 'MKR-002'
+  });
+  
+  fleetComponentSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 5: Vessel_Component (24 columns - EXACT HEADERS, NO IS Parent)
+  // =====================================================
+  const vesselComponentSheet = workbook.addWorksheet('Vessel_Component');
+  vesselComponentSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
+    { header: 'Parent Component Code', key: 'parentComponentCode', width: 22 },
+    { header: 'Component Code', key: 'componentCode', width: 18 },
+    { header: 'Component Name', key: 'componentName', width: 35 },
+    { header: 'Component Category', key: 'componentCategory', width: 35 },
+    { header: 'Maker', key: 'maker', width: 25 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Model', key: 'model', width: 20 },
+    { header: 'Model Number', key: 'modelNumber', width: 20 },
+    { header: 'Serial No', key: 'serialNo', width: 20 },
+    { header: 'Drawing No', key: 'drawingNo', width: 18 },
+    { header: 'Location', key: 'location', width: 20 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'Condition Based Yes/No', key: 'conditionBased', width: 20 },
+    { header: 'Installation Date', key: 'installationDate', width: 18 },
+    { header: 'Commissioned Date', key: 'commissionedDate', width: 18 },
+    { header: 'Rating', key: 'rating', width: 20 },
+    { header: 'Eqpt / System Department', key: 'department', width: 25 },
+    { header: 'Notes', key: 'notes', width: 40 },
+    { header: 'Running Hours', key: 'runningHours', width: 15 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'SFI System', key: 'sfiSystem', width: 15 }
+  ];
+  
+  // Add example row
+  vesselComponentSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    parentComponentCode: '711',
+    componentCode: '711.001',
+    componentName: 'LO Transfer Pump No.1',
+    componentCategory: '7 Systems for Machinery Main Components',
+    maker: 'MAN Energy Solutions',
+    makerCode: 'MKR-002',
+    model: 'LO-2000',
+    modelNumber: 'LO-2000-X-15',
+    serialNo: 'SN-2024-12345',
+    drawingNo: 'DRW-711-001',
+    location: 'Engine Room - Port',
+    critical: 'Yes',
+    conditionBased: 'No',
+    installationDate: '01-JAN-2020',
+    commissionedDate: '15-MAR-2020',
+    rating: '15 m3/h @ 4 bar',
+    department: 'Engine',
+    notes: 'Primary LO transfer pump - Overhauled 2023',
+    runningHours: '12500',
+    isActive: 'Yes',
+    vesselCode: 'V001',
+    sfiSystem: '711.001'
+  });
+  
+  vesselComponentSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 6: Fleet_Job (21 columns - EXACT HEADERS with dual frequency)
+  // =====================================================
+  const fleetJobSheet = workbook.addWorksheet('Fleet_Job');
+  fleetJobSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
+    { header: 'Job Code', key: 'jobCode', width: 15 },
+    { header: 'Job Title', key: 'jobTitle', width: 40 },
+    { header: 'Job Description', key: 'jobDescription', width: 50 },
+    { header: 'Department', key: 'department', width: 15 },
+    { header: 'Responsible Rank', key: 'responsibleRank', width: 20 },
+    { header: 'Schedule Type', key: 'scheduleType', width: 15 },
+    { header: 'Calendar Interval', key: 'calendarInterval', width: 18 },
+    { header: 'Interval Unit', key: 'intervalUnit', width: 15 },
+    { header: 'RH Interval', key: 'rhInterval', width: 15 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'Estimated Hours', key: 'estimatedHours', width: 15 },
+    { header: 'Spare Parts Required', key: 'sparePartsRequired', width: 30 },
+    { header: 'Safety Procedure', key: 'safetyProcedure', width: 25 },
+    { header: 'Checklist', key: 'checklist', width: 40 },
+    { header: 'Reference Documents', key: 'referenceDocuments', width: 30 },
+    { header: 'Tools Required', key: 'toolsRequired', width: 30 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+  ];
+  
+  // Add example rows - one Calendar, one RH, one Both
+  fleetJobSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    jobCode: 'JOB-711-001',
+    jobTitle: 'Check LO Pump Bearing Temperature',
+    jobDescription: 'Measure and record bearing temperature. Check for abnormal vibration.',
+    department: 'Engine',
+    responsibleRank: '3rd Engineer',
+    scheduleType: 'Running Hours',
+    calendarInterval: '',
+    intervalUnit: '',
+    rhInterval: '500',
+    critical: 'No',
+    estimatedHours: '1',
+    sparePartsRequired: '',
+    safetyProcedure: 'Hot Surface',
+    checklist: 'Temperature < 80°C, No vibration, Oil level OK',
+    referenceDocuments: 'MAN-TM-711-001',
+    toolsRequired: 'IR Thermometer, Vibration meter',
+    isActive: 'Yes',
+    makerCode: 'MKR-002',
+    classSurveyCode: ''
+  });
+  fleetJobSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    jobCode: 'JOB-711-002',
+    jobTitle: 'Annual LO Pump Overhaul',
+    jobDescription: 'Complete overhaul of LO transfer pump including bearing replacement.',
+    department: 'Engine',
+    responsibleRank: '2nd Engineer',
+    scheduleType: 'Calendar',
+    calendarInterval: '12',
+    intervalUnit: 'Months',
+    rhInterval: '',
+    critical: 'Yes',
+    estimatedHours: '8',
+    sparePartsRequired: 'Bearing set, Mechanical seal, O-rings',
+    safetyProcedure: 'Lockout-Tagout',
+    checklist: 'Bearings replaced, Seal replaced, Test run OK, No leaks',
+    referenceDocuments: 'MAN-TM-711-001-OH',
+    toolsRequired: 'Bearing puller, Torque wrench',
+    isActive: 'Yes',
+    makerCode: 'MKR-002',
+    classSurveyCode: ''
+  });
+  fleetJobSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    jobCode: 'JOB-711-003',
+    jobTitle: 'LO Pump Performance Check',
+    jobDescription: 'Check pump output pressure and flow rate. Inspect for wear.',
+    department: 'Engine',
+    responsibleRank: '3rd Engineer',
+    scheduleType: 'Both',
+    calendarInterval: '6',
+    intervalUnit: 'Months',
+    rhInterval: '2000',
+    critical: 'Yes',
+    estimatedHours: '2',
+    sparePartsRequired: '',
+    safetyProcedure: '',
+    checklist: 'Pressure test, Flow rate check, Wear inspection',
+    referenceDocuments: 'MAN-TM-711-001',
+    toolsRequired: 'Pressure gauge, Flow meter',
+    isActive: 'Yes',
+    makerCode: 'MKR-002',
+    classSurveyCode: ''
+  });
+  
+  fleetJobSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 7: Vessel_Job (21 columns - EXACT HEADERS)
+  // =====================================================
+  const vesselJobSheet = workbook.addWorksheet('Vessel_Job');
+  vesselJobSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Component Code', key: 'componentCode', width: 18 },
+    { header: 'Component Name', key: 'componentName', width: 30 },
+    { header: 'Job Code', key: 'jobCode', width: 15 },
+    { header: 'Job Title', key: 'jobTitle', width: 40 },
+    { header: 'Job Description', key: 'jobDescription', width: 50 },
+    { header: 'Department', key: 'department', width: 15 },
+    { header: 'Responsible Rank', key: 'responsibleRank', width: 20 },
+    { header: 'Schedule Type', key: 'scheduleType', width: 15 },
+    { header: 'Calendar Interval', key: 'calendarInterval', width: 18 },
+    { header: 'Interval Unit', key: 'intervalUnit', width: 15 },
+    { header: 'RH Interval', key: 'rhInterval', width: 15 },
+    { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
+    { header: 'Last Done RH', key: 'lastDoneRH', width: 15 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'Estimated Hours', key: 'estimatedHours', width: 15 },
+    { header: 'Spare Parts Required', key: 'sparePartsRequired', width: 30 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+  ];
+  
+  // Add example row
+  vesselJobSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    componentCode: '711.001',
+    componentName: 'LO Transfer Pump No.1',
+    jobCode: 'JOB-711-001',
+    jobTitle: 'Check LO Pump Bearing Temperature',
+    jobDescription: 'Measure and record bearing temperature. Check for abnormal vibration.',
+    department: 'Engine',
+    responsibleRank: '3rd Engineer',
+    scheduleType: 'Running Hours',
+    calendarInterval: '',
+    intervalUnit: '',
+    rhInterval: '500',
+    lastDoneDate: '01-NOV-2024',
+    lastDoneRH: '12000',
+    critical: 'No',
+    estimatedHours: '1',
+    sparePartsRequired: '',
+    isActive: 'Yes',
+    vesselCode: 'V001',
+    makerCode: 'MKR-002',
+    classSurveyCode: ''
+  });
+  
+  vesselJobSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 8: Fleet_Spare (19 columns - EXACT HEADERS)
+  // =====================================================
+  const fleetSpareSheet = workbook.addWorksheet('Fleet_Spare');
+  fleetSpareSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
+    { header: 'Part Code', key: 'partCode', width: 18 },
+    { header: 'Part Name', key: 'partName', width: 35 },
+    { header: 'Part Number', key: 'partNumber', width: 20 },
+    { header: 'Maker', key: 'maker', width: 25 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Unit Of Measurement', key: 'uom', width: 20 },
+    { header: 'Stocking Number', key: 'stockingNumber', width: 18 },
+    { header: 'Specification', key: 'specification', width: 40 },
+    { header: 'Drawing No', key: 'drawingNo', width: 18 },
+    { header: 'Min Stock', key: 'minStock', width: 12 },
+    { header: 'Max Stock', key: 'maxStock', width: 12 },
+    { header: 'Unit Cost', key: 'unitCost', width: 12 },
+    { header: 'Lead Time Days', key: 'leadTimeDays', width: 15 },
+    { header: 'Supplier', key: 'supplier', width: 30 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Remarks', key: 'remarks', width: 40 }
+  ];
+  
+  // Add example row
+  fleetSpareSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    partCode: 'SPR-711-001-001',
+    partName: 'Bearing Set - LO Pump',
+    partNumber: 'BRG-6205-2RS',
+    maker: 'SKF',
+    makerCode: 'MKR-SKF',
+    uom: 'SET',
+    stockingNumber: 'STK-711-001',
+    specification: 'Deep groove ball bearing, 25x52x15mm, sealed',
+    drawingNo: 'DRW-711-001-A',
+    minStock: '2',
+    maxStock: '4',
+    unitCost: '450.00',
+    leadTimeDays: '30',
+    supplier: 'ABC Marine Supplies',
+    critical: 'Yes',
+    isActive: 'Yes',
+    remarks: 'Keep minimum stock for emergency overhaul'
+  });
+  
+  fleetSpareSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 9: Vessel_Spare (27 columns - EXACT HEADERS with ROB by Location)
+  // =====================================================
+  const vesselSpareSheet = workbook.addWorksheet('Vessel_Spare');
+  vesselSpareSheet.columns = [
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28 },
+    { header: 'Component Code', key: 'componentCode', width: 18 },
+    { header: 'Component Name', key: 'componentName', width: 28 },
+    { header: 'Part Code', key: 'partCode', width: 18 },
+    { header: 'Part Name', key: 'partName', width: 32 },
+    { header: 'Part Number', key: 'partNumber', width: 18 },
+    { header: 'Maker', key: 'maker', width: 22 },
+    { header: 'Maker Code', key: 'makerCode', width: 15 },
+    { header: 'Unit Of Measurement', key: 'uom', width: 18 },
+    { header: 'Stocking Number', key: 'stockingNumber', width: 18 },
+    { header: 'Specification', key: 'specification', width: 35 },
+    { header: 'Drawing No', key: 'drawingNo', width: 15 },
+    { header: 'ROB Deck Store', key: 'robDeckStore', width: 15 },
+    { header: 'ROB Engine Store', key: 'robEngineStore', width: 16 },
+    { header: 'ROB Store 1', key: 'robStore1', width: 12 },
+    { header: 'ROB Store 2', key: 'robStore2', width: 12 },
+    { header: 'Total ROB', key: 'totalRob', width: 12 },
+    { header: 'Min Stock', key: 'minStock', width: 10 },
+    { header: 'Max Stock', key: 'maxStock', width: 10 },
+    { header: 'Unit Cost', key: 'unitCost', width: 12 },
+    { header: 'Lead Time Days', key: 'leadTimeDays', width: 15 },
+    { header: 'Supplier', key: 'supplier', width: 28 },
+    { header: 'Critical Yes/No', key: 'critical', width: 15 },
+    { header: 'IS Active', key: 'isActive', width: 12 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Remarks', key: 'remarks', width: 35 }
+  ];
+  
+  // Add example row
+  vesselSpareSheet.addRow({
+    fleetEquipmentCode: 'FE-711-001',
+    fleetEquipmentName: 'LO Transfer Pump No.1',
+    componentCode: '711.001',
+    componentName: 'LO Transfer Pump No.1',
+    partCode: 'SPR-711-001-001',
+    partName: 'Bearing Set - LO Pump',
+    partNumber: 'BRG-6205-2RS',
+    maker: 'SKF',
+    makerCode: 'MKR-SKF',
+    uom: 'SET',
+    stockingNumber: 'STK-711-001',
+    specification: 'Deep groove ball bearing, 25x52x15mm, sealed',
+    drawingNo: 'DRW-711-001-A',
+    robDeckStore: '0',
+    robEngineStore: '3',
+    robStore1: '0',
+    robStore2: '0',
+    totalRob: '3',
+    minStock: '2',
+    maxStock: '4',
+    unitCost: '450.00',
+    leadTimeDays: '30',
+    supplier: 'ABC Marine Supplies',
+    critical: 'Yes',
+    isActive: 'Yes',
+    vesselCode: 'V001',
+    remarks: 'Replenished Oct 2024'
+  });
+  
+  vesselSpareSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 10: Vessel_Stores (12 columns - EXACT HEADERS with IMPA Code)
+  // =====================================================
+  const vesselStoresSheet = workbook.addWorksheet('Vessel_Stores');
+  vesselStoresSheet.columns = [
+    { header: 'Item Code', key: 'itemCode', width: 15 },
+    { header: 'IMPA Code', key: 'impaCode', width: 15 },
+    { header: 'Item Name', key: 'itemName', width: 35 },
+    { header: 'Type', key: 'type', width: 15 },
+    { header: 'Stores Category', key: 'storesCategory', width: 20 },
+    { header: 'Unit Of Measurement', key: 'uom', width: 18 },
+    { header: 'ROB', key: 'rob', width: 10 },
+    { header: 'Min Stock', key: 'minStock', width: 10 },
+    { header: 'Max Stock', key: 'maxStock', width: 10 },
+    { header: 'Location', key: 'location', width: 20 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
+    { header: 'Remarks', key: 'remarks', width: 40 }
+  ];
+  
+  // Add example rows
+  vesselStoresSheet.addRow({
+    itemCode: 'ST-001',
+    impaCode: '450101',
+    itemName: 'Welding Electrodes E6013 3.2mm',
+    type: 'Stores',
+    storesCategory: 'General Stores',
+    uom: 'KG',
+    rob: '25',
+    minStock: '10',
+    maxStock: '50',
+    location: 'Workshop Store',
+    vesselCode: 'V001',
+    remarks: 'AWS E6013 specification'
+  });
+  vesselStoresSheet.addRow({
+    itemCode: 'LB-001',
+    impaCode: '450201',
+    itemName: 'Cylinder Oil SAE 50',
+    type: 'Lubes',
+    storesCategory: 'Mechanical',
+    uom: 'LTR',
+    rob: '200',
+    minStock: '100',
+    maxStock: '500',
+    location: 'Engine Room Store',
+    vesselCode: 'V001',
+    remarks: 'For main engine cylinders'
+  });
+  vesselStoresSheet.addRow({
+    itemCode: 'CH-001',
+    impaCode: '550101',
+    itemName: 'Rust Remover',
+    type: 'Chemicals',
+    storesCategory: 'Consumables',
+    uom: 'LTR',
+    rob: '10',
+    minStock: '5',
+    maxStock: '20',
+    location: 'Paint Store',
+    vesselCode: 'V001',
+    remarks: 'Phosphoric acid based'
+  });
+  
+  vesselStoresSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // SHEET 11: Master Data (dropdown reference values)
+  // =====================================================
+  const masterDataSheet = workbook.addWorksheet('Master Data');
+  masterDataSheet.columns = [
+    { header: 'Departments', key: 'departments', width: 18 },
+    { header: 'Responsible Ranks', key: 'ranks', width: 20 },
+    { header: 'Schedule Types', key: 'scheduleTypes', width: 18 },
+    { header: 'Interval Units', key: 'intervalUnits', width: 15 },
+    { header: 'UOM', key: 'uom', width: 12 },
+    { header: 'Store Types', key: 'storeTypes', width: 15 },
+    { header: 'Yes/No', key: 'yesNo', width: 10 },
+    { header: 'Categories', key: 'categories', width: 40 }
+  ];
+  
+  // Add dropdown values - max rows needed
+  const maxRows = Math.max(
+    DEPARTMENTS.length,
+    RESPONSIBLE_RANKS.length,
+    SCHEDULE_TYPES.length,
+    INTERVAL_UNITS.length,
+    UOM_LIST.length,
+    4, // Store types
+    2, // Yes/No
+    COMPONENT_CATEGORIES.length
+  );
+  
+  for (let i = 0; i < maxRows; i++) {
+    masterDataSheet.addRow({
+      departments: DEPARTMENTS[i] || '',
+      ranks: RESPONSIBLE_RANKS[i] || '',
+      scheduleTypes: SCHEDULE_TYPES[i] || '',
+      intervalUnits: INTERVAL_UNITS[i] || '',
+      uom: UOM_LIST[i]?.toUpperCase() || '',
+      storeTypes: ['Stores', 'Lubes', 'Chemicals', 'Others'][i] || '',
+      yesNo: ['Yes', 'No'][i] || '',
+      categories: COMPONENT_CATEGORIES[i] || ''
+    });
+  }
+  
+  masterDataSheet.getRow(1).font = { bold: true };
+  
+  // =====================================================
+  // Add Data Validations to sheets
+  // =====================================================
+  
+  // Fleet_Component validations
+  for (let row = 2; row <= 1000; row++) {
+    // Critical Yes/No (col 5)
+    fleetComponentSheet.getCell(row, 5).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Condition Based Yes/No (col 6)
+    fleetComponentSheet.getCell(row, 6).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Department (col 9)
+    fleetComponentSheet.getCell(row, 9).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // IS Parent Yes/No (col 11)
+    fleetComponentSheet.getCell(row, 11).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // IS Active (col 12)
+    fleetComponentSheet.getCell(row, 12).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Vessel_Component validations
+  for (let row = 2; row <= 1000; row++) {
+    // Critical Yes/No (col 14)
+    vesselComponentSheet.getCell(row, 14).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Condition Based Yes/No (col 15)
+    vesselComponentSheet.getCell(row, 15).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Department (col 19)
+    vesselComponentSheet.getCell(row, 19).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // IS Active (col 22)
+    vesselComponentSheet.getCell(row, 22).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Fleet_Job validations
+  for (let row = 2; row <= 1000; row++) {
+    // Department (col 6)
+    fleetJobSheet.getCell(row, 6).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // Responsible Rank (col 7)
+    fleetJobSheet.getCell(row, 7).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Schedule Type (col 8)
+    fleetJobSheet.getCell(row, 8).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$C$2:$C$4"]
+    };
+    // Interval Unit (col 10)
+    fleetJobSheet.getCell(row, 10).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$D$2:$D$5"]
+    };
+    // Critical Yes/No (col 12)
+    fleetJobSheet.getCell(row, 12).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // IS Active (col 19)
+    fleetJobSheet.getCell(row, 19).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Vessel_Job validations
+  for (let row = 2; row <= 1000; row++) {
+    // Department (col 7)
+    vesselJobSheet.getCell(row, 7).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // Responsible Rank (col 8)
+    vesselJobSheet.getCell(row, 8).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Schedule Type (col 9)
+    vesselJobSheet.getCell(row, 9).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$C$2:$C$4"]
+    };
+    // Interval Unit (col 11)
+    vesselJobSheet.getCell(row, 11).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$D$2:$D$5"]
+    };
+    // Critical Yes/No (col 15)
+    vesselJobSheet.getCell(row, 15).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // IS Active (col 18)
+    vesselJobSheet.getCell(row, 18).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Fleet_Spare validations
+  for (let row = 2; row <= 1000; row++) {
+    // UOM (col 8)
+    fleetSpareSheet.getCell(row, 8).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$E$2:$E$11"]
+    };
+    // Critical Yes/No (col 17)
+    fleetSpareSheet.getCell(row, 17).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // IS Active (col 18)
+    fleetSpareSheet.getCell(row, 18).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Vessel_Spare validations
+  for (let row = 2; row <= 1000; row++) {
+    // UOM (col 10)
+    vesselSpareSheet.getCell(row, 10).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$E$2:$E$11"]
+    };
+    // Critical Yes/No (col 24)
+    vesselSpareSheet.getCell(row, 24).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // IS Active (col 25)
+    vesselSpareSheet.getCell(row, 25).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+  }
+  
+  // Vessel_Stores validations
+  for (let row = 2; row <= 1000; row++) {
+    // Type (col 4)
+    vesselStoresSheet.getCell(row, 4).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$F$2:$F$5"]
+    };
+    // Stores Category (col 5)
+    vesselStoresSheet.getCell(row, 5).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$H$2:$H$6"]
+    };
+    // UOM (col 6)
+    vesselStoresSheet.getCell(row, 6).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$E$2:$E$11"]
+    };
+  }
+  
+  // Write to buffer and return
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 // Helper function to generate work-orders template using ExcelJS (supports data validations)
 async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
@@ -722,8 +1542,24 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
 router.get('/template', async (req, res) => {
   const { type, vesselId } = req.query;
   
+  // Handle fleet-master-data as special case with multi-sheet Excel template
+  if (type === 'fleet-master-data') {
+    try {
+      console.log('📋 Generating Fleet Master Data template (multi-sheet)...');
+      const buffer = await generateFleetMasterTemplate();
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=Fleet_Master_Data_Template.xlsx');
+      console.log('✅ Fleet Master Data template generated successfully');
+      return res.send(buffer);
+    } catch (error) {
+      console.error('❌ Error generating fleet master data template:', error);
+      return res.status(500).json({ error: 'Failed to generate template' });
+    }
+  }
+  
   if (!['components', 'spares', 'stores', 'work-orders', 'jobs'].includes(type as string)) {
-    return res.status(400).json({ error: 'Invalid template type' });
+    return res.status(400).json({ error: 'Invalid template type. Valid types: components, spares, stores, work-orders, jobs, fleet-master-data' });
   }
   
   // Default to V001 if no vesselId provided
@@ -3345,6 +4181,356 @@ router.post('/undo/:historyId', async (req, res) => {
       error: 'Failed to undo import',
       details: error.message
     });
+  }
+});
+
+// =====================================================
+// MAKER LIST CRUD API ENDPOINTS
+// =====================================================
+
+// Get all makers
+router.get('/makers', async (req, res) => {
+  try {
+    const makers = await storage.getMakerList();
+    res.json(makers);
+  } catch (error: any) {
+    console.error('Error fetching makers:', error);
+    res.status(500).json({ error: 'Failed to fetch makers' });
+  }
+});
+
+// Get maker by ID
+router.get('/makers/:id', async (req, res) => {
+  try {
+    const maker = await storage.getMaker(parseInt(req.params.id));
+    if (!maker) {
+      return res.status(404).json({ error: 'Maker not found' });
+    }
+    res.json(maker);
+  } catch (error: any) {
+    console.error('Error fetching maker:', error);
+    res.status(500).json({ error: 'Failed to fetch maker' });
+  }
+});
+
+// Create maker
+router.post('/makers', async (req, res) => {
+  try {
+    const { makerCode, makerName, address, addressId } = req.body;
+    
+    if (!makerCode || !makerName) {
+      return res.status(400).json({ error: 'Maker Code and Maker Name are required' });
+    }
+    
+    // Check if maker code already exists
+    const existing = await storage.getMakerByCode(makerCode);
+    if (existing) {
+      return res.status(409).json({ error: `Maker Code '${makerCode}' already exists` });
+    }
+    
+    const maker = await storage.createMaker({
+      makerCode,
+      makerName,
+      address: address || null,
+      addressId: addressId || null
+    });
+    
+    res.status(201).json(maker);
+  } catch (error: any) {
+    console.error('Error creating maker:', error);
+    res.status(500).json({ error: 'Failed to create maker' });
+  }
+});
+
+// Update maker
+router.patch('/makers/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { makerCode, makerName, address, addressId } = req.body;
+    
+    const existing = await storage.getMaker(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Maker not found' });
+    }
+    
+    // If changing maker code, check for duplicates
+    if (makerCode && makerCode !== existing.makerCode) {
+      const duplicate = await storage.getMakerByCode(makerCode);
+      if (duplicate && duplicate.id !== id) {
+        return res.status(409).json({ error: `Maker Code '${makerCode}' already exists` });
+      }
+    }
+    
+    const updated = await storage.updateMaker(id, {
+      makerCode: makerCode || existing.makerCode,
+      makerName: makerName || existing.makerName,
+      address: address !== undefined ? address : existing.address,
+      addressId: addressId !== undefined ? addressId : existing.addressId
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating maker:', error);
+    res.status(500).json({ error: 'Failed to update maker' });
+  }
+});
+
+// Delete maker (soft delete - sets isActive to false)
+router.delete('/makers/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    const existing = await storage.getMaker(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Maker not found' });
+    }
+    
+    await storage.deleteMaker(id);
+    res.json({ message: 'Maker deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting maker:', error);
+    res.status(500).json({ error: 'Failed to delete maker' });
+  }
+});
+
+// Bulk import makers from Excel
+router.post('/makers/import', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames.find(name => 
+      name.toLowerCase().includes('maker') || name.toLowerCase() === 'maker list'
+    ) || workbook.SheetNames[0];
+    
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+    
+    const results = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as string[]
+    };
+    
+    for (let i = 0; i < data.length; i++) {
+      const row: any = data[i];
+      const rowNum = i + 2; // Excel row number (1-indexed + header)
+      
+      const makerCode = row['Maker Code'];
+      const makerName = row['Maker Name'];
+      const address = row['Address'] || null;
+      
+      if (!makerCode || !makerName) {
+        results.errors.push(`Row ${rowNum}: Missing Maker Code or Maker Name`);
+        results.skipped++;
+        continue;
+      }
+      
+      try {
+        const existing = await storage.getMakerByCode(String(makerCode).trim());
+        if (existing) {
+          await storage.updateMaker(existing.id, {
+            makerName: String(makerName).trim(),
+            address: address ? String(address).trim() : null
+          });
+          results.updated++;
+        } else {
+          await storage.createMaker({
+            makerCode: String(makerCode).trim(),
+            makerName: String(makerName).trim(),
+            address: address ? String(address).trim() : null
+          });
+          results.created++;
+        }
+      } catch (error: any) {
+        results.errors.push(`Row ${rowNum}: ${error.message}`);
+        results.skipped++;
+      }
+    }
+    
+    console.log(`✅ Makers import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+    res.json(results);
+  } catch (error: any) {
+    console.error('Error importing makers:', error);
+    res.status(500).json({ error: 'Failed to import makers' });
+  }
+});
+
+// =====================================================
+// SFI DETAILS CRUD API ENDPOINTS
+// =====================================================
+
+// Get all SFI details
+router.get('/sfi-details', async (req, res) => {
+  try {
+    const sfiDetails = await storage.getSfiDetails();
+    res.json(sfiDetails);
+  } catch (error: any) {
+    console.error('Error fetching SFI details:', error);
+    res.status(500).json({ error: 'Failed to fetch SFI details' });
+  }
+});
+
+// Get SFI detail by ID
+router.get('/sfi-details/:id', async (req, res) => {
+  try {
+    const sfi = await storage.getSfiDetail(parseInt(req.params.id));
+    if (!sfi) {
+      return res.status(404).json({ error: 'SFI detail not found' });
+    }
+    res.json(sfi);
+  } catch (error: any) {
+    console.error('Error fetching SFI detail:', error);
+    res.status(500).json({ error: 'Failed to fetch SFI detail' });
+  }
+});
+
+// Create SFI detail
+router.post('/sfi-details', async (req, res) => {
+  try {
+    const { componentCode, componentName, description } = req.body;
+    
+    if (!componentCode || !componentName) {
+      return res.status(400).json({ error: 'Component Code and Component Name are required' });
+    }
+    
+    // Check if component code already exists
+    const existing = await storage.getSfiByCode(componentCode);
+    if (existing) {
+      return res.status(409).json({ error: `Component Code '${componentCode}' already exists` });
+    }
+    
+    const sfi = await storage.createSfiDetail({
+      componentCode,
+      componentName,
+      description: description || null
+    });
+    
+    res.status(201).json(sfi);
+  } catch (error: any) {
+    console.error('Error creating SFI detail:', error);
+    res.status(500).json({ error: 'Failed to create SFI detail' });
+  }
+});
+
+// Update SFI detail
+router.patch('/sfi-details/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { componentCode, componentName, description } = req.body;
+    
+    const existing = await storage.getSfiDetail(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'SFI detail not found' });
+    }
+    
+    // If changing component code, check for duplicates
+    if (componentCode && componentCode !== existing.componentCode) {
+      const duplicate = await storage.getSfiByCode(componentCode);
+      if (duplicate && duplicate.id !== id) {
+        return res.status(409).json({ error: `Component Code '${componentCode}' already exists` });
+      }
+    }
+    
+    const updated = await storage.updateSfiDetail(id, {
+      componentCode: componentCode || existing.componentCode,
+      componentName: componentName || existing.componentName,
+      description: description !== undefined ? description : existing.description
+    });
+    
+    res.json(updated);
+  } catch (error: any) {
+    console.error('Error updating SFI detail:', error);
+    res.status(500).json({ error: 'Failed to update SFI detail' });
+  }
+});
+
+// Delete SFI detail (soft delete - sets isActive to false)
+router.delete('/sfi-details/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    const existing = await storage.getSfiDetail(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'SFI detail not found' });
+    }
+    
+    await storage.deleteSfiDetail(id);
+    res.json({ message: 'SFI detail deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting SFI detail:', error);
+    res.status(500).json({ error: 'Failed to delete SFI detail' });
+  }
+});
+
+// Bulk import SFI details from Excel
+router.post('/sfi-details/import', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames.find(name => 
+      name.toLowerCase().includes('sfi') || name.toLowerCase() === 'sfi details'
+    ) || workbook.SheetNames[0];
+    
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+    
+    const results = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as string[]
+    };
+    
+    for (let i = 0; i < data.length; i++) {
+      const row: any = data[i];
+      const rowNum = i + 2; // Excel row number (1-indexed + header)
+      
+      const componentCode = row['Component Code'];
+      const componentName = row['Component Name'];
+      const description = row['Description'] || null;
+      
+      if (!componentCode || !componentName) {
+        results.errors.push(`Row ${rowNum}: Missing Component Code or Component Name`);
+        results.skipped++;
+        continue;
+      }
+      
+      try {
+        const existing = await storage.getSfiByCode(String(componentCode).trim());
+        if (existing) {
+          await storage.updateSfiDetail(existing.id, {
+            componentName: String(componentName).trim(),
+            description: description ? String(description).trim() : null
+          });
+          results.updated++;
+        } else {
+          await storage.createSfiDetail({
+            componentCode: String(componentCode).trim(),
+            componentName: String(componentName).trim(),
+            description: description ? String(description).trim() : null
+          });
+          results.created++;
+        }
+      } catch (error: any) {
+        results.errors.push(`Row ${rowNum}: ${error.message}`);
+        results.skipped++;
+      }
+    }
+    
+    console.log(`✅ SFI details import complete: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+    res.json(results);
+  } catch (error: any) {
+    console.error('Error importing SFI details:', error);
+    res.status(500).json({ error: 'Failed to import SFI details' });
   }
 });
 

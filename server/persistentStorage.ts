@@ -61,7 +61,11 @@ import {
   type StoresItem,
   type InsertStoresItem,
   type StoresLedger,
-  type InsertStoresLedger
+  type InsertStoresLedger,
+  type MakerList,
+  type InsertMakerList,
+  type SfiDetails,
+  type InsertSfiDetails
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -108,6 +112,8 @@ interface PersistentData {
   pmsVesselSettings: Record<string, PmsVesselSettings>;
   storesItems: Record<number, StoresItem>;
   storesLedger: StoresLedger[];
+  makersList: Record<number, MakerList>;
+  sfiDetailsList: Record<number, SfiDetails>;
   
   // Counter state
   counters: {
@@ -134,6 +140,8 @@ interface PersistentData {
     pmsVesselSettingsId: number;
     storesItemId: number;
     storesLedgerId: number;
+    makersListId: number;
+    sfiDetailsListId: number;
   };
 }
 
@@ -316,6 +324,8 @@ export class PersistentFileStorage implements IStorage {
           pmsVesselSettings: loadedData.pmsVesselSettings || {},
           storesItems: loadedData.storesItems || {},
           storesLedger: loadedData.storesLedger || [],
+          makersList: loadedData.makersList || {},
+          sfiDetailsList: loadedData.sfiDetailsList || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -339,7 +349,9 @@ export class PersistentFileStorage implements IStorage {
             auditLogId: loadedData.counters?.auditLogId || 1,
             pmsVesselSettingsId: loadedData.counters?.pmsVesselSettingsId || 1,
             storesItemId: loadedData.counters?.storesItemId || 1,
-            storesLedgerId: loadedData.counters?.storesLedgerId || 1
+            storesLedgerId: loadedData.counters?.storesLedgerId || 1,
+            makersListId: loadedData.counters?.makersListId || 1,
+            sfiDetailsListId: loadedData.counters?.sfiDetailsListId || 1
           }
         };
         
@@ -387,6 +399,8 @@ export class PersistentFileStorage implements IStorage {
       pmsVesselSettings: {},
       storesItems: {},
       storesLedger: [],
+      makersList: {},
+      sfiDetailsList: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -410,7 +424,9 @@ export class PersistentFileStorage implements IStorage {
         auditLogId: 1,
         pmsVesselSettingsId: 1,
         storesItemId: 1,
-        storesLedgerId: 1
+        storesLedgerId: 1,
+        makersListId: 1,
+        sfiDetailsListId: 1
       }
     };
     
@@ -6088,5 +6104,122 @@ export class PersistentFileStorage implements IStorage {
 
   async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
     return this.data.storesLedger.filter(entry => entry.storesItemId === itemId);
+  }
+
+  // =====================================================
+  // MAKER LIST - Master data for manufacturers
+  // =====================================================
+  
+  async getMakerList(): Promise<MakerList[]> {
+    return Object.values(this.data.makersList).filter(m => m.isActive);
+  }
+  
+  async getMaker(id: number): Promise<MakerList | undefined> {
+    return this.data.makersList[id];
+  }
+  
+  async getMakerByCode(makerCode: string): Promise<MakerList | undefined> {
+    return Object.values(this.data.makersList).find(m => m.makerCode === makerCode);
+  }
+  
+  async createMaker(maker: InsertMakerList): Promise<MakerList> {
+    const id = this.data.counters.makersListId++;
+    const now = new Date();
+    const newMaker: MakerList = {
+      id,
+      makerCode: maker.makerCode,
+      makerName: maker.makerName,
+      address: maker.address || null,
+      addressId: maker.addressId || null,
+      isActive: maker.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.makersList[id] = newMaker;
+    this.persistData();
+    return newMaker;
+  }
+  
+  async updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList> {
+    const existing = this.data.makersList[id];
+    if (!existing) {
+      throw new Error(`Maker with id ${id} not found`);
+    }
+    const updated: MakerList = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.data.makersList[id] = updated;
+    this.persistData();
+    return updated;
+  }
+  
+  async deleteMaker(id: number): Promise<void> {
+    const existing = this.data.makersList[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.data.makersList[id] = existing;
+      this.persistData();
+    }
+  }
+  
+  // =====================================================
+  // SFI DETAILS - SFI Code lookup table
+  // =====================================================
+  
+  async getSfiDetails(): Promise<SfiDetails[]> {
+    return Object.values(this.data.sfiDetailsList).filter(s => s.isActive);
+  }
+  
+  async getSfiDetail(id: number): Promise<SfiDetails | undefined> {
+    return this.data.sfiDetailsList[id];
+  }
+  
+  async getSfiByCode(componentCode: string): Promise<SfiDetails | undefined> {
+    return Object.values(this.data.sfiDetailsList).find(s => s.componentCode === componentCode);
+  }
+  
+  async createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails> {
+    const id = this.data.counters.sfiDetailsListId++;
+    const now = new Date();
+    const newSfi: SfiDetails = {
+      id,
+      componentCode: sfi.componentCode,
+      componentName: sfi.componentName,
+      description: sfi.description || null,
+      isActive: sfi.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.sfiDetailsList[id] = newSfi;
+    this.persistData();
+    return newSfi;
+  }
+  
+  async updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails> {
+    const existing = this.data.sfiDetailsList[id];
+    if (!existing) {
+      throw new Error(`SFI Detail with id ${id} not found`);
+    }
+    const updated: SfiDetails = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.data.sfiDetailsList[id] = updated;
+    this.persistData();
+    return updated;
+  }
+  
+  async deleteSfiDetail(id: number): Promise<void> {
+    const existing = this.data.sfiDetailsList[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.data.sfiDetailsList[id] = existing;
+      this.persistData();
+    }
   }
 }

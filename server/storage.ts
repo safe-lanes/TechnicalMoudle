@@ -103,7 +103,13 @@ import {
   type IhmMaintenanceLog,
   pmsVesselSettings,
   type PmsVesselSettings,
-  type InsertPmsVesselSettings
+  type InsertPmsVesselSettings,
+  makerList,
+  type MakerList,
+  type InsertMakerList,
+  sfiDetails,
+  type SfiDetails,
+  type InsertSfiDetails
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -524,6 +530,22 @@ export interface IStorage {
   getAllPmsVesselSettings(): Promise<PmsVesselSettings[]>;
   createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings>;
   deletePmsVesselSettings(vesselId: string): Promise<void>;
+  
+  // Maker List - Master data for manufacturers
+  getMakerList(): Promise<MakerList[]>;
+  getMaker(id: number): Promise<MakerList | undefined>;
+  getMakerByCode(makerCode: string): Promise<MakerList | undefined>;
+  createMaker(maker: InsertMakerList): Promise<MakerList>;
+  updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList>;
+  deleteMaker(id: number): Promise<void>;
+  
+  // SFI Details - SFI Code lookup table
+  getSfiDetails(): Promise<SfiDetails[]>;
+  getSfiDetail(id: number): Promise<SfiDetails | undefined>;
+  getSfiByCode(componentCode: string): Promise<SfiDetails | undefined>;
+  createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails>;
+  updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails>;
+  deleteSfiDetail(id: number): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -616,6 +638,10 @@ export class MemStorage implements IStorage {
   private currentStoresLedgerId: number;
   private pmsVesselSettings: Map<string, PmsVesselSettings>;
   private currentPmsVesselSettingsId: number;
+  private makers: Map<number, MakerList>;
+  private currentMakerId: number;
+  private sfiDetailsMap: Map<number, SfiDetails>;
+  private currentSfiDetailId: number;
 
   constructor() {
     this.users = new Map();
@@ -671,6 +697,10 @@ export class MemStorage implements IStorage {
     this.currentStoresLedgerId = 1;
     this.pmsVesselSettings = new Map();
     this.currentPmsVesselSettingsId = 1;
+    this.makers = new Map();
+    this.currentMakerId = 1;
+    this.sfiDetailsMap = new Map();
+    this.currentSfiDetailId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -5135,6 +5165,117 @@ export class MemStorage implements IStorage {
   async deletePmsVesselSettings(vesselId: string): Promise<void> {
     this.pmsVesselSettings.delete(vesselId);
   }
+  
+  // =====================================================
+  // MAKER LIST - Master data for manufacturers
+  // =====================================================
+  
+  async getMakerList(): Promise<MakerList[]> {
+    return Array.from(this.makers.values()).filter(m => m.isActive);
+  }
+  
+  async getMaker(id: number): Promise<MakerList | undefined> {
+    return this.makers.get(id);
+  }
+  
+  async getMakerByCode(makerCode: string): Promise<MakerList | undefined> {
+    return Array.from(this.makers.values()).find(m => m.makerCode === makerCode);
+  }
+  
+  async createMaker(maker: InsertMakerList): Promise<MakerList> {
+    const id = this.currentMakerId++;
+    const now = new Date();
+    const newMaker: MakerList = {
+      id,
+      makerCode: maker.makerCode,
+      makerName: maker.makerName,
+      address: maker.address || null,
+      addressId: maker.addressId || null,
+      isActive: maker.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.makers.set(id, newMaker);
+    return newMaker;
+  }
+  
+  async updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList> {
+    const existing = this.makers.get(id);
+    if (!existing) {
+      throw new Error(`Maker with id ${id} not found`);
+    }
+    const updated: MakerList = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.makers.set(id, updated);
+    return updated;
+  }
+  
+  async deleteMaker(id: number): Promise<void> {
+    const existing = this.makers.get(id);
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.makers.set(id, existing);
+    }
+  }
+  
+  // =====================================================
+  // SFI DETAILS - SFI Code lookup table
+  // =====================================================
+  
+  async getSfiDetails(): Promise<SfiDetails[]> {
+    return Array.from(this.sfiDetailsMap.values()).filter(s => s.isActive);
+  }
+  
+  async getSfiDetail(id: number): Promise<SfiDetails | undefined> {
+    return this.sfiDetailsMap.get(id);
+  }
+  
+  async getSfiByCode(componentCode: string): Promise<SfiDetails | undefined> {
+    return Array.from(this.sfiDetailsMap.values()).find(s => s.componentCode === componentCode);
+  }
+  
+  async createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails> {
+    const id = this.currentSfiDetailId++;
+    const now = new Date();
+    const newSfi: SfiDetails = {
+      id,
+      componentCode: sfi.componentCode,
+      componentName: sfi.componentName,
+      description: sfi.description || null,
+      isActive: sfi.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.sfiDetailsMap.set(id, newSfi);
+    return newSfi;
+  }
+  
+  async updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails> {
+    const existing = this.sfiDetailsMap.get(id);
+    if (!existing) {
+      throw new Error(`SFI Detail with id ${id} not found`);
+    }
+    const updated: SfiDetails = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.sfiDetailsMap.set(id, updated);
+    return updated;
+  }
+  
+  async deleteSfiDetail(id: number): Promise<void> {
+    const existing = this.sfiDetailsMap.get(id);
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.sfiDetailsMap.set(id, existing);
+    }
+  }
 }
 
 export class PostgresStorage implements IStorage {
@@ -7752,6 +7893,116 @@ export class PostgresStorage implements IStorage {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
     await db.delete(pmsVesselSettings).where(eq(pmsVesselSettings.vesselId, vesselId));
+  }
+  
+  // =====================================================
+  // MAKER LIST - Master data for manufacturers
+  // =====================================================
+  
+  async getMakerList(): Promise<MakerList[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(makerList).where(eq(makerList.isActive, true));
+  }
+  
+  async getMaker(id: number): Promise<MakerList | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(makerList).where(eq(makerList.id, id));
+    return result[0];
+  }
+  
+  async getMakerByCode(makerCode: string): Promise<MakerList | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(makerList).where(eq(makerList.makerCode, makerCode));
+    return result[0];
+  }
+  
+  async createMaker(maker: InsertMakerList): Promise<MakerList> {
+    const db = await this.getDb();
+    const result = await db.insert(makerList).values({
+      ...maker,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(makerList)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(makerList.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteMaker(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.update(makerList)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(makerList.id, id));
+  }
+  
+  // =====================================================
+  // SFI DETAILS - SFI Code lookup table
+  // =====================================================
+  
+  async getSfiDetails(): Promise<SfiDetails[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(sfiDetails).where(eq(sfiDetails.isActive, true));
+  }
+  
+  async getSfiDetail(id: number): Promise<SfiDetails | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(sfiDetails).where(eq(sfiDetails.id, id));
+    return result[0];
+  }
+  
+  async getSfiByCode(componentCode: string): Promise<SfiDetails | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(sfiDetails).where(eq(sfiDetails.componentCode, componentCode));
+    return result[0];
+  }
+  
+  async createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails> {
+    const db = await this.getDb();
+    const result = await db.insert(sfiDetails).values({
+      ...sfi,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(sfiDetails)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(sfiDetails.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteSfiDetail(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.update(sfiDetails)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(sfiDetails.id, id));
   }
 }
 

@@ -404,15 +404,17 @@ export const storesItems = pgTable("stores_items", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
   itemType: text("item_type").notNull(), // 'stores' | 'lubricants' | 'chemicals' | 'others'
-  itemCode: text("item_code").notNull(), // Unique item identifier
-  itemName: text("item_name").notNull(),
+  itemCode: text("item_code").notNull(), // Unique item identifier (Part Code)
+  impaCode: text("impa_code"), // IMPA Code - standardization code for stores
+  itemName: text("item_name").notNull(), // Item Name
+  category: text("category"), // Category (General Stores, Electrical, Mechanical, Safety, etc.)
   specification: text("specification"), // Technical specs (size, dimensions, material)
   uom: text("uom"), // Unit of measurement
   rob: decimal("rob", { precision: 10, scale: 2 }).notNull().default("0"), // Remaining on Board (total)
   robLocationA: decimal("rob_location_a", { precision: 10, scale: 2 }).notNull().default("0"), // ROB at Location A
   robLocationB: decimal("rob_location_b", { precision: 10, scale: 2 }).notNull().default("0"), // ROB at Location B
-  locationA: text("location_a"), // Primary storage location name
-  locationB: text("location_b"), // Secondary storage location name
+  locationA: text("location_a"), // Primary storage location name (Location A)
+  locationB: text("location_b"), // Secondary storage location name (Location B)
   min: decimal("min", { precision: 10, scale: 2 }).notNull().default("0"), // Minimum stock level
   max: decimal("max", { precision: 10, scale: 2 }), // Maximum stock level
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // Cost per unit
@@ -430,6 +432,7 @@ export const storesItems = pgTable("stores_items", {
   vesselIdIdx: index("idx_stores_vessel").on(table.vesselId),
   itemTypeIdx: index("idx_stores_item_type").on(table.itemType),
   itemCodeIdx: index("idx_stores_item_code").on(table.vesselId, table.itemCode),
+  impaCodeIdx: index("idx_stores_impa_code").on(table.impaCode),
   deletedIdx: index("idx_stores_deleted").on(table.deleted),
 }));
 
@@ -1407,3 +1410,55 @@ export const insertPmsVesselSettingsSchema = createInsertSchema(pmsVesselSetting
 
 export type InsertPmsVesselSettings = z.infer<typeof insertPmsVesselSettingsSchema>;
 export type PmsVesselSettings = typeof pmsVesselSettings.$inferSelect;
+
+// =====================================================
+// MAKER LIST - Master data for equipment manufacturers
+// Linked with fleet components, vessel components, fleet spares, vessel spares
+// =====================================================
+export const makerList = pgTable("maker_list", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  makerCode: text("maker_code").notNull().unique(), // Unique identifier for maker
+  makerName: text("maker_name").notNull(), // Full manufacturer name
+  address: text("address"), // Manufacturer address
+  addressId: text("address_id"), // Address reference ID
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  makerCodeIdx: index("idx_maker_code").on(table.makerCode),
+  makerNameIdx: index("idx_maker_name").on(table.makerName),
+}));
+
+export const insertMakerListSchema = createInsertSchema(makerList).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMakerList = z.infer<typeof insertMakerListSchema>;
+export type MakerList = typeof makerList.$inferSelect;
+
+// =====================================================
+// SFI DETAILS - SFI Code lookup table
+// Used for standardizing component codes across fleet
+// =====================================================
+export const sfiDetails = pgTable("sfi_details", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  componentCode: text("component_code").notNull().unique(), // SFI component code (e.g., 711.001)
+  componentName: text("component_name").notNull(), // Standard SFI name
+  description: text("description"), // Additional description
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  sfiCodeIdx: index("idx_sfi_component_code").on(table.componentCode),
+}));
+
+export const insertSfiDetailsSchema = createInsertSchema(sfiDetails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSfiDetails = z.infer<typeof insertSfiDetailsSchema>;
+export type SfiDetails = typeof sfiDetails.$inferSelect;
