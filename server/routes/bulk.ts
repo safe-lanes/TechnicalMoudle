@@ -2996,7 +2996,7 @@ async function performImport(
       } else if (mode === 'update') {
         if (existingComponent) {
           const previousSnapshot = createRecordSnapshot(existingComponent);
-          const updatedComponent = await updateComponentFromRow(componentCode, row);
+          const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
           existingComponentsMap.set(componentCode, updatedComponent);
           result.updated++;
           
@@ -3013,7 +3013,7 @@ async function performImport(
         if (existingComponent && existingComponent.id) {
           console.log(`🔄 Updating existing component: ${componentCode}`);
           const previousSnapshot = createRecordSnapshot(existingComponent);
-          const updatedComponent = await updateComponentFromRow(componentCode, row);
+          const updatedComponent = await updateComponentFromRow(componentCode, row, vesselId, existingComponent);
           existingComponentsMap.set(componentCode, updatedComponent);
           result.updated++;
           
@@ -3838,7 +3838,8 @@ async function createComponentFromRow(row: any, vesselId?: string) {
 }
 
 // Helper function to update component from Excel row
-async function updateComponentFromRow(componentCode: string, row: any) {
+// existingComponent: Pass the component from the map if available to avoid lookup issues
+async function updateComponentFromRow(componentCode: string, row: any, vesselId?: string, existingComponent?: any) {
   const updateData: any = {};
   
   if (row['Component Name']) updateData.name = row['Component Name'];
@@ -3908,8 +3909,14 @@ async function updateComponentFromRow(componentCode: string, row: any) {
     updateData.vesselCode = row['Vessel Code'];  // Display value
   }
 
-  // Look up component by code to get its ID, then update by ID
-  const component = await storage.getComponentByCode(componentCode, updateData.vesselId);
+  // Use existing component if provided (from map), otherwise look up
+  let component = existingComponent;
+  if (!component) {
+    // Use vesselId from row, or passed vesselId parameter
+    const lookupVesselId = row['Vessel Code'] || vesselId;
+    component = await storage.getComponentByCode(componentCode, lookupVesselId);
+  }
+  
   if (!component) {
     throw new Error(`Component ${componentCode} not found`);
   }
