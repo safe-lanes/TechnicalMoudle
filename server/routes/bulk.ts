@@ -13,8 +13,8 @@ import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dat
 
 const router = Router();
 
-const TEMPLATE_VERSION = '1.0.0';
-const TEMPLATE_VERSION_DATE = '2025-11-27';
+const TEMPLATE_VERSION = '2.0.0';
+const TEMPLATE_VERSION_DATE = '2025-11-28';
 const TEMPLATE_VERSION_CELL = '_TEMPLATE_VERSION_';
 
 function checkTemplateVersion(worksheet: XLSX.WorkSheet): { valid: boolean; version?: string; message?: string } {
@@ -295,22 +295,11 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Address', key: 'address', width: 50 }
   ];
   
-  // Add example row
-  makerSheet.addRow({
-    makerCode: 'MKR-001',
-    makerName: 'Wartsila Corporation',
-    address: 'John Stenbergin ranta 2, FI-00530 Helsinki, Finland'
-  });
-  makerSheet.addRow({
-    makerCode: 'MKR-002',
-    makerName: 'MAN Energy Solutions',
-    address: 'Teglholmsgade 41, 2450 Copenhagen, Denmark'
-  });
-  
+  // Headers only - no sample data
   makerSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 3: SFI Details
+  // SHEET 3: SFI Details (2 columns)
   // =====================================================
   const sfiSheet = workbook.addWorksheet('SFI Details');
   sfiSheet.columns = [
@@ -318,20 +307,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Component Name', key: 'componentName', width: 50 }
   ];
   
-  // Add example SFI entries
-  const sfiExamples = [
-    ['6', 'MACHINERY MAIN COMPONENTS'],
-    ['61', 'DIESEL ENGINES'],
-    ['611', 'MAIN ENGINE'],
-    ['7', 'SYSTEMS FOR MACHINERY MAIN COMPONENTS'],
-    ['71', 'LUBE OIL SYSTEMS'],
-    ['711', 'LO TRANSFER SYSTEM'],
-    ['711.001', 'LO Transfer Pump No.1']
-  ];
-  sfiExamples.forEach(([code, name]) => {
-    sfiSheet.addRow({ componentCode: code, componentName: name });
-  });
-  
+  // Headers only - no sample data
   sfiSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -354,38 +330,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Maker Code', key: 'makerCode', width: 15 }
   ];
   
-  // Add example rows
-  fleetComponentSheet.addRow({
-    fleetEquipmentCode: 'FE-711',
-    fleetEquipmentName: 'LO Transfer System',
-    parentFleetEquipmentCode: 'FE-71',
-    sfiSystem: '711',
-    critical: 'Yes',
-    conditionBased: 'No',
-    location: 'Engine Room',
-    rating: '15 m3/h @ 4 bar',
-    department: 'Engine',
-    notes: 'Lube oil transfer and circulation system',
-    isParent: 'Yes',
-    isActive: 'Yes',
-    makerCode: 'MKR-001'
-  });
-  fleetComponentSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    parentFleetEquipmentCode: 'FE-711',
-    sfiSystem: '711.001',
-    critical: 'Yes',
-    conditionBased: 'No',
-    location: 'Engine Room - Port',
-    rating: '15 m3/h',
-    department: 'Engine',
-    notes: 'Primary LO transfer pump',
-    isParent: 'No',
-    isActive: 'Yes',
-    makerCode: 'MKR-002'
-  });
-  
+  // Headers only - no sample data
   fleetComponentSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -419,34 +364,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'SFI System', key: 'sfiSystem', width: 15 }
   ];
   
-  // Add example row
-  vesselComponentSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    parentComponentCode: '711',
-    componentCode: '711.001',
-    componentName: 'LO Transfer Pump No.1',
-    componentCategory: '7 Systems for Machinery Main Components',
-    maker: 'MAN Energy Solutions',
-    makerCode: 'MKR-002',
-    model: 'LO-2000',
-    modelNumber: 'LO-2000-X-15',
-    serialNo: 'SN-2024-12345',
-    drawingNo: 'DRW-711-001',
-    location: 'Engine Room - Port',
-    critical: 'Yes',
-    conditionBased: 'No',
-    installationDate: '01-JAN-2020',
-    commissionedDate: '15-MAR-2020',
-    rating: '15 m3/h @ 4 bar',
-    department: 'Engine',
-    notes: 'Primary LO transfer pump - Overhauled 2023',
-    runningHours: '12500',
-    isActive: 'Yes',
-    vesselCode: 'V001',
-    sfiSystem: '711.001'
-  });
-  
+  // Headers only - no sample data
   vesselComponentSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -477,77 +395,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
   ];
   
-  // Add example rows - one Calendar, one RH, one Both
-  fleetJobSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    jobCode: 'JOB-711-001',
-    jobTitle: 'Check LO Pump Bearing Temperature',
-    jobDescription: 'Measure and record bearing temperature. Check for abnormal vibration.',
-    department: 'Engine',
-    responsibleRank: '3rd Engineer',
-    scheduleType: 'Running Hours',
-    calendarInterval: '',
-    intervalUnit: '',
-    rhInterval: '500',
-    critical: 'No',
-    estimatedHours: '1',
-    sparePartsRequired: '',
-    safetyProcedure: 'Hot Surface',
-    checklist: 'Temperature < 80°C, No vibration, Oil level OK',
-    referenceDocuments: 'MAN-TM-711-001',
-    toolsRequired: 'IR Thermometer, Vibration meter',
-    isActive: 'Yes',
-    makerCode: 'MKR-002',
-    classSurveyCode: ''
-  });
-  fleetJobSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    jobCode: 'JOB-711-002',
-    jobTitle: 'Annual LO Pump Overhaul',
-    jobDescription: 'Complete overhaul of LO transfer pump including bearing replacement.',
-    department: 'Engine',
-    responsibleRank: '2nd Engineer',
-    scheduleType: 'Calendar',
-    calendarInterval: '12',
-    intervalUnit: 'Months',
-    rhInterval: '',
-    critical: 'Yes',
-    estimatedHours: '8',
-    sparePartsRequired: 'Bearing set, Mechanical seal, O-rings',
-    safetyProcedure: 'Lockout-Tagout',
-    checklist: 'Bearings replaced, Seal replaced, Test run OK, No leaks',
-    referenceDocuments: 'MAN-TM-711-001-OH',
-    toolsRequired: 'Bearing puller, Torque wrench',
-    isActive: 'Yes',
-    makerCode: 'MKR-002',
-    classSurveyCode: ''
-  });
-  fleetJobSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    jobCode: 'JOB-711-003',
-    jobTitle: 'LO Pump Performance Check',
-    jobDescription: 'Check pump output pressure and flow rate. Inspect for wear.',
-    department: 'Engine',
-    responsibleRank: '3rd Engineer',
-    scheduleType: 'Both',
-    calendarInterval: '6',
-    intervalUnit: 'Months',
-    rhInterval: '2000',
-    critical: 'Yes',
-    estimatedHours: '2',
-    sparePartsRequired: '',
-    safetyProcedure: '',
-    checklist: 'Pressure test, Flow rate check, Wear inspection',
-    referenceDocuments: 'MAN-TM-711-001',
-    toolsRequired: 'Pressure gauge, Flow meter',
-    isActive: 'Yes',
-    makerCode: 'MKR-002',
-    classSurveyCode: ''
-  });
-  
+  // Headers only - no sample data
   fleetJobSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -578,31 +426,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
   ];
   
-  // Add example row
-  vesselJobSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    componentCode: '711.001',
-    componentName: 'LO Transfer Pump No.1',
-    jobCode: 'JOB-711-001',
-    jobTitle: 'Check LO Pump Bearing Temperature',
-    jobDescription: 'Measure and record bearing temperature. Check for abnormal vibration.',
-    department: 'Engine',
-    responsibleRank: '3rd Engineer',
-    scheduleType: 'Running Hours',
-    calendarInterval: '',
-    intervalUnit: '',
-    rhInterval: '500',
-    lastDoneDate: '01-NOV-2024',
-    lastDoneRH: '12000',
-    critical: 'No',
-    estimatedHours: '1',
-    sparePartsRequired: '',
-    isActive: 'Yes',
-    vesselCode: 'V001',
-    makerCode: 'MKR-002',
-    classSurveyCode: ''
-  });
-  
+  // Headers only - no sample data
   vesselJobSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -631,29 +455,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Remarks', key: 'remarks', width: 40 }
   ];
   
-  // Add example row
-  fleetSpareSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    partCode: 'SPR-711-001-001',
-    partName: 'Bearing Set - LO Pump',
-    partNumber: 'BRG-6205-2RS',
-    maker: 'SKF',
-    makerCode: 'MKR-SKF',
-    uom: 'SET',
-    stockingNumber: 'STK-711-001',
-    specification: 'Deep groove ball bearing, 25x52x15mm, sealed',
-    drawingNo: 'DRW-711-001-A',
-    minStock: '2',
-    maxStock: '4',
-    unitCost: '450.00',
-    leadTimeDays: '30',
-    supplier: 'ABC Marine Supplies',
-    critical: 'Yes',
-    isActive: 'Yes',
-    remarks: 'Keep minimum stock for emergency overhaul'
-  });
-  
+  // Headers only - no sample data
   fleetSpareSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -690,37 +492,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Remarks', key: 'remarks', width: 35 }
   ];
   
-  // Add example row
-  vesselSpareSheet.addRow({
-    fleetEquipmentCode: 'FE-711-001',
-    fleetEquipmentName: 'LO Transfer Pump No.1',
-    componentCode: '711.001',
-    componentName: 'LO Transfer Pump No.1',
-    partCode: 'SPR-711-001-001',
-    partName: 'Bearing Set - LO Pump',
-    partNumber: 'BRG-6205-2RS',
-    maker: 'SKF',
-    makerCode: 'MKR-SKF',
-    uom: 'SET',
-    stockingNumber: 'STK-711-001',
-    specification: 'Deep groove ball bearing, 25x52x15mm, sealed',
-    drawingNo: 'DRW-711-001-A',
-    robDeckStore: '0',
-    robEngineStore: '3',
-    robStore1: '0',
-    robStore2: '0',
-    totalRob: '3',
-    minStock: '2',
-    maxStock: '4',
-    unitCost: '450.00',
-    leadTimeDays: '30',
-    supplier: 'ABC Marine Supplies',
-    critical: 'Yes',
-    isActive: 'Yes',
-    vesselCode: 'V001',
-    remarks: 'Replenished Oct 2024'
-  });
-  
+  // Headers only - no sample data
   vesselSpareSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -742,50 +514,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Remarks', key: 'remarks', width: 40 }
   ];
   
-  // Add example rows
-  vesselStoresSheet.addRow({
-    itemCode: 'ST-001',
-    impaCode: '450101',
-    itemName: 'Welding Electrodes E6013 3.2mm',
-    type: 'Stores',
-    storesCategory: 'General Stores',
-    uom: 'KG',
-    rob: '25',
-    minStock: '10',
-    maxStock: '50',
-    location: 'Workshop Store',
-    vesselCode: 'V001',
-    remarks: 'AWS E6013 specification'
-  });
-  vesselStoresSheet.addRow({
-    itemCode: 'LB-001',
-    impaCode: '450201',
-    itemName: 'Cylinder Oil SAE 50',
-    type: 'Lubes',
-    storesCategory: 'Mechanical',
-    uom: 'LTR',
-    rob: '200',
-    minStock: '100',
-    maxStock: '500',
-    location: 'Engine Room Store',
-    vesselCode: 'V001',
-    remarks: 'For main engine cylinders'
-  });
-  vesselStoresSheet.addRow({
-    itemCode: 'CH-001',
-    impaCode: '550101',
-    itemName: 'Rust Remover',
-    type: 'Chemicals',
-    storesCategory: 'Consumables',
-    uom: 'LTR',
-    rob: '10',
-    minStock: '5',
-    maxStock: '20',
-    location: 'Paint Store',
-    vesselCode: 'V001',
-    remarks: 'Phosphoric acid based'
-  });
-  
+  // Headers only - no sample data
   vesselStoresSheet.getRow(1).font = { bold: true };
   
   // =====================================================
@@ -1634,120 +1363,101 @@ router.get('/template', async (req, res) => {
   switch (type) {
     case 'components':
       headers = [
-        // Vessel Component Sheet - 23 columns
+        // Vessel Component Sheet - 24 columns (matching Fleet Master Data template)
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Parent Component Code',
         'Component Code', 'Component Name', 'Component Category',
         'Maker', 'Maker Code', 'Model', 'Model Number', 'Serial No', 'Drawing No',
-        'Location', 'Critical (Yes/No)', 'Condition Based (Yes/No)',
+        'Location', 'Critical Yes/No', 'Condition Based Yes/No',
         'Installation Date', 'Commissioned Date', 'Rating',
         'Eqpt / System Department', 'Notes', 'Running Hours',
-        'IS Active', 'Vessel Code'
+        'IS Active', 'Vessel Code', 'SFI System'
       ];
 
       validValues = [
-        'Text (Fleet ID)', 'Text (General name from SFI)', 'Text (Optional)',
-        'Required, SFI Format', 'Required', 'Auto-calculated from code',
-        'Text (Manufacturer)', 'Text (Unique maker ID)', 'Text', 'Text', 'Text', 'Text (Drawing #)',
-        'Text', 'Yes/No', 'Yes/No',
-        'DD-MM-YYYY', 'DD-MM-YYYY', 'Text (Capacity)',
-        'Text', 'Text (Specifications)', 'Number >= 0',
-        'Yes/No', 'Text (Vessel identifier)'
+        'Text (XXX.XXX.XX format)', 'Text (Equipment description)', 'Text (Parent SFI code)',
+        'Required (SFI Format XXX.XXX)', 'Required (Equipment name)', 'Text (SFI category name)',
+        'Text (Manufacturer name)', 'Text (Maker ID from Maker List)', 'Text (Model name)', 'Text (Model number)', 'Text (Serial number)', 'Text (Drawing reference)',
+        'Text (Physical location)', 'Yes/No', 'Yes/No',
+        'DD-MMM-YYYY', 'DD-MMM-YYYY', 'Text (Capacity/specification)',
+        'Engine/Deck/Electrical', 'Text (Additional notes)', 'Number >= 0',
+        'Yes/No', 'Text (e.g., V001)', 'Text (SFI code reference)'
       ];
 
-      example = [
-        'FE-711', 'LO Transfer System', '',
-        '711.001', 'LO transfer systems', '7 Systems for Machinery Main Components',
-        'ABC Marine', 'ABC-001', 'LO-2000', 'LO-2000-X', 'SN-12345', 'DRW-711-001',
-        'Engine Room', 'Yes', 'No',
-        '01-01-2020', '15-03-2020', '50 bar',
-        'Engineering', 'Lube oil transfer and circulation system', '5000',
-        'Yes', 'V001'
-      ];
+      example = [];
       break;
 
     case 'spares':
       headers = [
-        'Fleet Equipment Name', 'Vessel Code', 'Component Code', 'Component Name',
-        'Part Code', 'Part Name', 'Part Number', 'Unit Of Measurement',
-        'Stocking Number', 'Maker', 'Maker Code', 'Specification',
-        'Drawing No', 'Location', 'ROB', 'Min Stock', 'Max Stock',
-        'Unit Cost', 'Criticality (Yes/No)', 'Lead Time', 'Supplier',
-        'Last Order Date', 'Remarks'
+        // Vessel_Spare - 27 columns (matching Fleet Master Data template with ROB by Location)
+        'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
+        'Part Code', 'Part Name', 'Part Number', 'Maker', 'Maker Code',
+        'Unit Of Measurement', 'Stocking Number', 'Specification', 'Drawing No',
+        'ROB Deck Store', 'ROB Engine Store', 'ROB Store 1', 'ROB Store 2', 'Total ROB',
+        'Min Stock', 'Max Stock', 'Unit Cost', 'Lead Time Days', 'Supplier',
+        'Critical Yes/No', 'IS Active', 'Vessel Code', 'Remarks'
       ];
 
       validValues = [
-        'Text (Fleet reference)', 'Required (e.g., V001)', 'Required, Must exist in system', 'Auto-filled from component',
-        'Auto-generated PT-XXXXXX or manual', 'Required', 'Text (Manufacturer P/N)', UOM_LIST.join('|'),
-        'Text (Internal stock ref)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Technical specs)',
-        'Text (Drawing reference)', 'Text (Storage location)', 'Number >= 0', 'Number >= 0', 'Number >= 0',
-        'Decimal (Cost per unit)', 'Yes/No', 'Text (e.g., 30 days)', 'Text (Supplier name)',
-        'DD-MMM-YYYY', 'Text (Additional notes)'
+        'Text (Fleet ID)', 'Text (Fleet description)', 'Required (Must exist)', 'Text (Component name)',
+        'Required (Part ID)', 'Required (Part name)', 'Text (P/N)', 'Text (Manufacturer)', 'Text (Maker ID)',
+        UOM_LIST.join('/').toUpperCase(), 'Text (Stock ref)', 'Text (Specs)', 'Text (Drawing ref)',
+        'Number >= 0', 'Number >= 0', 'Number >= 0', 'Number >= 0', 'Number (Auto-sum)',
+        'Number >= 0', 'Number >= 0', 'Decimal', 'Number (days)', 'Text (Supplier)',
+        'Yes/No', 'Yes/No', 'Text (e.g., V001)', 'Text (Notes)'
       ];
 
-      example = [
-        'ME cylinder covers', 'V001', '651.552.AA', 'ME cylinder covers,exhaust',
-        'PT-000001', 'Cylinder Head Gasket', 'GHI-2345', 'PCS',
-        'STK-12345', 'Maker ZZZ', 'MKR-001', 'Size: YYY',
-        'DRW-651-552', 'Engine Room Store', '5', '2', '10',
-        '1250.00', 'Yes', '30 days', 'ABC Suppliers Ltd',
-        '15-NOV-2024', 'Critical spare for main engine'
-      ];
+      example = [];
       break;
 
     case 'stores':
       headers = [
-        'Item Code', 'Item Name', 'Type',
-        'Stores Category', 'UOM', 'ROB', 'Min', 'Location',
-        'Application Area', 'Remarks'
+        // Vessel_Stores - 12 columns (matching Fleet Master Data template)
+        'Item Code', 'IMPA Code', 'Item Name', 'Type',
+        'Stores Category', 'Unit Of Measurement', 'ROB', 'Min Stock', 'Max Stock',
+        'Location', 'Vessel Code', 'Remarks'
       ];
 
       validValues = [
-        'Required, Unique', 'Required', 'Stores|Lubes|Chemicals|Others',
-        STORES_CATEGORIES.join('|'), UOM_LIST.join('|'), 
-        'Number >= 0', 'Number >= 0', 'Text',
-        'Text', 'Text'
+        'Required (Unique per vessel)', 'Text (IMPA standard code)', 'Required (Item description)', 'Stores/Lubes/Chemicals/Others',
+        STORES_CATEGORIES.join('/'), UOM_LIST.join('/').toUpperCase(), 
+        'Number >= 0', 'Number >= 0', 'Number >= 0',
+        'Text (Storage location)', 'Text (e.g., V001)', 'Text (Additional notes)'
       ];
 
-      example = [
-        'ST-001', 'Welding Electrodes', 'Stores',
-        'General Stores', 'kg', '50', '20', 'Workshop Store',
-        'Deck & Engine', 'AWS E6013 specification'
-      ];
+      example = [];
       break;
 
     case 'work-orders':
       headers = [
-        'Generated_Component_Code', 'Component_Name', 'Job_Code', 'Job_Title', 
-        'Job_Description', 'Department', 'Responsible_Rank', 'Schedule_Type',
-        'Interval', 'Interval_Unit', 'Criticality', 'Estimated_Hours', 
-        'Spares_Required', 'Safety_Permit_Required'
+        // Work Orders / Jobs template
+        'Component Code', 'Component Name', 'Job Code', 'Job Title', 
+        'Job Description', 'Department', 'Responsible Rank', 'Schedule Type',
+        'Calendar Interval', 'Interval Unit', 'RH Interval', 'Critical Yes/No',
+        'Estimated Hours', 'Spare Parts Required', 'Safety Procedure'
       ];
 
       validValues = [
-        'Required (from system)', 'Auto-filled from component', 'Optional (e.g., ME-001)', 'Required',
-        'Optional task description', 'Engine|Deck|Electrical', 'Chief Engineer|2nd Engineer|3rd Engineer|4th Engineer|Chief Officer|Electrician',
-        'Running Hours|Calendar', 'Number (e.g., 500, 6)', 'Hours|Days|Weeks|Months|Years',
-        'yes|no', 'Number of hours', 'Optional spare parts required', 'Hot Work|Enclosed Space Entry|Lockout-Tagout|Working Aloft'
+        'Required (SFI Format)', 'Text (Component name)', 'Required (Job ID)', 'Required (Job title)',
+        'Text (Task description)', 'Engine/Deck/Electrical', RESPONSIBLE_RANKS.join('/'),
+        'Running Hours/Calendar/Both', 'Number (for Calendar)', 'Days/Weeks/Months/Years', 'Number (for RH)',
+        'Yes/No', 'Number (hours)', 'Text (Parts list)', 'Hot Work/Enclosed Space Entry/Lockout-Tagout/Working Aloft'
       ];
 
-      example = [
-        '601(1)', 'DIESEL ENGINES 1', 'ME-001', 'Check Turbocharger Bearings',
-        'Inspect for wear, check lube oil supply, and clean intake side.', 'Engine', '2nd Engineer',
-        'Running Hours', '500', 'Hours', 'yes', '4', 'Bearing Set P/N 12345', 'Hot Work'
-      ];
+      example = [];
       break;
   }
 
   // Create main sheet - Headers only, NO sample data row
   const mainSheet = XLSX.utils.aoa_to_sheet([headers]);
 
-  // Add data validation for components (23-column format)
+  // Add data validation for components (24-column format)
+  // Columns: ...N=Critical Yes/No, O=Condition Based Yes/No, ...V=IS Active...
   if (type === 'components') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Column N: Critical (Yes/No) - row 2 onwards
+    // Column N: Critical Yes/No - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1759,7 +1469,7 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Column O: Condition Based (Yes/No) - row 2 onwards
+    // Column O: Condition Based Yes/No - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1771,7 +1481,7 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Column V: IS Active (Yes/No) - row 2 onwards
+    // Column V: IS Active - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1784,17 +1494,18 @@ router.get('/template', async (req, res) => {
     });
   }
 
-  // Add data validation for spares
+  // Add data validation for spares (27-column format)
+  // Columns: ...J=UOM, ...X=Critical Yes/No, Y=IS Active...
   if (type === 'spares') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // UOM dropdown (Column H - Unit Of Measurement, starting from row 2)
+    // UOM dropdown (Column J - Unit Of Measurement, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'H2:H1000',
+      sqref: 'J2:J1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -1802,11 +1513,23 @@ router.get('/template', async (req, res) => {
       error: `Please select from: ${UOM_LIST.join(', ')}`
     });
 
-    // Criticality (Yes/No) dropdown (Column S, starting from row 2)
+    // Critical Yes/No dropdown (Column X, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'S2:S1000',
+      sqref: 'X2:X1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // IS Active dropdown (Column Y, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'Y2:Y1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -1815,17 +1538,18 @@ router.get('/template', async (req, res) => {
     });
   }
 
-  // Add data validation for stores
+  // Add data validation for stores (12-column format)
+  // Columns: A=Item Code, B=IMPA Code, C=Item Name, D=Type, E=Stores Category, F=UOM, ...
   if (type === 'stores') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Type dropdown (Column C, starting from row 2)
+    // Type dropdown (Column D, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'C2:C1000',
+      sqref: 'D2:D1000',
       formulas: ['"Stores,Lubes,Chemicals,Others"'],
       allowBlank: true,
       showErrorMessage: true,
@@ -1833,11 +1557,11 @@ router.get('/template', async (req, res) => {
       error: 'Please select from: Stores, Lubes, Chemicals, Others'
     });
 
-    // Stores Category dropdown (Column D, starting from row 2)
+    // Stores Category dropdown (Column E, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'D2:D1000',
+      sqref: 'E2:E1000',
       formulas: [`"${STORES_CATEGORIES.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -1845,11 +1569,11 @@ router.get('/template', async (req, res) => {
       error: `Please select from: ${STORES_CATEGORIES.join(', ')}`
     });
 
-    // UOM dropdown (Column E, starting from row 2)
+    // UOM dropdown (Column F, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'E2:E1000',
+      sqref: 'F2:F1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
