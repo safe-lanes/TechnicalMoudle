@@ -11,6 +11,7 @@ import * as XLSX from "xlsx";
 import bulkRouter from "./routes/bulk";
 import alertRouter from "./routes/alerts";
 import formRouter from "./routes/forms";
+import fleetAdminRouter from "./routes/fleetAdmin";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
@@ -3323,6 +3324,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register form routes
   app.use("/api/forms", formRouter);
+  
+  // Register Fleet Admin routes
+  app.use("/api/fleet-admin", fleetAdminRouter);
   
   // Mount the Change Requests router  
   const changeRequestsRouter = createChangeRequestsRouter(storage);

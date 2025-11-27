@@ -584,8 +584,8 @@ export interface IStorage {
   removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void>;
   
   // Fleet Component Mapping - Links Fleet Equipment to Vessel Components
-  getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]>;
-  getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]>;
+  getFleetComponentMappings(fleetEquipmentCode?: string): Promise<FleetComponentMapping[]>;
+  getFleetComponentMappingsByVessel(vesselCode?: string): Promise<FleetComponentMapping[]>;
   createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping>;
   removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void>;
   
@@ -5515,14 +5515,20 @@ export class MemStorage implements IStorage {
   // FLEET COMPONENT MAPPING
   // =====================================================
   
-  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
-    return Array.from(this.fleetComponentMappings.values())
-      .filter(m => m.fleetEquipmentCode === fleetEquipmentCode && m.isActive);
+  async getFleetComponentMappings(fleetEquipmentCode?: string): Promise<FleetComponentMapping[]> {
+    let mappings = Array.from(this.fleetComponentMappings.values()).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      mappings = mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    return mappings;
   }
   
-  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
-    return Array.from(this.fleetComponentMappings.values())
-      .filter(m => m.vesselCode === vesselCode && m.isActive);
+  async getFleetComponentMappingsByVessel(vesselCode?: string): Promise<FleetComponentMapping[]> {
+    let mappings = Array.from(this.fleetComponentMappings.values()).filter(m => m.isActive);
+    if (vesselCode) {
+      mappings = mappings.filter(m => m.vesselCode === vesselCode);
+    }
+    return mappings;
   }
   
   async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
@@ -8625,26 +8631,28 @@ export class PostgresStorage implements IStorage {
   // FLEET COMPONENT MAPPING
   // =====================================================
   
-  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+  async getFleetComponentMappings(fleetEquipmentCode?: string): Promise<FleetComponentMapping[]> {
     const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
     
-    return await db.select().from(fleetComponentMapping)
-      .where(and(
-        eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
-        eq(fleetComponentMapping.isActive, true)
-      ));
+    const conditions = [eq(fleetComponentMapping.isActive, true)];
+    if (fleetEquipmentCode) {
+      conditions.push(eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode));
+    }
+    
+    return await db.select().from(fleetComponentMapping).where(and(...conditions));
   }
   
-  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+  async getFleetComponentMappingsByVessel(vesselCode?: string): Promise<FleetComponentMapping[]> {
     const db = await this.getDb();
     const { eq, and } = await import('drizzle-orm');
     
-    return await db.select().from(fleetComponentMapping)
-      .where(and(
-        eq(fleetComponentMapping.vesselCode, vesselCode),
-        eq(fleetComponentMapping.isActive, true)
-      ));
+    const conditions = [eq(fleetComponentMapping.isActive, true)];
+    if (vesselCode) {
+      conditions.push(eq(fleetComponentMapping.vesselCode, vesselCode));
+    }
+    
+    return await db.select().from(fleetComponentMapping).where(and(...conditions));
   }
   
   async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
