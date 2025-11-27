@@ -25,7 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate } from "@/lib/dateUtils";
 import {
   Select,
@@ -1599,6 +1599,7 @@ const Components: React.FC = () => {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
@@ -2187,9 +2188,9 @@ const Components: React.FC = () => {
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
-                {VESSELS.map(vessel => (
+                {vessels.map(vessel => (
                   <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.id} – MV {vessel.name}
+                    {vessel.id} - {vessel.name}
                   </SelectItem>
                 ))}
               </SelectContent>

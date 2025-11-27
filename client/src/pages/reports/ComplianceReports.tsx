@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { reportGenerator } from "@/lib/reportGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { useVessels } from "@/hooks/useVessels";
 
 interface ComplianceReport {
   id: string;
@@ -56,6 +57,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
 
   const reports: ComplianceReport[] = [
     {
@@ -194,9 +196,11 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
         description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
       });
 
-      // Get current filters
+      // Get current filters - use globalFilters vessel or first available vessel
+      const vesselName = globalFilters?.vessel || vessels[0]?.name || "Unknown Vessel";
+      const vesselCode = vesselName.replace(/\s+/g, '_');
       const filters = {
-        vessel: "MV Atlantic Star", // Will be dynamic later
+        vessel: vesselName,
         frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
         area: selectedArea !== "all" ? selectedArea : undefined,
         search: searchQuery || undefined,
@@ -208,7 +212,7 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
       const filename = reportGenerator.generateFilename(
         report?.name || 'compliance-report', 
         format, 
-        'MV_Atlantic_Star'
+        vesselCode
       );
       
       await reportGenerator.downloadReport(blob, filename);

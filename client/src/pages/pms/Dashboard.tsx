@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkOrder } from "@shared/schema";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 
 interface DashboardFilters {
   vesselId: string;
@@ -44,6 +44,7 @@ const Dashboard = () => {
   });
   const [activeTab, setActiveTab] = useState("overview");
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
 
   // Dashboard filters (date range only, vessel comes from context)
   const [filters, setFilters] = useState(() => {
@@ -374,10 +375,10 @@ const Dashboard = () => {
               <Ship className="w-4 h-4 text-gray-500" />
               <Select value={vesselId} onValueChange={handleVesselChange}>
                 <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue />
+                  <SelectValue placeholder="Select vessel" />
                 </SelectTrigger>
                 <SelectContent>
-                  {VESSELS.map(vessel => (
+                  {vessels.map(vessel => (
                     <SelectItem key={vessel.id} value={vessel.id}>
                       {vessel.id} - {vessel.name}
                     </SelectItem>

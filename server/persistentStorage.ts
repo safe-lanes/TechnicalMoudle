@@ -4718,29 +4718,79 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getDefectsReportData(reportKey: string, filters: any): Promise<any> {
-    // Return mock report data based on reportKey
-    const mockData = {
-      openDefectsDashboard: {
-        kpis: {
-          totalOpen: 125,
-          dueThisMonth: 32,
-          overdue: 18,
-          avgDaysOpen: 14.5
-        },
-        data: []
-      },
-      closurePerformance: {
-        kpis: {
-          closureRate: 78,
-          avgClosureTime: 21,
-          onTimeCompletion: 65,
-          backlog: 47
-        },
-        data: []
-      }
-    };
+    const defects = Object.values(this.data.defects).filter(d => d !== null && d !== undefined);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     
-    return mockData[reportKey as keyof typeof mockData] || { kpis: {}, data: [] };
+    const openDefects = defects.filter(d => d.status !== 'Closed');
+    const closedDefects = defects.filter(d => d.status === 'Closed');
+    
+    const overdueDefects = openDefects.filter(d => {
+      if (!d.targetCloseDate) return false;
+      return new Date(d.targetCloseDate) < now;
+    });
+    
+    const dueThisMonth = openDefects.filter(d => {
+      if (!d.targetCloseDate) return false;
+      const dueDate = new Date(d.targetCloseDate);
+      return dueDate >= startOfMonth && dueDate <= endOfMonth;
+    });
+    
+    const avgDaysOpen = openDefects.length > 0 
+      ? openDefects.reduce((sum, d) => {
+          const days = Math.floor((now.getTime() - new Date(d.issueDate).getTime()) / (1000 * 60 * 60 * 24));
+          return sum + days;
+        }, 0) / openDefects.length
+      : 0;
+    
+    const closureRate = defects.length > 0 
+      ? Math.round((closedDefects.length / defects.length) * 100) 
+      : 0;
+    
+    const avgClosureTime = closedDefects.length > 0 
+      ? closedDefects.reduce((sum, d) => {
+          const openDate = new Date(d.issueDate);
+          const closeDate = d.closedOn ? new Date(d.closedOn) : now;
+          const days = Math.floor((closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60 * 24));
+          return sum + days;
+        }, 0) / closedDefects.length
+      : 0;
+    
+    const onTimeCompletions = closedDefects.filter(d => {
+      if (!d.targetCloseDate || !d.closedOn) return false;
+      return new Date(d.closedOn) <= new Date(d.targetCloseDate);
+    });
+    
+    const onTimeRate = closedDefects.length > 0 
+      ? Math.round((onTimeCompletions.length / closedDefects.length) * 100)
+      : 0;
+
+    if (reportKey === 'openDefectsDashboard') {
+      return {
+        kpis: {
+          totalOpen: openDefects.length,
+          dueThisMonth: dueThisMonth.length,
+          overdue: overdueDefects.length,
+          avgDaysOpen: Math.round(avgDaysOpen * 10) / 10
+        },
+        data: openDefects
+      };
+    }
+    
+    if (reportKey === 'closurePerformance') {
+      return {
+        kpis: {
+          closureRate,
+          avgClosureTime: Math.round(avgClosureTime),
+          onTimeCompletion: onTimeRate,
+          backlog: openDefects.length
+        },
+        data: closedDefects
+      };
+    }
+    
+    return { kpis: {}, data: [] };
   }
 
   // Recurring Defects methods

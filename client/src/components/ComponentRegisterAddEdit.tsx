@@ -15,7 +15,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getComponentCategory } from "@/utils/componentUtils";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 
 interface ComponentNode {
   id: string;
@@ -39,6 +39,7 @@ export default function ComponentRegisterAddEdit({
 }: ComponentRegisterAddEditProps) {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
@@ -619,7 +620,7 @@ export default function ComponentRegisterAddEdit({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {VESSELS.map(v => (
+              {vessels.map(v => (
                 <SelectItem key={v.id} value={v.id}>{v.id}</SelectItem>
               ))}
             </SelectContent>

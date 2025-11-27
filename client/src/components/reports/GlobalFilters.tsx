@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useVessels } from "@/hooks/useVessels";
+import { useDepartments } from "@/hooks/useDepartments";
 
 export interface FilterValues {
   vessel: string;
@@ -52,22 +54,14 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   onReset,
   className
 }) => {
-  const vessels = [
-    { id: "V001", name: "MV Atlantic Star", type: "Bulk Carrier" },
-    { id: "V002", name: "MV Pacific Dawn", type: "Container Ship" },
-    { id: "V003", name: "MV Nordic Explorer", type: "Tanker" },
-    { id: "V004", name: "MV Southern Cross", type: "General Cargo" },
-    { id: "V005", name: "MV Eastern Horizon", type: "RoRo" }
-  ];
-
-  const departments = [
-    { id: "deck", name: "Deck Department", icon: "⚓" },
-    { id: "engine", name: "Engine Department", icon: "⚙️" },
-    { id: "electrical", name: "Electrical Department", icon: "⚡" },
-    { id: "catering", name: "Catering Department", icon: "🍽️" },
-    { id: "radio", name: "Radio Department", icon: "📡" },
-    { id: "safety", name: "Safety & Security", icon: "🛡️" }
-  ];
+  const { data: vessels = [] } = useVessels();
+  const { data: departmentsList = [] } = useDepartments();
+  
+  const departments = departmentsList.map(d => ({
+    id: d.listKey,
+    name: d.listValue,
+    icon: ""
+  }));
 
   const priorities = [
     { id: "high", name: "High Priority", color: "bg-red-100 text-red-800" },
@@ -109,7 +103,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
   const getSelectedVessel = () => {
     const vessel = vessels.find(v => v.id === filters.vessel);
-    return vessel ? `${vessel.name} (${vessel.type})` : "All Vessels";
+    return vessel ? vessel.name : "All Vessels";
   };
 
   const getSelectedDepartment = () => {
@@ -180,7 +174,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
                   <SelectItem key={vessel.id} value={vessel.id}>
                     <div className="flex flex-col">
                       <span className="font-medium">{vessel.name}</span>
-                      <span className="text-xs text-gray-500">{vessel.type}</span>
+                      <span className="text-xs text-gray-500">{vessel.id}</span>
                     </div>
                   </SelectItem>
                 ))}

@@ -21,7 +21,7 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { WorkOrder, InsertWorkOrder, WorkOrderWithLeadTime } from "@shared/schema";
 import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 
 // Extend WorkOrderWithLeadTime to include computed status from backend
@@ -71,6 +71,7 @@ const WorkOrders: React.FC = () => {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   
   // Fetch work orders using React Query (includes computedStatus and lead time from backend)
   const { data: workOrdersList = [], isLoading, error } = useQuery<WorkOrderWithHydratedData[]>({
@@ -357,7 +358,7 @@ const WorkOrders: React.FC = () => {
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            {VESSELS.map(vessel => (
+            {vessels.map(vessel => (
               <SelectItem key={vessel.id} value={vessel.id}>
                 {vessel.id} - {vessel.name}
               </SelectItem>

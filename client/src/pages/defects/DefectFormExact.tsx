@@ -18,13 +18,7 @@ import { useMutation } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
-
-// Vessel mapping for proper vesselName updates
-const vesselMap: Record<string, string> = {
-  "V001": "MV SEAFARER",
-  "V002": "MV VOYAGER", 
-  "V003": "MV EXPLORER",
-};
+import { useVessels } from "@/hooks/useVessels";
 
 // Generate defect reference number
 const generateDefectRef = () => {
@@ -64,6 +58,7 @@ interface DefectFormExactProps {
 
 export default function DefectFormExact({ onClose, defect, mode = 'new' }: DefectFormExactProps) {
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
   const [defectRef] = useState(defect?.id || generateDefectRef());
   const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
@@ -427,7 +422,10 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                           <Select 
                             onValueChange={(value) => {
                               field.onChange(value);
-                              form.setValue("vesselName", vesselMap[value] || "");
+                              const vessel = vessels.find(v => v.id === value);
+                              if (vessel) {
+                                form.setValue("vesselName", vessel.name);
+                              }
                             }} 
                             defaultValue={field.value}
                           >
@@ -437,9 +435,9 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="V001">MV SEAFARER</SelectItem>
-                              <SelectItem value="V002">MV VOYAGER</SelectItem>
-                              <SelectItem value="V003">MV EXPLORER</SelectItem>
+                              {vessels.map(vessel => (
+                                <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}

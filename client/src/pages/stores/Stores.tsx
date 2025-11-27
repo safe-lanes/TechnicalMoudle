@@ -12,7 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import { FEATURES } from "@/config/features";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 
 // IHM constants
 const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
@@ -622,6 +622,7 @@ const storeItems: StoreItem[] = [
 const Stores: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">("stores");
   const [viewMode, setViewMode] = useState<"inventory" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
@@ -1256,7 +1257,7 @@ const Stores: React.FC = () => {
               <SelectValue placeholder="Select Vessel" />
             </SelectTrigger>
             <SelectContent>
-              {VESSELS.map(vessel => (
+              {vessels.map(vessel => (
                 <SelectItem key={vessel.id} value={vessel.id}>
                   {vessel.id} - {vessel.name}
                 </SelectItem>
@@ -1316,7 +1317,6 @@ const Stores: React.FC = () => {
             setSearchTerm("");
             setCategoryFilter("all");
             setStockFilter("all");
-            setVesselFilter("");
           }}
         >
           Clear

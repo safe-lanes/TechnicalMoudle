@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { insertDefectSchema, type InsertDefect } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVessels } from "@/hooks/useVessels";
 
 // Use shared schema with UI validation extensions
 const defectFormSchema = insertDefectSchema.extend({
@@ -24,13 +25,6 @@ const defectFormSchema = insertDefectSchema.extend({
 
 type DefectFormData = z.infer<typeof defectFormSchema>;
 
-// Vessel mapping for proper vesselName updates
-const vesselMap: Record<string, string> = {
-  "V001": "MV SEAFARER",
-  "V002": "MV VOYAGER", 
-  "V003": "MV EXPLORER",
-};
-
 interface DefectFormSimpleProps {
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -38,6 +32,7 @@ interface DefectFormSimpleProps {
 
 export function DefectFormSimple({ onSuccess, onCancel }: DefectFormSimpleProps) {
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
   
   // Generate reference number
   const generateReference = () => {
@@ -123,8 +118,10 @@ export function DefectFormSimple({ onSuccess, onCancel }: DefectFormSimpleProps)
                       <Select 
                         onValueChange={(value) => {
                           field.onChange(value);
-                          // Update vesselName when vesselId changes
-                          form.setValue("vesselName", vesselMap[value] || "");
+                          const vessel = vessels.find(v => v.id === value);
+                          if (vessel) {
+                            form.setValue("vesselName", vessel.name);
+                          }
                         }} 
                         defaultValue={field.value}
                       >
@@ -134,9 +131,9 @@ export function DefectFormSimple({ onSuccess, onCancel }: DefectFormSimpleProps)
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="V001">MV SEAFARER</SelectItem>
-                          <SelectItem value="V002">MV VOYAGER</SelectItem>
-                          <SelectItem value="V003">MV EXPLORER</SelectItem>
+                          {vessels.map(vessel => (
+                            <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </FormItem>

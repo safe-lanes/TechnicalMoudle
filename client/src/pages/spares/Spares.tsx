@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 import type { Spare } from "@shared/schema";
 
 // Component tree is now imported from shared data
@@ -352,6 +352,7 @@ const historyData = [
 const Spares: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   
   const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -666,7 +667,7 @@ const Spares: React.FC = () => {
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            {VESSELS.map(vessel => (
+            {vessels.map(vessel => (
               <SelectItem key={vessel.id} value={vessel.id}>
                 {vessel.name}
               </SelectItem>

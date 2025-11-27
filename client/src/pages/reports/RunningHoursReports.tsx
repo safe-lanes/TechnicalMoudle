@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { reportGenerator } from "@/lib/reportGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { useVessels } from "@/hooks/useVessels";
 
 interface RunningHoursReport {
   id: string;
@@ -51,6 +52,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
 
   const reports: RunningHoursReport[] = [
     {
@@ -148,9 +150,11 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
         description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
       });
 
-      // Get current filters
+      // Get current filters - use first available vessel
+      const vesselName = vessels[0]?.name || "Unknown Vessel";
+      const vesselCode = vesselName.replace(/\s+/g, '_');
       const filters = {
-        vessel: "MV Atlantic Star", // Will be dynamic later
+        vessel: vesselName,
         frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
         priority: selectedPriority !== "all" ? selectedPriority : undefined,
         search: searchQuery || undefined,
@@ -162,7 +166,7 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
       const filename = reportGenerator.generateFilename(
         report?.name || 'running-hours-report', 
         format, 
-        'MV_Atlantic_Star'
+        vesselCode
       );
       
       await reportGenerator.downloadReport(blob, filename);

@@ -21,6 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
+import { useVessels } from "@/hooks/useVessels";
 
 // Form validation schema
 const defectFormSchema = insertDefectSchema.extend({
@@ -66,6 +67,7 @@ export default function DefectFormWizard({
   onCompleted 
 }: DefectFormWizardProps = {}) {
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
   const [, setLocation] = useLocation();
   const params = useParams();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialStep);
@@ -510,12 +512,10 @@ export default function DefectFormWizard({
                           <Select 
                             onValueChange={(value) => {
                               field.onChange(value);
-                              const vesselNames: Record<string, string> = {
-                                "V001": "MV SEAFARER",
-                                "V002": "MV VOYAGER",
-                                "V003": "MV EXPLORER"
-                              };
-                              form.setValue("vesselName", vesselNames[value] || "");
+                              const vessel = vessels.find(v => v.id === value);
+                              if (vessel) {
+                                form.setValue("vesselName", vessel.name);
+                              }
                             }} 
                             value={field.value}
                             disabled={isViewMode}
@@ -524,9 +524,9 @@ export default function DefectFormWizard({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="V001">MV SEAFARER</SelectItem>
-                              <SelectItem value="V002">MV VOYAGER</SelectItem>
-                              <SelectItem value="V003">MV EXPLORER</SelectItem>
+                              {vessels.map(vessel => (
+                                <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}

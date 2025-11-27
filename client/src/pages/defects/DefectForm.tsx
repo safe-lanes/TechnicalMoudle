@@ -13,6 +13,7 @@ import { Upload, Eye } from "lucide-react";
 import { insertDefectSchema, type InsertDefect } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVessels } from "@/hooks/useVessels";
 
 // Form validation schema
 const defectFormSchema = insertDefectSchema.extend({
@@ -41,6 +42,7 @@ const quillModules = {
 
 export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
   const { toast } = useToast();
+  const { data: vessels = [] } = useVessels();
   
   // Generate reference number (format: DN/007/21/1243/V)
   const generateReference = () => {
@@ -125,14 +127,23 @@ export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
                   name="vesselId"
                   control={form.control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const vessel = vessels.find(v => v.id === value);
+                        if (vessel) {
+                          form.setValue("vesselName", vessel.name);
+                        }
+                      }} 
+                      value={field.value}
+                    >
                       <SelectTrigger data-testid="select-vessel" className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="V001">MV SEAFARER</SelectItem>
-                        <SelectItem value="V002">MV VOYAGER</SelectItem>
-                        <SelectItem value="V003">MV EXPLORER</SelectItem>
+                        {vessels.map(vessel => (
+                          <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

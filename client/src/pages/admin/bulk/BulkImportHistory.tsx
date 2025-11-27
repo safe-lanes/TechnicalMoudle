@@ -23,15 +23,16 @@ import {
   Calendar
 } from "lucide-react";
 import { format } from "date-fns";
-import { VESSELS, type VesselId } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 import type { BulkImportHistory as BulkImportHistoryType, BulkImportError } from "@shared/schema";
 
 interface BulkImportHistoryProps {
-  vesselId?: VesselId;
+  vesselId?: string;
   moduleType?: string;
 }
 
 export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHistoryProps) {
+  const { data: vessels = [] } = useVessels();
   const [selectedVessel, setSelectedVessel] = useState<string>(vesselId || 'all');
   const [selectedModule, setSelectedModule] = useState<string>(moduleType || 'all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -152,7 +153,7 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Vessels</SelectItem>
-                {VESSELS.map((vessel) => (
+                {vessels.map((vessel) => (
                   <SelectItem key={vessel.id} value={vessel.id}>
                     {vessel.id} - {vessel.name}
                   </SelectItem>

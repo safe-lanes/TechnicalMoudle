@@ -16,17 +16,18 @@ import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
-import { VESSELS, type VesselId } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
 export default function BulkDataImport() {
+  const { data: vessels = [] } = useVessels();
   const [isFleetMode, setIsFleetMode] = useState(false);
   const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
-  const [selectedVessel, setSelectedVessel] = useState<VesselId>('V001');
+  const [selectedVessel, setSelectedVessel] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('upload');
 
   const vesselTemplates = [
@@ -87,12 +88,12 @@ export default function BulkDataImport() {
               <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700">
                 Select Vessel:
               </Label>
-              <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value as VesselId)}>
+              <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
                 <SelectTrigger id="vessel-select" className="w-64" data-testid="select-vessel">
                   <SelectValue placeholder="Choose vessel..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {VESSELS.map((vessel) => (
+                  {vessels.map((vessel) => (
                     <SelectItem key={vessel.id} value={vessel.id} data-testid={`vessel-${vessel.id}`}>
                       {vessel.id} - {vessel.name}
                     </SelectItem>

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { FEATURES, IHM_PRESENCE, IHM_EVIDENCE_TYPES } from '@/config/features';
-import { VESSELS } from "@/lib/vessels";
+import { useVessels } from "@/hooks/useVessels";
 
 interface Spare {
   id: number;
@@ -59,6 +59,7 @@ const Spares: React.FC = () => {
   const [criticalityFilter, setCriticalityFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
   const { vesselId, setVesselId } = useVessel();
+  const { data: vessels = [] } = useVessels();
   
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
@@ -792,7 +793,7 @@ const Spares: React.FC = () => {
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            {VESSELS.map(vessel => (
+            {vessels.map(vessel => (
               <SelectItem key={vessel.id} value={vessel.id}>
                 {vessel.id} - {vessel.name}
               </SelectItem>
