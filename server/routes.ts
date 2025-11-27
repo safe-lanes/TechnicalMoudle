@@ -108,30 +108,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Field mapping from file headers to database fields
+      // Supports multiple variations of each column name for flexible Excel import
       const fieldMapping: { [key: string]: string } = {
+        // Core identifiers
         'Component ID': 'id',
         'Component Name': 'name',
         'Component Code': 'componentCode',
         'Parent ID': 'parentId',
         'Parent Component Code': 'parentId',
+        'Parent Component': 'parentId',
+        
+        // Category and classification
         'Category': 'category',
+        'Component Category': 'componentCategory',
+        'Department Category': 'deptCategory',
+        'Dept Category': 'deptCategory',
+        
+        // Vessel identification
         'Vessel ID': 'vesselId',
         'Vessel Code': 'vesselCode',
-        'Current Cumulative RH': 'currentCumulativeRH',
-        'Last Updated': 'lastUpdated',
+        
+        // Fleet equipment fields
+        'Fleet Equipment Code': 'fleetEquipmentCode',
+        'Fleet Eqpt Code': 'fleetEquipmentCode',
+        'Fleet Equipment Name': 'fleetEquipmentName',
+        'Fleet Eqpt Name': 'fleetEquipmentName',
+        'Parent Fleet Equipment Code': 'parentFleetEquipmentCode',
+        'Parent Fleet Eqpt Code': 'parentFleetEquipmentCode',
+        
+        // Maker and model information
         'Maker': 'maker',
+        'Maker Code': 'makerCode',
+        'MakerCode': 'makerCode',
+        'Maker No': 'makerCode',
         'Model': 'model',
+        'Model Code': 'modelCode',
+        'ModelCode': 'modelCode',
+        'Model Number': 'modelNumber',
+        'Model No': 'modelNumber',
         'Serial No': 'serialNo',
-        'Department Category': 'deptCategory',
-        'Component Category': 'componentCategory',
+        'SerialNo': 'serialNo',
+        'Serial Number': 'serialNo',
+        'Drawing No': 'drawingNo',
+        'DrawingNo': 'drawingNo',
+        'Drawing Number': 'drawingNo',
+        
+        // Location and department
         'Location': 'location',
+        'Department': 'department',
+        'Dept': 'department',
+        'Eqpt System Dept': 'eqptSystemDept',
+        'Equip System Dept': 'eqptSystemDept',
+        'Equipment System Department': 'eqptSystemDept',
+        
+        // Running hours and dates
+        'Current Cumulative RH': 'currentCumulativeRH',
+        'Running Hours': 'runningHours',
+        'RH': 'runningHours',
+        'Last Updated': 'lastUpdated',
         'Commissioned Date': 'commissionedDate',
+        'Commissioning Date': 'commissionedDate',
+        'Installation Date': 'installationDate',
+        
+        // Boolean flags
         'Critical': 'critical',
         'Critical (Yes/No)': 'critical',
+        'Is Critical': 'critical',
         'Class Item': 'classItem',
+        'ClassItem': 'classItem',
+        'Is Class Item': 'classItem',
         'Condition Based': 'conditionBased',
         'Condition Based (Yes/No)': 'conditionBased',
-        'Running Hours': 'runningHours'
+        'ConditionBased': 'conditionBased',
+        'Is Condition Based': 'conditionBased',
+        'Is Parent': 'isParent',
+        'IsParent': 'isParent',
+        'Is Active': 'isActive',
+        'IsActive': 'isActive',
+        'Active': 'isActive',
+        
+        // Additional fields
+        'Rating': 'rating',
+        'Notes': 'notes',
+        'Remarks': 'notes',
+        'No of Units': 'noOfUnits',
+        'Number of Units': 'noOfUnits',
+        'Dimensions Size': 'dimensionsSize',
+        'Dimensions': 'dimensionsSize',
+        'Size': 'dimensionsSize',
+        'Scope Notes': 'scopeNotes'
       };
 
       // Create normalized mapping (case-insensitive, flexible separator matching)
@@ -183,11 +248,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let processedValue = value;
             
             // Convert boolean fields
-            if (dbField === 'critical' || dbField === 'classItem' || dbField === 'conditionBased') {
+            const booleanFields = ['critical', 'classItem', 'conditionBased', 'isParent', 'isActive'];
+            if (booleanFields.includes(dbField)) {
               if (typeof processedValue === 'string') {
                 processedValue = processedValue.toLowerCase() === 'true' || 
                                  processedValue.toLowerCase() === 'yes' || 
                                  processedValue === '1';
+              } else if (typeof processedValue === 'boolean') {
+                // Already boolean, keep as-is
+              } else {
+                processedValue = Boolean(processedValue);
               }
             }
             

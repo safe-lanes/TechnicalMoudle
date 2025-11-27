@@ -134,7 +134,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         parentComponent: comp.parentId || "",
         componentCode: selectedComponent.code,
         componentName: comp.name || selectedComponent.name || "",
-        componentCategory: getComponentCategory(selectedComponent.id),
+        // Use stored componentCategory from Excel first, fall back to derived category only if not present
+        componentCategory: comp.componentCategory || comp.category || getComponentCategory(selectedComponent.id),
         maker: comp.maker || "",
         makerCode: comp.makerCode || "",
         model: comp.model || "",
@@ -147,10 +148,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         installationDate: comp.installationDate || "",
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
-        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || "",
+        eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
         notes: comp.notes || "",
-        runningHours: comp.runningHours || "",
-        isActive: toBoolString(comp.isActive),
+        runningHours: comp.runningHours || comp.currentCumulativeRH || "",
+        isActive: toBoolString(comp.isActive !== undefined ? comp.isActive : true),
         vesselCode: comp.vesselCode || "",
         isParent: toBoolString(comp.isParent),
         // Legacy fields
