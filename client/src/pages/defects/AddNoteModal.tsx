@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,14 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
   const { toast } = useToast();
   const [noteText, setNoteText] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
+
+  // Reset form state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setNoteText("");
+      setAttachments([]);
+    }
+  }, [open]);
 
   const addNoteMutation = useMutation({
     mutationFn: async () => {
@@ -111,8 +119,15 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={open}>
+      <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()}>
+        <button 
+          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 focus:outline-none"
+          onClick={onClose}
+          data-testid="button-close-add-note"
+        >
+          <X className="h-4 w-4" />
+        </button>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Paperclip className="h-5 w-5" />

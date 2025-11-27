@@ -22,7 +22,14 @@ interface LinkDefectsModalProps {
 export default function LinkDefectsModal({ open, onClose, defectId, currentLinkedDefects = [] }: LinkDefectsModalProps) {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDefects, setSelectedDefects] = useState<string[]>([]);
+  const [selectedDefects, setSelectedDefects] = useState<string[]>(currentLinkedDefects);
+
+  // Initialize selectedDefects when modal opens with new linked defects
+  useEffect(() => {
+    if (open) {
+      setSelectedDefects(currentLinkedDefects);
+    }
+  }, [open, currentLinkedDefects]);
 
   // Fetch all defects for searching
   const { data: allDefects = [], isLoading } = useQuery<Defect[]>({
@@ -73,7 +80,7 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
 
   const handleClose = () => {
     setSearchTerm("");
-    setSelectedDefects([]);
+    setSelectedDefects(currentLinkedDefects); // Preserve linked defects
     onClose();
   };
 
@@ -108,8 +115,15 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl">
+    <Dialog open={open}>
+      <DialogContent className="max-w-3xl" onInteractOutside={(e) => e.preventDefault()}>
+        <button 
+          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 focus:outline-none"
+          onClick={handleClose}
+          data-testid="button-close-link-defects"
+        >
+          <X className="h-4 w-4" />
+        </button>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link className="h-5 w-5" />
