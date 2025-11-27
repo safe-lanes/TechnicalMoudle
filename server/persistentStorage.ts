@@ -327,6 +327,7 @@ export class PersistentFileStorage implements IStorage {
         // Ensure all required fields exist with proper defaults
         const result = {
           users: loadedData.users || {},
+          fleets: loadedData.fleets || {},
           vessels: loadedData.vessels || {},
           components: loadedData.components || {},
           runningHoursAudits: loadedData.runningHoursAudits || [],
