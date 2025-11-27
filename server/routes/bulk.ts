@@ -1738,8 +1738,8 @@ router.get('/template', async (req, res) => {
       break;
   }
 
-  // Create main sheet - Just headers and example, NO description row
-  const mainSheet = XLSX.utils.aoa_to_sheet([headers, example]);
+  // Create main sheet - Headers only, NO sample data row
+  const mainSheet = XLSX.utils.aoa_to_sheet([headers]);
 
   // Add data validation for components (23-column format)
   if (type === 'components') {
