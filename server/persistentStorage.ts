@@ -939,6 +939,12 @@ export class PersistentFileStorage implements IStorage {
     const vesselImportCounts = new Map<string, number>();
     const importsByVessel = new Map<string, ImportHistory[]>();
     
+    // Safety check: ensure importHistory is an array
+    if (!Array.isArray(this.data.importHistory)) {
+      this.data.importHistory = [];
+      return;
+    }
+    
     this.data.importHistory.forEach(history => {
       if (history.vesselId) {
         if (!importsByVessel.has(history.vesselId)) {
@@ -5398,12 +5404,20 @@ export class PersistentFileStorage implements IStorage {
       originalName: history.originalName || null,
       archiveMissing: history.archiveMissing || false
     };
+    // Safety check: ensure importHistory is an array
+    if (!Array.isArray(this.data.importHistory)) {
+      this.data.importHistory = [];
+    }
     this.data.importHistory.push(newHistory);
     this.persistData();
     return newHistory;
   }
 
   async getImportHistory(type?: string, limit: number = 20, offset: number = 0): Promise<{ items: ImportHistory[]; total: number }> {
+    // Safety check: ensure importHistory is an array
+    if (!Array.isArray(this.data.importHistory)) {
+      this.data.importHistory = [];
+    }
     let filtered = [...this.data.importHistory];
     
     // Filter by type if provided
@@ -5425,10 +5439,16 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    if (!Array.isArray(this.data.importHistory)) {
+      this.data.importHistory = [];
+    }
     return this.data.importHistory.find(h => h.id === id);
   }
 
   async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    if (!Array.isArray(this.data.importHistory)) {
+      this.data.importHistory = [];
+    }
     const index = this.data.importHistory.findIndex(h => h.id === id);
     if (index === -1) {
       throw new Error(`Import history with id ${id} not found`);
