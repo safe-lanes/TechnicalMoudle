@@ -8123,15 +8123,31 @@
           "newValue": "No"
         }
       ],
-      "status": "submitted",
+      "status": "approved",
       "requestedByUserId": "current_user",
       "id": 2,
       "createdAt": "2025-11-17T04:34:49.137Z",
       "updatedAt": "2025-11-17T04:34:49.137Z",
       "movePreviewJson": null,
       "submittedAt": null,
-      "reviewedByUserId": null,
-      "reviewedAt": null
+      "reviewedByUserId": "current_user",
+      "reviewedAt": "2025-11-27T09:03:09.603Z",
+      "revisionNumber": 1,
+      "revisionHistory": [
+        {
+          "revisionNumber": 1,
+          "approvedBy": "current_user",
+          "approvedAt": "2025-11-27T09:03:09.603Z",
+          "appliedChanges": [
+            {
+              "field": "componentInfo.isActive",
+              "oldValue": "Yes",
+              "newValue": "No"
+            }
+          ],
+          "comments": "Request approved"
+        }
+      ]
     },
     "3": {
       "vesselId": "V001",
@@ -571253,6 +571269,35 @@
       "createdAt": "2025-11-26T22:13:17.430Z"
     }
   ],
+  "makersList": {},
+  "sfiDetailsList": {},
+  "masterDataList": {
+    "1": {
+      "id": 1,
+      "slNo": null,
+      "makerName": "Caterpillar",
+      "makerCode": "CAT",
+      "countMaker": null,
+      "model": "3516B",
+      "modelCode": "CAT-3516B",
+      "countSfiCode": null,
+      "fleetEquipmentCode": "722.001.AA",
+      "sfiCode": "722",
+      "assignedSubCode": null,
+      "vesselName": "MV Pacific Star",
+      "vesselCode": "PACSTAR",
+      "equipmentName": "Main Engine No.1 (Updated)",
+      "isActive": true,
+      "createdAt": "2025-11-27T09:16:06.368Z",
+      "updatedAt": "2025-11-27T09:16:18.430Z"
+    }
+  },
+  "fleetVesselMappings": {},
+  "fleetComponentMappings": {},
+  "fleetJobVesselMappings": {},
+  "fleetSpareVesselMappings": {},
+  "bulkImportHistory": {},
+  "bulkImportErrors": [],
   "counters": {
     "userId": 1,
     "auditId": 129,
@@ -571276,6 +571321,15 @@
     "auditLogId": 1,
     "pmsVesselSettingsId": 3,
     "storesItemId": 2,
-    "storesLedgerId": 2
+    "storesLedgerId": 2,
+    "makersListId": 1,
+    "sfiDetailsListId": 1,
+    "masterDataId": 2,
+    "fleetVesselMappingId": 1,
+    "fleetComponentMappingId": 1,
+    "fleetJobVesselMappingId": 1,
+    "fleetSpareVesselMappingId": 1,
+    "bulkImportHistoryId": 1,
+    "bulkImportErrorId": 1
   }
 }

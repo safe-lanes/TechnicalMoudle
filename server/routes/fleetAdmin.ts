@@ -82,10 +82,15 @@ router.get('/master-data/by-code/:code', async (req, res) => {
   }
 });
 
+// Schema for creating master data - fleetEquipmentCode is auto-generated
+const createMasterDataSchema = insertMasterDataSchema.extend({
+  fleetEquipmentCode: z.string().optional()
+});
+
 // Create new master data entry with auto-generated Fleet Equipment Code
 router.post('/master-data', async (req, res) => {
   try {
-    const validatedData = insertMasterDataSchema.parse(req.body);
+    const validatedData = createMasterDataSchema.parse(req.body);
     
     // Generate Fleet Equipment Code if not provided
     let fleetEquipmentCode = validatedData.fleetEquipmentCode;
