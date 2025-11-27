@@ -4024,6 +4024,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a new vessel
+  app.post("/api/vessels", async (req, res) => {
+    try {
+      const { id, name, code, imoNumber, vesselType, flag, isActive } = req.body;
+      
+      if (!id || !name) {
+        return res.status(400).json({ error: "Vessel ID and name are required" });
+      }
+      
+      const vessel = await storage.createVessel({
+        id,
+        name,
+        code: code || id,
+        imoNumber: imoNumber || null,
+        vesselType: vesselType || null,
+        flag: flag || null,
+        isActive: isActive ?? true,
+      });
+      
+      res.status(201).json(vessel);
+    } catch (error: any) {
+      console.error("Error creating vessel:", error);
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to create vessel" });
+    }
+  });
+
   // =====================================================
   // PMS Vessel Settings - Lead Time & Grace Period (Task 9)
   // =====================================================

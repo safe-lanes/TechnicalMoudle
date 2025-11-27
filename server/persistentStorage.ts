@@ -4,6 +4,8 @@ import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode
 import { 
   type User, 
   type InsertUser,
+  type Vessel,
+  type InsertVessel,
   type Component,
   type InsertComponent,
   type RunningHoursAudit,
@@ -97,6 +99,7 @@ class StorageInitializationError extends Error {
 
 interface PersistentData {
   users: Record<number, User>;
+  vessels: Record<string, Vessel>;
   components: Record<string, Component>;
   runningHoursAudits: RunningHoursAudit[];
   spares: Record<number, Spare>;
@@ -321,6 +324,7 @@ export class PersistentFileStorage implements IStorage {
         // Ensure all required fields exist with proper defaults
         const result = {
           users: loadedData.users || {},
+          vessels: loadedData.vessels || {},
           components: loadedData.components || {},
           runningHoursAudits: loadedData.runningHoursAudits || [],
           spares: loadedData.spares || {},
@@ -412,6 +416,7 @@ export class PersistentFileStorage implements IStorage {
   private initializeEmptyData(): PersistentData {
     const emptyData: PersistentData = {
       users: {},
+      vessels: {},
       components: {},
       runningHoursAudits: [],
       spares: {},
@@ -5789,6 +5794,19 @@ export class PersistentFileStorage implements IStorage {
     const vesselIds = new Set<string>();
     const vessels: Array<{id: string, name: string, code: string}> = [];
     
+    // First add vessels from the dedicated vessels table
+    Object.values(this.data.vessels || {}).forEach(v => {
+      if (v && v.id && v.isActive !== false && !vesselIds.has(v.id)) {
+        vesselIds.add(v.id);
+        vessels.push({
+          id: v.id,
+          name: v.name,
+          code: v.code
+        });
+      }
+    });
+    
+    // Then add any vessels from components that aren't already in the list
     Object.values(this.data.components || {}).forEach(c => {
       if (c && c.vesselId && c.dataScope !== 'fleet' && !vesselIds.has(c.vesselId)) {
         vesselIds.add(c.vesselId);
@@ -5801,6 +5819,98 @@ export class PersistentFileStorage implements IStorage {
     });
     
     return vessels;
+  }
+
+  async createVessel(vessel: InsertVessel): Promise<Vessel> {
+    const now = new Date();
+    
+    // Normalize vessel id and code (trim + uppercase for consistency)
+    const normalizedId = vessel.id.trim().toUpperCase();
+    const normalizedCode = (vessel.code || vessel.id).trim().toUpperCase();
+    
+    // Check all existing vessel IDs (normalized comparison to prevent case/whitespace duplicates)
+    const existingVesselIds = Object.keys(this.data.vessels || {})
+      .map(id => id.trim().toUpperCase());
+    if (existingVesselIds.includes(normalizedId)) {
+      throw new Error(`Vessel with id ${normalizedId} already exists`);
+    }
+    
+    // Check if vessel ID conflicts with existing component-linked vessels (normalized comparison)
+    const componentVesselIds = new Set<string>();
+    Object.values(this.data.components || {}).forEach(c => {
+      if (c && c.vesselId && c.dataScope !== 'fleet') {
+        componentVesselIds.add(c.vesselId.trim().toUpperCase());
+      }
+    });
+    
+    if (componentVesselIds.has(normalizedId)) {
+      throw new Error(`Vessel id ${normalizedId} is already in use by existing components. Cannot create a conflicting vessel record.`);
+    }
+    
+    // Check if vessel ID conflicts with existing fleet vessel mappings
+    if (Array.isArray(this.data.fleetVesselMappings)) {
+      const mappingVesselIds = new Set<string>();
+      this.data.fleetVesselMappings.forEach((m: any) => {
+        if (m && m.vesselId) {
+          mappingVesselIds.add(m.vesselId.trim().toUpperCase());
+        }
+      });
+      if (mappingVesselIds.has(normalizedId)) {
+        throw new Error(`Vessel id ${normalizedId} is already in use in fleet vessel mappings.`);
+      }
+    }
+    
+    // Check if vessel ID conflicts with existing PMS vessel settings
+    const settingsVesselIds = Object.keys(this.data.pmsVesselSettings || {})
+      .map(id => id.trim().toUpperCase());
+    if (settingsVesselIds.includes(normalizedId)) {
+      throw new Error(`Vessel id ${normalizedId} already has PMS settings configured.`);
+    }
+    
+    const newVessel: Vessel = {
+      id: normalizedId,
+      name: vessel.name.trim(),
+      code: normalizedCode,
+      imoNumber: vessel.imoNumber?.trim() || null,
+      vesselType: vessel.vesselType?.trim() || null,
+      flag: vessel.flag?.trim() || null,
+      isActive: vessel.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.data.vessels[normalizedId] = newVessel;
+    this.persistData();
+    return newVessel;
+  }
+
+  async getVesselById(id: string): Promise<Vessel | null> {
+    return this.data.vessels[id] || null;
+  }
+
+  async updateVessel(id: string, data: Partial<InsertVessel>): Promise<Vessel> {
+    const existing = this.data.vessels[id];
+    if (!existing) {
+      throw new Error(`Vessel with id ${id} not found`);
+    }
+    
+    const updated: Vessel = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    
+    this.data.vessels[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteVessel(id: string): Promise<void> {
+    if (!this.data.vessels[id]) {
+      throw new Error(`Vessel with id ${id} not found`);
+    }
+    delete this.data.vessels[id];
+    this.persistData();
   }
 
   // =====================================================

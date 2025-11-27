@@ -32,6 +32,27 @@ export type UserRole = "Ship" | "Office" | "PMS Admin";
 
 export type PublicUser = Omit<User, "password">;
 
+// Vessels Table - Core vessel registry
+export const vessels = pgTable("vessels", {
+  id: text("id").primaryKey(), // Vessel code like V001, V002
+  name: text("name").notNull(), // Vessel display name
+  code: text("code").notNull(), // Same as id for compatibility
+  imoNumber: text("imo_number"), // IMO number if applicable
+  vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
+  flag: text("flag"), // Flag state
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertVesselSchema = createInsertSchema(vessels).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVessel = z.infer<typeof insertVesselSchema>;
+export type Vessel = typeof vessels.$inferSelect;
+
 // Running Hours Audit Table
 export const runningHoursAudit = pgTable("running_hours_audit", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),

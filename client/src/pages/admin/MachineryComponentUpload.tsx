@@ -268,6 +268,15 @@ export default function AdminMachineryUpload({ vesselId }: MachineryComponentUpl
     setIsImporting(true);
 
     try {
+      // Only pass rowIndices if there are errors (partial import)
+      // If all rows are valid, omit rowIndices to use full-import validation
+      const hasErrors = dryRunResult.summary.errors > 0;
+      const validRowIndices = hasErrors 
+        ? dryRunResult.rows
+            .filter(row => row.status === 'ok')
+            .map(row => row.row)
+        : undefined;
+
       const response = await fetch('/api/bulk/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -276,7 +285,8 @@ export default function AdminMachineryUpload({ vesselId }: MachineryComponentUpl
           type: 'components',
           mode: importMode,
           archiveMissing: false,
-          vesselId: vesselId
+          vesselId: vesselId,
+          ...(validRowIndices && { rowIndices: validRowIndices })
         })
       });
 
@@ -559,7 +569,7 @@ export default function AdminMachineryUpload({ vesselId }: MachineryComponentUpl
                     <div className="flex justify-end">
                       <Button
                         onClick={handleImport}
-                        disabled={dryRunResult.summary.errors > 0 || isImporting}
+                        disabled={dryRunResult.summary.ok === 0 || isImporting}
                         className="bg-blue-600 hover:bg-blue-700"
                         data-testid="button-import"
                       >
