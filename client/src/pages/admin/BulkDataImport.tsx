@@ -83,24 +83,29 @@ export default function BulkDataImport() {
         {/* Vessel Selector Header */}
         <div className="bg-white border-b px-6 py-4">
           <div className="flex items-center gap-4">
-            <Ship className="h-5 w-5 text-sky-600" />
-            <div className="flex items-center gap-3">
-              <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700">
-                Select Vessel:
-              </Label>
-              <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
-                <SelectTrigger id="vessel-select" className="w-64" data-testid="select-vessel">
-                  <SelectValue placeholder="Choose vessel..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {vessels.map((vessel) => (
-                    <SelectItem key={vessel.id} value={vessel.id} data-testid={`vessel-${vessel.id}`}>
-                      {vessel.id} - {vessel.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Vessel Selector - Hidden when Fleet Data Import is ON */}
+            {!isFleetMode && (
+              <>
+                <Ship className="h-5 w-5 text-sky-600" />
+                <div className="flex items-center gap-3">
+                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700">
+                    Select Vessel:
+                  </Label>
+                  <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
+                    <SelectTrigger id="vessel-select" className="w-64" data-testid="select-vessel">
+                      <SelectValue placeholder="Choose vessel..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vessels.map((vessel) => (
+                        <SelectItem key={vessel.id} value={vessel.id} data-testid={`vessel-${vessel.id}`}>
+                          {vessel.id} - {vessel.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             
             {/* Fleet Data Import Toggle */}
             <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50">
