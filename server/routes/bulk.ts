@@ -2171,15 +2171,26 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Component Name'] = String(row['Component Name']).trim();
       }
 
-      // Validate Yes/No fields with support for IS Active
-      ['Critical (Yes/No)', 'Condition Based (Yes/No)', 'IS Active'].forEach(field => {
-        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
-          const value = String(row[field]).toLowerCase().trim();
+      // Validate Yes/No fields - Support both template format and legacy format
+      // Template uses: Critical Yes/No, Condition Based Yes/No
+      // Legacy uses: Critical (Yes/No), Condition Based (Yes/No)
+      const yesNoFieldMappings = [
+        { template: 'Critical Yes/No', legacy: 'Critical (Yes/No)' },
+        { template: 'Condition Based Yes/No', legacy: 'Condition Based (Yes/No)' },
+        { template: 'IS Active', legacy: 'IS Active' }
+      ];
+      
+      yesNoFieldMappings.forEach(({ template, legacy }) => {
+        const fieldValue = row[template] ?? row[legacy];
+        if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+          const value = String(fieldValue).toLowerCase().trim();
           if (!['yes', 'no', 'y', 'n', 'true', 'false', '1', '0'].includes(value)) {
-            errors.push(`Row ${rowNum}: ${field} must be Yes or No`);
+            errors.push(`Row ${rowNum}: ${template} must be Yes or No`);
           } else {
-            // Normalize to boolean-friendly format
-            normalized[field] = ['yes', 'y', 'true', '1'].includes(value);
+            // Normalize to boolean-friendly format - store in both formats
+            const normalizedValue = ['yes', 'y', 'true', '1'].includes(value);
+            normalized[template] = normalizedValue;
+            normalized[legacy] = normalizedValue;
           }
         }
       });
@@ -2309,13 +2320,17 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
 
-      // Validate Criticality (Yes/No)
-      if (row['Criticality (Yes/No)']) {
-        const value = String(row['Criticality (Yes/No)']).toLowerCase().trim();
+      // Validate Critical Yes/No - Support both template format and legacy format
+      const criticalField = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+      if (criticalField) {
+        const value = String(criticalField).toLowerCase().trim();
         if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
+          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
         } else {
-          normalized['Criticality (Yes/No)'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+          // Store in both formats for backward compatibility
+          const normalizedValue = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+          normalized['Critical Yes/No'] = normalizedValue;
+          normalized['Criticality (Yes/No)'] = normalizedValue;
         }
       }
 
@@ -2680,13 +2695,16 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Department'] = row['Department'];
       }
       
-      // Criticality - optional yes/no
-      if (row['Criticality']) {
-        const value = row['Criticality'].toString().toLowerCase();
-        if (!['yes', 'no'].includes(value)) {
-          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
+      // Critical Yes/No - Support both template format and legacy format
+      const criticalJobField = row['Critical Yes/No'] ?? row['Criticality'];
+      if (criticalJobField) {
+        const value = criticalJobField.toString().toLowerCase();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
         } else {
-          normalized['Criticality'] = value;
+          const normalizedCritical = ['yes', 'y'].includes(value) ? 'yes' : 'no';
+          normalized['Critical Yes/No'] = normalizedCritical;
+          normalized['Criticality'] = normalizedCritical;
         }
       }
       
@@ -3114,7 +3132,8 @@ async function performImport(
             continue;
           }
           
-          // Create new spare
+          // Create new spare - Support both template format and legacy format for criticality
+          const criticalVal = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           const newSpare = await storage.createSpare({
             partCode: partCode,
             partName: String(row['Part Name']).trim(),
@@ -3122,7 +3141,7 @@ async function performImport(
             componentCode: componentCode,
             componentName: component.name || '',
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
-            critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+            critical: criticalVal === 'Yes' || criticalVal === true ? 'Yes' : 'No',
             rob: row['ROB'] ? parseInt(row['ROB']) : 0,
             min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
             location: row['Location'] ? String(row['Location']).trim() : null,
@@ -3160,13 +3179,14 @@ async function performImport(
             continue;
           }
           
-          // Update existing spare
+          // Update existing spare - Support both template format and legacy format
+          const criticalValUpdate = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           const updatedSpare = await storage.updateSpare(existingSpare.id, {
             partName: String(row['Part Name']).trim(),
             componentId: component.id,
             componentCode: componentCode,
             componentName: component.name || '',
-            critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+            critical: criticalValUpdate === 'Yes' || criticalValUpdate === true ? 'Yes' : 'No',
             rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
             min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
             location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
@@ -3195,6 +3215,8 @@ async function performImport(
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
           
         } else if (mode === 'upsert') {
+          // Support both template format and legacy format for criticality
+          const criticalValUpsert = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
           if (existingSpare) {
             // Update existing
             const updatedSpare = await storage.updateSpare(existingSpare.id, {
@@ -3202,7 +3224,7 @@ async function performImport(
               componentId: component.id,
               componentCode: componentCode,
               componentName: component.name || '',
-              critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+              critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
               rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
               min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
               location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
@@ -3230,7 +3252,7 @@ async function performImport(
             
             console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
           } else {
-            // Create new
+            // Create new - use criticalValUpsert from parent scope
             const newSpare = await storage.createSpare({
               partCode: partCode,
               partName: String(row['Part Name']).trim(),
@@ -3238,7 +3260,7 @@ async function performImport(
               componentCode: componentCode,
               componentName: component.name || '',
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
-              critical: row['Criticality (Yes/No)'] === 'Yes' ? 'Yes' : 'No',
+              critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
               rob: row['ROB'] ? parseInt(row['ROB']) : 0,
               min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
               location: row['Location'] ? String(row['Location']).trim() : null,
@@ -3665,11 +3687,19 @@ async function performImport(
         assignedTo: row['Assigned To'] || null,
         approver: row['Approver'] || null,
         jobPriority: row['Job Priority'] || null,
-        classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes') : null,
+        // Schema expects text 'Yes'/'No', not boolean
+        classRelated: row['Class Related'] ? (row['Class Related'].toString().toLowerCase() === 'yes' ? 'Yes' : 'No') : null,
         lastDoneDate: lastDoneDate,         // Store Last Done date
         nextDueDate: nextDueDate,           // Calculated: lastDoneDate + frequencyValue + frequencyUnit (for Calendar jobs)
         department: row['Department'] || null,
-        criticality: row['Criticality'] ? (row['Criticality'].toString().toLowerCase() === 'yes') : null,
+        // Support both template format (Critical Yes/No) and legacy format (Criticality)
+        // Schema expects text 'Yes'/'No', not boolean
+        criticality: (() => {
+          const critVal = row['Critical Yes/No'] ?? row['Criticality'];
+          if (!critVal) return null;
+          const isYes = critVal === true || critVal.toString().toLowerCase() === 'yes' || critVal.toString().toLowerCase() === 'y';
+          return isYes ? 'Yes' : 'No';
+        })(),
         isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true
       };
       
@@ -3815,10 +3845,12 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
     commissionedDate: row['Commissioned Date'] ? normalizeDateToDDMMMYYYY(row['Commissioned Date']) : null,
     installationDate: row['Installation Date'] ? normalizeDateToDDMMMYYYY(row['Installation Date']) : null,
-    // Status and classification
-    critical: row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes',
+    // Status and classification - Support both template format and legacy format
+    critical: row['Critical Yes/No'] === true || row['Critical Yes/No'] === 'Yes' || 
+              row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes',
     classItem: false, // Not in template, defaulting to false
-    conditionBased: row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes',
+    conditionBased: row['Condition Based Yes/No'] === true || row['Condition Based Yes/No'] === 'Yes' ||
+                    row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes',
     isActive: row['IS Active'] !== false && row['IS Active'] !== 'No', // Default to true
     // Technical specifications
     rating: row['Rating'] || null,
@@ -3884,12 +3916,14 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
   if (row['Commissioned Date']) updateData.commissionedDate = normalizeDateToDDMMMYYYY(row['Commissioned Date']);
   if (row['Installation Date']) updateData.installationDate = normalizeDateToDDMMMYYYY(row['Installation Date']);
-  // Status and classification
-  if (row['Critical (Yes/No)'] !== undefined) {
-    updateData.critical = row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes';
+  // Status and classification - Support both template format and legacy format
+  const criticalValue = row['Critical Yes/No'] ?? row['Critical (Yes/No)'];
+  if (criticalValue !== undefined) {
+    updateData.critical = criticalValue === true || criticalValue === 'Yes';
   }
-  if (row['Condition Based (Yes/No)'] !== undefined) {
-    updateData.conditionBased = row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes';
+  const conditionBasedValue = row['Condition Based Yes/No'] ?? row['Condition Based (Yes/No)'];
+  if (conditionBasedValue !== undefined) {
+    updateData.conditionBased = conditionBasedValue === true || conditionBasedValue === 'Yes';
   }
   if (row['IS Active'] !== undefined) {
     updateData.isActive = row['IS Active'] !== false && row['IS Active'] !== 'No';
