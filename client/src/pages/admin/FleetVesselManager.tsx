@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -13,6 +15,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Accordion,
   AccordionContent,
@@ -44,25 +54,66 @@ interface VesselWithFleet extends Vessel {
   fleetCode?: string;
 }
 
+const fleetFormSchema = z.object({
+  code: z.string().min(1, "Fleet code is required").max(20, "Fleet code must be 20 characters or less"),
+  name: z.string().min(1, "Fleet name is required").max(100, "Fleet name must be 100 characters or less"),
+  description: z.string().optional(),
+});
+
+type FleetFormData = z.infer<typeof fleetFormSchema>;
+
+const vesselFormSchema = z.object({
+  id: z.string().min(1, "Vessel ID is required"),
+  name: z.string().min(1, "Vessel name is required"),
+  code: z.string().optional(),
+  fleetId: z.string().optional(),
+  imoNumber: z.string().optional(),
+  vesselType: z.string().optional(),
+  flag: z.string().optional(),
+});
+
+type VesselFormData = z.infer<typeof vesselFormSchema>;
+
+const vesselAssignmentSchema = z.object({
+  fleetId: z.string().optional(),
+});
+
+type VesselAssignmentData = z.infer<typeof vesselAssignmentSchema>;
+
 export default function FleetVesselManager() {
   const { toast } = useToast();
   const [isFleetDialogOpen, setIsFleetDialogOpen] = useState(false);
   const [isVesselDialogOpen, setIsVesselDialogOpen] = useState(false);
   const [editingFleet, setEditingFleet] = useState<Fleet | null>(null);
   const [editingVessel, setEditingVessel] = useState<Vessel | null>(null);
-  const [fleetFormData, setFleetFormData] = useState({
-    code: "",
-    name: "",
-    description: "",
+
+  const fleetForm = useForm<FleetFormData>({
+    resolver: zodResolver(fleetFormSchema),
+    defaultValues: {
+      code: "",
+      name: "",
+      description: "",
+    },
   });
-  const [vesselFormData, setVesselFormData] = useState({
-    id: "",
-    name: "",
-    code: "",
-    fleetId: "",
-    imoNumber: "",
-    vesselType: "",
-    flag: "",
+
+  const vesselForm = useForm<VesselFormData>({
+    resolver: zodResolver(vesselFormSchema),
+    defaultValues: {
+      id: "",
+      name: "",
+      code: "",
+      fleetId: "",
+      imoNumber: "",
+      vesselType: "",
+      flag: "",
+    },
+  });
+
+  const vesselAssignmentForm = useForm<VesselAssignmentData>({
+    resolver: zodResolver(vesselAssignmentSchema),
+    defaultValues: {
+      fleetId: "",
+    },
   });
 
   const { data: fleets = [], isLoading: isFleetsLoading } = useQuery<Fleet[]>({
@@ -74,14 +125,14 @@ export default function FleetVesselManager() {
   });
 
   const createFleetMutation = useMutation({
-    mutationFn: async (data: { code: string; name: string; description?: string }) => {
+    mutationFn: async (data: FleetFormData) => {
       return await apiRequest("POST", "/api/fleets", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fleets"] });
       toast({ title: "Fleet created successfully" });
       setIsFleetDialogOpen(false);
-      resetFleetForm();
+      fleetForm.reset();
     },
     onError: (error: any) => {
       toast({ title: "Error creating fleet", description: error.message, variant: "destructive" });
@@ -89,7 +140,7 @@ export default function FleetVesselManager() {
   });
 
   const updateFleetMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Fleet> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: FleetFormData }) => {
       return await apiRequest("PUT", `/api/fleets/${id}`, data);
     },
     onSuccess: () => {
@@ -98,7 +149,7 @@ export default function FleetVesselManager() {
       toast({ title: "Fleet updated successfully" });
       setIsFleetDialogOpen(false);
       setEditingFleet(null);
-      resetFleetForm();
+      fleetForm.reset();
     },
     onError: (error: any) => {
       toast({ title: "Error updating fleet", description: error.message, variant: "destructive" });
@@ -119,55 +170,54 @@ export default function FleetVesselManager() {
   });
 
   const createVesselMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/vessels", data);
+    mutationFn: async (data: VesselFormData) => {
+      return await apiRequest("POST", "/api/vessels", {
+        ...data,
+        code: data.code || data.id,
+        fleetId: data.fleetId || null,
+        imoNumber: data.imoNumber || null,
+        vesselType: data.vesselType || null,
+        flag: data.flag || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vessels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vessels-with-fleets"] });
       toast({ title: "Vessel created successfully" });
       setIsVesselDialogOpen(false);
-      resetVesselForm();
+      vesselForm.reset();
     },
     onError: (error: any) => {
       toast({ title: "Error creating vessel", description: error.message, variant: "destructive" });
     },
   });
 
-  const updateVesselMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await apiRequest("PUT", `/api/vessels/${id}/fleet`, data);
+  const updateVesselFleetMutation = useMutation({
+    mutationFn: async ({ id, fleetId }: { id: string; fleetId: string | null }) => {
+      return await apiRequest("PUT", `/api/vessels/${id}/fleet`, { fleetId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vessels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vessels-with-fleets"] });
-      toast({ title: "Vessel updated successfully" });
+      toast({ title: "Vessel assignment updated successfully" });
       setIsVesselDialogOpen(false);
       setEditingVessel(null);
-      resetVesselForm();
+      vesselAssignmentForm.reset();
     },
     onError: (error: any) => {
       toast({ title: "Error updating vessel", description: error.message, variant: "destructive" });
     },
   });
 
-  const resetFleetForm = () => {
-    setFleetFormData({ code: "", name: "", description: "" });
-  };
-
-  const resetVesselForm = () => {
-    setVesselFormData({ id: "", name: "", code: "", fleetId: "", imoNumber: "", vesselType: "", flag: "" });
-  };
-
   const handleCreateFleet = () => {
     setEditingFleet(null);
-    resetFleetForm();
+    fleetForm.reset({ code: "", name: "", description: "" });
     setIsFleetDialogOpen(true);
   };
 
   const handleEditFleet = (fleet: Fleet) => {
     setEditingFleet(fleet);
-    setFleetFormData({
+    fleetForm.reset({
       code: fleet.code,
       name: fleet.name,
       description: fleet.description || "",
@@ -181,52 +231,37 @@ export default function FleetVesselManager() {
     }
   };
 
-  const handleFleetSubmit = () => {
+  const handleFleetSubmit = (data: FleetFormData) => {
     if (editingFleet) {
-      updateFleetMutation.mutate({ id: editingFleet.id, data: fleetFormData });
+      updateFleetMutation.mutate({ id: editingFleet.id, data });
     } else {
-      createFleetMutation.mutate(fleetFormData);
+      createFleetMutation.mutate(data);
     }
   };
 
   const handleCreateVessel = (fleetId?: string) => {
     setEditingVessel(null);
-    resetVesselForm();
-    if (fleetId) {
-      setVesselFormData(prev => ({ ...prev, fleetId }));
-    }
+    vesselForm.reset({ id: "", name: "", code: "", fleetId: fleetId || "", imoNumber: "", vesselType: "", flag: "" });
     setIsVesselDialogOpen(true);
   };
 
   const handleEditVessel = (vessel: Vessel) => {
     setEditingVessel(vessel);
-    setVesselFormData({
-      id: vessel.id,
-      name: vessel.name,
-      code: vessel.code,
+    vesselAssignmentForm.reset({
       fleetId: vessel.fleetId || "",
-      imoNumber: vessel.imoNumber || "",
-      vesselType: vessel.vesselType || "",
-      flag: vessel.flag || "",
     });
     setIsVesselDialogOpen(true);
   };
 
-  const handleVesselSubmit = () => {
+  const handleVesselSubmit = (data: VesselFormData) => {
+    createVesselMutation.mutate(data);
+  };
+
+  const handleVesselAssignmentSubmit = (data: VesselAssignmentData) => {
     if (editingVessel) {
-      updateVesselMutation.mutate({ 
-        id: editingVessel.id, 
-        data: { fleetId: vesselFormData.fleetId || null } 
-      });
-    } else {
-      createVesselMutation.mutate({
-        id: vesselFormData.id,
-        name: vesselFormData.name,
-        code: vesselFormData.code || vesselFormData.id,
-        fleetId: vesselFormData.fleetId || null,
-        imoNumber: vesselFormData.imoNumber || null,
-        vesselType: vesselFormData.vesselType || null,
-        flag: vesselFormData.flag || null,
+      updateVesselFleetMutation.mutate({
+        id: editingVessel.id,
+        fleetId: data.fleetId || null,
       });
     }
   };
@@ -442,50 +477,73 @@ export default function FleetVesselManager() {
               {editingFleet ? "Edit Fleet" : "Create New Fleet"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="fleetCode">Fleet Code</Label>
-              <Input
-                id="fleetCode"
-                value={fleetFormData.code}
-                onChange={(e) => setFleetFormData(prev => ({ ...prev, code: e.target.value }))}
-                placeholder="e.g., FLT001"
-                data-testid="input-fleet-code"
+          <Form {...fleetForm}>
+            <form onSubmit={fleetForm.handleSubmit(handleFleetSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={fleetForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fleet Code</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., FLT001"
+                        data-testid="input-fleet-code"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fleetName">Fleet Name</Label>
-              <Input
-                id="fleetName"
-                value={fleetFormData.name}
-                onChange={(e) => setFleetFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Pacific Fleet"
-                data-testid="input-fleet-name"
+              <FormField
+                control={fleetForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fleet Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Pacific Fleet"
+                        data-testid="input-fleet-name"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fleetDescription">Description (Optional)</Label>
-              <Textarea
-                id="fleetDescription"
-                value={fleetFormData.description}
-                onChange={(e) => setFleetFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter fleet description..."
-                data-testid="input-fleet-description"
+              <FormField
+                control={fleetForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter fleet description..."
+                        data-testid="input-fleet-description"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFleetDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleFleetSubmit}
-              disabled={!fleetFormData.code || !fleetFormData.name}
-              data-testid="button-submit-fleet"
-            >
-              {editingFleet ? "Update Fleet" : "Create Fleet"}
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsFleetDialogOpen(false)} data-testid="button-cancel-fleet">
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createFleetMutation.isPending || updateFleetMutation.isPending}
+                  data-testid="button-submit-fleet"
+                >
+                  {createFleetMutation.isPending || updateFleetMutation.isPending ? "Saving..." : (editingFleet ? "Update Fleet" : "Create Fleet")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
@@ -496,95 +554,188 @@ export default function FleetVesselManager() {
               {editingVessel ? "Edit Vessel Fleet Assignment" : "Create New Vessel"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            {!editingVessel && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="vesselId">Vessel ID</Label>
-                  <Input
-                    id="vesselId"
-                    value={vesselFormData.id}
-                    onChange={(e) => setVesselFormData(prev => ({ ...prev, id: e.target.value }))}
-                    placeholder="e.g., V001"
-                    data-testid="input-vessel-id"
-                  />
+          {editingVessel ? (
+            <Form {...vesselAssignmentForm}>
+              <form onSubmit={vesselAssignmentForm.handleSubmit(handleVesselAssignmentSubmit)} className="space-y-4 py-4">
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <p className="font-medium">{editingVessel.name}</p>
+                  <p className="text-sm text-gray-500">Code: {editingVessel.code}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vesselName">Vessel Name</Label>
-                  <Input
-                    id="vesselName"
-                    value={vesselFormData.name}
-                    onChange={(e) => setVesselFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., MV Pacific Star"
-                    data-testid="input-vessel-name"
-                  />
-                </div>
+                <FormField
+                  control={vesselAssignmentForm.control}
+                  name="fleetId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign to Fleet</FormLabel>
+                      <Select
+                        value={field.value || "none"}
+                        onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-vessel-fleet">
+                            <SelectValue placeholder="Select a fleet (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Fleet (Unassigned)</SelectItem>
+                          {fleets.map((fleet) => (
+                            <SelectItem key={fleet.id} value={fleet.id}>
+                              {fleet.name} ({fleet.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsVesselDialogOpen(false)} data-testid="button-cancel-vessel-assignment">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateVesselFleetMutation.isPending}
+                    data-testid="button-submit-vessel-assignment"
+                  >
+                    {updateVesselFleetMutation.isPending ? "Saving..." : "Update Assignment"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          ) : (
+            <Form {...vesselForm}>
+              <form onSubmit={vesselForm.handleSubmit(handleVesselSubmit)} className="space-y-4 py-4">
+                <FormField
+                  control={vesselForm.control}
+                  name="id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vessel ID</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., V001"
+                          data-testid="input-vessel-id"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={vesselForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vessel Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., MV Pacific Star"
+                          data-testid="input-vessel-name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vesselImo">IMO Number</Label>
-                    <Input
-                      id="vesselImo"
-                      value={vesselFormData.imoNumber}
-                      onChange={(e) => setVesselFormData(prev => ({ ...prev, imoNumber: e.target.value }))}
-                      placeholder="IMO1234567"
-                      data-testid="input-vessel-imo"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vesselType">Vessel Type</Label>
-                    <Input
-                      id="vesselType"
-                      value={vesselFormData.vesselType}
-                      onChange={(e) => setVesselFormData(prev => ({ ...prev, vesselType: e.target.value }))}
-                      placeholder="e.g., Tanker"
-                      data-testid="input-vessel-type"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vesselFlag">Flag</Label>
-                  <Input
-                    id="vesselFlag"
-                    value={vesselFormData.flag}
-                    onChange={(e) => setVesselFormData(prev => ({ ...prev, flag: e.target.value }))}
-                    placeholder="e.g., Panama"
-                    data-testid="input-vessel-flag"
+                  <FormField
+                    control={vesselForm.control}
+                    name="imoNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>IMO Number</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="IMO1234567"
+                            data-testid="input-vessel-imo"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={vesselForm.control}
+                    name="vesselType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Vessel Type</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Tanker"
+                            data-testid="input-vessel-type"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="vesselFleet">Assign to Fleet</Label>
-              <Select
-                value={vesselFormData.fleetId}
-                onValueChange={(value) => setVesselFormData(prev => ({ ...prev, fleetId: value === "none" ? "" : value }))}
-              >
-                <SelectTrigger data-testid="select-vessel-fleet">
-                  <SelectValue placeholder="Select a fleet (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Fleet (Unassigned)</SelectItem>
-                  {fleets.map((fleet) => (
-                    <SelectItem key={fleet.id} value={fleet.id}>
-                      {fleet.name} ({fleet.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsVesselDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleVesselSubmit}
-              disabled={!editingVessel && (!vesselFormData.id || !vesselFormData.name)}
-              data-testid="button-submit-vessel"
-            >
-              {editingVessel ? "Update Assignment" : "Create Vessel"}
-            </Button>
-          </DialogFooter>
+                <FormField
+                  control={vesselForm.control}
+                  name="flag"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Flag</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Panama"
+                          data-testid="input-vessel-flag"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={vesselForm.control}
+                  name="fleetId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign to Fleet</FormLabel>
+                      <Select
+                        value={field.value || "none"}
+                        onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-vessel-fleet">
+                            <SelectValue placeholder="Select a fleet (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Fleet (Unassigned)</SelectItem>
+                          {fleets.map((fleet) => (
+                            <SelectItem key={fleet.id} value={fleet.id}>
+                              {fleet.name} ({fleet.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsVesselDialogOpen(false)} data-testid="button-cancel-vessel">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createVesselMutation.isPending}
+                    data-testid="button-submit-vessel"
+                  >
+                    {createVesselMutation.isPending ? "Creating..." : "Create Vessel"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
