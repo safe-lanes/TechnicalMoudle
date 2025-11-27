@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { FileSpreadsheet, Ship } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileSpreadsheet, Ship, History } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
@@ -13,16 +14,19 @@ import FleetComponentUpload from "./bulk/FleetComponentUpload";
 import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
+import BulkImportHistory from "./bulk/BulkImportHistory";
 import { VESSELS, type VesselId } from "@/lib/vessels";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
+type ViewMode = 'upload' | 'history';
 
 export default function BulkDataImport() {
   const [isFleetMode, setIsFleetMode] = useState(false);
   const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<VesselId>('V001');
+  const [viewMode, setViewMode] = useState<ViewMode>('upload');
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
@@ -109,18 +113,32 @@ export default function BulkDataImport() {
               />
             </div>
             
-            <p className="text-sm text-gray-500 ml-auto">
-              {isFleetMode 
-                ? "Fleet imports apply across all vessels" 
-                : "All imports will be associated with the selected vessel"}
-            </p>
+            <div className="ml-auto flex items-center gap-3">
+              <p className="text-sm text-gray-500">
+                {viewMode === 'history' 
+                  ? "View import history and error logs"
+                  : isFleetMode 
+                    ? "Fleet imports apply across all vessels" 
+                    : "All imports will be associated with the selected vessel"}
+              </p>
+              <Button
+                variant={viewMode === 'history' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode(viewMode === 'history' ? 'upload' : 'history')}
+                data-testid="button-toggle-history"
+              >
+                <History className="h-4 w-4 mr-2" />
+                {viewMode === 'history' ? 'Back to Upload' : 'Import History'}
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Template Content */}
         <div className="p-6">
-          {isFleetMode ? (
-            // Fleet Mode Templates
+          {viewMode === 'history' ? (
+            <BulkImportHistory vesselId={selectedVessel} />
+          ) : isFleetMode ? (
             selectedFleetTemplate === 'maker-list' ? (
               <MakerListUpload />
             ) : selectedFleetTemplate === 'master-data' ? (
@@ -144,7 +162,6 @@ export default function BulkDataImport() {
               </Card>
             )
           ) : (
-            // Vessel Mode Templates
             selectedVesselTemplate === 'machinery' ? (
               <MachineryComponentUpload vesselId={selectedVessel} />
             ) : selectedVesselTemplate === 'jobs' ? (
