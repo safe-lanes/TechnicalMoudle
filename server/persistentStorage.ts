@@ -5828,44 +5828,16 @@ export class PersistentFileStorage implements IStorage {
     const normalizedId = vessel.id.trim().toUpperCase();
     const normalizedCode = (vessel.code || vessel.id).trim().toUpperCase();
     
-    // Check all existing vessel IDs (normalized comparison to prevent case/whitespace duplicates)
+    // Check all existing vessel IDs in the vessels table (normalized comparison)
     const existingVesselIds = Object.keys(this.data.vessels || {})
       .map(id => id.trim().toUpperCase());
     if (existingVesselIds.includes(normalizedId)) {
-      throw new Error(`Vessel with id ${normalizedId} already exists`);
+      throw new Error(`Vessel with id ${normalizedId} already exists in the vessel registry`);
     }
     
-    // Check if vessel ID conflicts with existing component-linked vessels (normalized comparison)
-    const componentVesselIds = new Set<string>();
-    Object.values(this.data.components || {}).forEach(c => {
-      if (c && c.vesselId && c.dataScope !== 'fleet') {
-        componentVesselIds.add(c.vesselId.trim().toUpperCase());
-      }
-    });
-    
-    if (componentVesselIds.has(normalizedId)) {
-      throw new Error(`Vessel id ${normalizedId} is already in use by existing components. Cannot create a conflicting vessel record.`);
-    }
-    
-    // Check if vessel ID conflicts with existing fleet vessel mappings
-    if (Array.isArray(this.data.fleetVesselMappings)) {
-      const mappingVesselIds = new Set<string>();
-      this.data.fleetVesselMappings.forEach((m: any) => {
-        if (m && m.vesselId) {
-          mappingVesselIds.add(m.vesselId.trim().toUpperCase());
-        }
-      });
-      if (mappingVesselIds.has(normalizedId)) {
-        throw new Error(`Vessel id ${normalizedId} is already in use in fleet vessel mappings.`);
-      }
-    }
-    
-    // Check if vessel ID conflicts with existing PMS vessel settings
-    const settingsVesselIds = Object.keys(this.data.pmsVesselSettings || {})
-      .map(id => id.trim().toUpperCase());
-    if (settingsVesselIds.includes(normalizedId)) {
-      throw new Error(`Vessel id ${normalizedId} already has PMS settings configured.`);
-    }
+    // Note: We intentionally do NOT block creation if vesselId exists in components.
+    // This allows users to properly register vessels that were previously imported
+    // without a formal vessel registry entry.
     
     const newVessel: Vessel = {
       id: normalizedId,
