@@ -43,6 +43,19 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Running Hours Module**: Cascade update system for parent/child components, automatic work order generation, and backend validation.
 - **Components Module Job Display**: Displays relevant maintenance tasks from parent and descendant components.
 - **Admin Module**: Bulk data import, data purging, and a Fleet Admin Dashboard for master data management.
+- **Multi-Sheet Excel Bulk Import Templates**: Comprehensive 11-sheet template system for Fleet and Vessel data:
+    - **Master_Sheet**: Import instructions and guidance
+    - **Maker List**: 3 columns (Maker Code, Maker Name, Address) with CRUD API
+    - **SFI Details**: 2 columns (Component Code, Component Name) with CRUD API
+    - **Fleet_Component**: 13 columns including IS Parent Yes/No, Critical, Condition Based
+    - **Fleet_Job**: 21 columns with dual frequency support (Calendar Interval + RH Interval)
+    - **Fleet_Spare**: 19 columns for fleet-level spare parts master data
+    - **Vessel_Component**: 24 columns (no IS Parent) for vessel-specific equipment
+    - **Vessel_Job**: 21 columns for vessel-specific maintenance tasks
+    - **Vessel_Spare**: 27 columns with ROB by Location (Deck Store, Engine Store, Store 1, Store 2)
+    - **Vessel_Stores**: 12 columns including IMPA Code for stores inventory
+    - **Master Data**: Dropdown reference values for consistent data entry
+    - Fleet Equipment Code linkage between fleet master data and vessel-specific records
 - **Role-Based Access Control (RBAC)**: Implements three user roles (Ship, Office, PMS Admin) with enhanced user schema, `AuthContext`, `RoleGuard` components, and backend middleware for authorization and data isolation.
 - **Global Business Rules Compliance**:
     - Enforces rules for Parent vs Sub-Component RH Authority, Jobs Belong to Sub-Components, Stores Module Isolation, Component Code Cascade Updates, Component Cascade Inactivate, RH Correction → WO Re-trigger, Grace Period → Overdue Transition, Job Frequency Change Impact, Spare Consumption Warning (Rule #9), and Multi-Department Approver Validation (Rule #19).
