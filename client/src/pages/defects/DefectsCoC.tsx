@@ -10,6 +10,8 @@ import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Plus, Sh
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import DefectFormExact from "./DefectFormExact";
 import DefectFormWizard from "./DefectFormWizard";
+import AddNoteModal from "./AddNoteModal";
+import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
@@ -33,6 +35,8 @@ export default function DefectsCoC() {
     open: false, 
     defect: null 
   });
+  const [addNoteModal, setAddNoteModal] = useState<{ open: boolean; defectId: string | null }>({ open: false, defectId: null });
+  const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
 
   // Get CoC defects only
   const { data: allDefects = [], isLoading } = useQuery({
@@ -437,7 +441,7 @@ export default function DefectsCoC() {
                                 size="sm" 
                                 className="h-7 w-7 p-0"
                                 title="Add Note"
-                                onClick={() => alert('Add Note feature coming soon')}
+                                onClick={() => setAddNoteModal({ open: true, defectId: defect.id })}
                                 data-testid={`button-note-coc-${defect.id}`}
                               >
                                 <Paperclip className="h-3 w-3" />
@@ -447,7 +451,7 @@ export default function DefectsCoC() {
                                 size="sm" 
                                 className="h-7 w-7 p-0"
                                 title="Link"
-                                onClick={() => alert('Link feature coming soon')}
+                                onClick={() => setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] })}
                                 data-testid={`button-link-coc-${defect.id}`}
                               >
                                 <Link className="h-3 w-3" />
@@ -530,6 +534,25 @@ export default function DefectsCoC() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Add Note Modal */}
+      {addNoteModal.defectId && (
+        <AddNoteModal
+          open={addNoteModal.open}
+          onClose={() => setAddNoteModal({ open: false, defectId: null })}
+          defectId={addNoteModal.defectId}
+        />
+      )}
+
+      {/* Link Defects Modal */}
+      {linkModal.defectId && (
+        <LinkDefectsModal
+          open={linkModal.open}
+          onClose={() => setLinkModal({ open: false, defectId: null, linkedDefects: [] })}
+          defectId={linkModal.defectId}
+          currentLinkedDefects={linkModal.linkedDefects}
+        />
       )}
     </div>
   );

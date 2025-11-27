@@ -9,6 +9,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useVessel } from "@/contexts/VesselContext";
+import { VESSELS } from "@/lib/vessels";
 import type { Spare } from "@shared/schema";
 
 // Component tree is now imported from shared data
@@ -349,7 +351,7 @@ const historyData = [
 
 const Spares: React.FC = () => {
   const { toast } = useToast();
-  const vesselId = "V001";
+  const { vesselId, setVesselId } = useVessel();
   
   const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -363,6 +365,7 @@ const Spares: React.FC = () => {
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   
   // Fetch spares from API
   const { data: sparesData = [], isLoading: sparesLoading } = useQuery<Spare[]>({
@@ -516,13 +519,67 @@ const Spares: React.FC = () => {
     }));
   };
 
-  // Save bulk updates
-  const saveBulkUpdates = () => {
-    // In a real application, this would update the backend
-    // For now, we'll just close the modal
-    console.log("Bulk updates saved:", bulkUpdateData);
-    setIsBulkUpdateModalOpen(false);
-    setBulkUpdateData({});
+  // Save bulk updates - persist to backend
+  const saveBulkUpdates = async () => {
+    setIsBulkUpdating(true);
+    
+    try {
+      // Collect items to consume
+      const itemsToConsume = Object.entries(bulkUpdateData)
+        .filter(([_, data]) => data.consumed > 0)
+        .map(([spareId, data]) => ({
+          spareId: parseInt(spareId),
+          quantity: data.consumed,
+          notes: `Bulk consumption on ${dateReceived || new Date().toISOString().split('T')[0]}`
+        }));
+      
+      // Collect items to receive
+      const itemsToReceive = Object.entries(bulkUpdateData)
+        .filter(([_, data]) => data.received > 0)
+        .map(([spareId, data]) => ({
+          spareId: parseInt(spareId),
+          quantity: data.received,
+          notes: `Bulk receipt at ${placeReceived || 'Unknown location'} on ${dateReceived || new Date().toISOString().split('T')[0]}`
+        }));
+      
+      // Execute consume operations
+      if (itemsToConsume.length > 0) {
+        await apiRequest('POST', `/api/spares/${vesselId}/batch-consume`, {
+          items: itemsToConsume,
+          consumedBy: 'System'
+        });
+      }
+      
+      // Execute receive operations
+      if (itemsToReceive.length > 0) {
+        await apiRequest('POST', `/api/spares/${vesselId}/batch-receive`, {
+          items: itemsToReceive,
+          receivedBy: 'System',
+          purchaseOrderRef: `BULK-${new Date().toISOString().split('T')[0]}`
+        });
+      }
+      
+      // Invalidate cache to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      
+      toast({
+        title: "Success",
+        description: `Bulk update completed: ${itemsToConsume.length} consumed, ${itemsToReceive.length} received`,
+      });
+      
+      setIsBulkUpdateModalOpen(false);
+      setBulkUpdateData({});
+      setPlaceReceived("");
+      setDateReceived("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save bulk updates",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkUpdating(false);
+    }
   };
 
   const renderComponentTree = (nodes: ComponentNode[], level: number = 0) => {
@@ -604,13 +661,16 @@ const Spares: React.FC = () => {
 
       {/* Search and Filters - Single Row Layout */}
       <div className="flex gap-3 items-center mb-4">
-        <Select>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Vessel" />
+        <Select value={vesselId} onValueChange={setVesselId}>
+          <SelectTrigger className="w-40" data-testid="select-vessel">
+            <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="vessel1">Vessel 1</SelectItem>
-            <SelectItem value="vessel2">Vessel 2</SelectItem>
+            {VESSELS.map(vessel => (
+              <SelectItem key={vessel.id} value={vessel.id}>
+                {vessel.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -1135,14 +1195,17 @@ const Spares: React.FC = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setIsBulkUpdateModalOpen(false)}
+                disabled={isBulkUpdating}
               >
                 Cancel
               </Button>
               <Button 
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={saveBulkUpdates}
+                disabled={isBulkUpdating}
+                data-testid="button-save-bulk-updates"
               >
-                Save Updates
+                {isBulkUpdating ? "Saving..." : "Save Updates"}
               </Button>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
@@ -927,6 +929,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
 };
 
 const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
+  const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  
   // Fetch maintenance history for the selected component
   const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/component-maintenance-history', selectedComponent?.id],
@@ -961,7 +965,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
           <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
         </div>
         <div className="text-xs text-gray-500 italic">
-          ⚠️ Records are immutable and cannot be edited or deleted
+          Records are immutable and cannot be edited or deleted
         </div>
       </div>
       
@@ -984,6 +988,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
               <tr 
                 key={index} 
                 className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
+                onClick={() => setSelectedRecord(record)}
                 data-testid={`maintenance-record-${record.workOrderNo}`}
               >
                 <td className="py-3 px-3 text-gray-900 font-medium" data-testid={`wo-no-${record.workOrderNo}`}>
@@ -1010,10 +1015,139 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
         </table>
       </div>
       
-      {/* Expandable Details Section - Future Enhancement */}
+      {/* Instruction hint */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-        💡 Click on a record to view full details including work description, spares used, and remarks (feature coming soon)
+        Click on a record to view full details including work description, spares used, and remarks
       </div>
+
+      {/* Record Detail Modal */}
+      <Dialog open={!!selectedRecord} onOpenChange={(open) => !open && setSelectedRecord(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-blue-600" />
+              Maintenance Record Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedRecord && (
+            <div className="space-y-6 py-4">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Work Order No.</label>
+                  <p className="text-lg font-semibold text-gray-900" data-testid="detail-wo-no">{selectedRecord.workOrderNo}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 uppercase">Status</label>
+                  <Badge className="bg-green-100 text-green-800 mt-1">{selectedRecord.status}</Badge>
+                </div>
+              </div>
+
+              {/* Job Information */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Job Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                  <div>
+                    <label className="text-xs text-gray-500">Job Title</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.jobTitle}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Maintenance Type</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.maintenanceType}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Date Completed</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.dateCompleted}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Running Hours at Completion</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.runningHoursAtCompletion || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Personnel */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <User className="h-4 w-4" /> Personnel
+                </h4>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                  <div>
+                    <label className="text-xs text-gray-500">Performed By</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.performedBy}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Approved By</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedRecord.approvedBy || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Description */}
+              {selectedRecord.workDescription && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" /> Work Description
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedRecord.workDescription}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Spares Used */}
+              {selectedRecord.sparesUsed && selectedRecord.sparesUsed.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Package className="h-4 w-4" /> Spares Used
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-2 text-gray-600">Part Code</th>
+                          <th className="text-left py-2 text-gray-600">Part Name</th>
+                          <th className="text-right py-2 text-gray-600">Qty Used</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedRecord.sparesUsed.map((spare: any, idx: number) => (
+                          <tr key={idx} className="border-b border-gray-100">
+                            <td className="py-2 text-gray-900">{spare.partCode}</td>
+                            <td className="py-2 text-gray-900">{spare.partName}</td>
+                            <td className="py-2 text-gray-900 text-right">{spare.quantity}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Remarks */}
+              {selectedRecord.remarks && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" /> Remarks
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedRecord.remarks}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Record Metadata */}
+              <div className="pt-4 border-t text-xs text-gray-500">
+                <p>This record was automatically created when the work order was completed and approved.</p>
+                <p className="mt-1">Records are immutable for audit compliance purposes.</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

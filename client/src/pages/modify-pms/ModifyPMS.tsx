@@ -375,8 +375,22 @@ const ModifyPMS: React.FC = () => {
               <ComponentChangeRequestForm 
                 onClose={handleCloseFormModal}
                 onSubmit={(componentData) => {
-                  console.log("Component change request:", componentData);
-                  // Create change request here
+                  const newRequest = changeRequestService.createChangeRequest({
+                    category: "components",
+                    requestTitle: `Component Change: ${componentData.componentCode || 'Unknown'}`,
+                    requestedBy: currentUser.name,
+                    requestDate: new Date().toISOString().split('T')[0],
+                    status: "Pending Approval",
+                    originalData: {
+                      componentId: componentData.componentId,
+                      serialNo: componentData.serialNo,
+                      drawingNo: componentData.drawingNo,
+                    },
+                    newData: componentData,
+                    changedFields: Object.keys(componentData),
+                    comments: componentData.remarks || "Component modification request"
+                  });
+                  setRequests(changeRequestService.getAllChangeRequests());
                   handleCloseFormModal();
                 }}
                 initialData={{
@@ -399,8 +413,22 @@ const ModifyPMS: React.FC = () => {
               <WorkOrdersChangeRequestForm 
                 onClose={handleCloseFormModal}
                 onSubmit={(workOrderData) => {
-                  console.log("Work Order change request:", workOrderData);
-                  // Create change request here
+                  const newRequest = changeRequestService.createChangeRequest({
+                    category: "work-orders",
+                    requestTitle: `Work Order Change: ${workOrderData.workOrderNo || workOrderData.title || 'Unknown'}`,
+                    requestedBy: currentUser.name,
+                    requestDate: new Date().toISOString().split('T')[0],
+                    status: "Pending Approval",
+                    originalData: {
+                      workOrderNo: workOrderData.workOrderNo,
+                      title: workOrderData.title,
+                      status: workOrderData.status,
+                    },
+                    newData: workOrderData,
+                    changedFields: Object.keys(workOrderData),
+                    comments: workOrderData.briefWorkDescription || "Work order modification request"
+                  });
+                  setRequests(changeRequestService.getAllChangeRequests());
                   handleCloseFormModal();
                 }}
                 initialData={{
@@ -428,8 +456,22 @@ const ModifyPMS: React.FC = () => {
               <SparesChangeRequestForm 
                 onClose={handleCloseFormModal}
                 onSubmit={(sparesData) => {
-                  console.log("Spares change request:", sparesData);
-                  // Create change request here
+                  const newRequest = changeRequestService.createChangeRequest({
+                    category: "spares",
+                    requestTitle: `Spare Part Change: ${sparesData.partCode || sparesData.partName || 'Unknown'}`,
+                    requestedBy: currentUser.name,
+                    requestDate: new Date().toISOString().split('T')[0],
+                    status: "Pending Approval",
+                    originalData: {
+                      partCode: sparesData.partCode,
+                      partName: sparesData.partName,
+                      qty: sparesData.qty,
+                    },
+                    newData: sparesData,
+                    changedFields: Object.keys(sparesData),
+                    comments: sparesData.remarks || "Spare part modification request"
+                  });
+                  setRequests(changeRequestService.getAllChangeRequests());
                   handleCloseFormModal();
                 }}
                 initialData={{
@@ -447,8 +489,22 @@ const ModifyPMS: React.FC = () => {
               <StoresChangeRequestForm 
                 onClose={handleCloseFormModal}
                 onSubmit={(storesData) => {
-                  console.log("Stores change request:", storesData);
-                  // Create change request here
+                  const newRequest = changeRequestService.createChangeRequest({
+                    category: "stores",
+                    requestTitle: `Store Item Change: ${storesData.itemCode || storesData.itemName || 'Unknown'}`,
+                    requestedBy: currentUser.name,
+                    requestDate: new Date().toISOString().split('T')[0],
+                    status: "Pending Approval",
+                    originalData: {
+                      itemCode: storesData.itemCode,
+                      itemName: storesData.itemName,
+                      rob: storesData.rob,
+                    },
+                    newData: storesData,
+                    changedFields: Object.keys(storesData),
+                    comments: storesData.remarks || "Store item modification request"
+                  });
+                  setRequests(changeRequestService.getAllChangeRequests());
                   handleCloseFormModal();
                 }}
                 initialData={{

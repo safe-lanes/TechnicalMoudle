@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Trash2, Search, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import DefectFormExact from "./DefectFormExact";
+import AddNoteModal from "./AddNoteModal";
+import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
@@ -31,6 +33,8 @@ export default function DefectsActive() {
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
   const [activeTab, setActiveTab] = useState("Active");
+  const [addNoteModal, setAddNoteModal] = useState<{ open: boolean; defectId: string | null }>({ open: false, defectId: null });
+  const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
 
   // Get all defects to calculate counts and filter
   const { data: allDefects = [], isLoading } = useQuery({
@@ -465,7 +469,7 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="Add Note"
-                            onClick={() => alert('Add Note feature coming soon')}
+                            onClick={() => setAddNoteModal({ open: true, defectId: defect.id })}
                             data-testid={`button-note-${defect.id}`}
                           >
                             <Paperclip className="h-3 w-3" />
@@ -475,7 +479,7 @@ export default function DefectsActive() {
                             size="sm" 
                             className="h-7 w-7 p-0"
                             title="Link"
-                            onClick={() => alert('Link feature coming soon')}
+                            onClick={() => setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] })}
                             data-testid={`button-link-${defect.id}`}
                           >
                             <Link className="h-3 w-3" />
@@ -512,6 +516,25 @@ export default function DefectsActive() {
           </div>
         )}
       </div>
+
+      {/* Add Note Modal */}
+      {addNoteModal.defectId && (
+        <AddNoteModal
+          open={addNoteModal.open}
+          onClose={() => setAddNoteModal({ open: false, defectId: null })}
+          defectId={addNoteModal.defectId}
+        />
+      )}
+
+      {/* Link Defects Modal */}
+      {linkModal.defectId && (
+        <LinkDefectsModal
+          open={linkModal.open}
+          onClose={() => setLinkModal({ open: false, defectId: null, linkedDefects: [] })}
+          defectId={linkModal.defectId}
+          currentLinkedDefects={linkModal.linkedDefects}
+        />
+      )}
     </div>
   );
 }
