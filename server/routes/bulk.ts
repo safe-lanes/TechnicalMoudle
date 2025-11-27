@@ -12,6 +12,57 @@ import { getSFIName } from '../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dateUtils';
 
 const router = Router();
+
+const TEMPLATE_VERSION = '1.0.0';
+const TEMPLATE_VERSION_DATE = '2025-11-27';
+const TEMPLATE_VERSION_CELL = '_TEMPLATE_VERSION_';
+
+function checkTemplateVersion(worksheet: XLSX.WorkSheet): { valid: boolean; version?: string; message?: string } {
+  let versionValue: string | null = null;
+  
+  const cellsToCheck = ['AA1', 'C1', 'Z1'];
+  for (const cellAddr of cellsToCheck) {
+    const cell = worksheet[cellAddr];
+    if (cell && cell.v && String(cell.v).startsWith(TEMPLATE_VERSION_CELL)) {
+      versionValue = String(cell.v);
+      break;
+    }
+  }
+  
+  if (!versionValue) {
+    return { valid: true, message: 'No version info found - legacy template accepted' };
+  }
+  
+  const version = versionValue.replace(TEMPLATE_VERSION_CELL, '');
+  if (version === TEMPLATE_VERSION) {
+    return { valid: true, version };
+  }
+  
+  const versionParts = version.split('.').map(p => parseInt(p, 10));
+  const currentParts = TEMPLATE_VERSION.split('.').map(p => parseInt(p, 10));
+  
+  if (versionParts.some(isNaN) || currentParts.some(isNaN)) {
+    return { valid: true, version, message: 'Version format could not be parsed - accepting upload' };
+  }
+  
+  const uploadMajor = versionParts[0] || 0;
+  const currentMajor = currentParts[0] || 0;
+  
+  if (uploadMajor < currentMajor) {
+    return { 
+      valid: false, 
+      version, 
+      message: `Template version ${version} is outdated. Please download the latest template (v${TEMPLATE_VERSION}).` 
+    };
+  }
+  
+  return { valid: true, version };
+}
+
+function addVersionInfoToSheet(sheet: ExcelJS.Worksheet): void {
+  sheet.getCell('AA1').value = `${TEMPLATE_VERSION_CELL}${TEMPLATE_VERSION}`;
+  sheet.getColumn('AA').hidden = true;
+}
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
@@ -205,6 +256,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   ];
   
   const instructions = [
+    ['Template Version', `Version ${TEMPLATE_VERSION} (${TEMPLATE_VERSION_DATE}) - Do not modify version info`],
     ['Overview', 'This workbook contains template sheets for importing Fleet Master Data and Vessel-specific data.'],
     ['Fleet vs Vessel', 'FLEET sheets define master templates applied at fleet level. VESSEL sheets contain vessel-specific instance data.'],
     ['Fleet Equipment Code', 'Links fleet and vessel data. Fleet_Component creates master equipment. Vessel_Component references via Fleet Equipment Code.'],
@@ -221,6 +273,9 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     ['Stores vs Spares', 'Vessel_Stores is for consumables (paint, chemicals). Spares are linked to equipment/components.'],
     ['IMPA Code', 'Vessel_Stores includes IMPA Code field for international maritime parts standardization.']
   ];
+  
+  masterSheet.getCell('C1').value = `${TEMPLATE_VERSION_CELL}${TEMPLATE_VERSION}`;
+  masterSheet.getColumn('C').hidden = true;
   
   instructions.forEach(([section, text]) => {
     masterSheet.addRow({ section, instructions: text });
@@ -1181,6 +1236,8 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
+  addVersionInfoToSheet(woSheet);
+  
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -1398,6 +1455,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
+  addVersionInfoToSheet(jobsSheet);
+  
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -1532,6 +1591,8 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
       };
     }
   });
+  
+  addVersionInfoToSheet(sparesSheet);
   
   // Write to buffer and return
   const buffer = await workbook.xlsx.writeBuffer();
@@ -2043,6 +2104,16 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       if (!targetSheet) {
         return res.status(400).json({ 
           error: `Sheet "${targetSheetName}" not found. Available sheets: ${workbook.SheetNames.join(', ')}` 
+        });
+      }
+      
+      const versionCheck = checkTemplateVersion(targetSheet);
+      if (!versionCheck.valid) {
+        return res.status(400).json({ 
+          error: versionCheck.message || 'Template version is outdated. Please download the latest template.',
+          outdatedTemplate: true,
+          uploadedVersion: versionCheck.version,
+          currentVersion: TEMPLATE_VERSION
         });
       }
       
