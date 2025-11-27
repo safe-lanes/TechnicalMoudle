@@ -1462,3 +1462,224 @@ export const insertSfiDetailsSchema = createInsertSchema(sfiDetails).omit({
 
 export type InsertSfiDetails = z.infer<typeof insertSfiDetailsSchema>;
 export type SfiDetails = typeof sfiDetails.$inferSelect;
+
+// =====================================================
+// MASTER DATA - Fleet Equipment Code generation and tracking
+// Central sheet for generating Fleet Equipment Codes from Maker + Model + SFI
+// =====================================================
+export const masterData = pgTable("master_data", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  slNo: integer("sl_no"), // Serial number for tracking
+  makerName: text("maker_name").notNull(), // Manufacturer name from Maker List
+  makerCode: text("maker_code").notNull(), // Unique code from Maker List
+  countMaker: integer("count_maker"), // Internal counter for maker grouping
+  model: text("model").notNull(), // Model name/number from manufacturer
+  modelCode: text("model_code").notNull(), // Combination of Maker Code + Model
+  countSfiCode: integer("count_sfi_code"), // Counter for SFI codes
+  fleetEquipmentCode: text("fleet_equipment_code").notNull().unique(), // System-generated: SFI.SEQ (e.g., 722.001.AA)
+  sfiCode: text("sfi_code").notNull(), // 7-digit SFI classification code
+  assignedSubCode: text("assigned_sub_code"), // Sub-code under SFI for finer grouping
+  vesselName: text("vessel_name"), // Vessel where equipment was first created
+  vesselCode: text("vessel_code"), // Vessel code
+  equipmentName: text("equipment_name").notNull(), // Descriptive name of equipment
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  fleetEquipmentCodeIdx: index("idx_master_data_fleet_code").on(table.fleetEquipmentCode),
+  sfiCodeIdx: index("idx_master_data_sfi").on(table.sfiCode),
+  makerCodeIdx: index("idx_master_data_maker").on(table.makerCode),
+  modelCodeIdx: index("idx_master_data_model").on(table.modelCode),
+}));
+
+export const insertMasterDataSchema = createInsertSchema(masterData).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMasterData = z.infer<typeof insertMasterDataSchema>;
+export type MasterData = typeof masterData.$inferSelect;
+
+
+// =====================================================
+// FLEET VESSEL MAPPING - Links Fleet Equipment Codes to Vessels
+// Controls which vessels have access to which fleet equipment
+// =====================================================
+export const fleetVesselMapping = pgTable("fleet_vessel_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(), // From masterData or components
+  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselName: text("vessel_name"), // Vessel display name
+  mappedBy: text("mapped_by").notNull(), // User who created mapping
+  mappedAt: timestamp("mapped_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  fleetCodeIdx: index("idx_fleet_vessel_mapping_fleet").on(table.fleetEquipmentCode),
+  vesselCodeIdx: index("idx_fleet_vessel_mapping_vessel").on(table.vesselCode),
+  uniqueMapping: unique("unique_fleet_vessel_mapping").on(table.fleetEquipmentCode, table.vesselCode),
+}));
+
+export const insertFleetVesselMappingSchema = createInsertSchema(fleetVesselMapping).omit({
+  id: true,
+  mappedAt: true,
+});
+
+export type InsertFleetVesselMapping = z.infer<typeof insertFleetVesselMappingSchema>;
+export type FleetVesselMapping = typeof fleetVesselMapping.$inferSelect;
+
+// =====================================================
+// FLEET COMPONENT MAPPING - Links Fleet Equipment to Vessel Components
+// Maps a Fleet Equipment Code to specific vessel component codes
+// =====================================================
+export const fleetComponentMapping = pgTable("fleet_component_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Fleet equipment identifier
+  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  componentCode: text("component_code").notNull(), // Vessel-specific component code
+  componentId: text("component_id"), // Reference to components table
+  componentName: text("component_name"), // Display name
+  mappedBy: text("mapped_by").notNull(), // User who created mapping
+  mappedAt: timestamp("mapped_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  fleetCodeIdx: index("idx_fleet_comp_mapping_fleet").on(table.fleetEquipmentCode),
+  vesselCodeIdx: index("idx_fleet_comp_mapping_vessel").on(table.vesselCode),
+  componentCodeIdx: index("idx_fleet_comp_mapping_component").on(table.componentCode),
+  uniqueMapping: unique("unique_fleet_component_mapping").on(table.fleetEquipmentCode, table.vesselCode, table.componentCode),
+}));
+
+export const insertFleetComponentMappingSchema = createInsertSchema(fleetComponentMapping).omit({
+  id: true,
+  mappedAt: true,
+});
+
+export type InsertFleetComponentMapping = z.infer<typeof insertFleetComponentMappingSchema>;
+export type FleetComponentMapping = typeof fleetComponentMapping.$inferSelect;
+
+// =====================================================
+// FLEET JOB VESSEL MAPPING - Links Fleet Jobs to Vessels
+// Controls which vessels have access to which fleet jobs
+// =====================================================
+export const fleetJobVesselMapping = pgTable("fleet_job_vessel_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the job belongs to
+  jobCode: text("job_code").notNull(), // Fleet job code
+  jobId: text("job_id"), // Reference to jobs table
+  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselName: text("vessel_name"), // Vessel display name
+  mappedBy: text("mapped_by").notNull(), // User who created mapping
+  mappedAt: timestamp("mapped_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  fleetCodeIdx: index("idx_fleet_job_mapping_fleet").on(table.fleetEquipmentCode),
+  jobCodeIdx: index("idx_fleet_job_mapping_job").on(table.jobCode),
+  vesselCodeIdx: index("idx_fleet_job_mapping_vessel").on(table.vesselCode),
+  uniqueMapping: unique("unique_fleet_job_vessel_mapping").on(table.jobCode, table.vesselCode),
+}));
+
+export const insertFleetJobVesselMappingSchema = createInsertSchema(fleetJobVesselMapping).omit({
+  id: true,
+  mappedAt: true,
+});
+
+export type InsertFleetJobVesselMapping = z.infer<typeof insertFleetJobVesselMappingSchema>;
+export type FleetJobVesselMapping = typeof fleetJobVesselMapping.$inferSelect;
+
+// =====================================================
+// FLEET SPARE VESSEL MAPPING - Links Fleet Spares to Vessels
+// Controls which vessels have access to which fleet spares
+// =====================================================
+export const fleetSpareVesselMapping = pgTable("fleet_spare_vessel_mapping", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  fleetEquipmentCode: text("fleet_equipment_code").notNull(), // Equipment the spare belongs to
+  partCode: text("part_code").notNull(), // Fleet spare part code
+  spareId: text("spare_id"), // Reference to spares table
+  vesselCode: text("vessel_code").notNull(), // Vessel identifier
+  vesselName: text("vessel_name"), // Vessel display name
+  mappedBy: text("mapped_by").notNull(), // User who created mapping
+  mappedAt: timestamp("mapped_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  fleetCodeIdx: index("idx_fleet_spare_mapping_fleet").on(table.fleetEquipmentCode),
+  partCodeIdx: index("idx_fleet_spare_mapping_part").on(table.partCode),
+  vesselCodeIdx: index("idx_fleet_spare_mapping_vessel").on(table.vesselCode),
+  uniqueMapping: unique("unique_fleet_spare_vessel_mapping").on(table.partCode, table.vesselCode),
+}));
+
+export const insertFleetSpareVesselMappingSchema = createInsertSchema(fleetSpareVesselMapping).omit({
+  id: true,
+  mappedAt: true,
+});
+
+export type InsertFleetSpareVesselMapping = z.infer<typeof insertFleetSpareVesselMappingSchema>;
+export type FleetSpareVesselMapping = typeof fleetSpareVesselMapping.$inferSelect;
+
+// =====================================================
+// BULK IMPORT HISTORY - Tracks all bulk import operations
+// Audit trail for all Excel/CSV bulk imports
+// =====================================================
+export const bulkImportHistory = pgTable("bulk_import_history", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselCode: text("vessel_code"), // Null for fleet-level imports
+  vesselName: text("vessel_name"),
+  moduleType: text("module_type").notNull(), // 'Machinery' | 'Jobs' | 'Spares' | 'Stores' | 'Fleet_Component' | 'Fleet_Job' | 'Fleet_Spare'
+  sheetName: text("sheet_name"), // Which sheet was imported (for multi-sheet templates)
+  fileName: text("file_name").notNull(), // Original file name
+  fileSize: integer("file_size"), // File size in bytes
+  uploadedBy: text("uploaded_by").notNull(), // User who uploaded
+  uploadedByName: text("uploaded_by_name"), // User display name
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  totalRows: integer("total_rows").notNull().default(0), // Total data rows in file
+  successCount: integer("success_count").notNull().default(0), // Successfully imported
+  failedCount: integer("failed_count").notNull().default(0), // Failed rows
+  skippedCount: integer("skipped_count").notNull().default(0), // Skipped (duplicates, etc.)
+  status: text("status").notNull().default("Processing"), // 'Processing' | 'Completed' | 'Failed' | 'Partial'
+  errorSummary: text("error_summary"), // Brief summary of errors
+  isFleetImport: boolean("is_fleet_import").notNull().default(false), // True if Fleet Data Import mode
+  templateVersion: text("template_version"), // Version of template used
+  processingTimeMs: integer("processing_time_ms"), // How long import took
+}, (table) => ({
+  vesselCodeIdx: index("idx_bulk_import_vessel").on(table.vesselCode),
+  moduleTypeIdx: index("idx_bulk_import_module").on(table.moduleType),
+  uploadedAtIdx: index("idx_bulk_import_date").on(table.uploadedAt),
+  statusIdx: index("idx_bulk_import_status").on(table.status),
+}));
+
+export const insertBulkImportHistorySchema = createInsertSchema(bulkImportHistory).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertBulkImportHistory = z.infer<typeof insertBulkImportHistorySchema>;
+export type BulkImportHistory = typeof bulkImportHistory.$inferSelect;
+
+// =====================================================
+// BULK IMPORT ERRORS - Detailed error log for bulk imports
+// Tracks each row-level error with recommended fixes
+// =====================================================
+export const bulkImportErrors = pgTable("bulk_import_errors", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  importId: integer("import_id").notNull(), // Reference to bulkImportHistory
+  rowNumber: integer("row_number").notNull(), // Row number in Excel (1-indexed)
+  fieldName: text("field_name"), // Which field had the error
+  fieldValue: text("field_value"), // Value that caused error
+  errorType: text("error_type").notNull(), // 'Required' | 'Format' | 'Duplicate' | 'Reference' | 'Validation'
+  errorDescription: text("error_description").notNull(), // Human-readable error message
+  recommendedFix: text("recommended_fix"), // Suggested solution
+  severity: text("severity").notNull().default("Error"), // 'Error' | 'Warning' | 'Info'
+  rawRowData: json("raw_row_data"), // Original row data for debugging
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  importIdIdx: index("idx_bulk_error_import").on(table.importId),
+  rowNumberIdx: index("idx_bulk_error_row").on(table.importId, table.rowNumber),
+  errorTypeIdx: index("idx_bulk_error_type").on(table.errorType),
+}));
+
+export const insertBulkImportErrorSchema = createInsertSchema(bulkImportErrors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBulkImportError = z.infer<typeof insertBulkImportErrorSchema>;
+export type BulkImportError = typeof bulkImportErrors.$inferSelect;

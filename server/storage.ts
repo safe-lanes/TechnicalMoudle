@@ -109,7 +109,28 @@ import {
   type InsertMakerList,
   sfiDetails,
   type SfiDetails,
-  type InsertSfiDetails
+  type InsertSfiDetails,
+  masterData,
+  type MasterData,
+  type InsertMasterData,
+  fleetVesselMapping,
+  type FleetVesselMapping,
+  type InsertFleetVesselMapping,
+  fleetComponentMapping,
+  type FleetComponentMapping,
+  type InsertFleetComponentMapping,
+  fleetJobVesselMapping,
+  type FleetJobVesselMapping,
+  type InsertFleetJobVesselMapping,
+  fleetSpareVesselMapping,
+  type FleetSpareVesselMapping,
+  type InsertFleetSpareVesselMapping,
+  bulkImportHistory,
+  type BulkImportHistory,
+  type InsertBulkImportHistory,
+  bulkImportErrors,
+  type BulkImportError,
+  type InsertBulkImportError
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -546,6 +567,56 @@ export interface IStorage {
   createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails>;
   updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails>;
   deleteSfiDetail(id: number): Promise<void>;
+  
+  // Master Data - Fleet Equipment Code generation and tracking
+  getMasterDataList(): Promise<MasterData[]>;
+  getMasterDataItem(id: number): Promise<MasterData | undefined>;
+  getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined>;
+  createMasterData(data: InsertMasterData): Promise<MasterData>;
+  updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData>;
+  deleteMasterData(id: number): Promise<void>;
+  generateFleetEquipmentCode(sfiCode: string): Promise<string>;
+  
+  // Fleet Vessel Mapping - Links Fleet Equipment to Vessels
+  getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]>;
+  getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]>;
+  createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping>;
+  removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void>;
+  
+  // Fleet Component Mapping - Links Fleet Equipment to Vessel Components
+  getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]>;
+  getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]>;
+  createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping>;
+  removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void>;
+  
+  // Fleet Job Vessel Mapping - Links Fleet Jobs to Vessels  
+  getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]>;
+  createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping>;
+  removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void>;
+  
+  // Fleet Spare Vessel Mapping - Links Fleet Spares to Vessels
+  getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]>;
+  createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping>;
+  removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void>;
+  
+  // Bulk Import History - Tracking all bulk imports
+  getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]>;
+  getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined>;
+  createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory>;
+  updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory>;
+  
+  // Bulk Import Errors - Detailed error tracking
+  getBulkImportErrors(importId: number): Promise<BulkImportError[]>;
+  createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError>;
+  createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]>;
+  
+  // Fleet Admin Dashboard Metrics
+  getFleetAdminMetrics(): Promise<{
+    totalMakers: number;
+    totalModels: number;
+    totalFleetComponents: number;
+    totalMasterLists: number;
+  }>;
 }
 
 // Helper function to normalize and validate immediateCause structure
@@ -638,10 +709,24 @@ export class MemStorage implements IStorage {
   private currentStoresLedgerId: number;
   private pmsVesselSettings: Map<string, PmsVesselSettings>;
   private currentPmsVesselSettingsId: number;
-  private makers: Map<number, MakerList>;
-  private currentMakerId: number;
+  private makerListMap: Map<number, MakerList>;
+  private currentMakerListId: number;
   private sfiDetailsMap: Map<number, SfiDetails>;
   private currentSfiDetailId: number;
+  private masterDataMap: Map<number, MasterData>;
+  private currentMasterDataId: number;
+  private fleetVesselMappings: Map<number, FleetVesselMapping>;
+  private currentFleetVesselMappingId: number;
+  private fleetComponentMappings: Map<number, FleetComponentMapping>;
+  private currentFleetComponentMappingId: number;
+  private fleetJobVesselMappings: Map<number, FleetJobVesselMapping>;
+  private currentFleetJobVesselMappingId: number;
+  private fleetSpareVesselMappings: Map<number, FleetSpareVesselMapping>;
+  private currentFleetSpareVesselMappingId: number;
+  private bulkImportHistoryMap: Map<number, BulkImportHistory>;
+  private currentBulkImportHistoryId: number;
+  private bulkImportErrorsMap: Map<number, BulkImportError>;
+  private currentBulkImportErrorId: number;
 
   constructor() {
     this.users = new Map();
@@ -697,10 +782,24 @@ export class MemStorage implements IStorage {
     this.currentStoresLedgerId = 1;
     this.pmsVesselSettings = new Map();
     this.currentPmsVesselSettingsId = 1;
-    this.makers = new Map();
-    this.currentMakerId = 1;
+    this.makerListMap = new Map();
+    this.currentMakerListId = 1;
     this.sfiDetailsMap = new Map();
     this.currentSfiDetailId = 1;
+    this.masterDataMap = new Map();
+    this.currentMasterDataId = 1;
+    this.fleetVesselMappings = new Map();
+    this.currentFleetVesselMappingId = 1;
+    this.fleetComponentMappings = new Map();
+    this.currentFleetComponentMappingId = 1;
+    this.fleetJobVesselMappings = new Map();
+    this.currentFleetJobVesselMappingId = 1;
+    this.fleetSpareVesselMappings = new Map();
+    this.currentFleetSpareVesselMappingId = 1;
+    this.bulkImportHistoryMap = new Map();
+    this.currentBulkImportHistoryId = 1;
+    this.bulkImportErrorsMap = new Map();
+    this.currentBulkImportErrorId = 1;
     
     // Initialize sample components and spares
     this.initializeComponents();
@@ -5276,6 +5375,386 @@ export class MemStorage implements IStorage {
       this.sfiDetailsMap.set(id, existing);
     }
   }
+  
+  // =====================================================
+  // MASTER DATA - Fleet Equipment Code generation and tracking
+  // =====================================================
+  
+  async getMasterDataList(): Promise<MasterData[]> {
+    return Array.from(this.masterDataMap.values()).filter(m => m.isActive);
+  }
+  
+  async getMasterDataItem(id: number): Promise<MasterData | undefined> {
+    return this.masterDataMap.get(id);
+  }
+  
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
+    return Array.from(this.masterDataMap.values()).find(m => m.fleetEquipmentCode === fleetEquipmentCode);
+  }
+  
+  async createMasterData(data: InsertMasterData): Promise<MasterData> {
+    const id = this.currentMasterDataId++;
+    const now = new Date();
+    const newMasterData: MasterData = {
+      id,
+      slNo: data.slNo ?? null,
+      makerName: data.makerName,
+      makerCode: data.makerCode,
+      countMaker: data.countMaker ?? null,
+      model: data.model,
+      modelCode: data.modelCode,
+      countSfiCode: data.countSfiCode ?? null,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      sfiCode: data.sfiCode,
+      assignedSubCode: data.assignedSubCode ?? null,
+      vesselName: data.vesselName ?? null,
+      vesselCode: data.vesselCode ?? null,
+      equipmentName: data.equipmentName,
+      isActive: data.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.masterDataMap.set(id, newMasterData);
+    return newMasterData;
+  }
+  
+  async updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData> {
+    const existing = this.masterDataMap.get(id);
+    if (!existing) {
+      throw new Error(`Master Data with id ${id} not found`);
+    }
+    const updated: MasterData = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.masterDataMap.set(id, updated);
+    return updated;
+  }
+  
+  async deleteMasterData(id: number): Promise<void> {
+    const existing = this.masterDataMap.get(id);
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.masterDataMap.set(id, existing);
+    }
+  }
+  
+  async generateFleetEquipmentCode(sfiCode: string): Promise<string> {
+    // Format: SFI.SEQ (e.g., 722.001.AA)
+    // Find existing codes with this SFI prefix and increment sequence
+    const existingCodes = Array.from(this.masterDataMap.values())
+      .filter(m => m.sfiCode === sfiCode)
+      .map(m => m.fleetEquipmentCode);
+    
+    // Parse existing sequence numbers
+    const seqNumbers = existingCodes.map(code => {
+      const parts = code.split('.');
+      if (parts.length >= 2) {
+        const seqPart = parts[1];
+        return parseInt(seqPart, 10) || 0;
+      }
+      return 0;
+    });
+    
+    const nextSeq = Math.max(0, ...seqNumbers) + 1;
+    const seqStr = nextSeq.toString().padStart(3, '0');
+    
+    // Generate sub-code (AA, AB, AC, etc.)
+    const subCodeIndex = existingCodes.filter(c => c.startsWith(`${sfiCode}.${seqStr}`)).length;
+    const subCode = String.fromCharCode(65 + Math.floor(subCodeIndex / 26)) + 
+                    String.fromCharCode(65 + (subCodeIndex % 26));
+    
+    return `${sfiCode}.${seqStr}.${subCode}`;
+  }
+  
+  // =====================================================
+  // FLEET VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]> {
+    const mappings = Array.from(this.fleetVesselMappings.values()).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      return mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    return mappings;
+  }
+  
+  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+    return Array.from(this.fleetVesselMappings.values())
+      .filter(m => m.vesselCode === vesselCode && m.isActive);
+  }
+  
+  async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
+    const id = this.currentFleetVesselMappingId++;
+    const newMapping: FleetVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.fleetVesselMappings.set(id, newMapping);
+    return newMapping;
+  }
+  
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of this.fleetVesselMappings) {
+      if (mapping.fleetEquipmentCode === fleetEquipmentCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.fleetVesselMappings.set(id, mapping);
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET COMPONENT MAPPING
+  // =====================================================
+  
+  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+    return Array.from(this.fleetComponentMappings.values())
+      .filter(m => m.fleetEquipmentCode === fleetEquipmentCode && m.isActive);
+  }
+  
+  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+    return Array.from(this.fleetComponentMappings.values())
+      .filter(m => m.vesselCode === vesselCode && m.isActive);
+  }
+  
+  async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
+    const id = this.currentFleetComponentMappingId++;
+    const newMapping: FleetComponentMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      componentCode: mapping.componentCode,
+      componentId: mapping.componentId ?? null,
+      componentName: mapping.componentName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.fleetComponentMappings.set(id, newMapping);
+    return newMapping;
+  }
+  
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+    for (const [id, mapping] of this.fleetComponentMappings) {
+      if (mapping.fleetEquipmentCode === fleetEquipmentCode && 
+          mapping.vesselCode === vesselCode && 
+          mapping.componentCode === componentCode) {
+        mapping.isActive = false;
+        this.fleetComponentMappings.set(id, mapping);
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET JOB VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]> {
+    let mappings = Array.from(this.fleetJobVesselMappings.values()).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      mappings = mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    if (jobCode) {
+      mappings = mappings.filter(m => m.jobCode === jobCode);
+    }
+    return mappings;
+  }
+  
+  async createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping> {
+    const id = this.currentFleetJobVesselMappingId++;
+    const newMapping: FleetJobVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      jobCode: mapping.jobCode,
+      jobId: mapping.jobId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.fleetJobVesselMappings.set(id, newMapping);
+    return newMapping;
+  }
+  
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of this.fleetJobVesselMappings) {
+      if (mapping.jobCode === jobCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.fleetJobVesselMappings.set(id, mapping);
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET SPARE VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]> {
+    let mappings = Array.from(this.fleetSpareVesselMappings.values()).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      mappings = mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    if (partCode) {
+      mappings = mappings.filter(m => m.partCode === partCode);
+    }
+    return mappings;
+  }
+  
+  async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
+    const id = this.currentFleetSpareVesselMappingId++;
+    const newMapping: FleetSpareVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      partCode: mapping.partCode,
+      spareId: mapping.spareId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.fleetSpareVesselMappings.set(id, newMapping);
+    return newMapping;
+  }
+  
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of this.fleetSpareVesselMappings) {
+      if (mapping.partCode === partCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.fleetSpareVesselMappings.set(id, mapping);
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // BULK IMPORT HISTORY
+  // =====================================================
+  
+  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+    let history = Array.from(this.bulkImportHistoryMap.values());
+    if (vesselCode) {
+      history = history.filter(h => h.vesselCode === vesselCode);
+    }
+    if (moduleType) {
+      history = history.filter(h => h.moduleType === moduleType);
+    }
+    return history.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+  }
+  
+  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+    return this.bulkImportHistoryMap.get(id);
+  }
+  
+  async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
+    const id = this.currentBulkImportHistoryId++;
+    const newHistory: BulkImportHistory = {
+      id,
+      vesselCode: history.vesselCode ?? null,
+      vesselName: history.vesselName ?? null,
+      moduleType: history.moduleType,
+      sheetName: history.sheetName ?? null,
+      fileName: history.fileName,
+      fileSize: history.fileSize ?? null,
+      uploadedBy: history.uploadedBy,
+      uploadedByName: history.uploadedByName ?? null,
+      uploadedAt: new Date(),
+      totalRows: history.totalRows ?? 0,
+      successCount: history.successCount ?? 0,
+      failedCount: history.failedCount ?? 0,
+      skippedCount: history.skippedCount ?? 0,
+      status: history.status ?? 'Processing',
+      errorSummary: history.errorSummary ?? null,
+      isFleetImport: history.isFleetImport ?? false,
+      templateVersion: history.templateVersion ?? null,
+      processingTimeMs: history.processingTimeMs ?? null,
+    };
+    this.bulkImportHistoryMap.set(id, newHistory);
+    return newHistory;
+  }
+  
+  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+    const existing = this.bulkImportHistoryMap.get(id);
+    if (!existing) {
+      throw new Error(`Bulk Import History with id ${id} not found`);
+    }
+    const updated: BulkImportHistory = {
+      ...existing,
+      ...data,
+    };
+    this.bulkImportHistoryMap.set(id, updated);
+    return updated;
+  }
+  
+  // =====================================================
+  // BULK IMPORT ERRORS
+  // =====================================================
+  
+  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+    return Array.from(this.bulkImportErrorsMap.values())
+      .filter(e => e.importId === importId);
+  }
+  
+  async createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError> {
+    const id = this.currentBulkImportErrorId++;
+    const newError: BulkImportError = {
+      id,
+      importId: error.importId,
+      rowNumber: error.rowNumber,
+      fieldName: error.fieldName ?? null,
+      fieldValue: error.fieldValue ?? null,
+      errorType: error.errorType,
+      errorDescription: error.errorDescription,
+      recommendedFix: error.recommendedFix ?? null,
+      severity: error.severity ?? 'Error',
+      rawRowData: error.rawRowData ?? null,
+      createdAt: new Date(),
+    };
+    this.bulkImportErrorsMap.set(id, newError);
+    return newError;
+  }
+  
+  async createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]> {
+    const results: BulkImportError[] = [];
+    for (const error of errors) {
+      results.push(await this.createBulkImportError(error));
+    }
+    return results;
+  }
+  
+  // =====================================================
+  // FLEET ADMIN DASHBOARD METRICS
+  // =====================================================
+  
+  async getFleetAdminMetrics(): Promise<{
+    totalMakers: number;
+    totalModels: number;
+    totalFleetComponents: number;
+    totalMasterLists: number;
+  }> {
+    const activeMakers = Array.from(this.makerListMap.values()).filter(m => m.isActive).length;
+    const activeModels = Array.from(this.masterDataMap.values()).filter(m => m.isActive).length;
+    const fleetComponents = Array.from(this.components.values()).filter(c => c.dataScope === 'fleet').length;
+    const activeMasterLists = Array.from(this.masterLists.values()).filter(m => m.isActive).length;
+    
+    return {
+      totalMakers: activeMakers,
+      totalModels: activeModels,
+      totalFleetComponents: fleetComponents,
+      totalMasterLists: activeMasterLists,
+    };
+  }
 }
 
 export class PostgresStorage implements IStorage {
@@ -8003,6 +8482,377 @@ export class PostgresStorage implements IStorage {
     await db.update(sfiDetails)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(sfiDetails.id, id));
+  }
+  
+  // =====================================================
+  // MASTER DATA - Fleet Equipment Code generation and tracking
+  // =====================================================
+  
+  async getMasterDataList(): Promise<MasterData[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(masterData).where(eq(masterData.isActive, true));
+  }
+  
+  async getMasterDataItem(id: number): Promise<MasterData | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(masterData).where(eq(masterData.id, id));
+    return result[0];
+  }
+  
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(masterData).where(eq(masterData.fleetEquipmentCode, fleetEquipmentCode));
+    return result[0];
+  }
+  
+  async createMasterData(data: InsertMasterData): Promise<MasterData> {
+    const db = await this.getDb();
+    const result = await db.insert(masterData).values({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(masterData)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(masterData.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteMasterData(id: number): Promise<void> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    await db.update(masterData)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(masterData.id, id));
+  }
+  
+  async generateFleetEquipmentCode(sfiCode: string): Promise<string> {
+    const db = await this.getDb();
+    const { eq, like } = await import('drizzle-orm');
+    
+    // Find existing codes with this SFI prefix
+    const existingRecords = await db.select({ fleetEquipmentCode: masterData.fleetEquipmentCode })
+      .from(masterData)
+      .where(eq(masterData.sfiCode, sfiCode));
+    
+    const existingCodes = existingRecords.map(r => r.fleetEquipmentCode);
+    
+    // Parse existing sequence numbers
+    const seqNumbers = existingCodes.map(code => {
+      const parts = code.split('.');
+      if (parts.length >= 2) {
+        const seqPart = parts[1];
+        return parseInt(seqPart, 10) || 0;
+      }
+      return 0;
+    });
+    
+    const nextSeq = Math.max(0, ...seqNumbers) + 1;
+    const seqStr = nextSeq.toString().padStart(3, '0');
+    
+    // Generate sub-code (AA, AB, AC, etc.)
+    const subCodeIndex = existingCodes.filter(c => c.startsWith(`${sfiCode}.${seqStr}`)).length;
+    const subCode = String.fromCharCode(65 + Math.floor(subCodeIndex / 26)) + 
+                    String.fromCharCode(65 + (subCodeIndex % 26));
+    
+    return `${sfiCode}.${seqStr}.${subCode}`;
+  }
+  
+  // =====================================================
+  // FLEET VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    if (fleetEquipmentCode) {
+      return await db.select().from(fleetVesselMapping)
+        .where(and(
+          eq(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+          eq(fleetVesselMapping.isActive, true)
+        ));
+    }
+    return await db.select().from(fleetVesselMapping).where(eq(fleetVesselMapping.isActive, true));
+  }
+  
+  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    return await db.select().from(fleetVesselMapping)
+      .where(and(
+        eq(fleetVesselMapping.vesselCode, vesselCode),
+        eq(fleetVesselMapping.isActive, true)
+      ));
+  }
+  
+  async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
+    const db = await this.getDb();
+    const result = await db.insert(fleetVesselMapping).values({
+      ...mapping,
+      mappedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    await db.update(fleetVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetVesselMapping.vesselCode, vesselCode)
+      ));
+  }
+  
+  // =====================================================
+  // FLEET COMPONENT MAPPING
+  // =====================================================
+  
+  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    return await db.select().from(fleetComponentMapping)
+      .where(and(
+        eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetComponentMapping.isActive, true)
+      ));
+  }
+  
+  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    return await db.select().from(fleetComponentMapping)
+      .where(and(
+        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.isActive, true)
+      ));
+  }
+  
+  async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
+    const db = await this.getDb();
+    const result = await db.insert(fleetComponentMapping).values({
+      ...mapping,
+      mappedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    await db.update(fleetComponentMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.componentCode, componentCode)
+      ));
+  }
+  
+  // =====================================================
+  // FLEET JOB VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    const conditions = [eq(fleetJobVesselMapping.isActive, true)];
+    if (fleetEquipmentCode) {
+      conditions.push(eq(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    }
+    if (jobCode) {
+      conditions.push(eq(fleetJobVesselMapping.jobCode, jobCode));
+    }
+    
+    return await db.select().from(fleetJobVesselMapping).where(and(...conditions));
+  }
+  
+  async createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping> {
+    const db = await this.getDb();
+    const result = await db.insert(fleetJobVesselMapping).values({
+      ...mapping,
+      mappedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    await db.update(fleetJobVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetJobVesselMapping.jobCode, jobCode),
+        eq(fleetJobVesselMapping.vesselCode, vesselCode)
+      ));
+  }
+  
+  // =====================================================
+  // FLEET SPARE VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    const conditions = [eq(fleetSpareVesselMapping.isActive, true)];
+    if (fleetEquipmentCode) {
+      conditions.push(eq(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    }
+    if (partCode) {
+      conditions.push(eq(fleetSpareVesselMapping.partCode, partCode));
+    }
+    
+    return await db.select().from(fleetSpareVesselMapping).where(and(...conditions));
+  }
+  
+  async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
+    const db = await this.getDb();
+    const result = await db.insert(fleetSpareVesselMapping).values({
+      ...mapping,
+      mappedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    
+    await db.update(fleetSpareVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetSpareVesselMapping.partCode, partCode),
+        eq(fleetSpareVesselMapping.vesselCode, vesselCode)
+      ));
+  }
+  
+  // =====================================================
+  // BULK IMPORT HISTORY
+  // =====================================================
+  
+  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+    const db = await this.getDb();
+    const { eq, and, desc } = await import('drizzle-orm');
+    
+    const conditions = [];
+    if (vesselCode) {
+      conditions.push(eq(bulkImportHistory.vesselCode, vesselCode));
+    }
+    if (moduleType) {
+      conditions.push(eq(bulkImportHistory.moduleType, moduleType));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(bulkImportHistory)
+        .where(and(...conditions))
+        .orderBy(desc(bulkImportHistory.uploadedAt));
+    }
+    
+    return await db.select().from(bulkImportHistory)
+      .orderBy(desc(bulkImportHistory.uploadedAt));
+  }
+  
+  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select().from(bulkImportHistory).where(eq(bulkImportHistory.id, id));
+    return result[0];
+  }
+  
+  async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
+    const db = await this.getDb();
+    const result = await db.insert(bulkImportHistory).values({
+      ...history,
+      uploadedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    const result = await db.update(bulkImportHistory)
+      .set(data)
+      .where(eq(bulkImportHistory.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  // =====================================================
+  // BULK IMPORT ERRORS
+  // =====================================================
+  
+  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+    const db = await this.getDb();
+    const { eq } = await import('drizzle-orm');
+    return await db.select().from(bulkImportErrors).where(eq(bulkImportErrors.importId, importId));
+  }
+  
+  async createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError> {
+    const db = await this.getDb();
+    const result = await db.insert(bulkImportErrors).values({
+      ...error,
+      createdAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]> {
+    if (errors.length === 0) return [];
+    const db = await this.getDb();
+    const result = await db.insert(bulkImportErrors).values(
+      errors.map(e => ({ ...e, createdAt: new Date() }))
+    ).returning();
+    return result;
+  }
+  
+  // =====================================================
+  // FLEET ADMIN DASHBOARD METRICS
+  // =====================================================
+  
+  async getFleetAdminMetrics(): Promise<{
+    totalMakers: number;
+    totalModels: number;
+    totalFleetComponents: number;
+    totalMasterLists: number;
+  }> {
+    const db = await this.getDb();
+    const { eq, count, sql } = await import('drizzle-orm');
+    
+    const [makersResult] = await db.select({ count: count() }).from(makerList).where(eq(makerList.isActive, true));
+    const [modelsResult] = await db.select({ count: count() }).from(masterData).where(eq(masterData.isActive, true));
+    const [fleetCompResult] = await db.select({ count: count() }).from(components).where(eq(components.dataScope, 'fleet'));
+    const [masterListResult] = await db.select({ count: count() }).from(masterLists).where(eq(masterLists.isActive, true));
+    
+    return {
+      totalMakers: makersResult?.count || 0,
+      totalModels: modelsResult?.count || 0,
+      totalFleetComponents: fleetCompResult?.count || 0,
+      totalMasterLists: masterListResult?.count || 0,
+    };
   }
 }
 

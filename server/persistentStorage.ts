@@ -65,7 +65,21 @@ import {
   type MakerList,
   type InsertMakerList,
   type SfiDetails,
-  type InsertSfiDetails
+  type InsertSfiDetails,
+  type MasterData,
+  type InsertMasterData,
+  type FleetVesselMapping,
+  type InsertFleetVesselMapping,
+  type FleetComponentMapping,
+  type InsertFleetComponentMapping,
+  type FleetJobVesselMapping,
+  type InsertFleetJobVesselMapping,
+  type FleetSpareVesselMapping,
+  type InsertFleetSpareVesselMapping,
+  type BulkImportHistory,
+  type InsertBulkImportHistory,
+  type BulkImportError,
+  type InsertBulkImportError
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -114,6 +128,13 @@ interface PersistentData {
   storesLedger: StoresLedger[];
   makersList: Record<number, MakerList>;
   sfiDetailsList: Record<number, SfiDetails>;
+  masterDataList: Record<number, MasterData>;
+  fleetVesselMappings: Record<number, FleetVesselMapping>;
+  fleetComponentMappings: Record<number, FleetComponentMapping>;
+  fleetJobVesselMappings: Record<number, FleetJobVesselMapping>;
+  fleetSpareVesselMappings: Record<number, FleetSpareVesselMapping>;
+  bulkImportHistory: Record<number, BulkImportHistory>;
+  bulkImportErrors: BulkImportError[];
   
   // Counter state
   counters: {
@@ -142,6 +163,13 @@ interface PersistentData {
     storesLedgerId: number;
     makersListId: number;
     sfiDetailsListId: number;
+    masterDataId: number;
+    fleetVesselMappingId: number;
+    fleetComponentMappingId: number;
+    fleetJobVesselMappingId: number;
+    fleetSpareVesselMappingId: number;
+    bulkImportHistoryId: number;
+    bulkImportErrorId: number;
   };
 }
 
@@ -326,6 +354,13 @@ export class PersistentFileStorage implements IStorage {
           storesLedger: loadedData.storesLedger || [],
           makersList: loadedData.makersList || {},
           sfiDetailsList: loadedData.sfiDetailsList || {},
+          masterDataList: loadedData.masterDataList || {},
+          fleetVesselMappings: loadedData.fleetVesselMappings || {},
+          fleetComponentMappings: loadedData.fleetComponentMappings || {},
+          fleetJobVesselMappings: loadedData.fleetJobVesselMappings || {},
+          fleetSpareVesselMappings: loadedData.fleetSpareVesselMappings || {},
+          bulkImportHistory: loadedData.bulkImportHistory || {},
+          bulkImportErrors: loadedData.bulkImportErrors || [],
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -351,7 +386,14 @@ export class PersistentFileStorage implements IStorage {
             storesItemId: loadedData.counters?.storesItemId || 1,
             storesLedgerId: loadedData.counters?.storesLedgerId || 1,
             makersListId: loadedData.counters?.makersListId || 1,
-            sfiDetailsListId: loadedData.counters?.sfiDetailsListId || 1
+            sfiDetailsListId: loadedData.counters?.sfiDetailsListId || 1,
+            masterDataId: loadedData.counters?.masterDataId || 1,
+            fleetVesselMappingId: loadedData.counters?.fleetVesselMappingId || 1,
+            fleetComponentMappingId: loadedData.counters?.fleetComponentMappingId || 1,
+            fleetJobVesselMappingId: loadedData.counters?.fleetJobVesselMappingId || 1,
+            fleetSpareVesselMappingId: loadedData.counters?.fleetSpareVesselMappingId || 1,
+            bulkImportHistoryId: loadedData.counters?.bulkImportHistoryId || 1,
+            bulkImportErrorId: loadedData.counters?.bulkImportErrorId || 1
           }
         };
         
@@ -401,6 +443,13 @@ export class PersistentFileStorage implements IStorage {
       storesLedger: [],
       makersList: {},
       sfiDetailsList: {},
+      masterDataList: {},
+      fleetVesselMappings: {},
+      fleetComponentMappings: {},
+      fleetJobVesselMappings: {},
+      fleetSpareVesselMappings: {},
+      bulkImportHistory: {},
+      bulkImportErrors: [],
       counters: {
         userId: 1,
         auditId: 1,
@@ -426,7 +475,14 @@ export class PersistentFileStorage implements IStorage {
         storesItemId: 1,
         storesLedgerId: 1,
         makersListId: 1,
-        sfiDetailsListId: 1
+        sfiDetailsListId: 1,
+        masterDataId: 1,
+        fleetVesselMappingId: 1,
+        fleetComponentMappingId: 1,
+        fleetJobVesselMappingId: 1,
+        fleetSpareVesselMappingId: 1,
+        bulkImportHistoryId: 1,
+        bulkImportErrorId: 1
       }
     };
     
@@ -6221,5 +6277,394 @@ export class PersistentFileStorage implements IStorage {
       this.data.sfiDetailsList[id] = existing;
       this.persistData();
     }
+  }
+  
+  // =====================================================
+  // MASTER DATA - Fleet Equipment Code generation and tracking
+  // =====================================================
+  
+  async getMasterDataList(): Promise<MasterData[]> {
+    return Object.values(this.data.masterDataList).filter(m => m.isActive);
+  }
+  
+  async getMasterDataItem(id: number): Promise<MasterData | undefined> {
+    return this.data.masterDataList[id];
+  }
+  
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
+    return Object.values(this.data.masterDataList).find(m => m.fleetEquipmentCode === fleetEquipmentCode);
+  }
+  
+  async createMasterData(data: InsertMasterData): Promise<MasterData> {
+    const id = this.data.counters.masterDataId++;
+    const now = new Date();
+    const newMasterData: MasterData = {
+      id,
+      slNo: data.slNo ?? null,
+      makerName: data.makerName,
+      makerCode: data.makerCode,
+      countMaker: data.countMaker ?? null,
+      model: data.model,
+      modelCode: data.modelCode,
+      countSfiCode: data.countSfiCode ?? null,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      sfiCode: data.sfiCode,
+      assignedSubCode: data.assignedSubCode ?? null,
+      vesselName: data.vesselName ?? null,
+      vesselCode: data.vesselCode ?? null,
+      equipmentName: data.equipmentName,
+      isActive: data.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.masterDataList[id] = newMasterData;
+    this.persistData();
+    return newMasterData;
+  }
+  
+  async updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData> {
+    const existing = this.data.masterDataList[id];
+    if (!existing) {
+      throw new Error(`Master Data with id ${id} not found`);
+    }
+    const updated: MasterData = {
+      ...existing,
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.data.masterDataList[id] = updated;
+    this.persistData();
+    return updated;
+  }
+  
+  async deleteMasterData(id: number): Promise<void> {
+    const existing = this.data.masterDataList[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date();
+      this.data.masterDataList[id] = existing;
+      this.persistData();
+    }
+  }
+  
+  async generateFleetEquipmentCode(sfiCode: string): Promise<string> {
+    const existingCodes = Object.values(this.data.masterDataList)
+      .filter(m => m.sfiCode === sfiCode)
+      .map(m => m.fleetEquipmentCode);
+    
+    const seqNumbers = existingCodes.map(code => {
+      const parts = code.split('.');
+      if (parts.length >= 2) {
+        const seqPart = parts[1];
+        return parseInt(seqPart, 10) || 0;
+      }
+      return 0;
+    });
+    
+    const nextSeq = Math.max(0, ...seqNumbers) + 1;
+    const seqStr = nextSeq.toString().padStart(3, '0');
+    
+    const subCodeIndex = existingCodes.filter(c => c.startsWith(`${sfiCode}.${seqStr}`)).length;
+    const subCode = String.fromCharCode(65 + Math.floor(subCodeIndex / 26)) + 
+                    String.fromCharCode(65 + (subCodeIndex % 26));
+    
+    return `${sfiCode}.${seqStr}.${subCode}`;
+  }
+  
+  // =====================================================
+  // FLEET VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]> {
+    const mappings = Object.values(this.data.fleetVesselMappings).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      return mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    return mappings;
+  }
+  
+  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+    return Object.values(this.data.fleetVesselMappings)
+      .filter(m => m.vesselCode === vesselCode && m.isActive);
+  }
+  
+  async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
+    const id = this.data.counters.fleetVesselMappingId++;
+    const newMapping: FleetVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.data.fleetVesselMappings[id] = newMapping;
+    this.persistData();
+    return newMapping;
+  }
+  
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of Object.entries(this.data.fleetVesselMappings)) {
+      if (mapping.fleetEquipmentCode === fleetEquipmentCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.data.fleetVesselMappings[Number(id)] = mapping;
+        this.persistData();
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET COMPONENT MAPPING
+  // =====================================================
+  
+  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+    return Object.values(this.data.fleetComponentMappings)
+      .filter(m => m.fleetEquipmentCode === fleetEquipmentCode && m.isActive);
+  }
+  
+  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+    return Object.values(this.data.fleetComponentMappings)
+      .filter(m => m.vesselCode === vesselCode && m.isActive);
+  }
+  
+  async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
+    const id = this.data.counters.fleetComponentMappingId++;
+    const newMapping: FleetComponentMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      componentCode: mapping.componentCode,
+      componentId: mapping.componentId ?? null,
+      componentName: mapping.componentName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.data.fleetComponentMappings[id] = newMapping;
+    this.persistData();
+    return newMapping;
+  }
+  
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+    for (const [id, mapping] of Object.entries(this.data.fleetComponentMappings)) {
+      if (mapping.fleetEquipmentCode === fleetEquipmentCode && 
+          mapping.vesselCode === vesselCode && 
+          mapping.componentCode === componentCode) {
+        mapping.isActive = false;
+        this.data.fleetComponentMappings[Number(id)] = mapping;
+        this.persistData();
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET JOB VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]> {
+    let mappings = Object.values(this.data.fleetJobVesselMappings).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      mappings = mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    if (jobCode) {
+      mappings = mappings.filter(m => m.jobCode === jobCode);
+    }
+    return mappings;
+  }
+  
+  async createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping> {
+    const id = this.data.counters.fleetJobVesselMappingId++;
+    const newMapping: FleetJobVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      jobCode: mapping.jobCode,
+      jobId: mapping.jobId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.data.fleetJobVesselMappings[id] = newMapping;
+    this.persistData();
+    return newMapping;
+  }
+  
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of Object.entries(this.data.fleetJobVesselMappings)) {
+      if (mapping.jobCode === jobCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.data.fleetJobVesselMappings[Number(id)] = mapping;
+        this.persistData();
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // FLEET SPARE VESSEL MAPPING
+  // =====================================================
+  
+  async getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]> {
+    let mappings = Object.values(this.data.fleetSpareVesselMappings).filter(m => m.isActive);
+    if (fleetEquipmentCode) {
+      mappings = mappings.filter(m => m.fleetEquipmentCode === fleetEquipmentCode);
+    }
+    if (partCode) {
+      mappings = mappings.filter(m => m.partCode === partCode);
+    }
+    return mappings;
+  }
+  
+  async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
+    const id = this.data.counters.fleetSpareVesselMappingId++;
+    const newMapping: FleetSpareVesselMapping = {
+      id,
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      partCode: mapping.partCode,
+      spareId: mapping.spareId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      mappedAt: new Date(),
+      isActive: mapping.isActive ?? true,
+    };
+    this.data.fleetSpareVesselMappings[id] = newMapping;
+    this.persistData();
+    return newMapping;
+  }
+  
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+    for (const [id, mapping] of Object.entries(this.data.fleetSpareVesselMappings)) {
+      if (mapping.partCode === partCode && mapping.vesselCode === vesselCode) {
+        mapping.isActive = false;
+        this.data.fleetSpareVesselMappings[Number(id)] = mapping;
+        this.persistData();
+        break;
+      }
+    }
+  }
+  
+  // =====================================================
+  // BULK IMPORT HISTORY
+  // =====================================================
+  
+  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+    let history = Object.values(this.data.bulkImportHistory);
+    if (vesselCode) {
+      history = history.filter(h => h.vesselCode === vesselCode);
+    }
+    if (moduleType) {
+      history = history.filter(h => h.moduleType === moduleType);
+    }
+    return history.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  }
+  
+  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+    return this.data.bulkImportHistory[id];
+  }
+  
+  async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
+    const id = this.data.counters.bulkImportHistoryId++;
+    const newHistory: BulkImportHistory = {
+      id,
+      vesselCode: history.vesselCode ?? null,
+      vesselName: history.vesselName ?? null,
+      moduleType: history.moduleType,
+      sheetName: history.sheetName ?? null,
+      fileName: history.fileName,
+      fileSize: history.fileSize ?? null,
+      uploadedBy: history.uploadedBy,
+      uploadedByName: history.uploadedByName ?? null,
+      uploadedAt: new Date(),
+      totalRows: history.totalRows ?? 0,
+      successCount: history.successCount ?? 0,
+      failedCount: history.failedCount ?? 0,
+      skippedCount: history.skippedCount ?? 0,
+      status: history.status ?? 'Processing',
+      errorSummary: history.errorSummary ?? null,
+      isFleetImport: history.isFleetImport ?? false,
+      templateVersion: history.templateVersion ?? null,
+      processingTimeMs: history.processingTimeMs ?? null,
+    };
+    this.data.bulkImportHistory[id] = newHistory;
+    this.persistData();
+    return newHistory;
+  }
+  
+  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+    const existing = this.data.bulkImportHistory[id];
+    if (!existing) {
+      throw new Error(`Bulk Import History with id ${id} not found`);
+    }
+    const updated: BulkImportHistory = {
+      ...existing,
+      ...data,
+    };
+    this.data.bulkImportHistory[id] = updated;
+    this.persistData();
+    return updated;
+  }
+  
+  // =====================================================
+  // BULK IMPORT ERRORS
+  // =====================================================
+  
+  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+    return this.data.bulkImportErrors.filter(e => e.importId === importId);
+  }
+  
+  async createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError> {
+    const id = this.data.counters.bulkImportErrorId++;
+    const newError: BulkImportError = {
+      id,
+      importId: error.importId,
+      rowNumber: error.rowNumber,
+      fieldName: error.fieldName ?? null,
+      fieldValue: error.fieldValue ?? null,
+      errorType: error.errorType,
+      errorDescription: error.errorDescription,
+      recommendedFix: error.recommendedFix ?? null,
+      severity: error.severity ?? 'Error',
+      rawRowData: error.rawRowData ?? null,
+      createdAt: new Date(),
+    };
+    this.data.bulkImportErrors.push(newError);
+    this.persistData();
+    return newError;
+  }
+  
+  async createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]> {
+    const results: BulkImportError[] = [];
+    for (const error of errors) {
+      results.push(await this.createBulkImportError(error));
+    }
+    return results;
+  }
+  
+  // =====================================================
+  // FLEET ADMIN DASHBOARD METRICS
+  // =====================================================
+  
+  async getFleetAdminMetrics(): Promise<{
+    totalMakers: number;
+    totalModels: number;
+    totalFleetComponents: number;
+    totalMasterLists: number;
+  }> {
+    const activeMakers = Object.values(this.data.makersList).filter(m => m.isActive).length;
+    const activeModels = Object.values(this.data.masterDataList).filter(m => m.isActive).length;
+    const fleetComponents = Object.values(this.data.components).filter(c => c.dataScope === 'fleet').length;
+    const activeMasterLists = Object.values(this.data.masterLists).filter(m => m.isActive).length;
+    
+    return {
+      totalMakers: activeMakers,
+      totalModels: activeModels,
+      totalFleetComponents: fleetComponents,
+      totalMasterLists: activeMasterLists,
+    };
   }
 }
