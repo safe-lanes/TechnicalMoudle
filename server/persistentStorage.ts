@@ -4,6 +4,8 @@ import { generateFleetEquipmentCode, generateFleetJobCode, generateFleetPartCode
 import { 
   type User, 
   type InsertUser,
+  type Fleet,
+  type InsertFleet,
   type Vessel,
   type InsertVessel,
   type Component,
@@ -99,6 +101,7 @@ class StorageInitializationError extends Error {
 
 interface PersistentData {
   users: Record<number, User>;
+  fleets: Record<string, Fleet>;
   vessels: Record<string, Vessel>;
   components: Record<string, Component>;
   runningHoursAudits: RunningHoursAudit[];
@@ -416,6 +419,7 @@ export class PersistentFileStorage implements IStorage {
   private initializeEmptyData(): PersistentData {
     const emptyData: PersistentData = {
       users: {},
+      fleets: {},
       vessels: {},
       components: {},
       runningHoursAudits: [],
@@ -5790,9 +5794,152 @@ export class PersistentFileStorage implements IStorage {
     this.persistData();
   }
 
-  async getVessels(): Promise<Array<{id: string, name: string, code: string}>> {
+  // =====================================================
+  // Fleet Registry CRUD
+  // =====================================================
+
+  async getFleets(): Promise<Fleet[]> {
+    return Object.values(this.data.fleets || {}).filter(f => f && f.isActive !== false);
+  }
+
+  async getAllFleets(): Promise<Fleet[]> {
+    return Object.values(this.data.fleets || {});
+  }
+
+  async getFleetById(id: string): Promise<Fleet | null> {
+    return this.data.fleets[id] || null;
+  }
+
+  async getFleetByCode(code: string): Promise<Fleet | null> {
+    const normalizedCode = code.trim().toUpperCase();
+    return Object.values(this.data.fleets || {}).find(f => f.code.toUpperCase() === normalizedCode) || null;
+  }
+
+  async createFleet(fleet: InsertFleet): Promise<Fleet> {
+    const now = new Date();
+    
+    // Normalize fleet id and code (trim + uppercase for consistency)
+    const normalizedId = fleet.id.trim().toUpperCase();
+    const normalizedCode = fleet.code.trim().toUpperCase();
+    
+    // Check if fleet with same id already exists
+    if (this.data.fleets[normalizedId]) {
+      throw new Error(`Fleet with id ${normalizedId} already exists`);
+    }
+    
+    // Check if fleet with same code already exists
+    const existingWithCode = Object.values(this.data.fleets || {}).find(
+      f => f.code.toUpperCase() === normalizedCode
+    );
+    if (existingWithCode) {
+      throw new Error(`Fleet with code ${normalizedCode} already exists`);
+    }
+    
+    const newFleet: Fleet = {
+      id: normalizedId,
+      code: normalizedCode,
+      name: fleet.name.trim(),
+      description: fleet.description?.trim() || null,
+      isActive: fleet.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.data.fleets[normalizedId] = newFleet;
+    this.persistData();
+    return newFleet;
+  }
+
+  async updateFleet(id: string, data: Partial<InsertFleet>): Promise<Fleet> {
+    const existing = this.data.fleets[id];
+    if (!existing) {
+      throw new Error(`Fleet with id ${id} not found`);
+    }
+    
+    // If updating code, check for conflicts
+    if (data.code && data.code.toUpperCase() !== existing.code.toUpperCase()) {
+      const normalizedCode = data.code.trim().toUpperCase();
+      const existingWithCode = Object.values(this.data.fleets || {}).find(
+        f => f.code.toUpperCase() === normalizedCode && f.id !== id
+      );
+      if (existingWithCode) {
+        throw new Error(`Fleet with code ${normalizedCode} already exists`);
+      }
+    }
+    
+    const updated: Fleet = {
+      ...existing,
+      ...data,
+      code: data.code ? data.code.trim().toUpperCase() : existing.code,
+      name: data.name ? data.name.trim() : existing.name,
+      updatedAt: new Date(),
+    };
+    
+    this.data.fleets[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteFleet(id: string): Promise<void> {
+    if (!this.data.fleets[id]) {
+      throw new Error(`Fleet with id ${id} not found`);
+    }
+    
+    // Check if any vessels are assigned to this fleet
+    const assignedVessels = Object.values(this.data.vessels || {}).filter(
+      v => v.fleetId === id
+    );
+    if (assignedVessels.length > 0) {
+      throw new Error(`Cannot delete fleet: ${assignedVessels.length} vessel(s) are assigned to it. Reassign or remove vessels first.`);
+    }
+    
+    delete this.data.fleets[id];
+    this.persistData();
+  }
+
+  async getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
+    const vessels = Object.values(this.data.vessels || {});
+    return vessels.map(v => {
+      const fleet = v.fleetId ? this.data.fleets[v.fleetId] : null;
+      return {
+        ...v,
+        fleetName: fleet?.name,
+        fleetCode: fleet?.code,
+      };
+    });
+  }
+
+  async getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
+    return Object.values(this.data.vessels || {}).filter(v => v.fleetId === fleetId);
+  }
+
+  async assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel> {
+    const vessel = this.data.vessels[vesselId];
+    if (!vessel) {
+      throw new Error(`Vessel with id ${vesselId} not found`);
+    }
+    
+    if (fleetId) {
+      const fleet = this.data.fleets[fleetId];
+      if (!fleet) {
+        throw new Error(`Fleet with id ${fleetId} not found`);
+      }
+    }
+    
+    const updated: Vessel = {
+      ...vessel,
+      fleetId: fleetId,
+      updatedAt: new Date(),
+    };
+    
+    this.data.vessels[vesselId] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async getVessels(): Promise<Array<{id: string, name: string, code: string, fleetId?: string | null}>> {
     const vesselIds = new Set<string>();
-    const vessels: Array<{id: string, name: string, code: string}> = [];
+    const vessels: Array<{id: string, name: string, code: string, fleetId?: string | null}> = [];
     
     // First add vessels from the dedicated vessels table
     Object.values(this.data.vessels || {}).forEach(v => {
@@ -5801,7 +5948,8 @@ export class PersistentFileStorage implements IStorage {
         vessels.push({
           id: v.id,
           name: v.name,
-          code: v.code
+          code: v.code,
+          fleetId: v.fleetId || null
         });
       }
     });
@@ -5813,7 +5961,8 @@ export class PersistentFileStorage implements IStorage {
         vessels.push({
           id: c.vesselId,
           name: c.vesselId,
-          code: c.vesselCode || c.vesselId
+          code: c.vesselCode || c.vesselId,
+          fleetId: null
         });
       }
     });
@@ -5835,6 +5984,14 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Vessel with id ${normalizedId} already exists in the vessel registry`);
     }
     
+    // Validate fleetId if provided
+    if (vessel.fleetId) {
+      const fleet = this.data.fleets[vessel.fleetId];
+      if (!fleet) {
+        throw new Error(`Fleet with id ${vessel.fleetId} not found`);
+      }
+    }
+    
     // Note: We intentionally do NOT block creation if vesselId exists in components.
     // This allows users to properly register vessels that were previously imported
     // without a formal vessel registry entry.
@@ -5843,6 +6000,7 @@ export class PersistentFileStorage implements IStorage {
       id: normalizedId,
       name: vessel.name.trim(),
       code: normalizedCode,
+      fleetId: vessel.fleetId || null,
       imoNumber: vessel.imoNumber?.trim() || null,
       vesselType: vessel.vesselType?.trim() || null,
       flag: vessel.flag?.trim() || null,

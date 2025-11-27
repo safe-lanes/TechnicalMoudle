@@ -4013,6 +4013,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =====================================================
+  // Fleet Registry CRUD
+  // =====================================================
+
+  // Get all active fleets
+  app.get("/api/fleets", async (req, res) => {
+    try {
+      const includeInactive = req.query.includeInactive === 'true';
+      const fleets = includeInactive 
+        ? await storage.getAllFleets()
+        : await storage.getFleets();
+      res.json(fleets);
+    } catch (error: any) {
+      console.error("Error fetching fleets:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch fleets" });
+    }
+  });
+
+  // Get fleet by ID
+  app.get("/api/fleets/:id", async (req, res) => {
+    try {
+      const fleet = await storage.getFleetById(req.params.id);
+      if (!fleet) {
+        return res.status(404).json({ error: "Fleet not found" });
+      }
+      res.json(fleet);
+    } catch (error: any) {
+      console.error("Error fetching fleet:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch fleet" });
+    }
+  });
+
+  // Create a new fleet
+  app.post("/api/fleets", async (req, res) => {
+    try {
+      const { id, code, name, description, isActive } = req.body;
+      
+      if (!code || !name) {
+        return res.status(400).json({ error: "Fleet code and name are required" });
+      }
+      
+      const fleet = await storage.createFleet({
+        id: id || code, // Use code as id if not provided
+        code,
+        name,
+        description: description || null,
+        isActive: isActive ?? true,
+      });
+      
+      res.status(201).json(fleet);
+    } catch (error: any) {
+      console.error("Error creating fleet:", error);
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to create fleet" });
+    }
+  });
+
+  // Update a fleet
+  app.put("/api/fleets/:id", async (req, res) => {
+    try {
+      const { code, name, description, isActive } = req.body;
+      
+      const fleet = await storage.updateFleet(req.params.id, {
+        code,
+        name,
+        description,
+        isActive,
+      });
+      
+      res.json(fleet);
+    } catch (error: any) {
+      console.error("Error updating fleet:", error);
+      if (error.message?.includes("not found")) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to update fleet" });
+    }
+  });
+
+  // Delete a fleet
+  app.delete("/api/fleets/:id", async (req, res) => {
+    try {
+      await storage.deleteFleet(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting fleet:", error);
+      if (error.message?.includes("not found")) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Cannot delete")) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to delete fleet" });
+    }
+  });
+
+  // Get vessels by fleet
+  app.get("/api/fleets/:id/vessels", async (req, res) => {
+    try {
+      const vessels = await storage.getVesselsByFleet(req.params.id);
+      res.json(vessels);
+    } catch (error: any) {
+      console.error("Error fetching fleet vessels:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch fleet vessels" });
+    }
+  });
+
+  // Assign vessel to fleet
+  app.put("/api/vessels/:id/fleet", async (req, res) => {
+    try {
+      const { fleetId } = req.body;
+      const vessel = await storage.assignVesselToFleet(req.params.id, fleetId);
+      res.json(vessel);
+    } catch (error: any) {
+      console.error("Error assigning vessel to fleet:", error);
+      if (error.message?.includes("not found")) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to assign vessel to fleet" });
+    }
+  });
+
+  // Get vessels with fleet info
+  app.get("/api/vessels-with-fleets", async (req, res) => {
+    try {
+      const vessels = await storage.getVesselsWithFleets();
+      res.json(vessels);
+    } catch (error: any) {
+      console.error("Error fetching vessels with fleets:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch vessels with fleets" });
+    }
+  });
+
   // Get vessels list (for dropdown)
   app.get("/api/vessels", async (req, res) => {
     try {
@@ -4027,7 +4165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new vessel
   app.post("/api/vessels", async (req, res) => {
     try {
-      const { id, name, code, imoNumber, vesselType, flag, isActive } = req.body;
+      const { id, name, code, fleetId, imoNumber, vesselType, flag, isActive } = req.body;
       
       if (!id || !name) {
         return res.status(400).json({ error: "Vessel ID and name are required" });
@@ -4037,6 +4175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id,
         name,
         code: code || id,
+        fleetId: fleetId || null,
         imoNumber: imoNumber || null,
         vesselType: vesselType || null,
         flag: flag || null,

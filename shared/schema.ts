@@ -32,11 +32,31 @@ export type UserRole = "Ship" | "Office" | "PMS Admin";
 
 export type PublicUser = Omit<User, "password">;
 
+// Fleets Table - Fleet registry for grouping vessels
+export const fleets = pgTable("fleets", {
+  id: text("id").primaryKey(), // Fleet code like FLT001, FLT002
+  code: text("code").notNull().unique(), // Unique fleet code
+  name: text("name").notNull(), // Fleet display name
+  description: text("description"), // Optional description
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertFleetSchema = createInsertSchema(fleets).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFleet = z.infer<typeof insertFleetSchema>;
+export type Fleet = typeof fleets.$inferSelect;
+
 // Vessels Table - Core vessel registry
 export const vessels = pgTable("vessels", {
   id: text("id").primaryKey(), // Vessel code like V001, V002
   name: text("name").notNull(), // Vessel display name
   code: text("code").notNull(), // Same as id for compatibility
+  fleetId: text("fleet_id"), // Optional reference to fleet
   imoNumber: text("imo_number"), // IMO number if applicable
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
   flag: text("flag"), // Flag state
