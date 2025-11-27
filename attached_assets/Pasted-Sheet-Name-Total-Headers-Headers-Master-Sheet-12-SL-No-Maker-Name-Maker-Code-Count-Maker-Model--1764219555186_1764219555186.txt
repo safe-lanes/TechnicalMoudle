@@ -1,0 +1,12 @@
+Sheet Name	Total Headers	Headers
+Master_Sheet	12	SL No, Maker Name, Maker Code, Count_Maker, Model, Model Code, Count_SFI Code, Fleet Equipment Code, SFI Code, Assigned Sub Code, Vessel Name, Equipment Name
+Maker List	4	Maker Code, Maker Name, Address, Address ID
+Fleet_Component Sheet	13	Parent Fleet Equipment Code, Fleet Equipment Code, Fleet Equipment Name, Component Category, Maker, Maker Code, Model, Model Code, Location, Rating, Eqpt / System Department, Notes, Vessel Code
+Vessel_Component Sheet	24	Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code, Component Name, Component Category, Maker, Maker Code, Model, Model Code, Serial No, Drawing No, Location, Critical (Yes/No), Condition Based (Yes/No), Installation Date, Commissioned Date, Rating, Eqpt / System Department, Notes, Running Hours, IS Active, Vessel Code, IS Parent
+Fleet_Job Sheet	21	WO Code/Job Code, Fleet Equipment Code, Fleet Equipment Name, WO Title/Job Title, Maintenance Basis, Interval Value, Unit, Interval Running Hour, Task Type, Assigned To, Approver, Job Priority, Class Related, Brief Work Description, Department, Criticality, Is Active, Vessel Code, Component Name, Sub Componnet Name, Extra
+Vessel_Job Sheet	21	WO Code/Job Code, Fleet Equipment Code, Fleet Equipment Name, WO Title, Component Code, Component Name, Maintenance Basis, Interval Value, Interval Running Hour, Unit, Task Type, Assigned To, Approver, Job Priority, Class Related, Next Due Date, Brief Work Description, Department, Criticality, Is Active, Vessel Code
+Fleet_Spare Sheet	19	Part Code, Fleet Equipment Code, Fleet Equipment Name, Part Name, Part Number, Unit Of Measurement, Drawing Number, Position Number, Note, Specification, Maker, Maker Code, Manual Name, Page Number, Criticality, Is Active, IHM (Inventory of Hazardous Materials), Evidence Type, Vessel Code
+Veesel_Spare Sheet	27	Part Code, Fleet Equipment Code, Fleet Equipment Name, Component Code, Component Name, Part Name, Part Number, Unit Of Measurement, Drawing Number, Position Number, Note, Specification, Maker, Maker Code, Manual Name, Page Number, Criticality, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Minimum Stock, Is Active, IHM (Inventory of Hazardous Materials), Evidence Type, Vessel Code
+Vessel_Stores	12	Part Code, IMPA Code, Item Name, UOM, Category, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Min, Stock
+Master Data	3	Components, Jobs, Master Sheet
+SFI Details	2	Component Code, Component Name
