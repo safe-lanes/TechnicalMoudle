@@ -34,13 +34,13 @@ const StoresChangeRequestForm: React.FC<StoresChangeRequestFormProps> = ({
   
   const [storeItems, setStoreItems] = useState<StoreItem[]>([
     {
-      itemCode: initialData.itemCode || (category === "stores" ? "ST-TOOL-001" : category === "lubes" ? "ISO VG 100" : "CHM-ALK-001"),
-      itemName: initialData.itemName || (category === "stores" ? "Torque Wrench" : category === "lubes" ? "Compressor Oil" : "Alkaline Cleaner"),
-      storesCategory: initialData.storesCategory || (category === "stores" ? "Engine Stores" : category === "lubes" ? "Air Compressor #2" : "Engine Bilge Cleaning"),
-      rob: initialData.rob || "2",
+      itemCode: initialData.itemCode || "",
+      itemName: initialData.itemName || "",
+      storesCategory: initialData.storesCategory || "",
+      rob: initialData.rob || "0",
       consumed: "",
       received: "",
-      newRob: initialData.rob || "2",
+      newRob: initialData.rob || "0",
       comments: ""
     },
     { itemCode: "", itemName: "", storesCategory: "", rob: "", consumed: "", received: "", newRob: "", comments: "" },

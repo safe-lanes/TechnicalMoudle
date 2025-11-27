@@ -167,44 +167,7 @@ const ReportsModule = () => {
     }
   ];
 
-  const recentReports: RecentReport[] = [
-    {
-      id: "1",
-      name: "Due Jobs (7 days)",
-      category: "Maintenance & Work Orders",
-      generatedAt: "2 hours ago",
-      generatedBy: "Chief Engineer",
-      format: "PDF",
-      status: "completed"
-    },
-    {
-      id: "2", 
-      name: "Current Stock Snapshot",
-      category: "Inventory - Spares",
-      generatedAt: "4 hours ago",
-      generatedBy: "2nd Engineer",
-      format: "Excel",
-      status: "completed"
-    },
-    {
-      id: "3",
-      name: "Running Hours Ledger",
-      category: "Running Hours & Condition", 
-      generatedAt: "6 hours ago",
-      generatedBy: "3rd Engineer",
-      format: "PDF",
-      status: "completed"
-    },
-    {
-      id: "4",
-      name: "Monthly Maintenance Summary",
-      category: "Maintenance & Work Orders",
-      generatedAt: "1 day ago",
-      generatedBy: "Chief Engineer", 
-      format: "Dashboard",
-      status: "completed"
-    }
-  ];
+  const recentReports: RecentReport[] = [];
 
   const quickAccessReports = [
     { name: "Due Jobs (7 days)", category: "maintenance", frequency: "Daily" },
@@ -338,7 +301,9 @@ const ReportsModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-total-reports">41</p>
+                <p className="text-2xl font-bold text-gray-800" data-testid="text-total-reports">
+                  {reportCategories.reduce((sum, cat) => sum + cat.reportCount, 0)}
+                </p>
               </div>
               <FileText className="h-8 w-8 text-blue-500" />
             </div>
@@ -349,7 +314,9 @@ const ReportsModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Generated Today</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-generated-today">12</p>
+                <p className="text-2xl font-bold text-gray-800" data-testid="text-generated-today">
+                  {recentReports.filter(r => r.generatedAt.includes('hour')).length}
+                </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-500" />
             </div>
@@ -360,7 +327,9 @@ const ReportsModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Export Queue</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-export-queue">3</p>
+                <p className="text-2xl font-bold text-gray-800" data-testid="text-export-queue">
+                  {recentReports.filter(r => r.status === 'processing').length}
+                </p>
               </div>
               <BarChart3 className="h-8 w-8 text-orange-500" />
             </div>
@@ -371,7 +340,7 @@ const ReportsModule = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Scheduled</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-scheduled">8</p>
+                <p className="text-2xl font-bold text-gray-800" data-testid="text-scheduled">0</p>
               </div>
               <Calendar className="h-8 w-8 text-purple-500" />
             </div>

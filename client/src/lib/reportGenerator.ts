@@ -128,7 +128,7 @@ class ReportGeneratorService {
       reportType,
       generatedAt: new Date(),
       generatedBy: 'Current User', // Will be replaced with actual user
-      vessel: filters.vessel || 'MV Atlantic Star',
+      vessel: filters.vessel || 'All Vessels',
       department: filters.department || 'All Departments',
       filters,
       data: [],
