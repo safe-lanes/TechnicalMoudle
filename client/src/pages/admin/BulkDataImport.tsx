@@ -8,6 +8,7 @@ import { FileSpreadsheet, Ship, History } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
+import StoresUpload from "./bulk/StoresUpload";
 import MakerListUpload from "./bulk/MakerListUpload";
 import MasterDataUpload from "./bulk/MasterDataUpload";
 import FleetComponentUpload from "./bulk/FleetComponentUpload";
@@ -169,14 +170,7 @@ export default function BulkDataImport() {
             ) : selectedVesselTemplate === 'spares' ? (
               <SparesUpload vesselId={selectedVessel} />
             ) : selectedVesselTemplate === 'stores' ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileSpreadsheet className="h-16 w-16 text-gray-300 mb-4" />
-                  <p className="text-gray-500 text-center">
-                    Stores bulk upload functionality will be available soon
-                  </p>
-                </CardContent>
-              </Card>
+              <StoresUpload vesselId={selectedVessel} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

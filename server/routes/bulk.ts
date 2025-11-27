@@ -2945,7 +2945,7 @@ function createRecordSnapshot(record: any): { checksum: string; snapshot: string
 async function trackChange(
   importHistoryId: string,
   operation: 'created' | 'updated' | 'archived',
-  entityType: 'component' | 'job' | 'spare' | 'workOrder',
+  entityType: 'component' | 'job' | 'spare' | 'workOrder' | 'storesItem',
   entityId: string,
   previousData: any | null,
   newData: any | null
@@ -3381,10 +3381,200 @@ async function performImport(
     
     console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'stores') {
-    // TODO: Implement stores import
+    console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+    
+    // Fetch existing stores items for this vessel
+    const existingStoresItems = await storage.getStoresItems(vesselId || '');
+    const storesByItemCode = new Map(existingStoresItems.map(s => [s.itemCode, s]));
+    
     for (const row of data) {
-      result.created++;
+      try {
+        const itemCode = String(row['Item Code'] || '').trim();
+        if (!itemCode) {
+          console.log('⏭️ Skipping row with empty Item Code');
+          result.skipped++;
+          continue;
+        }
+        
+        const itemName = String(row['Item Name'] || '').trim();
+        if (!itemName) {
+          console.log(`⏭️ Skipping row ${itemCode} with empty Item Name`);
+          result.skipped++;
+          continue;
+        }
+        
+        // Map item type from template values
+        const itemTypeRaw = String(row['Type'] || '').trim().toLowerCase();
+        let itemType = 'stores';
+        if (itemTypeRaw === 'lubes' || itemTypeRaw === 'lubricants') {
+          itemType = 'lubricants';
+        } else if (itemTypeRaw === 'chemicals') {
+          itemType = 'chemicals';
+        } else if (itemTypeRaw === 'others') {
+          itemType = 'others';
+        }
+        
+        const existingItem = storesByItemCode.get(itemCode);
+        
+        if (mode === 'add') {
+          if (existingItem) {
+            result.skipped++;
+            continue;
+          }
+          
+          const newStoresItem = await storage.createStoresItem({
+            vesselId: vesselId || '',
+            itemCode,
+            impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : null,
+            itemName,
+            itemType,
+            category: row['Stores Category'] ? String(row['Stores Category']).trim() : null,
+            specification: row['Specification'] ? String(row['Specification']).trim() : null,
+            uom: row['UOM'] ? String(row['UOM']).trim() : null,
+            rob: String(row['ROB'] ?? 0),
+            robLocationA: String(row['ROB Location A'] ?? row['ROB'] ?? 0),
+            robLocationB: String(row['ROB Location B'] ?? 0),
+            locationA: row['Location A'] ? String(row['Location A']).trim() : null,
+            locationB: row['Location B'] ? String(row['Location B']).trim() : null,
+            min: String(row['Min'] ?? 0),
+            max: row['Max'] ? String(row['Max']) : null,
+            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
+            supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
+            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
+            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
+            ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : false,
+            ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : null,
+            remarks: row['Remarks'] ? String(row['Remarks']).trim() : null,
+            isActive: true
+          });
+          
+          storesByItemCode.set(itemCode, newStoresItem);
+          result.created++;
+          
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'created', 'storesItem', String(newStoresItem.id), null, newStoresItem);
+          }
+          
+          console.log(`✅ Created stores item: ${itemCode} - ${itemName}`);
+        } else if (mode === 'update') {
+          if (!existingItem) {
+            result.skipped++;
+            continue;
+          }
+          
+          const previousSnapshot = createRecordSnapshot(existingItem);
+          
+          const updated = await storage.updateStoresItem(existingItem.id, {
+            impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
+            itemName: itemName || existingItem.itemName,
+            itemType,
+            category: row['Stores Category'] ? String(row['Stores Category']).trim() : existingItem.category,
+            specification: row['Specification'] ? String(row['Specification']).trim() : existingItem.specification,
+            uom: row['UOM'] ? String(row['UOM']).trim() : existingItem.uom,
+            rob: row['ROB'] !== undefined ? String(row['ROB']) : existingItem.rob,
+            robLocationA: row['ROB Location A'] !== undefined ? String(row['ROB Location A']) : existingItem.robLocationA,
+            robLocationB: row['ROB Location B'] !== undefined ? String(row['ROB Location B']) : existingItem.robLocationB,
+            locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
+            locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
+            min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
+            max: row['Max'] !== undefined ? String(row['Max']) : existingItem.max,
+            unitCost: row['Unit Cost'] !== undefined ? String(row['Unit Cost']) : existingItem.unitCost,
+            supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingItem.supplier,
+            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingItem.lastOrderDate,
+            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingItem.leadTime,
+            ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : existingItem.ihm,
+            ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : existingItem.ihmDetails,
+            remarks: row['Remarks'] ? String(row['Remarks']).trim() : existingItem.remarks
+          });
+          
+          storesByItemCode.set(itemCode, updated);
+          result.updated++;
+          
+          if (importHistoryId) {
+            await trackChange(importHistoryId, 'updated', 'storesItem', String(existingItem.id), previousSnapshot, updated);
+          }
+          
+          console.log(`✅ Updated stores item: ${itemCode}`);
+        } else {
+          // Upsert mode
+          if (existingItem) {
+            const previousSnapshot = createRecordSnapshot(existingItem);
+            
+            const updated = await storage.updateStoresItem(existingItem.id, {
+              impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
+              itemName: itemName || existingItem.itemName,
+              itemType,
+              category: row['Stores Category'] ? String(row['Stores Category']).trim() : existingItem.category,
+              specification: row['Specification'] ? String(row['Specification']).trim() : existingItem.specification,
+              uom: row['UOM'] ? String(row['UOM']).trim() : existingItem.uom,
+              rob: row['ROB'] !== undefined ? String(row['ROB']) : existingItem.rob,
+              robLocationA: row['ROB Location A'] !== undefined ? String(row['ROB Location A']) : existingItem.robLocationA,
+              robLocationB: row['ROB Location B'] !== undefined ? String(row['ROB Location B']) : existingItem.robLocationB,
+              locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
+              locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
+              min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
+              max: row['Max'] !== undefined ? String(row['Max']) : existingItem.max,
+              unitCost: row['Unit Cost'] !== undefined ? String(row['Unit Cost']) : existingItem.unitCost,
+              supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingItem.supplier,
+              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingItem.lastOrderDate,
+              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingItem.leadTime,
+              ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : existingItem.ihm,
+              ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : existingItem.ihmDetails,
+              remarks: row['Remarks'] ? String(row['Remarks']).trim() : existingItem.remarks
+            });
+            
+            storesByItemCode.set(itemCode, updated);
+            result.updated++;
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'updated', 'storesItem', String(existingItem.id), previousSnapshot, updated);
+            }
+            
+            console.log(`✅ Updated stores item (upsert): ${itemCode}`);
+          } else {
+            const newStoresItem = await storage.createStoresItem({
+              vesselId: vesselId || '',
+              itemCode,
+              impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : null,
+              itemName,
+              itemType,
+              category: row['Stores Category'] ? String(row['Stores Category']).trim() : null,
+              specification: row['Specification'] ? String(row['Specification']).trim() : null,
+              uom: row['UOM'] ? String(row['UOM']).trim() : null,
+              rob: String(row['ROB'] ?? 0),
+              robLocationA: String(row['ROB Location A'] ?? row['ROB'] ?? 0),
+              robLocationB: String(row['ROB Location B'] ?? 0),
+              locationA: row['Location A'] ? String(row['Location A']).trim() : null,
+              locationB: row['Location B'] ? String(row['Location B']).trim() : null,
+              min: String(row['Min'] ?? 0),
+              max: row['Max'] ? String(row['Max']) : null,
+              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
+              supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
+              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
+              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
+              ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : false,
+              ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : null,
+              remarks: row['Remarks'] ? String(row['Remarks']).trim() : null,
+              isActive: true
+            });
+            
+            storesByItemCode.set(itemCode, newStoresItem);
+            result.created++;
+            
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'created', 'storesItem', String(newStoresItem.id), null, newStoresItem);
+            }
+            
+            console.log(`✅ Created stores item (upsert): ${itemCode} - ${itemName}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`❌ Error processing stores item row:`, error);
+        result.skipped++;
+      }
     }
+    
+    console.log(`✅ Stores import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'work-orders') {
     console.log(`🚀 Starting work-orders import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
     
