@@ -2595,6 +2595,18 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
 
+      // Validate Fleet Equipment Code if provided
+      if (row['Fleet Equipment Code']) {
+        const fleetCode = String(row['Fleet Equipment Code']).trim();
+        normalized['Fleet Equipment Code'] = fleetCode;
+        
+        // Validate that Fleet Equipment Code exists in master data
+        const masterEntry = await storage.getMasterDataByFleetCode(fleetCode);
+        if (!masterEntry) {
+          warnings.push(`Row ${rowNum}: Fleet Equipment Code '${fleetCode}' not found in master data. Code will be accepted but not linked.`);
+        }
+      }
+      
       // Copy text fields directly
       const textFields = [
         'Fleet Equipment Name', 'Stocking Number', 'Maker', 'Maker Code',
@@ -2819,9 +2831,16 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Job Code'] = String(row['Job Code']).trim();
       }
       
-      // Fleet Equipment Code is optional
+      // Fleet Equipment Code is optional but must exist in master data if provided
       if (row['Fleet Equipment Code']) {
-        normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
+        const fleetCode = String(row['Fleet Equipment Code']).trim();
+        normalized['Fleet Equipment Code'] = fleetCode;
+        
+        // Validate that Fleet Equipment Code exists in master data
+        const masterEntry = await storage.getMasterDataByFleetCode(fleetCode);
+        if (!masterEntry) {
+          warnings.push(`Row ${rowNum}: Fleet Equipment Code '${fleetCode}' not found in master data. Code will be accepted but not linked.`);
+        }
       }
       
       // Fleet Equipment Name is optional
@@ -3057,6 +3076,87 @@ async function performImport(
 
   if (type === 'components') {
     console.log(`🚀 Starting component import: ${data.length} rows, mode: ${mode}`);
+    
+    // Step 0: Auto-populate Maker List from component data
+    // Fetch all existing makers ONCE at the start (performance optimization)
+    const existingMakers = await storage.getMakerList();
+    const existingMakersByName = new Map(existingMakers.map(m => [m.makerName.toLowerCase(), m]));
+    const existingMakersByCode = new Map(existingMakers.map(m => [m.makerCode, m]));
+    
+    // Find max MKR number once for sequential generation
+    let maxMakerNum = 0;
+    for (const m of existingMakers) {
+      const match = m.makerCode.match(/MKR-(\d+)/);
+      if (match) {
+        maxMakerNum = Math.max(maxMakerNum, parseInt(match[1], 10));
+      }
+    }
+    
+    // Track makers to create (only for rows without valid Maker Code)
+    const makersToCreate = new Map<string, { makerName: string; address?: string }>();
+    for (const row of data) {
+      const makerName = row['Maker'];
+      const makerCode = row['Maker Code'];
+      
+      if (makerName && makerName.toString().trim()) {
+        const trimmedName = makerName.toString().trim();
+        const trimmedCode = makerCode?.toString().trim();
+        
+        // If valid Maker Code is provided, verify it exists or keep as-is
+        if (trimmedCode && existingMakersByCode.has(trimmedCode)) {
+          continue; // Valid existing maker code - no action needed
+        }
+        
+        // If Maker Code provided but not found, and maker name exists, use existing code
+        if (existingMakersByName.has(trimmedName.toLowerCase())) {
+          const existingMaker = existingMakersByName.get(trimmedName.toLowerCase())!;
+          row['Maker Code'] = existingMaker.makerCode;
+          continue;
+        }
+        
+        // No valid code and no existing maker - need to create
+        if (!makersToCreate.has(trimmedName.toLowerCase())) {
+          makersToCreate.set(trimmedName.toLowerCase(), {
+            makerName: trimmedName,
+            address: row['Address']?.toString().trim() || undefined
+          });
+        }
+      }
+    }
+    
+    // Create missing makers with sequential codes
+    const newMakerCodes = new Map<string, string>();
+    for (const [key, makerInfo] of makersToCreate) {
+      maxMakerNum++;
+      const newMakerCode = `MKR-${String(maxMakerNum).padStart(6, '0')}`;
+      
+      try {
+        const newMaker = await storage.createMaker({
+          makerCode: newMakerCode,
+          makerName: makerInfo.makerName,
+          address: makerInfo.address || null
+        });
+        newMakerCodes.set(key, newMakerCode);
+        existingMakersByName.set(key, newMaker);
+        existingMakersByCode.set(newMakerCode, newMaker);
+        console.log(`✅ Created new maker: ${makerInfo.makerName} -> ${newMakerCode}`);
+      } catch (err) {
+        console.error(`Failed to create maker ${makerInfo.makerName}:`, err);
+      }
+    }
+    
+    // Update data rows with resolved Maker Codes (only for rows that need it)
+    for (const row of data) {
+      const makerName = row['Maker'];
+      if (makerName && !row['Maker Code']) {
+        const resolvedCode = newMakerCodes.get(makerName.toString().trim().toLowerCase());
+        if (resolvedCode) {
+          row['Maker Code'] = resolvedCode;
+        }
+      }
+    }
+    
+    console.log(`📋 Maker sync complete: ${newMakerCodes.size} new makers created`);
     
     // Step 1: Prefetch all existing components by codes for performance
     const allCodes = data.map(row => String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim());

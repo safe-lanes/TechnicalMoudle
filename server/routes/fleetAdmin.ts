@@ -10,8 +10,13 @@ import {
   insertBulkImportHistorySchema,
   insertBulkImportErrorSchema
 } from '@shared/schema';
+import { requireOfficeOrAdmin } from '../middleware/auth';
 
 const router = Router();
+
+// Apply Office/PMS Admin access control to all Fleet Admin routes
+// Fleet data is visible only on the office side per PMS Process Flow requirements
+router.use(requireOfficeOrAdmin);
 
 // ============================================================
 // MASTER DATA CRUD - Fleet Equipment Code Management
@@ -88,14 +93,32 @@ const createMasterDataSchema = insertMasterDataSchema.extend({
 });
 
 // Create new master data entry with auto-generated Fleet Equipment Code
+// Follows the rule: Same Maker + Model = Same Fleet Equipment Code
 router.post('/master-data', async (req, res) => {
   try {
     const validatedData = createMasterDataSchema.parse(req.body);
     
-    // Generate Fleet Equipment Code if not provided
+    // Check if same Maker+Model combination already exists
+    // If so, reuse the existing Fleet Equipment Code
     let fleetEquipmentCode = validatedData.fleetEquipmentCode;
+    
+    if (!fleetEquipmentCode && validatedData.makerCode && validatedData.model) {
+      const existingEntry = await storage.getMasterDataByMakerModel(
+        validatedData.makerCode,
+        validatedData.model
+      );
+      
+      if (existingEntry) {
+        // Reuse existing Fleet Equipment Code for same Maker+Model
+        fleetEquipmentCode = existingEntry.fleetEquipmentCode;
+        console.log(`Reusing Fleet Equipment Code ${fleetEquipmentCode} for existing Maker+Model: ${validatedData.makerCode}/${validatedData.model}`);
+      }
+    }
+    
+    // Generate new Fleet Equipment Code only if not provided and no existing match
     if (!fleetEquipmentCode && validatedData.sfiCode) {
       fleetEquipmentCode = await storage.generateFleetEquipmentCode(validatedData.sfiCode);
+      console.log(`Generated new Fleet Equipment Code ${fleetEquipmentCode} for new Maker+Model: ${validatedData.makerCode}/${validatedData.model}`);
     }
     
     const newEntry = await storage.createMasterData({

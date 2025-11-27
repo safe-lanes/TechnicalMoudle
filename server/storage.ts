@@ -572,6 +572,7 @@ export interface IStorage {
   getMasterDataList(): Promise<MasterData[]>;
   getMasterDataItem(id: number): Promise<MasterData | undefined>;
   getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined>;
+  getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined>;
   createMasterData(data: InsertMasterData): Promise<MasterData>;
   updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData>;
   deleteMasterData(id: number): Promise<void>;
@@ -5392,6 +5393,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.masterDataMap.values()).find(m => m.fleetEquipmentCode === fleetEquipmentCode);
   }
   
+  async getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined> {
+    return Array.from(this.masterDataMap.values()).find(
+      m => m.makerCode === makerCode && m.model === model && m.isActive
+    );
+  }
+  
   async createMasterData(data: InsertMasterData): Promise<MasterData> {
     const id = this.currentMasterDataId++;
     const now = new Date();
@@ -8511,6 +8518,18 @@ export class PostgresStorage implements IStorage {
     const db = await this.getDb();
     const { eq } = await import('drizzle-orm');
     const result = await db.select().from(masterData).where(eq(masterData.fleetEquipmentCode, fleetEquipmentCode));
+    return result[0];
+  }
+  
+  async getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined> {
+    const db = await this.getDb();
+    const { eq, and } = await import('drizzle-orm');
+    const result = await db.select().from(masterData)
+      .where(and(
+        eq(masterData.makerCode, makerCode),
+        eq(masterData.model, model),
+        eq(masterData.isActive, true)
+      ));
     return result[0];
   }
   
