@@ -2817,9 +2817,10 @@ async function performImport(
     }
     
     // Track makers to create (only for rows without valid Maker Code)
+    // Support both 'Maker' and 'Maker Name' column headers
     const makersToCreate = new Map<string, { makerName: string; address?: string }>();
     for (const row of data) {
-      const makerName = row['Maker'];
+      const makerName = row['Maker'] || row['Maker Name'];
       const makerCode = row['Maker Code'];
       
       if (makerName && makerName.toString().trim()) {
@@ -2871,7 +2872,7 @@ async function performImport(
     
     // Update data rows with resolved Maker Codes (only for rows that need it)
     for (const row of data) {
-      const makerName = row['Maker'];
+      const makerName = row['Maker'] || row['Maker Name'];
       if (makerName && !row['Maker Code']) {
         const resolvedCode = newMakerCodes.get(makerName.toString().trim().toLowerCase());
         if (resolvedCode) {
@@ -3129,7 +3130,7 @@ async function performImport(
             partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
             uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
             stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
-            maker: row['Maker'] ? String(row['Maker']).trim() : null,
+            maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : null,
             makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
             specification: row['Specification'] ? String(row['Specification']).trim() : null,
             drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
@@ -3172,7 +3173,7 @@ async function performImport(
             partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
             uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
             stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
-            maker: row['Maker'] ? String(row['Maker']).trim() : existingSpare.maker,
+            maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
             makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
             specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
             drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
@@ -3208,7 +3209,7 @@ async function performImport(
               partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
               uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
               stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
-              maker: row['Maker'] ? String(row['Maker']).trim() : existingSpare.maker,
+              maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
               makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
               specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
               drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
@@ -3245,7 +3246,7 @@ async function performImport(
               partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
               uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
               stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
-              maker: row['Maker'] ? String(row['Maker']).trim() : null,
+              maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : null,
               makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
               specification: row['Specification'] ? String(row['Specification']).trim() : null,
               drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
@@ -3774,7 +3775,8 @@ async function createComponentFromRow(row: any, vesselId?: string) {
   const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
   
   // Resolve maker name from maker code if not provided directly
-  let makerName = row['Maker'] || null;
+  // Support both 'Maker' and 'Maker Name' column headers
+  let makerName = row['Maker'] || row['Maker Name'] || null;
   const makerCode = row['Maker Code'] || null;
   if (!makerName && makerCode) {
     const maker = await storage.getMakerByCode(String(makerCode).trim());
@@ -3851,8 +3853,10 @@ async function updateComponentFromRow(componentCode: string, row: any) {
   if (row['Fleet Equipment Code']) updateData.fleetEquipmentCode = row['Fleet Equipment Code'];
   if (row['Fleet Equipment Name']) updateData.fleetEquipmentName = row['Fleet Equipment Name'];
   // Maker and Model fields - resolve name from code if needed
-  if (row['Maker']) {
-    updateData.maker = row['Maker'];
+  // Support both 'Maker' and 'Maker Name' column headers
+  const makerFromExcel = row['Maker'] || row['Maker Name'];
+  if (makerFromExcel) {
+    updateData.maker = makerFromExcel;
   } else if (row['Maker Code']) {
     // Try to resolve maker name from maker code
     const maker = await storage.getMakerByCode(String(row['Maker Code']).trim());
