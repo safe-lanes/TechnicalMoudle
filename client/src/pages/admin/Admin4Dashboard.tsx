@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock, FileCode2 } from "lucide-react";
+import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock, FileCode2, FolderTree } from "lucide-react";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -11,9 +11,10 @@ import FleetJobsManagement from "./FleetJobsManagement";
 import FleetSparesManagement from "./FleetSparesManagement";
 import FleetVesselMapping from "./FleetVesselMapping";
 import PmsVesselSettingsManagement from "./PmsVesselSettingsManagement";
+import FleetEquipmentTreeView from "./FleetEquipmentTreeView";
 import type { PmsVesselSettings } from "@shared/schema";
 
-type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings';
+type ViewType = 'dashboard' | 'makers' | 'master-lists' | 'master-data' | 'components' | 'jobs' | 'spares' | 'vessel-mapping' | 'pms-settings' | 'equipment-tree';
 
 export default function Admin4Dashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -228,6 +229,27 @@ export default function Admin4Dashboard() {
           <h1 className="text-xl font-semibold text-gray-900">Lead Time & Grace Period Settings</h1>
         </div>
         <PmsVesselSettingsManagement />
+      </div>
+    );
+  }
+
+  if (currentView === 'equipment-tree') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b px-6 py-4 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentView('dashboard')}
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="h-6 w-px bg-gray-300" />
+          <h1 className="text-xl font-semibold text-gray-900">Fleet Equipment Data Tree View</h1>
+        </div>
+        <FleetEquipmentTreeView />
       </div>
     );
   }
@@ -547,6 +569,19 @@ export default function Admin4Dashboard() {
               <div className="text-left">
                 <div className="font-medium">Fleet Equipment Codes</div>
                 <div className="text-sm text-gray-500">Equipment code mappings</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-4 px-6"
+              onClick={() => setCurrentView('equipment-tree')}
+              data-testid="link-equipment-tree"
+            >
+              <FolderTree className="mr-3 h-5 w-5 text-emerald-600" />
+              <div className="text-left">
+                <div className="font-medium">Equipment Tree View</div>
+                <div className="text-sm text-gray-500">Hierarchical equipment data</div>
               </div>
             </Button>
 
