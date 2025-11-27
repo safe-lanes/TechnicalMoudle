@@ -5,9 +5,7 @@ import {
   BarChart3, 
   FileCheck, 
   AlertTriangle, 
-  Wrench, 
-  Settings,
-  Shield
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
@@ -48,11 +46,6 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
       id: "pms",
       label: "PMS",
       icon: Wrench,
-    },
-    {
-      id: "admin",
-      label: "Admin",
-      icon: Shield,
     },
   ];
 
