@@ -25,6 +25,17 @@
       "isActive": true,
       "createdAt": "2025-11-27T17:46:09.306Z",
       "updatedAt": "2025-11-27T17:46:09.306Z"
+    },
+    "V0001": {
+      "id": "V0001",
+      "name": "MV TEST 1",
+      "code": "V0001",
+      "imoNumber": null,
+      "vesselType": null,
+      "flag": null,
+      "isActive": true,
+      "createdAt": "2025-11-27T18:01:50.221Z",
+      "updatedAt": "2025-11-27T18:01:50.221Z"
     }
   },
   "components": {},
