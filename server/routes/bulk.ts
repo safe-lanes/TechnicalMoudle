@@ -3799,9 +3799,9 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     componentCategory: row['Component Category'] || row['Main Group Name'] || null,
     location: row['Location'] || null,
     eqptSystemDept: row['Eqpt / System Department'] || null,
-    // Dates
-    commissionedDate: row['Commissioned Date'] || null,
-    installationDate: row['Installation Date'] || null,
+    // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
+    commissionedDate: row['Commissioned Date'] ? normalizeDateToDDMMMYYYY(row['Commissioned Date']) : null,
+    installationDate: row['Installation Date'] ? normalizeDateToDDMMMYYYY(row['Installation Date']) : null,
     // Status and classification
     critical: row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes',
     classItem: false, // Not in template, defaulting to false
@@ -3857,9 +3857,9 @@ async function updateComponentFromRow(componentCode: string, row: any) {
     updateData.componentCategory = row['Component Category'] || row['Main Group Name'];
   }
   if (row['Location']) updateData.location = row['Location'];
-  // Dates
-  if (row['Commissioned Date']) updateData.commissionedDate = row['Commissioned Date'];
-  if (row['Installation Date']) updateData.installationDate = row['Installation Date'];
+  // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
+  if (row['Commissioned Date']) updateData.commissionedDate = normalizeDateToDDMMMYYYY(row['Commissioned Date']);
+  if (row['Installation Date']) updateData.installationDate = normalizeDateToDDMMMYYYY(row['Installation Date']);
   // Status and classification
   if (row['Critical (Yes/No)'] !== undefined) {
     updateData.critical = row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes';
