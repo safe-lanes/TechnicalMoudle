@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { BarChart3, PieChart, TrendingUp, FileSpreadsheet, FileText, FileDown, Play, AlertTriangle, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { VesselContext } from "@/contexts/VesselContext";
 
 interface ReportFilter {
   vesselId?: string;
@@ -84,9 +85,19 @@ const reportConfigs: ReportConfig[] = [
 ];
 
 export default function DefectsReports() {
+  const vesselContext = useContext(VesselContext);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [filters, setFilters] = useState<ReportFilter>({});
   const [reportData, setReportData] = useState<any>(null);
+
+  const { data: vessels = [] } = useQuery({
+    queryKey: ['/api/vessels'],
+    queryFn: async () => {
+      const response = await fetch('/api/vessels');
+      if (!response.ok) throw new Error('Failed to fetch vessels');
+      return response.json();
+    }
+  });
 
   const runReportMutation = useMutation({
     mutationFn: async (reportId: string) => {
@@ -218,14 +229,17 @@ export default function DefectsReports() {
             <div className="grid grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs">Vessel</Label>
-                <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
+                <Select value={filters.vesselId || ''} onValueChange={(value) => handleFilterChange('vesselId', value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="All Vessels" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Vessels</SelectItem>
-                    <SelectItem value="V001">Vessel 1</SelectItem>
-                    <SelectItem value="V002">Vessel 2</SelectItem>
+                    {vessels.map((vessel: any) => (
+                      <SelectItem key={vessel.id} value={vessel.id}>
+                        {vessel.name || vessel.code}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

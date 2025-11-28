@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Bell, Mail, AlertCircle, Clock, Package, Shield, HardDrive } from 'lucide-react';
 import AlertPolicyDrawer from '@/components/alerts/AlertPolicyDrawer';
 import AlertHistory from '@/components/alerts/AlertHistory';
+import { VesselContext } from '@/contexts/VesselContext';
 
 interface AlertPolicy {
   id: number;
@@ -70,6 +71,8 @@ const alertTypeInfo = {
 
 export default function Alerts() {
   const { toast } = useToast();
+  const vesselContext = useContext(VesselContext);
+  const selectedVesselId = vesselContext?.selectedVessel?.id || 'V001';
   const [selectedPolicy, setSelectedPolicy] = useState<AlertPolicy | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [localPolicies, setLocalPolicies] = useState<AlertPolicy[]>([]);
@@ -89,9 +92,9 @@ export default function Alerts() {
 
   // Fetch alert configuration
   const { data: config, isLoading: configLoading } = useQuery({
-    queryKey: ['/api/alerts/config/V001'],
+    queryKey: ['/api/alerts/config', selectedVesselId],
     queryFn: async () => {
-      const response = await fetch('/api/alerts/config/V001');
+      const response = await fetch(`/api/alerts/config/${selectedVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch config');
       const data = await response.json();
       setLocalConfig(data);
@@ -138,7 +141,7 @@ export default function Alerts() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/alerts/config/V001'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/alerts/config', selectedVesselId] });
       toast({
         title: 'Configuration Saved',
         description: 'Alert configuration has been updated successfully.'
