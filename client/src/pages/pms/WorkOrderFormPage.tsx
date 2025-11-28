@@ -236,6 +236,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [templateData, setTemplateData] = useState({
     woTitle: "",
     component: "",
+    componentName: "",
     componentCode: "",
     woTemplateCode: "",
     maintenanceBasis: "Calendar",
@@ -1148,8 +1149,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]">Component</Label>
                   <Input
-                    value={templateData.component}
-                    onChange={(e) => handleTemplateChange('component', e.target.value)}
+                    value={templateData.componentName || templateData.component}
+                    onChange={(e) => handleTemplateChange('componentName', e.target.value)}
                     className="text-sm"
                     placeholder="Enter component"
                     disabled={isReadOnly}
