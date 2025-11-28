@@ -231,7 +231,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
   
-  const isReadOnly = false;
+  // Determine if Part A should be read-only (immutable)
+  // Part A is read-only when:
+  // 1. Viewing/editing an existing work order that's linked to a job (on-demand WO)
+  // 2. Viewing a job template (mode=template)
+  const context = workOrderContext as any;
+  const hasLinkedJob = !!(context?.job || context?.workOrder?.jobId);
+  const isPartAReadOnly = resolvedMode === 'template' || (!!workOrderId && hasLinkedJob);
+  
+  const isReadOnly = false; // General read-only flag (not currently used)
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -1141,7 +1149,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
                     className="text-sm"
                     placeholder="Enter job title"
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                     data-testid="input-wo-title"
                   />
                 </div>
@@ -1153,7 +1161,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     onChange={(e) => handleTemplateChange('componentName', e.target.value)}
                     className="text-sm"
                     placeholder="Enter component"
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                     data-testid="input-component"
                   />
                 </div>
@@ -1165,7 +1173,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     onChange={(e) => handleTemplateChange('componentCode', e.target.value)}
                     className="text-sm"
                     placeholder="Enter SFI code"
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                     data-testid="input-component-code"
                   />
                 </div>
@@ -1177,7 +1185,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
                     className="text-sm"
                     placeholder="Auto-generated"
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                     data-testid="input-wo-template-code"
                   />
                 </div>
@@ -1187,7 +1195,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.maintenanceBasis}
                     onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-maintenance-basis">
                       <SelectValue />
@@ -1209,7 +1217,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleTemplateChange('frequencyValue', e.target.value)}
                       className="text-sm flex-1"
                       placeholder="Value"
-                      disabled={isReadOnly}
+                      disabled={isPartAReadOnly}
                       data-testid="input-frequency-value"
                     />
                     <Select
@@ -1241,7 +1249,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.taskType}
                     onValueChange={(value) => handleTemplateChange('taskType', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-task-type">
                       <SelectValue />
@@ -1261,7 +1269,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.assignedTo}
                     onValueChange={(value) => handleTemplateChange('assignedTo', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-assigned-to">
                       <SelectValue placeholder="Select rank" />
@@ -1279,7 +1287,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.approver}
                     onValueChange={(value) => handleTemplateChange('approver', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-approver">
                       <SelectValue placeholder="Select rank" />
@@ -1297,7 +1305,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.jobPriority}
                     onValueChange={(value) => handleTemplateChange('jobPriority', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-job-priority">
                       <SelectValue />
@@ -1316,7 +1324,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <Select
                     value={templateData.classRelated}
                     onValueChange={(value) => handleTemplateChange('classRelated', value)}
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                   >
                     <SelectTrigger className="text-sm" data-testid="select-class-related">
                       <SelectValue />
@@ -1335,7 +1343,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     value={templateData.nextDueDate}
                     onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
                     className="text-sm"
-                    disabled={isReadOnly}
+                    disabled={isPartAReadOnly}
                     data-testid="input-next-due-date"
                   />
                 </div>
@@ -1348,7 +1356,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   onChange={(e) => handleTemplateChange('briefWorkDescription', e.target.value)}
                   className="text-sm min-h-[80px]"
                   placeholder="Describe what this job is to do for the manufacturer/builder guidance (e.g. Lubricate, Clean, Change Oil, etc.)"
-                  disabled={isReadOnly}
+                  disabled={isPartAReadOnly}
                   data-testid="textarea-brief-work-description"
                 />
               </div>
@@ -1368,7 +1376,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddSparePart}
-                  disabled={isReadOnly}
+                  disabled={isPartAReadOnly}
                   data-testid="button-add-spare"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -1514,7 +1522,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   size="sm"
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddTool}
-                  disabled={isReadOnly}
+                  disabled={isPartAReadOnly}
                   data-testid="button-add-tool"
                 >
                   <Plus className="h-4 w-4 mr-1" />
