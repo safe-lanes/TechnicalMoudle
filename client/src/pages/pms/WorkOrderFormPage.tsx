@@ -271,6 +271,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string}>
   });
 
+  // Store work order number from context (e.g., MKR-IN-00001.WO-2025-001)
+  const [workOrderNo, setWorkOrderNo] = useState("");
+
   const [executionData, setExecutionData] = useState({
     woExecutionId: "",
     riskAssessment: "No",
@@ -398,6 +401,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           ...context.executionData,
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
         }));
+      }
+      
+      // Load work order number from context (for Part B display)
+      if (context.workOrder?.workOrderNo || context.workOrder?.templateCode) {
+        setWorkOrderNo(context.workOrder.workOrderNo || context.workOrder.templateCode);
       }
       
       // Auto-populate previousReading from component's current running hours (Part B Section B3)
@@ -1798,11 +1806,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             description="Safety assessments and checklists completed"
           >
             <div className="space-y-6">
-              {/* WO Execution ID */}
+              {/* Work Order No. */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <Label className="text-sm text-[#8798ad]">WO Execution ID</Label>
+                <Label className="text-sm text-[#8798ad]">Work Order No.</Label>
                 <div className="text-sm font-medium text-gray-900 mt-1">
-                  {executionData.woExecutionId}
+                  {workOrderNo || 'Not assigned'}
                 </div>
               </div>
 
