@@ -3017,8 +3017,8 @@
       "templateCode": "MKR-IN-00003.WO-2025-001",
       "jobTitle": "Steering Gear Actuator Stuffing Gland, Inspection - 1Y",
       "assignedTo": "2nd Engineer",
-      "dueDate": "01-Nov-2025",
-      "status": "Active",
+      "dueDate": "2025-12-01",
+      "status": "Postponed",
       "taskType": "Inspection",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
@@ -3063,7 +3063,10 @@
       "scopeNotes": null,
       "criticality": null,
       "uploadedDocuments": [],
-      "consumedSpareParts": []
+      "consumedSpareParts": [],
+      "postponementEndDate": "03-Dec-2025",
+      "postponementReason": "",
+      "postponementAuthorizedBy": "captain"
     },
     {
       "id": "WO-1764290088433-asygd6e",
