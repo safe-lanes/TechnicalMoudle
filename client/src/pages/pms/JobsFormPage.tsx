@@ -56,6 +56,9 @@ const JobsFormPage: React.FC = () => {
     approver: "",
     jobPriority: "Medium",
     classRelated: "No",
+    department: "",
+    criticality: "",
+    isActive: "Yes",
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
@@ -256,9 +259,9 @@ const JobsFormPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <ReadOnlyField label="Job Title" value={templateData.woTitle} />
-                  <ReadOnlyField label="Component" value={templateData.componentName || templateData.component} />
-                  <ReadOnlyField label="SFI Code" value={templateData.componentCode} />
-                  <ReadOnlyField label="Job Template Code" value={templateData.woTemplateCode} />
+                  <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} />
+                  <ReadOnlyField label="Component Code" value={templateData.componentCode} />
+                  <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} />
                   <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} />
                   <ReadOnlyField label="Frequency" value={formatFrequency()} />
                   <ReadOnlyField label="Task Type" value={templateData.taskType} />
@@ -267,6 +270,9 @@ const JobsFormPage: React.FC = () => {
                   <ReadOnlyField label="Job Priority" value={templateData.jobPriority} />
                   <ReadOnlyField label="Class Related" value={templateData.classRelated} />
                   <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} />
+                  <ReadOnlyField label="Department" value={templateData.department} />
+                  <ReadOnlyField label="Criticality" value={templateData.criticality} />
+                  <ReadOnlyField label="Is Active" value={templateData.isActive} />
                 </div>
 
                 <div className="space-y-1">
