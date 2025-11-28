@@ -1801,6 +1801,31 @@ const Components: React.FC = () => {
       }
     });
     
+    // Sort children in ascending order by component code
+    const sortChildrenAscending = (nodes: ComponentNode[]) => {
+      nodes.forEach(node => {
+        if (node.children && node.children.length > 0) {
+          // Sort children by code in ascending order (handles numeric and alphanumeric codes)
+          node.children.sort((a, b) => {
+            const aCode = a.code || '';
+            const bCode = b.code || '';
+            // Try numeric comparison first
+            const aNum = parseFloat(aCode);
+            const bNum = parseFloat(bCode);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return aNum - bNum;
+            }
+            // Fall back to string comparison
+            return aCode.localeCompare(bCode);
+          });
+          // Recursively sort descendants
+          sortChildrenAscending(node.children);
+        }
+      });
+    };
+    
+    sortChildrenAscending(mainCategories);
+    
     return mainCategories;
   }, [fetchedComponents]);
 
