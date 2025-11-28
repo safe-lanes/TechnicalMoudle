@@ -1226,7 +1226,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     <Select
                       value={templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit}
                       onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
-                      disabled={isReadOnly || templateData.maintenanceBasis === 'Running Hours'}
+                      disabled={isPartAReadOnly || templateData.maintenanceBasis === 'Running Hours'}
                     >
                       <SelectTrigger className="text-sm w-32" data-testid="select-frequency-unit">
                         <SelectValue />
