@@ -132,10 +132,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     };
   }, [resolvedMode]);
   
-  const { data: workOrderContext, isLoading: isContextLoading } = useQuery({
-    queryKey: ['/api/work-orders', workOrderId, 'context'],
-    enabled: !!workOrderId
+  // Use job context endpoint for template mode (viewing job template), 
+  // work order context endpoint otherwise
+  const { data: jobContext, isLoading: isJobContextLoading } = useQuery({
+    queryKey: ['/api/jobs', workOrderId, 'context'],
+    enabled: !!workOrderId && resolvedMode === 'template'
   });
+
+  const { data: woContext, isLoading: isWoContextLoading } = useQuery({
+    queryKey: ['/api/work-orders', workOrderId, 'context'],
+    enabled: !!workOrderId && resolvedMode !== 'template'
+  });
+  
+  // Combine contexts: use job context for template mode, work order context otherwise
+  const workOrderContext = resolvedMode === 'template' ? jobContext : woContext;
+  const isContextLoading = resolvedMode === 'template' ? isJobContextLoading : isWoContextLoading;
 
   // Extract vesselId from context for spares query
   const vesselId = workOrderContext ? (workOrderContext as any).templateData?.vesselId || (workOrderContext as any).workOrder?.vesselId : null;
