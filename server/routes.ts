@@ -384,6 +384,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get job context (for job template viewing - Part A hydration)
+  app.get("/api/jobs/:id/context", async (req, res) => {
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // Get component data
+      const component = await storage.getComponent(job.componentId);
+      
+      // Get parent component data if exists
+      let parentComponent = null;
+      if (component?.parentId) {
+        parentComponent = await storage.getComponent(component.parentId);
+      }
+      
+      // Build template data from job fields (matching work order context structure)
+      const templateData = {
+        jobTitle: job.jobTitle,
+        jobNo: job.jobNo,
+        component: job.componentId,
+        componentCode: job.componentCode,
+        componentName: job.componentName,
+        sfiCode: job.sfiCode || job.componentCode,
+        maintenanceBasis: job.maintenanceBasis,
+        maintenanceType: job.maintenanceType,
+        frequencyValue: job.frequencyValue?.toString() || '',
+        frequencyUnit: job.frequencyUnit || 'Months',
+        intervalRunningHour: job.intervalRunningHour?.toString() || '',
+        assignedTo: job.assignedTo,
+        approver: job.approver,
+        department: job.department,
+        jobPriority: job.jobPriority,
+        classRelated: job.classRelated,
+        criticality: job.criticality,
+        lastDoneDate: job.lastDoneDate,
+        nextDueDate: job.nextDueDate,
+        lastDoneRH: job.lastDoneRH?.toString() || '',
+        nextDueRH: job.nextDueRH?.toString() || '',
+        briefWorkDescription: job.briefWorkDescription || job.jobDescription,
+        jobDescription: job.jobDescription,
+        requiredSpareParts: job.requiredSpareParts || [],
+        requiredTools: job.requiredTools || [],
+        safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+        vesselId: job.vesselId
+      };
+      
+      res.json({
+        job,
+        templateData,
+        component: component ? {
+          id: component.id,
+          componentCode: component.componentCode,
+          name: component.name,
+          parentId: component.parentId,
+          currentCumulativeRH: component.currentCumulativeRH,
+          lastUpdated: component.lastUpdated
+        } : null,
+        parentComponent: parentComponent ? {
+          id: parentComponent.id,
+          componentCode: parentComponent.componentCode,
+          name: parentComponent.name,
+          currentCumulativeRH: parentComponent.currentCumulativeRH
+        } : null,
+        maintenanceBasis: job.maintenanceBasis
+      });
+    } catch (error) {
+      console.error("Failed to fetch job context:", error);
+      res.status(500).json({ error: "Failed to fetch job context" });
+    }
+  });
+  
   // Create new job
   app.post("/api/jobs", async (req, res) => {
     try {
