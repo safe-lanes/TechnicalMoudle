@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2 } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -1795,183 +1795,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 id="part-b"
                 label="Part B"
                 title="Work Completion Record"
-                description="Record details of work execution and completion"
+                description="Enter work completion details here including Risk assessment, checklists, comments etc."
               />
           
-          {/* B1. Work Completion Record */}
+          {/* B1. Risk Assessment, Checklists & Records */}
           <SectionBlock
             id="completion"
             number="B1"
-            title="Risk Assessment, Checklist & Remarks"
-            description="Safety assessments and checklists completed"
-          >
-            <div className="space-y-6">
-              {/* Work Order No. */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <Label className="text-sm text-[#8798ad]">Work Order No.</Label>
-                <div className="text-sm font-medium text-gray-900 mt-1">
-                  {workOrderNo || 'Not assigned'}
-                </div>
-              </div>
-
-              {/* Execution Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Start Date & Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={executionData.startDateTime}
-                    onChange={(e) => handleExecutionChange('startDateTime', e.target.value)}
-                    className="text-sm"
-                    data-testid="input-start-datetime"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Completion Date & Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={executionData.completionDateTime}
-                    onChange={(e) => handleExecutionChange('completionDateTime', e.target.value)}
-                    className="text-sm"
-                    data-testid="input-completion-datetime"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Date of Completion</Label>
-                  <Input
-                    type="date"
-                    value={executionData.dateOfCompletion}
-                    onChange={(e) => handleExecutionChange('dateOfCompletion', e.target.value)}
-                    className="text-sm"
-                    data-testid="input-date-of-completion"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Running Hours</Label>
-                  <Input
-                    type="number"
-                    value={executionData.runningHours}
-                    onChange={(e) => handleExecutionChange('runningHours', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter running hours"
-                    data-testid="input-running-hours"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Assigned To (Rank)</Label>
-                  <Select
-                    value={executionData.assignedTo}
-                    onValueChange={(value) => handleExecutionChange('assignedTo', value)}
-                  >
-                    <SelectTrigger className="text-sm" data-testid="select-execution-assigned-to">
-                      <SelectValue placeholder="Select rank" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ranks.map((rank) => (
-                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Performed By (Rank)</Label>
-                  <Select
-                    value={executionData.performedBy}
-                    onValueChange={(value) => handleExecutionChange('performedBy', value)}
-                  >
-                    <SelectTrigger className="text-sm" data-testid="select-performed-by">
-                      <SelectValue placeholder="Select rank" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ranks.map((rank) => (
-                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">No. of Persons</Label>
-                  <Input
-                    type="number"
-                    value={executionData.noOfPersons}
-                    onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter number"
-                    data-testid="input-no-of-persons"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Total Time (Hours)</Label>
-                  <Input
-                    type="number"
-                    value={executionData.totalTimeHours}
-                    onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter hours"
-                    data-testid="input-total-time-hours"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Man-hours</Label>
-                  <Input
-                    type="number"
-                    value={executionData.manhours}
-                    onChange={(e) => handleExecutionChange('manhours', e.target.value)}
-                    className="text-sm"
-                    placeholder="Calculated automatically"
-                    disabled
-                    data-testid="input-manhours"
-                  />
-                </div>
-              </div>
-
-              {/* Work Carried Out */}
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
-                <Textarea
-                  ref={workCarriedOutRef}
-                  value={executionData.workCarriedOut}
-                  onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
-                  className="text-sm min-h-[120px]"
-                  placeholder="Describe the work performed..."
-                  data-testid="textarea-work-carried-out"
-                />
-              </div>
-
-              {/* Job Experience Notes */}
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Job Experience Notes</Label>
-                <Textarea
-                  value={executionData.jobExperienceNotes}
-                  onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
-                  className="text-sm min-h-[80px]"
-                  placeholder="Any important notes or learnings..."
-                  data-testid="textarea-job-experience-notes"
-                />
-              </div>
-            </div>
-          </SectionBlock>
-
-          {/* B2. Document Management */}
-          <SectionBlock
-            id="documents"
-            number="B2"
-            title="Document Management"
-            description="Upload and manage risk assessments, checklists, and operational forms"
+            title="Risk Assessment, Checklists & Records"
           >
             <div className="space-y-4">
-              {/* Risk Assessment */}
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium text-gray-900">Risk Assessment</Label>
+              {/* B1.1 Risk Assessment */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                <Label className="text-sm text-gray-700">B1.1 Risk Assessment Completed / Reviewed:</Label>
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
                       <input 
@@ -1997,30 +1834,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       />
                       <span className="text-sm">No</span>
                     </label>
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="radio" 
+                        name="riskAssessment" 
+                        value="NA" 
+                        checked={executionData.riskAssessment === "NA"}
+                        onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
+                        className="text-blue-600" 
+                        data-testid="radio-risk-assessment-na"
+                      />
+                      <span className="text-sm">NA</span>
+                    </label>
                   </div>
-                </div>
-                {executionData.riskAssessment === "Yes" && (
                   <div className="flex items-center gap-2">
                     {getUploadedDocument('riskAssessment') ? (
                       <>
-                        <span className="text-sm text-gray-700 flex-1">{getUploadedDocument('riskAssessment')?.fileName}</span>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument('riskAssessment')}
                           data-testid="button-view-risk-assessment"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
                           View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteDocumentClick('riskAssessment')}
-                          className="text-red-600 hover:text-red-800"
-                          data-testid="button-delete-risk-assessment"
-                        >
-                          Delete
                         </Button>
                       </>
                     ) : (
@@ -2030,8 +1866,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
                         data-testid="button-upload-risk-assessment"
                       >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload Document
+                        Upload
                       </Button>
                     )}
                     <input
@@ -2041,14 +1876,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'riskAssessment')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Link2 className="h-4 w-4 text-gray-500" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Paperclip className="h-4 w-4 text-gray-500" />
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Safety Checklists */}
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium text-gray-900">Safety Checklists</Label>
+              {/* B1.2 Safety Checklists */}
+              <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                <Label className="text-sm text-gray-700">B1.2 Safety Checklists Completed (As applicable):</Label>
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
                       <input 
@@ -2074,30 +1915,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       />
                       <span className="text-sm">No</span>
                     </label>
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="radio" 
+                        name="safetyChecklists" 
+                        value="NA" 
+                        checked={executionData.safetyChecklists === "NA"}
+                        onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
+                        className="text-blue-600" 
+                        data-testid="radio-safety-checklists-na"
+                      />
+                      <span className="text-sm">NA</span>
+                    </label>
                   </div>
-                </div>
-                {executionData.safetyChecklists === "Yes" && (
                   <div className="flex items-center gap-2">
                     {getUploadedDocument('safetyChecklists') ? (
                       <>
-                        <span className="text-sm text-gray-700 flex-1">{getUploadedDocument('safetyChecklists')?.fileName}</span>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument('safetyChecklists')}
                           data-testid="button-view-safety-checklists"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
                           View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteDocumentClick('safetyChecklists')}
-                          className="text-red-600 hover:text-red-800"
-                          data-testid="button-delete-safety-checklists"
-                        >
-                          Delete
                         </Button>
                       </>
                     ) : (
@@ -2107,8 +1947,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onClick={() => handleUploadDocument('safetyChecklists', safetyChecklistFileRef)}
                         data-testid="button-upload-safety-checklists"
                       >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload Document
+                        Upload
                       </Button>
                     )}
                     <input
@@ -2118,14 +1957,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'safetyChecklists')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Link2 className="h-4 w-4 text-gray-500" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Paperclip className="h-4 w-4 text-gray-500" />
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Operational Forms */}
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium text-gray-900">Operational Forms</Label>
+              {/* B1.3 Operational Forms */}
+              <div className="flex items-center justify-between py-3">
+                <Label className="text-sm text-gray-700">B1.3 Operational Forms Completed (As applicable):</Label>
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
                       <input 
@@ -2151,30 +1996,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       />
                       <span className="text-sm">No</span>
                     </label>
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="radio" 
+                        name="operationalForms" 
+                        value="NA" 
+                        checked={executionData.operationalForms === "NA"}
+                        onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
+                        className="text-blue-600" 
+                        data-testid="radio-operational-forms-na"
+                      />
+                      <span className="text-sm">NA</span>
+                    </label>
                   </div>
-                </div>
-                {executionData.operationalForms === "Yes" && (
                   <div className="flex items-center gap-2">
                     {getUploadedDocument('operationalForms') ? (
                       <>
-                        <span className="text-sm text-gray-700 flex-1">{getUploadedDocument('operationalForms')?.fileName}</span>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument('operationalForms')}
                           data-testid="button-view-operational-forms"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
                           View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteDocumentClick('operationalForms')}
-                          className="text-red-600 hover:text-red-800"
-                          data-testid="button-delete-operational-forms"
-                        >
-                          Delete
                         </Button>
                       </>
                     ) : (
@@ -2184,8 +2028,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         onClick={() => handleUploadDocument('operationalForms', operationalFormFileRef)}
                         data-testid="button-upload-operational-forms"
                       >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload Document
+                        Upload
                       </Button>
                     )}
                     <input
@@ -2195,8 +2038,185 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       onChange={(e) => handleFileSelected(e, 'operationalForms')}
                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Link2 className="h-4 w-4 text-gray-500" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Paperclip className="h-4 w-4 text-gray-500" />
+                    </Button>
                   </div>
-                )}
+                </div>
+              </div>
+            </div>
+          </SectionBlock>
+
+          {/* B2. Details of Work Carried Out */}
+          <SectionBlock
+            id="work-details"
+            number="B2"
+            title="Details of Work Carried Out"
+          >
+            <div className="space-y-6">
+              {/* B2.1 Work Duration */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-4">B2.1 Work Duration:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={executionData.startDateTime ? executionData.startDateTime.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const currentTime = executionData.startDateTime ? executionData.startDateTime.split('T')[1] || '' : '';
+                        handleExecutionChange('startDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
+                      }}
+                      className="text-sm"
+                      placeholder="dd-mm-yyyy"
+                      data-testid="input-start-date"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Start Time</Label>
+                    <Input
+                      type="text"
+                      value={executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
+                      onChange={(e) => {
+                        const currentDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+                        handleExecutionChange('startDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
+                      }}
+                      className="text-sm"
+                      placeholder="1045"
+                      data-testid="input-start-time"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Assigned To</Label>
+                    <Select
+                      value={executionData.assignedTo}
+                      onValueChange={(value) => handleExecutionChange('assignedTo', value)}
+                    >
+                      <SelectTrigger className="text-sm" data-testid="select-execution-assigned-to">
+                        <SelectValue placeholder="Select rank" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ranks.map((rank) => (
+                          <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Completion Date</Label>
+                    <Input
+                      type="date"
+                      value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
+                      onChange={(e) => {
+                        const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
+                        handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
+                        handleExecutionChange('dateOfCompletion', e.target.value);
+                      }}
+                      className="text-sm"
+                      placeholder="dd-mm-yyyy"
+                      data-testid="input-completion-date"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Completion Time</Label>
+                    <Input
+                      type="text"
+                      value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
+                      onChange={(e) => {
+                        const currentDate = executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : '';
+                        handleExecutionChange('completionDateTime', currentDate ? `${currentDate}T${e.target.value}` : e.target.value);
+                      }}
+                      className="text-sm"
+                      placeholder="1200"
+                      data-testid="input-completion-time"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Performed by</Label>
+                    <Select
+                      value={executionData.performedBy}
+                      onValueChange={(value) => handleExecutionChange('performedBy', value)}
+                    >
+                      <SelectTrigger className="text-sm" data-testid="select-performed-by">
+                        <SelectValue placeholder="Select rank" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ranks.map((rank) => (
+                          <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">No of Persons in the team</Label>
+                    <Input
+                      type="number"
+                      value={executionData.noOfPersons}
+                      onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
+                      className="text-sm"
+                      placeholder="3"
+                      data-testid="input-no-of-persons"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Total Time Taken (Hours)</Label>
+                    <Input
+                      type="number"
+                      value={executionData.totalTimeHours}
+                      onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
+                      className="text-sm"
+                      placeholder="3"
+                      data-testid="input-total-time-hours"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Manhours</Label>
+                    <Input
+                      type="number"
+                      value={executionData.manhours}
+                      onChange={(e) => handleExecutionChange('manhours', e.target.value)}
+                      className="text-sm"
+                      placeholder="3.3"
+                      data-testid="input-manhours"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Carried Out */}
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
+                <Textarea
+                  ref={workCarriedOutRef}
+                  value={executionData.workCarriedOut}
+                  onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
+                  className="text-sm min-h-[100px]"
+                  placeholder="Work carried out"
+                  data-testid="textarea-work-carried-out"
+                />
+              </div>
+
+              {/* Job Experience / Notes */}
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]">Job Experience / Notes</Label>
+                <Textarea
+                  value={executionData.jobExperienceNotes}
+                  onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
+                  className="text-sm min-h-[80px]"
+                  placeholder="Job Experience / Notes"
+                  data-testid="textarea-job-experience-notes"
+                />
               </div>
             </div>
           </SectionBlock>
@@ -2206,42 +2226,27 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="running-hours"
             number="B3"
             title="Running Hours"
-            description="Component running hours at time of work completion"
           >
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Previous Reading (RH)</Label>
-                  <Input
-                    value={executionData.previousReading}
-                    className="text-sm bg-gray-50"
-                    placeholder="Auto-filled from component"
-                    disabled
-                    data-testid="input-previous-reading"
-                  />
-                  <p className="text-xs text-gray-500">Last recorded running hours for this component</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Current Reading (RH)</Label>
-                  <Input
-                    type="number"
-                    value={executionData.currentReading}
-                    onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter current running hours"
-                    data-testid="input-current-reading"
-                  />
-                  <p className="text-xs text-gray-500">Enter running hours at work completion</p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]">Previous reading</Label>
+                <Input
+                  value={executionData.previousReading}
+                  className="text-sm bg-gray-50"
+                  disabled
+                  data-testid="input-previous-reading"
+                />
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                <p className="text-sm text-blue-900">
-                  <strong>Note:</strong> Upon work order approval, the component's running hours will be automatically updated. 
-                  For parent components, the running hours will be set to the current reading. 
-                  For child components, the delta (current - previous) will be propagated to maintain hierarchy consistency.
-                </p>
+              <div className="space-y-2">
+                <Label className="text-sm text-[#8798ad]">Current Reading</Label>
+                <Input
+                  type="number"
+                  value={executionData.currentReading}
+                  onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
+                  className="text-sm"
+                  data-testid="input-current-reading"
+                />
               </div>
             </div>
           </SectionBlock>
@@ -2251,13 +2256,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             id="spare-parts-consumed"
             number="B4"
             title="Spare Parts Consumed"
-            description="Record spare parts used during work order execution"
           >
             <div className="space-y-3">
               <div className="flex justify-end">
                 <Button
+                  variant="outline"
                   size="sm"
-                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={() => {
                     setExecutionData(prev => ({
                       ...prev,
@@ -2266,25 +2270,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         { partNo: '', description: '', quantityConsumed: '', location: '' as const, comments: '' }
                       ]
                     }));
+                    setEditingConsumedSparePart(executionData.consumedSpareParts.length);
                   }}
                   data-testid="button-add-consumed-spare"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Spare
+                  + Add Spare Part
                 </Button>
               </div>
 
               {/* Spare Parts Consumed Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[25%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">QTY CONSUMED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">LOCATION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">COMMENTS</th>
-                      <th className="text-center p-2 font-medium text-gray-700 w-[10%]">ACTIONS</th>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]">Part No</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]">Description</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]">Quantity Consumed</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]">Comments (If any)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2292,17 +2294,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     {templateData.requiredSpareParts.map((spare, index) => {
                       const consumedIndex = executionData.consumedSpareParts.findIndex(c => c.partNo === spare.partNo);
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
-                      const availableLocations = getAvailableLocationsForSpare(spare.partNo);
                       const autoSelectedLocation = getAutoSelectedLocation(spare.partNo);
-                      const currentLocation = consumedData?.location || autoSelectedLocation || '';
-                      const hasQuantityConsumed = consumedData?.quantityConsumed && parseFloat(consumedData.quantityConsumed) > 0;
-                      const needsLocationSelection = hasQuantityConsumed && !currentLocation && availableLocations.length > 1;
                       
                       return (
-                        <tr key={`preloaded-${index}`} className={`border-b border-gray-200 hover:bg-gray-50 ${needsLocationSelection ? 'bg-amber-50' : ''}`}>
-                          <td className="p-2 text-gray-900">{spare.partNo}</td>
-                          <td className="p-2 text-gray-700">{spare.description}</td>
-                          <td className="p-2">
+                        <tr key={`preloaded-${index}`} className="border-b border-gray-100">
+                          <td className="py-3 text-gray-900">{spare.partNo}</td>
+                          <td className="py-3 text-gray-700">{spare.description}</td>
+                          <td className="py-3">
                             <Input
                               type="number"
                               value={consumedData?.quantityConsumed || ''}
@@ -2314,7 +2312,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     consumed[consumedIndex] = {
                                       ...consumed[consumedIndex],
                                       quantityConsumed: newValue,
-                                      // Auto-select location if only one available
                                       location: consumed[consumedIndex].location || autoSelectedLocation || ''
                                     };
                                   } else {
@@ -2329,60 +2326,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   return { ...prev, consumedSpareParts: consumed };
                                 });
                               }}
-                              placeholder="0"
-                              className="text-sm h-8"
+                              className="text-sm h-8 w-24"
                               data-testid={`input-consumed-qty-${spare.partNo}`}
                             />
                           </td>
-                          <td className="p-2">
-                            <div className="space-y-1">
-                              <select
-                                value={currentLocation}
-                                onChange={(e) => {
-                                  const newValue = e.target.value as 'Location A' | 'Location B' | '';
-                                  setExecutionData(prev => {
-                                    const consumed = [...prev.consumedSpareParts];
-                                    if (consumedIndex >= 0) {
-                                      consumed[consumedIndex] = {
-                                        ...consumed[consumedIndex],
-                                        location: newValue
-                                      };
-                                    } else {
-                                      consumed.push({
-                                        partNo: spare.partNo,
-                                        description: spare.description,
-                                        quantityConsumed: '',
-                                        location: newValue,
-                                        comments: ''
-                                      });
-                                    }
-                                    return { ...prev, consumedSpareParts: consumed };
-                                  });
-                                }}
-                                className={`w-full h-8 text-sm border rounded px-2 bg-white ${needsLocationSelection ? 'border-amber-400 ring-1 ring-amber-200' : 'border-gray-200'}`}
-                                disabled={autoSelectedLocation !== null}
-                                data-testid={`select-consumed-location-${spare.partNo}`}
-                              >
-                                {autoSelectedLocation ? (
-                                  <option value={autoSelectedLocation}>{autoSelectedLocation} (only stock)</option>
-                                ) : (
-                                  <>
-                                    <option value="">Select Location</option>
-                                    {availableLocations.map(loc => (
-                                      <option key={loc} value={loc}>{loc}</option>
-                                    ))}
-                                  </>
-                                )}
-                              </select>
-                              {needsLocationSelection && (
-                                <p className="text-xs text-amber-600">Location required</p>
-                              )}
-                              {autoSelectedLocation && (
-                                <p className="text-xs text-gray-500">Auto-selected (single location)</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-2">
+                          <td className="py-3">
                             <Input
                               value={consumedData?.comments || ''}
                               onChange={(e) => {
@@ -2406,12 +2354,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   return { ...prev, consumedSpareParts: consumed };
                                 });
                               }}
-                              placeholder="Optional notes..."
                               className="text-sm h-8"
                               data-testid={`input-consumed-comments-${spare.partNo}`}
                             />
                           </td>
-                          <td className="p-2 text-center text-gray-400 italic">Pre-loaded</td>
                         </tr>
                       );
                     })}
@@ -2424,10 +2370,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         const isEditing = editingConsumedSparePart === actualIndex;
                         
                         return (
-                          <tr key={`manual-${actualIndex}`} className="border-b border-gray-200 hover:bg-gray-50">
+                          <tr key={`manual-${actualIndex}`} className="border-b border-gray-100">
                             {isEditing ? (
                               <>
-                                <td className="p-2">
+                                <td className="py-3">
                                   <Input
                                     value={consumed.partNo}
                                     onChange={(e) => {
@@ -2439,9 +2385,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     }}
                                     placeholder="Part number"
                                     className="text-sm h-8"
+                                    autoFocus
                                   />
                                 </td>
-                                <td className="p-2">
+                                <td className="py-3">
                                   <Input
                                     value={consumed.description}
                                     onChange={(e) => {
@@ -2455,7 +2402,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                     className="text-sm h-8"
                                   />
                                 </td>
-                                <td className="p-2">
+                                <td className="py-3">
                                   <Input
                                     type="number"
                                     value={consumed.quantityConsumed}
@@ -2466,28 +2413,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
-                                    placeholder="0"
-                                    className="text-sm h-8"
+                                    className="text-sm h-8 w-24"
+                                    onBlur={() => setEditingConsumedSparePart(null)}
                                   />
                                 </td>
-                                <td className="p-2">
-                                  <select
-                                    value={consumed.location || ''}
-                                    onChange={(e) => {
-                                      setExecutionData(prev => {
-                                        const updated = [...prev.consumedSpareParts];
-                                        updated[actualIndex] = { ...updated[actualIndex], location: e.target.value as 'Location A' | 'Location B' | '' };
-                                        return { ...prev, consumedSpareParts: updated };
-                                      });
-                                    }}
-                                    className="w-full h-8 text-sm border border-gray-200 rounded px-2 bg-white"
-                                  >
-                                    <option value="">Select Location</option>
-                                    <option value="Location A">Location A</option>
-                                    <option value="Location B">Location B</option>
-                                  </select>
-                                </td>
-                                <td className="p-2">
+                                <td className="py-3">
                                   <Input
                                     value={consumed.comments}
                                     onChange={(e) => {
@@ -2497,91 +2427,48 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
-                                    placeholder="Optional notes..."
                                     className="text-sm h-8"
                                   />
-                                </td>
-                                <td className="p-2">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setEditingConsumedSparePart(null)}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <Check className="h-4 w-4 text-green-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setExecutionData(prev => ({
-                                          ...prev,
-                                          consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== actualIndex)
-                                        }));
-                                        setEditingConsumedSparePart(null);
-                                      }}
-                                      className="h-7 w-7 p-0 text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
                                 </td>
                               </>
                             ) : (
                               <>
-                                <td className="p-2 text-gray-900">{consumed.partNo}</td>
-                                <td className="p-2 text-gray-700">{consumed.description}</td>
-                                <td className="p-2 text-gray-900">{consumed.quantityConsumed}</td>
-                                <td className="p-2 text-gray-700">{consumed.location || '-'}</td>
-                                <td className="p-2 text-gray-700">{consumed.comments}</td>
-                                <td className="p-2">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setEditingConsumedSparePart(actualIndex)}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setExecutionData(prev => ({
-                                          ...prev,
-                                          consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== actualIndex)
-                                        }));
-                                      }}
-                                      className="h-7 w-7 p-0 text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
+                                <td className="py-3 text-gray-900">{consumed.partNo || '-'}</td>
+                                <td className="py-3 text-gray-700">{consumed.description || '-'}</td>
+                                <td className="py-3">
+                                  <Input
+                                    type="number"
+                                    value={consumed.quantityConsumed}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], quantityConsumed: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    className="text-sm h-8 w-24"
+                                  />
+                                </td>
+                                <td className="py-3">
+                                  <Input
+                                    value={consumed.comments}
+                                    onChange={(e) => {
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { ...updated[actualIndex], comments: e.target.value };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                    className="text-sm h-8"
+                                  />
                                 </td>
                               </>
                             )}
                           </tr>
                         );
                       })}
-
-                    {templateData.requiredSpareParts.length === 0 && executionData.consumedSpareParts.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="text-center p-4 text-gray-500 italic">
-                          No spare parts consumed yet. Click "Add Spare" to record consumption.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-4">
-                <p className="text-sm text-amber-900">
-                  <strong>Note:</strong> Upon work order approval, spare parts consumed will be automatically deducted from inventory. 
-                  ROB (Remaining on Board) will be updated, and low-stock alerts will be triggered if inventory falls below minimum levels.
-                </p>
               </div>
             </div>
           </SectionBlock>
