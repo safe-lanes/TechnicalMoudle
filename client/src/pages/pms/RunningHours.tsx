@@ -15,6 +15,7 @@ import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
+import { useVessel } from "@/contexts/VesselContext";
 
 interface RunningHoursData {
   id: string;
@@ -60,7 +61,7 @@ const RunningHours = () => {
   });
   
   const { toast } = useToast();
-  const vesselId = "V001"; // Default vessel ID
+  const { vesselId } = useVessel(); // Get vessel ID from context
   
   // Fetch parent components with RH-based child jobs
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({

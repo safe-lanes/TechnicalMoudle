@@ -21,7 +21,7 @@ import { getComponentCategory } from "@/utils/componentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { FEATURES } from '@/config/features';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
@@ -787,6 +787,128 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   );
 };
 
+const JobRow: React.FC<{
+  job: any;
+  onRowClick: (job: any) => void;
+  toast: any;
+}> = ({ job, onRowClick, toast }) => {
+  const [showReasonDialog, setShowReasonDialog] = useState(false);
+
+  const generateWOMutation = useMutation({
+    mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
+      const response = await fetch(`/api/jobs/${job.id}/generate-wo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate work order');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Work Order Created",
+        description: `Work order ${data.workOrderNo} has been created successfully.`
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      setShowReasonDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate work order",
+        variant: "destructive"
+      });
+      setShowReasonDialog(false);
+    }
+  });
+
+  const handleGenerateWO = (reason: 'Planning' | 'Breakdown' | 'Other') => {
+    generateWOMutation.mutate(reason);
+  };
+
+  return (
+    <>
+      <tr 
+        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+        onClick={() => onRowClick(job)}
+        data-testid={`job-row-${job.jobNo}`}
+      >
+        <td className="py-3 px-3 text-gray-900" data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
+        <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
+        <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
+        <td className="py-3 px-3 text-gray-900">
+          {job.maintenanceBasis === 'Running Hours' 
+            ? `${job.intervalRunningHour || 0} RH` 
+            : `${job.frequencyValue} ${job.frequencyUnit}`}
+        </td>
+        <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
+        <td className="py-3 px-3 text-gray-900">
+          {job.maintenanceBasis === 'Running Hours' 
+            ? `${job.nextDueRH || '-'} RH` 
+            : formatProfessionalDate(job.nextDueDate) || '-'}
+        </td>
+        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowReasonDialog(true)}
+            disabled={generateWOMutation.isPending}
+            className="text-xs"
+            data-testid={`btn-generate-wo-${job.jobNo}`}
+          >
+            {generateWOMutation.isPending ? 'Generating...' : 'Generate WO'}
+          </Button>
+        </td>
+      </tr>
+      
+      <Dialog open={showReasonDialog} onOpenChange={setShowReasonDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate Work Order</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Select the reason for generating this work order on-demand:
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button 
+                onClick={() => handleGenerateWO('Planning')} 
+                disabled={generateWOMutation.isPending}
+                variant="outline"
+                className="justify-start"
+              >
+                Planning - Scheduled ahead of time
+              </Button>
+              <Button 
+                onClick={() => handleGenerateWO('Breakdown')} 
+                disabled={generateWOMutation.isPending}
+                variant="outline"
+                className="justify-start"
+              >
+                Breakdown - Emergency repair needed
+              </Button>
+              <Button 
+                onClick={() => handleGenerateWO('Other')} 
+                disabled={generateWOMutation.isPending}
+                variant="outline"
+                className="justify-start"
+              >
+                Other - Custom reason
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
 const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string }> = ({ componentCode, componentName }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -890,36 +1012,30 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
               <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
+              <th className="text-center py-2 px-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
+                <td colSpan={7} className="py-8 text-center text-gray-500">
                   Loading jobs...
                 </td>
               </tr>
             ) : jobs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-500">
+                <td colSpan={7} className="py-8 text-center text-gray-500">
                   No jobs found for this component
                 </td>
               </tr>
             ) : (
               jobs.map((job, index) => (
-                <tr 
-                  key={index} 
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleRowClick(job)}
-                  data-testid={`job-row-${job.jobNo}`}
-                >
-                  <td className="py-3 px-3 text-gray-900" data-testid={`job-no-${job.jobNo}`}>{job.jobNo}</td>
-                  <td className="py-3 px-3 text-gray-900" data-testid={`job-title-${job.jobNo}`}>{job.jobTitle}</td>
-                  <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
-                  <td className="py-3 px-3 text-gray-900">{job.frequencyValue} {job.frequencyUnit}</td>
-                  <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
-                  <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.nextDueDate) || '-'}</td>
-                </tr>
+                <JobRow 
+                  key={index}
+                  job={job}
+                  onRowClick={handleRowClick}
+                  toast={toast}
+                />
               ))
             )}
           </tbody>

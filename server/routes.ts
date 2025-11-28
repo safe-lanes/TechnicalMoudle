@@ -31,6 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     process.exit(1); // Fail fast - do not serve traffic without immutability
   }
   
+  // Start Job Due Scanner - scans jobs and auto-generates work orders when due
+  const { jobDueScanner } = await import("./services/jobDueScanner");
+  jobDueScanner.start(60 * 60 * 1000); // Run every hour
+  console.log('[JobDueScanner] Scheduler started - will auto-generate work orders for due jobs');
+  
   // Register Running Hours routes from dedicated file
   registerRunningHoursRoutes(app);
   // Set up multer for file uploads
