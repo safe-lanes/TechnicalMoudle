@@ -1768,12 +1768,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Build executionData from work order (Part B - editable execution record)
       const executionData = {
-        woExecutionId: workOrder.woExecutionId || '',
+        // B1 - Risk Assessment, Checklists & Records
+        riskAssessmentStatus: workOrder.riskAssessmentStatus || '',
+        safetyChecklistsStatus: workOrder.safetyChecklistsStatus || '',
+        operationalFormsStatus: workOrder.operationalFormsStatus || '',
+        uploadedDocuments: workOrder.uploadedDocuments || [],
+        // B2 - Work Duration
+        startDateTime: workOrder.startDateTime || '',
+        completionDateTime: workOrder.completionDateTime || '',
+        executionAssignedTo: workOrder.executionAssignedTo || '',
+        performedBy: workOrder.performedBy || '',
+        noOfPersons: workOrder.noOfPersons || '',
+        totalTimeHours: workOrder.totalTimeHours || '',
+        manhours: workOrder.manhours || '',
+        workCarriedOut: workOrder.workCarriedOut || '',
+        jobExperienceNotes: workOrder.jobExperienceNotes || '',
+        // B3 - Running Hours
         previousReading: workOrder.previousReading?.toString() || '',
         currentReading: workOrder.currentReading?.toString() || '',
         runningHoursDifference: workOrder.runningHoursDifference?.toString() || '',
         readingDate: workOrder.readingDate || '',
+        runningHours: workOrder.runningHours || '',
+        // B4 - Spare Parts Consumed
         consumedSpareParts: workOrder.consumedSpareParts || [],
+        // Metadata
+        woExecutionId: workOrder.woExecutionId || '',
         remarks: workOrder.remarks || '',
         dateCompleted: workOrder.dateCompleted || '',
         completionRemarks: workOrder.completionRemarks || ''
