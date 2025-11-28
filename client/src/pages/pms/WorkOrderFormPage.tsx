@@ -135,12 +135,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
   const { data: jobContext, isLoading: isJobContextLoading } = useQuery({
-    queryKey: ['/api/jobs', workOrderId, 'context'],
+    queryKey: [`/api/jobs/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode === 'template'
   });
 
   const { data: woContext, isLoading: isWoContextLoading } = useQuery({
-    queryKey: ['/api/work-orders', workOrderId, 'context'],
+    queryKey: [`/api/work-orders/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode !== 'template'
   });
   
