@@ -696,6 +696,8 @@ export class PersistentFileStorage implements IStorage {
         woExecutionId: null,
         remarks: null,
         completionRemarks: null,
+        rejectionComments: null,
+        approvalAction: null,
         createdAt: now,
         updatedAt: now
       },
@@ -775,6 +777,8 @@ export class PersistentFileStorage implements IStorage {
         woExecutionId: null,
         remarks: null,
         completionRemarks: null,
+        rejectionComments: null,
+        approvalAction: null,
         createdAt: now,
         updatedAt: now
       }
@@ -3301,7 +3305,9 @@ export class PersistentFileStorage implements IStorage {
       requiredTools: workOrder.requiredTools || [],
       safetyRequirements: workOrder.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
       uploadedDocuments: workOrder.uploadedDocuments || [],
-      consumedSpareParts: workOrder.consumedSpareParts || []
+      consumedSpareParts: workOrder.consumedSpareParts || [],
+      rejectionComments: workOrder.rejectionComments || null,
+      approvalAction: workOrder.approvalAction || null
     };
     this.data.workOrders.push(newWorkOrder);
     this.persistData();

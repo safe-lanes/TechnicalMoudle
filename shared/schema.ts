@@ -822,6 +822,9 @@ export const workOrders = pgTable("work_orders", {
   woExecutionId: text("wo_execution_id"), // Unique execution ID (WOE-XXXXXXX)
   remarks: text("remarks"), // General remarks
   completionRemarks: text("completion_remarks"), // Remarks upon completion
+  // Approval workflow fields
+  rejectionComments: text("rejection_comments"), // Comments when work order is rejected by approver
+  approvalAction: text("approval_action"), // 'approved' | 'rejected' - action taken by approver
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
