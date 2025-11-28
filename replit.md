@@ -6,6 +6,71 @@ This project is a comprehensive full-stack Technical Module for a maritime Plann
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Core PMS Business Logic (Source of Truth)
+
+**THIS SECTION IS THE DEFINITIVE REFERENCE FOR THE PLANNED MAINTENANCE SYSTEM LOGIC. DO NOT DELETE OR MODIFY WITHOUT USER APPROVAL.**
+
+### Jobs = Templates (Immutable Definitions)
+- **Jobs** define maintenance tasks that need to be performed on equipment
+- Contain all **Part A information**: task details, frequency, assigned rank, approver rank, required spares/tools, safety requirements (PPE, permits, other)
+- Set maintenance frequency: **Calendar-based** (days/weeks/months/years) OR **Running Hours-based**
+- Jobs are the master templates - the source of truth for task definitions
+- Jobs Form (`/pms/job/:id`) displays job template data in read-only format
+
+### Work Orders = Execution Records
+- **Work Orders** are generated automatically when a Job becomes due (based on frequency + lead time settings from Admin sub-module)
+- Each Work Order has two parts:
+  - **Part A**: Copied from the Job template at creation time → **FROZEN/IMMUTABLE** (cannot be edited)
+  - **Part B**: Filled by the crew member performing the work → **EDITABLE** until submission
+
+### Frozen Snapshot Rule
+- When a Work Order is created, Part A is a **frozen snapshot** of the Job template at that moment
+- If the Job template is modified later, existing Work Orders **retain the original values**
+- Changes to Job templates only apply to **NEW Work Orders** created after the change date
+
+### Work Order Lifecycle
+```
+Job becomes Due (based on frequency + lead time)
+    ↓
+Work Order Auto-Generated (Part A frozen from Job template)
+    ↓
+Appears in "Due" tab in Work Orders sub-module
+    ↓
+Assigned user fills Part B with work details
+    ↓
+User submits for approval
+    ↓
+Moves to "Pending Approval" tab
+    ↓
+Approver (HOD mentioned in Part A) reviews:
+    ├── ✓ APPROVE → Moves to "Completed" tab (immutable audit record)
+    │               → Updates Job's Section A5 "Work History"
+    │               → Updates Job's lastDoneDate/nextDueDate or lastDoneRH/nextDueRH
+    │
+    └── ✗ REJECT → Returns to "Due" tab for revision
+```
+
+### Approver Authorization
+- The **Approver** is defined in Part A of each Job/Work Order (a rank like Chief Engineer, Master, etc.)
+- When a user is logged in with that approver role, they can approve/reject Work Orders assigned to their department
+- Rule #19: Backend validates that approver's department matches the job's assigned department
+
+### Immutable Audit Records
+- Once a Work Order is **Approved**, it becomes a **permanent immutable record** for audit purposes
+- These records cannot be modified or deleted
+- Completed Work Orders are reflected in the Job's Section A5 "Work History" for historical reference
+
+### Status Flow Summary
+| Tab | Description |
+|-----|-------------|
+| Due | Work Orders ready to be executed (includes rejected WOs returned for revision) |
+| Active | Work Orders currently being worked on |
+| Pending Approval | Submitted, waiting for HOD approval |
+| Completed | Approved - immutable audit records |
+| Overdue | Past due date, requires immediate attention |
+| Grace Period | Within grace period after due date |
+| Postponed | Temporarily deferred (reappears when postponement expires) |
+
 ## System Architecture
 The application utilizes a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter) for a mobile-first and responsive user experience. The backend is powered by Express.js (TypeScript).
 
