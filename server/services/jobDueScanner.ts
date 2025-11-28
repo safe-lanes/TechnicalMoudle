@@ -1,7 +1,7 @@
 import { workOrderService } from "./workOrderService";
 import { jobService } from "./jobService";
 import { storage } from "../storage";
-import { nanoid } from "nanoid";
+import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import type { InsertWorkOrder, Job } from "@shared/schema";
 
 /**
@@ -138,12 +138,12 @@ export class JobDueScannerService {
         const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
         
         if (!activeWorkOrderKeys.has(workOrderKey)) {
-          // Generate work order
-          const workOrderNo = `WO-${job.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
+          // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+          const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
           
           const workOrderData: InsertWorkOrder = {
             vesselId: job.vesselId,
-            component: job.componentId,
+            component: job.componentName, // Use component name, not ID
             componentCode: job.componentCode,
             workOrderNo: workOrderNo,
             templateCode: workOrderNo,
@@ -210,12 +210,12 @@ export class JobDueScannerService {
       };
     }
 
-    // Generate the work order
-    const workOrderNo = `WO-${job.componentCode}-${new Date().getFullYear()}-${nanoid(4).toUpperCase()}`;
+    // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
     
     const workOrderData: InsertWorkOrder = {
       vesselId: job.vesselId,
-      component: job.componentId,
+      component: job.componentName, // Use component name, not ID
       componentCode: job.componentCode,
       workOrderNo: workOrderNo,
       templateCode: workOrderNo,
