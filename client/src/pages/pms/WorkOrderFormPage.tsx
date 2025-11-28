@@ -255,6 +255,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     approver: "",
     jobPriority: "Medium",
     classRelated: "No",
+    department: "",
+    criticality: "",
+    isActive: "Yes",
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
@@ -1155,7 +1158,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Component</Label>
+                  <Label className="text-sm text-[#8798ad]">Component Name</Label>
                   <Input
                     value={templateData.componentName || templateData.component}
                     onChange={(e) => handleTemplateChange('componentName', e.target.value)}
@@ -1167,19 +1170,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">SFI Code</Label>
+                  <Label className="text-sm text-[#8798ad]">Component Code</Label>
                   <Input
                     value={templateData.componentCode}
                     onChange={(e) => handleTemplateChange('componentCode', e.target.value)}
                     className="text-sm"
-                    placeholder="Enter SFI code"
+                    placeholder="Enter component code"
                     disabled={isPartAReadOnly}
                     data-testid="input-component-code"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Job Template Code</Label>
+                  <Label className="text-sm text-[#8798ad]">Job Code</Label>
                   <Input
                     value={templateData.woTemplateCode}
                     onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
@@ -1346,6 +1349,47 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     disabled={isPartAReadOnly}
                     data-testid="input-next-due-date"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]">Department</Label>
+                  <Input
+                    value={templateData.department}
+                    onChange={(e) => handleTemplateChange('department', e.target.value)}
+                    className="text-sm"
+                    placeholder="Enter department"
+                    disabled={isPartAReadOnly}
+                    data-testid="input-department"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]">Criticality</Label>
+                  <Input
+                    value={templateData.criticality}
+                    onChange={(e) => handleTemplateChange('criticality', e.target.value)}
+                    className="text-sm"
+                    placeholder="Enter criticality"
+                    disabled={isPartAReadOnly}
+                    data-testid="input-criticality"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-[#8798ad]">Is Active</Label>
+                  <Select
+                    value={templateData.isActive}
+                    onValueChange={(value) => handleTemplateChange('isActive', value)}
+                    disabled={isPartAReadOnly}
+                  >
+                    <SelectTrigger className="text-sm" data-testid="select-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
