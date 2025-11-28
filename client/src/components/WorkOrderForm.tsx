@@ -219,6 +219,10 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   
   // Check if form should be read-only - BUT in modify mode, make it editable
   const isReadOnly = !isModifyMode && (workOrder?.status === "Pending Approval" || workOrder?.status === "Approved" || isApprovalMode || mode === 'history');
+  
+  // Part A is ALWAYS read-only for ship users in execution mode (per spec)
+  // Part A should display pre-populated job data and not be editable by ship crew
+  const isPartAReadOnly = mode === 'execution' || executionMode || isReadOnly;
 
   // Template data (Part A)
   const [templateData, setTemplateData] = useState({
@@ -417,31 +421,56 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   }, [mode, templateData.componentCode]);
 
   // Load existing workOrder data (skip in history mode)
+  // This hydrates Part A with ALL job data - Part A is read-only for ship users
   useEffect(() => {
     if (mode !== 'history' && workOrder) {
+      // Parse safety requirements from workOrder
+      const safetyReqs = workOrder.safetyRequirements || {};
+      const parsedSafetyRequirements = {
+        ppeRequirements: Array.isArray(safetyReqs.ppeRequirements) ? safetyReqs.ppeRequirements : [],
+        permitRequirements: Array.isArray(safetyReqs.permitRequirements) ? safetyReqs.permitRequirements : [],
+        otherRequirements: Array.isArray(safetyReqs.otherRequirements) ? safetyReqs.otherRequirements : []
+      };
+      
+      // Parse required spare parts from workOrder
+      const parsedSpareParts = Array.isArray(workOrder.requiredSpareParts) 
+        ? workOrder.requiredSpareParts.map((spare: any) => ({
+            partNo: spare.partNo || spare.partCode || '',
+            description: spare.description || spare.partName || '',
+            quantityRequired: spare.quantityRequired || spare.quantity || '',
+            remarks: spare.remarks || ''
+          }))
+        : [];
+      
+      // Parse required tools from workOrder
+      const parsedTools = Array.isArray(workOrder.requiredTools) 
+        ? workOrder.requiredTools.map((tool: any) => ({
+            toolName: tool.toolName || tool.name || '',
+            quantity: tool.quantity || '',
+            remarks: tool.remarks || ''
+          }))
+        : [];
+      
+      // Hydrate ALL Part A fields from workOrder data
       const initialData = {
         woTitle: workOrder.jobTitle || "",
         component: workOrder.component || component?.name || "",
         componentCode: workOrder.componentCode || component?.code || "",
-        woTemplateCode: workOrder.templateCode || "",
+        woTemplateCode: workOrder.workOrderNo || workOrder.templateCode || "",
         maintenanceBasis: workOrder.maintenanceBasis || "Calendar",
         frequencyValue: workOrder.frequencyValue || "",
         frequencyUnit: workOrder.frequencyUnit || "Months",
-        taskType: workOrder.taskType || "Inspection",
+        taskType: workOrder.taskType || workOrder.maintenanceType || "Inspection",
         assignedTo: workOrder.assignedTo || "",
-        approver: "",
-        jobPriority: "Medium",
-        classRelated: "No",
-        briefWorkDescription: "",
-        nextDueDate: workOrder.dueDate || "",
-        nextDueReading: "",
-        requiredSpareParts: [],
-        requiredTools: [],
-        safetyRequirements: {
-          ppeRequirements: [],
-          permitRequirements: [],
-          otherRequirements: []
-        },
+        approver: workOrder.approver || workOrder.department || "",
+        jobPriority: workOrder.jobPriority || "Medium",
+        classRelated: workOrder.classRelated || "No",
+        briefWorkDescription: workOrder.briefWorkDescription || workOrder.jobDescription || "",
+        nextDueDate: workOrder.dueDate || workOrder.nextDueDate || "",
+        nextDueReading: workOrder.nextDueReading || workOrder.nextDueRH || "",
+        requiredSpareParts: parsedSpareParts,
+        requiredTools: parsedTools,
+        safetyRequirements: parsedSafetyRequirements,
         workHistory: []
       };
       
@@ -1083,7 +1112,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           originalValue={workOrder?.jobTitle || ""}
                           currentValue={templateData.woTitle}
                           fieldName="woTitle"
-                          isModifyMode={isModifyMode}
+                          isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
                           <Input 
@@ -1091,7 +1120,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
                             className="text-sm"
                             placeholder="Enter work order title"
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           />
                         </ModifyFieldWrapper>
                       </div>
@@ -1118,13 +1147,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           originalValue={workOrder?.maintenanceBasis || "Calendar"}
                           currentValue={templateData.maintenanceBasis}
                           fieldName="maintenanceBasis"
-                          isModifyMode={isModifyMode}
+                          isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
                           <Select 
                             value={templateData.maintenanceBasis} 
                             onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           >
                             <SelectTrigger className="text-sm">
                               <SelectValue />
@@ -1146,7 +1175,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           originalValue={workOrder?.frequencyValue || ""}
                           currentValue={templateData.frequencyValue}
                           fieldName="frequencyValue"
-                          isModifyMode={isModifyMode}
+                          isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
                           <Input 
@@ -1157,7 +1186,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                               hasPreviewChange('frequencyValue') ? 'text-red-600 border-red-300 bg-red-50' : ''
                             }`}
                             placeholder={templateData.maintenanceBasis === "Running Hours" ? "e.g., 1000" : ""}
-                            disabled={isReadOnly || isPreviewMode}
+                            disabled={isPartAReadOnly || isPreviewMode}
                           />
                         </ModifyFieldWrapper>
                       </div>
@@ -1169,13 +1198,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             originalValue={workOrder?.frequencyUnit || "Months"}
                             currentValue={templateData.frequencyUnit}
                             fieldName="frequencyUnit"
-                            isModifyMode={isModifyMode}
+                            isModifyMode={isModifyMode && !isPartAReadOnly}
                             onFieldChange={trackFieldChange}
                           >
                             <Select 
                               value={templateData.frequencyUnit} 
                               onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
-                              disabled={isReadOnly}
+                              disabled={isPartAReadOnly}
                             >
                               <SelectTrigger className="text-sm">
                                 <SelectValue />
@@ -1198,13 +1227,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           originalValue={workOrder?.taskType || "Inspection"}
                           currentValue={templateData.taskType}
                           fieldName="taskType"
-                          isModifyMode={isModifyMode}
+                          isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
                           <Select 
                             value={templateData.taskType} 
                             onValueChange={(value) => handleTemplateChange('taskType', value)}
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           >
                             <SelectTrigger className="text-sm">
                               <SelectValue />
@@ -1225,13 +1254,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           originalValue={workOrder?.assignedTo || ""}
                           currentValue={templateData.assignedTo}
                           fieldName="assignedTo"
-                          isModifyMode={isModifyMode}
+                          isModifyMode={isModifyMode && !isPartAReadOnly}
                           onFieldChange={trackFieldChange}
                         >
                           <Select 
                             value={templateData.assignedTo} 
                             onValueChange={(value) => handleTemplateChange('assignedTo', value)}
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           >
                             <SelectTrigger className="text-sm">
                               <SelectValue placeholder="Select rank" />
@@ -1247,7 +1276,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Approver</Label>
-                        <Select value={templateData.approver} onValueChange={(value) => handleTemplateChange('approver', value)}>
+                        <Select 
+                          value={templateData.approver} 
+                          onValueChange={(value) => handleTemplateChange('approver', value)}
+                          disabled={isPartAReadOnly}
+                        >
                           <SelectTrigger className="text-sm">
                             <SelectValue placeholder="Select rank (optional)" />
                           </SelectTrigger>
@@ -1262,7 +1295,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       {/* Row 3 */}
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Job Priority</Label>
-                        <Select value={templateData.jobPriority} onValueChange={(value) => handleTemplateChange('jobPriority', value)}>
+                        <Select 
+                          value={templateData.jobPriority} 
+                          onValueChange={(value) => handleTemplateChange('jobPriority', value)}
+                          disabled={isPartAReadOnly}
+                        >
                           <SelectTrigger className="text-sm">
                             <SelectValue />
                           </SelectTrigger>
@@ -1276,7 +1313,11 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                       
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Class Related</Label>
-                        <Select value={templateData.classRelated} onValueChange={(value) => handleTemplateChange('classRelated', value)}>
+                        <Select 
+                          value={templateData.classRelated} 
+                          onValueChange={(value) => handleTemplateChange('classRelated', value)}
+                          disabled={isPartAReadOnly}
+                        >
                           <SelectTrigger className="text-sm">
                             <SelectValue />
                           </SelectTrigger>
@@ -1298,7 +1339,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
                             className="text-sm"
                             placeholder="Leave empty to auto-calculate"
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           />
                         ) : (
                           <Input
@@ -1307,7 +1348,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             onChange={(e) => handleTemplateChange('nextDueReading', e.target.value)}
                             className="text-sm"
                             placeholder="Leave empty to auto-calculate"
-                            disabled={isReadOnly}
+                            disabled={isPartAReadOnly}
                           />
                         )}
                       </div>
@@ -1320,7 +1361,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         originalValue={workOrder?.briefWorkDescription || ""}
                         currentValue={templateData.briefWorkDescription}
                         fieldName="briefWorkDescription"
-                        isModifyMode={isModifyMode}
+                        isModifyMode={isModifyMode && !isPartAReadOnly}
                         onFieldChange={trackFieldChange}
                       >
                         <Textarea 
@@ -1329,7 +1370,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           className="mt-2 text-sm"
                           rows={3}
                           placeholder="Enter work description..."
-                          disabled={isReadOnly}
+                          disabled={isPartAReadOnly}
                         />
                       </ModifyFieldWrapper>
                     </div>
@@ -1339,17 +1380,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A2. Required Spare Parts</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={handleAddSparePart}
-                        disabled={isReadOnly}
-                        data-testid="button-add-spare-part-a2"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Spare Part
-                      </Button>
+                      {!isPartAReadOnly && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-800"
+                          onClick={handleAddSparePart}
+                          data-testid="button-add-spare-part-a2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Spare Part
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="border border-gray-200 rounded">
@@ -1413,31 +1455,31 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                <div className={`grid gap-4 items-center ${isPartAReadOnly ? 'grid-cols-[2fr_3fr_1.5fr_2fr]' : 'grid-cols-[2fr_3fr_1.5fr_2fr_auto]'}`}>
                                   <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
                                   <div className="text-sm text-gray-900">{part.description || '-'}</div>
                                   <div className="text-sm text-gray-900">{part.quantityRequired || '-'}</div>
                                   <div className="text-sm text-gray-900">{part.remarks || '-'}</div>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditSparePart(index)}
-                                      className="h-8 w-8 p-0"
-                                      disabled={isReadOnly}
-                                    >
-                                      <Pencil className="h-4 w-4 text-blue-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteSparePart(index)}
-                                      className="h-8 w-8 p-0"
-                                      disabled={isReadOnly}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                  </div>
+                                  {!isPartAReadOnly && (
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditSparePart(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Pencil className="h-4 w-4 text-blue-600" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteSparePart(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-600" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1455,17 +1497,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A3. Required Tools & Equipment</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={handleAddTool}
-                        disabled={isReadOnly}
-                        data-testid="button-add-tool-a3"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Tool
-                      </Button>
+                      {!isPartAReadOnly && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-800"
+                          onClick={handleAddTool}
+                          data-testid="button-add-tool-a3"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Tool
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="border border-gray-200 rounded">
@@ -1522,30 +1565,30 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-[3fr_1.5fr_2fr_auto] gap-4 items-center">
+                                <div className={`grid gap-4 items-center ${isPartAReadOnly ? 'grid-cols-[3fr_1.5fr_2fr]' : 'grid-cols-[3fr_1.5fr_2fr_auto]'}`}>
                                   <div className="text-sm text-gray-900">{tool.toolName || '-'}</div>
                                   <div className="text-sm text-gray-900">{tool.quantity || '-'}</div>
                                   <div className="text-sm text-gray-900">{tool.remarks || '-'}</div>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditTool(index)}
-                                      className="h-8 w-8 p-0"
-                                      disabled={isReadOnly}
-                                    >
-                                      <Pencil className="h-4 w-4 text-blue-600" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteTool(index)}
-                                      className="h-8 w-8 p-0"
-                                      disabled={isReadOnly}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                  </div>
+                                  {!isPartAReadOnly && (
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditTool(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Pencil className="h-4 w-4 text-blue-600" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteTool(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-600" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1563,17 +1606,18 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>A4. Safety Requirements</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={() => setIsSafetyModalOpen(true)}
-                        disabled={isReadOnly}
-                        data-testid="button-add-requirement-a4"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Requirement
-                      </Button>
+                      {!isPartAReadOnly && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-800"
+                          onClick={() => setIsSafetyModalOpen(true)}
+                          data-testid="button-add-requirement-a4"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Requirement
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="space-y-4">
@@ -1585,15 +1629,16 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             {templateData.safetyRequirements.ppeRequirements.map((req, index) => (
                               <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                                 <span className="text-sm text-gray-900">{req}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
-                                  className="h-6 w-6 p-0"
-                                  disabled={isReadOnly}
-                                >
-                                  <Trash2 className="h-3 w-3 text-red-600" />
-                                </Button>
+                                {!isPartAReadOnly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSafetyRequirement('ppeRequirements', index)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-red-600" />
+                                  </Button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1610,15 +1655,16 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             {templateData.safetyRequirements.permitRequirements.map((req, index) => (
                               <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                                 <span className="text-sm text-gray-900">{req}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
-                                  className="h-6 w-6 p-0"
-                                  disabled={isReadOnly}
-                                >
-                                  <Trash2 className="h-3 w-3 text-red-600" />
-                                </Button>
+                                {!isPartAReadOnly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSafetyRequirement('permitRequirements', index)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-red-600" />
+                                  </Button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1635,15 +1681,16 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                             {templateData.safetyRequirements.otherRequirements.map((req, index) => (
                               <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                                 <span className="text-sm text-gray-900">{req}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
-                                  className="h-6 w-6 p-0"
-                                  disabled={isReadOnly}
-                                >
-                                  <Trash2 className="h-3 w-3 text-red-600" />
-                                </Button>
+                                {!isPartAReadOnly && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSafetyRequirement('otherRequirements', index)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-red-600" />
+                                  </Button>
+                                )}
                               </div>
                             ))}
                           </div>
