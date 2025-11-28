@@ -737,12 +737,12 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Eqpt. / System Category</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Category</label>
                     <Input
                       value={componentData.eqptSystemCategory}
                       onChange={(e) => handleFieldChange('eqptSystemCategory', e.target.value)}
                       className="h-8 text-sm"
-                      data-testid="input-eqpt-category"
+                      data-testid="input-component-category"
                     />
                   </div>
                   <div>
@@ -755,12 +755,12 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Critical</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Criticality</label>
                     <Input
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
                       className="h-8 text-sm"
-                      data-testid="input-critical"
+                      data-testid="input-criticality"
                     />
                   </div>
                 </div>
@@ -806,16 +806,7 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">No of Units</label>
-                    <Input
-                      value={componentData.noOfUnits}
-                      onChange={(e) => handleFieldChange('noOfUnits', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-no-of-units"
-                    />
-                  </div>
+                <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Eqpt. / System Department</label>
                     <Input
