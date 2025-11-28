@@ -696,6 +696,8 @@ export const jobs = pgTable("jobs", {
   jobPriority: text("job_priority"), // 'Low' | 'Medium' | 'High' | 'Critical'
   classRelated: text("class_related"), // 'Yes' | 'No'
   briefWorkDescription: text("brief_work_description"),
+  jobDescription: text("job_description"), // Detailed job description
+  approver: text("approver"), // Rank who approves the job
   department: text("department"),
   
   // Template data (Part A)
@@ -753,6 +755,7 @@ export const workOrders = pgTable("work_orders", {
   submittedDate: text("submitted_date"),
   formData: json("form_data"), // Form submission data
   taskType: text("task_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
+  maintenanceType: text("maintenance_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
   maintenanceBasis: text("maintenance_basis"), // 'Calendar' | 'Running Hours'
   frequencyValue: text("frequency_value"),
   frequencyUnit: text("frequency_unit"), // 'Months' | 'Years' | 'Weeks' | 'Days'
@@ -813,9 +816,12 @@ export const workOrders = pgTable("work_orders", {
   // Part B Execution Fields (B3 - Running Hours)
   previousReading: text("previous_reading"), // Previous RH reading
   runningHours: text("running_hours"), // Current RH at completion
+  runningHoursDifference: text("running_hours_difference"), // Difference between current and previous reading
+  readingDate: text("reading_date"), // Date of running hours reading
   // Part B Execution Metadata
   woExecutionId: text("wo_execution_id"), // Unique execution ID (WOE-XXXXXXX)
   remarks: text("remarks"), // General remarks
+  completionRemarks: text("completion_remarks"), // Remarks upon completion
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
