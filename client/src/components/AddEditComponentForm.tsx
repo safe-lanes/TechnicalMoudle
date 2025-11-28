@@ -494,12 +494,12 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Critical</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Criticality</label>
                               <select
                                 value={componentData.critical}
                                 onChange={(e) => handleFieldChange('critical', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="select-critical"
+                                data-testid="select-criticality"
                               >
                                 <option value="">Select</option>
                                 <option value="Yes">Yes</option>
