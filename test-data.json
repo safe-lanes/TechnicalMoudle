@@ -1371,9 +1371,10 @@
   },
   "workOrders": [
     {
-      "id": "WO-1764315073789-u7ngy0r",
+      "id": "WO-1764315424971-gnzocy6",
       "vesselId": "V001",
       "component": "1764311869949_mfmiab4fq",
+      "componentName": "Rudders w/nozzle",
       "componentCode": "401.005",
       "jobId": "uM8XH_E1f8idvayeac78V",
       "workOrderNo": "MKR-IN-00001.WO-2025-001",
@@ -1430,8 +1431,8 @@
       },
       "uploadedDocuments": [],
       "consumedSpareParts": [],
-      "createdAt": "2025-11-28T07:31:13.790Z",
-      "updatedAt": "2025-11-28T07:31:13.790Z"
+      "createdAt": "2025-11-28T07:37:04.971Z",
+      "updatedAt": "2025-11-28T07:37:04.971Z"
     }
   ],
   "workOrderExecutions": [],

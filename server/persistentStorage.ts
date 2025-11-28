@@ -6109,6 +6109,7 @@ export class PersistentFileStorage implements IStorage {
       id: workOrderId,
       vesselId: job.vesselId || null,
       component: job.componentId || component?.id || '', // Use component ID for lookup
+      componentName: component?.name || job.componentName || '', // Store name for display
       componentCode: job.componentCode || null,
       jobId: jobId,
       workOrderNo: workOrderNo,
