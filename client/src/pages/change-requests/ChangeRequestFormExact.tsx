@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { insertChangeRequestSchema, type InsertChangeRequest, type ChangeRequest } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-// Vessel mapping for proper vessel updates
-const vesselMap: Record<string, string> = {
-  "V001": "MV SEAFARER",
-  "V002": "MV VOYAGER", 
-  "V003": "MV EXPLORER",
-};
+import { VesselContext } from "@/contexts/VesselContext";
 
 // Generate change request reference number
 const generateRequestRef = () => {
@@ -60,11 +54,23 @@ interface ChangeRequestFormExactProps {
 
 export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 'new' }: ChangeRequestFormExactProps) {
   const { toast } = useToast();
+  const vesselContext = useContext(VesselContext);
   const [activeSection, setActiveSection] = useState<string>('basic');
   const [proposedChanges, setProposedChanges] = useState<ProposedChange[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showChangesModal, setShowChangesModal] = useState(false);
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
+
+  const { data: vessels = [] } = useQuery({
+    queryKey: ['/api/vessels'],
+    queryFn: async () => {
+      const response = await fetch('/api/vessels');
+      if (!response.ok) throw new Error('Failed to fetch vessels');
+      return response.json();
+    }
+  });
+
+  const defaultVesselId = changeRequest?.vesselId || vesselContext?.selectedVessel?.id || (vessels[0]?.id);
 
   const form = useForm<ChangeRequestFormData>({
     resolver: zodResolver(changeRequestFormSchema),
@@ -78,7 +84,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
       status: changeRequest.status,
       requestedByUserId: changeRequest.requestedByUserId,
     } : {
-      vesselId: 'V001',
+      vesselId: defaultVesselId,
       category: 'components',
       status: 'draft',
       requestedByUserId: 'Current User', // In real app, get from auth context
