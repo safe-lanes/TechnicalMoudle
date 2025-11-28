@@ -1,1 +1,68 @@
-[]
+[
+  {
+    "id": "68f25635-6171-4f20-9f99-fa1d1301618c",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633376_82zdktlro",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"4 Ship Equipment\",\"classItem\":false,\"commissionedDate\":null,\"componentCategory\":null,\"componentCode\":\"403\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.376Z\",\"critical\":false,\"currentCumulativeRH\":\"0\",\"dataScope\":\"vessel\",\"department\":null,\"deptCategory\":null,\"dimensionsSize\":null,\"drawingNo\":null,\"eqptSystemDept\":null,\"fleetEquipmentCode\":null,\"fleetEquipmentName\":null,\"id\":\"1764311633376_82zdktlro\",\"installationDate\":null,\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":null,\"maker\":null,\"makerCode\":null,\"model\":null,\"modelCode\":null,\"modelNumber\":null,\"name\":\"STEERING GEAR/COLUMNS, TELEMOTOR SYS., RUDDER IND., EMERG.ST\",\"noOfUnits\":null,\"notes\":null,\"parentComponent\":null,\"parentFleetEquipmentCode\":null,\"parentId\":\"40\",\"rating\":null,\"runningHours\":null,\"scopeNotes\":null,\"serialNo\":null,\"updatedAt\":\"2025-11-28T06:33:53.376Z\",\"vesselCode\":null,\"vesselId\":\"V001\"}",
+    "checksum": "1a4a6248f8dc5d44146702719b469f1b69628a0efa0dda24d52dca0a676acbc0",
+    "createdAt": "2025-11-28T06:33:53.379Z"
+  },
+  {
+    "id": "c0d3ecd1-b3db-44da-8f55-7152c2937fef",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633380_ofzlgvmlh",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"4 Ship Equipment\",\"classItem\":false,\"commissionedDate\":null,\"componentCategory\":null,\"componentCode\":\"40\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.380Z\",\"critical\":false,\"currentCumulativeRH\":\"0\",\"dataScope\":\"vessel\",\"department\":null,\"deptCategory\":null,\"dimensionsSize\":null,\"drawingNo\":null,\"eqptSystemDept\":null,\"fleetEquipmentCode\":null,\"fleetEquipmentName\":null,\"id\":\"1764311633380_ofzlgvmlh\",\"installationDate\":null,\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":null,\"maker\":null,\"makerCode\":null,\"model\":null,\"modelCode\":null,\"modelNumber\":null,\"name\":\"MANOEUVRING MACHINERY & EQUIPMENT\",\"noOfUnits\":null,\"notes\":null,\"parentComponent\":null,\"parentFleetEquipmentCode\":null,\"parentId\":\"4\",\"rating\":null,\"runningHours\":null,\"scopeNotes\":null,\"serialNo\":null,\"updatedAt\":\"2025-11-28T06:33:53.380Z\",\"vesselCode\":null,\"vesselId\":\"V001\"}",
+    "checksum": "6849ec609da105d78c960fa2249d9d24b060d447959a96c58ed82a390f4e212a",
+    "createdAt": "2025-11-28T06:33:53.381Z"
+  },
+  {
+    "id": "02acdf01-7c76-4abc-91e0-aa60a605c941",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633382_aitniehct",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"4 Ship Equipment\",\"classItem\":false,\"commissionedDate\":null,\"componentCategory\":null,\"componentCode\":\"4\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.382Z\",\"critical\":false,\"currentCumulativeRH\":\"0\",\"dataScope\":\"vessel\",\"department\":null,\"deptCategory\":null,\"dimensionsSize\":null,\"drawingNo\":null,\"eqptSystemDept\":null,\"fleetEquipmentCode\":null,\"fleetEquipmentName\":null,\"id\":\"1764311633382_aitniehct\",\"installationDate\":null,\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":null,\"maker\":null,\"makerCode\":null,\"model\":null,\"modelCode\":null,\"modelNumber\":null,\"name\":\"SHIP EQUIPMENT\",\"noOfUnits\":null,\"notes\":null,\"parentComponent\":null,\"parentFleetEquipmentCode\":null,\"parentId\":null,\"rating\":null,\"runningHours\":null,\"scopeNotes\":null,\"serialNo\":null,\"updatedAt\":\"2025-11-28T06:33:53.382Z\",\"vesselCode\":null,\"vesselId\":\"V001\"}",
+    "checksum": "8103d68b3dac30ce4444a804f1797874f2ac6695e1966a93a2c06fc7b0821e2f",
+    "createdAt": "2025-11-28T06:33:53.383Z"
+  },
+  {
+    "id": "589f3575-9a70-4411-86a6-cb0c5cc72725",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633384_qzqch6vy6",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"4 Ship Equipment\",\"classItem\":false,\"commissionedDate\":null,\"componentCategory\":null,\"componentCode\":\"403.006\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.384Z\",\"critical\":false,\"currentCumulativeRH\":\"0\",\"dataScope\":\"vessel\",\"department\":null,\"deptCategory\":null,\"dimensionsSize\":null,\"drawingNo\":null,\"eqptSystemDept\":null,\"fleetEquipmentCode\":null,\"fleetEquipmentName\":null,\"id\":\"1764311633384_qzqch6vy6\",\"installationDate\":null,\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":null,\"maker\":null,\"makerCode\":null,\"model\":null,\"modelCode\":null,\"modelNumber\":null,\"name\":\"Hydr. oil pumps\",\"noOfUnits\":null,\"notes\":null,\"parentComponent\":null,\"parentFleetEquipmentCode\":null,\"parentId\":\"403\",\"rating\":null,\"runningHours\":null,\"scopeNotes\":null,\"serialNo\":null,\"updatedAt\":\"2025-11-28T06:33:53.384Z\",\"vesselCode\":null,\"vesselId\":\"V001\"}",
+    "checksum": "1fe969c051fd49168534dced3175fc9fb848382edc7acfdf525c46c4a6360605",
+    "createdAt": "2025-11-28T06:33:53.385Z"
+  },
+  {
+    "id": "b974ba63-6e7b-4b8d-8b83-47363e11e9f5",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633387_iquh4oqdj",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"Ship General\",\"classItem\":false,\"commissionedDate\":\"27-Nov-2024\",\"componentCategory\":\"Ship General\",\"componentCode\":\"403.006.01\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.387Z\",\"critical\":false,\"currentCumulativeRH\":\"20\",\"dataScope\":\"vessel\",\"department\":\"Deck\",\"deptCategory\":\"Deck\",\"dimensionsSize\":null,\"drawingNo\":\"d123\",\"eqptSystemDept\":\"Deck\",\"fleetEquipmentCode\":\"403.006.AA\",\"fleetEquipmentName\":\"Hydr. oil pumps\",\"id\":\"1764311633387_iquh4oqdj\",\"installationDate\":\"26-Nov-2024\",\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":\"Deck\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000004\",\"model\":\"L3MF45-70\",\"modelCode\":null,\"modelNumber\":\"MKR-000004-L3MF45-70\",\"name\":\"Hydr. oil pumps No.01\",\"noOfUnits\":null,\"notes\":\"215.3L/min\",\"parentComponent\":\"403.006\",\"parentFleetEquipmentCode\":null,\"parentId\":\"403.006\",\"rating\":\"12\",\"runningHours\":\"20\",\"scopeNotes\":null,\"serialNo\":\"s123\",\"updatedAt\":\"2025-11-28T06:33:53.387Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "f475d66639566ad8c970297bb7f030599fe77d50475371507b37515c8deac003",
+    "createdAt": "2025-11-28T06:33:53.389Z"
+  },
+  {
+    "id": "68375800-9c08-4286-8394-f769edb84abc",
+    "importHistoryId": "27dc719b-a86b-4c4b-be52-f9109311d881",
+    "operation": "created",
+    "entityType": "component",
+    "entityId": "1764311633391_9u0ts98y1",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"category\":\"Ship General\",\"classItem\":false,\"commissionedDate\":\"27-Nov-2024\",\"componentCategory\":\"Ship General\",\"componentCode\":\"403.006.02\",\"conditionBased\":false,\"createdAt\":\"2025-11-28T06:33:53.391Z\",\"critical\":false,\"currentCumulativeRH\":\"20\",\"dataScope\":\"vessel\",\"department\":\"Deck\",\"deptCategory\":\"Deck\",\"dimensionsSize\":null,\"drawingNo\":\"d124\",\"eqptSystemDept\":\"Deck\",\"fleetEquipmentCode\":\"403.006.AA\",\"fleetEquipmentName\":\"Hydr. oil pumps\",\"id\":\"1764311633391_9u0ts98y1\",\"installationDate\":\"26-Nov-2024\",\"isActive\":true,\"lastUpdated\":\"2025-11-28\",\"location\":\"Deck\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000004\",\"model\":\"L3MF45-70\",\"modelCode\":null,\"modelNumber\":\"MKR-000004-L3MF45-70\",\"name\":\"Hydr. oil pumps No.02\",\"noOfUnits\":null,\"notes\":\"215.3L/min\",\"parentComponent\":\"403.006\",\"parentFleetEquipmentCode\":null,\"parentId\":\"403.006\",\"rating\":\"13\",\"runningHours\":\"20\",\"scopeNotes\":null,\"serialNo\":\"s123\",\"updatedAt\":\"2025-11-28T06:33:53.391Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
+    "checksum": "f86ef663d1bc48d5d2b26bd50aa30dfbd23b6be3882ecd23509b32eeb9b511d8",
+    "createdAt": "2025-11-28T06:33:53.393Z"
+  }
+]
