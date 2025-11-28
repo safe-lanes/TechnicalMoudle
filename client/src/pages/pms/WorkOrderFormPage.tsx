@@ -231,6 +231,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
   
+  // Approver workflow state
+  const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
+  const [rejectionComments, setRejectionComments] = useState('');
+  const [isProcessingApproval, setIsProcessingApproval] = useState(false);
+  
   // Determine if Part A should be read-only (immutable)
   // Part A is read-only when:
   // 1. Viewing/editing an existing work order that's linked to a job (on-demand WO)
@@ -406,6 +411,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Load work order number from context (for Part B display)
       if (context.workOrder?.workOrderNo || context.workOrder?.templateCode) {
         setWorkOrderNo(context.workOrder.workOrderNo || context.workOrder.templateCode);
+      }
+      
+      // Load work order status for approval workflow
+      if (context.workOrder?.status) {
+        setCurrentWorkOrderStatus(context.workOrder.status);
       }
       
       // Auto-populate previousReading from component's current running hours (Part B Section B3)
@@ -1003,6 +1013,96 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         description: error.message || "Failed to save work order",
         variant: "destructive",
       });
+    }
+  };
+
+  // Approver actions
+  const handleApprove = async () => {
+    if (!workOrderId) return;
+    
+    setIsProcessingApproval(true);
+    try {
+      const response = await fetch(`/api/work-orders/${workOrderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'Completed',
+          approvalAction: 'approved',
+          dateCompleted: new Date().toISOString()
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to approve work order');
+      }
+      
+      setCurrentWorkOrderStatus('Completed');
+      toast({
+        title: "Approved",
+        description: "Work order has been approved and marked as completed",
+      });
+      navigate("/pms/work-orders");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve work order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingApproval(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!workOrderId) return;
+    
+    if (!rejectionComments.trim()) {
+      toast({
+        title: "Rejection Comments Required",
+        description: "Please provide rejection comments before rejecting the work order",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsProcessingApproval(true);
+    try {
+      const response = await fetch(`/api/work-orders/${workOrderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'Rejected',
+          approvalAction: 'rejected',
+          rejectionComments: rejectionComments
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reject work order');
+      }
+      
+      setCurrentWorkOrderStatus('Rejected');
+      toast({
+        title: "Rejected",
+        description: "Work order has been rejected",
+      });
+      navigate("/pms/work-orders");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject work order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingApproval(false);
     }
   };
 
@@ -2564,16 +2664,57 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* Save Button at Bottom */}
-          <div className="flex justify-end mt-6 pb-6">
-            <Button
-              onClick={handleSave}
-              className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
-              data-testid="button-save-bottom"
-            >
-              Save
-            </Button>
-          </div>
+          {/* Approval Section - Only visible for Pending Approval work orders */}
+          {currentWorkOrderStatus === 'Pending Approval' && (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4">
+              <div className="space-y-4">
+                {/* Rejection Comments */}
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold text-[#17a2b8]">Rejection Comments</Label>
+                  <Textarea
+                    value={rejectionComments}
+                    onChange={(e) => setRejectionComments(e.target.value)}
+                    placeholder="Enter rejection comments..."
+                    className="text-sm min-h-[100px] border-gray-200"
+                    data-testid="textarea-rejection-comments"
+                  />
+                </div>
+                
+                {/* Approve / Reject Buttons */}
+                <div className="flex justify-center gap-4 pt-2">
+                  <Button
+                    onClick={handleApprove}
+                    disabled={isProcessingApproval}
+                    className="bg-[#28a745] hover:bg-[#218838] text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
+                    data-testid="button-approve"
+                  >
+                    {isProcessingApproval ? 'Processing...' : 'Approve'}
+                  </Button>
+                  <Button
+                    onClick={handleReject}
+                    disabled={isProcessingApproval}
+                    className="bg-[#dc3545] hover:bg-[#c82333] text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
+                    data-testid="button-reject"
+                  >
+                    {isProcessingApproval ? 'Processing...' : 'Reject'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Save Button at Bottom - Hide when in Pending Approval mode (approver view) */}
+          {currentWorkOrderStatus !== 'Pending Approval' && (
+            <div className="flex justify-end mt-6 pb-6">
+              <Button
+                onClick={handleSave}
+                className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
+                data-testid="button-save-bottom"
+              >
+                Save
+              </Button>
+            </div>
+          )}
             </>
           )}
           </div>
