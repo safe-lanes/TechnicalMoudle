@@ -33,23 +33,36 @@ export function normalizeDateToDDMMMYYYY(dateInput: string | number | Date | nul
     else {
       const dateString = String(dateInput).trim();
       
-      // Try DD-MMM-YYYY format first (target format)
-      parsedDate = parse(dateString, 'dd-MMM-yyyy', new Date());
-      if (!isValid(parsedDate)) {
-        // Try DD/MM/YYYY format (European format with slashes)
-        parsedDate = parse(dateString, 'dd/MM/yyyy', new Date());
-      }
-      if (!isValid(parsedDate)) {
-        // Try DD-MM-YYYY format (European format with dashes)
-        parsedDate = parse(dateString, 'dd-MM-yyyy', new Date());
-      }
-      if (!isValid(parsedDate)) {
-        // Try ISO format (YYYY-MM-DD)
-        parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
-      }
-      if (!isValid(parsedDate)) {
-        // Try locale string format (fallback to native parser)
-        parsedDate = new Date(dateString);
+      // Check if string is a numeric Excel serial number (e.g., "45623")
+      // Excel serial numbers for modern dates are typically between 40000-60000
+      const numericValue = parseFloat(dateString);
+      if (!isNaN(numericValue) && /^\d+(\.\d+)?$/.test(dateString) && numericValue > 1000 && numericValue < 100000) {
+        // It's a numeric string representing an Excel serial date
+        let adjustedSerial = numericValue;
+        if (numericValue >= 60) {
+          adjustedSerial = numericValue - 1;
+        }
+        const excelEpoch = new Date(1899, 11, 31);
+        parsedDate = new Date(excelEpoch.getTime() + adjustedSerial * 24 * 60 * 60 * 1000);
+      } else {
+        // Try DD-MMM-YYYY format first (target format)
+        parsedDate = parse(dateString, 'dd-MMM-yyyy', new Date());
+        if (!isValid(parsedDate)) {
+          // Try DD/MM/YYYY format (European format with slashes)
+          parsedDate = parse(dateString, 'dd/MM/yyyy', new Date());
+        }
+        if (!isValid(parsedDate)) {
+          // Try DD-MM-YYYY format (European format with dashes)
+          parsedDate = parse(dateString, 'dd-MM-yyyy', new Date());
+        }
+        if (!isValid(parsedDate)) {
+          // Try ISO format (YYYY-MM-DD)
+          parsedDate = parse(dateString, 'yyyy-MM-dd', new Date());
+        }
+        if (!isValid(parsedDate)) {
+          // Try locale string format (fallback to native parser)
+          parsedDate = new Date(dateString);
+        }
       }
     }
     
