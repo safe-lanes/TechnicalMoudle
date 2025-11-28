@@ -1649,7 +1649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get work order context (for running hours validation)
+  // Get work order context (for running hours validation and Part A hydration)
   app.get("/api/work-orders/:id/context", async (req, res) => {
     try {
       const workOrder = await storage.getWorkOrder(req.params.id);
@@ -1673,8 +1673,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const audits = await storage.getRunningHoursAudits(workOrder.component);
       const latestAudit = audits.length > 0 ? audits[0] : null;
       
+      // Get linked job data for Part A hydration
+      let job = null;
+      if (workOrder.jobId) {
+        job = await storage.getJob(workOrder.jobId);
+      }
+      
+      // Helper function to convert DD-MMM-YYYY to ISO YYYY-MM-DD format for HTML date inputs
+      const convertToIsoDate = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '';
+        const monthMap: Record<string, string> = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        // Handle DD-MMM-YYYY format (e.g., "04-Dec-2025")
+        const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+        if (match) {
+          const [, day, month, year] = match;
+          const monthNum = monthMap[month];
+          if (monthNum) {
+            return `${year}-${monthNum}-${day.padStart(2, '0')}`;
+          }
+        }
+        // If already in ISO format or other format, return as-is
+        return dateStr;
+      };
+      
+      // Build templateData from job data (Part A - immutable from job definition)
+      // This ensures Section A is populated from the job template
+      const templateData = job ? {
+        woTitle: job.jobTitle,
+        jobTitle: job.jobTitle,
+        jobNo: job.jobNo,
+        component: workOrder.component,
+        componentCode: job.componentCode || component.componentCode,
+        componentName: job.componentName || component.name,
+        sfiCode: job.sfiCode || job.componentCode || component.componentCode,
+        maintenanceBasis: job.maintenanceBasis,
+        maintenanceType: job.maintenanceType,
+        frequencyValue: job.frequencyValue?.toString() || '',
+        frequencyUnit: job.frequencyUnit || 'Months',
+        intervalRunningHour: job.intervalRunningHour?.toString() || '',
+        assignedTo: job.assignedTo,
+        approver: job.approver,
+        department: job.department,
+        jobPriority: job.jobPriority,
+        classRelated: job.classRelated,
+        criticality: job.criticality,
+        lastDoneDate: convertToIsoDate(job.lastDoneDate),
+        nextDueDate: convertToIsoDate(job.nextDueDate),
+        lastDoneRH: job.lastDoneRH?.toString() || '',
+        nextDueRH: job.nextDueRH?.toString() || '',
+        briefWorkDescription: job.briefWorkDescription || job.jobDescription,
+        jobDescription: job.jobDescription,
+        requiredSpareParts: job.requiredSpareParts || [],
+        requiredTools: job.requiredTools || [],
+        safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+        vesselId: workOrder.vesselId
+      } : {
+        // Fallback: use work order fields if job not found (for unplanned WOs)
+        woTitle: workOrder.jobTitle,
+        jobTitle: workOrder.jobTitle,
+        jobNo: workOrder.templateCode,
+        component: workOrder.component,
+        componentCode: component.componentCode,
+        componentName: component.name,
+        sfiCode: component.componentCode,
+        maintenanceBasis: workOrder.maintenanceBasis || 'Calendar',
+        maintenanceType: workOrder.maintenanceType,
+        frequencyValue: workOrder.frequencyValue?.toString() || '',
+        frequencyUnit: workOrder.frequencyUnit || 'Months',
+        intervalRunningHour: '',
+        assignedTo: workOrder.assignedTo,
+        approver: workOrder.approver,
+        department: workOrder.department,
+        jobPriority: workOrder.jobPriority,
+        classRelated: workOrder.classRelated,
+        criticality: workOrder.criticality,
+        lastDoneDate: '',
+        nextDueDate: convertToIsoDate(workOrder.dueDate),
+        lastDoneRH: '',
+        nextDueRH: '',
+        briefWorkDescription: workOrder.briefWorkDescription,
+        jobDescription: workOrder.briefWorkDescription,
+        requiredSpareParts: [],
+        requiredTools: [],
+        safetyRequirements: { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+        vesselId: workOrder.vesselId
+      };
+      
+      // Build executionData from work order (Part B - editable execution record)
+      const executionData = {
+        woExecutionId: workOrder.woExecutionId || '',
+        previousReading: workOrder.previousReading?.toString() || '',
+        currentReading: workOrder.currentReading?.toString() || '',
+        runningHoursDifference: workOrder.runningHoursDifference?.toString() || '',
+        readingDate: workOrder.readingDate || '',
+        consumedSpareParts: workOrder.consumedSpareParts || [],
+        remarks: workOrder.remarks || '',
+        dateCompleted: workOrder.dateCompleted || '',
+        completionRemarks: workOrder.completionRemarks || ''
+      };
+      
       res.json({
         workOrder,
+        templateData,
+        executionData,
+        job,
         component: {
           id: component.id,
           componentCode: component.componentCode,
@@ -1689,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: parentComponent.name,
           currentCumulativeRH: parentComponent.currentCumulativeRH
         } : null,
-        maintenanceBasis: workOrder.maintenanceBasis
+        maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis
       });
     } catch (error) {
       console.error("Failed to fetch work order context:", error);

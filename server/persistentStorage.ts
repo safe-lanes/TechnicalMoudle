@@ -6108,7 +6108,7 @@ export class PersistentFileStorage implements IStorage {
     const newWorkOrder: WorkOrder = {
       id: workOrderId,
       vesselId: job.vesselId || null,
-      component: component?.componentName || job.componentName || '', // Use componentName, not ID
+      component: job.componentId || component?.id || '', // Use component ID for lookup
       componentCode: job.componentCode || null,
       jobId: jobId,
       workOrderNo: workOrderNo,
