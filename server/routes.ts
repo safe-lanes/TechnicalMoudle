@@ -1526,7 +1526,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return {
           ...wo,
-          assignedTo: wo.assignedTo || job?.assignedTo || 'Unassigned',
+          // Hydrate assignedTo from job if work order has 'Unassigned' or empty value
+          assignedTo: (wo.assignedTo && wo.assignedTo !== 'Unassigned') 
+            ? wo.assignedTo 
+            : (job?.assignedTo || 'Unassigned'),
           computedStatus: computeWorkOrderStatus({
             dueDate: wo.dueDate,
             dueRH,
