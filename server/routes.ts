@@ -401,8 +401,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parentComponent = await storage.getComponent(component.parentId);
       }
       
-      // Build template data from job fields (matching work order context structure)
+      // Helper function to convert DD-MMM-YYYY to ISO YYYY-MM-DD format for HTML date inputs
+      const convertToIsoDate = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '';
+        const monthMap: Record<string, string> = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        // Handle DD-MMM-YYYY format (e.g., "04-Dec-2025")
+        const match = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+        if (match) {
+          const [, day, month, year] = match;
+          const monthNum = monthMap[month];
+          if (monthNum) {
+            return `${year}-${monthNum}-${day.padStart(2, '0')}`;
+          }
+        }
+        // If already in ISO format or other format, return as-is
+        return dateStr;
+      };
+      
+      // Build template data from job fields (matching work order form structure)
       const templateData = {
+        woTitle: job.jobTitle,
         jobTitle: job.jobTitle,
         jobNo: job.jobNo,
         component: job.componentId,
@@ -420,8 +441,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobPriority: job.jobPriority,
         classRelated: job.classRelated,
         criticality: job.criticality,
-        lastDoneDate: job.lastDoneDate,
-        nextDueDate: job.nextDueDate,
+        lastDoneDate: convertToIsoDate(job.lastDoneDate),
+        nextDueDate: convertToIsoDate(job.nextDueDate),
         lastDoneRH: job.lastDoneRH?.toString() || '',
         nextDueRH: job.nextDueRH?.toString() || '',
         briefWorkDescription: job.briefWorkDescription || job.jobDescription,
