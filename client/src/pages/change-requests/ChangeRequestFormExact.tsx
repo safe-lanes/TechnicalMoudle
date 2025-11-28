@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { VesselContext } from "@/contexts/VesselContext";
+import { useVessel } from "@/contexts/VesselContext";
 
 // Generate change request reference number
 const generateRequestRef = () => {
@@ -54,7 +54,7 @@ interface ChangeRequestFormExactProps {
 
 export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 'new' }: ChangeRequestFormExactProps) {
   const { toast } = useToast();
-  const vesselContext = useContext(VesselContext);
+  const { vesselId: selectedVessel } = useVessel();
   const [activeSection, setActiveSection] = useState<string>('basic');
   const [proposedChanges, setProposedChanges] = useState<ProposedChange[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -70,7 +70,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
     }
   });
 
-  const defaultVesselId = changeRequest?.vesselId || vesselContext?.selectedVessel?.id || (vessels[0]?.id);
+  const defaultVesselId = changeRequest?.vesselId || selectedVessel;
 
   const form = useForm<ChangeRequestFormData>({
     resolver: zodResolver(changeRequestFormSchema),

@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Bell, Mail, AlertCircle, Clock, Package, Shield, HardDrive } from 'lucide-react';
 import AlertPolicyDrawer from '@/components/alerts/AlertPolicyDrawer';
 import AlertHistory from '@/components/alerts/AlertHistory';
-import { VesselContext } from '@/contexts/VesselContext';
+import { useVessel } from '@/contexts/VesselContext';
 
 interface AlertPolicy {
   id: number;
@@ -71,8 +71,7 @@ const alertTypeInfo = {
 
 export default function Alerts() {
   const { toast } = useToast();
-  const vesselContext = useContext(VesselContext);
-  const selectedVesselId = vesselContext?.selectedVessel?.id || 'V001';
+  const { vesselId: selectedVesselId = 'V001' } = useVessel();
   const [selectedPolicy, setSelectedPolicy] = useState<AlertPolicy | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [localPolicies, setLocalPolicies] = useState<AlertPolicy[]>([]);

@@ -14,7 +14,7 @@ interface VesselContextType {
   vessels: Vessel[];
 }
 
-const VesselContext = createContext<VesselContextType | undefined>(undefined);
+export const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
 export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const [vesselId, setVesselIdState] = useState<string>(() => {

@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { BarChart3, PieChart, TrendingUp, FileSpreadsheet, FileText, FileDown, Play, AlertTriangle, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { VesselContext } from "@/contexts/VesselContext";
 
 interface ReportFilter {
   vesselId?: string;
@@ -85,7 +84,6 @@ const reportConfigs: ReportConfig[] = [
 ];
 
 export default function DefectsReports() {
-  const vesselContext = useContext(VesselContext);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [filters, setFilters] = useState<ReportFilter>({});
   const [reportData, setReportData] = useState<any>(null);
