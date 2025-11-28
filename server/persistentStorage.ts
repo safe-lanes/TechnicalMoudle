@@ -505,16 +505,24 @@ export class PersistentFileStorage implements IStorage {
 
   private initializeSeedData(data: PersistentData): void {
     // Add seed users
+    const now = new Date();
     const seedUser: User = {
       id: 1,
       username: "admin",
-      password: "admin123"
+      password: "admin123",
+      fullName: "System Administrator",
+      email: null,
+      role: "PMS Admin",
+      vesselId: null,
+      department: null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
     };
     data.users[1] = seedUser;
     data.counters.userId = 2;
 
     // Add seed components
-    const now = new Date();
     const seedComponents: Component[] = [
       {
         id: "ME001",
@@ -548,6 +556,7 @@ export class PersistentFileStorage implements IStorage {
         classItem: false,
         conditionBased: false,
         isActive: true,
+        isParent: true,
         rating: null,
         noOfUnits: null,
         parentComponent: null,
@@ -591,6 +600,7 @@ export class PersistentFileStorage implements IStorage {
         classItem: false,
         conditionBased: false,
         isActive: true,
+        isParent: true,
         rating: null,
         noOfUnits: null,
         parentComponent: null,
