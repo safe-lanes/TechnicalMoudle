@@ -1006,9 +1006,9 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Job No.</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Maintenance Type</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
               <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
@@ -1172,7 +1172,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
                     <p className="text-sm font-medium text-gray-900">{selectedRecord.jobTitle}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500">Maintenance Type</label>
+                    <label className="text-xs text-gray-500">Task Type</label>
                     <p className="text-sm font-medium text-gray-900">{selectedRecord.maintenanceType}</p>
                   </div>
                   <div>
