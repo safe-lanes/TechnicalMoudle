@@ -992,10 +992,10 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   });
   console.log(`📊 Including all ${sortedComponents.length} components (all levels) in jobs template`);
   
-  // Create main "jobs" sheet with correct 21-column structure
+  // Create main "jobs" sheet with 26-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the correct 21-column specification
+  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
@@ -1017,7 +1017,13 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
     { header: 'Is Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 15 }
+    { header: 'Vessel Code', key: 'vesselCode', width: 15 },
+    // Part A fields - Work Order Form fields (semicolon-separated lists)
+    { header: 'Required Spare Parts', key: 'requiredSpareParts', width: 40 },
+    { header: 'Required Tools', key: 'requiredTools', width: 40 },
+    { header: 'PPE Requirements', key: 'ppeRequirements', width: 35 },
+    { header: 'Permit Requirements', key: 'permitRequirements', width: 35 },
+    { header: 'Other Safety Requirements', key: 'otherSafetyRequirements', width: 35 }
   ];
   
   // Pre-populate ALL components (all levels) in the template - sorted by code for hierarchical display
@@ -1043,7 +1049,13 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       department: '',
       criticality: '',
       isActive: 'Yes',
-      vesselCode: vesselId
+      vesselCode: vesselId,
+      // Part A fields - empty by default, users fill with semicolon-separated lists
+      requiredSpareParts: '',
+      requiredTools: '',
+      ppeRequirements: '',
+      permitRequirements: '',
+      otherSafetyRequirements: ''
     });
   });
   
@@ -3687,6 +3699,38 @@ async function performImport(
         nextDueRH = String(lastRH + intervalRH);
       }
       
+      // Parse spare parts, tools, and safety requirements from Excel (semicolon-separated)
+      // Returns string array for safety requirements
+      const parseStringList = (value: any): string[] => {
+        if (!value) return [];
+        const str = String(value).trim();
+        if (!str) return [];
+        return str.split(';').map(s => s.trim()).filter(s => s.length > 0);
+      };
+      
+      // Parse spare parts from semicolon-separated string into structured objects
+      // Format: "Part Name 1; Part Name 2" => [{partNo: '', description: 'Part Name 1', quantityRequired: '', remarks: ''}, ...]
+      const parseSpareParts = (value: any): Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> => {
+        const items = parseStringList(value);
+        return items.map(item => ({
+          partNo: '',
+          description: item,
+          quantityRequired: '',
+          remarks: ''
+        }));
+      };
+      
+      // Parse tools from semicolon-separated string into structured objects
+      // Format: "Tool 1; Tool 2" => [{toolName: 'Tool 1', quantity: '', remarks: ''}, ...]
+      const parseTools = (value: any): Array<{toolName: string, quantity: string, remarks: string}> => {
+        const items = parseStringList(value);
+        return items.map(item => ({
+          toolName: item,
+          quantity: '',
+          remarks: ''
+        }));
+      };
+      
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
         vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
@@ -3704,6 +3748,7 @@ async function performImport(
         intervalRunningHour: intervalRH,
         internalRunningHourNumber: row['Interval Running Hours'] || null,
         jobDescription: row['Brief Work Description'] || null,
+        briefWorkDescription: row['Brief Work Description'] || null,  // Store in both fields for compatibility
         assignedTo: row['Assigned To'] || null,
         approver: row['Approver'] || null,
         jobPriority: row['Job Priority'] || null,
@@ -3722,7 +3767,16 @@ async function performImport(
           const isYes = critVal === true || critVal.toString().toLowerCase() === 'yes' || critVal.toString().toLowerCase() === 'y';
           return isYes ? 'Yes' : 'No';
         })(),
-        isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true
+        isActive: row['Is Active'] ? (row['Is Active'].toString().toLowerCase() === 'yes') : true,
+        // Part A fields - Required Spare Parts, Tools, and Safety Requirements
+        // Spare parts and tools are parsed into structured objects matching schema
+        requiredSpareParts: parseSpareParts(row['Required Spare Parts']),
+        requiredTools: parseTools(row['Required Tools']),
+        safetyRequirements: {
+          ppeRequirements: parseStringList(row['PPE Requirements']),
+          permitRequirements: parseStringList(row['Permit Requirements']),
+          otherRequirements: parseStringList(row['Other Safety Requirements'])
+        }
       };
       
       // Auto-generate job number if not provided (format: JOB-XXXXXXX)

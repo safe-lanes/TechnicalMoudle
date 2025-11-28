@@ -362,7 +362,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         approver: template.approver || '',
         jobPriority: template.jobPriority || 'Medium',
         classRelated: template.classRelated || 'No',
-        briefWorkDescription: template.jobDescription || '',
+        briefWorkDescription: template.briefWorkDescription || template.jobDescription || '',
         nextDueDate: template.nextDueDate || '',
         nextDueReading: template.nextDueReading || '',
         requiredSpareParts: Array.isArray(template.requiredSpareParts) ? template.requiredSpareParts : [],
