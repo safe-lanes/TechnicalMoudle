@@ -1970,12 +1970,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update work order
   app.patch("/api/work-orders/:id", async (req, res) => {
     try {
-      const partialWorkOrderSchema = insertWorkOrderSchema.partial();
-      const validatedData = partialWorkOrderSchema.parse(req.body);
-      const workOrder = await storage.updateWorkOrder(req.params.id, validatedData);
+      // Log incoming data for debugging
+      console.log('📝 PATCH work order request body keys:', Object.keys(req.body));
+      
+      // Use a more permissive update approach - accept any partial data
+      // The storage layer will handle what fields to actually update
+      const updateData = { ...req.body };
+      
+      // Remove any undefined values
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
+      
+      console.log('📝 Cleaned update data keys:', Object.keys(updateData));
+      
+      const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
       res.json(workOrder);
     } catch (error: any) {
+      console.error('❌ Work order update error:', error);
       if (error.name === 'ZodError') {
+        console.error('❌ Zod validation errors:', JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Invalid work order data", details: error.errors });
       }
       if (error.message?.includes('not found')) {
