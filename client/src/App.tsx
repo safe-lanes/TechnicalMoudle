@@ -13,6 +13,7 @@ import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
+import JobsFormPage from "./pages/pms/JobsFormPage";
 
 import NotFound from "./pages/not-found";
 
@@ -37,6 +38,11 @@ function App() {
                 </Route>
                 <Route path="/pms/work-order/:id">
                   {() => <WorkOrderFormPage mode="execution" />}
+                </Route>
+                
+                {/* Jobs Form route - standalone, no TechnicalModule layout */}
+                <Route path="/pms/job/:id">
+                  {() => <JobsFormPage />}
                 </Route>
                 
                 <Route path="/pms/:subpage" component={TechnicalModule} />

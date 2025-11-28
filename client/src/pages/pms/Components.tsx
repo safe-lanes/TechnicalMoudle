@@ -945,10 +945,10 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     const openJobId = urlParams.get('openJobId');
     
     if (openJobId) {
-      // Find the job and navigate to its full-screen page in template mode
+      // Find the job and navigate to the Jobs Form page
       const jobToOpen = allJobs.find((job: any) => job.id === openJobId);
       if (jobToOpen) {
-        setLocation(`/pms/work-order/${jobToOpen.id}?mode=template`);
+        setLocation(`/pms/job/${jobToOpen.id}`);
       }
       
       // Always clean up the openJobId parameter after data has loaded
@@ -985,9 +985,9 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     setLocation(`/pms/work-order/new/${componentCode}`);
   };
 
-  const handleRowClick = (workOrder: any) => {
-    // Navigate to job template page (Part A only)
-    setLocation(`/pms/work-order/${workOrder.id}?mode=template`);
+  const handleRowClick = (job: any) => {
+    // Navigate to Jobs Form page
+    setLocation(`/pms/job/${job.id}`);
   };
 
   return (
