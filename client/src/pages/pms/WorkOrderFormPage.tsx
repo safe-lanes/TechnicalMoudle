@@ -902,13 +902,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
       
-      const isCompleting = !!(executionData.completionDateTime || executionData.dateOfCompletion);
+      // Check if Part B has completion data (indicates work is done and needs approval)
+      const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
       
-      if (isCompleting) {
+      // Validate running hours if completion data is present
+      if (hasCompletionData) {
         if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !executionData.runningHours) {
           toast({
             title: "Validation Error",
-            description: "Running hours is required for RH-based maintenance when completing work order",
+            description: "Running hours is required for RH-based maintenance when submitting for approval",
             variant: "destructive",
           });
           return;
@@ -964,31 +966,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
       
+      // FIXED: When saving Part B with completion data, set status to "Pending Approval"
+      // The work order should NOT go directly to "Completed" - it requires approval first
+      // Only the approver can change status to "Completed" via the Approve action
       let response;
-      if (isCompleting) {
-        response = await fetch(`/api/work-orders/${workOrderId}/complete`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            ...executionData,
-            runningHours: executionData.runningHours,
-            dateOfCompletion: executionData.dateOfCompletion
-          })
-        });
-      } else {
-        response = await fetch(`/api/work-orders/${workOrderId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            ...templateData,
-            ...executionData
-          })
-        });
-      }
+      response = await fetch(`/api/work-orders/${workOrderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...templateData,
+          ...executionData,
+          // If completion data is filled, set status to "Pending Approval"
+          // Otherwise keep current status (likely "Active" or "Due")
+          status: hasCompletionData ? 'Pending Approval' : undefined
+        })
+      });
       
       const result = await response.json();
       
@@ -998,11 +992,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       
       toast({
         title: "Success",
-        description: isCompleting && result.runningHoursUpdated 
-          ? "Work order completed and running hours updated successfully" 
-          : isCompleting 
-            ? "Work order completed successfully"
-            : "Work order saved successfully",
+        description: hasCompletionData 
+          ? "Work order submitted for approval" 
+          : "Work order saved successfully",
       });
       navigate("/pms/work-orders");
     } catch (error: any) {
