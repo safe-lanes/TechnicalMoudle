@@ -51,7 +51,9 @@ The application utilizes a modern full-stack architecture. The frontend is built
     - **Fleet_Job**: 21 columns with dual frequency support (Calendar Interval + RH Interval)
     - **Fleet_Spare**: 19 columns for fleet-level spare parts master data
     - **Vessel_Component**: 24 columns (no IS Parent) for vessel-specific equipment
-    - **Vessel_Job**: 21 columns for vessel-specific maintenance tasks
+    - **Vessel_Job**: 26 columns for vessel-specific maintenance tasks (21 original + 5 Part A fields):
+      - Part A fields: Required Spare Parts, Required Tools, PPE Requirements, Permit Requirements, Other Safety Requirements
+      - Spare parts/tools entered as semicolon-separated lists are parsed into structured objects
     - **Vessel_Spare**: 27 columns with ROB by Location (Deck Store, Engine Store, Store 1, Store 2)
     - **Vessel_Stores**: 12 columns including IMPA Code for stores inventory
     - **Master Data**: Dropdown reference values for consistent data entry
