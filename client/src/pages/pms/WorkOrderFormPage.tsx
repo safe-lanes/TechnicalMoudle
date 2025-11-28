@@ -2188,15 +2188,114 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
               {/* Work Carried Out */}
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
-                <Textarea
-                  ref={workCarriedOutRef}
-                  value={executionData.workCarriedOut}
-                  onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
-                  className="text-sm min-h-[100px]"
-                  placeholder="Work carried out"
-                  data-testid="textarea-work-carried-out"
-                />
+                {/* Header with Quick Input and Smart Suggestions buttons */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-[#8798ad]">Work Carried Out</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowQuickInputs(!showQuickInputs)}
+                      className="h-8 px-3 text-xs font-medium border-[#17a2b8] text-[#17a2b8] hover:bg-[#17a2b8]/10 hover:text-[#17a2b8] transition-colors"
+                      data-testid="button-quick-input"
+                    >
+                      Quick Input {showQuickInputs ? '▲' : '▼'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleSmartSuggestions}
+                      className="h-8 px-3 text-xs font-medium border-[#17a2b8] text-[#17a2b8] hover:bg-[#17a2b8]/10 hover:text-[#17a2b8] transition-colors"
+                      data-testid="button-smart-suggestions"
+                    >
+                      Smart Suggestions {showSmartSuggestions ? '▲' : '▼'}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Quick Input Expandable Panel */}
+                {showQuickInputs && (
+                  <div className="p-3 border border-[#17a2b8]/30 rounded-lg bg-[#f0fbfc]">
+                    <p className="text-xs text-gray-600 mb-2">Click to insert common phrases:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {quickAnswers.map((phrase, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertQuickText(phrase)}
+                          className="h-auto py-1.5 px-3 text-xs font-normal bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 whitespace-normal text-left"
+                          data-testid={`button-quick-phrase-${index}`}
+                        >
+                          {phrase}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Smart Suggestions Expandable Panel */}
+                {showSmartSuggestions && (
+                  <div className="p-3 border border-[#17a2b8]/30 rounded-lg bg-[#f0fbfc]">
+                    <p className="text-xs text-gray-600 mb-2">AI-powered suggestions based on context:</p>
+                    {smartSuggestions.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {smartSuggestions.map((suggestion, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => insertSuggestion(suggestion)}
+                            className="h-auto py-1.5 px-3 text-xs font-normal bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 whitespace-normal text-left"
+                            data-testid={`button-smart-suggestion-${index}`}
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 italic">Generating suggestions based on job context...</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Textarea with Upload button */}
+                <div className="flex gap-2">
+                  <Textarea
+                    ref={workCarriedOutRef}
+                    value={executionData.workCarriedOut}
+                    onChange={(e) => handleExecutionChange('workCarriedOut', e.target.value)}
+                    className="text-sm min-h-[100px] flex-1"
+                    placeholder="Describe work carried out..."
+                    data-testid="textarea-work-carried-out"
+                  />
+                  {/* Upload button column */}
+                  <div className="flex flex-col items-center gap-1 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        toast({
+                          title: "Upload",
+                          description: "Document upload feature coming soon"
+                        });
+                      }}
+                      className="h-8 px-3 text-xs font-medium border-gray-300 text-gray-600 hover:bg-gray-50"
+                      data-testid="button-upload-work-carried-out"
+                    >
+                      Upload
+                    </Button>
+                    <div className="flex items-center gap-1.5 text-gray-400">
+                      <Link2 className="w-4 h-4 cursor-pointer hover:text-gray-600" />
+                      <Paperclip className="w-4 h-4 cursor-pointer hover:text-gray-600" />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Job Experience / Notes */}
