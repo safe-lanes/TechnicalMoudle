@@ -74,6 +74,36 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only behavior for `component_maintenance_history`.
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values from linked jobs.
 
+## Development Guidelines & Verification-First Approach
+
+**Critical Data Persistence Validation**:
+- The system can SAVE data perfectly (backend works fine), but if the **frontend NEVER LOADS** the saved data, it's lost to users.
+- This is like saving files to a hard drive but never reading them - they exist in storage but are inaccessible.
+- **Testing Strategy**: During every test check, verify saved data **actually appears on the screen after page reload** (not just verify save API calls).
+
+**Verification-First Approach**:
+1. **Always check actual code implementation** before making claims about functionality
+2. **Systematic checking for data persistence**:
+   - Frontend: Verify save functions make actual API calls
+   - Backend: Confirm API endpoints exist and persist storage
+   - Storage: Check data actually gets written to test-data.json
+   - End-to-end: Verify data survives application restarts
+3. **Appropriate confidence levels**:
+   - Use "I can see that..." for things directly observable in code
+   - Use "Let me check..." for things requiring verification
+   - Avoid definitive claims without verification, especially for critical functionality like data persistence
+4. **Honest acknowledgment**:
+   - When discovering previous responses were wrong, immediately acknowledge
+   - Explain what was missed in the analysis
+   - Focus on fixing the actual problem rather than defending incorrect responses
+
+**Jobs Form Implementation** (Session 28):
+- Created separate Jobs Form page (`JobsFormPage.tsx`) for viewing job templates as immutable data
+- Uses `ReadOnlyField` component with plain text display (no disabled form controls)
+- Routes: `/pms/job/:id` for template viewing, separate from `/pms/work-order/:id` for execution
+- Components.tsx Section C job rows navigate to Jobs Form for template review
+- Data fetched via `/api/jobs/:id/context` with real job template data from storage
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
