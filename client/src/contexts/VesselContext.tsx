@@ -1,20 +1,46 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
+interface Vessel {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface VesselContextType {
   vesselId: string;
   setVesselId: (id: string) => void;
+  isLoading: boolean;
+  vessels: Vessel[];
 }
 
 const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
 export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const [vesselId, setVesselIdState] = useState<string>(() => {
-    const stored = localStorage.getItem('selectedVesselId');
-    return stored || 'V0001'; // Default to V0001 which matches actual vessel data
+    return localStorage.getItem('selectedVesselId') || '';
+  });
+
+  const { data: vessels = [], isLoading } = useQuery<Vessel[]>({
+    queryKey: ['/api/vessels'],
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
-    localStorage.setItem('selectedVesselId', vesselId);
+    if (vessels.length > 0) {
+      const vesselExists = vessels.some(v => v.id === vesselId);
+      if (!vesselId || !vesselExists) {
+        const firstVessel = vessels[0];
+        console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name})${!vesselExists && vesselId ? ` (stored '${vesselId}' not found)` : ''}`);
+        setVesselIdState(firstVessel.id);
+      }
+    }
+  }, [vessels, vesselId]);
+
+  useEffect(() => {
+    if (vesselId) {
+      localStorage.setItem('selectedVesselId', vesselId);
+    }
   }, [vesselId]);
 
   const setVesselId = (id: string) => {
@@ -22,7 +48,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <VesselContext.Provider value={{ vesselId, setVesselId }}>
+    <VesselContext.Provider value={{ vesselId, setVesselId, isLoading, vessels }}>
       {children}
     </VesselContext.Provider>
   );

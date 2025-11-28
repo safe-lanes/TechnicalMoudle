@@ -1,0 +1,248 @@
+Here is the **second prompt** you requested — this one focuses **ONLY on UI/UX, screen-by-screen analysis**, terminology, components, buttons, tables, filters, popups, modals, and their connections.
+
+You can paste this directly into Replit.
+
+---
+
+# **🔷 PROMPT 2 — FULL UI/UX TERMINOLOGY + SCREEN ELEMENTS AUDIT**
+
+You are now performing a **UI/UX audit** of the entire PMS software inside this Replit project.
+
+**❗Your job is NOT to explain business logic or backend logic.
+❗Your job is ONLY to analyze the UI as currently coded.
+❗Describe ONLY what the code actually does and what components exist.
+No hallucinations. No assumptions about intended design.**
+
+---
+
+# **1️⃣ TASK SUMMARY**
+
+For *every* screen, modal, popup, tab, panel, and dropdown in this PMS system:
+
+👉 Identify the screen name
+👉 Identify the React component file
+👉 Identify route and navigation entry
+👉 List all UI components present
+👉 List what each button does
+👉 List what each table contains
+👉 List all filters, search bars, dropdowns
+👉 List all input fields, checkboxes, icons, badges
+👉 List all popups/modals used
+👉 List linked API calls (from UI perspective, not backend code logic)
+
+**Do not describe how PMS *should* work — describe what the UI *actually shows and calls now*.**
+
+---
+
+# **2️⃣ SCOPE — COVER ALL THESE MODULES (and any others you find)**
+
+* Components Module
+* Work Orders Module
+* Running Hours Module
+* Spares Module
+* Stores / Lubes / Chemicals / Others Module
+* Modify PMS / Change Requests
+* Admin Module (Settings, Master Data, Lead Time, Grace, Ranks, Alerts, etc.)
+* Fleet Admin Module
+* Bulk Upload Screens
+* Reports Module
+* Certificates / Surveys / Technical Module
+* Dashboard (if exists)
+* Any shared components (sidebars, nav, modals)
+
+Also cover:
+
+* Each modal (Add Spare, Add Component, Update RH, Bulk Update, etc.)
+* Each popup (tooltips, info popovers, confirmations)
+* Each table & grid
+* Each set of filters (dropdown, text search, tabs, toggles)
+
+---
+
+# **3️⃣ FOR EACH SCREEN — ANSWER WITH THIS STRUCTURE**
+
+For each page/screen:
+
+---
+
+## **3.1 Screen Identification**
+
+* Screen name (based on what the code calls it)
+* Component file name & path (e.g., `ComponentsPage.tsx`)
+* Route path (e.g., `/components`)
+* Menu/Sidebar name & icon (if applicable)
+* How this page is navigated to
+
+---
+
+## **3.2 UI Layout Breakdown**
+
+Describe the screen with **UI-only terminology**, NOT business logic.
+
+Example:
+
+* Header
+* Breadcrumbs (if any)
+* Filters section
+* Search bar
+* Data table
+* Columns in the table
+* Buttons in the header
+* Buttons above the table
+* Secondary action buttons
+* Tags/badges/labels/icons
+
+---
+
+## **3.3 Buttons / Actions**
+
+List each button and what the UI code does when clicking it:
+
+Example:
+
+* **“Add Component” button → opens AddComponentModal**
+* **“Edit” button in row → calls openEditModal with component data**
+* **“Delete” icon → opens ConfirmationDialog**
+* **“Export” → triggers `handleExport()` → hits `/export-components` API**
+
+Be as explicit as possible.
+
+---
+
+## **3.4 Tables & Columns**
+
+For each table:
+
+* Table component name (AG Grid / MUI / custom table?)
+* Column names
+* Column keys
+* Sortable or not
+* Filters built into columns?
+* Icons (critical flag, status badge, etc.)
+
+---
+
+## **3.5 Filters / Search Inputs**
+
+For each screen, list:
+
+* Search bar (placeholder text)
+* Filters (dropdowns, date pickers, category selectors, toggles)
+* Clear button
+* Apply button
+* Default states
+
+---
+
+## **3.6 Forms & Inputs**
+
+For each modal form:
+
+* All input fields
+* Field labels (exact text)
+* Required vs optional
+* Dropdown data sources (static list vs API)
+* Default values
+* Buttons (Save, Cancel, Close)
+
+---
+
+## **3.7 Modals & Pop-ups**
+
+List:
+
+* Modal name
+* What file it is in
+* What action opens it
+* What fields it contains
+* What API calls it triggers (from the UI layer)
+
+Examples:
+
+* AddComponentModal
+* EditJobModal
+* RunningHoursUpdateModal
+* BulkUpdateSpareModal
+* IHMDocumentUploadModal
+* WOCompletionModal
+* PostponeWOModal
+
+---
+
+## **3.8 Linking / Navigation**
+
+For each screen, describe:
+
+* What other screens it links to
+* What happens when clicking e.g.:
+
+  * component name
+  * job name
+  * spare name
+  * “View History”
+  * “View Component”
+  * “View WO”
+  * breadcrumb
+
+Be precise — reference the actual UI link or `navigate()` usage.
+
+---
+
+# **4️⃣ CROSS-SCREEN TERMINOLOGY CHECK**
+
+List any common UI components across modules:
+
+* Standard table component names
+* Standard modal names
+* Shared dropdown types
+* Shared icons (critical flag, IHM flag, status chips)
+* Shared layouts (Left-pane tree, right-pane detail panel)
+
+This helps build a consistent vocabulary for future instructions.
+
+---
+
+# **5️⃣ OUTPUT FORMAT**
+
+You MUST output:
+
+> **One giant structured report**, module-by-module, screen-by-screen
+> EXACT section layout for every screen
+> EXACT UI filenames, functions, and JSX components
+> EXACT names of tables, modals, columns, filters
+> EXACT navigation paths
+> EXACT action handlers
+
+NO assumptions.
+NO “intended” logic.
+NO descriptions beyond what code implements.
+
+If something is unclear, write:
+
+> “UNCLEAR – UI uses empty placeholder component; no real functionality implemented.”
+
+If a screen is broken, write:
+
+> “BROKEN – Component renders but API call fails / undefined reference.”
+
+---
+
+# **6️⃣ NO HALLUCINATIONS**
+
+Describe **only** what exists in code.
+If a field appears in JSX, mention it.
+If a button has no handler, say so.
+If an API call responds with mock data, say so.
+
+---
+
+Paste this prompt into Replit to get a clean, reliable UI audit.
+
+When you get the output, I can help you:
+
+* Build missing screens
+* Fix inconsistencies
+* Rewrite screens
+* Clean UX
+* Plan migrations
+* Make developer instructions.

@@ -13,6 +13,11 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Dual-Storage Architecture**: The system dynamically switches between `PostgresStorage` (for production with `DATABASE_URL`) and `PersistentFileStorage` (for development using `test-data.json`).
 - Database migrations are managed with Drizzle ORM.
 - `server/postgresClient.ts` provides cached connection pooling for PostgreSQL.
+- **Data Persistence Verification**: The `PersistentFileStorage` class logs data counts on startup (users, components, spares, jobs) to confirm data was loaded correctly.
+
+**Vessel Context**:
+- `VesselContext` dynamically fetches vessels from `/api/vessels` and auto-selects the first available vessel if the stored vessel ID is invalid or doesn't exist.
+- This prevents data loading issues caused by stale localStorage values that don't match actual vessel data.
 
 **Service Layer Architecture**:
 - A dedicated service layer (`server/services/`) organizes business logic by domain (e.g., `jobService`, `workOrderService`, `componentService`), providing clean APIs and validation.
