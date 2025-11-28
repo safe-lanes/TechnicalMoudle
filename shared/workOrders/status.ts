@@ -107,7 +107,13 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
     return 'Active';
   }
   
-  // Templates: check for completion first (before due date calculation)
+  // IMPORTANT: Check for Pending Approval BEFORE checking completion
+  // This is the correct workflow: User fills Part B → Pending Approval → Approver approves → Completed
+  // The status 'Pending Approval' takes precedence over completionDateTime because
+  // the work order needs approval before it can be marked as Completed
+  if (status === 'Pending Approval') return 'Pending Approval';
+  
+  // Templates: check for completion (only after Pending Approval check)
   if (completionDateTime || status === 'Completed') {
     return 'Completed';
   }
