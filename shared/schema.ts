@@ -796,6 +796,26 @@ export const workOrders = pgTable("work_orders", {
   // Work Order Form Arrays (Part B - Execution)
   uploadedDocuments: json("uploaded_documents").notNull().default([]), // [{type: 'riskAssessment'|'safetyChecklist'|'operationalForm', fileName, fileKey, uploadedAt, uploadedBy}]
   consumedSpareParts: json("consumed_spare_parts").notNull().default([]), // [{partNo, description, quantityConsumed, comments, location: 'A'|'B'}]
+  // Part B Execution Fields (B1 - Risk Assessment, Checklists & Records)
+  riskAssessmentStatus: text("risk_assessment_status"), // 'Yes' | 'No' | 'NA'
+  safetyChecklistsStatus: text("safety_checklists_status"), // 'Yes' | 'No' | 'NA'
+  operationalFormsStatus: text("operational_forms_status"), // 'Yes' | 'No' | 'NA'
+  // Part B Execution Fields (B2 - Work Duration)
+  startDateTime: text("start_date_time"), // ISO datetime string
+  completionDateTime: text("completion_date_time"), // ISO datetime string
+  executionAssignedTo: text("execution_assigned_to"), // Rank assigned during execution
+  performedBy: text("performed_by"), // Rank who performed the work
+  noOfPersons: text("no_of_persons"), // Number of persons in team
+  totalTimeHours: text("total_time_hours"), // Total time taken in hours
+  manhours: text("manhours"), // Manhours calculation
+  workCarriedOut: text("work_carried_out"), // Description of work performed
+  jobExperienceNotes: text("job_experience_notes"), // Job experience/notes
+  // Part B Execution Fields (B3 - Running Hours)
+  previousReading: text("previous_reading"), // Previous RH reading
+  runningHours: text("running_hours"), // Current RH at completion
+  // Part B Execution Metadata
+  woExecutionId: text("wo_execution_id"), // Unique execution ID (WOE-XXXXXXX)
+  remarks: text("remarks"), // General remarks
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
