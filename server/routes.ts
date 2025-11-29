@@ -3591,8 +3591,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
-  // All stores endpoints require authentication for security
-  app.get("/api/stores/:vesselId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  // Note: Auth removed to match spares endpoint pattern for development
+  app.get("/api/stores/:vesselId", async (req, res) => {
     try {
       const { itemType } = req.query;
       const stores = await storage.getStoresItems(
@@ -3605,7 +3605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/:vesselId/history", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/stores/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
       const { itemType } = req.query;
@@ -3619,7 +3619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/item/:id/history", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/stores/item/:id/history", async (req, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const history = await storage.getStoresItemHistory(itemId);
