@@ -1920,7 +1920,7 @@ router.post('/import', async (req, res) => {
   const startedAt = new Date();
   
   try {
-    const { fileToken, type, mode, archiveMissing, vesselId, rowIndices } = req.body;
+    const { fileToken, type, mode, archiveMissing, vesselId, rowIndices, storeType } = req.body;
 
     const cachedData = dryRunCache.get(fileToken);
     if (!cachedData) {
@@ -1975,7 +1975,8 @@ router.post('/import', async (req, res) => {
       archiveMissing,
       vesselId,
       (req as any).user?.id || 'system',
-      historyId // Pass history ID for change tracking
+      historyId, // Pass history ID for change tracking
+      storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
     // Update ImportHistory with status='complete' and include file metadata
@@ -2873,7 +2874,8 @@ async function performImport(
   archiveMissing: boolean,
   vesselId: string | undefined,
   userId: string,
-  importHistoryId?: string
+  importHistoryId?: string,
+  storeType?: string
 ) {
   const result = {
     created: 0,
@@ -3408,11 +3410,16 @@ async function performImport(
     
     console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
   } else if (type === 'stores') {
-    console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
+    console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}, storeType: ${storeType}`);
     
     // Fetch existing stores items for this vessel
     const existingStoresItems = await storage.getStoresItems(vesselId || '');
     const storesByItemCode = new Map(existingStoresItems.map(s => [s.itemCode, s]));
+    
+    // Use the storeType passed from frontend - this determines which tab the data goes to
+    // Valid values: 'stores', 'lubricants', 'chemicals', 'others'
+    const itemType = storeType || 'stores';
+    console.log(`📌 All imported items will be assigned to itemType: ${itemType}`);
     
     for (const row of data) {
       try {
@@ -3430,17 +3437,8 @@ async function performImport(
           continue;
         }
         
-        // Map item type from Category field (new template format)
+        // Get category from the Category column (purely descriptive, not for routing)
         const categoryRaw = String(row['Category'] || '').trim();
-        let itemType = 'stores'; // default
-        const categoryLower = categoryRaw.toLowerCase();
-        if (categoryLower.includes('lube') || categoryLower === 'lubricants') {
-          itemType = 'lubricants';
-        } else if (categoryLower.includes('chemical')) {
-          itemType = 'chemicals';
-        } else if (categoryLower === 'others') {
-          itemType = 'others';
-        }
         
         // Helper to get ROB values - support both new and old field names
         const getTotalRob = () => row['Total ROB'] ?? row['ROB'] ?? 0;
