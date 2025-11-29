@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin } from "lucide-react";
 import { ComponentNode, componentTree } from "@/data/componentTree";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -90,6 +90,62 @@ const Spares: React.FC = () => {
   const { toast } = useToast();
   const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
   const [pendingAdjustments, setPendingAdjustments] = useState<Map<number, number>>(new Map());
+  
+  // Location dropdown state
+  const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
+  const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string}}>({});
+  const locationDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Click outside handler for location dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target as Node)) {
+        // Save the locations before closing
+        if (openLocationDropdown !== null && editingLocations[openLocationDropdown]) {
+          handleSaveLocation(openLocationDropdown);
+        }
+        setOpenLocationDropdown(null);
+      }
+    };
+    
+    if (openLocationDropdown !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openLocationDropdown, editingLocations]);
+  
+  const handleOpenLocationDropdown = (spare: Spare) => {
+    setOpenLocationDropdown(spare.id);
+    setEditingLocations(prev => ({
+      ...prev,
+      [spare.id]: {
+        locationA: spare.location || '',
+        locationB: spare.location2 || ''
+      }
+    }));
+  };
+  
+  const handleSaveLocation = async (spareId: number) => {
+    const locations = editingLocations[spareId];
+    if (!locations) return;
+    
+    try {
+      await fetch(`/api/spares/${vesselId}/${spareId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          location: locations.locationA,
+          location2: locations.locationB 
+        }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+    } catch (error) {
+      console.error('Failed to save location:', error);
+    }
+  };
 
   // Quick adjust mutation (for +/- buttons) with optimistic updates
   const adjustMutation = useMutation({
@@ -860,17 +916,16 @@ const Spares: React.FC = () => {
             <>
               {/* Inventory Table Header */}
               <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                <div className={`grid ${FEATURES.IHM ? 'grid-cols-12' : 'grid-cols-11'} gap-4 text-sm font-semibold text-[#ffffff]`}>
+                <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm font-semibold text-[#ffffff]`}>
                   <div className="text-[#ffffff]">Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
-                  <div>Spare Code</div>
-                  <div>Critical</div>
+                  <div>Part Number</div>
+                  <div>Criticality</div>
                   <div className="text-center">ROB</div>
                   <div className="text-center">Min</div>
                   <div className="text-center">Stock</div>
-                  <div>Location A</div>
-                  <div>Location B</div>
+                  <div>Location</div>
                   {FEATURES.IHM && <div className="text-center">IHM</div>}
                   <div className="text-center">Actions</div>
                 </div>
@@ -887,9 +942,13 @@ const Spares: React.FC = () => {
                 ) : (
                   filteredSpares.map((spare: Spare) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
+                    const isDropdownOpen = openLocationDropdown === spare.id;
+                    const locationDisplay = spare.location || spare.location2 
+                      ? `${spare.location || '-'} / ${spare.location2 || '-'}`
+                      : '-';
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-12' : 'grid-cols-11'} gap-4 text-sm items-center`}>
+                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm items-center`}>
                         <div className="text-gray-900">{spare.partCode}</div>
                         <div className="text-gray-700">{spare.partName}</div>
                         <div className="text-gray-700">{spare.componentName}</div>
@@ -910,8 +969,68 @@ const Spares: React.FC = () => {
                             {stockStatus.label}
                           </span>
                         </div>
-                        <div className="text-gray-700">{spare.location || '-'}</div>
-                        <div className="text-gray-700">{spare.location2 || '-'}</div>
+                        {/* Location Dropdown */}
+                        <div className="relative">
+                          <button
+                            onClick={() => handleOpenLocationDropdown(spare)}
+                            className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
+                            data-testid={`button-location-${spare.id}`}
+                          >
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate text-sm">{locationDisplay}</span>
+                            <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {isDropdownOpen && (
+                            <div 
+                              ref={locationDropdownRef}
+                              className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Location A</label>
+                                  <Input
+                                    type="text"
+                                    value={editingLocations[spare.id]?.locationA || ''}
+                                    onChange={(e) => setEditingLocations(prev => ({
+                                      ...prev,
+                                      [spare.id]: { ...prev[spare.id], locationA: e.target.value }
+                                    }))}
+                                    className="h-8 text-sm"
+                                    placeholder="Enter location A"
+                                    data-testid={`input-locationA-${spare.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">Location B</label>
+                                  <Input
+                                    type="text"
+                                    value={editingLocations[spare.id]?.locationB || ''}
+                                    onChange={(e) => setEditingLocations(prev => ({
+                                      ...prev,
+                                      [spare.id]: { ...prev[spare.id], locationB: e.target.value }
+                                    }))}
+                                    className="h-8 text-sm"
+                                    placeholder="Enter location B"
+                                    data-testid={`input-locationB-${spare.id}`}
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="w-full h-7 text-xs"
+                                  onClick={() => {
+                                    handleSaveLocation(spare.id);
+                                    setOpenLocationDropdown(null);
+                                  }}
+                                  data-testid={`button-save-location-${spare.id}`}
+                                >
+                                  Save
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         {FEATURES.IHM && (
                           <div className="flex justify-center">
                             {/* Mock IHM status - in real implementation, would come from API */}
@@ -969,7 +1088,7 @@ const Spares: React.FC = () => {
                   <div>Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
-                  <div>Spare Code</div>
+                  <div>Part Number</div>
                   <div>Event</div>
                   <div className="text-center">Qty Change</div>
                   <div className="text-center">ROB After</div>
