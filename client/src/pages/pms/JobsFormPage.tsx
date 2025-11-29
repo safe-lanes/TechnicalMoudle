@@ -105,7 +105,31 @@ const JobsFormPage: React.FC = () => {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     try {
-      return new Date(dateStr).toLocaleDateString('en-GB', { 
+      let normalizedDate = dateStr;
+      
+      // Handle non-standard formats like "2025-11-28T1200" (missing colon in time)
+      if (/^\d{4}-\d{2}-\d{2}T\d{4}$/.test(dateStr)) {
+        normalizedDate = dateStr.replace(/T(\d{2})(\d{2})$/, 'T$1:$2:00');
+      }
+      
+      // Handle DD-MMM-YYYY format (e.g., "28-Nov-2025")
+      const ddMmmYyyyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+      if (ddMmmYyyyMatch) {
+        const [, day, month, year] = ddMmmYyyyMatch;
+        const monthMap: Record<string, string> = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06',
+          'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        const monthNum = monthMap[month];
+        if (monthNum) {
+          normalizedDate = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+        }
+      }
+      
+      const date = new Date(normalizedDate);
+      if (isNaN(date.getTime())) return dateStr;
+      
+      return date.toLocaleDateString('en-GB', { 
         day: '2-digit', 
         month: 'short', 
         year: 'numeric' 
