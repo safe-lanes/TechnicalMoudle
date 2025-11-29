@@ -416,8 +416,8 @@ const RunningHours = () => {
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
           <div className="grid grid-cols-8 gap-4 text-sm font-medium">
-            <div>Component</div>
-            <div>SFI Code</div>
+            <div>Component Name</div>
+            <div>Component Code</div>
             <div>Component Category</div>
             <div>Running Hours</div>
             <div>last Updated</div>
