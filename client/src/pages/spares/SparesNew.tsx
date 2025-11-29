@@ -3,7 +3,7 @@ import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info } from "lucide-react";
 import { ComponentNode, componentTree } from "@/data/componentTree";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -30,6 +30,20 @@ interface Spare {
   location2?: string;
   vesselId: string;
   stockStatus?: string;
+  partNumber?: string;
+  uom?: string;
+  drawingNumber?: string;
+  positionNumber?: string;
+  note?: string;
+  specification?: string;
+  maker?: string;
+  makerCode?: string;
+  manualName?: string;
+  pageNumber?: string;
+  isActive?: boolean;
+  ihm?: string;
+  remarks?: string;
+  criticality?: string;
 }
 
 interface SpareHistory {
@@ -68,6 +82,7 @@ const Spares: React.FC = () => {
   const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
   const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
@@ -259,6 +274,12 @@ const Spares: React.FC = () => {
   const openConsumeReceiveModal = (spare: Spare) => {
     setSelectedSpare(spare);
     setIsConsumeReceiveModalOpen(true);
+  };
+
+  // Open info modal
+  const openInfoModal = (spare: Spare) => {
+    setSelectedSpare(spare);
+    setIsInfoModalOpen(true);
   };
 
   // Handle delete spare
@@ -1044,6 +1065,15 @@ const Spares: React.FC = () => {
                           </div>
                         )}
                         <div className="flex gap-1 justify-center">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => openInfoModal(spare)}
+                            title="View Details"
+                            data-testid={`button-info-${spare.id}`}
+                          >
+                            <Info className="h-4 w-4 text-blue-600" />
+                          </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
@@ -1906,6 +1936,167 @@ const Spares: React.FC = () => {
             </Button>
             <Button onClick={handleReceiveSubmit} disabled={receiveSpareMutation.isPending}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Spare Info Modal - Displays additional information not shown in the table */}
+      <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-600" />
+              Spare Part Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSpare && (
+            <div className="space-y-6">
+              {/* Basic Info Section */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Part Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.partCode}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Part Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.partName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Part Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.partNumber || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">UOM:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.uom || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Component:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.componentName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Component Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.componentCode || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock & Location Section */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">ROB (Total):</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.rob}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Minimum Stock:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.min}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Location A:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.location || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Location B:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.location2 || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Criticality:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpare.critical === 'Yes' || selectedSpare.critical === 'Critical'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {selectedSpare.critical}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Is Active:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpare.isActive !== false
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedSpare.isActive !== false ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Details Section */}
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Technical Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Maker:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.maker || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Maker Code:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.makerCode || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Drawing Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.drawingNumber || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Position Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.positionNumber || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Specification:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.specification || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual Reference Section */}
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Manual Reference</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Manual Name:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.manualName || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Page Number:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.pageNumber || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* IHM & Notes Section */}
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">IHM & Notes</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">IHM:</span>
+                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedSpare.ihm === 'Yes'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {selectedSpare.ihm || 'No'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Evidence Type:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.remarks || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Note:</span>
+                    <span className="ml-2 font-medium text-gray-900">{selectedSpare.note || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInfoModalOpen(false)} data-testid="button-close-info">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
