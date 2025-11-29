@@ -1277,9 +1277,30 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     queryKey: ['/api/spares'],
   });
   
-  // Filter spares by component ID
+  // Get all components to find children
+  const { data: allComponents = [] } = useQuery<any[]>({
+    queryKey: ['/api/components'],
+  });
+  
+  // Find all child component IDs recursively
+  // Note: parentId stores parent's componentCode (not id), so we match by code
+  const getAllChildIds = (parentCode: string): string[] => {
+    const children = allComponents.filter((c: any) => c.parentId === parentCode);
+    const childIds = children.map((c: any) => c.id);
+    // Recurse using each child's componentCode (or code) as the next parentCode
+    const descendantIds = children.flatMap((c: any) => getAllChildIds(c.componentCode || c.code));
+    return [...childIds, ...descendantIds];
+  };
+  
+  // Get component IDs to include (parent + all children)
+  // Use selectedComponent.code (the componentCode) to find children
+  const relevantComponentIds = selectedComponent 
+    ? [selectedComponent.id, ...getAllChildIds(selectedComponent.code)]
+    : [];
+  
+  // Filter spares for this component AND all its children
   const spares = selectedComponent 
-    ? allSpares.filter(s => s.componentId === selectedComponent.id)
+    ? allSpares.filter(s => relevantComponentIds.includes(s.componentId))
     : [];
   
   const [originalSpares] = useState(JSON.parse(JSON.stringify(spares)));
