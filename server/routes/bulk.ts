@@ -1183,6 +1183,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
 }
 
 // Helper function to generate spares template using ExcelJS with prepopulated components
+// Uses the exact 27-column Vessel_Spare specification
 async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   
@@ -1194,79 +1195,97 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   const validComponents = allComponents.filter(c => c.componentCode && c.componentCode.trim() !== '' && c.name && c.name.trim() !== '');
   console.log(`✅ ${validComponents.length} components have valid codes and names`);
   
-  // Create main "Spares" sheet
+  // Create main "Spares" sheet with exact 27-column Vessel_Spare specification
   const sparesSheet = workbook.addWorksheet('Spares');
   
-  // Add headers - 23 columns matching user's template
+  // Add headers - 27 columns matching Vessel_Spare specification exactly
   sparesSheet.columns = [
-    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 25 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'Component Code', key: 'componentCode', width: 20 },
-    { header: 'Component Name', key: 'componentName', width: 30 },
-    { header: 'Part Code', key: 'partCode', width: 18 },
-    { header: 'Part Name', key: 'partName', width: 35 },
-    { header: 'Part Number', key: 'partNumber', width: 20 },
-    { header: 'Unit Of Measurement', key: 'uom', width: 12 },
-    { header: 'Stocking Number', key: 'stockingNumber', width: 20 },
-    { header: 'Maker', key: 'maker', width: 20 },
-    { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Specification', key: 'specification', width: 30 },
-    { header: 'Drawing No', key: 'drawingNo', width: 18 },
-    { header: 'Location', key: 'location', width: 20 },
-    { header: 'ROB', key: 'rob', width: 10 },
-    { header: 'Min Stock', key: 'minStock', width: 10 },
-    { header: 'Max Stock', key: 'maxStock', width: 10 },
-    { header: 'Unit Cost', key: 'unitCost', width: 12 },
-    { header: 'Criticality (Yes/No)', key: 'criticality', width: 15 },
-    { header: 'Lead Time', key: 'leadTime', width: 15 },
-    { header: 'Supplier', key: 'supplier', width: 25 },
-    { header: 'Last Order Date', key: 'lastOrderDate', width: 18 },
-    { header: 'Remarks', key: 'remarks', width: 35 }
+    { header: 'Part Code', key: 'partCode', width: 18 },                          // A - Column 1
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },     // B - Column 2
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28 },     // C - Column 3
+    { header: 'Component Code', key: 'componentCode', width: 18 },                // D - Column 4
+    { header: 'Component Name', key: 'componentName', width: 28 },                // E - Column 5
+    { header: 'Part Name', key: 'partName', width: 32 },                          // F - Column 6
+    { header: 'Part Number', key: 'partNumber', width: 18 },                      // G - Column 7
+    { header: 'UOM', key: 'uom', width: 12 },                                     // H - Column 8
+    { header: 'Drawing Number', key: 'drawingNumber', width: 18 },                // I - Column 9
+    { header: 'Position Number', key: 'positionNumber', width: 16 },              // J - Column 10
+    { header: 'Note', key: 'note', width: 35 },                                   // K - Column 11
+    { header: 'Specification', key: 'specification', width: 35 },                 // L - Column 12
+    { header: 'Maker', key: 'maker', width: 22 },                                 // M - Column 13
+    { header: 'Maker Code', key: 'makerCode', width: 15 },                        // N - Column 14
+    { header: 'Manual Name', key: 'manualName', width: 20 },                      // O - Column 15
+    { header: 'Page Number', key: 'pageNumber', width: 14 },                      // P - Column 16
+    { header: 'Criticality', key: 'criticality', width: 14 },                     // Q - Column 17
+    { header: 'Total ROB', key: 'totalRob', width: 12 },                          // R - Column 18
+    { header: 'Location A', key: 'locationA', width: 15 },                        // S - Column 19
+    { header: 'Location A - ROB', key: 'locationARob', width: 16 },               // T - Column 20
+    { header: 'Location B', key: 'locationB', width: 15 },                        // U - Column 21
+    { header: 'Location B - ROB', key: 'locationBRob', width: 16 },               // V - Column 22
+    { header: 'Minimum Stock', key: 'minimumStock', width: 14 },                  // W - Column 23
+    { header: 'Is Active', key: 'isActive', width: 12 },                          // X - Column 24
+    { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35 },  // Y - Column 25
+    { header: 'Evidence Type', key: 'evidenceType', width: 16 },                  // Z - Column 26
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 }                       // AA - Column 27
   ];
   
-  // Add one example row
+  // Style header row
+  sparesSheet.getRow(1).font = { bold: true };
+  
+  // Add one example row to show expected format
   sparesSheet.addRow({
+    partCode: 'PT-000001',
+    fleetEquipmentCode: '651.552',
     fleetEquipmentName: 'ME cylinder covers',
-    vesselCode: vesselId,
     componentCode: '651.552.AA',
     componentName: 'ME cylinder covers,exhaust',
-    partCode: 'PT-000001',
     partName: 'Cylinder Head Gasket',
     partNumber: 'GHI-2345',
     uom: 'PCS',
-    stockingNumber: 'STK-12345',
+    drawingNumber: 'DRW-651-552',
+    positionNumber: 'POS-001',
+    note: 'For main engine overhaul',
+    specification: 'Size: 150mm, Material: Steel',
     maker: 'Maker ZZZ',
     makerCode: 'MKR-001',
-    specification: 'Size: YYY',
-    drawingNo: 'DRW-651-552',
-    location: 'Engine Room Store',
-    rob: '5',
-    minStock: '2',
-    maxStock: '10',
-    unitCost: '1250.00',
+    manualName: 'Main Engine Manual',
+    pageNumber: '125',
     criticality: 'Yes',
-    leadTime: '30 days',
-    supplier: 'ABC Suppliers Ltd',
-    lastOrderDate: '15-NOV-2024',
-    remarks: 'Critical spare for main engine'
+    totalRob: '5',
+    locationA: 'Engine Room Store',
+    locationARob: '3',
+    locationB: 'Deck Store',
+    locationBRob: '2',
+    minimumStock: '2',
+    isActive: 'Yes',
+    ihm: 'No',
+    evidenceType: 'SDoC',
+    vesselCode: vesselId
   });
   
   console.log(`📝 Added example row to spares template`);
   
-  // Create "Components" reference sheet
+  // Create "Components" reference sheet with pre-filled component data
   const componentsSheet = workbook.addWorksheet('Components');
   componentsSheet.columns = [
     { header: 'Component Code', key: 'componentCode', width: 20 },
     { header: 'Component Name', key: 'componentName', width: 40 },
-    { header: 'Category', key: 'category', width: 35 }
+    { header: 'Category', key: 'category', width: 35 },
+    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 }
   ];
   
-  // Add all valid components to reference sheet
+  // Style header row
+  componentsSheet.getRow(1).font = { bold: true };
+  
+  // Add all valid components to reference sheet - USER CAN COPY FROM HERE
   validComponents.forEach(component => {
     componentsSheet.addRow({
       componentCode: component.componentCode,
       componentName: component.name,
-      category: component.category || ''
+      category: component.category || '',
+      fleetEquipmentCode: component.fleetEquipmentCode || '',
+      fleetEquipmentName: component.fleetEquipmentName || ''
     });
   });
   
@@ -1276,41 +1295,51 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   const listsSheet = workbook.addWorksheet('Lists');
   listsSheet.columns = [
     { header: 'UOM', key: 'uom', width: 15 },
-    { header: 'Criticality', key: 'criticality', width: 15 }
+    { header: 'Yes/No', key: 'yesNo', width: 15 }
   ];
   
   // Add UOM values
-  UOM_LIST.forEach(uom => {
-    listsSheet.addRow({ uom: uom.toUpperCase(), criticality: '' });
+  UOM_LIST.forEach((uom, index) => {
+    listsSheet.getCell(index + 2, 1).value = uom.toUpperCase();
   });
   
-  // Add Yes/No for Criticality in the first two rows
-  listsSheet.getCell('B1').value = 'Criticality';
+  // Add Yes/No values
   listsSheet.getCell('B2').value = 'Yes';
   listsSheet.getCell('B3').value = 'No';
   
-  // Add data validations to Spares sheet
-  // Column H (UOM) - row 2 onwards
-  sparesSheet.getColumn(8).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-    if (rowNumber > 1) {
-      cell.dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['=Lists!$A$2:$A$11']
-      };
-    }
-  });
+  // Style header row
+  listsSheet.getRow(1).font = { bold: true };
   
-  // Column S (Criticality) - row 2 onwards
-  sparesSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-    if (rowNumber > 1) {
-      cell.dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['=Lists!$B$2:$B$3']
-      };
-    }
-  });
+  // Add data validations to Spares sheet for 1000 rows
+  for (let row = 2; row <= 1000; row++) {
+    // Column H (UOM) - Column 8
+    sparesSheet.getCell(row, 8).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$A$2:$A$11']
+    };
+    
+    // Column Q (Criticality) - Column 17
+    sparesSheet.getCell(row, 17).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
+    
+    // Column X (Is Active) - Column 24
+    sparesSheet.getCell(row, 24).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
+    
+    // Column Y (IHM) - Column 25
+    sparesSheet.getCell(row, 25).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ['=Lists!$B$2:$B$3']
+    };
+  }
   
   addVersionInfoToSheet(sparesSheet);
   
