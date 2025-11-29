@@ -496,7 +496,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   vesselSpareSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 10: Vessel_Store (12 columns - per user specification)
+  // SHEET 10: Vessel_Store (11 columns - per user specification)
   // =====================================================
   const vesselStoresSheet = workbook.addWorksheet('Vessel_Store');
   vesselStoresSheet.columns = [
@@ -510,8 +510,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Location A - ROB', key: 'locationARob', width: 16 },
     { header: 'Location B', key: 'locationB', width: 15 },
     { header: 'Location B - ROB', key: 'locationBRob', width: 16 },
-    { header: 'Min', key: 'min', width: 10 },
-    { header: 'Stock', key: 'stock', width: 15 }
+    { header: 'Min', key: 'min', width: 10 }
   ];
   
   // Headers only - no sample data
@@ -1434,17 +1433,17 @@ router.get('/template', async (req, res) => {
 
     case 'stores':
       headers = [
-        // Vessel_Store - 12 columns (per user specification)
+        // Vessel_Store - 11 columns (per user specification)
         'Item Code', 'IMPA Code', 'Item Name', 'UOM', 'Category',
         'Total ROB', 'Location A', 'Location A - ROB',
-        'Location B', 'Location B - ROB', 'Min', 'Stock'
+        'Location B', 'Location B - ROB', 'Min'
       ];
 
       validValues = [
         'Required (Unique per vessel)', 'Text (IMPA standard code)', 'Required (Item description)', 
         UOM_LIST.join('/').toUpperCase(), STORES_CATEGORIES.join('/'),
         'Number >= 0', 'Text (Location A)', 'Number >= 0',
-        'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Text (Stock status)'
+        'Text (Location B)', 'Number >= 0', 'Number >= 0'
       ];
 
       example = [];
@@ -1573,8 +1572,8 @@ router.get('/template', async (req, res) => {
     });
   }
 
-  // Add data validation for stores (12-column format per user specification)
-  // Columns: A=Item Code, B=IMPA Code, C=Item Name, D=UOM, E=Category, F=Total ROB, G=Location A, H=Location A - ROB, I=Location B, J=Location B - ROB, K=Min, L=Stock
+  // Add data validation for stores (11-column format per user specification)
+  // Columns: A=Item Code, B=IMPA Code, C=Item Name, D=UOM, E=Category, F=Total ROB, G=Location A, H=Location A - ROB, I=Location B, J=Location B - ROB, K=Min
   if (type === 'stores') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
@@ -2404,8 +2403,8 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
     } else if (type === 'stores') {
-      // Validate stores (12-column format per user specification)
-      // Columns: Item Code, IMPA Code, Item Name, UOM, Category, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Min, Stock
+      // Validate stores (11-column format per user specification)
+      // Columns: Item Code, IMPA Code, Item Name, UOM, Category, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Min
       
       if (!row['Item Code']) {
         errors.push(`Row ${rowNum}: Item Code is required`);
@@ -2453,7 +2452,7 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       });
 
       // Copy text fields
-      const textFields = ['Location A', 'Location B', 'Stock'];
+      const textFields = ['Location A', 'Location B'];
       textFields.forEach(field => {
         if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
           normalized[field] = String(row[field]).trim();
@@ -3475,7 +3474,7 @@ async function performImport(
             leadTime: null,
             ihm: false,
             ihmDetails: null,
-            remarks: row['Stock'] ? String(row['Stock']).trim() : null,
+            remarks: null,
             isActive: true
           });
           
@@ -3506,8 +3505,7 @@ async function performImport(
             robLocationB: row['Location B - ROB'] !== undefined ? String(row['Location B - ROB']) : existingItem.robLocationB,
             locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
             locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
-            min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
-            remarks: row['Stock'] ? String(row['Stock']).trim() : existingItem.remarks
+            min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min
           });
           
           storesByItemCode.set(itemCode, updated);
@@ -3534,8 +3532,7 @@ async function performImport(
               robLocationB: row['Location B - ROB'] !== undefined ? String(row['Location B - ROB']) : existingItem.robLocationB,
               locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
               locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
-              min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
-              remarks: row['Stock'] ? String(row['Stock']).trim() : existingItem.remarks
+              min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min
             });
             
             storesByItemCode.set(itemCode, updated);
@@ -3569,7 +3566,7 @@ async function performImport(
               leadTime: null,
               ihm: false,
               ihmDetails: null,
-              remarks: row['Stock'] ? String(row['Stock']).trim() : null,
+              remarks: null,
               isActive: true
             });
             
