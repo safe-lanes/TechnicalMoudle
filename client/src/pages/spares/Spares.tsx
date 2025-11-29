@@ -742,8 +742,8 @@ const Spares: React.FC = () => {
                 <div className="grid grid-cols-10 gap-4 text-sm font-medium">
                   <div>Part Code</div>
                   <div>Part Name</div>
-                  <div>Component</div>
-                  <div>Critical</div>
+                  <div>Component Name</div>
+                  <div>Criticality</div>
                   <div>ROB</div>
                   <div>Min</div>
                   <div>Stock</div>

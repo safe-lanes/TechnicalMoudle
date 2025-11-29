@@ -14,7 +14,7 @@ const FIELD_MAPPINGS = [
   { field: "Fleet Equipment Code", required: true, description: "10-character code (e.g., 601.002.01)" },
   { field: "Fleet Equipment Name", required: true, description: "Standard equipment name" },
   { field: "Parent Code", required: false, description: "Parent component code for hierarchy" },
-  { field: "SFI Code", required: false, description: "SFI classification code" },
+  { field: "Component Code", required: false, description: "Component classification code" },
   { field: "Category", required: false, description: "Component category from Master List" },
   { field: "Maker Name", required: false, description: "Must exist in Maker List" },
   { field: "Maker Code", required: false, description: "Must match Maker List" },

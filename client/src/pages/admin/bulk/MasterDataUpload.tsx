@@ -13,7 +13,7 @@ import { Download, Upload, CheckCircle, AlertTriangle, Clock, FileSpreadsheet } 
 const FIELD_MAPPINGS = [
   { field: "Fleet Equipment Code", required: true, description: "10-character code with periods (e.g., 601.002.01)" },
   { field: "Fleet Equipment Name", required: true, description: "Standard equipment name" },
-  { field: "SFI Code", required: false, description: "SFI main group code" },
+  { field: "Component Code", required: false, description: "Component main group code" },
   { field: "Model", required: false, description: "Equipment model designation" },
   { field: "Model Code", required: false, description: "Model identification code" },
   { field: "Maker Name", required: true, description: "Must exist in Maker List" },

@@ -21,7 +21,7 @@ const masterDataFormSchema = z.object({
   makerCode: z.string().min(1, "Maker code is required"),
   model: z.string().min(1, "Model is required"),
   modelCode: z.string().optional(),
-  sfiCode: z.string().min(1, "SFI code is required"),
+  sfiCode: z.string().min(1, "Component code is required"),
   equipmentName: z.string().min(1, "Equipment name is required"),
   vesselName: z.string().optional(),
   vesselCode: z.string().optional(),
@@ -225,7 +225,7 @@ export default function MasterDataManagement() {
     }
 
     const csvContent = [
-      ["Model Code", "SFI Code", "Fleet Equipment Code", "Count SFI Code", "Assigned Sub Code", "Vessel Name", "Equipment Name"].join(","),
+      ["Model Code", "Component Code", "Fleet Equipment Code", "Count Component Code", "Assigned Sub Code", "Vessel Name", "Equipment Name"].join(","),
       ...masterDataList.map(item => [
         item.modelCode || "",
         item.sfiCode || "",
@@ -274,7 +274,7 @@ export default function MasterDataManagement() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="text"
-                    placeholder="Search by code, SFI, equipment name..."
+                    placeholder="Search by code, component, equipment name..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
@@ -340,11 +340,11 @@ export default function MasterDataManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fleet Equipment Code</TableHead>
-                      <TableHead>SFI Code</TableHead>
+                      <TableHead>Component Code</TableHead>
                       <TableHead>Equipment Name</TableHead>
                       <TableHead>Model Code</TableHead>
                       <TableHead>Vessel Name</TableHead>
-                      <TableHead>Count SFI</TableHead>
+                      <TableHead>Count Component Code</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -477,15 +477,15 @@ export default function MasterDataManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="sfiCode">
-                  SFI Code <span className="text-red-500">*</span>
+                  Component Code <span className="text-red-500">*</span>
                 </Label>
                 {sfiDetails && sfiDetails.length > 0 ? (
                   <Select
                     value={form.watch("sfiCode")}
                     onValueChange={handleSfiChange}
                   >
-                    <SelectTrigger data-testid="select-sfi-code">
-                      <SelectValue placeholder="Select SFI Code" />
+                    <SelectTrigger data-testid="select-component-code">
+                      <SelectValue placeholder="Select Component Code" />
                     </SelectTrigger>
                     <SelectContent>
                       {sfiDetails.map((sfi) => (
@@ -500,7 +500,7 @@ export default function MasterDataManagement() {
                     id="sfiCode"
                     {...form.register("sfiCode")}
                     placeholder="e.g., 722"
-                    data-testid="input-sfi-code"
+                    data-testid="input-component-code"
                   />
                 )}
                 {form.formState.errors.sfiCode && (
@@ -559,7 +559,7 @@ export default function MasterDataManagement() {
             {!selectedItem && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
                 <strong>Note:</strong> The Fleet Equipment Code will be automatically generated 
-                based on the SFI Code. Format: XXX.XXX.XX (e.g., 722.001.AA)
+                based on the Component Code. Format: XXX.XXX.XX (e.g., 722.001.AA)
               </div>
             )}
 
