@@ -48,7 +48,11 @@ const JobsFormPage: React.FC = () => {
     componentName: "",
     componentCode: "",
     woTemplateCode: "",
+    fleetEquipmentCode: "",
+    fleetEquipmentName: "",
     maintenanceBasis: "Calendar",
+    intervalValue: "",
+    intervalRunningHour: "",
     frequencyValue: "",
     frequencyUnit: "Months",
     taskType: "Inspection",
@@ -59,6 +63,7 @@ const JobsFormPage: React.FC = () => {
     department: "",
     criticality: "",
     isActive: "Yes",
+    vesselCode: "",
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
@@ -282,21 +287,26 @@ const JobsFormPage: React.FC = () => {
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ReadOnlyField label="Job Title" value={templateData.woTitle} />
-                  <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} />
-                  <ReadOnlyField label="Component Code" value={templateData.componentCode} />
                   <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} />
+                  <ReadOnlyField label="Fleet Equipment Code" value={templateData.fleetEquipmentCode} />
+                  <ReadOnlyField label="Fleet Equipment Name" value={templateData.fleetEquipmentName} />
+                  <ReadOnlyField label="Job Title" value={templateData.woTitle} />
+                  <ReadOnlyField label="Component Code" value={templateData.componentCode} />
+                  <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} />
                   <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} />
-                  <ReadOnlyField label="Frequency" value={formatFrequency()} />
+                  <ReadOnlyField label="Interval Value" value={templateData.intervalValue || templateData.frequencyValue} />
+                  <ReadOnlyField label="Interval Running Hour" value={templateData.intervalRunningHour} />
+                  <ReadOnlyField label="Unit" value={templateData.frequencyUnit} />
                   <ReadOnlyField label="Task Type" value={templateData.taskType} />
-                  <ReadOnlyField label="Assigned To (Rank)" value={templateData.assignedTo} />
-                  <ReadOnlyField label="Approver (Rank)" value={templateData.approver} />
+                  <ReadOnlyField label="Assigned To" value={templateData.assignedTo} />
+                  <ReadOnlyField label="Approver" value={templateData.approver} />
                   <ReadOnlyField label="Job Priority" value={templateData.jobPriority} />
                   <ReadOnlyField label="Class Related" value={templateData.classRelated} />
                   <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} />
                   <ReadOnlyField label="Department" value={templateData.department} />
                   <ReadOnlyField label="Criticality" value={templateData.criticality} />
                   <ReadOnlyField label="Is Active" value={templateData.isActive} />
+                  <ReadOnlyField label="Vessel Code" value={templateData.vesselCode} />
                 </div>
 
                 <div className="space-y-1">
