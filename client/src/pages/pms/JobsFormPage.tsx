@@ -69,7 +69,7 @@ const JobsFormPage: React.FC = () => {
       permitRequirements: [] as string[],
       otherRequirements: [] as string[]
     },
-    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string}>
+    workHistory: [] as Array<{woNo: string, assignedTo: string, performedBy: string, workDate: string, runDate: string, completionDate: string, status: string, description: string, remarks: string}>
   });
 
   useEffect(() => {
@@ -452,10 +452,14 @@ const JobsFormPage: React.FC = () => {
                         <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                           <td className="p-2" data-testid={`text-history-date-${index}`}>{formatDate(record.completionDate || record.workDate)}</td>
                           <td className="p-2" data-testid={`text-history-wo-${index}`}>{record.woNo || '-'}</td>
-                          <td className="p-2" data-testid={`text-history-description-${index}`}>-</td>
+                          <td className="p-2 max-w-[200px] truncate" data-testid={`text-history-description-${index}`} title={record.description || '-'}>{record.description || '-'}</td>
                           <td className="p-2" data-testid={`text-history-performed-by-${index}`}>{record.performedBy || '-'}</td>
-                          <td className="p-2" data-testid={`text-history-status-${index}`}>{record.status || '-'}</td>
-                          <td className="p-2" data-testid={`text-history-remarks-${index}`}>-</td>
+                          <td className="p-2" data-testid={`text-history-status-${index}`}>
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                              {record.status || 'Completed'}
+                            </span>
+                          </td>
+                          <td className="p-2" data-testid={`text-history-remarks-${index}`}>{record.remarks || '-'}</td>
                         </tr>
                       ))
                     )}

@@ -421,6 +421,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return dateStr;
       };
       
+      // Fetch completed work orders for this job (Work History - Section A5)
+      const allWorkOrdersForJob = await storage.getWorkOrdersByJobId(req.params.id);
+      const completedWorkOrders = allWorkOrdersForJob.filter(wo => wo.status === 'Completed');
+      
+      // Map to workHistory format expected by frontend
+      // Fields come from actual persisted work order data structure
+      // Check both top-level fields and formData for backwards compatibility
+      const workHistory = completedWorkOrders.map(wo => {
+        const formDataRemarks = (wo.formData as any)?.sectionB2?.remarks || 
+                                (wo.formData as any)?.remarks || '';
+        return {
+          woNo: wo.workOrderNo || wo.woExecutionId || wo.id || '-',
+          assignedTo: wo.assignedTo || '-',
+          performedBy: wo.performedBy || wo.assignedTo || '-',
+          workDate: wo.startDateTime || wo.dueDate || '',
+          runDate: wo.runningHours?.toString() || '',
+          completionDate: wo.completionDateTime || wo.dateCompleted || '',
+          status: wo.status || 'Completed',
+          description: wo.workCarriedOut || wo.jobTitle || 'Maintenance completed',
+          remarks: wo.completionRemarks || wo.remarks || wo.jobExperienceNotes || formDataRemarks || ''
+        };
+      });
+      
       // Build template data from job fields (matching work order form structure)
       const templateData = {
         woTitle: job.jobTitle,
@@ -450,7 +473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requiredSpareParts: job.requiredSpareParts || [],
         requiredTools: job.requiredTools || [],
         safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
-        vesselId: job.vesselId
+        vesselId: job.vesselId,
+        workHistory: workHistory
       };
       
       res.json({
