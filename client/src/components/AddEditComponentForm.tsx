@@ -534,7 +534,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                           {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Commissioning Date</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Commissioned Date</label>
                               <input
                                 type="date"
                                 value={componentData.commissionedDate}
@@ -554,7 +554,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Equip/System Department</label>
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department</label>
                               <input
                                 type="text"
                                 value={componentData.eqptSystemDept}

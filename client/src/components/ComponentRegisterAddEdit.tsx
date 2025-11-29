@@ -689,7 +689,7 @@ export default function ComponentRegisterAddEdit({
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">A. Component Information</h3>
                 <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Maker*</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Maker</label>
                     <Input
                       value={componentData.maker}
                       onChange={(e) => handleFieldChange('maker', e.target.value)}
@@ -808,7 +808,7 @@ export default function ComponentRegisterAddEdit({
 
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Eqpt. / System Department</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department</label>
                     <Input
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
@@ -817,7 +817,7 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Parent Component</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code</label>
                     <Input
                       value={componentData.parentComponent}
                       onChange={(e) => handleFieldChange('parentComponent', e.target.value)}

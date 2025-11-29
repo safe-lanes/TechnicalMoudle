@@ -429,7 +429,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Critical</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Criticality</label>
           {isChangeMode ? (
             <select
               value={componentData.critical}
@@ -505,7 +505,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioning Date</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioned Date</label>
           {isChangeMode ? (
             <input
               type="date"
@@ -541,7 +541,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Equip/System Department</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Equipment / System Department</label>
           {isChangeMode ? (
             <input
               type="text"
