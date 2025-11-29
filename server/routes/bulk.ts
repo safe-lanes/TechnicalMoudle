@@ -496,22 +496,22 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   vesselSpareSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 10: Vessel_Stores (12 columns - EXACT HEADERS with IMPA Code)
+  // SHEET 10: Vessel_Store (12 columns - per user specification)
   // =====================================================
-  const vesselStoresSheet = workbook.addWorksheet('Vessel_Stores');
+  const vesselStoresSheet = workbook.addWorksheet('Vessel_Store');
   vesselStoresSheet.columns = [
     { header: 'Item Code', key: 'itemCode', width: 15 },
     { header: 'IMPA Code', key: 'impaCode', width: 15 },
     { header: 'Item Name', key: 'itemName', width: 35 },
-    { header: 'Type', key: 'type', width: 15 },
-    { header: 'Stores Category', key: 'storesCategory', width: 20 },
-    { header: 'Unit Of Measurement', key: 'uom', width: 18 },
-    { header: 'ROB', key: 'rob', width: 10 },
-    { header: 'Min Stock', key: 'minStock', width: 10 },
-    { header: 'Max Stock', key: 'maxStock', width: 10 },
-    { header: 'Location', key: 'location', width: 20 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'Remarks', key: 'remarks', width: 40 }
+    { header: 'UOM', key: 'uom', width: 12 },
+    { header: 'Category', key: 'category', width: 20 },
+    { header: 'Total ROB', key: 'totalRob', width: 12 },
+    { header: 'Location A', key: 'locationA', width: 15 },
+    { header: 'Location A - ROB', key: 'locationARob', width: 16 },
+    { header: 'Location B', key: 'locationB', width: 15 },
+    { header: 'Location B - ROB', key: 'locationBRob', width: 16 },
+    { header: 'Min', key: 'min', width: 10 },
+    { header: 'Stock', key: 'stock', width: 15 }
   ];
   
   // Headers only - no sample data
@@ -1434,17 +1434,17 @@ router.get('/template', async (req, res) => {
 
     case 'stores':
       headers = [
-        // Vessel_Stores - 12 columns (matching Fleet Master Data template)
-        'Item Code', 'IMPA Code', 'Item Name', 'Type',
-        'Stores Category', 'Unit Of Measurement', 'ROB', 'Min Stock', 'Max Stock',
-        'Location', 'Vessel Code', 'Remarks'
+        // Vessel_Store - 12 columns (per user specification)
+        'Item Code', 'IMPA Code', 'Item Name', 'UOM', 'Category',
+        'Total ROB', 'Location A', 'Location A - ROB',
+        'Location B', 'Location B - ROB', 'Min', 'Stock'
       ];
 
       validValues = [
-        'Required (Unique per vessel)', 'Text (IMPA standard code)', 'Required (Item description)', 'Stores/Lubes/Chemicals/Others',
-        STORES_CATEGORIES.join('/'), UOM_LIST.join('/').toUpperCase(), 
-        'Number >= 0', 'Number >= 0', 'Number >= 0',
-        'Text (Storage location)', 'Text (e.g., V001)', 'Text (Additional notes)'
+        'Required (Unique per vessel)', 'Text (IMPA standard code)', 'Required (Item description)', 
+        UOM_LIST.join('/').toUpperCase(), STORES_CATEGORIES.join('/'),
+        'Number >= 0', 'Text (Location A)', 'Number >= 0',
+        'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Text (Stock status)'
       ];
 
       example = [];
@@ -1573,26 +1573,26 @@ router.get('/template', async (req, res) => {
     });
   }
 
-  // Add data validation for stores (12-column format)
-  // Columns: A=Item Code, B=IMPA Code, C=Item Name, D=Type, E=Stores Category, F=UOM, ...
+  // Add data validation for stores (12-column format per user specification)
+  // Columns: A=Item Code, B=IMPA Code, C=Item Name, D=UOM, E=Category, F=Total ROB, G=Location A, H=Location A - ROB, I=Location B, J=Location B - ROB, K=Min, L=Stock
   if (type === 'stores') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Type dropdown (Column D, starting from row 2)
+    // UOM dropdown (Column D, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
       sqref: 'D2:D1000',
-      formulas: ['"Stores,Lubes,Chemicals,Others"'],
+      formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
-      errorTitle: 'Invalid Type',
-      error: 'Please select from: Stores, Lubes, Chemicals, Others'
+      errorTitle: 'Invalid UOM',
+      error: `Please select from: ${UOM_LIST.join(', ')}`
     });
 
-    // Stores Category dropdown (Column E, starting from row 2)
+    // Category dropdown (Column E, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1602,18 +1602,6 @@ router.get('/template', async (req, res) => {
       showErrorMessage: true,
       errorTitle: 'Invalid Category',
       error: `Please select from: ${STORES_CATEGORIES.join(', ')}`
-    });
-
-    // UOM dropdown (Column F, starting from row 2)
-    mainSheet['!dataValidation'].push({
-      type: 'list',
-      operator: 'equal',
-      sqref: 'F2:F1000',
-      formulas: [`"${UOM_LIST.join(',')}"`],
-      allowBlank: true,
-      showErrorMessage: true,
-      errorTitle: 'Invalid UOM',
-      error: `Please select from: ${UOM_LIST.join(', ')}`
     });
   }
 
@@ -1722,8 +1710,11 @@ router.get('/template', async (req, res) => {
     
     // Append Lists sheet
     XLSX.utils.book_append_sheet(workbook, listsSheet, 'Lists');
+  } else if (type === 'stores') {
+    // For stores, use "Vessel_Store" sheet name per user specification
+    XLSX.utils.book_append_sheet(workbook, mainSheet, 'Vessel_Store');
   } else {
-    // For non-work-orders, use standard "Data" sheet name
+    // For non-work-orders and non-stores, use standard "Data" sheet name
     XLSX.utils.book_append_sheet(workbook, mainSheet, 'Data');
   }
 
@@ -2412,11 +2403,18 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
     } else if (type === 'stores') {
-      // Validate stores
+      // Validate stores (12-column format per user specification)
+      // Columns: Item Code, IMPA Code, Item Name, UOM, Category, Total ROB, Location A, Location A - ROB, Location B, Location B - ROB, Min, Stock
+      
       if (!row['Item Code']) {
         errors.push(`Row ${rowNum}: Item Code is required`);
       } else {
         normalized['Item Code'] = String(row['Item Code']).trim();
+      }
+
+      // IMPA Code - optional
+      if (row['IMPA Code']) {
+        normalized['IMPA Code'] = String(row['IMPA Code']).trim();
       }
 
       if (!row['Item Name']) {
@@ -2425,27 +2423,39 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Item Name'] = String(row['Item Name']).trim();
       }
 
-      if (row['Type'] && !['Stores', 'Lubes', 'Chemicals', 'Others'].includes(row['Type'])) {
-        errors.push(`Row ${rowNum}: Invalid Type. Allowed: Stores, Lubes, Chemicals, Others`);
-      } else if (row['Type']) {
-        normalized['Type'] = row['Type'];
-      }
-
+      // UOM validation
       if (row['UOM'] && !UOM_LIST.includes(row['UOM'].toLowerCase())) {
         errors.push(`Row ${rowNum}: Invalid UOM. Allowed: ${UOM_LIST.join(', ')}`);
       } else if (row['UOM']) {
         normalized['UOM'] = row['UOM'].toLowerCase();
       }
 
-      // Validate numbers
-      ['ROB', 'Min'].forEach(field => {
-        if (row[field]) {
+      // Category validation
+      if (row['Category'] && !STORES_CATEGORIES.includes(row['Category'])) {
+        warnings.push(`Row ${rowNum}: Category '${row['Category']}' not in standard list`);
+        normalized['Category'] = row['Category'];
+      } else if (row['Category']) {
+        normalized['Category'] = row['Category'];
+      }
+
+      // Validate numeric fields
+      const numericFields = ['Total ROB', 'Location A - ROB', 'Location B - ROB', 'Min'];
+      numericFields.forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
           const num = parseFloat(row[field]);
           if (isNaN(num) || num < 0) {
             errors.push(`Row ${rowNum}: ${field} must be a non-negative number`);
           } else {
             normalized[field] = num;
           }
+        }
+      });
+
+      // Copy text fields
+      const textFields = ['Location A', 'Location B', 'Stock'];
+      textFields.forEach(field => {
+        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
+          normalized[field] = String(row[field]).trim();
         }
       });
 
@@ -3420,16 +3430,22 @@ async function performImport(
           continue;
         }
         
-        // Map item type from template values
-        const itemTypeRaw = String(row['Type'] || '').trim().toLowerCase();
-        let itemType = 'stores';
-        if (itemTypeRaw === 'lubes' || itemTypeRaw === 'lubricants') {
+        // Map item type from Category field (new template format)
+        const categoryRaw = String(row['Category'] || '').trim();
+        let itemType = 'stores'; // default
+        const categoryLower = categoryRaw.toLowerCase();
+        if (categoryLower.includes('lube') || categoryLower === 'lubricants') {
           itemType = 'lubricants';
-        } else if (itemTypeRaw === 'chemicals') {
+        } else if (categoryLower.includes('chemical')) {
           itemType = 'chemicals';
-        } else if (itemTypeRaw === 'others') {
+        } else if (categoryLower === 'others') {
           itemType = 'others';
         }
+        
+        // Helper to get ROB values - support both new and old field names
+        const getTotalRob = () => row['Total ROB'] ?? row['ROB'] ?? 0;
+        const getLocationARob = () => row['Location A - ROB'] ?? row['ROB Location A'] ?? 0;
+        const getLocationBRob = () => row['Location B - ROB'] ?? row['ROB Location B'] ?? 0;
         
         const existingItem = storesByItemCode.get(itemCode);
         
@@ -3445,23 +3461,23 @@ async function performImport(
             impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : null,
             itemName,
             itemType,
-            category: row['Stores Category'] ? String(row['Stores Category']).trim() : null,
-            specification: row['Specification'] ? String(row['Specification']).trim() : null,
+            category: categoryRaw || null,
+            specification: null,
             uom: row['UOM'] ? String(row['UOM']).trim() : null,
-            rob: String(row['ROB'] ?? 0),
-            robLocationA: String(row['ROB Location A'] ?? row['ROB'] ?? 0),
-            robLocationB: String(row['ROB Location B'] ?? 0),
+            rob: String(getTotalRob()),
+            robLocationA: String(getLocationARob()),
+            robLocationB: String(getLocationBRob()),
             locationA: row['Location A'] ? String(row['Location A']).trim() : null,
             locationB: row['Location B'] ? String(row['Location B']).trim() : null,
             min: String(row['Min'] ?? 0),
-            max: row['Max'] ? String(row['Max']) : null,
-            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
-            supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
-            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
-            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
-            ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : false,
-            ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : null,
-            remarks: row['Remarks'] ? String(row['Remarks']).trim() : null,
+            max: null,
+            unitCost: null,
+            supplier: null,
+            lastOrderDate: null,
+            leadTime: null,
+            ihm: false,
+            ihmDetails: null,
+            remarks: row['Stock'] ? String(row['Stock']).trim() : null,
             isActive: true
           });
           
@@ -3485,23 +3501,15 @@ async function performImport(
             impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
             itemName: itemName || existingItem.itemName,
             itemType,
-            category: row['Stores Category'] ? String(row['Stores Category']).trim() : existingItem.category,
-            specification: row['Specification'] ? String(row['Specification']).trim() : existingItem.specification,
+            category: categoryRaw || existingItem.category,
             uom: row['UOM'] ? String(row['UOM']).trim() : existingItem.uom,
-            rob: row['ROB'] !== undefined ? String(row['ROB']) : existingItem.rob,
-            robLocationA: row['ROB Location A'] !== undefined ? String(row['ROB Location A']) : existingItem.robLocationA,
-            robLocationB: row['ROB Location B'] !== undefined ? String(row['ROB Location B']) : existingItem.robLocationB,
+            rob: row['Total ROB'] !== undefined ? String(row['Total ROB']) : existingItem.rob,
+            robLocationA: row['Location A - ROB'] !== undefined ? String(row['Location A - ROB']) : existingItem.robLocationA,
+            robLocationB: row['Location B - ROB'] !== undefined ? String(row['Location B - ROB']) : existingItem.robLocationB,
             locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
             locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
             min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
-            max: row['Max'] !== undefined ? String(row['Max']) : existingItem.max,
-            unitCost: row['Unit Cost'] !== undefined ? String(row['Unit Cost']) : existingItem.unitCost,
-            supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingItem.supplier,
-            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingItem.lastOrderDate,
-            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingItem.leadTime,
-            ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : existingItem.ihm,
-            ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : existingItem.ihmDetails,
-            remarks: row['Remarks'] ? String(row['Remarks']).trim() : existingItem.remarks
+            remarks: row['Stock'] ? String(row['Stock']).trim() : existingItem.remarks
           });
           
           storesByItemCode.set(itemCode, updated);
@@ -3521,23 +3529,15 @@ async function performImport(
               impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : existingItem.impaCode,
               itemName: itemName || existingItem.itemName,
               itemType,
-              category: row['Stores Category'] ? String(row['Stores Category']).trim() : existingItem.category,
-              specification: row['Specification'] ? String(row['Specification']).trim() : existingItem.specification,
+              category: categoryRaw || existingItem.category,
               uom: row['UOM'] ? String(row['UOM']).trim() : existingItem.uom,
-              rob: row['ROB'] !== undefined ? String(row['ROB']) : existingItem.rob,
-              robLocationA: row['ROB Location A'] !== undefined ? String(row['ROB Location A']) : existingItem.robLocationA,
-              robLocationB: row['ROB Location B'] !== undefined ? String(row['ROB Location B']) : existingItem.robLocationB,
+              rob: row['Total ROB'] !== undefined ? String(row['Total ROB']) : existingItem.rob,
+              robLocationA: row['Location A - ROB'] !== undefined ? String(row['Location A - ROB']) : existingItem.robLocationA,
+              robLocationB: row['Location B - ROB'] !== undefined ? String(row['Location B - ROB']) : existingItem.robLocationB,
               locationA: row['Location A'] ? String(row['Location A']).trim() : existingItem.locationA,
               locationB: row['Location B'] ? String(row['Location B']).trim() : existingItem.locationB,
               min: row['Min'] !== undefined ? String(row['Min']) : existingItem.min,
-              max: row['Max'] !== undefined ? String(row['Max']) : existingItem.max,
-              unitCost: row['Unit Cost'] !== undefined ? String(row['Unit Cost']) : existingItem.unitCost,
-              supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingItem.supplier,
-              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingItem.lastOrderDate,
-              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingItem.leadTime,
-              ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : existingItem.ihm,
-              ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : existingItem.ihmDetails,
-              remarks: row['Remarks'] ? String(row['Remarks']).trim() : existingItem.remarks
+              remarks: row['Stock'] ? String(row['Stock']).trim() : existingItem.remarks
             });
             
             storesByItemCode.set(itemCode, updated);
@@ -3555,23 +3555,23 @@ async function performImport(
               impaCode: row['IMPA Code'] ? String(row['IMPA Code']).trim() : null,
               itemName,
               itemType,
-              category: row['Stores Category'] ? String(row['Stores Category']).trim() : null,
-              specification: row['Specification'] ? String(row['Specification']).trim() : null,
+              category: categoryRaw || null,
+              specification: null,
               uom: row['UOM'] ? String(row['UOM']).trim() : null,
-              rob: String(row['ROB'] ?? 0),
-              robLocationA: String(row['ROB Location A'] ?? row['ROB'] ?? 0),
-              robLocationB: String(row['ROB Location B'] ?? 0),
+              rob: String(getTotalRob()),
+              robLocationA: String(getLocationARob()),
+              robLocationB: String(getLocationBRob()),
               locationA: row['Location A'] ? String(row['Location A']).trim() : null,
               locationB: row['Location B'] ? String(row['Location B']).trim() : null,
               min: String(row['Min'] ?? 0),
-              max: row['Max'] ? String(row['Max']) : null,
-              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
-              supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
-              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
-              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
-              ihm: row['IHM'] ? String(row['IHM']).toLowerCase() === 'yes' : false,
-              ihmDetails: row['IHM Details'] ? String(row['IHM Details']).trim() : null,
-              remarks: row['Remarks'] ? String(row['Remarks']).trim() : null,
+              max: null,
+              unitCost: null,
+              supplier: null,
+              lastOrderDate: null,
+              leadTime: null,
+              ihm: false,
+              ihmDetails: null,
+              remarks: row['Stock'] ? String(row['Stock']).trim() : null,
               isActive: true
             });
             
