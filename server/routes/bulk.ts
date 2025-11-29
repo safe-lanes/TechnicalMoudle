@@ -1379,22 +1379,22 @@ router.get('/template', async (req, res) => {
 
     case 'spares':
       headers = [
-        // Vessel_Spare - 27 columns (matching Fleet Master Data template with ROB by Location)
-        'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
-        'Part Code', 'Part Name', 'Part Number', 'Maker', 'Maker Code',
-        'Unit Of Measurement', 'Stocking Number', 'Specification', 'Drawing No',
-        'ROB Deck Store', 'ROB Engine Store', 'ROB Store 1', 'ROB Store 2', 'Total ROB',
-        'Min Stock', 'Max Stock', 'Unit Cost', 'Lead Time Days', 'Supplier',
-        'Critical Yes/No', 'IS Active', 'Vessel Code', 'Remarks'
+        // Vessel_Spare - 27 columns (per specification)
+        'Part Code', 'Fleet Equipment Code', 'Fleet Equipment Name', 'Component Code', 'Component Name',
+        'Part Name', 'Part Number', 'UOM', 'Drawing Number', 'Position Number',
+        'Note', 'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
+        'Criticality', 'Total ROB', 'Location A', 'Location A - ROB',
+        'Location B', 'Location B - ROB', 'Minimum Stock', 'Is Active',
+        'IHM (Inventory of Hazardous Materials)', 'Evidence Type', 'Vessel Code'
       ];
 
       validValues = [
-        'Text (Fleet ID)', 'Text (Fleet description)', 'Required (Must exist)', 'Text (Component name)',
-        'Required (Part ID)', 'Required (Part name)', 'Text (P/N)', 'Text (Manufacturer)', 'Text (Maker ID)',
-        UOM_LIST.join('/').toUpperCase(), 'Text (Stock ref)', 'Text (Specs)', 'Text (Drawing ref)',
-        'Number >= 0', 'Number >= 0', 'Number >= 0', 'Number >= 0', 'Number (Auto-sum)',
-        'Number >= 0', 'Number >= 0', 'Decimal', 'Number (days)', 'Text (Supplier)',
-        'Yes/No', 'Yes/No', 'Text (e.g., V001)', 'Text (Notes)'
+        'Text (Part ID)', 'Text (Fleet ID)', 'Text (Fleet description)', 'Required (Must exist)', 'Text (Component name)',
+        'Required (Part name)', 'Text (P/N)', UOM_LIST.join('/').toUpperCase(), 'Text (Drawing ref)', 'Text (Position)',
+        'Text (Notes)', 'Text (Specs)', 'Text (Manufacturer)', 'Text (Maker ID)', 'Text (Manual name)', 'Text (Page #)',
+        'Yes/No', 'Number >= 0', 'Text (Location A)', 'Number >= 0',
+        'Text (Location B)', 'Number >= 0', 'Number >= 0', 'Yes/No',
+        'Yes/No', 'Text (Evidence type)', 'Text (e.g., V001)'
       ];
 
       example = [];
@@ -1485,18 +1485,18 @@ router.get('/template', async (req, res) => {
     });
   }
 
-  // Add data validation for spares (27-column format)
-  // Columns: ...J=UOM, ...X=Critical Yes/No, Y=IS Active...
+  // Add data validation for spares (27-column format per specification)
+  // Columns: H=UOM, Q=Criticality, X=Is Active, Y=IHM
   if (type === 'spares') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // UOM dropdown (Column J - Unit Of Measurement, starting from row 2)
+    // UOM dropdown (Column H, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'J2:J1000',
+      sqref: 'H2:H1000',
       formulas: [`"${UOM_LIST.join(',')}"`],
       allowBlank: true,
       showErrorMessage: true,
@@ -1504,7 +1504,19 @@ router.get('/template', async (req, res) => {
       error: `Please select from: ${UOM_LIST.join(', ')}`
     });
 
-    // Critical Yes/No dropdown (Column X, starting from row 2)
+    // Criticality dropdown (Column Q, starting from row 2)
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'Q2:Q1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Is Active dropdown (Column X, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1516,7 +1528,7 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // IS Active dropdown (Column Y, starting from row 2)
+    // IHM dropdown (Column Y, starting from row 2)
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -2278,50 +2290,68 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Part Number'] = String(row['Part Number']).trim();
       }
 
-      // Unit Of Measurement - validate against UOM_LIST
-      const uomField = row['Unit Of Measurement'] || row['UOM'];
+      // UOM - validate against UOM_LIST (support both UOM and Unit Of Measurement)
+      const uomField = row['UOM'] || row['Unit Of Measurement'];
       if (uomField) {
         const uomValue = String(uomField).toLowerCase().trim();
         if (!UOM_LIST.includes(uomValue)) {
-          errors.push(`Row ${rowNum}: Invalid Unit Of Measurement. Allowed: ${UOM_LIST.join(', ')}`);
+          errors.push(`Row ${rowNum}: Invalid UOM. Allowed: ${UOM_LIST.join(', ')}`);
         } else {
-          normalized['Unit Of Measurement'] = uomValue.toUpperCase();
+          normalized['UOM'] = uomValue.toUpperCase();
         }
       }
 
-      // Validate numeric fields
-      ['ROB', 'Min Stock', 'Max Stock'].forEach(field => {
-        if (row[field] !== undefined && row[field] !== null && row[field] !== '') {
-          const num = parseInt(row[field]);
+      // Validate numeric fields - support new field names
+      // Total ROB, Location A - ROB, Location B - ROB, Minimum Stock
+      const numericFieldMappings = [
+        { source: 'Total ROB', target: 'Total ROB' },
+        { source: 'Location A - ROB', target: 'Location A - ROB' },
+        { source: 'Location B - ROB', target: 'Location B - ROB' },
+        { source: 'Minimum Stock', target: 'Minimum Stock' }
+      ];
+      
+      numericFieldMappings.forEach(({ source, target }) => {
+        if (row[source] !== undefined && row[source] !== null && row[source] !== '') {
+          const num = parseInt(row[source]);
           if (isNaN(num) || num < 0) {
-            errors.push(`Row ${rowNum}: ${field} must be a non-negative integer`);
+            errors.push(`Row ${rowNum}: ${source} must be a non-negative integer`);
           } else {
-            normalized[field] = num;
+            normalized[target] = num;
           }
         }
       });
 
-      // Validate Unit Cost (decimal)
-      if (row['Unit Cost'] !== undefined && row['Unit Cost'] !== null && row['Unit Cost'] !== '') {
-        const cost = parseFloat(row['Unit Cost']);
-        if (isNaN(cost) || cost < 0) {
-          errors.push(`Row ${rowNum}: Unit Cost must be a non-negative number`);
-        } else {
-          normalized['Unit Cost'] = cost;
-        }
-      }
-
-      // Validate Critical Yes/No - Support both template format and legacy format
-      const criticalField = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+      // Validate Criticality - Support new format and legacy formats
+      const criticalField = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
       if (criticalField) {
         const value = String(criticalField).toLowerCase().trim();
         if (!['yes', 'no', 'y', 'n'].includes(value)) {
-          errors.push(`Row ${rowNum}: Critical must be Yes or No`);
+          errors.push(`Row ${rowNum}: Criticality must be Yes or No`);
         } else {
-          // Store in both formats for backward compatibility
           const normalizedValue = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
-          normalized['Critical Yes/No'] = normalizedValue;
-          normalized['Criticality (Yes/No)'] = normalizedValue;
+          normalized['Criticality'] = normalizedValue;
+        }
+      }
+
+      // Validate Is Active
+      const isActiveField = row['Is Active'] || row['IS Active'];
+      if (isActiveField) {
+        const value = String(isActiveField).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: Is Active must be Yes or No`);
+        } else {
+          normalized['Is Active'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
+        }
+      }
+
+      // Validate IHM (Inventory of Hazardous Materials)
+      const ihmField = row['IHM (Inventory of Hazardous Materials)'];
+      if (ihmField) {
+        const value = String(ihmField).toLowerCase().trim();
+        if (!['yes', 'no', 'y', 'n'].includes(value)) {
+          errors.push(`Row ${rowNum}: IHM must be Yes or No`);
+        } else {
+          normalized['IHM (Inventory of Hazardous Materials)'] = ['yes', 'y'].includes(value) ? 'Yes' : 'No';
         }
       }
 
@@ -2337,11 +2367,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Copy text fields directly
+      // Copy text fields directly - new template fields
       const textFields = [
-        'Fleet Equipment Name', 'Stocking Number', 'Maker', 'Maker Code',
-        'Specification', 'Drawing No', 'Location', 'Lead Time',
-        'Supplier', 'Last Order Date', 'Remarks'
+        'Fleet Equipment Name', 'Drawing Number', 'Position Number', 'Note',
+        'Specification', 'Maker', 'Maker Code', 'Manual Name', 'Page Number',
+        'Location A', 'Location B', 'Evidence Type'
       ];
       
       textFields.forEach(field => {
@@ -3123,8 +3153,21 @@ async function performImport(
             continue;
           }
           
-          // Create new spare - Support both template format and legacy format for criticality
-          const criticalVal = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          // Create new spare - Support new template format (Criticality) and legacy formats
+          const criticalVal = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          const isActiveVal = row['Is Active'] || row['IS Active'];
+          const ihmVal = row['IHM (Inventory of Hazardous Materials)'];
+          
+          // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
+          let totalRob = 0;
+          if (row['Total ROB'] !== undefined && row['Total ROB'] !== null && row['Total ROB'] !== '') {
+            totalRob = parseInt(row['Total ROB']) || 0;
+          } else {
+            const locARob = parseInt(row['Location A - ROB']) || 0;
+            const locBRob = parseInt(row['Location B - ROB']) || 0;
+            totalRob = locARob + locBRob;
+          }
+          
           const newSpare = await storage.createSpare({
             partCode: partCode,
             partName: String(row['Part Name']).trim(),
@@ -3133,23 +3176,24 @@ async function performImport(
             componentName: component.name || '',
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
             critical: criticalVal === 'Yes' || criticalVal === true ? 'Yes' : 'No',
-            rob: row['ROB'] ? parseInt(row['ROB']) : 0,
-            min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
-            location: row['Location'] ? String(row['Location']).trim() : null,
+            rob: totalRob,
+            min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
+            location: row['Location A'] ? String(row['Location A']).trim() : null,
+            location2: row['Location B'] ? String(row['Location B']).trim() : null,
             vesselId: vesselId,
             partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
-            uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
-            stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
+            uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : null,
             maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : null,
             makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
             specification: row['Specification'] ? String(row['Specification']).trim() : null,
-            drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
-            max: row['Max Stock'] ? parseInt(row['Max Stock']) : null,
-            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
-            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
-            supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
-            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
-            note: row['Remarks'] ? String(row['Remarks']).trim() : null,
+            drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : null,
+            positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : null,
+            note: row['Note'] ? String(row['Note']).trim() : null,
+            manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : null,
+            pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : null,
+            isActive: isActiveVal === 'Yes' || isActiveVal === true ? true : (isActiveVal === 'No' ? false : true),
+            ihm: ihmVal === 'Yes' || ihmVal === true ? 'Yes' : 'No',
+            remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
             dataScope: 'vessel'
           });
           
@@ -3170,30 +3214,44 @@ async function performImport(
             continue;
           }
           
-          // Update existing spare - Support both template format and legacy format
-          const criticalValUpdate = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          // Update existing spare - Support new template format and legacy formats
+          const criticalValUpdate = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          const isActiveValUpdate = row['Is Active'] || row['IS Active'];
+          const ihmValUpdate = row['IHM (Inventory of Hazardous Materials)'];
+          
+          // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
+          let totalRobUpdate = existingSpare.rob;
+          if (row['Total ROB'] !== undefined && row['Total ROB'] !== null && row['Total ROB'] !== '') {
+            totalRobUpdate = parseInt(row['Total ROB']) || 0;
+          } else if (row['Location A - ROB'] !== undefined || row['Location B - ROB'] !== undefined) {
+            const locARob = parseInt(row['Location A - ROB']) || 0;
+            const locBRob = parseInt(row['Location B - ROB']) || 0;
+            totalRobUpdate = locARob + locBRob;
+          }
+          
           const updatedSpare = await storage.updateSpare(existingSpare.id, {
             partName: String(row['Part Name']).trim(),
             componentId: component.id,
             componentCode: componentCode,
             componentName: component.name || '',
             critical: criticalValUpdate === 'Yes' || criticalValUpdate === true ? 'Yes' : 'No',
-            rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
-            min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
-            location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
+            rob: totalRobUpdate,
+            min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
+            location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+            location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
             partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
-            uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
-            stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
+            uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
             maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
             makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
             specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
-            drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
-            max: row['Max Stock'] ? parseInt(row['Max Stock']) : existingSpare.max,
-            unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : existingSpare.unitCost,
-            leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingSpare.leadTime,
-            supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingSpare.supplier,
-            lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingSpare.lastOrderDate,
-            note: row['Remarks'] ? String(row['Remarks']).trim() : existingSpare.note
+            drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : existingSpare.drawingNumber,
+            positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : existingSpare.positionNumber,
+            note: row['Note'] ? String(row['Note']).trim() : existingSpare.note,
+            manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : existingSpare.manualName,
+            pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
+            isActive: isActiveValUpdate === 'Yes' || isActiveValUpdate === true ? true : (isActiveValUpdate === 'No' ? false : existingSpare.isActive),
+            ihm: ihmValUpdate === 'Yes' || ihmValUpdate === true ? 'Yes' : (ihmValUpdate === 'No' ? 'No' : existingSpare.ihm),
+            remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
           });
           
           sparesByPartCode.set(partCode, updatedSpare);
@@ -3206,8 +3264,21 @@ async function performImport(
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
           
         } else if (mode === 'upsert') {
-          // Support both template format and legacy format for criticality
-          const criticalValUpsert = row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          // Support new template format and legacy formats for criticality
+          const criticalValUpsert = row['Criticality'] || row['Critical Yes/No'] || row['Criticality (Yes/No)'];
+          const isActiveValUpsert = row['Is Active'] || row['IS Active'];
+          const ihmValUpsert = row['IHM (Inventory of Hazardous Materials)'];
+          
+          // Calculate Total ROB from Location A - ROB and Location B - ROB if not provided
+          let totalRobUpsert = 0;
+          if (row['Total ROB'] !== undefined && row['Total ROB'] !== null && row['Total ROB'] !== '') {
+            totalRobUpsert = parseInt(row['Total ROB']) || 0;
+          } else {
+            const locARob = parseInt(row['Location A - ROB']) || 0;
+            const locBRob = parseInt(row['Location B - ROB']) || 0;
+            totalRobUpsert = locARob + locBRob;
+          }
+          
           if (existingSpare) {
             // Update existing
             const updatedSpare = await storage.updateSpare(existingSpare.id, {
@@ -3216,22 +3287,23 @@ async function performImport(
               componentCode: componentCode,
               componentName: component.name || '',
               critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
-              rob: row['ROB'] ? parseInt(row['ROB']) : existingSpare.rob,
-              min: row['Min Stock'] ? parseInt(row['Min Stock']) : existingSpare.min,
-              location: row['Location'] ? String(row['Location']).trim() : existingSpare.location,
+              rob: totalRobUpsert || existingSpare.rob,
+              min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
+              location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+              location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
               partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
-              uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
-              stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : existingSpare.stockingNumber,
+              uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
               maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
               makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
               specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
-              drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : existingSpare.drawingNumber,
-              max: row['Max Stock'] ? parseInt(row['Max Stock']) : existingSpare.max,
-              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : existingSpare.unitCost,
-              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : existingSpare.leadTime,
-              supplier: row['Supplier'] ? String(row['Supplier']).trim() : existingSpare.supplier,
-              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : existingSpare.lastOrderDate,
-              note: row['Remarks'] ? String(row['Remarks']).trim() : existingSpare.note
+              drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : existingSpare.drawingNumber,
+              positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : existingSpare.positionNumber,
+              note: row['Note'] ? String(row['Note']).trim() : existingSpare.note,
+              manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : existingSpare.manualName,
+              pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
+              isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : existingSpare.isActive),
+              ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
+              remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
             });
             
             sparesByPartCode.set(partCode, updatedSpare);
@@ -3252,23 +3324,24 @@ async function performImport(
               componentName: component.name || '',
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
               critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
-              rob: row['ROB'] ? parseInt(row['ROB']) : 0,
-              min: row['Min Stock'] ? parseInt(row['Min Stock']) : 0,
-              location: row['Location'] ? String(row['Location']).trim() : null,
+              rob: totalRobUpsert,
+              min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
+              location: row['Location A'] ? String(row['Location A']).trim() : null,
+              location2: row['Location B'] ? String(row['Location B']).trim() : null,
               vesselId: vesselId,
               partNumber: row['Part Number'] ? String(row['Part Number']).trim() : null,
-              uom: row['Unit Of Measurement'] ? String(row['Unit Of Measurement']).toUpperCase() : null,
-              stockingNumber: row['Stocking Number'] ? String(row['Stocking Number']).trim() : null,
+              uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : null,
               maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : null,
               makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : null,
               specification: row['Specification'] ? String(row['Specification']).trim() : null,
-              drawingNumber: row['Drawing No'] ? String(row['Drawing No']).trim() : null,
-              max: row['Max Stock'] ? parseInt(row['Max Stock']) : null,
-              unitCost: row['Unit Cost'] ? String(row['Unit Cost']) : null,
-              leadTime: row['Lead Time'] ? String(row['Lead Time']).trim() : null,
-              supplier: row['Supplier'] ? String(row['Supplier']).trim() : null,
-              lastOrderDate: row['Last Order Date'] ? String(row['Last Order Date']).trim() : null,
-              note: row['Remarks'] ? String(row['Remarks']).trim() : null,
+              drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : null,
+              positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : null,
+              note: row['Note'] ? String(row['Note']).trim() : null,
+              manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : null,
+              pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : null,
+              isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : true),
+              ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : 'No',
+              remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
               dataScope: 'vessel'
             });
             
