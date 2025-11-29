@@ -1232,38 +1232,41 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   // Style header row
   sparesSheet.getRow(1).font = { bold: true };
   
-  // Add one example row to show expected format
-  sparesSheet.addRow({
-    partCode: 'PT-000001',
-    fleetEquipmentCode: '651.552',
-    fleetEquipmentName: 'ME cylinder covers',
-    componentCode: '651.552.AA',
-    componentName: 'ME cylinder covers,exhaust',
-    partName: 'Cylinder Head Gasket',
-    partNumber: 'GHI-2345',
-    uom: 'PCS',
-    drawingNumber: 'DRW-651-552',
-    positionNumber: 'POS-001',
-    note: 'For main engine overhaul',
-    specification: 'Size: 150mm, Material: Steel',
-    maker: 'Maker ZZZ',
-    makerCode: 'MKR-001',
-    manualName: 'Main Engine Manual',
-    pageNumber: '125',
-    criticality: 'Yes',
-    totalRob: '5',
-    locationA: 'Engine Room Store',
-    locationARob: '3',
-    locationB: 'Deck Store',
-    locationBRob: '2',
-    minimumStock: '2',
-    isActive: 'Yes',
-    ihm: 'No',
-    evidenceType: 'SDoC',
-    vesselCode: vesselId
+  // Pre-fill the Spares sheet with component data - one row per component
+  // User just needs to fill in Part Code, Part Name, and other part-specific details
+  validComponents.forEach((component, index) => {
+    sparesSheet.addRow({
+      partCode: '',  // User fills this
+      fleetEquipmentCode: component.fleetEquipmentCode || '',
+      fleetEquipmentName: component.fleetEquipmentName || '',
+      componentCode: component.componentCode,
+      componentName: component.name,
+      partName: '',  // User fills this
+      partNumber: '',  // User fills this
+      uom: '',  // User selects from dropdown
+      drawingNumber: '',
+      positionNumber: '',
+      note: '',
+      specification: '',
+      maker: component.maker || '',
+      makerCode: component.makerCode || '',
+      manualName: '',
+      pageNumber: '',
+      criticality: '',  // User selects from dropdown
+      totalRob: '',
+      locationA: '',
+      locationARob: '',
+      locationB: '',
+      locationBRob: '',
+      minimumStock: '',
+      isActive: 'Yes',  // Default to Yes
+      ihm: 'No',  // Default to No
+      evidenceType: '',
+      vesselCode: vesselId
+    });
   });
   
-  console.log(`📝 Added example row to spares template`);
+  console.log(`📝 Pre-filled ${validComponents.length} component rows in spares template`);
   
   // Create "Components" reference sheet with pre-filled component data
   const componentsSheet = workbook.addWorksheet('Components');
