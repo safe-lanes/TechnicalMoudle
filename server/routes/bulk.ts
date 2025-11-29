@@ -226,6 +226,15 @@ const STORES_CATEGORIES = [
 // Departments list for jobs/work orders
 const DEPARTMENTS = ['Engine', 'Deck', 'Electrical'];
 
+// Task types for jobs
+const TASK_TYPES = [
+  'Inspection', 'Overhaul', 'Replacement', 'Testing', 
+  'Cleaning', 'Lubrication', 'Calibration', 'Survey', 'Other'
+];
+
+// Job priority levels
+const JOB_PRIORITY = ['High', 'Medium', 'Low', 'Critical'];
+
 // Responsible ranks for work orders
 const RESPONSIBLE_RANKS = [
   'Master', 'Chief Officer', '2nd Officer', '3rd Officer',
@@ -372,27 +381,23 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   // =====================================================
   const fleetJobSheet = workbook.addWorksheet('Fleet_Job');
   fleetJobSheet.columns = [
+    { header: 'Job Code', key: 'jobCode', width: 15 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
     { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
-    { header: 'Job Code', key: 'jobCode', width: 15 },
     { header: 'Job Title', key: 'jobTitle', width: 40 },
-    { header: 'Job Description', key: 'jobDescription', width: 50 },
+    { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
+    { header: 'Interval Value', key: 'intervalValue', width: 15 },
+    { header: 'Interval Running Hour', key: 'intervalRunningHour', width: 20 },
+    { header: 'Unit', key: 'unit', width: 12 },
+    { header: 'Task Type', key: 'taskType', width: 15 },
+    { header: 'Assigned To', key: 'assignedTo', width: 20 },
+    { header: 'Approver', key: 'approver', width: 20 },
+    { header: 'Job Priority', key: 'jobPriority', width: 15 },
+    { header: 'Class Related', key: 'classRelated', width: 15 },
+    { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 15 },
-    { header: 'Responsible Rank', key: 'responsibleRank', width: 20 },
-    { header: 'Schedule Type', key: 'scheduleType', width: 15 },
-    { header: 'Calendar Interval', key: 'calendarInterval', width: 18 },
-    { header: 'Interval Unit', key: 'intervalUnit', width: 15 },
-    { header: 'RH Interval', key: 'rhInterval', width: 15 },
-    { header: 'Critical Yes/No', key: 'critical', width: 15 },
-    { header: 'Estimated Hours', key: 'estimatedHours', width: 15 },
-    { header: 'Spare Parts Required', key: 'sparePartsRequired', width: 30 },
-    { header: 'Safety Procedure', key: 'safetyProcedure', width: 25 },
-    { header: 'Checklist', key: 'checklist', width: 40 },
-    { header: 'Reference Documents', key: 'referenceDocuments', width: 30 },
-    { header: 'Tools Required', key: 'toolsRequired', width: 30 },
-    { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+    { header: 'Criticality', key: 'criticality', width: 15 },
+    { header: 'Is Active', key: 'isActive', width: 12 }
   ];
   
   // Headers only - no sample data
@@ -403,27 +408,27 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   // =====================================================
   const vesselJobSheet = workbook.addWorksheet('Vessel_Job');
   vesselJobSheet.columns = [
+    { header: 'Job Code', key: 'jobCode', width: 15 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
+    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
+    { header: 'Job Title', key: 'jobTitle', width: 40 },
     { header: 'Component Code', key: 'componentCode', width: 18 },
     { header: 'Component Name', key: 'componentName', width: 30 },
-    { header: 'Job Code', key: 'jobCode', width: 15 },
-    { header: 'Job Title', key: 'jobTitle', width: 40 },
-    { header: 'Job Description', key: 'jobDescription', width: 50 },
+    { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
+    { header: 'Interval Value', key: 'intervalValue', width: 15 },
+    { header: 'Interval Running Hour', key: 'intervalRunningHour', width: 20 },
+    { header: 'Unit', key: 'unit', width: 12 },
+    { header: 'Task Type', key: 'taskType', width: 15 },
+    { header: 'Assigned To', key: 'assignedTo', width: 20 },
+    { header: 'Approver', key: 'approver', width: 20 },
+    { header: 'Job Priority', key: 'jobPriority', width: 15 },
+    { header: 'Class Related', key: 'classRelated', width: 15 },
+    { header: 'Next Due Date', key: 'nextDueDate', width: 15 },
+    { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 15 },
-    { header: 'Responsible Rank', key: 'responsibleRank', width: 20 },
-    { header: 'Schedule Type', key: 'scheduleType', width: 15 },
-    { header: 'Calendar Interval', key: 'calendarInterval', width: 18 },
-    { header: 'Interval Unit', key: 'intervalUnit', width: 15 },
-    { header: 'RH Interval', key: 'rhInterval', width: 15 },
-    { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
-    { header: 'Last Done RH', key: 'lastDoneRH', width: 15 },
-    { header: 'Critical Yes/No', key: 'critical', width: 15 },
-    { header: 'Estimated Hours', key: 'estimatedHours', width: 15 },
-    { header: 'Spare Parts Required', key: 'sparePartsRequired', width: 30 },
-    { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Class Survey Code', key: 'classSurveyCode', width: 18 }
+    { header: 'Criticality', key: 'criticality', width: 15 },
+    { header: 'Is Active', key: 'isActive', width: 12 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 }
   ];
   
   // Headers only - no sample data
@@ -529,6 +534,8 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'UOM', key: 'uom', width: 12 },
     { header: 'Store Types', key: 'storeTypes', width: 15 },
     { header: 'Yes/No', key: 'yesNo', width: 10 },
+    { header: 'Task Types', key: 'taskTypes', width: 15 },
+    { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Categories', key: 'categories', width: 40 }
   ];
   
@@ -541,6 +548,8 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     UOM_LIST.length,
     4, // Store types
     2, // Yes/No
+    TASK_TYPES.length,
+    JOB_PRIORITY.length,
     COMPONENT_CATEGORIES.length
   );
   
@@ -553,6 +562,8 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
       uom: UOM_LIST[i]?.toUpperCase() || '',
       storeTypes: ['Stores', 'Lubes', 'Chemicals', 'Others'][i] || '',
       yesNo: ['Yes', 'No'][i] || '',
+      taskTypes: TASK_TYPES[i] || '',
+      jobPriority: JOB_PRIORITY[i] || '',
       categories: COMPONENT_CATEGORIES[i] || ''
     });
   }
@@ -625,80 +636,128 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     };
   }
   
-  // Fleet_Job validations
+  // Fleet_Job validations (17 columns)
   for (let row = 2; row <= 1000; row++) {
-    // Department (col 6)
-    fleetJobSheet.getCell(row, 6).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
-    };
-    // Responsible Rank (col 7)
-    fleetJobSheet.getCell(row, 7).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$B$2:$B$12"]
-    };
-    // Schedule Type (col 8)
-    fleetJobSheet.getCell(row, 8).dataValidation = {
+    // Maintenance Basis (col 5)
+    fleetJobSheet.getCell(row, 5).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$C$2:$C$4"]
     };
-    // Interval Unit (col 10)
-    fleetJobSheet.getCell(row, 10).dataValidation = {
+    // Unit (col 8)
+    fleetJobSheet.getCell(row, 8).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$D$2:$D$5"]
     };
-    // Critical Yes/No (col 12)
+    // Task Type (col 9)
+    fleetJobSheet.getCell(row, 9).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$H$2:$H$10"]
+    };
+    // Assigned To (col 10)
+    fleetJobSheet.getCell(row, 10).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Approver (col 11)
+    fleetJobSheet.getCell(row, 11).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Job Priority (col 12)
     fleetJobSheet.getCell(row, 12).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$I$2:$I$5"]
+    };
+    // Class Related (col 13)
+    fleetJobSheet.getCell(row, 13).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
-    // IS Active (col 19)
-    fleetJobSheet.getCell(row, 19).dataValidation = {
+    // Department (col 15)
+    fleetJobSheet.getCell(row, 15).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // Criticality (col 16)
+    fleetJobSheet.getCell(row, 16).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Is Active (col 17)
+    fleetJobSheet.getCell(row, 17).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
   }
   
-  // Vessel_Job validations
+  // Vessel_Job validations (21 columns)
   for (let row = 2; row <= 1000; row++) {
-    // Department (col 7)
+    // Maintenance Basis (col 7)
     vesselJobSheet.getCell(row, 7).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$A$2:$A$4"]
-    };
-    // Responsible Rank (col 8)
-    vesselJobSheet.getCell(row, 8).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: ["'Master Data'!$B$2:$B$12"]
-    };
-    // Schedule Type (col 9)
-    vesselJobSheet.getCell(row, 9).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$C$2:$C$4"]
     };
-    // Interval Unit (col 11)
-    vesselJobSheet.getCell(row, 11).dataValidation = {
+    // Unit (col 10)
+    vesselJobSheet.getCell(row, 10).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$D$2:$D$5"]
     };
-    // Critical Yes/No (col 15)
+    // Task Type (col 11)
+    vesselJobSheet.getCell(row, 11).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$H$2:$H$10"]
+    };
+    // Assigned To (col 12)
+    vesselJobSheet.getCell(row, 12).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Approver (col 13)
+    vesselJobSheet.getCell(row, 13).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$B$2:$B$12"]
+    };
+    // Job Priority (col 14)
+    vesselJobSheet.getCell(row, 14).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$I$2:$I$5"]
+    };
+    // Class Related (col 15)
     vesselJobSheet.getCell(row, 15).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
     };
-    // IS Active (col 18)
+    // Department (col 18)
     vesselJobSheet.getCell(row, 18).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$A$2:$A$4"]
+    };
+    // Criticality (col 19)
+    vesselJobSheet.getCell(row, 19).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: ["'Master Data'!$G$2:$G$3"]
+    };
+    // Is Active (col 20)
+    vesselJobSheet.getCell(row, 20).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: ["'Master Data'!$G$2:$G$3"]
@@ -995,24 +1054,24 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   // Create main "jobs" sheet with 26-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
+  // Add headers matching the 21-column Vessel_Job specification + 5 Part A fields = 26 total
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
     { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 30 },
-    { header: 'WO Title', key: 'woTitle', width: 35 },
+    { header: 'Job Title', key: 'jobTitle', width: 35 },
     { header: 'Component Code', key: 'componentCode', width: 20 },
     { header: 'Component Name', key: 'componentName', width: 30 },
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
     { header: 'Interval Value', key: 'intervalValue', width: 15 },
-    { header: 'Interval Running Hours', key: 'intervalRunningHours', width: 25 },
+    { header: 'Interval Running Hour', key: 'intervalRunningHour', width: 25 },
     { header: 'Unit', key: 'unit', width: 12 },
     { header: 'Task Type', key: 'taskType', width: 20 },
     { header: 'Assigned To', key: 'assignedTo', width: 20 },
     { header: 'Approver', key: 'approver', width: 20 },
     { header: 'Job Priority', key: 'jobPriority', width: 15 },
     { header: 'Class Related', key: 'classRelated', width: 15 },
-    { header: 'Last Done Date', key: 'lastDoneDate', width: 15 },
+    { header: 'Next Due Date', key: 'nextDueDate', width: 15 },
     { header: 'Brief Work Description', key: 'briefWorkDescription', width: 50 },
     { header: 'Department', key: 'department', width: 20 },
     { header: 'Criticality', key: 'criticality', width: 15 },
@@ -1032,12 +1091,12 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       jobCode: '',
       fleetEquipmentCode: component.fleetEquipmentCode || '',
       fleetEquipmentName: '',
-      woTitle: '',
+      jobTitle: '',
       componentCode: component.componentCode,
       componentName: component.name,
       maintenanceBasis: '',
       intervalValue: '',
-      internalRunningHourNumber: '',
+      intervalRunningHour: '',
       unit: '',
       taskType: '',
       assignedTo: '',
@@ -3662,7 +3721,9 @@ async function performImport(
       // VALIDATION: interval must be a valid number > 0
       let nextDueRH: string | null = null;
       let lastDoneRH: string | null = null;
-      const intervalRH = row['Interval Running Hours'] ? Number(String(row['Interval Running Hours']).trim()) : null;
+      // Support both new 'Interval Running Hour' and legacy 'Interval Running Hours' headers
+      const intervalRHValue = row['Interval Running Hour'] || row['Interval Running Hours'];
+      const intervalRH = intervalRHValue ? Number(String(intervalRHValue).trim()) : null;
       
       if (maintenanceBasis === 'Running Hours') {
         // Validate intervalRunningHour is present and valid for RH jobs
@@ -3739,14 +3800,14 @@ async function performImport(
         componentName: row['Component Name'] || component.name || null,
         fleetEquipmentCode: row['Fleet Equipment Code'] || null,
         fleetEquipmentName: row['Fleet Equipment Name'] || null,
-        jobTitle: row['WO Title'],          // Job title from WO Title column
+        jobTitle: row['Job Title'] || row['WO Title'],          // Job title (supports both new 'Job Title' and legacy 'WO Title' headers)
         maintenanceType: row['Task Type'],  // maintenanceType from Task Type column
         maintenanceBasis: maintenanceBasis,
         frequencyValue: frequencyValue ? parseFloat(frequencyValue) : null,
         frequencyUnit: frequencyUnit,
         // For Running Hours jobs: store interval in both fields for compatibility
         intervalRunningHour: intervalRH,
-        internalRunningHourNumber: row['Interval Running Hours'] || null,
+        internalRunningHourNumber: intervalRHValue || null,
         jobDescription: row['Brief Work Description'] || null,
         briefWorkDescription: row['Brief Work Description'] || null,  // Store in both fields for compatibility
         assignedTo: row['Assigned To'] || null,
