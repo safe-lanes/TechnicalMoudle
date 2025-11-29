@@ -124,18 +124,15 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     serialNo: "Serial No",
     drawingNo: "Drawing No",
     location: "Location",
-    critical: "Critical",
+    criticality: "Criticality",
     installation: "Installation Date",
     commissionedDate: "Commissioned Date",
     rating: "Rating",
     conditionBased: "Condition Based",
-    noOfUnits: "No of Units",
-    eqptSystemDept: "Eqpt / System Department",
-    parentComponent: "Parent Component",
-    dimensionsSize: "Dimensions/Size",
+    equipmentDepartment: "Equipment / System Department",
+    parentComponentCode: "Parent Component Code",
     notes: "Notes",
     runningHours: "Running Hours",
-    dateUpdated: "Date Updated",
     nextDue: "Next Due",
     woTitle: "WO Title",
     assignedTo: "Assigned To",
@@ -163,7 +160,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     installation: "",
     componentType: "",
     rating: "",
-    noOfUnits: "",
     equipmentDepartment: "",
     parentComponent: "",
     facility: "",
@@ -172,17 +168,14 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     maker: "",
     makerCode: "",
     model: "",
-    modelNumber: "",
     modelCode: "",
     department: "",
-    critical: "",
+    criticality: "",
     classItem: "",
     conditionBased: "",
-    dimensionsSize: "",
     notes: "",
     commissionedDate: "",
     installationDate: "",
-    eqptSystemDept: "",
     fleetEquipmentCode: "",
     fleetEquipmentName: "",
     vesselCode: "",
@@ -190,7 +183,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     isParent: "",
     // Section B: Running Hours
     runningHours: "",
-    dateUpdated: "",
     // Section C: Work Orders
     woTitle: "",
     assignedTo: "",
@@ -377,7 +369,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       installation: "",
       componentType: "",
       rating: "",
-      noOfUnits: "",
       equipmentDepartment: "",
       parentComponent: selectedNode.name,
       facility: "",
@@ -386,17 +377,14 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       maker: "",
       makerCode: "",
       model: "",
-      modelNumber: "",
       modelCode: "",
       department: "",
-      critical: "",
+      criticality: "",
       classItem: "",
       conditionBased: "",
-      dimensionsSize: "",
       notes: "",
       commissionedDate: "",
       installationDate: "",
-      eqptSystemDept: "",
       fleetEquipmentCode: "",
       fleetEquipmentName: "",
       vesselCode: "",
@@ -404,7 +392,6 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
       isParent: "",
       // Section B: Running Hours
       runningHours: "",
-      dateUpdated: "",
       // Section C: Work Orders
       woTitle: "",
       assignedTo: "",
@@ -1000,12 +987,12 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Critical</Label>
+                      <Label className="text-sm text-[#8798ad]">Criticality</Label>
                       <Select 
-                        value={componentData.critical || ''}
-                        onValueChange={(value) => handleInputChange('critical', value)}
+                        value={componentData.criticality || ''}
+                        onValueChange={(value) => handleInputChange('criticality', value)}
                       >
-                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-critical">
+                        <SelectTrigger className="border-[#52baf3] border-2 focus:border-[#52baf3]" data-testid="select-criticality">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1061,12 +1048,12 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Equip/System Department</Label>
+                      <Label className="text-sm text-[#8798ad]">Equipment / System Department</Label>
                       <Input 
-                        value={componentData.eqptSystemDept || ''}
-                        onChange={(e) => handleInputChange('eqptSystemDept', e.target.value)}
+                        value={componentData.equipmentDepartment || ''}
+                        onChange={(e) => handleInputChange('equipmentDepartment', e.target.value)}
                         className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-eqpt-system-dept"
+                        data-testid="input-equipment-department"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1207,22 +1194,13 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Full content when expanded */}
                     <CollapsibleContent>
-                      <div className="grid grid-cols-2 gap-6 mb-4">
+                      <div className="max-w-xs mb-4">
                         <DeletableField fieldKey="runningHours">
                           <EditableLabel fieldKey="runningHours" />
                           <Input 
                             value={componentData.runningHours}
                             onChange={(e) => handleInputChange('runningHours', e.target.value)}
                             placeholder="20000"
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                        <DeletableField fieldKey="dateUpdated">
-                          <EditableLabel fieldKey="dateUpdated" />
-                          <Input 
-                            value={componentData.dateUpdated}
-                            onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
-                            placeholder="dd-mm-yyyy"
                             className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                           />
                         </DeletableField>
@@ -1237,24 +1215,15 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     </CollapsibleContent>
                   </Collapsible>
                   
-                  {/* Preview when collapsed - 2 rows - OUTSIDE Collapsible */}
+                  {/* Preview when collapsed - OUTSIDE Collapsible */}
                   {collapsedSections.B && (
-                    <div className="grid grid-cols-2 gap-6 mb-4">
+                    <div className="max-w-xs mb-4">
                       <DeletableField fieldKey="runningHours">
                         <EditableLabel fieldKey="runningHours" />
                         <Input 
                           value={componentData.runningHours}
                           onChange={(e) => handleInputChange('runningHours', e.target.value)}
                           placeholder="20000"
-                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        />
-                      </DeletableField>
-                      <DeletableField fieldKey="dateUpdated">
-                        <EditableLabel fieldKey="dateUpdated" />
-                        <Input 
-                          value={componentData.dateUpdated}
-                          onChange={(e) => handleInputChange('dateUpdated', e.target.value)}
-                          placeholder="dd-mm-yyyy"
                           className="border-[#52baf3] border-2 focus:border-[#52baf3]"
                         />
                       </DeletableField>
