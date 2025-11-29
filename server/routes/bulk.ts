@@ -2247,22 +2247,50 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
   // Get columns from first row
   results.columns = Object.keys(data[0]);
 
-  // Filter out instruction/description rows (rows where Component Code contains descriptive text like "Required")
-  // Keep only rows with valid SFI codes or empty rows
+  // Filter out instruction/description rows based on the type
+  // Each type has a different primary key field to check
   const filteredData = data.filter((row, index) => {
-    const componentCode = row['Component Code'];
-    if (!componentCode) return false; // Skip empty rows
+    // Determine the primary identifier field based on type
+    let primaryField: string;
+    switch (type) {
+      case 'components':
+        primaryField = 'Component Code';
+        break;
+      case 'jobs':
+        primaryField = 'Job Code';
+        break;
+      case 'spares':
+        primaryField = 'Part Code';
+        break;
+      case 'stores':
+        primaryField = 'Item Code';
+        break;
+      case 'work-orders':
+        primaryField = 'Work Order Number';
+        break;
+      default:
+        primaryField = 'Component Code';
+    }
     
-    const codeStr = String(componentCode).trim();
+    const fieldValue = row[primaryField];
+    if (!fieldValue) {
+      console.log(`[${type}] Row ${index + 2}: Skipping - no ${primaryField} value`);
+      return false; // Skip empty rows
+    }
+    
+    const valueStr = String(fieldValue).trim();
+    if (!valueStr) {
+      console.log(`[${type}] Row ${index + 2}: Skipping - empty ${primaryField} value`);
+      return false;
+    }
     
     // Skip instruction rows - they typically contain words like "Required", "Text", "Unique", etc.
-    // Valid SFI codes should match the pattern: digits with optional dots
+    // Only apply this filter for components type where instruction rows are common in templates
     if (type === 'components') {
-      // If it contains common instruction keywords, skip it
       const instructionKeywords = ['required', 'unique', 'text', 'number', 'yes/no', 'dd-mm-yyyy', 'maximum', 'allowable'];
-      const lowerCode = codeStr.toLowerCase();
+      const lowerCode = valueStr.toLowerCase();
       if (instructionKeywords.some(keyword => lowerCode.includes(keyword))) {
-        console.log(`Skipping instruction row ${index + 2}: ${codeStr}`);
+        console.log(`Skipping instruction row ${index + 2}: ${valueStr}`);
         return false;
       }
     }
