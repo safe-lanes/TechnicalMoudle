@@ -73,7 +73,7 @@ interface ComponentData {
   maker: string;
   makerCode: string;
   model: string;
-  modelNumber: string;
+  modelCode: string;
   serialNo: string;
   drawingNo: string;
   componentCategory: string;
@@ -83,20 +83,16 @@ interface ComponentData {
   commissionedDate: string;
   rating: string;
   conditionBased: string;
-  noOfUnits: string;
   equipmentDepartment: string;
   parentComponent: string;
-  dimensionsSize: string;
   notes: string;
   runningHours: string;
-  dateUpdated: string;
   utilizationRate: string;
   avgDailyUsage: string;
   fleetEquipmentCode: string;
   fleetEquipmentName: string;
   vesselCode: string;
   isActive: string;
-  metrics: ConditionMetric[];
   workOrders: WorkOrder[];
   spares: Spare[];
   documents: Document[];
@@ -189,7 +185,7 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     maker: isEngine ? "MAN B&W" : isDeck ? "MacGregor" : isHull ? "Hyundai Heavy Industries" : "Daikin Industries",
     makerCode: isEngine ? "MAN-BW" : isDeck ? "MCG" : isHull ? "HHI" : "DKN",
     model: isEngine ? "6S60ME-C8.2" : isDeck ? "TTS-2400" : isHull ? "HHI-TANK-500" : "FXMQ-200",
-    modelNumber: isEngine ? "6S60ME" : isDeck ? "TTS2400" : isHull ? "TANK500" : "FXMQ200",
+    modelCode: isEngine ? "6S60ME" : isDeck ? "TTS2400" : isHull ? "TANK500" : "FXMQ200",
     serialNo: `SN-${component.code.replace(/\./g, "")}-2024-${Math.floor(Math.random() * 9000) + 1000}`,
     drawingNo: `DRW-${component.code.replace(/\./g, "")}-001`,
     componentCategory: getComponentCategory(component.id),
@@ -199,24 +195,16 @@ const generateMockComponentData = (component: ComponentNode): ComponentData => {
     commissionedDate: "2020-04-01",
     rating: isEngine ? "6000 kW" : isDeck ? "25 tons" : isHull ? "500 m³" : "200 kW",
     conditionBased: "Yes",
-    noOfUnits: "1",
     equipmentDepartment: isEngine ? "Engine" : isDeck ? "Deck" : isHull ? "Hull" : "Hotel",
     parentComponent: component.code.split(".").slice(0, -1).join(".") || "Ship",
-    dimensionsSize: isEngine ? "12m x 3m x 4m" : isDeck ? "8m x 6m x 3m" : isHull ? "20m x 15m x 8m" : "4m x 3m x 2.5m",
     notes: `Regular maintenance required. Last inspection completed successfully.`,
     runningHours: String(Math.floor(Math.random() * 50000) + 10000),
-    dateUpdated: "2024-12-15",
     fleetEquipmentCode: `FLEET-${component.code.split(".")[0]}`,
     fleetEquipmentName: isEngine ? "Main Propulsion System" : isDeck ? "Cargo Handling System" : "Ship Structure",
     vesselCode: "V001",
     isActive: "Yes",
     utilizationRate: `${Math.floor(Math.random() * 30) + 70}%`,
     avgDailyUsage: `${Math.floor(Math.random() * 8) + 16} hrs`,
-    metrics: [
-      { id: "m1", name: "Vibration", value: parseFloat((Math.random() * 2 + 1).toFixed(1)), originalData: { name: "Vibration", value: parseFloat((Math.random() * 2 + 1).toFixed(1)) } },
-      { id: "m2", name: "Temperature", value: Math.floor(Math.random() * 20) + 60, originalData: { name: "Temperature", value: Math.floor(Math.random() * 20) + 60 } },
-      { id: "m3", name: "Pressure", value: parseFloat((Math.random() * 2 + 6).toFixed(1)), originalData: { name: "Pressure", value: parseFloat((Math.random() * 2 + 6).toFixed(1)) } }
-    ],
     workOrders: [
       {
         id: `wo-${component.code}-1`,
@@ -560,75 +548,6 @@ export default function ComponentRegisterFormCR({
     updateSectionChangeCount();
   };
 
-  // Handle Metrics
-  const handleAddMetric = () => {
-    if (!componentData) return;
-    
-    const newMetric: ConditionMetric = {
-      id: `metric-new-${Date.now()}`,
-      name: "New Metric",
-      value: 0,
-      isNew: true,
-      isEditing: true
-    };
-    
-    setComponentData(prev => ({
-      ...prev!,
-      metrics: [...(prev!.metrics || []), newMetric]
-    }));
-    
-    updateSectionChangeCount();
-  };
-
-  const handleMetricFieldChange = (metricId: string, field: string, value: any) => {
-    if (!componentData) return;
-    
-    setComponentData(prev => ({
-      ...prev!,
-      metrics: (prev!.metrics || []).map(m => {
-        if (m.id === metricId) {
-          const updated = { ...m, [field]: value, isEditing: true };
-          if (!m.isNew && m.originalData) {
-            // Check if value is back to original
-            if (m.originalData[field] === value) {
-              updated.isEditing = false;
-            }
-          }
-          return updated;
-        }
-        return m;
-      })
-    }));
-    
-    updateSectionChangeCount();
-  };
-
-  const handleDeleteMetric = (metricId: string) => {
-    console.log('handleDeleteMetric called with:', metricId);
-    if (!componentData) return;
-    
-    setComponentData(prev => ({
-      ...prev!,
-      metrics: (prev!.metrics || []).map(m => 
-        m.id === metricId ? { ...m, pendingDelete: true } : m
-      )
-    }));
-    
-    updateSectionChangeCount();
-  };
-
-  const handleRestoreMetric = (metricId: string) => {
-    if (!componentData) return;
-    
-    setComponentData(prev => ({
-      ...prev!,
-      metrics: (prev!.metrics || []).map(m => 
-        m.id === metricId ? { ...m, pendingDelete: false } : m
-      )
-    }));
-    
-    updateSectionChangeCount();
-  };
 
   // Build change request payload
   const buildChangeRequestPayload = () => {
@@ -638,10 +557,9 @@ export default function ComponentRegisterFormCR({
     const summary: any = {};
 
     // Track Section A changes
-    const sectionAFields = ['maker', 'model', 'serialNo', 'location', 'critical', 
+    const sectionAFields = ['maker', 'model', 'modelCode', 'serialNo', 'location', 'critical', 
                            'installation', 'commissionedDate', 'rating', 'conditionBased',
-                           'noOfUnits', 'equipmentDepartment', 'parentComponent', 
-                           'dimensionsSize', 'notes'];
+                           'equipmentDepartment', 'parentComponent', 'notes'];
     
     let sectionACount = 0;
     sectionAFields.forEach(field => {
@@ -656,8 +574,7 @@ export default function ComponentRegisterFormCR({
     if (sectionACount > 0) summary['A'] = sectionACount;
 
     // Track Section B changes
-    const sectionBFields = ['runningHours', 'dateUpdated', 'utilizationRate', 
-                           'avgDailyUsage', 'vibration', 'temperature', 'pressure'];
+    const sectionBFields = ['runningHours', 'utilizationRate', 'avgDailyUsage'];
     
     let sectionBCount = 0;
     sectionBFields.forEach(field => {
@@ -933,11 +850,11 @@ export default function ComponentRegisterFormCR({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.modelNumber')}>Model Number</Label>
+                    <Label className={getLabelClass('A.modelCode')}>Model Code</Label>
                     <Input 
-                      value={componentData.modelNumber}
-                      onChange={(e) => handleInputChange('modelNumber', e.target.value, 'A')}
-                      className={getFieldClass('A.modelNumber', "border-[#52baf3] border-2")}
+                      value={componentData.modelCode}
+                      onChange={(e) => handleInputChange('modelCode', e.target.value, 'A')}
+                      className={getFieldClass('A.modelCode', "border-[#52baf3] border-2")}
                     />
                   </div>
                   <div className="space-y-2">
@@ -989,7 +906,7 @@ export default function ComponentRegisterFormCR({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.critical')}>Critical</Label>
+                    <Label className={getLabelClass('A.critical')}>Criticality</Label>
                     <Select 
                       value={componentData.critical}
                       onValueChange={(value) => handleInputChange('critical', value, 'A')}
@@ -1049,17 +966,9 @@ export default function ComponentRegisterFormCR({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.noOfUnits')}>No of Units</Label>
-                    <Input 
-                      value={componentData.noOfUnits}
-                      onChange={(e) => handleInputChange('noOfUnits', e.target.value, 'A')}
-                      className={getFieldClass('A.noOfUnits', "border-[#52baf3] border-2")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className={getLabelClass('A.equipmentDepartment')}>Eqpt / System Department</Label>
+                    <Label className={getLabelClass('A.equipmentDepartment')}>Equipment / System Department</Label>
                     <Input 
                       value={componentData.equipmentDepartment}
                       onChange={(e) => handleInputChange('equipmentDepartment', e.target.value, 'A')}
@@ -1067,7 +976,7 @@ export default function ComponentRegisterFormCR({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className={getLabelClass('A.parentComponent')}>Parent Component</Label>
+                    <Label className={getLabelClass('A.parentComponent')}>Parent Component Code</Label>
                     <Input 
                       value={componentData.parentComponent}
                       onChange={(e) => handleInputChange('parentComponent', e.target.value, 'A')}
@@ -1120,15 +1029,6 @@ export default function ComponentRegisterFormCR({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className={getLabelClass('A.dimensionsSize')}>Dimensions / Size</Label>
-                    <Input 
-                      value={componentData.dimensionsSize}
-                      onChange={(e) => handleInputChange('dimensionsSize', e.target.value, 'A')}
-                      className={getFieldClass('A.dimensionsSize', "border-[#52baf3] border-2")}
-                    />
-                  </div>
-                  <div className="col-span-1"></div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
@@ -1146,14 +1046,14 @@ export default function ComponentRegisterFormCR({
             )}
           </div>
 
-          {/* Section B - Running Hours & Condition Monitoring */}
+          {/* Section B - Running Hours */}
           <div>
             <h4 
               className="text-lg font-semibold mb-4 text-[#16569e] cursor-pointer flex items-center justify-between"
               onClick={() => toggleSection('B')}
             >
               <span className="flex items-center">
-                B. Running Hours & Condition Monitoring
+                B. Running Hours
                 {sectionChangeCounts['B'] > 0 && (
                   <span className="section-chip">
                     {sectionChangeCounts['B']} changes
@@ -1165,108 +1065,14 @@ export default function ComponentRegisterFormCR({
             
             {expandedSections.has('B') && (
               <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className={getLabelClass('B.runningHours')}>Running Hours</Label>
-                    <Input 
-                      type="number"
-                      value={componentData.runningHours}
-                      onChange={(e) => handleInputChange('runningHours', e.target.value, 'B')}
-                      className={getFieldClass('B.runningHours', "border-[#52baf3] border-2")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className={getLabelClass('B.dateUpdated')}>Date Updated</Label>
-                    <Input 
-                      type="date"
-                      value={componentData.dateUpdated}
-                      onChange={(e) => handleInputChange('dateUpdated', e.target.value, 'B')}
-                      className={getFieldClass('B.dateUpdated', "border-[#52baf3] border-2")}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <Label>Condition Monitoring Metrics</Label>
-                    <Button 
-                      onClick={() => handleAddMetric()}
-                      size="sm"
-                      className="bg-[#52baf3] hover:bg-[#4299d1] text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Metric
-                    </Button>
-                  </div>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Metric Name</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Value</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {componentData.metrics?.map((metric) => (
-                          <tr 
-                            key={metric.id} 
-                            className={`
-                              ${metric.pendingDelete ? 'strike-removed cr-changed-row' : ''}
-                              ${metric.isNew ? 'cr-new-item' : ''}
-                              ${metric.isEditing && !metric.isNew ? 'cr-modified-item' : ''}
-                            `}
-                          >
-                            <td className="px-4 py-2">
-                              <Input 
-                                value={metric.name}
-                                onChange={(e) => handleMetricFieldChange(metric.id!, 'name', e.target.value)}
-                                className={`h-8 ${metric.isEditing || metric.isNew ? 'cr-changed' : ''}`}
-                                disabled={metric.pendingDelete}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <Input 
-                                type="number"
-                                value={metric.value}
-                                onChange={(e) => handleMetricFieldChange(metric.id!, 'value', parseFloat(e.target.value))}
-                                className={`h-8 w-32 ${metric.isEditing || metric.isNew ? 'cr-changed' : ''}`}
-                                disabled={metric.pendingDelete}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              {!metric.pendingDelete && (
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    console.log('Delete metric clicked:', metric.id);
-                                    handleDeleteMetric(metric.id!);
-                                  }}
-                                  className="h-8 text-red-600 hover:text-red-700"
-                                  type="button"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {metric.pendingDelete && (
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRestoreMetric(metric.id!)}
-                                  className="h-8"
-                                >
-                                  Restore
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="space-y-2 max-w-xs">
+                  <Label className={getLabelClass('B.runningHours')}>Running Hours</Label>
+                  <Input 
+                    type="number"
+                    value={componentData.runningHours}
+                    onChange={(e) => handleInputChange('runningHours', e.target.value, 'B')}
+                    className={getFieldClass('B.runningHours', "border-[#52baf3] border-2")}
+                  />
                 </div>
               </div>
             )}
