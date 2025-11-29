@@ -313,7 +313,7 @@ export class PersistentFileStorage implements IStorage {
     }
     
     console.log(`✅ PersistentFileStorage initialized with file: ${this.dataFile}`);
-    console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares, ${Object.keys(this.data.jobs).length} jobs`);
+    console.log(`📊 Data loaded: ${Object.keys(this.data.users).length} users, ${Object.keys(this.data.components).length} components, ${Object.keys(this.data.spares).length} spares, ${Object.keys(this.data.jobs).length} jobs, ${Object.keys(this.data.storesItems || {}).length} stores items`);
     console.log(`📋 Change logs loaded: ${this.importChangeLogs.length} entries`);
   }
 
@@ -6367,9 +6367,13 @@ export class PersistentFileStorage implements IStorage {
   // =====================================================
 
   async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
-    const items = Object.values(this.data.storesItems).filter(
+    const allItems = Object.values(this.data.storesItems || {});
+    console.log(`📦 getStoresItems called: vesselId=${vesselId}, itemType=${itemType}, total items in storage: ${allItems.length}`);
+    
+    const items = allItems.filter(
       (item) => item.vesselId === vesselId && !item.deleted && (itemType ? item.itemType === itemType : true)
     );
+    console.log(`📦 Filtered result: ${items.length} items match criteria`);
     return items;
   }
 
