@@ -504,5 +504,60 @@
     "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-003\",\"createdAt\":\"2025-11-29T11:36:22.785Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing05\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":7,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-005\",\"partName\":\"gasket\",\"partNumber\":\"123-145\",\"positionNumber\":\"3\",\"remarks\":null,\"rob\":10,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:36:22.785Z\",\"vesselId\":\"V001\"}",
     "checksum": "4699e4ba3560eb9c0de94870dd8289b494d10ee1af25dabfdfd4421bbce865c2",
     "createdAt": "2025-11-29T11:36:22.798Z"
+  },
+  {
+    "id": "13b95c1c-1baf-4a3b-858e-1a859b50afbb",
+    "importHistoryId": "07994fd1-ee8f-4804-93c4-bf45e4c9789b",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "8",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.01\",\"componentId\":\"1764311633387_iquh4oqdj\",\"componentName\":\"Hydr. oil pumps No.01\",\"componentSpareCode\":\"SP-403.006.01-001\",\"createdAt\":\"2025-11-29T11:49:19.367Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing01\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":8,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":1,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-001\",\"partName\":\"stator\",\"partNumber\":\"123-123\",\"positionNumber\":\"1\",\"remarks\":null,\"rob\":5,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:49:19.367Z\",\"vesselId\":\"V001\"}",
+    "checksum": "29c130c15a52fda3b8d423de1d5a9df974684f444c0e32920d0e39be9520040a",
+    "createdAt": "2025-11-29T11:49:19.381Z"
+  },
+  {
+    "id": "092a3121-44bc-4b54-8c77-9e122e799092",
+    "importHistoryId": "07994fd1-ee8f-4804-93c4-bf45e4c9789b",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "9",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.01\",\"componentId\":\"1764311633387_iquh4oqdj\",\"componentName\":\"Hydr. oil pumps No.01\",\"componentSpareCode\":\"SP-403.006.01-002\",\"createdAt\":\"2025-11-29T11:49:19.382Z\",\"critical\":\"Yes\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing02\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":9,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-002\",\"partName\":\"rotor\",\"partNumber\":\"123-12\",\"positionNumber\":\"2\",\"remarks\":null,\"rob\":6,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:49:19.382Z\",\"vesselId\":\"V001\"}",
+    "checksum": "0dc77b51f7d236d074aec77d3bab00f05b8e5e21d2b3956d59ea7e21b3b3a40e",
+    "createdAt": "2025-11-29T11:49:19.394Z"
+  },
+  {
+    "id": "90563cb1-6d79-4ef9-8fa6-19f9388a1a63",
+    "importHistoryId": "07994fd1-ee8f-4804-93c4-bf45e4c9789b",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "10",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-003\",\"createdAt\":\"2025-11-29T11:49:19.394Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing03\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":10,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":1,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-003\",\"partName\":\"stator\",\"partNumber\":\"123-123\",\"positionNumber\":\"1\",\"remarks\":null,\"rob\":5,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:49:19.394Z\",\"vesselId\":\"V001\"}",
+    "checksum": "fd9039cd8b4a32ab60b0c4decec0e71cc2ad847d69af7a0388bcaf931bedd541",
+    "createdAt": "2025-11-29T11:49:19.410Z"
+  },
+  {
+    "id": "9724e7d9-b596-4afd-b91c-d27ab287954c",
+    "importHistoryId": "07994fd1-ee8f-4804-93c4-bf45e4c9789b",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "11",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-004\",\"createdAt\":\"2025-11-29T11:49:19.412Z\",\"critical\":\"Yes\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing04\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":11,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-004\",\"partName\":\"rotor\",\"partNumber\":\"123-12\",\"positionNumber\":\"2\",\"remarks\":null,\"rob\":6,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:49:19.412Z\",\"vesselId\":\"V001\"}",
+    "checksum": "fa144770d0d05a6e971a41be35857de8d8fd1dc2e69a732097d55f5d56654f08",
+    "createdAt": "2025-11-29T11:49:19.429Z"
+  },
+  {
+    "id": "18dc2a82-6964-4a21-b089-627c4c1d5d4a",
+    "importHistoryId": "07994fd1-ee8f-4804-93c4-bf45e4c9789b",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "12",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-005\",\"createdAt\":\"2025-11-29T11:49:19.430Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing05\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":12,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-005\",\"partName\":\"gasket\",\"partNumber\":\"123-145\",\"positionNumber\":\"3\",\"remarks\":null,\"rob\":10,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:49:19.430Z\",\"vesselId\":\"V001\"}",
+    "checksum": "7d9d9e79437542aceaf84a99c0f2dce8d18ada897a613413e80b4628768b4920",
+    "createdAt": "2025-11-29T11:49:19.447Z"
   }
 ]
