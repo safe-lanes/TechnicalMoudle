@@ -1282,6 +1282,12 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     queryKey: ['/api/components'],
   });
   
+  // Find the actual database ID for a component by its code
+  const getActualComponentId = (code: string): string | undefined => {
+    const comp = allComponents.find((c: any) => (c.componentCode || c.code) === code);
+    return comp?.id;
+  };
+  
   // Find all child component IDs recursively
   // Note: parentId stores parent's componentCode (not id), so we match by code
   const getAllChildIds = (parentCode: string): string[] => {
@@ -1293,9 +1299,10 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   };
   
   // Get component IDs to include (parent + all children)
-  // Use selectedComponent.code (the componentCode) to find children
+  // Use selectedComponent.code to find the actual database ID and children
+  const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
   const relevantComponentIds = selectedComponent 
-    ? [selectedComponent.id, ...getAllChildIds(selectedComponent.code)]
+    ? [selectedActualId, ...getAllChildIds(selectedComponent.code)].filter(Boolean) as string[]
     : [];
   
   // Filter spares for this component AND all its children
