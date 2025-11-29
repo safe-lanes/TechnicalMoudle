@@ -61,7 +61,28 @@ const UOM_OPTIONS = [
   "Other"
 ];
 
-// Store items are now fetched from API - no hardcoded data
+// API response type for stores items
+interface StoresApiItem {
+  id: number;
+  itemCode: string;
+  itemName: string;
+  impaCode?: string;
+  category?: string;
+  uom?: string;
+  totalRob?: number;
+  locationA?: string;
+  locationARob?: number;
+  locationB?: string;
+  locationBRob?: number;
+  min?: number;
+  max?: number;
+  itemType?: string;
+  vesselId?: string;
+  notes?: string;
+  isArchived?: boolean;
+  ihmPresence?: string;
+  ihmEvidenceType?: string;
+}
 
 const Stores: React.FC = () => {
   const { toast } = useToast();
@@ -77,6 +98,47 @@ const Stores: React.FC = () => {
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [items, setItems] = useState<StoreItem[]>([]);
+
+  // Fetch stores items from API - uses default TanStack Query fetcher
+  // The query key includes the full URL with query parameters
+  const { data: storesData = [], isLoading: storesLoading } = useQuery<StoresApiItem[]>({
+    queryKey: vesselId ? [`/api/stores/${vesselId}?itemType=${activeTab}`] : ['stores-disabled'],
+    enabled: !!vesselId,
+  });
+
+  // Map API data to StoreItem format and update items state
+  useEffect(() => {
+    if (storesData && storesData.length > 0) {
+      const mappedItems: StoreItem[] = storesData.map((item: any) => {
+        // Parse numeric values from strings (API may return strings)
+        const totalRob = Number(item.totalRob ?? item.rob ?? 0) || 0;
+        const locationARob = Number(item.locationARob ?? item.robLocationA ?? 0) || 0;
+        const locationBRob = Number(item.locationBRob ?? item.robLocationB ?? 0) || 0;
+        const rob = totalRob || (locationARob + locationBRob);
+        const min = Number(item.min ?? 0) || 0;
+        
+        return {
+          id: item.id,
+          itemCode: item.itemCode || '',
+          itemName: item.itemName || '',
+          storesCategory: item.category || '',
+          uom: item.uom || '',
+          rob: rob,
+          min: min,
+          stock: '', // Will be calculated by updateItemsStock
+          location: item.locationA || '',
+          category: (item.itemType as "stores" | "lubes" | "chemicals" | "others") || activeTab,
+          notes: item.notes || '',
+          isArchived: item.isArchived || false,
+          ihmPresence: (item.ihmPresence as typeof IHM_PRESENCE[number]) || 'Unknown',
+          ihmEvidenceType: (item.ihmEvidenceType as typeof IHM_EVIDENCE_TYPES[number]) || 'None',
+        };
+      });
+      setItems(mappedItems);
+    } else {
+      setItems([]);
+    }
+  }, [storesData, activeTab]);
   
   // History filters
   const [historyDateFrom, setHistoryDateFrom] = useState("");
