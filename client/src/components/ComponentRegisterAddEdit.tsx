@@ -61,13 +61,10 @@ export default function ComponentRegisterAddEdit({
     commissionedDate: "",
     rating: "",
     conditionBased: "",
-    noOfUnits: "",
     eqptSystemDept: "",
     parentComponent: parentComponent?.id || "",
-    dimensionsSize: "",
     notes: "",
     runningHours: "",
-    dateUpdated: "",
   });
 
 
@@ -126,13 +123,10 @@ export default function ComponentRegisterAddEdit({
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
         conditionBased: comp.conditionBased ? "Yes" : "No",
-        noOfUnits: comp.noOfUnits || "",
         eqptSystemDept: comp.eqptSystemDept || "",
         parentComponent: comp.parentId || "",
-        dimensionsSize: comp.dimensionsSize || "",
         notes: comp.notes || "",
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
-        dateUpdated: comp.dateUpdated || new Date().toISOString().split('T')[0],
       });
       setSelectedTreeNode(comp.id);
 
@@ -434,13 +428,10 @@ export default function ComponentRegisterAddEdit({
       commissionedDate: comp.commissionedDate || "",
       rating: comp.rating || "",
       conditionBased: comp.conditionBased ? "Yes" : "No",
-      noOfUnits: comp.noOfUnits || "",
       eqptSystemDept: comp.eqptSystemDept || "",
       parentComponent: comp.parentId || "",
-      dimensionsSize: comp.dimensionsSize || "",
       notes: comp.notes || "",
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
-      dateUpdated: comp.dateUpdated || new Date().toISOString().split('T')[0],
     });
     
     const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
@@ -562,13 +553,10 @@ export default function ComponentRegisterAddEdit({
                 commissionedDate: "",
                 rating: "",
                 conditionBased: "",
-                noOfUnits: "",
                 eqptSystemDept: "",
                 parentComponent: parentId,
-                dimensionsSize: "",
                 notes: "",
                 runningHours: "",
-                dateUpdated: new Date().toISOString().split('T')[0],
               });
               setWorkOrders([]);
               setMaintenanceHistory([]);
@@ -806,7 +794,7 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department</label>
                     <Input
@@ -825,15 +813,6 @@ export default function ComponentRegisterAddEdit({
                       data-testid="input-parent-component"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Dimensions/Size</label>
-                    <Input
-                      value={componentData.dimensionsSize}
-                      onChange={(e) => handleFieldChange('dimensionsSize', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-dimensions-size"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -849,30 +828,19 @@ export default function ComponentRegisterAddEdit({
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours & Condition Monitoring Metrics</h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours</h3>
+                <div className="mb-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Running Hours</label>
                     <Input
                       value={componentData.runningHours}
                       onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-                      className="h-8 text-sm"
+                      className="h-8 text-sm max-w-xs"
                       placeholder="20000"
                       data-testid="input-running-hours"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Date Updated</label>
-                    <Input
-                      type="date"
-                      value={componentData.dateUpdated}
-                      onChange={(e) => handleFieldChange('dateUpdated', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-date-updated"
-                    />
-                  </div>
                 </div>
-
               </div>
 
               <div>
