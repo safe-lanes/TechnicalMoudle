@@ -319,13 +319,13 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 35 },
     { header: 'Parent Fleet Equipment Code', key: 'parentFleetEquipmentCode', width: 25 },
     { header: 'SFI System', key: 'sfiSystem', width: 15 },
-    { header: 'Critical Yes/No', key: 'critical', width: 15 },
-    { header: 'Condition Based Yes/No', key: 'conditionBased', width: 20 },
+    { header: 'Criticality', key: 'criticality', width: 15 },
+    { header: 'Condition Based', key: 'conditionBased', width: 20 },
     { header: 'Location', key: 'location', width: 20 },
     { header: 'Rating', key: 'rating', width: 20 },
-    { header: 'Eqpt / System Department', key: 'department', width: 25 },
+    { header: 'Equipment / System Department', key: 'equipmentDepartment', width: 28 },
     { header: 'Notes', key: 'notes', width: 40 },
-    { header: 'IS Parent Yes/No', key: 'isParent', width: 15 },
+    { header: 'IS Parent', key: 'isParent', width: 15 },
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Maker Code', key: 'makerCode', width: 15 }
   ];
@@ -334,7 +334,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   fleetComponentSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 5: Vessel_Component (24 columns - EXACT HEADERS, NO IS Parent)
+  // SHEET 5: Vessel_Component (24 columns - EXACT HEADERS)
   // =====================================================
   const vesselComponentSheet = workbook.addWorksheet('Vessel_Component');
   vesselComponentSheet.columns = [
@@ -347,21 +347,21 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Maker', key: 'maker', width: 25 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
     { header: 'Model', key: 'model', width: 20 },
-    { header: 'Model Number', key: 'modelNumber', width: 20 },
+    { header: 'Model Code', key: 'modelCode', width: 20 },
     { header: 'Serial No', key: 'serialNo', width: 20 },
     { header: 'Drawing No', key: 'drawingNo', width: 18 },
     { header: 'Location', key: 'location', width: 20 },
-    { header: 'Critical Yes/No', key: 'critical', width: 15 },
-    { header: 'Condition Based Yes/No', key: 'conditionBased', width: 20 },
+    { header: 'Criticality', key: 'criticality', width: 15 },
+    { header: 'Condition Based', key: 'conditionBased', width: 20 },
     { header: 'Installation Date', key: 'installationDate', width: 18 },
     { header: 'Commissioned Date', key: 'commissionedDate', width: 18 },
     { header: 'Rating', key: 'rating', width: 20 },
-    { header: 'Eqpt / System Department', key: 'department', width: 25 },
+    { header: 'Equipment / System Department', key: 'equipmentDepartment', width: 28 },
     { header: 'Notes', key: 'notes', width: 40 },
     { header: 'Running Hours', key: 'runningHours', width: 15 },
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'SFI System', key: 'sfiSystem', width: 15 }
+    { header: 'IS Parent', key: 'isParent', width: 12 }
   ];
   
   // Headers only - no sample data
@@ -1357,21 +1357,21 @@ router.get('/template', async (req, res) => {
         // Vessel Component Sheet - 24 columns (matching Fleet Master Data template)
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Parent Component Code',
         'Component Code', 'Component Name', 'Component Category',
-        'Maker', 'Maker Code', 'Model', 'Model Number', 'Serial No', 'Drawing No',
-        'Location', 'Critical Yes/No', 'Condition Based Yes/No',
+        'Maker', 'Maker Code', 'Model', 'Model Code', 'Serial No', 'Drawing No',
+        'Location', 'Criticality', 'Condition Based',
         'Installation Date', 'Commissioned Date', 'Rating',
-        'Eqpt / System Department', 'Notes', 'Running Hours',
-        'IS Active', 'Vessel Code', 'SFI System'
+        'Equipment / System Department', 'Notes', 'Running Hours',
+        'IS Active', 'Vessel Code', 'IS Parent'
       ];
 
       validValues = [
         'Text (XXX.XXX.XX format)', 'Text (Equipment description)', 'Text (Parent SFI code)',
         'Required (SFI Format XXX.XXX)', 'Required (Equipment name)', 'Text (SFI category name)',
-        'Text (Manufacturer name)', 'Text (Maker ID from Maker List)', 'Text (Model name)', 'Text (Model number)', 'Text (Serial number)', 'Text (Drawing reference)',
+        'Text (Manufacturer name)', 'Text (Maker ID from Maker List)', 'Text (Model name)', 'Text (Model code)', 'Text (Serial number)', 'Text (Drawing reference)',
         'Text (Physical location)', 'Yes/No', 'Yes/No',
         'DD-MMM-YYYY', 'DD-MMM-YYYY', 'Text (Capacity/specification)',
         'Engine/Deck/Electrical', 'Text (Additional notes)', 'Number >= 0',
-        'Yes/No', 'Text (e.g., V001)', 'Text (SFI code reference)'
+        'Yes/No', 'Text (e.g., V001)', 'Yes/No'
       ];
 
       example = [];
@@ -2206,11 +2206,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
 
-      // Copy text fields directly
+      // Copy text fields directly - support both new and legacy header formats
       const textFields = [
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Maker', 'Maker Code',
-        'Model', 'Model Number', 'Serial No', 'Drawing No', 'Location',
-        'Rating', 'Eqpt / System Department', 'Notes', 'Vessel Code'
+        'Model', 'Model Code', 'Model Number', 'Serial No', 'Drawing No', 'Location',
+        'Rating', 'Equipment / System Department', 'Eqpt / System Department', 'Notes', 'Vessel Code'
       ];
       
       textFields.forEach(field => {
@@ -3891,6 +3891,21 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     }
   }
   
+  // Support both new and legacy header formats for department
+  const departmentValue = row['Equipment / System Department'] || row['Eqpt / System Department'] || null;
+  
+  // Support both new and legacy header formats for criticality
+  const criticalValue = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Critical (Yes/No)'];
+  const isCritical = criticalValue === true || criticalValue === 'Yes';
+  
+  // Support both new and legacy header formats for condition based
+  const conditionBasedValue = row['Condition Based'] ?? row['Condition Based Yes/No'] ?? row['Condition Based (Yes/No)'];
+  const isConditionBased = conditionBasedValue === true || conditionBasedValue === 'Yes';
+  
+  // Support both new and legacy header formats for IS Parent
+  const isParentValue = row['IS Parent'] ?? row['IS Parent Yes/No'];
+  const isParent = isParentValue === true || isParentValue === 'Yes';
+  
   const componentData = {
     componentCode: componentCode,
     name: row['Component Name'] || '',
@@ -3907,32 +3922,29 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     maker: makerName,
     makerCode: makerCode,
     model: row['Model'] || null,
-    modelNumber: row['Model Number'] || null,
-    modelCode: null, // Can be computed from Maker Code + Model if needed
+    modelCode: row['Model Code'] || row['Model Number'] || null, // Support both new and legacy headers
     // Component specific fields
     serialNo: row['Serial No'] || null,
     drawingNo: row['Drawing No'] || null,
-    // Department and categorization
-    department: row['Eqpt / System Department'] || null,
-    deptCategory: row['Eqpt / System Department'] || null,
+    // Department and categorization - support both new and legacy headers
+    department: departmentValue,
+    deptCategory: departmentValue,
     componentCategory: row['Component Category'] || row['Main Group Name'] || null,
     location: row['Location'] || null,
-    eqptSystemDept: row['Eqpt / System Department'] || null,
+    equipmentDepartment: departmentValue,
     // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
     commissionedDate: row['Commissioned Date'] ? normalizeDateToDDMMMYYYY(row['Commissioned Date']) : null,
     installationDate: row['Installation Date'] ? normalizeDateToDDMMMYYYY(row['Installation Date']) : null,
     // Status and classification - Support both template format and legacy format
-    critical: row['Critical Yes/No'] === true || row['Critical Yes/No'] === 'Yes' || 
-              row['Critical (Yes/No)'] === true || row['Critical (Yes/No)'] === 'Yes',
+    critical: isCritical,
+    criticality: isCritical ? 'Yes' : 'No',
     classItem: false, // Not in template, defaulting to false
-    conditionBased: row['Condition Based Yes/No'] === true || row['Condition Based Yes/No'] === 'Yes' ||
-                    row['Condition Based (Yes/No)'] === true || row['Condition Based (Yes/No)'] === 'Yes',
+    conditionBased: isConditionBased,
     isActive: row['IS Active'] !== false && row['IS Active'] !== 'No', // Default to true
+    isParent: isParent,
     // Technical specifications
     rating: row['Rating'] || null,
-    noOfUnits: null, // Not in new template
     parentComponent: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
-    dimensionsSize: null, // Not in new template
     notes: row['Notes'] || null,
     // Running Hours
     runningHours: row['Running Hours'] ? String(row['Running Hours']) : null,
@@ -3975,15 +3987,18 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   }
   if (row['Maker Code']) updateData.makerCode = row['Maker Code'];
   if (row['Model']) updateData.model = row['Model'];
-  if (row['Model Number']) updateData.modelNumber = row['Model Number'];
+  // Support both new (Model Code) and legacy (Model Number) headers
+  const modelCodeValue = row['Model Code'] || row['Model Number'];
+  if (modelCodeValue) updateData.modelCode = modelCodeValue;
   // Component specific fields
   if (row['Serial No']) updateData.serialNo = row['Serial No'];
   if (row['Drawing No']) updateData.drawingNo = row['Drawing No'];
-  // Department and categorization
-  if (row['Eqpt / System Department']) {
-    updateData.department = row['Eqpt / System Department'];
-    updateData.deptCategory = row['Eqpt / System Department'];
-    updateData.eqptSystemDept = row['Eqpt / System Department'];
+  // Department and categorization - support both new and legacy headers
+  const deptValue = row['Equipment / System Department'] || row['Eqpt / System Department'];
+  if (deptValue) {
+    updateData.department = deptValue;
+    updateData.deptCategory = deptValue;
+    updateData.equipmentDepartment = deptValue;
   }
   if (row['Component Category'] || row['Main Group Name']) {
     updateData.componentCategory = row['Component Category'] || row['Main Group Name'];
@@ -3992,17 +4007,24 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   // Dates - Convert Excel serial numbers to DD-MMM-YYYY format
   if (row['Commissioned Date']) updateData.commissionedDate = normalizeDateToDDMMMYYYY(row['Commissioned Date']);
   if (row['Installation Date']) updateData.installationDate = normalizeDateToDDMMMYYYY(row['Installation Date']);
-  // Status and classification - Support both template format and legacy format
-  const criticalValue = row['Critical Yes/No'] ?? row['Critical (Yes/No)'];
+  // Status and classification - Support both new and legacy header formats
+  const criticalValue = row['Criticality'] ?? row['Critical Yes/No'] ?? row['Critical (Yes/No)'];
   if (criticalValue !== undefined) {
-    updateData.critical = criticalValue === true || criticalValue === 'Yes';
+    const isCritical = criticalValue === true || criticalValue === 'Yes';
+    updateData.critical = isCritical;
+    updateData.criticality = isCritical ? 'Yes' : 'No';
   }
-  const conditionBasedValue = row['Condition Based Yes/No'] ?? row['Condition Based (Yes/No)'];
+  const conditionBasedValue = row['Condition Based'] ?? row['Condition Based Yes/No'] ?? row['Condition Based (Yes/No)'];
   if (conditionBasedValue !== undefined) {
     updateData.conditionBased = conditionBasedValue === true || conditionBasedValue === 'Yes';
   }
   if (row['IS Active'] !== undefined) {
     updateData.isActive = row['IS Active'] !== false && row['IS Active'] !== 'No';
+  }
+  // Support IS Parent field
+  const isParentValue = row['IS Parent'] ?? row['IS Parent Yes/No'];
+  if (isParentValue !== undefined) {
+    updateData.isParent = isParentValue === true || isParentValue === 'Yes';
   }
   // Technical specifications
   if (row['Rating']) updateData.rating = row['Rating'];
