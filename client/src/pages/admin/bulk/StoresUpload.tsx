@@ -61,9 +61,17 @@ interface StoresUploadProps {
   vesselId: string;
 }
 
+const STORE_TYPES = [
+  { value: 'stores', label: 'Stores' },
+  { value: 'lubricants', label: 'Lubes' },
+  { value: 'chemicals', label: 'Chemicals' },
+  { value: 'others', label: 'Others' }
+];
+
 export default function StoresUpload({ vesselId }: StoresUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
+  const [selectedStoreType, setSelectedStoreType] = useState<string>('');
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -180,6 +188,7 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
     formData.append('mode', importMode);
     formData.append('vesselId', vesselId);
     formData.append('archiveMissing', 'false');
+    formData.append('storeType', selectedStoreType);
     
     if (sheetName) {
       formData.append('sheetName', sheetName);
@@ -241,7 +250,8 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
           type: 'stores',
           mode: importMode,
           vesselId,
-          archiveMissing: false
+          archiveMissing: false,
+          storeType: selectedStoreType
         })
       });
 
@@ -261,6 +271,7 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
       setDryRunResult(null);
       setAvailableSheets([]);
       setSelectedSheet('');
+      setSelectedStoreType('');
       
       queryClient.invalidateQueries({ queryKey: ['/api/stores'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history'] });
@@ -298,7 +309,7 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
             </TabsList>
 
             <TabsContent value="upload" className="space-y-6 pt-4">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-6">
                 <div>
                   <Label className="text-sm font-medium">Import Mode</Label>
                   <Select value={importMode} onValueChange={(v) => setImportMode(v as any)}>
@@ -319,6 +330,23 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
                 </div>
 
                 <div>
+                  <Label className="text-sm font-medium">Store Type <span className="text-red-500">*</span></Label>
+                  <Select value={selectedStoreType} onValueChange={setSelectedStoreType}>
+                    <SelectTrigger className="mt-2" data-testid="select-store-type">
+                      <SelectValue placeholder="Select store type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STORE_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select which tab this data belongs to
+                  </p>
+                </div>
+
+                <div>
                   <Label className="text-sm font-medium">Select File</Label>
                   <div className="mt-2">
                     <input
@@ -328,16 +356,23 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
                       className="hidden"
                       id="stores-file-input"
                       data-testid="input-file"
+                      disabled={!selectedStoreType}
                     />
                     <Button
                       variant="outline"
                       onClick={() => document.getElementById('stores-file-input')?.click()}
                       className="w-full"
+                      disabled={!selectedStoreType}
                       data-testid="button-select-file"
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       {selectedFile ? selectedFile.name : 'Choose File'}
                     </Button>
+                    {!selectedStoreType && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Please select a store type first
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
