@@ -459,37 +459,37 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   fleetSpareSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 9: Vessel_Spare (27 columns - EXACT HEADERS with ROB by Location)
+  // SHEET 9: Vessel_Spare (27 columns - EXACT HEADERS per specification)
   // =====================================================
   const vesselSpareSheet = workbook.addWorksheet('Vessel_Spare');
   vesselSpareSheet.columns = [
+    { header: 'Part Code', key: 'partCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
     { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28 },
     { header: 'Component Code', key: 'componentCode', width: 18 },
     { header: 'Component Name', key: 'componentName', width: 28 },
-    { header: 'Part Code', key: 'partCode', width: 18 },
     { header: 'Part Name', key: 'partName', width: 32 },
     { header: 'Part Number', key: 'partNumber', width: 18 },
+    { header: 'UOM', key: 'uom', width: 12 },
+    { header: 'Drawing Number', key: 'drawingNumber', width: 18 },
+    { header: 'Position Number', key: 'positionNumber', width: 16 },
+    { header: 'Note', key: 'note', width: 35 },
+    { header: 'Specification', key: 'specification', width: 35 },
     { header: 'Maker', key: 'maker', width: 22 },
     { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Unit Of Measurement', key: 'uom', width: 18 },
-    { header: 'Stocking Number', key: 'stockingNumber', width: 18 },
-    { header: 'Specification', key: 'specification', width: 35 },
-    { header: 'Drawing No', key: 'drawingNo', width: 15 },
-    { header: 'ROB Deck Store', key: 'robDeckStore', width: 15 },
-    { header: 'ROB Engine Store', key: 'robEngineStore', width: 16 },
-    { header: 'ROB Store 1', key: 'robStore1', width: 12 },
-    { header: 'ROB Store 2', key: 'robStore2', width: 12 },
+    { header: 'Manual Name', key: 'manualName', width: 20 },
+    { header: 'Page Number', key: 'pageNumber', width: 14 },
+    { header: 'Criticality', key: 'criticality', width: 14 },
     { header: 'Total ROB', key: 'totalRob', width: 12 },
-    { header: 'Min Stock', key: 'minStock', width: 10 },
-    { header: 'Max Stock', key: 'maxStock', width: 10 },
-    { header: 'Unit Cost', key: 'unitCost', width: 12 },
-    { header: 'Lead Time Days', key: 'leadTimeDays', width: 15 },
-    { header: 'Supplier', key: 'supplier', width: 28 },
-    { header: 'Critical Yes/No', key: 'critical', width: 15 },
-    { header: 'IS Active', key: 'isActive', width: 12 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'Remarks', key: 'remarks', width: 35 }
+    { header: 'Location A', key: 'locationA', width: 15 },
+    { header: 'Location A - ROB', key: 'locationARob', width: 16 },
+    { header: 'Location B', key: 'locationB', width: 15 },
+    { header: 'Location B - ROB', key: 'locationBRob', width: 16 },
+    { header: 'Minimum Stock', key: 'minimumStock', width: 14 },
+    { header: 'Is Active', key: 'isActive', width: 12 },
+    { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35 },
+    { header: 'Evidence Type', key: 'evidenceType', width: 16 },
+    { header: 'Vessel Code', key: 'vesselCode', width: 12 }
   ];
   
   // Headers only - no sample data
