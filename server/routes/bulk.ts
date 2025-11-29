@@ -117,6 +117,167 @@ function extractRawExcelData(worksheet: XLSX.WorkSheet): any[] {
   return data;
 }
 
+/**
+ * Column name mapping for normalization
+ * Maps various column name variations to the expected format
+ */
+const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
+  stores: {
+    // Item Code variations
+    'itemcode': 'Item Code',
+    'item_code': 'Item Code',
+    'item code': 'Item Code',
+    'code': 'Item Code',
+    // IMPA Code variations
+    'impacode': 'IMPA Code',
+    'impa_code': 'IMPA Code',
+    'impa code': 'IMPA Code',
+    'impa': 'IMPA Code',
+    // Item Name variations
+    'itemname': 'Item Name',
+    'item_name': 'Item Name',
+    'item name': 'Item Name',
+    'name': 'Item Name',
+    'description': 'Item Name',
+    'item_description': 'Item Name',
+    // UOM variations
+    'uom': 'UOM',
+    'unit': 'UOM',
+    'unit_of_measure': 'UOM',
+    'unit of measure': 'UOM',
+    // Category variations
+    'category': 'Category',
+    'stores_category': 'Category',
+    'stores category': 'Category',
+    'storescategory': 'Category',
+    // Total ROB variations
+    'totalrob': 'Total ROB',
+    'total_rob': 'Total ROB',
+    'total rob': 'Total ROB',
+    'rob': 'Total ROB',
+    'stock': 'Total ROB',
+    'quantity': 'Total ROB',
+    // Location A variations
+    'locationa': 'Location A',
+    'location_a': 'Location A',
+    'location a': 'Location A',
+    'loc_a': 'Location A',
+    'loc a': 'Location A',
+    // Location A - ROB variations
+    'locationa-rob': 'Location A - ROB',
+    'location_a_rob': 'Location A - ROB',
+    'location a - rob': 'Location A - ROB',
+    'loc_a_rob': 'Location A - ROB',
+    'loc a rob': 'Location A - ROB',
+    'location a rob': 'Location A - ROB',
+    // Location B variations
+    'locationb': 'Location B',
+    'location_b': 'Location B',
+    'location b': 'Location B',
+    'loc_b': 'Location B',
+    'loc b': 'Location B',
+    // Location B - ROB variations
+    'locationb-rob': 'Location B - ROB',
+    'location_b_rob': 'Location B - ROB',
+    'location b - rob': 'Location B - ROB',
+    'loc_b_rob': 'Location B - ROB',
+    'loc b rob': 'Location B - ROB',
+    'location b rob': 'Location B - ROB',
+    // Min variations
+    'min': 'Min',
+    'minimum': 'Min',
+    'min_stock': 'Min',
+    'minimum_stock': 'Min',
+    'min stock': 'Min',
+    'minimum stock': 'Min',
+    'minstock': 'Min',
+    'minimumstock': 'Min'
+  },
+  spares: {
+    'partcode': 'Part Code',
+    'part_code': 'Part Code',
+    'part code': 'Part Code',
+    'componentcode': 'Component Code',
+    'component_code': 'Component Code',
+    'component code': 'Component Code',
+    'componentname': 'Component Name',
+    'component_name': 'Component Name',
+    'component name': 'Component Name',
+    'partname': 'Part Name',
+    'part_name': 'Part Name',
+    'part name': 'Part Name',
+    'partnumber': 'Part Number',
+    'part_number': 'Part Number',
+    'part number': 'Part Number',
+    'uom': 'UOM',
+    'totalrob': 'Total ROB',
+    'total_rob': 'Total ROB',
+    'total rob': 'Total ROB'
+  },
+  components: {
+    'componentcode': 'Component Code',
+    'component_code': 'Component Code',
+    'component code': 'Component Code',
+    'componentname': 'Component Name',
+    'component_name': 'Component Name',
+    'component name': 'Component Name',
+    'category': 'Category',
+    'maingroupcode': 'Main Group Code',
+    'main_group_code': 'Main Group Code',
+    'main group code': 'Main Group Code'
+  },
+  jobs: {
+    'componentcode': 'Component Code',
+    'component_code': 'Component Code',
+    'component code': 'Component Code',
+    'jobcode': 'Job Code',
+    'job_code': 'Job Code',
+    'job code': 'Job Code',
+    'jobtitle': 'Job Title',
+    'job_title': 'Job Title',
+    'job title': 'Job Title'
+  }
+};
+
+/**
+ * Normalize column names in data array to expected format
+ */
+function normalizeColumnNames(data: any[], type: string): any[] {
+  const mappings = COLUMN_MAPPINGS[type];
+  if (!mappings || data.length === 0) {
+    return data;
+  }
+
+  // Get original column names from first row
+  const originalColumns = Object.keys(data[0] || {});
+  
+  // Build a mapping from original column name to normalized name
+  const columnMap: { [original: string]: string } = {};
+  
+  for (const col of originalColumns) {
+    // Normalize the column name for lookup (lowercase, trim)
+    const normalizedLookup = col.toLowerCase().trim();
+    
+    // Check if we have a mapping for this column
+    if (mappings[normalizedLookup]) {
+      columnMap[col] = mappings[normalizedLookup];
+    } else {
+      // Keep original if no mapping found
+      columnMap[col] = col;
+    }
+  }
+
+  // Transform all rows using the column mapping
+  return data.map(row => {
+    const normalizedRow: any = {};
+    for (const [originalCol, value] of Object.entries(row)) {
+      const normalizedCol = columnMap[originalCol] || originalCol;
+      normalizedRow[normalizedCol] = value;
+    }
+    return normalizedRow;
+  });
+}
+
 // Component categories from existing system (8 main categories)
 const COMPONENT_CATEGORIES = [
   "1 Ship General",
@@ -1872,8 +2033,26 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Unsupported file format' });
     }
 
+    // Log raw data for debugging
+    console.log(`📊 [${type}] Raw data parsed: ${data.length} rows`);
+    if (data.length > 0) {
+      console.log(`📋 Original columns: ${Object.keys(data[0]).join(', ')}`);
+      console.log(`📋 First row sample: ${JSON.stringify(data[0])}`);
+    } else {
+      console.log(`⚠️ NO DATA ROWS FOUND in file!`);
+      console.log(`📋 Sheet may be empty or header row might be missing data rows`);
+    }
+
+    // Normalize column names to expected format
+    data = normalizeColumnNames(data, type);
+    
+    if (data.length > 0) {
+      console.log(`📋 Normalized columns: ${Object.keys(data[0]).join(', ')}`);
+    }
+
     // Validate data
     const results = await validateData(type, data, mode, vesselId);
+    console.log(`✅ Validation complete: ${results.summary.ok} valid, ${results.summary.errors} errors, ${results.rows.length} total rows`);
     
     // Generate file token
     const fileToken = uuidv4();
