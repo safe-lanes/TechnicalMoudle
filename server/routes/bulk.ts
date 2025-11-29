@@ -2786,11 +2786,14 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     if (errors.length > 0) {
       status = 'error';
       results.summary.errors++;
+      console.log(`❌ Row ${rowNum} has ERRORS: ${JSON.stringify(errors)}`);
     } else if (warnings.length > 0) {
       status = 'warning';
       results.summary.warnings++;
+      console.log(`⚠️ Row ${rowNum} has warnings: ${JSON.stringify(warnings)}`);
     } else {
       results.summary.ok++;
+      console.log(`✅ Row ${rowNum} is OK`);
     }
 
     results.rows.push({

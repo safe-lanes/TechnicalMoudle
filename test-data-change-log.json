@@ -471,5 +471,38 @@
     "newData": "{\"approver\":\"Chief Engineer\",\"assignedTo\":\"2nd Engineer\",\"briefWorkDescription\":\"SAFETY PROCEDURE (COMPANY)\\r\\n===========================\\r\\nEnsure compliance with safety procedures according to the company policy and requirements.\\r\\n\\r\\nJOB REFERENCE DETAILS\\r\\n===================\\r\\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\\r\\nPdf Page No: 118\\r\\nChapter: Periodical Maintenance\\r\\n\\r\\n\\r\\nDESCRIPTION\\r\\n===========\\r\\n1. Replace the rotor seal & gland seal.\",\"classRelated\":\"No\",\"componentCode\":\"403.001\",\"componentId\":\"1764311869955_srvdp4g60\",\"componentName\":\"Steering gears, complete\",\"createdAt\":\"2025-11-28T06:44:55.302Z\",\"criticality\":\"Yes\",\"dataScope\":\"vessel\",\"department\":\"Engine\",\"fleetEquipmentCode\":\"403.001.AA\",\"fleetEquipmentName\":\"Steering gears, complete\",\"fleetJobCode\":null,\"frequencyUnit\":\"Hours\",\"frequencyValue\":500,\"id\":\"0T4PNjSVCxDAmULfXnkEz\",\"initialNextDue\":null,\"internalRunningHourNumber\":\"500\",\"intervalRunningHour\":500,\"isActive\":true,\"jobDescription\":\"SAFETY PROCEDURE (COMPANY)\\r\\n===========================\\r\\nEnsure compliance with safety procedures according to the company policy and requirements.\\r\\n\\r\\nJOB REFERENCE DETAILS\\r\\n===================\\r\\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\\r\\nPdf Page No: 118\\r\\nChapter: Periodical Maintenance\\r\\n\\r\\n\\r\\nDESCRIPTION\\r\\n===========\\r\\n1. Replace the rotor seal & gland seal.\",\"jobNo\":\"MKR-SE-00001\",\"jobPriority\":\"Medium\",\"jobTitle\":\"Steering Gear Rotor Seal & Gland Seal, Renewal/Replace - 5Y\",\"lastDoneDate\":\"27-Nov-2025\",\"lastDoneRH\":\"100\",\"maintenanceBasis\":\"Running Hours\",\"maintenanceType\":\"Service\",\"nextDueDate\":null,\"nextDueRH\":\"600\",\"requiredSpareParts\":[],\"requiredTools\":[],\"safetyRequirements\":{\"otherRequirements\":[],\"permitRequirements\":[],\"ppeRequirements\":[]},\"sfiCode\":null,\"updatedAt\":\"2025-11-28T06:44:55.302Z\",\"vesselCode\":\"V001\",\"vesselId\":\"V001\"}",
     "checksum": "d51bca96ee2fdbdbc87c88913b5dac79de24d8152ae6300cd9838b5d65f6a188",
     "createdAt": "2025-11-28T06:44:55.310Z"
+  },
+  {
+    "id": "1f5779e3-bc34-4d03-a2d0-edc95029ad52",
+    "importHistoryId": "c6d5a71b-5bc7-4d8c-988c-e3d10a463ebe",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "5",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-001\",\"createdAt\":\"2025-11-29T11:36:22.745Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing03\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":5,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":1,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-003\",\"partName\":\"stator\",\"partNumber\":\"123-123\",\"positionNumber\":\"1\",\"remarks\":null,\"rob\":5,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:36:22.745Z\",\"vesselId\":\"V001\"}",
+    "checksum": "56f4ba04f6ede5c18d0fa7a8a6bda80eeeedeae786c42deba36865b29401376d",
+    "createdAt": "2025-11-29T11:36:22.763Z"
+  },
+  {
+    "id": "a4f89b20-1434-45b5-b54d-5eccc642f9ec",
+    "importHistoryId": "c6d5a71b-5bc7-4d8c-988c-e3d10a463ebe",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "6",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-002\",\"createdAt\":\"2025-11-29T11:36:22.767Z\",\"critical\":\"Yes\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing04\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":6,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-004\",\"partName\":\"rotor\",\"partNumber\":\"123-12\",\"positionNumber\":\"2\",\"remarks\":null,\"rob\":6,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:36:22.767Z\",\"vesselId\":\"V001\"}",
+    "checksum": "f119495fa4ad67923b3e0871b96ec456cb3a2758c8fb24944a94a4821e52f7fc",
+    "createdAt": "2025-11-29T11:36:22.783Z"
+  },
+  {
+    "id": "7f3494ae-b031-49de-805f-c9286f76db54",
+    "importHistoryId": "c6d5a71b-5bc7-4d8c-988c-e3d10a463ebe",
+    "operation": "created",
+    "entityType": "spare",
+    "entityId": "7",
+    "previousData": null,
+    "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"403.006.02\",\"componentId\":\"1764311633391_9u0ts98y1\",\"componentName\":\"Hydr. oil pumps No.02\",\"componentSpareCode\":\"SP-403.006.02-003\",\"createdAt\":\"2025-11-29T11:36:22.785Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"testdrawing05\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":7,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"store_a\",\"location2\":\"store_b\",\"maker\":\"Rolls Royce\",\"makerCode\":\"MKR-000001\",\"manualName\":\"user manual\",\"max\":null,\"min\":0,\"model\":null,\"note\":\"samples notes\",\"pageNumber\":\"456\",\"partCategory\":null,\"partCode\":\"403.006-005\",\"partName\":\"gasket\",\"partNumber\":\"123-145\",\"positionNumber\":\"3\",\"remarks\":null,\"rob\":10,\"scopeNotes\":null,\"specification\":\"test\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-11-29T11:36:22.785Z\",\"vesselId\":\"V001\"}",
+    "checksum": "4699e4ba3560eb9c0de94870dd8289b494d10ee1af25dabfdfd4421bbce865c2",
+    "createdAt": "2025-11-29T11:36:22.798Z"
   }
 ]
