@@ -8,11 +8,26 @@ import Admin4Dashboard from "../admin/Admin4Dashboard";
 export default function PMSAdmin() {
   const [activeTab, setActiveTab] = useState("bulk-data-imp");
 
+  const getPageTitle = () => {
+    switch (activeTab) {
+      case "bulk-data-imp":
+        return "Bulk Data Import";
+      case "alerts":
+        return "Alert Configuration";
+      case "forms":
+        return "Forms";
+      case "admin-4":
+        return "Master Data";
+      default:
+        return "Admin";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
         <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Bulk Data Import</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h1>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

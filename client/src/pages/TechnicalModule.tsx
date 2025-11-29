@@ -9,8 +9,6 @@ import MaintenanceRecords from "./pms/MaintenanceRecords";
 import { ModifyPMS } from "@/components/modifyPms/ModifyPMS";
 import Spares from "./spares/SparesNew";
 import Stores from "./stores/Stores";
-import AdminPanel from "./admin/AdminPanel";
-import BulkDataImport from "./admin/BulkDataImport";
 import PMSAdmin from "./pms/PMSAdmin";
 import ReportsModule from "./reports/ReportsModule";
 import DefectsLogWithTabs from "./defects/DefectsLogWithTabs";
@@ -136,10 +134,8 @@ export const TechnicalModule: React.FC = () => {
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem.startsWith("maintenance-records") ? (
             <MaintenanceRecords />
-          ) : selectedSubModule === "admin" && selectedMenuItem === "bulk-data-import" ? (
-            <BulkDataImport />
           ) : selectedSubModule === "admin" ? (
-            <AdminPanel />
+            <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
           ) : selectedSubModule === "defects" && (selectedMenuItem === "new" || selectedMenuItem === "edit") ? (
