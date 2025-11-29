@@ -18,7 +18,7 @@ const FIELD_MAPPINGS = [
 
 const STORE_TYPES = [
   { value: 'stores', label: 'Stores' },
-  { value: 'lubricants', label: 'Lubes' },
+  { value: 'lubes', label: 'Lubes' },
   { value: 'chemicals', label: 'Chemicals' },
   { value: 'others', label: 'Others' }
 ];
