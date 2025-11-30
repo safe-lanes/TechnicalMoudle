@@ -155521,11 +155521,11 @@
       "rhLeadHoursCritical": 50,
       "rhLeadHoursNonCritical": 100,
       "rhGraceHours": 168,
-      "locationAName": "PersistTestA-Tfne",
-      "locationBName": "PersistTestB-hCvy",
-      "updatedBy": "User",
+      "locationAName": "Engine Room",
+      "locationBName": "Deck Store",
+      "updatedBy": "System",
       "createdAt": "2025-11-30T14:34:17.187Z",
-      "updatedAt": "2025-11-30T16:53:55.016Z"
+      "updatedAt": "2025-11-30T18:08:17.974Z"
     }
   },
   "storesItems": {

@@ -110,7 +110,7 @@ const Spares: React.FC = () => {
   
   // Location dropdown state
   const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
-  const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string}}>({});
+  const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
   const locationDropdownRef = useRef<HTMLDivElement>(null);
   
   // Click outside handler for location dropdown
@@ -153,6 +153,7 @@ const Spares: React.FC = () => {
     const robB = parseInt(locations.locationB) || 0;
     
     try {
+      // Save ROB quantities to spare
       await fetch(`/api/spares/${vesselId}/${spareId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -162,11 +163,25 @@ const Spares: React.FC = () => {
           rob: robA + robB
         }),
       });
+      
+      // Save location names to vessel settings if they were edited
+      if (locations.nameA || locations.nameB) {
+        await fetch(`/api/vessel-location-names/${vesselId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            locationAName: locations.nameA || locationNames.locationA || 'Location A',
+            locationBName: locations.nameB || locationNames.locationB || 'Location B'
+          }),
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      toast({ title: "Saved", description: "Location quantities updated" });
+      toast({ title: "Saved", description: "Location settings updated" });
     } catch (error) {
       console.error('Failed to save location:', error);
-      toast({ title: "Error", description: "Failed to save location quantities", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save location settings", variant: "destructive" });
     }
   };
 
@@ -323,13 +338,16 @@ const Spares: React.FC = () => {
     queryKey: [`/api/vessel-location-names/${vesselId}`],
     queryFn: async () => {
       const response = await fetch(`/api/vessel-location-names/${vesselId}`);
-      if (!response.ok) return { locationA: 'Location A', locationB: 'Location B' };
+      if (!response.ok) return { locationAName: 'Location A', locationBName: 'Location B' };
       return response.json();
     },
     enabled: !!vesselId
   });
   
-  const locationNames = locationNamesData || { locationA: 'Location A', locationB: 'Location B' };
+  const locationNames = {
+    locationA: locationNamesData?.locationAName || 'Location A',
+    locationB: locationNamesData?.locationBName || 'Location B'
+  };
 
   // Consume spare mutation
   const consumeSpareMutation = useMutation({
@@ -1032,9 +1050,17 @@ const Spares: React.FC = () => {
                               <div className="space-y-3">
                                 <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    {locationNames.locationA || 'Location A'}
-                                  </label>
+                                  <Input
+                                    type="text"
+                                    value={editingLocations[spare.id]?.nameA || locationNames.locationA || 'Location A'}
+                                    onChange={(e) => setEditingLocations(prev => ({
+                                      ...prev,
+                                      [spare.id]: { ...prev[spare.id], nameA: e.target.value }
+                                    }))}
+                                    className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
+                                    placeholder="Location A name"
+                                    data-testid={`input-nameA-${spare.id}`}
+                                  />
                                   <Input
                                     type="number"
                                     min="0"
@@ -1049,9 +1075,17 @@ const Spares: React.FC = () => {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    {locationNames.locationB || 'Location B'}
-                                  </label>
+                                  <Input
+                                    type="text"
+                                    value={editingLocations[spare.id]?.nameB || locationNames.locationB || 'Location B'}
+                                    onChange={(e) => setEditingLocations(prev => ({
+                                      ...prev,
+                                      [spare.id]: { ...prev[spare.id], nameB: e.target.value }
+                                    }))}
+                                    className="h-6 text-xs font-medium text-gray-600 mb-1 border-dashed"
+                                    placeholder="Location B name"
+                                    data-testid={`input-nameB-${spare.id}`}
+                                  />
                                   <Input
                                     type="number"
                                     min="0"
