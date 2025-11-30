@@ -1284,18 +1284,20 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
   
   // Fetch spares scoped to the current vessel to avoid cross-vessel data leakage
+  // Note: queryKey[0] is used as the URL by default fetcher, so include vesselId in the URL path
   const { data: allSpares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: [`/api/spares/${vesselId}`],
     enabled: !!vesselId,
   });
   
-  // Fetch vessel location names
+  // Fetch vessel location names - URL must include vesselId since default fetcher uses queryKey[0]
   const { data: locationNames = { locationAName: 'Location A', locationBName: 'Location B' } } = useQuery<{
     vesselId: string;
     locationAName: string;
     locationBName: string;
   }>({
-    queryKey: ['/api/vessel-location-names', vesselId],
+    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    enabled: !!vesselId,
   });
   
   // Get all components to find children
@@ -1315,7 +1317,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/vessel-location-names', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
       setEditLocationDialogOpen(false);
     },
   });

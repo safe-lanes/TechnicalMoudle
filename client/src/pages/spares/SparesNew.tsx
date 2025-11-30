@@ -329,8 +329,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare consumed successfully" });
       setIsConsumeModalOpen(false);
       setConsumeForm({ quantity: "", date: "", workOrder: "", remarks: "" });
@@ -363,8 +363,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
       setReceiveForm({ quantity: "", date: "", supplier: "", remarks: "" });
@@ -384,7 +384,7 @@ const Spares: React.FC = () => {
       return apiRequest('POST', '/api/spares', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
       setAddSpareForm({
@@ -446,7 +446,7 @@ const Spares: React.FC = () => {
         });
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
       
       // Count successes, failures, and skipped
       const succeeded = results.filter((r: any) => r.success).length;

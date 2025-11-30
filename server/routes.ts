@@ -3521,6 +3521,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple consume endpoint (legacy - consumes from Location A by default)
+  app.post("/api/spares/:id/consume", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.id);
+      if (isNaN(spareId)) {
+        return res.status(400).json({ error: "Invalid spare ID" });
+      }
+      
+      const { qty, dateLocal, place, remarks, userId, workOrder } = req.body;
+      
+      if (!qty || qty <= 0) {
+        return res.status(400).json({ error: "Quantity must be a positive number" });
+      }
+      
+      // Use consumeSpareFromLocation with Location A as default
+      const result = await storage.consumeSpareFromLocation(
+        spareId,
+        qty,
+        'A', // Default to Location A
+        userId || 'User',
+        remarks || `Consumed at ${place || 'unknown location'} on ${dateLocal}`,
+        workOrder
+      );
+      
+      res.json({ 
+        success: true, 
+        message: "Spare consumed successfully",
+        data: result 
+      });
+    } catch (error: any) {
+      console.error("Error consuming spare:", error);
+      res.status(500).json({ error: error.message || "Failed to consume spare" });
+    }
+  });
+  
+  // Simple receive endpoint (legacy - receives to Location A by default)
+  app.post("/api/spares/:id/receive", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.id);
+      if (isNaN(spareId)) {
+        return res.status(400).json({ error: "Invalid spare ID" });
+      }
+      
+      const { qty, dateLocal, supplierPO, remarks, userId } = req.body;
+      
+      if (!qty || qty <= 0) {
+        return res.status(400).json({ error: "Quantity must be a positive number" });
+      }
+      
+      // Update robLocationA and recalculate total
+      const spare = await storage.getSpare(spareId);
+      if (!spare) {
+        return res.status(404).json({ error: "Spare not found" });
+      }
+      
+      const newRobLocationA = (spare.robLocationA || 0) + qty;
+      const updatedSpare = await storage.updateSpare(spareId, {
+        robLocationA: newRobLocationA
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Spare received successfully",
+        data: updatedSpare 
+      });
+    } catch (error: any) {
+      console.error("Error receiving spare:", error);
+      res.status(500).json({ error: error.message || "Failed to receive spare" });
+    }
+  });
+
   // Rule A3: Location-aware spare consumption with negative prevention
   // Deducts from specified location, never goes negative, returns shortage info
   const consumeFromLocationBodySchema = z.object({
