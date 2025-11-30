@@ -1188,7 +1188,7 @@
       "componentName": "Hydr. oil pumps No.01",
       "componentSpareCode": "SP-403.006.01-001",
       "critical": "No",
-      "rob": 3,
+      "rob": 8,
       "min": 1,
       "location": "4",
       "location2": "1",
@@ -1227,8 +1227,8 @@
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.367Z",
       "updatedAt": "2025-11-30T17:15:10.986Z",
-      "robLocationA": 3,
-      "robLocationB": 0
+      "robLocationA": 5,
+      "robLocationB": 3
     },
     "9": {
       "partCode": "403.006-002",
@@ -155521,11 +155521,11 @@
       "rhLeadHoursCritical": 50,
       "rhLeadHoursNonCritical": 100,
       "rhGraceHours": 168,
-      "locationAName": "Engine Room",
-      "locationBName": "Deck Store",
+      "locationAName": "Main Engine Room",
+      "locationBName": "Bridge Deck Store",
       "updatedBy": "System",
       "createdAt": "2025-11-30T14:34:17.187Z",
-      "updatedAt": "2025-11-30T18:08:17.974Z"
+      "updatedAt": "2025-11-30T18:28:39.221Z"
     }
   },
   "storesItems": {
