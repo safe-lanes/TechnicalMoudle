@@ -152,6 +152,16 @@ export default function ComponentRegisterAddEdit({
     }
   }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId]);
 
+  // Auto-update eqptSystemCategory when componentCode changes
+  useEffect(() => {
+    if (componentData.componentCode) {
+      const derivedCategory = getComponentCategory(componentData.componentCode);
+      if (derivedCategory && derivedCategory !== componentData.eqptSystemCategory) {
+        setComponentData(prev => ({ ...prev, eqptSystemCategory: derivedCategory }));
+      }
+    }
+  }, [componentData.componentCode]);
+
   const isCritical = (comp: any): boolean => {
     if (comp.critical === true) return true;
     if (comp.critical === "Yes" || comp.critical === "Y" || comp.critical === "yes" || comp.critical === "y") return true;

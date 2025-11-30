@@ -195,6 +195,16 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     }
   }, [existingComponent, isLoadingComponent, isEditMode, parentComponent, vesselId]);
 
+  // Auto-update componentCategory when componentCode changes
+  useEffect(() => {
+    if (componentData.componentCode) {
+      const derivedCategory = getComponentCategory(componentData.componentCode);
+      if (derivedCategory && derivedCategory !== componentData.componentCategory) {
+        setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
+      }
+    }
+  }, [componentData.componentCode]);
+
   const handleFieldChange = (fieldName: string, value: string) => {
     setComponentData(prev => ({ ...prev, [fieldName]: value }));
   };

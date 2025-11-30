@@ -1,7 +1,6 @@
 // Component Category mapping based on top-level group
-export const getComponentCategory = (componentId: string): string => {
-  // Extract the first level from the component ID
-  const topLevelId = componentId.split('.')[0];
+export const getComponentCategory = (componentIdOrCode: string): string => {
+  if (!componentIdOrCode) return '';
   
   // Map top-level ID to category name
   const categoryMap: Record<string, string> = {
@@ -15,7 +14,15 @@ export const getComponentCategory = (componentId: string): string => {
     '8': 'Ship Common Systems'
   };
   
-  return categoryMap[topLevelId] || '';
+  // Handle dotted IDs like "3.0.1" - extract first segment
+  if (componentIdOrCode.includes('.')) {
+    const topLevelId = componentIdOrCode.split('.')[0];
+    return categoryMap[topLevelId] || '';
+  }
+  
+  // Handle plain codes like "301" - extract first character
+  const firstChar = componentIdOrCode.charAt(0);
+  return categoryMap[firstChar] || '';
 };
 
 // Find a component node by ID in the tree

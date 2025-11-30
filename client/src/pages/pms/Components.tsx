@@ -177,6 +177,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       setChangedFields(new Set());
     }
   }, [selectedComponent, isModifyMode, isChangeMode]);
+
+  // Auto-update componentCategory when componentCode changes (for new components)
+  useEffect(() => {
+    if (componentData.componentCode) {
+      const derivedCategory = getComponentCategory(componentData.componentCode);
+      if (derivedCategory && derivedCategory !== componentData.componentCategory) {
+        setComponentData(prev => ({ ...prev, componentCategory: derivedCategory }));
+      }
+    }
+  }, [componentData.componentCode]);
   
   // Track which fields have been changed
   const [changedFields, setChangedFields] = useState<Set<string>>(new Set());
