@@ -155521,11 +155521,11 @@
       "rhLeadHoursCritical": 50,
       "rhLeadHoursNonCritical": 100,
       "rhGraceHours": 168,
-      "locationAName": "Main Engine Room",
-      "locationBName": "Bridge Deck Store",
+      "locationAName": "Engine Room Store",
+      "locationBName": "Bridge Store",
       "updatedBy": "System",
       "createdAt": "2025-11-30T14:34:17.187Z",
-      "updatedAt": "2025-11-30T18:28:39.221Z"
+      "updatedAt": "2025-11-30T18:50:13.015Z"
     }
   },
   "storesItems": {
@@ -155536,9 +155536,9 @@
       "itemType": "stores",
       "storesCategory": null,
       "uom": "pcs",
-      "rob": "24",
-      "robLocationA": "12",
-      "robLocationB": "8",
+      "rob": 15,
+      "robLocationA": 10,
+      "robLocationB": 5,
       "min": "16",
       "locationA": "Bridge",
       "locationB": "Main Deck",
@@ -155548,7 +155548,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:22:38.102Z",
-      "updatedAt": "2025-11-29T21:22:38.102Z"
+      "updatedAt": "2025-11-30T18:50:12.981Z"
     },
     "12": {
       "id": 12,
@@ -155746,9 +155746,9 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "3000",
-      "robLocationA": "1800",
-      "robLocationB": "1200",
+      "rob": 10,
+      "robLocationA": 7,
+      "robLocationB": 3,
       "min": "1500",
       "locationA": "Engine Store",
       "locationB": "Main Deck Locker",
@@ -155758,7 +155758,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:23:45.937Z",
-      "updatedAt": "2025-11-29T21:23:45.937Z"
+      "updatedAt": "2025-11-30T18:52:27.411Z"
     },
     "22": {
       "id": 22,
@@ -155956,9 +155956,9 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "500",
-      "robLocationA": "300",
-      "robLocationB": "200",
+      "rob": 500,
+      "robLocationA": 300,
+      "robLocationB": 200,
       "min": "250",
       "locationA": "Engine Store",
       "locationB": "Main Deck Locker",
@@ -155968,7 +155968,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:43:55.979Z",
-      "updatedAt": "2025-11-29T21:43:55.979Z"
+      "updatedAt": "2025-11-30T18:53:52.037Z"
     },
     "32": {
       "id": 32,
