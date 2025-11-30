@@ -28,6 +28,8 @@ interface Spare {
   max?: number;
   location?: string;
   location2?: string;
+  robLocationA?: number;
+  robLocationB?: number;
   vesselId: string;
   stockStatus?: string;
   partNumber?: string;
@@ -137,8 +139,8 @@ const Spares: React.FC = () => {
     setEditingLocations(prev => ({
       ...prev,
       [spare.id]: {
-        locationA: spare.location || '',
-        locationB: spare.location2 || ''
+        locationA: String(spare.robLocationA ?? 0),
+        locationB: String(spare.robLocationB ?? 0)
       }
     }));
   };
@@ -147,18 +149,24 @@ const Spares: React.FC = () => {
     const locations = editingLocations[spareId];
     if (!locations) return;
     
+    const robA = parseInt(locations.locationA) || 0;
+    const robB = parseInt(locations.locationB) || 0;
+    
     try {
       await fetch(`/api/spares/${vesselId}/${spareId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          location: locations.locationA,
-          location2: locations.locationB 
+          robLocationA: robA,
+          robLocationB: robB,
+          rob: robA + robB
         }),
       });
       queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      toast({ title: "Saved", description: "Location quantities updated" });
     } catch (error) {
       console.error('Failed to save location:', error);
+      toast({ title: "Error", description: "Failed to save location quantities", variant: "destructive" });
     }
   };
 
@@ -309,6 +317,19 @@ const Spares: React.FC = () => {
     },
     enabled: activeTab === 'history'
   });
+
+  // Fetch vessel location names
+  const { data: locationNamesData } = useQuery({
+    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/vessel-location-names/${vesselId}`);
+      if (!response.ok) return { locationA: 'Location A', locationB: 'Location B' };
+      return response.json();
+    },
+    enabled: !!vesselId
+  });
+  
+  const locationNames = locationNamesData || { locationA: 'Location A', locationB: 'Location B' };
 
   // Consume spare mutation
   const consumeSpareMutation = useMutation({
@@ -964,9 +985,9 @@ const Spares: React.FC = () => {
                   filteredSpares.map((spare: Spare) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
                     const isDropdownOpen = openLocationDropdown === spare.id;
-                    const locationDisplay = spare.location || spare.location2 
-                      ? `${spare.location || '-'} / ${spare.location2 || '-'}`
-                      : '-';
+                    const robA = spare.robLocationA ?? 0;
+                    const robB = spare.robLocationB ?? 0;
+                    const locationDisplay = `${robA} / ${robB}`;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm items-center`}>
@@ -1009,33 +1030,43 @@ const Spares: React.FC = () => {
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="space-y-3">
+                                <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">Location A</label>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    {locationNames.locationA || 'Location A'}
+                                  </label>
                                   <Input
-                                    type="text"
-                                    value={editingLocations[spare.id]?.locationA || ''}
+                                    type="number"
+                                    min="0"
+                                    value={editingLocations[spare.id]?.locationA || '0'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], locationA: e.target.value }
                                     }))}
                                     className="h-8 text-sm"
-                                    placeholder="Enter location A"
+                                    placeholder="0"
                                     data-testid={`input-locationA-${spare.id}`}
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">Location B</label>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    {locationNames.locationB || 'Location B'}
+                                  </label>
                                   <Input
-                                    type="text"
-                                    value={editingLocations[spare.id]?.locationB || ''}
+                                    type="number"
+                                    min="0"
+                                    value={editingLocations[spare.id]?.locationB || '0'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], locationB: e.target.value }
                                     }))}
                                     className="h-8 text-sm"
-                                    placeholder="Enter location B"
+                                    placeholder="0"
                                     data-testid={`input-locationB-${spare.id}`}
                                   />
+                                </div>
+                                <div className="text-xs text-gray-500 text-center border-t pt-2">
+                                  Total ROB: {(parseInt(editingLocations[spare.id]?.locationA) || 0) + (parseInt(editingLocations[spare.id]?.locationB) || 0)}
                                 </div>
                                 <Button
                                   size="sm"

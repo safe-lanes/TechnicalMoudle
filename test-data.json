@@ -1188,7 +1188,7 @@
       "componentName": "Hydr. oil pumps No.01",
       "componentSpareCode": "SP-403.006.01-001",
       "critical": "No",
-      "rob": 2,
+      "rob": 3,
       "min": 1,
       "location": "4",
       "location2": "1",
@@ -1227,7 +1227,7 @@
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.367Z",
       "updatedAt": "2025-11-30T17:15:10.986Z",
-      "robLocationA": 2,
+      "robLocationA": 3,
       "robLocationB": 0
     },
     "9": {
