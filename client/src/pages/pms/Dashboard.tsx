@@ -1,23 +1,23 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { format, subDays, startOfMonth, endOfMonth, startOfYear } from "date-fns";
+import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
 import {
   RefreshCw,
-  Moon,
-  Sun,
-  TrendingUp,
   AlertTriangle,
   CheckCircle,
   Package,
   Clock,
-  ChevronDown,
   Ship,
-  BarChart3,
-  Activity,
   Wrench,
-  Shield
+  ClipboardList,
+  Box,
+  Gauge,
+  FileText,
+  ChevronRight,
+  AlertCircle,
+  RotateCcw
 } from "lucide-react";
 import { AgCharts } from "ag-charts-react";
 import { AgChartOptions } from "ag-charts-community";
@@ -25,309 +25,240 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkOrder } from "@shared/schema";
 import { useVessels } from "@/hooks/useVessels";
 
-interface DashboardFilters {
-  vesselId: string;
-  dateRange: string;
-  startDate: Date;
-  endDate: Date;
+interface Spare {
+  id: number;
+  partNumber: string;
+  partName: string;
+  rob: number;
+  min: number;
+  critical: string;
+  componentName?: string;
+}
+
+interface StoresItem {
+  id: number;
+  itemCode: string;
+  itemName: string;
+  rob: number;
+  min: number;
+  itemType: string;
+}
+
+interface Component {
+  id: string;
+  code: string;
+  name: string;
+  parentId?: string;
+  isActive?: boolean;
 }
 
 const Dashboard = () => {
   const [, setLocation] = useLocation();
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('dashboard-dark-mode') === 'true';
-  });
-  const [activeTab, setActiveTab] = useState("overview");
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
 
-  // Dashboard filters (date range only, vessel comes from context)
-  const [filters, setFilters] = useState(() => {
-    const saved = localStorage.getItem('dashboard-filters');
-    const defaultFilters = {
-      dateRange: 'last30',
-      startDate: subDays(new Date(), 30),
-      endDate: new Date()
-    };
-    
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        ...parsed,
-        startDate: new Date(parsed.startDate),
-        endDate: new Date(parsed.endDate)
-      };
-    }
-    return defaultFilters;
-  });
-
-
-  // Date range presets
-  const dateRanges = [
-    { id: 'last7', label: 'Last 7 days', days: 7 },
-    { id: 'last30', label: 'Last 30 days', days: 30 },
-    { id: 'last90', label: 'Last 90 days', days: 90 },
-    { id: 'ytd', label: 'Year to Date', isYTD: true }
-  ];
-
   // Fetch real work orders data
-  const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery({
+  const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
     queryKey: ['/api/work-orders', vesselId],
     queryFn: async () => {
       const response = await fetch(`/api/work-orders?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch work orders');
-      return await response.json() as WorkOrder[];
-    }
+      return await response.json();
+    },
+    enabled: !!vesselId
   });
 
   // Fetch spares data
-  const { data: sparesData = [] } = useQuery({
+  const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
     queryKey: ['/api/spares', vesselId],
     queryFn: async () => {
       const response = await fetch(`/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
-    }
+    },
+    enabled: !!vesselId
   });
 
-  // Filter work orders based on date range
-  const filteredWorkOrders = useMemo(() => {
-    if (!workOrdersData || workOrdersData.length === 0) return [];
-    return workOrdersData.filter(wo => {
-      const woDate = new Date(wo.createdAt);
-      return woDate >= filters.startDate && woDate <= filters.endDate;
-    });
-  }, [workOrdersData, filters]);
+  // Fetch stores data
+  const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
+    queryKey: ['/api/stores', vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch stores');
+      return response.json();
+    },
+    enabled: !!vesselId
+  });
 
-  // Helper: Determine department from component code
-  const getDepartment = (componentCode: string): 'Engine' | 'Deck' | 'Electrical' | 'Other' => {
-    if (!componentCode) return 'Other';
-    const code = componentCode.toLowerCase();
-    if (code.includes('engine') || code.includes('6.') || code.includes('boiler') || code.includes('generator')) {
-      return 'Engine';
-    }
-    if (code.includes('electrical') || code.includes('power') || code.includes('battery')) {
-      return 'Electrical';
-    }
-    if (code.includes('deck') || code.includes('crane') || code.includes('winch') || code.includes('steering')) {
-      return 'Deck';
-    }
-    return 'Other';
+  // Fetch components data
+  const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
+    queryKey: ['/api/components', vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/api/components/${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch components');
+      return response.json();
+    },
+    enabled: !!vesselId
+  });
+
+  // Helper: Calculate stock status
+  const getStockStatus = (rob: number, min: number): { label: string; isLow: boolean } => {
+    if (rob < min) return { label: 'Low', isLow: true };
+    if (rob === min) return { label: 'At Min', isLow: true };
+    return { label: 'OK', isLow: false };
   };
 
-  // Helper: Get equipment category
-  const getEquipmentCategory = (componentCode: string): string => {
-    if (!componentCode) return 'Other';
-    const code = componentCode.toLowerCase();
-    if (code.includes('engine') || code.includes('6.') || code.includes('turbo')) return 'Main Engine';
-    if (code.includes('generator') || code.includes('aux')) return 'Auxiliary Machinery';
-    if (code.includes('pump')) return 'Pumps & Systems';
-    if (code.includes('crane') || code.includes('winch') || code.includes('deck')) return 'Deck Machinery';
-    if (code.includes('safety') || code.includes('fire') || code.includes('lifeboat')) return 'Safety Equipment';
-    if (code.includes('nav') || code.includes('radar') || code.includes('radio')) return 'Navigation & Electronics';
-    return 'Other';
-  };
-
-  // KPI Calculations
-  const kpis = useMemo(() => {
-    const total = filteredWorkOrders.length;
-    const completed = filteredWorkOrders.filter(wo => wo.status === 'Completed').length;
-    const overdue = filteredWorkOrders.filter(wo => wo.status === 'Overdue').length;
-    const pending = filteredWorkOrders.filter(wo => wo.status === 'Due').length;
-    const criticalSpares = sparesData.filter((s: any) => s.stockStatus === 'Critical').length;
+  // Work Order KPIs with computed status
+  const workOrderKPIs = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
     
+    const overdue = safeWOs.filter(wo => 
+      (wo as any).computedStatus === 'Overdue' && !wo.isExecution
+    );
+    const due = safeWOs.filter(wo => 
+      ((wo as any).computedStatus === 'Due' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
+    );
+    const pendingApproval = safeWOs.filter(wo => 
+      (wo as any).computedStatus === 'Pending Approval'
+    );
+    const completed = safeWOs.filter(wo => 
+      (wo as any).computedStatus === 'Completed'
+    );
+    const active = safeWOs.filter(wo => 
+      (wo as any).computedStatus === 'Active' && !wo.isExecution
+    );
+
     return {
-      activeWorkOrders: total - completed,
-      completedWorkOrders: completed,
-      overduePercentage: total > 0 ? ((overdue / total) * 100).toFixed(1) : '0.0',
-      completionRate: total > 0 ? ((completed / total) * 100).toFixed(1) : '0.0',
-      criticalSpares,
-      totalSpares: sparesData.length
+      total: safeWOs.filter(wo => !wo.isExecution).length,
+      overdue: overdue.length,
+      overdueList: overdue.slice(0, 5),
+      due: due.length,
+      dueList: due.slice(0, 5),
+      pendingApproval: pendingApproval.length,
+      pendingApprovalList: pendingApproval.slice(0, 5),
+      completed: completed.length,
+      active: active.length
     };
-  }, [filteredWorkOrders, sparesData]);
+  }, [workOrdersData]);
 
-  // Department breakdown for bar charts
-  const departmentData = useMemo(() => {
-    const depts = ['Engine', 'Deck', 'Electrical', 'Other'];
-    return depts.map(dept => {
-      const deptWOs = filteredWorkOrders.filter(wo => getDepartment(wo.componentCode || '') === dept);
-      return {
-        department: dept,
-        scheduled: deptWOs.filter(wo => wo.status === 'Due').length,
-        completed: deptWOs.filter(wo => wo.status === 'Completed').length,
-        overdue: deptWOs.filter(wo => wo.status === 'Overdue').length
-      };
+  // Spares KPIs
+  const sparesKPIs = useMemo(() => {
+    const lowStockSpares = sparesData.filter(spare => {
+      const status = getStockStatus(spare.rob, spare.min);
+      return status.isLow;
     });
-  }, [filteredWorkOrders]);
+    const criticalSpares = sparesData.filter(spare => 
+      spare.critical === 'Critical' || spare.critical === 'Yes'
+    );
+    const criticalLowStock = lowStockSpares.filter(spare => 
+      spare.critical === 'Critical' || spare.critical === 'Yes'
+    );
 
-  // Time series data for line/area charts
-  const timeSeriesData = useMemo(() => {
-    const days = 30;
-    const data: { date: string; completed: number; created: number; cumulative: number }[] = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-      const dateStr = format(date, 'MM/dd');
-      const wosOnDate = filteredWorkOrders.filter(wo => {
-        const woDate = new Date(wo.createdAt);
-        return format(woDate, 'MM/dd') === dateStr;
-      });
-      data.push({
-        date: dateStr,
-        completed: wosOnDate.filter(wo => wo.status === 'Completed').length,
-        created: wosOnDate.length,
-        cumulative: data.length > 0 ? data[data.length - 1].cumulative + wosOnDate.length : wosOnDate.length
-      });
-    }
-    return data;
-  }, [filteredWorkOrders]);
-
-  // Job type breakdown for pie charts - using real data from work orders
-  const jobTypeData = useMemo(() => {
-    const typeCount: Record<string, number> = {};
-    filteredWorkOrders.forEach(wo => {
-      const type = wo.taskType || 'Other';
-      typeCount[type] = (typeCount[type] || 0) + 1;
-    });
-    
-    const colorMap: Record<string, string> = {
-      'Inspection': '#3b82f6',
-      'Overhaul': '#10b981',
-      'Service': '#f59e0b',
-      'Testing': '#8b5cf6',
-      'Other': '#6b7280'
+    return {
+      total: sparesData.length,
+      lowStock: lowStockSpares.length,
+      lowStockList: lowStockSpares.slice(0, 5),
+      critical: criticalSpares.length,
+      criticalLowStock: criticalLowStock.length,
+      criticalLowStockList: criticalLowStock.slice(0, 5)
     };
-    
-    return Object.entries(typeCount).map(([type, count]) => ({
-      type,
-      count,
-      color: colorMap[type] || '#6b7280'
-    }));
-  }, [filteredWorkOrders]);
+  }, [sparesData]);
 
-  // Criticality breakdown
-  const criticalityData = useMemo(() => {
-    const critical = filteredWorkOrders.filter(wo => wo.jobPriority === 'Critical' || wo.jobPriority === 'High').length;
-    const medium = filteredWorkOrders.filter(wo => wo.jobPriority === 'Medium').length;
-    const low = filteredWorkOrders.filter(wo => wo.jobPriority === 'Low').length;
+  // Stores KPIs
+  const storesKPIs = useMemo(() => {
+    const lowStockStores = storesData.filter(item => {
+      const status = getStockStatus(item.rob, item.min);
+      return status.isLow;
+    });
+
+    return {
+      total: storesData.length,
+      lowStock: lowStockStores.length,
+      lowStockList: lowStockStores.slice(0, 5),
+      stores: storesData.filter(i => i.itemType === 'stores').length,
+      lubes: storesData.filter(i => i.itemType === 'lubes').length,
+      chemicals: storesData.filter(i => i.itemType === 'chemicals').length,
+      others: storesData.filter(i => i.itemType === 'others').length
+    };
+  }, [storesData]);
+
+  // Components KPIs
+  const componentsKPIs = useMemo(() => {
+    const activeComponents = componentsData.filter(c => c.isActive !== false);
+    return {
+      total: componentsData.length,
+      active: activeComponents.length
+    };
+  }, [componentsData]);
+
+  // Work Order Status chart data
+  const workOrderStatusChartData = useMemo(() => {
     return [
-      { level: 'Critical', count: critical, color: '#ef4444' },
-      { level: 'Medium', count: medium, color: '#f59e0b' },
-      { level: 'Low', count: low, color: '#10b981' }
-    ];
-  }, [filteredWorkOrders]);
+      { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ef4444' },
+      { status: 'Due', count: workOrderKPIs.due, color: '#f59e0b' },
+      { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#3b82f6' },
+      { status: 'Active', count: workOrderKPIs.active, color: '#8b5cf6' },
+      { status: 'Completed', count: workOrderKPIs.completed, color: '#10b981' }
+    ].filter(d => d.count > 0);
+  }, [workOrderKPIs]);
 
-  // Heatmap data: Department activity by day of week - using real data
-  const heatmapData = useMemo(() => {
-    const departments = ['Engine', 'Deck', 'Electrical', 'Other'];
-    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const data = [];
+  // Spares Stock Status chart data
+  const sparesStockChartData = useMemo(() => {
+    const ok = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'OK').length;
+    const atMin = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'At Min').length;
+    const low = sparesData.filter(s => getStockStatus(s.rob, s.min).label === 'Low').length;
     
-    for (const dept of departments) {
-      for (const day of daysOfWeek) {
-        // Filter work orders by department and day of week
-        const dayWOs = filteredWorkOrders.filter(wo => {
-          const woDept = getDepartment(wo.componentCode || '');
-          const woDate = new Date(wo.createdAt);
-          const woDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][woDate.getDay()];
-          return woDept === dept && woDay === day;
-        });
-        
-        const count = dayWOs.length;
-        data.push({
-          department: dept,
-          day,
-          activity: count,
-          color: count > 15 ? '#ef4444' : count > 10 ? '#f59e0b' : count > 5 ? '#3b82f6' : '#10b981'
-        });
-      }
+    return [
+      { status: 'OK', count: ok, color: '#10b981' },
+      { status: 'At Min', count: atMin, color: '#f59e0b' },
+      { status: 'Low', count: low, color: '#ef4444' }
+    ].filter(d => d.count > 0);
+  }, [sparesData]);
+
+  // Navigation handlers
+  const navigateToWorkOrders = (tab?: string) => {
+    if (tab) {
+      sessionStorage.setItem('workOrdersActiveTab', tab);
     }
-    return data;
-  }, [filteredWorkOrders]);
+    setLocation('/pms/work-orders');
+  };
 
-  // Scatter plot data: Maintenance frequency vs Equipment age - using real frequency data
-  const scatterData = useMemo(() => {
-    const categories = ['Main Engine', 'Auxiliary Machinery', 'Pumps & Systems', 'Deck Machinery', 'Safety Equipment', 'Navigation & Electronics'];
-    return categories.map((category, idx) => {
-      const categoryWOs = filteredWorkOrders.filter(wo => getEquipmentCategory(wo.componentCode || '') === category);
-      // Use index as proxy for age since we don't have actual equipment age in schema
-      // Main Engine (older) vs Navigation (newer)
-      const estimatedAge = idx <= 1 ? 10 + idx * 2 : 3 + idx;
-      return {
-        category,
-        equipmentAge: estimatedAge,
-        maintenanceFrequency: categoryWOs.length,
-        size: Math.max(categoryWOs.length * 3, 10) // Bubble size, minimum 10
-      };
-    }).filter(d => d.maintenanceFrequency > 0); // Only show categories with data
-  }, [filteredWorkOrders]);
+  const navigateToSpares = (filter?: string) => {
+    if (filter) {
+      sessionStorage.setItem('sparesStockFilter', filter);
+    }
+    setLocation('/spares');
+  };
 
-  // Treemap data: Hierarchical cost view by department - based on work order count
-  const treemapData = useMemo(() => {
-    const departments = ['Engine', 'Deck', 'Electrical', 'Other'];
-    return departments.map(dept => {
-      const deptWOs = filteredWorkOrders.filter(wo => getDepartment(wo.componentCode || '') === dept);
-      // Calculate estimated costs based on work order counts and typical ratios
-      const laborCost = deptWOs.length * 350;  // $350 avg per WO
-      const partsCost = deptWOs.length * 520;  // $520 avg per WO
-      const servicesCost = deptWOs.length * 180; // $180 avg per WO
-      
-      return {
-        name: dept,
-        value: laborCost + partsCost + servicesCost,
-        children: [
-          { name: 'Labor', value: laborCost },
-          { name: 'Parts', value: partsCost },
-          { name: 'Services', value: servicesCost }
-        ]
-      };
-    }).filter(d => d.value > 0); // Only show departments with work orders
-  }, [filteredWorkOrders]);
+  const navigateToStores = (tab?: string) => {
+    if (tab) {
+      sessionStorage.setItem('storesActiveTab', tab);
+    }
+    setLocation('/stores');
+  };
 
-  // Equipment category performance metrics
-  const equipmentPerformanceData = useMemo(() => {
-    const categories = ['Main Engine', 'Auxiliary Machinery', 'Pumps & Systems', 'Deck Machinery', 'Safety Equipment', 'Navigation & Electronics'];
-    return categories.map(category => {
-      const categoryWOs = filteredWorkOrders.filter(wo => getEquipmentCategory(wo.componentCode || '') === category);
-      const completed = categoryWOs.filter(wo => wo.status === 'Completed').length;
-      return {
-        category,
-        total: categoryWOs.length,
-        completed,
-        pending: categoryWOs.filter(wo => wo.status === 'Due').length,
-        overdue: categoryWOs.filter(wo => wo.status === 'Overdue').length,
-        completionRate: categoryWOs.length > 0 ? ((completed / categoryWOs.length) * 100).toFixed(1) : '0'
-      };
-    });
-  }, [filteredWorkOrders]);
+  const navigateToComponents = () => {
+    setLocation('/pms/components');
+  };
 
-  // Handle filter changes
+  const navigateToRunningHours = () => {
+    setLocation('/pms/running-hrs');
+  };
+
+  const navigateToReports = () => {
+    setLocation('/reports');
+  };
+
+  const navigateToWorkOrder = (workOrderId: number) => {
+    setLocation(`/pms/work-order/${workOrderId}`);
+  };
+
   const handleVesselChange = (newVesselId: string) => {
     setVesselId(newVesselId);
-  };
-
-  const handleDateRangeChange = (rangeId: string) => {
-    const range = dateRanges.find(r => r.id === rangeId);
-    if (!range) return;
-
-    let startDate: Date;
-    let endDate = new Date();
-
-    if (range.isYTD) {
-      startDate = startOfYear(new Date());
-    } else if (range.days) {
-      startDate = subDays(new Date(), range.days);
-    } else {
-      startDate = subDays(new Date(), 30);
-    }
-
-    const newFilters = { ...filters, dateRange: rangeId, startDate, endDate };
-    setFilters(newFilters);
-    localStorage.setItem('dashboard-filters', JSON.stringify(newFilters));
   };
 
   const handleRefresh = () => {
@@ -335,41 +266,33 @@ const Dashboard = () => {
     window.location.reload();
   };
 
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    localStorage.setItem('dashboard-dark-mode', String(newMode));
-    document.documentElement.classList.toggle('dark', newMode);
-  };
+  const isLoading = isWorkOrdersLoading || isSparesLoading || isStoresLoading || isComponentsLoading;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-dashboard-title">Dashboard</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Electronic Planned Maintenance System Control Center</p>
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">PMS Dashboard</h1>
+              <p className="text-sm text-gray-500">Planned Maintenance System Control Center</p>
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <Activity className="w-3 h-3 mr-1" />
+                <CheckCircle className="w-3 h-3 mr-1" />
                 E-PMS Active
               </Badge>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-gray-500">
                 Last updated: {format(lastUpdated, 'HH:mm:ss')}
               </span>
               <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
                 <RefreshCw className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={toggleDarkMode} data-testid="button-theme-toggle">
-                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </Button>
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Vessel Selector */}
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <Ship className="w-4 h-4 text-gray-500" />
@@ -386,537 +309,494 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-500" />
-              <Select value={filters.dateRange} onValueChange={handleDateRangeChange}>
-                <SelectTrigger className="w-40" data-testid="select-date-range">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {dateRanges.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto" data-testid="tabs-navigation">
-            <TabsTrigger value="overview" data-testid="tab-overview">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="departments" data-testid="tab-departments">
-              <Wrench className="w-4 h-4 mr-2" />
-              Departments
-            </TabsTrigger>
-            <TabsTrigger value="equipment" data-testid="tab-equipment">
-              <Package className="w-4 h-4 mr-2" />
-              Equipment
-            </TabsTrigger>
-            <TabsTrigger value="compliance" data-testid="tab-compliance">
-              <Shield className="w-4 h-4 mr-2" />
-              Compliance
-            </TabsTrigger>
-          </TabsList>
+      <div className="px-6 py-6 space-y-6">
+        
+        {/* Work Order Status KPI Cards - Clickable */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-red-500"
+            onClick={() => navigateToWorkOrders('Overdue')}
+            data-testid="card-overdue-wo"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+                Overdue Work Orders
+              </CardDescription>
+              <CardTitle className="text-3xl text-red-600">{workOrderKPIs.overdue}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center text-sm text-red-600">
+                <ChevronRight className="w-4 h-4" />
+                <span>View all overdue</span>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* OVERVIEW TAB */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card data-testid="card-active-work-orders">
-                <CardHeader className="pb-2">
-                  <CardDescription>Active Work Orders</CardDescription>
-                  <CardTitle className="text-3xl">{kpis.activeWorkOrders}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-sm">
-                    <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                    <span className="text-green-600">+2 from last week</span>
-                  </div>
-                </CardContent>
-              </Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-amber-500"
+            onClick={() => navigateToWorkOrders('Due')}
+            data-testid="card-due-wo"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Clock className="w-4 h-4 text-amber-500" />
+                Due Work Orders
+              </CardDescription>
+              <CardTitle className="text-3xl text-amber-600">{workOrderKPIs.due}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center text-sm text-amber-600">
+                <ChevronRight className="w-4 h-4" />
+                <span>View all due</span>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card data-testid="card-completion-rate">
-                <CardHeader className="pb-2">
-                  <CardDescription>Completion Rate</CardDescription>
-                  <CardTitle className="text-3xl">{kpis.completionRate}%</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
-                    <span className="text-gray-600 dark:text-gray-400">{kpis.completedWorkOrders} completed</span>
-                  </div>
-                </CardContent>
-              </Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+            onClick={() => navigateToWorkOrders('Pending Approval')}
+            data-testid="card-pending-approval-wo"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <ClipboardList className="w-4 h-4 text-blue-500" />
+                Pending Approval
+              </CardDescription>
+              <CardTitle className="text-3xl text-blue-600">{workOrderKPIs.pendingApproval}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center text-sm text-blue-600">
+                <ChevronRight className="w-4 h-4" />
+                <span>Review pending</span>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card data-testid="card-overdue-tasks">
-                <CardHeader className="pb-2">
-                  <CardDescription>Overdue Tasks</CardDescription>
-                  <CardTitle className="text-3xl text-red-600">{kpis.overduePercentage}%</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-sm">
-                    <AlertTriangle className="w-4 h-4 text-red-500 mr-1" />
-                    <span className="text-red-600">Action needed</span>
-                  </div>
-                </CardContent>
-              </Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
+            onClick={() => navigateToWorkOrders('Completed')}
+            data-testid="card-completed-wo"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                Completed
+              </CardDescription>
+              <CardTitle className="text-3xl text-green-600">{workOrderKPIs.completed}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center text-sm text-green-600">
+                <ChevronRight className="w-4 h-4" />
+                <span>View completed</span>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card data-testid="card-critical-spares">
-                <CardHeader className="pb-2">
-                  <CardDescription>Critical Stock Alerts</CardDescription>
-                  <CardTitle className="text-3xl">{kpis.criticalSpares}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center text-sm">
-                    <Package className="w-4 h-4 text-orange-500 mr-1" />
-                    <span className="text-gray-600 dark:text-gray-400">Low stock items</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400"
+            onClick={() => navigateToWorkOrders('All W.O')}
+            data-testid="card-total-wo"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Wrench className="w-4 h-4 text-gray-500" />
+                Total Work Orders
+              </CardDescription>
+              <CardTitle className="text-3xl">{workOrderKPIs.total}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center text-sm text-gray-600">
+                <ChevronRight className="w-4 h-4" />
+                <span>View all work orders</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Bar Chart: Work Orders by Department */}
-              <Card data-testid="card-dept-bar-chart">
-                <CardHeader>
-                  <CardTitle>Work Orders by Department</CardTitle>
-                  <CardDescription>Scheduled, Completed, and Overdue maintenance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <AgCharts options={{
-                      data: departmentData,
-                      series: [
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'scheduled',
-                          yName: 'Scheduled',
-                          fill: '#3b82f6',
-                          strokeWidth: 0,
-                          stacked: true
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'completed',
-                          yName: 'Completed',
-                          fill: '#10b981',
-                          strokeWidth: 0,
-                          stacked: true
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'overdue',
-                          yName: 'Overdue',
-                          fill: '#ef4444',
-                          strokeWidth: 0,
-                          stacked: true
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Work Order Status Donut - Clickable */}
+          <Card data-testid="card-wo-status-chart">
+            <CardHeader>
+              <CardTitle>Work Order Status Distribution</CardTitle>
+              <CardDescription>Click segments to view filtered work orders</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                {workOrderStatusChartData.length > 0 ? (
+                  <AgCharts options={{
+                    data: workOrderStatusChartData,
+                    series: [{
+                      type: 'donut',
+                      angleKey: 'count',
+                      calloutLabelKey: 'status',
+                      sectorLabelKey: 'count',
+                      innerRadiusRatio: 0.6,
+                      fills: workOrderStatusChartData.map(d => d.color),
+                      strokes: workOrderStatusChartData.map(d => d.color),
+                      listeners: {
+                        nodeClick: (event: any) => {
+                          const status = event.datum.status;
+                          if (status === 'Overdue') navigateToWorkOrders('Overdue');
+                          else if (status === 'Due') navigateToWorkOrders('Due');
+                          else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
+                          else if (status === 'Completed') navigateToWorkOrders('Completed');
+                          else navigateToWorkOrders('All W.O');
                         }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Work Orders' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Line Chart: Completion Trends */}
-              <Card data-testid="card-completion-trend">
-                <CardHeader>
-                  <CardTitle>Maintenance Completion Trends</CardTitle>
-                  <CardDescription>Daily work order completion vs creation</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <AgCharts options={{
-                      data: timeSeriesData,
-                      series: [
-                        {
-                          type: 'line',
-                          xKey: 'date',
-                          yKey: 'completed',
-                          yName: 'Completed',
-                          stroke: '#10b981',
-                          marker: { enabled: true, size: 6 }
-                        },
-                        {
-                          type: 'line',
-                          xKey: 'date',
-                          yKey: 'created',
-                          yName: 'Created',
-                          stroke: '#3b82f6',
-                          marker: { enabled: true, size: 6 }
-                        }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Count' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Pie Chart: Job Types */}
-              <Card data-testid="card-job-types">
-                <CardHeader>
-                  <CardTitle>Maintenance Job Types</CardTitle>
-                  <CardDescription>Breakdown by maintenance category</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <AgCharts options={{
-                      data: jobTypeData,
-                      series: [{
-                        type: 'pie',
-                        angleKey: 'count',
-                        calloutLabelKey: 'type',
-                        sectorLabelKey: 'count',
-                        fills: jobTypeData.map(d => d.color),
-                        strokes: jobTypeData.map(d => d.color)
-                      } as any],
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Area Chart: Cumulative Work Orders */}
-              <Card data-testid="card-cumulative-area">
-                <CardHeader>
-                  <CardTitle>Cumulative Maintenance Activity</CardTitle>
-                  <CardDescription>Total work orders over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <AgCharts options={{
-                      data: timeSeriesData,
-                      series: [{
-                        type: 'area',
-                        xKey: 'date',
-                        yKey: 'cumulative',
-                        fill: '#3b82f6',
-                        fillOpacity: 0.3,
-                        stroke: '#3b82f6',
-                        strokeWidth: 2
-                      } as any],
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Cumulative Count' } }
-                      ] as any,
-                      legend: { enabled: false }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* DEPARTMENTS TAB */}
-          <TabsContent value="departments" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card data-testid="card-dept-comparison">
-                <CardHeader>
-                  <CardTitle>Department Performance Comparison</CardTitle>
-                  <CardDescription>Maintenance workload across departments</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: departmentData,
-                      series: [{
-                        type: 'bar',
-                        xKey: 'department',
-                        yKey: 'completed',
-                        yName: 'Completed',
-                        fill: '#10b981'
-                      } as any],
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left' }
-                      ] as any
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Heatmap: Department activity by day - Using AG Charts bubble chart */}
-              <Card data-testid="card-dept-heatmap">
-                <CardHeader>
-                  <CardTitle>Maintenance Activity Heatmap</CardTitle>
-                  <CardDescription>Bubble size represents activity level (larger = more tasks)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: heatmapData.map((d, idx) => ({
-                        ...d,
-                        dayIndex: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(d.day),
-                        deptIndex: ['Engine', 'Deck', 'Electrical', 'Other'].indexOf(d.department),
-                        displaySize: Math.max(d.activity, 1) // Ensure visible markers even for 0 activity
-                      })),
-                      series: [{
-                        type: 'scatter',
-                        xKey: 'dayIndex',
-                        yKey: 'deptIndex',
-                        sizeKey: 'displaySize',
-                        yName: 'Maintenance Activity',
-                        marker: {
-                          size: 5,
-                          maxSize: 45,
-                          fill: '#3b82f6',
-                          fillOpacity: 0.7,
-                          stroke: '#1e40af',
-                          strokeWidth: 2
-                        },
-                        tooltip: {
-                          renderer: (params: any) => ({
-                            content: `${params.datum.department} - ${params.datum.day}<br/>Tasks: ${params.datum.activity}`
-                          })
-                        }
-                      } as any],
-                      axes: [
-                        { 
-                          type: 'category', 
-                          position: 'bottom',
-                          keys: ['dayIndex'],
-                          title: { text: 'Day of Week' },
-                          label: {
-                            formatter: (params: any) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][params.value] || ''
-                          }
-                        },
-                        { 
-                          type: 'category', 
-                          position: 'left',
-                          keys: ['deptIndex'],
-                          title: { text: 'Department' },
-                          label: {
-                            formatter: (params: any) => ['Engine', 'Deck', 'Electrical', 'Other'][params.value] || ''
-                          }
-                        }
-                      ] as any,
-                      legend: { 
-                        enabled: true, 
-                        position: 'bottom'
                       }
-                    } as AgChartOptions} />
+                    } as any],
+                    legend: { enabled: true, position: 'bottom' }
+                  } as AgChartOptions} />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    No work orders to display
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Treemap as grouped bar chart: Cost hierarchy by department */}
-              <Card data-testid="card-dept-treemap">
-                <CardHeader>
-                  <CardTitle>Cost Distribution by Department</CardTitle>
-                  <CardDescription>Hierarchical view of maintenance costs (Labor/Parts/Services)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: treemapData.map(dept => ({
-                        department: dept.name,
-                        labor: dept.children.find(c => c.name === 'Labor')?.value || 0,
-                        parts: dept.children.find(c => c.name === 'Parts')?.value || 0,
-                        services: dept.children.find(c => c.name === 'Services')?.value || 0
-                      })),
-                      series: [
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'labor',
-                          yName: 'Labor',
-                          grouped: true,
-                          fill: '#3b82f6'
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'parts',
-                          yName: 'Parts',
-                          grouped: true,
-                          fill: '#10b981'
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'department',
-                          yKey: 'services',
-                          yName: 'Services',
-                          grouped: true,
-                          fill: '#f59e0b'
+          {/* Spares Stock Status Donut - Clickable */}
+          <Card data-testid="card-spares-status-chart">
+            <CardHeader>
+              <CardTitle>Spares Stock Status</CardTitle>
+              <CardDescription>Click segments to view filtered spares</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                {sparesStockChartData.length > 0 ? (
+                  <AgCharts options={{
+                    data: sparesStockChartData,
+                    series: [{
+                      type: 'donut',
+                      angleKey: 'count',
+                      calloutLabelKey: 'status',
+                      sectorLabelKey: 'count',
+                      innerRadiusRatio: 0.6,
+                      fills: sparesStockChartData.map(d => d.color),
+                      strokes: sparesStockChartData.map(d => d.color),
+                      listeners: {
+                        nodeClick: (event: any) => {
+                          const status = event.datum.status;
+                          navigateToSpares(status);
                         }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom', title: { text: 'Department' } },
-                        { type: 'number', position: 'left', title: { text: 'Cost ($)' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
+                      }
+                    } as any],
+                    legend: { enabled: true, position: 'bottom' }
+                  } as AgChartOptions} />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    No spares to display
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Actionable Tables Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Overdue Work Orders Table */}
+          <Card data-testid="card-overdue-table">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Overdue Work Orders
+                </CardTitle>
+                <CardDescription>Immediate attention required</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigateToWorkOrders('Overdue')}
+                data-testid="button-view-all-overdue"
+              >
+                View All ({workOrderKPIs.overdue})
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {workOrderKPIs.overdueList.length > 0 ? (
+                <div className="space-y-2">
+                  {workOrderKPIs.overdueList.map((wo: any) => (
+                    <div 
+                      key={wo.id}
+                      className="flex items-center justify-between p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+                      onClick={() => navigateToWorkOrder(wo.id)}
+                      data-testid={`row-overdue-wo-${wo.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{wo.workOrderNumber || `WO-${wo.id}`}</div>
+                        <div className="text-xs text-gray-600">{wo.taskDescription || wo.jobTitle || 'No description'}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-red-500 text-white">Overdue</Badge>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                  <p>No overdue work orders</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Low Stock Spares Table */}
+          <Card data-testid="card-low-stock-table">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                  Low Stock Spares
+                </CardTitle>
+                <CardDescription>Reorder recommended</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigateToSpares('Low')}
+                data-testid="button-view-all-low-stock"
+              >
+                View All ({sparesKPIs.lowStock})
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {sparesKPIs.lowStockList.length > 0 ? (
+                <div className="space-y-2">
+                  {sparesKPIs.lowStockList.map((spare: Spare) => (
+                    <div 
+                      key={spare.id}
+                      className="flex items-center justify-between p-3 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
+                      onClick={() => navigateToSpares('Low')}
+                      data-testid={`row-low-stock-spare-${spare.id}`}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{spare.partName}</div>
+                        <div className="text-xs text-gray-600">{spare.partNumber}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">ROB: {spare.rob} / Min: {spare.min}</span>
+                        {(spare.critical === 'Critical' || spare.critical === 'Yes') && (
+                          <Badge className="bg-red-500 text-white text-xs">Critical</Badge>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                  <p>All spares adequately stocked</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sub-Module Summary Cards - All Clickable */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Components Card */}
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={navigateToComponents}
+            data-testid="card-components-summary"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Box className="w-4 h-4 text-blue-500" />
+                Components
+              </CardDescription>
+              <CardTitle className="text-2xl">{componentsKPIs.total}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">{componentsKPIs.active} active</span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Spares Card */}
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigateToSpares()}
+            data-testid="card-spares-summary"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Package className="w-4 h-4 text-purple-500" />
+                Spares Inventory
+              </CardDescription>
+              <CardTitle className="text-2xl">{sparesKPIs.total}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">
+                  <span className={sparesKPIs.lowStock > 0 ? 'text-red-500 font-medium' : 'text-gray-500'}>
+                    {sparesKPIs.lowStock} low stock
+                  </span>
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stores Card */}
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigateToStores()}
+            data-testid="card-stores-summary"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Box className="w-4 h-4 text-teal-500" />
+                Stores Inventory
+              </CardDescription>
+              <CardTitle className="text-2xl">{storesKPIs.total}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">
+                  <span className={storesKPIs.lowStock > 0 ? 'text-amber-500 font-medium' : 'text-gray-500'}>
+                    {storesKPIs.lowStock} low stock
+                  </span>
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Running Hours Card */}
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={navigateToRunningHours}
+            data-testid="card-running-hours-summary"
+          >
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Gauge className="w-4 h-4 text-orange-500" />
+                Running Hours
+              </CardDescription>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <RotateCcw className="w-5 h-5" />
+                Track
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Update component hours</span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Stores Breakdown */}
+        <Card data-testid="card-stores-breakdown">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Box className="w-5 h-5 text-teal-500" />
+              Stores Inventory Breakdown
+            </CardTitle>
+            <CardDescription>Click on category to view</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div 
+                className="p-4 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors text-center"
+                onClick={() => navigateToStores('stores')}
+                data-testid="card-stores-tab"
+              >
+                <div className="text-2xl font-bold text-blue-600">{storesKPIs.stores}</div>
+                <div className="text-sm text-gray-600">Stores</div>
+              </div>
+              <div 
+                className="p-4 bg-amber-50 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors text-center"
+                onClick={() => navigateToStores('lubes')}
+                data-testid="card-lubes-tab"
+              >
+                <div className="text-2xl font-bold text-amber-600">{storesKPIs.lubes}</div>
+                <div className="text-sm text-gray-600">Lubes</div>
+              </div>
+              <div 
+                className="p-4 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors text-center"
+                onClick={() => navigateToStores('chemicals')}
+                data-testid="card-chemicals-tab"
+              >
+                <div className="text-2xl font-bold text-green-600">{storesKPIs.chemicals}</div>
+                <div className="text-sm text-gray-600">Chemicals</div>
+              </div>
+              <div 
+                className="p-4 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors text-center"
+                onClick={() => navigateToStores('others')}
+                data-testid="card-others-tab"
+              >
+                <div className="text-2xl font-bold text-purple-600">{storesKPIs.others}</div>
+                <div className="text-sm text-gray-600">Others</div>
+              </div>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          {/* EQUIPMENT TAB */}
-          <TabsContent value="equipment" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card data-testid="card-criticality-pie">
-                <CardHeader>
-                  <CardTitle>Equipment Criticality Levels</CardTitle>
-                  <CardDescription>Maintenance priority distribution</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: criticalityData,
-                      series: [{
-                        type: 'pie',
-                        angleKey: 'count',
-                        calloutLabelKey: 'level',
-                        sectorLabelKey: 'count',
-                        fills: criticalityData.map(d => d.color),
-                        strokes: criticalityData.map(d => d.color)
-                      } as any],
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Scatter/Bubble Chart: Maintenance vs Age */}
-              <Card data-testid="card-scatter-bubble">
-                <CardHeader>
-                  <CardTitle>Maintenance Frequency vs Equipment Age</CardTitle>
-                  <CardDescription>Bubble size represents maintenance workload</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: scatterData,
-                      series: [{
-                        type: 'scatter',
-                        xKey: 'equipmentAge',
-                        yKey: 'maintenanceFrequency',
-                        sizeKey: 'size',
-                        labelKey: 'category',
-                        marker: {
-                          size: 10,
-                          maxSize: 30,
-                          fill: '#3b82f6',
-                          fillOpacity: 0.7,
-                          stroke: '#1e40af',
-                          strokeWidth: 2
-                        },
-                        tooltip: {
-                          renderer: (params: any) => ({
-                            content: `${params.datum.category}<br/>Age: ${params.datum.equipmentAge} years<br/>Frequency: ${params.datum.maintenanceFrequency} jobs`
-                          })
-                        }
-                      } as any],
-                      axes: [
-                        { type: 'number', position: 'bottom', title: { text: 'Equipment Age (years)' } },
-                        { type: 'number', position: 'left', title: { text: 'Maintenance Frequency' } }
-                      ] as any
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Equipment Performance Bar Chart */}
-              <Card data-testid="card-equipment-performance" className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Equipment Category Performance</CardTitle>
-                  <CardDescription>Completion rates by equipment type</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: equipmentPerformanceData,
-                      series: [
-                        {
-                          type: 'bar',
-                          xKey: 'category',
-                          yKey: 'completed',
-                          yName: 'Completed',
-                          fill: '#10b981',
-                          stacked: true
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'category',
-                          yKey: 'pending',
-                          yName: 'Pending',
-                          fill: '#3b82f6',
-                          stacked: true
-                        },
-                        {
-                          type: 'bar',
-                          xKey: 'category',
-                          yKey: 'overdue',
-                          yName: 'Overdue',
-                          fill: '#ef4444',
-                          stacked: true
-                        }
-                      ] as any,
-                      axes: [
-                        { type: 'category', position: 'bottom' },
-                        { type: 'number', position: 'left', title: { text: 'Work Orders' } }
-                      ] as any,
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Quick Actions */}
+        <Card data-testid="card-quick-actions">
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Navigate to sub-modules</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col gap-1"
+                onClick={() => navigateToWorkOrders()}
+                data-testid="button-goto-workorders"
+              >
+                <Wrench className="w-5 h-5" />
+                <span className="text-xs">Work Orders</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col gap-1"
+                onClick={navigateToComponents}
+                data-testid="button-goto-components"
+              >
+                <Box className="w-5 h-5" />
+                <span className="text-xs">Components</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col gap-1"
+                onClick={() => navigateToSpares()}
+                data-testid="button-goto-spares"
+              >
+                <Package className="w-5 h-5" />
+                <span className="text-xs">Spares</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col gap-1"
+                onClick={navigateToReports}
+                data-testid="button-goto-reports"
+              >
+                <FileText className="w-5 h-5" />
+                <span className="text-xs">Reports</span>
+              </Button>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          {/* COMPLIANCE TAB */}
-          <TabsContent value="compliance" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              {/* Certificate Status Pie */}
-              <Card data-testid="card-compliance-status">
-                <CardHeader>
-                  <CardTitle>Certificate Status Overview</CardTitle>
-                  <CardDescription>Expiring and expired certificates</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <AgCharts options={{
-                      data: [
-                        { status: 'Valid', count: 15, color: '#10b981' },
-                        { status: 'Expiring Soon', count: 3, color: '#f59e0b' },
-                        { status: 'Expired', count: 1, color: '#ef4444' }
-                      ],
-                      series: [{
-                        type: 'pie',
-                        angleKey: 'count',
-                        calloutLabelKey: 'status',
-                        sectorLabelKey: 'count',
-                        fills: ['#10b981', '#f59e0b', '#ef4444'],
-                        strokes: ['#10b981', '#f59e0b', '#ef4444']
-                      } as any],
-                      legend: { enabled: true, position: 'bottom' }
-                    } as AgChartOptions} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );
