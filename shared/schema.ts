@@ -314,7 +314,9 @@ export const spares = pgTable("spares", {
   componentName: text("component_name").notNull(),
   componentSpareCode: text("component_spare_code"), // Format: SP-<ComponentCode>-<NNN>
   critical: text("critical").notNull(), // 'Critical' | 'Non-Critical' | 'Yes' | 'No'
-  rob: integer("rob").notNull().default(0), // Remaining on Board
+  rob: integer("rob").notNull().default(0), // Remaining on Board (total = robLocationA + robLocationB)
+  robLocationA: integer("rob_location_a").notNull().default(0), // ROB in Location A
+  robLocationB: integer("rob_location_b").notNull().default(0), // ROB in Location B
   min: integer("min").notNull().default(0), // Minimum stock
   max: integer("max"), // Maximum stock level
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // Cost per unit
@@ -1463,6 +1465,10 @@ export const pmsVesselSettings = pgTable("pms_vessel_settings", {
   rhLeadHoursCritical: integer("rh_lead_hours_critical").notNull().default(50), // Hours before due for critical RH jobs
   rhLeadHoursNonCritical: integer("rh_lead_hours_non_critical").notNull().default(100), // Hours before due for non-critical RH jobs
   rhGraceHours: integer("rh_grace_hours").notNull().default(168), // Grace period hours for escalation (default 168 = 1 week)
+
+  // Spare Parts Location Names (customizable per vessel)
+  locationAName: text("location_a_name").notNull().default("Location A"), // Custom name for Location A
+  locationBName: text("location_b_name").notNull().default("Location B"), // Custom name for Location B
 
   // Audit fields
   updatedBy: text("updated_by").notNull(),

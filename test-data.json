@@ -1190,8 +1190,8 @@
       "critical": "No",
       "rob": 5,
       "min": 1,
-      "location": "store_a",
-      "location2": "store_b",
+      "location": "Test Store A",
+      "location2": "Test Store B",
       "vesselId": "V001",
       "partNumber": "123-123",
       "uom": "PCS",
@@ -1226,7 +1226,9 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.367Z",
-      "updatedAt": "2025-11-29T11:49:19.367Z"
+      "updatedAt": "2025-11-29T11:49:19.367Z",
+      "robLocationA": 5,
+      "robLocationB": 0
     },
     "9": {
       "partCode": "403.006-002",
@@ -1274,7 +1276,9 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.382Z",
-      "updatedAt": "2025-11-29T11:49:19.382Z"
+      "updatedAt": "2025-11-29T11:49:19.382Z",
+      "robLocationA": 6,
+      "robLocationB": 0
     },
     "10": {
       "partCode": "403.006-003",
@@ -1322,7 +1326,9 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.394Z",
-      "updatedAt": "2025-11-29T11:49:19.394Z"
+      "updatedAt": "2025-11-29T11:49:19.394Z",
+      "robLocationA": 5,
+      "robLocationB": 0
     },
     "11": {
       "partCode": "403.006-004",
@@ -1370,7 +1376,9 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.412Z",
-      "updatedAt": "2025-11-29T11:49:19.412Z"
+      "updatedAt": "2025-11-29T11:49:19.412Z",
+      "robLocationA": 6,
+      "robLocationB": 0
     },
     "12": {
       "partCode": "403.006-005",
@@ -1418,7 +1426,9 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-11-29T11:49:19.430Z",
-      "updatedAt": "2025-11-29T11:49:19.430Z"
+      "updatedAt": "2025-11-29T11:49:19.430Z",
+      "robLocationA": 10,
+      "robLocationB": 0
     }
   },
   "sparesHistory": [],
@@ -155436,7 +155446,24 @@
   "makers": [],
   "masterLists": [],
   "auditLogs": [],
-  "pmsVesselSettings": {},
+  "pmsVesselSettings": {
+    "V001": {
+      "id": 1,
+      "vesselId": "V001",
+      "calendarLeadDaysCritical": 7,
+      "calendarLeadDaysNonCritical": 14,
+      "calendarGraceMode": "COMPANY_STANDARD",
+      "calendarGraceDays": 7,
+      "rhLeadHoursCritical": 50,
+      "rhLeadHoursNonCritical": 100,
+      "rhGraceHours": 168,
+      "locationAName": "Engine Room Store",
+      "locationBName": "Deck Store",
+      "updatedBy": "Test",
+      "createdAt": "2025-11-30T14:34:17.187Z",
+      "updatedAt": "2025-11-30T14:34:17.187Z"
+    }
+  },
   "storesItems": {
     "11": {
       "id": 11,
@@ -156320,6 +156347,7 @@
   "fleetSpareVesselMappings": {},
   "bulkImportHistory": {},
   "bulkImportErrors": [],
+  "componentMaintenanceHistory": {},
   "counters": {
     "userId": 1,
     "auditId": 1,
@@ -156341,7 +156369,7 @@
     "defectAttachmentId": 1,
     "recurringDefectId": 1,
     "auditLogId": 1,
-    "pmsVesselSettingsId": 1,
+    "pmsVesselSettingsId": 2,
     "storesItemId": 51,
     "storesLedgerId": 1,
     "makersListId": 4,
@@ -156352,6 +156380,7 @@
     "fleetJobVesselMappingId": 1,
     "fleetSpareVesselMappingId": 1,
     "bulkImportHistoryId": 1,
-    "bulkImportErrorId": 1
+    "bulkImportErrorId": 1,
+    "maintenanceHistoryId": 1
   }
 }

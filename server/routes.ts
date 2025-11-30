@@ -4783,6 +4783,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete PMS vessel settings" });
     }
   });
+  
+  // Get vessel location names (with defaults if settings don't exist)
+  app.get("/api/vessel-location-names/:vesselId", async (req, res) => {
+    try {
+      const settings = await storage.getPmsVesselSettings(req.params.vesselId);
+      res.json({
+        vesselId: req.params.vesselId,
+        locationAName: settings?.locationAName ?? 'Location A',
+        locationBName: settings?.locationBName ?? 'Location B'
+      });
+    } catch (error) {
+      console.error("Error fetching vessel location names:", error);
+      res.status(500).json({ error: "Failed to fetch vessel location names" });
+    }
+  });
+  
+  // Update vessel location names (PATCH semantics - only updates location fields)
+  app.put("/api/vessel-location-names/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const { locationAName, locationBName } = req.body;
+      
+      // Validate input
+      if (locationAName !== undefined && typeof locationAName !== 'string') {
+        return res.status(400).json({ error: "locationAName must be a string" });
+      }
+      if (locationBName !== undefined && typeof locationBName !== 'string') {
+        return res.status(400).json({ error: "locationBName must be a string" });
+      }
+      
+      // Get existing settings - preserve ALL existing values
+      const existingSettings = await storage.getPmsVesselSettings(vesselId);
+      
+      // Create update object with ONLY location fields changed, preserving all other settings
+      const settingsToSave = existingSettings 
+        ? {
+            ...existingSettings,
+            vesselId,
+            locationAName: locationAName ?? existingSettings.locationAName ?? 'Location A',
+            locationBName: locationBName ?? existingSettings.locationBName ?? 'Location B',
+            updatedBy: req.body.updatedBy || 'System'
+          }
+        : {
+            // New settings - use defaults for non-location fields
+            vesselId,
+            locationAName: locationAName ?? 'Location A',
+            locationBName: locationBName ?? 'Location B',
+            calendarLeadDaysCritical: 7,
+            calendarLeadDaysNonCritical: 14,
+            calendarGraceMode: 'COMPANY_STANDARD',
+            calendarGraceDays: 7,
+            rhLeadHoursCritical: 50,
+            rhLeadHoursNonCritical: 100,
+            rhGraceHours: 168,
+            updatedBy: req.body.updatedBy || 'System'
+          };
+      
+      const updatedSettings = await storage.createOrUpdatePmsVesselSettings(settingsToSave);
+      
+      res.json({
+        vesselId,
+        locationAName: updatedSettings.locationAName,
+        locationBName: updatedSettings.locationBName
+      });
+    } catch (error) {
+      console.error("Error updating vessel location names:", error);
+      res.status(500).json({ error: "Failed to update vessel location names" });
+    }
+  });
 
   // =====================================================
   // On-Demand Work Order Generation (Rule #4)

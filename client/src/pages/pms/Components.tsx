@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
@@ -39,6 +39,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ComponentNode {
   id: string;
@@ -1271,16 +1276,62 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
 
 const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { isModifyMode } = useModifyMode();
+  const [editLocationDialogOpen, setEditLocationDialogOpen] = useState(false);
+  const [editingLocationA, setEditingLocationA] = useState('');
+  const [editingLocationB, setEditingLocationB] = useState('');
   
-  // Fetch existing spares data from current API
+  // Get vesselId from selectedComponent or default to V001
+  const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
+  
+  // Fetch spares scoped to the current vessel to avoid cross-vessel data leakage
   const { data: allSpares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares'],
+    queryKey: ['/api/spares', vesselId],
+    enabled: !!vesselId,
+  });
+  
+  // Fetch vessel location names
+  const { data: locationNames = { locationAName: 'Location A', locationBName: 'Location B' } } = useQuery<{
+    vesselId: string;
+    locationAName: string;
+    locationBName: string;
+  }>({
+    queryKey: ['/api/vessel-location-names', vesselId],
   });
   
   // Get all components to find children
   const { data: allComponents = [] } = useQuery<any[]>({
     queryKey: ['/api/components'],
   });
+  
+  // Mutation to update location names
+  const updateLocationNamesMutation = useMutation({
+    mutationFn: async (data: { locationAName: string; locationBName: string }) => {
+      const response = await fetch(`/api/vessel-location-names/${vesselId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, updatedBy: 'User' }),
+      });
+      if (!response.ok) throw new Error('Failed to update location names');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vessel-location-names', vesselId] });
+      setEditLocationDialogOpen(false);
+    },
+  });
+  
+  const handleEditLocations = () => {
+    setEditingLocationA(locationNames.locationAName);
+    setEditingLocationB(locationNames.locationBName);
+    setEditLocationDialogOpen(true);
+  };
+  
+  const handleSaveLocations = () => {
+    updateLocationNamesMutation.mutate({
+      locationAName: editingLocationA,
+      locationBName: editingLocationB,
+    });
+  };
   
   // Find the actual database ID for a component by its code
   const getActualComponentId = (code: string): string | undefined => {
@@ -1465,24 +1516,57 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                 </span>
               </td>
               <td className="py-3 px-3 text-gray-900">
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares[index].location}
-                    currentValue={spare.location}
-                    fieldName={`location-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'location', value)}
-                  >
-                    <input
-                      type="text"
-                      value={spare.location}
-                      onChange={(e) => handleFieldChange(index, 'location', e.target.value)}
-                      className="text-sm w-full px-2 py-1 border rounded"
-                    />
-                  </ModifyFieldWrapper>
-                ) : (
-                  spare.location
-                )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      data-testid={`location-popup-trigger-${index}`}
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span>View Locations</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0" align="start">
+                    <div className="p-3 border-b bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-sm text-gray-800">Storage Locations</h4>
+                        <button 
+                          onClick={handleEditLocations}
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          data-testid="edit-location-names-btn"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit Names
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <span className="text-sm font-medium text-gray-700">{locationNames.locationAName}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-gray-900">{spare.robLocationA ?? 0}</span>
+                          <span className="text-xs text-gray-500 ml-1">units</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-100">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <span className="text-sm font-medium text-gray-700">{locationNames.locationBName}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-gray-900">{spare.robLocationB ?? 0}</span>
+                          <span className="text-xs text-gray-500 ml-1">units</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t text-xs text-gray-500">
+                        Total ROB: <span className="font-semibold text-gray-700">{spare.rob}</span> units
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </td>
               {FEATURES.IHM && (
                 <td className="py-3 px-3 text-center">
@@ -1500,6 +1584,59 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
           ))}
         </tbody>
       </table>
+      
+      {/* Edit Location Names Dialog */}
+      <Dialog open={editLocationDialogOpen} onOpenChange={setEditLocationDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Edit Storage Location Names</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="locationAName" className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                Location A Name
+              </Label>
+              <Input
+                id="locationAName"
+                value={editingLocationA}
+                onChange={(e) => setEditingLocationA(e.target.value)}
+                placeholder="e.g., Engine Room Store"
+                data-testid="input-location-a-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="locationBName" className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                Location B Name
+              </Label>
+              <Input
+                id="locationBName"
+                value={editingLocationB}
+                onChange={(e) => setEditingLocationB(e.target.value)}
+                placeholder="e.g., Deck Store"
+                data-testid="input-location-b-name"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setEditLocationDialogOpen(false)}
+                data-testid="btn-cancel-location-edit"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveLocations}
+                disabled={updateLocationNamesMutation.isPending}
+                data-testid="btn-save-location-names"
+              >
+                {updateLocationNamesMutation.isPending ? 'Saving...' : 'Save Names'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

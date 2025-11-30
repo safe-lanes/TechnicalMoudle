@@ -409,6 +409,27 @@ export class PersistentFileStorage implements IStorage {
           }
         };
         
+        // Backfill: Migrate existing spares to include robLocationA/robLocationB
+        let sparesBackfilled = 0;
+        Object.values(result.spares).forEach((spare: any) => {
+          if (spare && spare.robLocationA === undefined) {
+            spare.robLocationA = spare.rob || 0;
+            spare.robLocationB = 0;
+            sparesBackfilled++;
+          }
+        });
+        if (sparesBackfilled > 0) {
+          console.log(`🔄 Backfilled ${sparesBackfilled} spares with robLocationA/robLocationB fields`);
+        }
+        
+        // Backfill: Add location names to existing pmsVesselSettings
+        Object.values(result.pmsVesselSettings).forEach((settings: any) => {
+          if (settings && settings.locationAName === undefined) {
+            settings.locationAName = 'Location A';
+            settings.locationBName = 'Location B';
+          }
+        });
+        
         return result;
       } else {
         console.log(`📝 Creating new data file at ${this.dataFile}`);
@@ -2496,7 +2517,9 @@ export class PersistentFileStorage implements IStorage {
       location: spare.location || null,
       componentSpareCode: spare.componentSpareCode || null,
       vesselId: spare.vesselId || null,
-      rob: spare.rob || 0,
+      robLocationA: spare.robLocationA ?? spare.rob ?? 0, // Default to total rob if not specified
+      robLocationB: spare.robLocationB ?? 0,
+      rob: (spare.robLocationA ?? spare.rob ?? 0) + (spare.robLocationB ?? 0), // Always sync total
       min: spare.min || 0,
       maker: spare.maker || null,
       makerCode: spare.makerCode || null,
@@ -2545,6 +2568,21 @@ export class PersistentFileStorage implements IStorage {
       throw new Error(`Spare ${id} not found`);
     }
     const updated = { ...spare, ...data };
+    
+    // Keep rob synchronized with robLocationA + robLocationB
+    // If either location ROB is updated, recalculate total
+    if (data.robLocationA !== undefined || data.robLocationB !== undefined) {
+      const locationA = data.robLocationA ?? updated.robLocationA ?? 0;
+      const locationB = data.robLocationB ?? updated.robLocationB ?? 0;
+      updated.rob = locationA + locationB;
+    }
+    // If total rob is updated directly, ensure it's reflected (backward compatibility)
+    if (data.rob !== undefined && data.robLocationA === undefined && data.robLocationB === undefined) {
+      // Only total rob updated - put difference in Location A
+      updated.robLocationA = data.rob;
+      updated.robLocationB = 0;
+    }
+    
     this.data.spares[id] = updated;
     this.persistData();
     return updated;
@@ -6414,6 +6452,8 @@ export class PersistentFileStorage implements IStorage {
         rhLeadHoursCritical: settings.rhLeadHoursCritical ?? 50,
         rhLeadHoursNonCritical: settings.rhLeadHoursNonCritical ?? 100,
         rhGraceHours: settings.rhGraceHours ?? 168,
+        locationAName: settings.locationAName ?? 'Location A',
+        locationBName: settings.locationBName ?? 'Location B',
         updatedBy: settings.updatedBy,
         createdAt: new Date(),
         updatedAt: new Date(),
