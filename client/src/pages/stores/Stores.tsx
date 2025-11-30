@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Minus, Archive, Download, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Minus, Archive, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -31,6 +31,8 @@ interface StoreItem {
   category: "stores" | "lubes" | "chemicals" | "others";
   notes?: string;
   isArchived?: boolean;
+  robLocationA?: number;
+  robLocationB?: number;
   // IHM fields
   ihmPresence?: typeof IHM_PRESENCE[number];
   ihmEvidenceType?: typeof IHM_EVIDENCE_TYPES[number];
@@ -70,10 +72,13 @@ interface StoresApiItem {
   category?: string;
   uom?: string;
   totalRob?: number;
+  rob?: number;
   locationA?: string;
   locationARob?: number;
+  robLocationA?: number;
   locationB?: string;
   locationBRob?: number;
+  robLocationB?: number;
   min?: number;
   max?: number;
   itemType?: string;
@@ -98,6 +103,11 @@ const Stores: React.FC = () => {
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [items, setItems] = useState<StoreItem[]>([]);
+  
+  // Location dropdown state
+  const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
+  const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
+  const locationDropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
@@ -105,15 +115,31 @@ const Stores: React.FC = () => {
     queryKey: vesselId ? [`/api/stores/${vesselId}?itemType=${activeTab}`] : ['stores-disabled'],
     enabled: !!vesselId,
   });
+  
+  // Fetch vessel location names
+  const { data: locationNamesData } = useQuery({
+    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/vessel-location-names/${vesselId}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!vesselId,
+  });
+  
+  const locationNames = {
+    locationA: locationNamesData?.locationAName || 'Location A',
+    locationB: locationNamesData?.locationBName || 'Location B'
+  };
 
   // Map API data to StoreItem format and update items state
   useEffect(() => {
     if (storesData && storesData.length > 0) {
       const mappedItems: StoreItem[] = storesData.map((item: any) => {
         // Parse numeric values from strings (API may return strings)
-        const totalRob = Number(item.totalRob ?? item.rob ?? 0) || 0;
         const locationARob = Number(item.locationARob ?? item.robLocationA ?? 0) || 0;
         const locationBRob = Number(item.locationBRob ?? item.robLocationB ?? 0) || 0;
+        const totalRob = Number(item.totalRob ?? item.rob ?? 0) || 0;
         const rob = totalRob || (locationARob + locationBRob);
         const min = Number(item.min ?? 0) || 0;
         
@@ -130,6 +156,8 @@ const Stores: React.FC = () => {
           category: (item.itemType as "stores" | "lubes" | "chemicals" | "others") || activeTab,
           notes: item.notes || '',
           isArchived: item.isArchived || false,
+          robLocationA: locationARob,
+          robLocationB: locationBRob,
           ihmPresence: (item.ihmPresence as typeof IHM_PRESENCE[number]) || 'Unknown',
           ihmEvidenceType: (item.ihmEvidenceType as typeof IHM_EVIDENCE_TYPES[number]) || 'None',
         };
@@ -146,6 +174,77 @@ const Stores: React.FC = () => {
   const [historySearch, setHistorySearch] = useState("");
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
   const [historyItems, setHistoryItems] = useState<StoresHistoryItem[]>([]);
+  
+  // Click outside handler for location dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target as Node)) {
+        if (openLocationDropdown !== null && editingLocations[openLocationDropdown]) {
+          handleSaveLocation(openLocationDropdown);
+        }
+        setOpenLocationDropdown(null);
+      }
+    };
+    
+    if (openLocationDropdown !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openLocationDropdown, editingLocations]);
+  
+  const handleOpenLocationDropdown = (item: StoreItem) => {
+    setOpenLocationDropdown(item.id);
+    setEditingLocations(prev => ({
+      ...prev,
+      [item.id]: {
+        locationA: String(item.robLocationA ?? 0),
+        locationB: String(item.robLocationB ?? 0)
+      }
+    }));
+  };
+  
+  const handleSaveLocation = async (itemId: number) => {
+    const locations = editingLocations[itemId];
+    if (!locations) return;
+    
+    const robA = parseInt(locations.locationA) || 0;
+    const robB = parseInt(locations.locationB) || 0;
+    
+    try {
+      // Save ROB quantities to store item
+      await fetch(`/api/stores/${vesselId}/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          robLocationA: robA,
+          robLocationB: robB,
+          rob: robA + robB
+        }),
+      });
+      
+      // Save location names to vessel settings if they were edited
+      if (locations.nameA || locations.nameB) {
+        await fetch(`/api/vessel-location-names/${vesselId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            locationAName: locations.nameA || locationNames.locationA || 'Location A',
+            locationBName: locations.nameB || locationNames.locationB || 'Location B'
+          }),
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: [`/api/stores/${vesselId}?itemType=${activeTab}`] });
+      toast({ title: "Saved", description: "Location settings updated" });
+    } catch (error) {
+      console.error('Failed to save location:', error);
+      toast({ title: "Error", description: "Failed to save location settings", variant: "destructive" });
+    }
+  };
   
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
