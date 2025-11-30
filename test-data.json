@@ -155548,7 +155548,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:22:38.102Z",
-      "updatedAt": "2025-11-30T18:50:12.981Z"
+      "updatedAt": "2025-11-30T19:08:13.631Z"
     },
     "12": {
       "id": 12,
@@ -155578,9 +155578,9 @@
       "itemType": "stores",
       "storesCategory": null,
       "uom": "m",
-      "rob": "800",
-      "robLocationA": "500",
-      "robLocationB": "300",
+      "rob": 800,
+      "robLocationA": 500,
+      "robLocationB": 300,
       "min": "400",
       "locationA": "Electrical Store",
       "locationB": "Engine Store",
@@ -155590,7 +155590,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:22:38.177Z",
-      "updatedAt": "2025-11-29T21:22:38.177Z"
+      "updatedAt": "2025-11-30T19:08:18.860Z"
     },
     "14": {
       "id": 14,
@@ -155620,9 +155620,9 @@
       "itemType": "stores",
       "storesCategory": null,
       "uom": "set",
-      "rob": "8",
-      "robLocationA": "4",
-      "robLocationB": "3",
+      "rob": 7,
+      "robLocationA": 4,
+      "robLocationB": 3,
       "min": "5",
       "locationA": "Bridge",
       "locationB": "Main Deck",
@@ -155632,7 +155632,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-11-29T21:22:38.228Z",
-      "updatedAt": "2025-11-29T21:22:38.228Z"
+      "updatedAt": "2025-11-30T19:08:23.832Z"
     },
     "16": {
       "id": 16,
