@@ -3744,6 +3744,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // PATCH endpoint for partial updates (location ROB updates)
+  app.patch("/api/stores/:vesselId/:id", async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      const { robLocationA, robLocationB, rob } = req.body;
+      
+      // Build update object with only provided fields
+      const updateData: any = {};
+      if (robLocationA !== undefined) updateData.robLocationA = robLocationA;
+      if (robLocationB !== undefined) updateData.robLocationB = robLocationB;
+      if (rob !== undefined) updateData.rob = rob;
+      
+      const item = await storage.updateStoresItem(itemId, updateData);
+      res.json(item);
+    } catch (error: any) {
+      console.error("Error updating stores item:", error);
+      res.status(500).json({ error: error.message || "Failed to update stores item" });
+    }
+  });
+  
   app.delete("/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
