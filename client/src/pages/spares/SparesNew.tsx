@@ -73,7 +73,14 @@ const Spares: React.FC = () => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
   const [searchTerm, setSearchTerm] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState("");
-  const [stockFilter, setStockFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState(() => {
+    const savedFilter = sessionStorage.getItem('sparesStockFilter');
+    if (savedFilter) {
+      sessionStorage.removeItem('sparesStockFilter');
+      return savedFilter;
+    }
+    return "";
+  });
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
   

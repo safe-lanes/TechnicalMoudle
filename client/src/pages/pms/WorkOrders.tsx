@@ -61,7 +61,14 @@ const WorkOrders: React.FC = () => {
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedComponent, setSelectedComponent] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
-  const [activeTab, setActiveTab] = useState("All W.O");
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = sessionStorage.getItem('workOrdersActiveTab');
+    if (savedTab) {
+      sessionStorage.removeItem('workOrdersActiveTab');
+      return savedTab;
+    }
+    return "All W.O";
+  });
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);

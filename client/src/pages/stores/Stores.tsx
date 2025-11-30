@@ -93,7 +93,14 @@ const Stores: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
-  const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">("stores");
+  const [activeTab, setActiveTab] = useState<"stores" | "lubes" | "chemicals" | "others">(() => {
+    const savedTab = sessionStorage.getItem('storesActiveTab');
+    if (savedTab && ['stores', 'lubes', 'chemicals', 'others'].includes(savedTab)) {
+      sessionStorage.removeItem('storesActiveTab');
+      return savedTab as "stores" | "lubes" | "chemicals" | "others";
+    }
+    return "stores";
+  });
   const [viewMode, setViewMode] = useState<"inventory" | "history">("inventory");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
