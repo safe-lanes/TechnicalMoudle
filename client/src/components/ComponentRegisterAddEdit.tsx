@@ -728,9 +728,10 @@ export default function ComponentRegisterAddEdit({
                     <label className="text-xs text-gray-500 mb-1 block">Component Category</label>
                     <Input
                       value={componentData.eqptSystemCategory}
-                      onChange={(e) => handleFieldChange('eqptSystemCategory', e.target.value)}
-                      className="h-8 text-sm"
+                      readOnly
+                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
                       data-testid="input-component-category"
+                      title="Auto-populated based on component group (1-8)"
                     />
                   </div>
                   <div>
@@ -744,12 +745,16 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Criticality</label>
-                    <Input
+                    <select
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-criticality"
-                    />
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-criticality"
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
                   </div>
                 </div>
 
@@ -785,24 +790,33 @@ export default function ComponentRegisterAddEdit({
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Condition Based</label>
-                    <Input
+                    <select
                       value={componentData.conditionBased}
                       onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-condition-based"
-                    />
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-condition-based"
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department</label>
-                    <Input
+                    <select
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-eqpt-dept"
-                    />
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-eqpt-dept"
+                    >
+                      <option value="">Select Department</option>
+                      <option value="Deck">Deck</option>
+                      <option value="Engine">Engine</option>
+                      <option value="Electrical">Electrical</option>
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Parent Component Code</label>

@@ -410,9 +410,10 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               <input
                                 type="text"
                                 value={componentData.componentCategory}
-                                onChange={(e) => handleFieldChange('componentCategory', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                readOnly
+                                className="text-sm w-full px-2 py-1 border rounded bg-gray-50 text-gray-700 border-gray-300 cursor-not-allowed"
                                 data-testid="input-component-category"
+                                title="Auto-populated based on component group (1-8)"
                               />
                             </div>
                             <div>
@@ -555,13 +556,17 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">Equipment / System Department</label>
-                              <input
-                                type="text"
+                              <select
                                 value={componentData.eqptSystemDept}
                                 onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
                                 className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-eqpt-system-dept"
-                              />
+                                data-testid="select-eqpt-system-dept"
+                              >
+                                <option value="">Select Department</option>
+                                <option value="Deck">Deck</option>
+                                <option value="Engine">Engine</option>
+                                <option value="Electrical">Electrical</option>
+                              </select>
                             </div>
                             <div>
                               {/* Empty spacer field */}
