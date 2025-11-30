@@ -1449,6 +1449,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Component Maintenance History API routes (read-only, immutable records)
+  
+  // Get ALL maintenance history records (for global display)
+  app.get("/api/component-maintenance-history", async (req, res) => {
+    try {
+      const allHistory = await storage.getAllComponentMaintenanceHistory();
+      res.json(allHistory);
+    } catch (error) {
+      console.error("Failed to get all component maintenance history:", error);
+      res.status(500).json({ error: "Failed to get component maintenance history" });
+    }
+  });
+  
   app.get("/api/component-maintenance-history/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First, verify the component exists and check vessel access
@@ -3322,6 +3334,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Spares routes...
+  
+  // Get ALL spares (for components page to filter by component ID)
+  app.get("/api/spares", async (req, res) => {
+    try {
+      const allSpares = await storage.getAllSpares();
+      res.json(allSpares);
+    } catch (error: any) {
+      console.error("Error fetching all spares:", error);
+      res.status(500).json({ error: "Failed to fetch spares", details: error.message });
+    }
+  });
   
   // Get spares for a vessel
   app.get("/api/spares/:vesselId", async (req, res) => {

@@ -141,6 +141,7 @@ interface PersistentData {
   fleetSpareVesselMappings: Record<number, FleetSpareVesselMapping>;
   bulkImportHistory: Record<number, BulkImportHistory>;
   bulkImportErrors: BulkImportError[];
+  componentMaintenanceHistory: Record<number, any>;
   
   // Counter state
   counters: {
@@ -176,6 +177,7 @@ interface PersistentData {
     fleetSpareVesselMappingId: number;
     bulkImportHistoryId: number;
     bulkImportErrorId: number;
+    maintenanceHistoryId: number;
   };
 }
 
@@ -369,6 +371,7 @@ export class PersistentFileStorage implements IStorage {
           fleetSpareVesselMappings: loadedData.fleetSpareVesselMappings || {},
           bulkImportHistory: loadedData.bulkImportHistory || {},
           bulkImportErrors: loadedData.bulkImportErrors || [],
+          componentMaintenanceHistory: loadedData.componentMaintenanceHistory || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -401,7 +404,8 @@ export class PersistentFileStorage implements IStorage {
             fleetJobVesselMappingId: loadedData.counters?.fleetJobVesselMappingId || 1,
             fleetSpareVesselMappingId: loadedData.counters?.fleetSpareVesselMappingId || 1,
             bulkImportHistoryId: loadedData.counters?.bulkImportHistoryId || 1,
-            bulkImportErrorId: loadedData.counters?.bulkImportErrorId || 1
+            bulkImportErrorId: loadedData.counters?.bulkImportErrorId || 1,
+            maintenanceHistoryId: loadedData.counters?.maintenanceHistoryId || 1
           }
         };
         
@@ -460,6 +464,7 @@ export class PersistentFileStorage implements IStorage {
       fleetSpareVesselMappings: {},
       bulkImportHistory: {},
       bulkImportErrors: [],
+      componentMaintenanceHistory: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -492,7 +497,8 @@ export class PersistentFileStorage implements IStorage {
         fleetJobVesselMappingId: 1,
         fleetSpareVesselMappingId: 1,
         bulkImportHistoryId: 1,
-        bulkImportErrorId: 1
+        bulkImportErrorId: 1,
+        maintenanceHistoryId: 1
       }
     };
     
@@ -2461,6 +2467,11 @@ export class PersistentFileStorage implements IStorage {
   }
 
   // Spares methods
+  async getAllSpares(): Promise<Spare[]> {
+    return Object.values(this.data.spares)
+      .filter(s => s !== null && s !== undefined && !s.deleted);
+  }
+  
   async getSpares(vesselId: string): Promise<Spare[]> {
     return Object.values(this.data.spares)
       .filter(s => s !== null && s !== undefined)
@@ -3024,8 +3035,64 @@ export class PersistentFileStorage implements IStorage {
     return { success: errors.length === 0, errors };
   }
 
-  // The rest of the methods will follow the same pattern...
-  // I'll continue with the most important ones for now
+  // Component Maintenance History methods
+  async getAllComponentMaintenanceHistory(): Promise<any[]> {
+    if (!this.data.componentMaintenanceHistory) {
+      this.data.componentMaintenanceHistory = {};
+    }
+    return Object.values(this.data.componentMaintenanceHistory)
+      .filter(h => h !== null)
+      .sort((a, b) => {
+        const dateA = new Date(a.dateCompleted || 0);
+        const dateB = new Date(b.dateCompleted || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+  
+  async getComponentMaintenanceHistory(componentId: string): Promise<any[]> {
+    if (!this.data.componentMaintenanceHistory) {
+      this.data.componentMaintenanceHistory = {};
+    }
+    return Object.values(this.data.componentMaintenanceHistory)
+      .filter(h => h !== null && h.componentId === componentId)
+      .sort((a, b) => {
+        const dateA = new Date(a.dateCompleted || 0);
+        const dateB = new Date(b.dateCompleted || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+
+  async getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined> {
+    if (!this.data.componentMaintenanceHistory) {
+      this.data.componentMaintenanceHistory = {};
+    }
+    return this.data.componentMaintenanceHistory[id];
+  }
+
+  async createComponentMaintenanceHistory(history: any): Promise<any> {
+    if (!this.data.componentMaintenanceHistory) {
+      this.data.componentMaintenanceHistory = {};
+    }
+    if (!this.data.counters) {
+      this.data.counters = { userId: 1, vesselId: 1, workOrderId: 1, executionId: 1, defectId: 1, defectActionId: 1, maintenanceHistoryId: 1 };
+    }
+    if (!this.data.counters.maintenanceHistoryId) {
+      this.data.counters.maintenanceHistoryId = 1;
+    }
+    
+    const id = this.data.counters.maintenanceHistoryId++;
+    const newHistory = {
+      ...history,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentMaintenanceHistory[id] = newHistory;
+    this.persistData();
+    console.log(`✅ Created maintenance history record #${id} for component ${history.componentId}`);
+    return newHistory;
+  }
 
   // Jobs methods (Templates for maintenance jobs linked to components)
   async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {

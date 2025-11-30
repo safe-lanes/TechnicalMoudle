@@ -244,6 +244,7 @@ export interface IStorage {
   deleteFleetComponent(id: string): Promise<void>;
   
   // Spares methods
+  getAllSpares(): Promise<Spare[]>;
   getSpares(vesselId: string): Promise<Spare[]>;
   getSpare(id: number): Promise<Spare | undefined>;
   createSpare(spare: InsertSpare): Promise<Spare>;
@@ -383,6 +384,7 @@ export interface IStorage {
   deleteComponentClassRegulatory(id: number): Promise<void>;
   
   // Component Maintenance History methods
+  getAllComponentMaintenanceHistory(): Promise<any[]>;
   getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
   createComponentMaintenanceHistory(history: any): Promise<any>;
