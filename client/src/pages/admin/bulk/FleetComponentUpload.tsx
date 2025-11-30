@@ -55,11 +55,32 @@ export default function FleetComponentUpload() {
     setSelectedFile(file);
   };
 
-  const handleDownloadTemplate = () => {
-    toast({
-      title: 'Template Downloaded',
-      description: 'Fleet Component template has been downloaded.'
-    });
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/bulk/template?type=components');
+      if (!response.ok) throw new Error('Failed to download template');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Fleet_Component_Template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Template Downloaded',
+        description: 'Fleet Component template has been downloaded.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: 'Failed to download template.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleUpload = () => {

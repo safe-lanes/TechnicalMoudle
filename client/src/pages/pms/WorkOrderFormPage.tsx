@@ -39,7 +39,6 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { generateSuggestions, extractContextFromWorkOrder, type WorkOrderContext } from "@/utils/suggestionEngine";
 import { FEATURES, IHM_ACTIONS } from '@/config/features';
 import type { WorkOrder, WorkOrderExecution } from '@shared/schema';
-import { sampleSpareParts, sampleTools, sampleSafetyRequirements, sampleWorkHistory } from '@/lib/workOrderSampleData';
 import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
