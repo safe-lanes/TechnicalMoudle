@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dateUtils';
+import { ObjectStorageService, ObjectNotFoundError } from '../objectStorage';
 
 const router = Router();
 
@@ -2164,13 +2165,28 @@ router.post('/import', async (req, res) => {
       storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
-    // Update ImportHistory with status='complete' and include file metadata
+    // Save the uploaded file to Object Storage for later retrieval
+    let storedFilePath: string | null = null;
+    try {
+      const objectStorage = new ObjectStorageService();
+      storedFilePath = await objectStorage.uploadBuffer(
+        cachedData.file,
+        cachedData.originalName,
+        `bulk-imports/${type}`
+      );
+      console.log(`📁 Uploaded file stored at: ${storedFilePath}`);
+    } catch (uploadError) {
+      console.warn('⚠️ Failed to store uploaded file to object storage:', uploadError);
+      // Continue - file storage is optional, import succeeded
+    }
+
+    // Update ImportHistory with status='complete' and include file path
     await storage.updateImportHistory(historyId, {
       ...importResult,
       finishedAt: new Date(),
       status: 'complete',
-      originalFile: cachedData.file,
-      originalName: cachedData.originalName
+      originalName: cachedData.originalName,
+      storedFilePath: storedFilePath // Store the object storage path
     });
 
     // Clean up cache
@@ -2219,7 +2235,7 @@ router.get('/history', async (req, res) => {
   }
 });
 
-// Download history files
+// Download history files (legacy endpoint)
 router.get('/history/:id/:fileType', async (req, res) => {
   try {
     const { id, fileType } = req.params;
@@ -2234,6 +2250,37 @@ router.get('/history/:id/:fileType', async (req, res) => {
     res.send(file.data);
   } catch (error) {
     console.error('File download error:', error);
+    res.status(500).json({ error: 'Failed to download file' });
+  }
+});
+
+// Download original uploaded file from Object Storage
+router.get('/history/:id/download-original', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get history record to find stored file path
+    const history = await storage.getImportHistoryById(id);
+    if (!history) {
+      return res.status(404).json({ error: 'Import history not found' });
+    }
+    
+    if (!history.storedFilePath) {
+      return res.status(404).json({ error: 'Original file not available for this import' });
+    }
+    
+    // Set download headers with original filename
+    const originalName = history.originalName || 'import_file';
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
+    
+    // Download from object storage
+    const objectStorage = new ObjectStorageService();
+    await objectStorage.downloadByPath(history.storedFilePath, res);
+  } catch (error) {
+    console.error('Original file download error:', error);
+    if (error instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: 'File not found in storage' });
+    }
     res.status(500).json({ error: 'Failed to download file' });
   }
 });
@@ -4482,7 +4529,8 @@ async function getImportHistory(type: string | undefined, limit: number, offset:
       skipped: h.skipped,
       archived: h.archived,
       status: h.status,
-      originalName: h.originalName
+      originalName: h.originalName,
+      storedFilePath: h.storedFilePath // Include file path for download
     })),
     total: result.total
   };

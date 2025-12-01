@@ -297,4 +297,84 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  // Upload a buffer directly to object storage
+  // Returns the object path that can be used for later retrieval
+  async uploadBuffer(buffer: Buffer, fileName: string, folder: string = 'bulk-imports'): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir) {
+      throw new Error(
+        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+          "tool and set PRIVATE_OBJECT_DIR env var."
+      );
+    }
+
+    // Create a unique path: /{bucket}/.private/{folder}/{timestamp}_{filename}
+    const timestamp = Date.now();
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const objectPath = `${privateObjectDir}/${folder}/${timestamp}_${safeFileName}`;
+
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    // Upload the buffer
+    await file.save(buffer, {
+      contentType: this.getContentType(fileName),
+      resumable: false
+    });
+
+    console.log(`📤 File uploaded to object storage: ${objectPath}`);
+    return objectPath;
+  }
+
+  // Get content type based on file extension
+  private getContentType(fileName: string): string {
+    const ext = fileName.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'csv':
+        return 'text/csv';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // Download a file from object storage by path
+  async downloadByPath(objectPath: string, res: Response): Promise<void> {
+    try {
+      const { bucketName, objectName } = parseObjectPath(objectPath);
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      const [exists] = await file.exists();
+      if (!exists) {
+        throw new ObjectNotFoundError();
+      }
+
+      await this.downloadObject(file, res);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        throw error;
+      }
+      console.error("Error downloading file by path:", error);
+      throw new Error("Error downloading file");
+    }
+  }
+
+  // Check if a file exists in object storage
+  async fileExists(objectPath: string): Promise<boolean> {
+    try {
+      const { bucketName, objectName } = parseObjectPath(objectPath);
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      const [exists] = await file.exists();
+      return exists;
+    } catch {
+      return false;
+    }
+  }
 }
