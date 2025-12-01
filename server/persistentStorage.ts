@@ -2096,6 +2096,8 @@ export class PersistentFileStorage implements IStorage {
       }
     }
     parent.currentCumulativeRH = newParentRH.toFixed(2);
+    // Also update the legacy runningHours field to ensure UI consistency
+    parent.runningHours = newParentRH.toFixed(2);
 
     // 5. Get all children of parent (parentId contains component code, not database ID)
     const parentCode = parent.componentCode;
@@ -2118,8 +2120,9 @@ export class PersistentFileStorage implements IStorage {
       const prevChildRH = parseFloat(child.currentCumulativeRH);
       const newChildRH = prevChildRH + delta;
       
-      // Update child.currentCumulativeRH
+      // Update child.currentCumulativeRH and legacy runningHours field
       child.currentCumulativeRH = newChildRH.toFixed(2);
+      child.runningHours = newChildRH.toFixed(2);
       
       // Create audit entry with all fields
       const childAudit: RunningHoursAudit = {

@@ -865,7 +865,14 @@ const JobRow: React.FC<{
         <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
         <td className="py-3 px-3 text-gray-900">
           {job.maintenanceBasis === 'Running Hours' 
-            ? `${job.nextDueRH || '-'} RH` 
+            ? (() => {
+                // Calculate remaining RH: Frequency - (Current RH - Last Done RH)
+                const frequency = parseFloat(job.intervalRunningHour || '0');
+                const currentRH = parseFloat(job.componentCurrentRH || '0');
+                const lastDoneRH = parseFloat(job.lastDoneRH || '0');
+                const remainingRH = frequency - (currentRH - lastDoneRH);
+                return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
+              })()
             : formatProfessionalDate(job.nextDueDate) || '-'}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>

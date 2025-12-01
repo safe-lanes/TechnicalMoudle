@@ -363,7 +363,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselId = req.query.vesselId as string | undefined;
       const componentId = req.query.componentId as string | undefined;
       const jobs = await storage.getJobs(vesselId, componentId);
-      res.json(jobs);
+      
+      // Hydrate Running Hours jobs with component's current RH for remaining RH calculation
+      const hydratedJobs = await Promise.all(jobs.map(async (job) => {
+        if (job.maintenanceBasis === 'Running Hours' && job.componentId) {
+          const component = await storage.getComponent(job.componentId);
+          if (component) {
+            // Get parent component's running hours if component has a parent
+            let currentRH = parseFloat(component.currentCumulativeRH || component.runningHours || '0');
+            if (component.parentId) {
+              const parentComponent = await storage.getComponentByCode(component.parentId, job.vesselId || '');
+              if (parentComponent) {
+                currentRH = parseFloat(parentComponent.currentCumulativeRH || parentComponent.runningHours || '0');
+              }
+            }
+            return {
+              ...job,
+              componentCurrentRH: currentRH.toFixed(2)
+            };
+          }
+        }
+        return job;
+      }));
+      
+      res.json(hydratedJobs);
     } catch (error) {
       console.error("Failed to fetch jobs:", error);
       res.status(500).json({ error: "Failed to fetch jobs" });
