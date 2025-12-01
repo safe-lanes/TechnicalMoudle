@@ -3817,7 +3817,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.152Z",
-      "updatedAt": "2025-12-01T19:26:27.601Z"
+      "updatedAt": "2025-12-01T19:48:20.031Z"
     },
     "1764617187167_pg8vss2kd": {
       "componentCode": "27",
@@ -3860,7 +3860,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.167Z",
-      "updatedAt": "2025-12-01T19:26:27.628Z"
+      "updatedAt": "2025-12-01T19:48:20.048Z"
     },
     "1764617187181_9un7vv95k": {
       "componentCode": "278",
@@ -3903,7 +3903,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.181Z",
-      "updatedAt": "2025-12-01T19:26:27.652Z"
+      "updatedAt": "2025-12-01T19:48:20.066Z"
     },
     "1764617187195_hn23e7i5f": {
       "componentCode": "4",
@@ -3946,7 +3946,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.195Z",
-      "updatedAt": "2025-12-01T19:26:27.672Z"
+      "updatedAt": "2025-12-01T19:48:20.087Z"
     },
     "1764617187212_jdorrq17i": {
       "componentCode": "40",
@@ -3989,7 +3989,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.212Z",
-      "updatedAt": "2025-12-01T19:26:27.688Z"
+      "updatedAt": "2025-12-01T19:48:20.106Z"
     },
     "1764617187224_q27gny1aw": {
       "componentCode": "401",
@@ -4032,7 +4032,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.224Z",
-      "updatedAt": "2025-12-01T19:26:27.702Z"
+      "updatedAt": "2025-12-01T19:48:20.124Z"
     },
     "1764617187239_ra3mr4fn6": {
       "componentCode": "403",
@@ -4075,7 +4075,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.239Z",
-      "updatedAt": "2025-12-01T19:26:27.727Z"
+      "updatedAt": "2025-12-01T19:48:20.146Z"
     },
     "1764617187256_168e0rv3q": {
       "componentCode": "6",
@@ -4118,7 +4118,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.256Z",
-      "updatedAt": "2025-12-01T19:26:27.740Z"
+      "updatedAt": "2025-12-01T19:48:20.165Z"
     },
     "1764617187267_gzbtqgc1z": {
       "componentCode": "60",
@@ -4161,7 +4161,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.267Z",
-      "updatedAt": "2025-12-01T19:26:27.753Z"
+      "updatedAt": "2025-12-01T19:48:20.181Z"
     },
     "1764617187283_f4vu3e1aq": {
       "componentCode": "601",
@@ -4204,7 +4204,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.283Z",
-      "updatedAt": "2025-12-01T19:26:27.767Z"
+      "updatedAt": "2025-12-01T19:48:20.201Z"
     },
     "1764617187310_k0yzoj2j3": {
       "componentCode": "7",
@@ -4247,7 +4247,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.310Z",
-      "updatedAt": "2025-12-01T19:26:27.780Z"
+      "updatedAt": "2025-12-01T19:48:20.219Z"
     },
     "1764617187336_xmyngjmyy": {
       "componentCode": "70",
@@ -4290,7 +4290,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.336Z",
-      "updatedAt": "2025-12-01T19:26:27.794Z"
+      "updatedAt": "2025-12-01T19:48:20.235Z"
     },
     "1764617187353_jkvqq8hhi": {
       "componentCode": "702",
@@ -4333,7 +4333,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.353Z",
-      "updatedAt": "2025-12-01T19:26:27.809Z"
+      "updatedAt": "2025-12-01T19:48:20.249Z"
     },
     "1764617187381_j49s1lfdo": {
       "componentCode": "71",
@@ -4376,7 +4376,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.381Z",
-      "updatedAt": "2025-12-01T19:26:27.826Z"
+      "updatedAt": "2025-12-01T19:48:20.264Z"
     },
     "1764617187395_fb266bjin": {
       "componentCode": "712",
@@ -4419,7 +4419,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.395Z",
-      "updatedAt": "2025-12-01T19:26:27.843Z"
+      "updatedAt": "2025-12-01T19:48:20.281Z"
     },
     "1764617187408_4exzx9zck": {
       "componentCode": "278.010",
@@ -4462,7 +4462,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.408Z",
-      "updatedAt": "2025-12-01T19:26:27.868Z"
+      "updatedAt": "2025-12-01T19:48:20.295Z"
     },
     "1764617187421_eursifbny": {
       "componentCode": "403.006",
@@ -4505,7 +4505,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.421Z",
-      "updatedAt": "2025-12-01T19:26:27.924Z"
+      "updatedAt": "2025-12-01T19:48:20.371Z"
     },
     "1764617187434_m0yrvtn2v": {
       "componentCode": "601.002",
@@ -4548,7 +4548,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.434Z",
-      "updatedAt": "2025-12-01T19:26:27.967Z"
+      "updatedAt": "2025-12-01T19:48:20.422Z"
     },
     "1764617187446_i2vl3irj6": {
       "componentCode": "601.003",
@@ -4591,7 +4591,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.446Z",
-      "updatedAt": "2025-12-01T19:26:28.005Z"
+      "updatedAt": "2025-12-01T19:48:20.439Z"
     },
     "1764617187460_7t06zk245": {
       "componentCode": "601.004",
@@ -4634,7 +4634,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.460Z",
-      "updatedAt": "2025-12-01T19:26:28.025Z"
+      "updatedAt": "2025-12-01T19:48:20.455Z"
     },
     "1764617187484_rn6ls0j0c": {
       "componentCode": "702.005",
@@ -4677,7 +4677,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.484Z",
-      "updatedAt": "2025-12-01T19:26:28.047Z"
+      "updatedAt": "2025-12-01T19:48:20.467Z"
     },
     "1764617187509_5shmix9gn": {
       "componentCode": "702.010",
@@ -4720,7 +4720,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.509Z",
-      "updatedAt": "2025-12-01T19:26:28.068Z"
+      "updatedAt": "2025-12-01T19:48:20.486Z"
     },
     "1764617187529_2396s3cx3": {
       "componentCode": "712.009",
@@ -4763,7 +4763,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.529Z",
-      "updatedAt": "2025-12-01T19:26:28.091Z"
+      "updatedAt": "2025-12-01T19:48:20.499Z"
     },
     "1764617187547_gx1gxdi78": {
       "componentCode": "712.011",
@@ -4806,7 +4806,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.547Z",
-      "updatedAt": "2025-12-01T19:26:28.108Z"
+      "updatedAt": "2025-12-01T19:48:20.513Z"
     },
     "1764617187572_k3md4qrl7": {
       "componentCode": "712.013",
@@ -4849,7 +4849,7 @@
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-12-01T19:26:27.573Z",
-      "updatedAt": "2025-12-01T19:26:28.137Z"
+      "updatedAt": "2025-12-01T19:48:20.528Z"
     },
     "1764617187885_v62rszx87": {
       "componentCode": "401.005",
@@ -4895,7 +4895,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:27.885Z",
-      "updatedAt": "2025-12-01T19:26:27.885Z"
+      "updatedAt": "2025-12-01T19:48:20.313Z"
     },
     "1764617187900_pox9yu9ys": {
       "componentCode": "403.001",
@@ -4941,7 +4941,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:27.900Z",
-      "updatedAt": "2025-12-01T19:26:27.900Z"
+      "updatedAt": "2025-12-01T19:48:20.337Z"
     },
     "1764617187941_foky2ha1b": {
       "componentCode": "601.001",
@@ -4987,7 +4987,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:27.941Z",
-      "updatedAt": "2025-12-01T19:26:27.941Z"
+      "updatedAt": "2025-12-01T19:48:20.402Z"
     },
     "1764617188154_ble50unsf": {
       "componentCode": "278.010.01",
@@ -5033,7 +5033,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.154Z",
-      "updatedAt": "2025-12-01T19:26:28.154Z"
+      "updatedAt": "2025-12-01T19:48:20.541Z"
     },
     "1764617188167_6xo9yrwqs": {
       "componentCode": "278.010.02",
@@ -5079,7 +5079,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.167Z",
-      "updatedAt": "2025-12-01T19:26:28.167Z"
+      "updatedAt": "2025-12-01T19:48:20.559Z"
     },
     "1764617188180_l7yo3jnac": {
       "componentCode": "403.006.01",
@@ -5125,7 +5125,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.180Z",
-      "updatedAt": "2025-12-01T19:26:28.180Z"
+      "updatedAt": "2025-12-01T19:48:20.576Z"
     },
     "1764617188192_itlkhqmp4": {
       "componentCode": "403.006.02",
@@ -5171,7 +5171,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.192Z",
-      "updatedAt": "2025-12-01T19:26:28.192Z"
+      "updatedAt": "2025-12-01T19:48:20.588Z"
     },
     "1764617188205_27mrtn971": {
       "componentCode": "601.002.01",
@@ -5217,7 +5217,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.205Z",
-      "updatedAt": "2025-12-01T19:26:28.205Z"
+      "updatedAt": "2025-12-01T19:48:20.608Z"
     },
     "1764617188216_d1zr64he6": {
       "componentCode": "601.002.02",
@@ -5263,7 +5263,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.216Z",
-      "updatedAt": "2025-12-01T19:26:28.216Z"
+      "updatedAt": "2025-12-01T19:48:20.622Z"
     },
     "1764617188226_lr4f9qsmh": {
       "componentCode": "601.002.03",
@@ -5309,7 +5309,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.226Z",
-      "updatedAt": "2025-12-01T19:26:28.226Z"
+      "updatedAt": "2025-12-01T19:48:20.641Z"
     },
     "1764617188237_iuz8xlpo5": {
       "componentCode": "601.002.04",
@@ -5355,7 +5355,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.237Z",
-      "updatedAt": "2025-12-01T19:26:28.237Z"
+      "updatedAt": "2025-12-01T19:48:20.656Z"
     },
     "1764617188251_ve2ntaw06": {
       "componentCode": "601.002.05",
@@ -5401,7 +5401,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.251Z",
-      "updatedAt": "2025-12-01T19:26:28.251Z"
+      "updatedAt": "2025-12-01T19:48:20.671Z"
     },
     "1764617188264_63ahmthqy": {
       "componentCode": "601.002.06",
@@ -5447,7 +5447,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.264Z",
-      "updatedAt": "2025-12-01T19:26:28.264Z"
+      "updatedAt": "2025-12-01T19:48:20.687Z"
     },
     "1764617188277_it43n8htr": {
       "componentCode": "601.003.01",
@@ -5493,7 +5493,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.277Z",
-      "updatedAt": "2025-12-01T19:26:28.277Z"
+      "updatedAt": "2025-12-01T19:48:20.704Z"
     },
     "1764617188290_0ubxgxc3u": {
       "componentCode": "601.003.02",
@@ -5539,7 +5539,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.290Z",
-      "updatedAt": "2025-12-01T19:26:28.290Z"
+      "updatedAt": "2025-12-01T19:48:20.728Z"
     },
     "1764617188303_egxk8pgrf": {
       "componentCode": "601.003.03",
@@ -5585,7 +5585,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.303Z",
-      "updatedAt": "2025-12-01T19:26:28.303Z"
+      "updatedAt": "2025-12-01T19:48:20.746Z"
     },
     "1764617188316_31rtjtsd1": {
       "componentCode": "601.003.04",
@@ -5631,7 +5631,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.316Z",
-      "updatedAt": "2025-12-01T19:26:28.316Z"
+      "updatedAt": "2025-12-01T19:48:20.761Z"
     },
     "1764617188327_dtlvzbfox": {
       "componentCode": "601.003.05",
@@ -5677,7 +5677,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.327Z",
-      "updatedAt": "2025-12-01T19:26:28.327Z"
+      "updatedAt": "2025-12-01T19:48:20.782Z"
     },
     "1764617188337_3vny8jrdn": {
       "componentCode": "601.003.06",
@@ -5723,7 +5723,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.337Z",
-      "updatedAt": "2025-12-01T19:26:28.337Z"
+      "updatedAt": "2025-12-01T19:48:20.796Z"
     },
     "1764617188348_ucuse5yhf": {
       "componentCode": "601.004.01",
@@ -5769,7 +5769,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.348Z",
-      "updatedAt": "2025-12-01T19:26:28.348Z"
+      "updatedAt": "2025-12-01T19:48:20.813Z"
     },
     "1764617188362_owhkpxe3o": {
       "componentCode": "601.004.02",
@@ -5815,7 +5815,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.362Z",
-      "updatedAt": "2025-12-01T19:26:28.362Z"
+      "updatedAt": "2025-12-01T19:48:20.828Z"
     },
     "1764617188374_lzrf4wqs9": {
       "componentCode": "601.004.03",
@@ -5861,7 +5861,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.374Z",
-      "updatedAt": "2025-12-01T19:26:28.374Z"
+      "updatedAt": "2025-12-01T19:48:20.844Z"
     },
     "1764617188389_d7jxtgvz8": {
       "componentCode": "601.004.04",
@@ -5907,7 +5907,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.389Z",
-      "updatedAt": "2025-12-01T19:26:28.389Z"
+      "updatedAt": "2025-12-01T19:48:20.859Z"
     },
     "1764617188407_zfo74qy7c": {
       "componentCode": "601.004.05",
@@ -5953,7 +5953,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.407Z",
-      "updatedAt": "2025-12-01T19:26:28.407Z"
+      "updatedAt": "2025-12-01T19:48:20.874Z"
     },
     "1764617188422_apz66cplq": {
       "componentCode": "601.004.06",
@@ -5999,7 +5999,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.422Z",
-      "updatedAt": "2025-12-01T19:26:28.422Z"
+      "updatedAt": "2025-12-01T19:48:20.888Z"
     },
     "1764617188443_ko1gtbp1o": {
       "componentCode": "702.005.01",
@@ -6045,7 +6045,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.443Z",
-      "updatedAt": "2025-12-01T19:26:28.443Z"
+      "updatedAt": "2025-12-01T19:48:20.906Z"
     },
     "1764617188464_zj1du0g8c": {
       "componentCode": "702.005.02",
@@ -6091,7 +6091,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.464Z",
-      "updatedAt": "2025-12-01T19:26:28.464Z"
+      "updatedAt": "2025-12-01T19:48:20.924Z"
     },
     "1764617188486_urcjl0u7x": {
       "componentCode": "702.010.01",
@@ -6137,7 +6137,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.486Z",
-      "updatedAt": "2025-12-01T19:26:28.486Z"
+      "updatedAt": "2025-12-01T19:48:20.943Z"
     },
     "1764617188503_3r4ck29pu": {
       "componentCode": "702.010.02",
@@ -6183,7 +6183,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.503Z",
-      "updatedAt": "2025-12-01T19:26:28.503Z"
+      "updatedAt": "2025-12-01T19:48:20.964Z"
     },
     "1764617188517_60c0054f8": {
       "componentCode": "712.009.01",
@@ -6229,7 +6229,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.517Z",
-      "updatedAt": "2025-12-01T19:26:28.517Z"
+      "updatedAt": "2025-12-01T19:48:20.986Z"
     },
     "1764617188537_k22alylon": {
       "componentCode": "712.009.02",
@@ -6275,7 +6275,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.537Z",
-      "updatedAt": "2025-12-01T19:26:28.537Z"
+      "updatedAt": "2025-12-01T19:48:21.005Z"
     },
     "1764617188552_r9djdund8": {
       "componentCode": "712.011.01",
@@ -6321,7 +6321,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.552Z",
-      "updatedAt": "2025-12-01T19:26:28.552Z"
+      "updatedAt": "2025-12-01T19:48:21.024Z"
     },
     "1764617188567_frneedwrw": {
       "componentCode": "712.011.02",
@@ -6367,7 +6367,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.567Z",
-      "updatedAt": "2025-12-01T19:26:28.567Z"
+      "updatedAt": "2025-12-01T19:48:21.051Z"
     },
     "1764617188583_yl86fqg1a": {
       "componentCode": "712.013.01",
@@ -6413,7 +6413,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.583Z",
-      "updatedAt": "2025-12-01T19:26:28.583Z"
+      "updatedAt": "2025-12-01T19:48:21.072Z"
     },
     "1764617188598_agibps1r1": {
       "componentCode": "712.013.02",
@@ -6459,7 +6459,7 @@
       "applicableVesselIds": null,
       "scopeNotes": null,
       "createdAt": "2025-12-01T19:26:28.598Z",
-      "updatedAt": "2025-12-01T19:26:28.598Z"
+      "updatedAt": "2025-12-01T19:48:21.103Z"
     }
   },
   "runningHoursAudits": [],
@@ -41027,6 +41027,24 @@
       "finishedAt": "2025-12-01T19:26:29.396Z",
       "status": "complete",
       "storedFilePath": null
+    },
+    {
+      "id": "2b516af7-cd14-4b91-ad3d-6396eb1b2c61",
+      "type": "components",
+      "mode": "upsert",
+      "archiveMissing": false,
+      "userId": "system",
+      "vesselId": "V001",
+      "originalName": "components_template (4).xlsx",
+      "fileSize": 17895,
+      "created": 0,
+      "updated": 60,
+      "skipped": 0,
+      "archived": 0,
+      "startedAt": "2025-12-01T19:48:19.993Z",
+      "finishedAt": "2025-12-01T19:48:21.160Z",
+      "status": "complete",
+      "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/components/1764618501159_components_template__4_.xlsx"
     }
   ],
   "makers": [],
