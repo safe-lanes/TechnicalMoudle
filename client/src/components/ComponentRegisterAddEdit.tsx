@@ -94,7 +94,7 @@ export default function ComponentRegisterAddEdit({
   });
 
   const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
-    queryKey: ['/api/components', componentId],
+    queryKey: [`/api/components/details/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 

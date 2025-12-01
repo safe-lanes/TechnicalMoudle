@@ -1966,7 +1966,23 @@ const Components: React.FC = () => {
       
       if (comp.parentId) {
         // Has explicit parent ID - use it
-        const parent = componentMap.get(comp.parentId);
+        // First try parentId as componentCode
+        let parent = componentMap.get(comp.parentId);
+        
+        // If not found, parentId might be a storage ID - search by matching componentCode
+        if (!parent) {
+          // Search for component whose code matches parentId OR whose original id matches parentId
+          const parentComp = clonedComponents.find((c: any) => 
+            c.id === comp.parentId || c.componentCode === comp.parentId
+          );
+          if (parentComp) {
+            parent = componentMap.get(parentComp.componentCode || parentComp.id);
+          }
+          if (!parent) {
+            console.log(`⚠️ Parent not found for component ${code}, parentId: ${comp.parentId}`);
+          }
+        }
+        
         if (parent) {
           if (!parent.children) {
             parent.children = [];

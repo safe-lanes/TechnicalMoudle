@@ -48,6 +48,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/components/:vesselId", async (req, res) => {
     try {
       const components = await storage.getComponents(req.params.vesselId);
+      // Debug logging for component tree building
+      console.log(`📋 GET /api/components/${req.params.vesselId} returning ${components.length} components`);
+      components.slice(0, 5).forEach(c => {
+        console.log(`  - code: ${c.componentCode}, name: ${c.name?.substring(0, 30)}, parentId: ${c.parentId || 'none'}`);
+      });
       res.json(components);
     } catch (error) {
       console.error("Error fetching components:", error);
@@ -3299,9 +3304,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.patch("/api/components/:id", async (req, res) => {
     try {
+      console.log(`🔧 PATCH /api/components/${req.params.id} with:`, JSON.stringify(req.body, null, 2).substring(0, 500));
       const component = await storage.updateComponent(req.params.id, req.body);
+      console.log(`✅ Updated component:`, component.componentCode, '| vesselId:', component.vesselId, '| parentId:', component.parentId);
       res.json(component);
     } catch (error: any) {
+      console.error(`❌ Error updating component ${req.params.id}:`, error.message);
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
       }
