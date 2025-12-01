@@ -2275,5 +2275,16 @@
     "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"601.002.04\",\"componentId\":\"1764567800180_n5hz0zwtx\",\"componentName\":\"ME cylinder covers w/valves No.04\",\"componentSpareCode\":\"SP-601.002.01-007\",\"createdAt\":\"2025-12-01T06:44:43.857Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"141\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":19,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"AAA-BBB-CCC\",\"location2\":\"CCC-BB-XXX\",\"maker\":\"Kobe Diesel Co Ltd\",\"makerCode\":\"MKR-000008\",\"manualName\":null,\"max\":null,\"min\":5,\"model\":null,\"note\":\"As Per the Manufacture Manuals\",\"pageNumber\":null,\"partCategory\":null,\"partCode\":\"MV0001-00494\",\"partName\":\"Nut\",\"partNumber\":\"Fig. 141\\\\H1411006\",\"positionNumber\":\"493\",\"remarks\":null,\"rob\":5,\"robLocationA\":5,\"robLocationB\":0,\"scopeNotes\":null,\"specification\":\"Other Details: FOR EXH. VALVE\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"PCS\",\"updatedAt\":\"2025-12-01T06:44:43.857Z\",\"vesselId\":\"V002\"}",
     "checksum": "256bac11c6aa2ae6ff853d34a2afbe8528b43f763c0ba841982b0025e97acab6",
     "createdAt": "2025-12-01T06:44:44.073Z"
+  },
+  {
+    "id": "5e069cbd-440a-41bf-8429-d147b32ef43a",
+    "importHistoryId": "bdfa0441-ed1f-4c5e-aa72-cd4ad1b0d47e",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "51",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-01T07:24:41.083Z\",\"deleted\":false,\"id\":51,\"isActive\":true,\"itemCode\":\"ST-0001\",\"itemName\":\"Gloves\",\"itemType\":\"stores\",\"locationA\":\"AAAAA\",\"locationB\":\"BBBBB\",\"min\":\"2\",\"remarks\":null,\"rob\":\"4\",\"robLocationA\":\"2\",\"robLocationB\":\"2\",\"storesCategory\":null,\"uom\":\"pcs\",\"updatedAt\":\"2025-12-01T07:24:41.083Z\",\"vesselId\":\"V002\"}",
+    "checksum": "7b3fcc57975baee8b56cacef688f33d6b6f6b9d63b3c9c42a37b74f6dc2c8823",
+    "createdAt": "2025-12-01T07:24:41.193Z"
   }
 ]

@@ -54,6 +54,7 @@ export default function ComponentRegisterAddEdit({
     serialNo: "",
     drawingNo: "",
     componentCode: "",
+    componentName: "",
     eqptSystemCategory: "",
     location: "",
     critical: "",
@@ -116,6 +117,7 @@ export default function ComponentRegisterAddEdit({
         serialNo: comp.serialNo || "",
         drawingNo: comp.drawingNo || "",
         componentCode: comp.componentCode || "",
+        componentName: comp.name || "",
         eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
         location: comp.location || "",
         critical: comp.critical ? "Yes" : "No",
@@ -371,7 +373,7 @@ export default function ComponentRegisterAddEdit({
     setIsSaving(true);
     try {
       const payload = {
-        name: componentData.componentCode,
+        name: componentData.componentName || componentData.componentCode,
         componentCode: componentData.componentCode,
         parentId: componentData.parentComponent || null,
         componentCategory: componentData.eqptSystemCategory || null,
@@ -441,6 +443,7 @@ export default function ComponentRegisterAddEdit({
       serialNo: comp.serialNo || "",
       drawingNo: comp.drawingNo || "",
       componentCode: comp.componentCode || comp.code || "",
+      componentName: comp.name || "",
       eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
       location: comp.location || "",
       critical: comp.critical ? "Yes" : "No",
@@ -566,6 +569,7 @@ export default function ComponentRegisterAddEdit({
                 serialNo: "",
                 drawingNo: "",
                 componentCode: nextCode,
+                componentName: "",
                 eqptSystemCategory: "",
                 location: "",
                 critical: "",
@@ -742,6 +746,15 @@ export default function ComponentRegisterAddEdit({
                       onChange={(e) => handleFieldChange('componentCode', e.target.value)}
                       className="h-8 text-sm"
                       data-testid="input-component-code"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Name</label>
+                    <Input
+                      value={componentData.componentName}
+                      onChange={(e) => handleFieldChange('componentName', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-component-name"
                     />
                   </div>
                   <div>

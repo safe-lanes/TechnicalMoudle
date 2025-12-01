@@ -1962,6 +1962,8 @@ const Components: React.FC = () => {
       
       if (!node) return;
       
+      let placed = false;
+      
       if (comp.parentId) {
         // Has explicit parent ID - use it
         const parent = componentMap.get(comp.parentId);
@@ -1970,8 +1972,12 @@ const Components: React.FC = () => {
             parent.children = [];
           }
           parent.children.push(node);
+          placed = true;
         }
-      } else {
+        // If parent not found, fall through to category-based placement
+      }
+      
+      if (!placed) {
         // No parent ID - determine category from code prefix
         let categoryCode = code.split('.')[0];
         
