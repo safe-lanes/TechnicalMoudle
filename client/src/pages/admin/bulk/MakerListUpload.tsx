@@ -23,10 +23,7 @@ const FIELD_MAPPINGS = [
   { field: "Is Active", required: false, description: "Yes/No - defaults to Yes" },
 ];
 
-const MOCK_HISTORY = [
-  { id: "1", fileName: "makers_batch1.xlsx", status: "success", uploadedAt: "2025-11-25 14:30", uploadedBy: "John Doe", created: 15, updated: 3, errors: 0 },
-  { id: "2", fileName: "makers_update.xlsx", status: "partial", uploadedAt: "2025-11-24 10:15", uploadedBy: "Jane Smith", created: 0, updated: 8, errors: 2 },
-];
+const MOCK_HISTORY: any[] = [];
 
 export default function MakerListUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

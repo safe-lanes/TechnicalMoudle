@@ -23,9 +23,7 @@ const FIELD_MAPPINGS = [
   { field: "Is Active", required: false, description: "Yes/No - defaults to Yes" },
 ];
 
-const MOCK_HISTORY = [
-  { id: "1", fileName: "fleet_equipment_master.xlsx", status: "success", uploadedAt: "2025-11-25 09:00", uploadedBy: "Admin", created: 45, updated: 12, errors: 0 },
-];
+const MOCK_HISTORY: any[] = [];
 
 export default function MasterDataUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
