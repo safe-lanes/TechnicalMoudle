@@ -1155,7 +1155,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   // Create main "jobs" sheet with 26-column structure (includes Part A fields)
   const jobsSheet = workbook.addWorksheet('Vessel_Job');
   
-  // Add headers matching the 26-column specification (21 original + 5 Part A fields)
+  // Add headers matching the 25-column specification (20 original + 5 Part A fields)
+  // NOTE: "Interval Running Hours" column removed - when Unit = "Hours", Interval Value is used as the running hours interval
   jobsSheet.columns = [
     { header: 'Job Code', key: 'jobCode', width: 18 },
     { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 22 },
@@ -1165,7 +1166,6 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Component Name', key: 'componentName', width: 30 },
     { header: 'Maintenance Basis', key: 'maintenanceBasis', width: 18 },
     { header: 'Interval Value', key: 'intervalValue', width: 15 },
-    { header: 'Interval Running Hours', key: 'intervalRunningHours', width: 25 },
     { header: 'Unit', key: 'unit', width: 12 },
     { header: 'Task Type', key: 'taskType', width: 20 },
     { header: 'Assigned To', key: 'assignedTo', width: 20 },
@@ -1197,14 +1197,13 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
       componentName: component.name,
       maintenanceBasis: '',
       intervalValue: '',
-      internalRunningHourNumber: '',
       unit: '',
       taskType: '',
       assignedTo: '',
       approver: '',
       jobPriority: '',
       classRelated: '',
-      nextDueDate: '',
+      lastDoneDate: '',
       briefWorkDescription: '',
       department: '',
       criticality: '',
@@ -1246,7 +1245,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
   
   listValues.forEach(row => listsSheet.addRow(row));
   
-  // Add data validations to jobs sheet (21-column layout)
+  // Add data validations to jobs sheet (20-column layout, removed Interval Running Hours)
   // Column G (Maintenance Basis) - row 2 onwards (Only Calendar and Running Hours allowed)
   jobsSheet.getColumn(7).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
@@ -1258,8 +1257,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column J (Unit - formerly Frequency Unit)
-  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column I (Unit - was J before removing Interval Running Hours column)
+  jobsSheet.getColumn(9).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1269,8 +1268,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column K (Task Type)
-  jobsSheet.getColumn(11).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column J (Task Type - was K before)
+  jobsSheet.getColumn(10).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1280,8 +1279,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column N (Job Priority)
-  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column M (Job Priority - was N before)
+  jobsSheet.getColumn(13).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1291,8 +1290,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column O (Class Related) - Yes/No
-  jobsSheet.getColumn(15).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column N (Class Related - was O before) - Yes/No
+  jobsSheet.getColumn(14).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1302,8 +1301,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column R (Department)
-  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column Q (Department - was R before)
+  jobsSheet.getColumn(17).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1313,8 +1312,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column S (Criticality) - Yes/No
-  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column R (Criticality - was S before) - Yes/No
+  jobsSheet.getColumn(18).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -1324,8 +1323,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     }
   });
   
-  // Column T (Is Active) - Yes/No
-  jobsSheet.getColumn(20).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  // Column S (Is Active - was T before) - Yes/No
+  jobsSheet.getColumn(19).eachCell({ includeEmpty: true }, (cell, rowNumber) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
@@ -2892,7 +2891,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       }
       
-      // Interval Running Hours is optional
+      // Interval Running Hours - optional (legacy column)
+      // For new templates: when Maintenance Basis = "Running Hours" AND Unit = "Hours", 
+      // the Interval Value is automatically used as the running hours interval
       if (row['Interval Running Hours']) {
         normalized['Interval Running Hours'] = String(row['Interval Running Hours']).trim();
       }
@@ -2915,6 +2916,11 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           }
         }
         normalized['Unit'] = 'Hours';
+        
+        // Auto-derive Interval Running Hours from Interval Value when Unit = Hours and no explicit value provided
+        if (!row['Interval Running Hours'] && row['Interval Value']) {
+          normalized['Interval Running Hours'] = String(row['Interval Value']).trim();
+        }
       }
 
       // Task Type - required
@@ -3976,11 +3982,25 @@ async function performImport(
       
       // Calculate Next Due RH for Running Hours-based jobs
       // Per documentation: nextDueRH = lastDoneRH + intervalRunningHour
-      // NOTE: Only use Interval Running Hours column, never fall back to frequencyValue (per schema)
+      // SIMPLIFIED: When Unit = "Hours", use Interval Value as the running hours interval
+      // (Interval Running Hours column removed from template - now auto-derived)
       // VALIDATION: interval must be a valid number > 0
       let nextDueRH: string | null = null;
       let lastDoneRH: string | null = null;
-      const intervalRH = row['Interval Running Hours'] ? Number(String(row['Interval Running Hours']).trim()) : null;
+      
+      // Auto-derive intervalRH from Interval Value when Unit = "Hours"
+      // Also support legacy templates that still have "Interval Running Hours" column
+      let intervalRH: number | null = null;
+      const rawIntervalRH = row['Interval Running Hours'];
+      const hasExplicitIntervalRH = rawIntervalRH !== undefined && rawIntervalRH !== null && String(rawIntervalRH).trim() !== '';
+      
+      if (hasExplicitIntervalRH) {
+        // Legacy template with explicit Interval Running Hours column
+        intervalRH = Number(String(rawIntervalRH).trim());
+      } else if (maintenanceBasis === 'Running Hours' && frequencyValue) {
+        // New simplified template: For Running Hours jobs, use Interval Value as the running hours interval
+        intervalRH = Number(frequencyValue);
+      }
       
       if (maintenanceBasis === 'Running Hours') {
         // Validate intervalRunningHour is present and valid for RH jobs
