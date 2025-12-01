@@ -42,7 +42,8 @@ import {
   Eye,
   FileWarning,
   Clock,
-  File
+  File,
+  FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -84,6 +85,8 @@ interface ImportHistory {
   status: string;
   userId: string;
   fileName?: string;
+  originalName?: string;
+  storedFilePath?: string | null;
 }
 
 interface StoreTypeOption {
@@ -465,6 +468,38 @@ export default function UniformBulkUpload({
     }
   };
 
+  const handleDownloadOriginalFile = async (historyId: string, fileName?: string) => {
+    try {
+      const response = await fetch(`/api/bulk/history/${historyId}/download-original`);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'File not available');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'import_file';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'File Downloaded',
+        description: 'Original uploaded file has been downloaded.'
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Download Failed',
+        description: error.message || 'Failed to download file. File may not be available for older imports.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const isStoresAndNoType = templateType === 'stores' && !selectedStoreType;
 
   return (
@@ -801,7 +836,7 @@ export default function UniformBulkUpload({
                             </div>
                           </TableCell>
                           <TableCell className="max-w-xs truncate">
-                            {h.fileName || '-'}
+                            {h.originalName || h.fileName || '-'}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">{h.mode}</Badge>
@@ -815,18 +850,32 @@ export default function UniformBulkUpload({
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            {h.status === 'complete' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUndoClick(h.id)}
-                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                data-testid={`button-undo-${h.id}`}
-                              >
-                                <Undo2 className="h-4 w-4 mr-1" />
-                                Undo
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-center gap-1">
+                              {h.status === 'complete' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUndoClick(h.id)}
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                  data-testid={`button-undo-${h.id}`}
+                                >
+                                  <Undo2 className="h-4 w-4 mr-1" />
+                                  Undo
+                                </Button>
+                              )}
+                              {h.storedFilePath && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDownloadOriginalFile(h.id, h.originalName)}
+                                  className="text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                                  title="Download original file"
+                                  data-testid={`button-download-file-${h.id}`}
+                                >
+                                  <FileDown className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

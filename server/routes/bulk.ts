@@ -2235,26 +2235,8 @@ router.get('/history', async (req, res) => {
   }
 });
 
-// Download history files (legacy endpoint)
-router.get('/history/:id/:fileType', async (req, res) => {
-  try {
-    const { id, fileType } = req.params;
-    
-    const file = await getHistoryFile(id, fileType);
-    if (!file) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
-    res.send(file.data);
-  } catch (error) {
-    console.error('File download error:', error);
-    res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
 // Download original uploaded file from Object Storage
+// NOTE: This route must be defined BEFORE the parameterized :fileType route
 router.get('/history/:id/download-original', async (req, res) => {
   try {
     const { id } = req.params;
@@ -2281,6 +2263,25 @@ router.get('/history/:id/download-original', async (req, res) => {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: 'File not found in storage' });
     }
+    res.status(500).json({ error: 'Failed to download file' });
+  }
+});
+
+// Download history files (legacy endpoint)
+router.get('/history/:id/:fileType', async (req, res) => {
+  try {
+    const { id, fileType } = req.params;
+    
+    const file = await getHistoryFile(id, fileType);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+    res.send(file.data);
+  } catch (error) {
+    console.error('File download error:', error);
     res.status(500).json({ error: 'Failed to download file' });
   }
 });

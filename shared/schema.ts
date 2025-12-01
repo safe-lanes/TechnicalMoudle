@@ -1166,6 +1166,7 @@ export const importHistory = pgTable("import_history", {
   status: text("status").notNull(), // 'complete' | 'failed' | 'undone' | 'undo_failed'
   originalName: text("original_name"), // Original uploaded filename
   fileSize: integer("file_size"), // File size in bytes
+  storedFilePath: text("stored_file_path"), // Object storage path to the uploaded file
   undoneAt: timestamp("undone_at"), // Timestamp when import was undone
   errorMessage: text("error_message"), // Error message if import or undo failed
 }, (table) => ({
