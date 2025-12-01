@@ -184,6 +184,7 @@ export default function BulkDataImport() {
                             value={newVesselId}
                             onChange={(e) => setNewVesselId(e.target.value)}
                             data-testid="input-vessel-code"
+                            autoComplete="off"
                           />
                           <p className="text-xs text-gray-500">
                             Unique identifier for the vessel (e.g., V001, V002)
@@ -197,6 +198,7 @@ export default function BulkDataImport() {
                             value={newVesselName}
                             onChange={(e) => setNewVesselName(e.target.value)}
                             data-testid="input-vessel-name"
+                            autoComplete="off"
                           />
                         </div>
                       </div>
