@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,6 +16,14 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
+
+interface ChildRHData {
+  id: string;
+  componentCode: string;
+  name: string;
+  currentCumulativeRH: string;
+  lastUpdated: string;
+}
 
 interface RunningHoursData {
   id: string;
@@ -60,8 +68,31 @@ const RunningHours = () => {
     comments: ""
   });
   
+  // Child RH popup state
+  const [isChildRHOpen, setIsChildRHOpen] = useState(false);
+  const [selectedParentForChildRH, setSelectedParentForChildRH] = useState<RunningHoursData | null>(null);
+  
   const { toast } = useToast();
   const { vesselId } = useVessel(); // Get vessel ID from context
+  
+  // Fetch children RH data when popup is open
+  const { data: childrenRHData, isLoading: isLoadingChildren } = useQuery<{
+    parent: { componentCode: string; name: string; currentCumulativeRH: string };
+    children: ChildRHData[];
+  }>({
+    queryKey: ['/api/running-hours/children', selectedParentForChildRH?.componentCode, vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch children RH');
+      return response.json();
+    },
+    enabled: isChildRHOpen && !!selectedParentForChildRH?.componentCode
+  });
+  
+  const openChildRHPopup = (item: RunningHoursData) => {
+    setSelectedParentForChildRH(item);
+    setIsChildRHOpen(true);
+  };
   
   // Fetch parent components with RH-based child jobs
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
@@ -480,14 +511,26 @@ const RunningHours = () => {
                 <div className="text-gray-700" title="Computed from last 30 days of RH entries">
                   {item.utilizationRate !== null ? `${item.utilizationRate} hrs/day` : "—"}
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-2 flex gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     className="h-8 w-8 p-0"
                     onClick={() => openUpdateDialog(item)}
+                    title="Update Running Hours"
+                    data-testid={`button-update-rh-${item.id}`}
                   >
-                    <span className="text-gray-600">⚙</span>
+                    <Settings className="h-4 w-4 text-gray-600" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 w-8 p-0"
+                    onClick={() => openChildRHPopup(item)}
+                    title="View Children Running Hours"
+                    data-testid={`button-view-children-rh-${item.id}`}
+                  >
+                    <Users className="h-4 w-4 text-blue-600" />
                   </Button>
                 </div>
               </div>
@@ -763,6 +806,62 @@ const RunningHours = () => {
               onClick={handleBulkSave}
             >
               Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Child RH Popup - Read-only view of children's running hours */}
+      <Dialog open={isChildRHOpen} onOpenChange={setIsChildRHOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#52baf3] border-b border-[#52baf3] pb-2">
+              Child Components — {selectedParentForChildRH?.component}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {isLoadingChildren ? (
+              <div className="text-center text-gray-500 py-8">Loading children data...</div>
+            ) : childrenRHData?.children && childrenRHData.children.length > 0 ? (
+              <div className="space-y-2">
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Delta Propagation:</strong> When parent RH is updated, the delta (change) is added to each child's 
+                    independent running hours. Children maintain their own RH values.
+                  </p>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-100 px-4 py-2 grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                    <div>Component Name</div>
+                    <div>Component Code</div>
+                    <div className="text-right">Running Hours</div>
+                    <div>Last Updated</div>
+                  </div>
+                  <div className="divide-y">
+                    {childrenRHData.children.map((child) => (
+                      <div key={child.id} className="px-4 py-3 grid grid-cols-4 gap-4 text-sm hover:bg-gray-50">
+                        <div className="text-gray-900">{child.name}</div>
+                        <div className="text-gray-600">{child.componentCode}</div>
+                        <div className="text-right font-medium text-gray-900">
+                          {parseFloat(child.currentCumulativeRH || '0').toLocaleString()} hrs
+                        </div>
+                        <div className="text-gray-600">
+                          {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-8">
+                No child components found for this parent.
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsChildRHOpen(false)}>
+              Close
             </Button>
           </div>
         </DialogContent>

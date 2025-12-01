@@ -25,7 +25,7 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, spec-compliant numbering, lead time warnings, and grace period logic (Company Standard or Custom Days).
 - **Per-Vessel PMS Settings**: Configurable lead times and grace periods per vessel via `pms_vessel_settings` table.
 - **Job Cycle Updates**: Automatic updates to job fields (`lastDoneDate`, `nextDueDate`, `lastDoneRH`, `nextDueRH`) upon work order completion.
-- **Running Hours Module**: Handles previous and current readings for sub-components with strict validation rules.
+- **Running Hours Module (Delta Propagation)**: Parent components appear in the RH module. When parent RH is updated, the **delta** (change amount) is propagated to all children - children maintain their own independent RH values. Example: Parent 1000→1050 (delta=50), Child's 800→850 (not copied to 1050). Child replacement: reset to 0, continues receiving future deltas. Child RH popup shows read-only view of children's independent RH values.
 - **Spare Parts Consumed**: Pre-loads required spares from jobs, allows manual entry, tracks consumption, and triggers inventory deduction/low-stock alerts.
 - **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management with dual locations, ROB/Min/Max, bulk upload, and transaction history.
@@ -42,7 +42,7 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values from linked jobs.
 - **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must always be kept in exact parity for fields, labels, and order to maintain the frozen snapshot rule for Work Order Part A.
 - **Change Request Approval (Issue #8)**: When change requests are approved, the approved changes are automatically applied to the target entity (component, spare, job, store). Field names with prefixes (e.g., `componentInfo.notes`) are normalized before update. Fallback lookup by componentCode respects vesselId. Hardcoded main categories (IDs 1-8) cannot be modified since they're organizational placeholders.
-- **Running Hours Inheritance (Issue #9)**: Components inherit Running Hours from parent or sibling RH authority. The `getComponents()` API now returns `effectiveRH` (inherited value) and `rhInherited` (boolean flag). Lookup supports both componentCode and UUID-based parentId references. UI displays "(Inherited)" indicator in blue when RH is inherited.
+- **Running Hours Delta Propagation (Issue #9 CORRECTED)**: When parent RH is updated, the **delta** (change amount) is added to each child's independent RH value. Children do NOT inherit parent's total RH - they maintain their own values. Child replacement scenario: Reset child RH to 0, continues receiving future parent deltas. API endpoints: `/api/running-hours/children/:parentCode` (view children RH), `/api/running-hours/reset-child/:componentId` (component replacement). The cascadeRunningHours function in persistentStorage.ts correctly implements delta propagation.
 - **Component Is Active Toggle (Issue #10)**: Component edit forms include "Is Active" dropdown with Active/Inactive options, plus "Vessel Code" and "Is Parent" fields for complete component management.
 - **Bulk Import Type Routing (Issue #11)**: Fleet Jobs and Fleet Spares bulk upload pages now use `UniformBulkUpload` component with proper `templateType` parameter, ensuring imports route to correct storage (jobs→jobs, spares→spares, not all to components).
 
@@ -60,7 +60,7 @@ The following 11 issues were identified, fixed, and verified via end-to-end test
 | #6 | Unplanned WO missing component list | Fixed component fetch for dropdown | WorkOrderFormPage.tsx |
 | #7 | Unplanned WO save failing | Fixed save payload construction | server/routes.ts |
 | #8 | Change request approval not applying | Added automatic entity update on approval | server/routes/modifyPms.ts |
-| #9 | Running Hours not inheriting | Added effectiveRH/rhInherited to API response | server/persistentStorage.ts |
+| #9 | Running Hours delta propagation | Removed wrong inheritance logic, kept correct delta propagation in cascadeRunningHours | server/persistentStorage.ts, runningHoursRoutes.ts, Components.tsx, RunningHours.tsx |
 | #10 | Missing Is Active toggle | Added dropdown to ComponentRegisterAddEdit.tsx | ComponentRegisterAddEdit.tsx |
 | #11 | Bulk imports all going to components | Replaced mock implementations with UniformBulkUpload | FleetJobsUpload.tsx, FleetSparesUpload.tsx |
 
