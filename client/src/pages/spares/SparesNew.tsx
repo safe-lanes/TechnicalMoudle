@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info } from "lucide-react";
-import { ComponentNode, componentTree } from "@/data/componentTree";
+// ComponentNode interface - matches the one used in Components.tsx
+interface ComponentNode {
+  id: string;
+  code: string;
+  name: string;
+  parentId?: string | null;
+  children?: ComponentNode[];
+  [key: string]: any;
+}
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -339,6 +347,151 @@ const Spares: React.FC = () => {
     },
     enabled: activeTab === 'history'
   });
+
+  // Fetch components for tree display
+  const { data: fetchedComponents = [] } = useQuery<any[]>({
+    queryKey: [`/api/components/${vesselId}`],
+  });
+  
+  // Build component tree from fetched data (same logic as Components.tsx)
+  const componentTree = useMemo(() => {
+    console.log('[SPARES_TREE] Building tree from', fetchedComponents.length, 'components');
+    
+    // Create a fresh clone of fetched components to avoid mutating React Query cache
+    const clonedComponents = fetchedComponents.map(comp => ({ ...comp }));
+    
+    // Start with the 8 hardcoded main categories (specification-compliant names)
+    const mainCategories: ComponentNode[] = [
+      { id: "1", code: "1", name: "Ship General", children: [] },
+      { id: "2", code: "2", name: "Hull", children: [] },
+      { id: "3", code: "3", name: "Equipment for Cargo", children: [] },
+      { id: "4", code: "4", name: "Ship's Equipment", children: [] },
+      { id: "5", code: "5", name: "Equipment for Crew & Passengers", children: [] },
+      { id: "6", code: "6", name: "Machinery Main Components", children: [] },
+      { id: "7", code: "7", name: "Systems for Machinery Main Components", children: [] },
+      { id: "8", code: "8", name: "Ship Common Systems", children: [] }
+    ];
+    
+    if (!clonedComponents || clonedComponents.length === 0) {
+      return mainCategories;
+    }
+    
+    // Build a map for quick lookup
+    const componentMap = new Map<string, ComponentNode>();
+    
+    // First, add all main categories to the map
+    mainCategories.forEach(cat => {
+      componentMap.set(cat.code, cat);
+    });
+    
+    // Convert fetched components to ComponentNode format and add to map
+    // Skip main categories (1-8) as they're already in the map from hardcoded mainCategories
+    clonedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      // Skip if this is a main category (single digit 1-8) - already in map
+      if (code.match(/^[1-8]$/)) {
+        return;
+      }
+      const node: ComponentNode = {
+        id: code,
+        code: code,
+        name: comp.name,
+        parentId: comp.parentId,
+        ...comp,
+        children: []
+      };
+      componentMap.set(node.code, node);
+    });
+    
+    // Build parent-child relationships
+    clonedComponents.forEach((comp: any) => {
+      const code = comp.componentCode || comp.id;
+      const node = componentMap.get(code);
+      
+      if (!node) return;
+      
+      let placed = false;
+      
+      if (comp.parentId) {
+        // Has explicit parent ID - use it
+        // First try parentId as componentCode
+        let parent = componentMap.get(comp.parentId);
+        
+        // If not found, parentId might be a storage ID - search by matching componentCode
+        if (!parent) {
+          // Search for component whose code matches parentId OR whose original id matches parentId
+          const parentComp = clonedComponents.find((c: any) => 
+            c.id === comp.parentId || c.componentCode === comp.parentId
+          );
+          if (parentComp) {
+            parent = componentMap.get(parentComp.componentCode || parentComp.id);
+          }
+        }
+        
+        if (parent) {
+          if (!parent.children) {
+            parent.children = [];
+          }
+          parent.children.push(node);
+          placed = true;
+        }
+      }
+      
+      if (!placed) {
+        // No parent ID - determine category from code prefix
+        let categoryCode = code.split('.')[0];
+        
+        // If the code prefix isn't a valid category (1-8), try the first character
+        if (!componentMap.get(categoryCode) || !categoryCode.match(/^[1-8]$/)) {
+          const firstChar = code.charAt(0);
+          if (firstChar.match(/^[1-8]$/)) {
+            categoryCode = firstChar;
+          } else {
+            // Fallback to "8 Ship Common Systems" for codes that don't match any category
+            categoryCode = "8";
+          }
+        }
+        
+        const category = componentMap.get(categoryCode);
+        if (category && categoryCode !== code) {
+          // Only add if it's not the category itself
+          if (!category.children) {
+            category.children = [];
+          }
+          category.children.push(node);
+        }
+      }
+    });
+    
+    // Sort children in ascending order by component code
+    const sortChildrenAscending = (nodes: ComponentNode[]) => {
+      nodes.forEach(node => {
+        if (node.children && node.children.length > 0) {
+          // Sort children by code in ascending order (handles numeric and alphanumeric codes)
+          node.children.sort((a, b) => {
+            const aCode = a.code || '';
+            const bCode = b.code || '';
+            // Try numeric comparison first
+            const aNum = parseFloat(aCode);
+            const bNum = parseFloat(bCode);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return aNum - bNum;
+            }
+            // Fall back to string comparison
+            return aCode.localeCompare(bCode);
+          });
+          // Recursively sort descendants
+          sortChildrenAscending(node.children);
+        }
+      });
+    };
+    
+    sortChildrenAscending(mainCategories);
+    
+    console.log('[SPARES_TREE] Tree built with categories:', mainCategories.map(c => `${c.code}(${c.children?.length || 0})`).join(', '));
+    
+    return mainCategories;
+  }, [fetchedComponents]);
 
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
