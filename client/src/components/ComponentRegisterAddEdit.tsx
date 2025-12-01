@@ -405,7 +405,17 @@ export default function ComponentRegisterAddEdit({
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+      // Refetch all component-related queries to ensure tree refreshes
+      console.log('🔄 Refetching component queries after save, vesselId:', vesselId);
+      await queryClient.refetchQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          const matches = typeof key === 'string' && key.startsWith('/api/components');
+          if (matches) console.log('🔄 Refetching query:', query.queryKey);
+          return matches;
+        }
+      });
+      console.log('✅ Component queries refetched');
       onBack();
     } catch (error: any) {
       toast({

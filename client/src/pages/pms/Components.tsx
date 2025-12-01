@@ -1972,8 +1972,20 @@ const Components: React.FC = () => {
           parent.children.push(node);
         }
       } else {
-        // No parent ID - determine category from code prefix (first digit)
-        const categoryCode = code.split('.')[0];
+        // No parent ID - determine category from code prefix
+        let categoryCode = code.split('.')[0];
+        
+        // If the code prefix isn't a valid category (1-8), try the first character
+        if (!componentMap.get(categoryCode) || !categoryCode.match(/^[1-8]$/)) {
+          const firstChar = code.charAt(0);
+          if (firstChar.match(/^[1-8]$/)) {
+            categoryCode = firstChar;
+          } else {
+            // Fallback to "8 Ship Common Systems" for codes that don't match any category
+            categoryCode = "8";
+          }
+        }
+        
         const category = componentMap.get(categoryCode);
         if (category && categoryCode !== code) {
           // Only add if it's not the category itself
