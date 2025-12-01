@@ -1,0 +1,51 @@
+Issues #1-9 are fixed. Now let's fix Issue #10: In the Component Edit screen, there is no "Is Active" option. Therefore, it is not possible to deactivate a component from the edit section.
+
+Current behavior:
+1. Open Component Edit form
+2. There's no toggle/dropdown to set Is Active status
+3. Cannot deactivate a component without direct database edit
+
+Please investigate and fix:
+
+1. In client/src/components/AddEditComponentForm.tsx:
+   - The state already has `isActive` field (around line 81): `isActive: "Yes"`
+   - But the UI field is missing from the form
+
+2. Find where other boolean fields are rendered (like Critical, Condition Based):
+   - Look in Section A (Component Information)
+   - These use Select dropdowns with Yes/No options
+
+3. Add the Is Active field in the form, near the other boolean fields:
+
+   <div className="space-y-1">
+     <Label className="text-xs font-medium text-gray-600">Is Active</Label>
+     <Select
+       value={componentData.isActive}
+       onValueChange={(value) => handleFieldChange("isActive", value)}
+     >
+       <SelectTrigger className="h-9">
+         <SelectValue placeholder="Select..." />
+       </SelectTrigger>
+       <SelectContent>
+         <SelectItem value="Yes">Yes (Active)</SelectItem>
+         <SelectItem value="No">No (Inactive)</SelectItem>
+       </SelectContent>
+     </Select>
+     <p className="text-xs text-gray-400">Inactive components are hidden from active views</p>
+   </div>
+
+4. Verify the save handler (handleSave) already converts isActive to boolean:
+   - Should have: `isActive: toBool(componentData.isActive)`
+   - The toBool function converts "Yes" to true, "No" to false
+
+5. Also add it to the read-only view in Components.tsx ComponentInformationSection:
+   - Display the current Is Active status
+   - Perhaps with a colored badge (green for Active, gray for Inactive)
+
+Test by:
+1. Edit any component
+2. Find the Is Active dropdown
+3. Change from Yes to No
+4. Save
+5. Verify component is now marked inactive
+6. Check if inactive components are filtered from main views
