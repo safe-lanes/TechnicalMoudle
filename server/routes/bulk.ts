@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import crypto from 'crypto';
 import { storage, calculateRecordChecksum, sortObjectKeys } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
@@ -2165,7 +2166,8 @@ router.post('/import', async (req, res) => {
       storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
-    // Save the uploaded file to Object Storage for later retrieval
+    // Save the uploaded file for later retrieval
+    // Try Object Storage first, fallback to local file storage
     let storedFilePath: string | null = null;
     try {
       const objectStorage = new ObjectStorageService();
@@ -2176,8 +2178,24 @@ router.post('/import', async (req, res) => {
       );
       console.log(`📁 Uploaded file stored at: ${storedFilePath}`);
     } catch (uploadError) {
-      console.warn('⚠️ Failed to store uploaded file to object storage:', uploadError);
-      // Continue - file storage is optional, import succeeded
+      console.warn('⚠️ Object Storage failed, falling back to local storage:', (uploadError as Error).message);
+      
+      // Fallback: Save file locally
+      try {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', type);
+        await fsPromises.mkdir(uploadsDir, { recursive: true });
+        
+        const timestamp = Date.now();
+        const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const localFilePath = path.join(uploadsDir, `${timestamp}_${safeFileName}`);
+        
+        await fsPromises.writeFile(localFilePath, cachedData.file);
+        storedFilePath = `local:${localFilePath}`;
+        console.log(`📁 File saved locally at: ${localFilePath}`);
+      } catch (localError) {
+        console.error('⚠️ Failed to store file locally:', localError);
+        // Continue - file storage is optional, import succeeded
+      }
     }
 
     // Update ImportHistory with status='complete' and include file path
@@ -2235,7 +2253,7 @@ router.get('/history', async (req, res) => {
   }
 });
 
-// Download original uploaded file from Object Storage
+// Download original uploaded file from Object Storage or local storage
 // NOTE: This route must be defined BEFORE the parameterized :fileType route
 router.get('/history/:id/download-original', async (req, res) => {
   try {
@@ -2255,9 +2273,25 @@ router.get('/history/:id/download-original', async (req, res) => {
     const originalName = history.originalName || 'import_file';
     res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
     
-    // Download from object storage
-    const objectStorage = new ObjectStorageService();
-    await objectStorage.downloadByPath(history.storedFilePath, res);
+    // Check if file is stored locally (prefixed with 'local:')
+    if (history.storedFilePath.startsWith('local:')) {
+      const localPath = history.storedFilePath.slice(6); // Remove 'local:' prefix
+      
+      // Check if file exists
+      try {
+        await fsPromises.access(localPath);
+      } catch {
+        return res.status(404).json({ error: 'File not found on server' });
+      }
+      
+      // Send the local file
+      const fileBuffer = await fsPromises.readFile(localPath);
+      res.send(fileBuffer);
+    } else {
+      // Download from object storage
+      const objectStorage = new ObjectStorageService();
+      await objectStorage.downloadByPath(history.storedFilePath, res);
+    }
   } catch (error) {
     console.error('Original file download error:', error);
     if (error instanceof ObjectNotFoundError) {
