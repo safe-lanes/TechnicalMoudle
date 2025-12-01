@@ -915,8 +915,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       const hasCompletionData = !!(executionData.completionDateTime || executionData.dateOfCompletion);
       
       // Validate running hours if completion data is present
+      // Note: The form uses "currentReading" field for running hours input (B3 section)
+      // We check both executionData.runningHours and executionData.currentReading for backwards compatibility
+      const runningHoursValue = executionData.currentReading || executionData.runningHours;
+      
       if (hasCompletionData) {
-        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !executionData.runningHours) {
+        if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !runningHoursValue) {
           toast({
             title: "Validation Error",
             description: "Running hours is required for RH-based maintenance when submitting for approval",
@@ -925,9 +929,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return;
         }
         
-        if (executionData.runningHours && workOrderContext && (workOrderContext as any).component) {
+        if (runningHoursValue && workOrderContext && (workOrderContext as any).component) {
           const { component, parentComponent } = workOrderContext as any;
-          const newRunningHours = parseInt(executionData.runningHours);
+          const newRunningHours = parseInt(runningHoursValue);
           
           if (isNaN(newRunningHours)) {
             toast({
@@ -979,6 +983,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // The work order should NOT go directly to "Completed" - it requires approval first
       // Only the approver can change status to "Completed" via the Approve action
       let response;
+      
+      // Ensure runningHours is set from currentReading for backend compatibility
+      const saveExecutionData = {
+        ...executionData,
+        // Sync runningHours with currentReading for backend storage
+        runningHours: runningHoursValue || executionData.runningHours
+      };
+      
       response = await fetch(`/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
@@ -986,7 +998,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         },
         body: JSON.stringify({
           ...templateData,
-          ...executionData,
+          ...saveExecutionData,
           // If completion data is filled, set status to "Pending Approval"
           // Otherwise keep current status (likely "Active" or "Due")
           status: hasCompletionData ? 'Pending Approval' : undefined
