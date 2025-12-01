@@ -2166,19 +2166,22 @@ router.post('/import', async (req, res) => {
       storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
-    // Save the uploaded file for later retrieval
-    // Try Object Storage first, fallback to local file storage
+    // Save the uploaded file for later retrieval using Replit Object Storage SDK
     let storedFilePath: string | null = null;
     try {
-      const objectStorage = new ObjectStorageService();
-      storedFilePath = await objectStorage.uploadBuffer(
-        cachedData.file,
-        cachedData.originalName,
-        `bulk-imports/${type}`
-      );
-      console.log(`📁 Uploaded file stored at: ${storedFilePath}`);
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
+      
+      const timestamp = Date.now();
+      const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const objectPath = `bulk-imports/${type}/${timestamp}_${safeFileName}`;
+      
+      // Upload file using the Replit Object Storage SDK
+      await client.uploadFromBytes(objectPath, cachedData.file);
+      storedFilePath = `replit:${objectPath}`;
+      console.log(`📁 File uploaded to Replit Object Storage: ${objectPath}`);
     } catch (uploadError) {
-      console.warn('⚠️ Object Storage failed, falling back to local storage:', (uploadError as Error).message);
+      console.warn('⚠️ Replit Object Storage failed, falling back to local storage:', (uploadError as Error).message);
       
       // Fallback: Save file locally
       try {
@@ -2273,22 +2276,35 @@ router.get('/history/:id/download-original', async (req, res) => {
     const originalName = history.originalName || 'import_file';
     res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
     
-    // Check if file is stored locally (prefixed with 'local:')
-    if (history.storedFilePath.startsWith('local:')) {
+    // Check storage type based on prefix
+    if (history.storedFilePath.startsWith('replit:')) {
+      // Download from Replit Object Storage using SDK
+      const objectPath = history.storedFilePath.slice(7); // Remove 'replit:' prefix
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client();
+      
+      try {
+        const result = await client.downloadAsBytes(objectPath);
+        if (!result.ok) {
+          return res.status(404).json({ error: 'File not found in storage' });
+        }
+        res.send(Buffer.from(result.value));
+      } catch {
+        return res.status(404).json({ error: 'File not found in storage' });
+      }
+    } else if (history.storedFilePath.startsWith('local:')) {
+      // Download from local file storage
       const localPath = history.storedFilePath.slice(6); // Remove 'local:' prefix
       
-      // Check if file exists
       try {
         await fsPromises.access(localPath);
+        const fileBuffer = await fsPromises.readFile(localPath);
+        res.send(fileBuffer);
       } catch {
         return res.status(404).json({ error: 'File not found on server' });
       }
-      
-      // Send the local file
-      const fileBuffer = await fsPromises.readFile(localPath);
-      res.send(fileBuffer);
     } else {
-      // Download from object storage
+      // Legacy: Download from old object storage path
       const objectStorage = new ObjectStorageService();
       await objectStorage.downloadByPath(history.storedFilePath, res);
     }
