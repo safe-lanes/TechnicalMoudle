@@ -711,16 +711,26 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   const latestUpdate = runningHoursAudit.length > 0 ? runningHoursAudit[0] : null;
   
   // State for running hours data - initialized from selectedComponent
+  // Issue #9 FIX: Use effectiveRH (inherited from parent) if available
+  const getDisplayRH = (comp: any) => {
+    const effectiveRH = comp?.effectiveRH || comp?.currentCumulativeRH || "0.00";
+    const rhInherited = comp?.rhInherited || false;
+    return { value: effectiveRH, inherited: rhInherited };
+  };
+  
   const [runningHoursData, setRunningHoursData] = useState({
-    currentHours: selectedComponent?.currentCumulativeRH || "0.00",
+    currentHours: getDisplayRH(selectedComponent).value,
+    rhInherited: getDisplayRH(selectedComponent).inherited,
     updatedDate: selectedComponent?.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
   });
   
   // Update data when selectedComponent changes
   React.useEffect(() => {
     if (selectedComponent) {
+      const displayRH = getDisplayRH(selectedComponent);
       setRunningHoursData({
-        currentHours: selectedComponent.currentCumulativeRH || "0.00",
+        currentHours: displayRH.value,
+        rhInherited: displayRH.inherited,
         updatedDate: selectedComponent.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
       });
     }
@@ -769,6 +779,9 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
             ) : (
               <div className="text-sm font-semibold text-gray-900" data-testid="text-current-hours">
                 {runningHoursData.currentHours}
+                {runningHoursData.rhInherited && (
+                  <span className="ml-1 text-xs text-blue-600 font-normal">(Inherited)</span>
+                )}
               </div>
             )}
           </div>

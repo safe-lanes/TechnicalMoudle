@@ -1107,9 +1107,92 @@ export class PersistentFileStorage implements IStorage {
     // Exclude archived components (isActive === false)
     const allComponents = Object.values(this.data.components)
       .filter(c => c !== null && c !== undefined && c.isActive !== false);
-    return vesselId 
+    const filtered = vesselId 
       ? allComponents.filter(c => c.vesselId === vesselId)
       : allComponents;
+    
+    // Issue #9 FIX: Calculate effective RH by inheriting from parent chain or sibling RH authority
+    // Build maps for quick lookup by componentCode AND by component id (UUIDs)
+    const componentByCode = new Map<string, Component>();
+    const componentById = new Map<string, Component>();
+    const siblingsByParent = new Map<string, Component[]>();
+    
+    filtered.forEach(c => {
+      // Index by componentCode
+      if (c.componentCode) {
+        componentByCode.set(c.componentCode, c);
+      }
+      // Also index by id (UUID) for parentId lookups that use id instead of code
+      if (c.id) {
+        componentById.set(c.id, c);
+      }
+      // Group siblings by their parentId for sibling RH lookup
+      if (c.parentId) {
+        const siblings = siblingsByParent.get(c.parentId) || [];
+        siblings.push(c);
+        siblingsByParent.set(c.parentId, siblings);
+      }
+    });
+    
+    // Helper to find parent by parentId (could be componentCode or UUID)
+    const findParent = (parentId: string): Component | undefined => {
+      // Try by componentCode first (most common)
+      let parent = componentByCode.get(parentId);
+      if (!parent) {
+        // Try by UUID
+        parent = componentById.get(parentId);
+      }
+      return parent;
+    };
+    
+    // Helper to find effective RH by walking up the parent chain or looking at siblings
+    const getEffectiveRH = (component: Component, visited: Set<string> = new Set()): string => {
+      // Avoid infinite loops
+      if (visited.has(component.componentCode || component.id)) {
+        return component.currentCumulativeRH || "0";
+      }
+      visited.add(component.componentCode || component.id);
+      
+      const ownRH = parseFloat(component.currentCumulativeRH || "0");
+      
+      // If component has non-zero RH, return it
+      if (ownRH > 0) {
+        return component.currentCumulativeRH || "0";
+      }
+      
+      // Try 1: Look up parent by parentId (supports both componentCode and UUID)
+      if (component.parentId) {
+        const parent = findParent(component.parentId);
+        if (parent) {
+          const parentRH = getEffectiveRH(parent, visited);
+          if (parseFloat(parentRH) > 0) {
+            return parentRH;
+          }
+        }
+        
+        // Try 2: Parent doesn't exist - look for sibling with RH (the RH authority)
+        // For maritime PMS, when siblings share a common parent, the main machinery component
+        // (usually .001 suffix like 601.001) is the RH authority for its siblings
+        const siblings = siblingsByParent.get(component.parentId) || [];
+        const rhAuthority = siblings.find(s => 
+          s.componentCode !== component.componentCode && 
+          parseFloat(s.currentCumulativeRH || "0") > 0
+        );
+        
+        if (rhAuthority) {
+          return rhAuthority.currentCumulativeRH || "0";
+        }
+      }
+      
+      return component.currentCumulativeRH || "0";
+    };
+    
+    // Augment each component with effectiveRH (inherited from parent or sibling if own is 0)
+    return filtered.map(c => ({
+      ...c,
+      effectiveRH: getEffectiveRH(c),
+      rhInherited: parseFloat(c.currentCumulativeRH || "0") === 0 && parseFloat(getEffectiveRH(c)) > 0
+    }));
   }
 
   async getComponent(id: string): Promise<Component | undefined> {

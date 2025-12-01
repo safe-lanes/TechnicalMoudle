@@ -42,6 +42,7 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values from linked jobs.
 - **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must always be kept in exact parity for fields, labels, and order to maintain the frozen snapshot rule for Work Order Part A.
 - **Change Request Approval (Issue #8)**: When change requests are approved, the approved changes are automatically applied to the target entity (component, spare, job, store). Field names with prefixes (e.g., `componentInfo.notes`) are normalized before update. Fallback lookup by componentCode respects vesselId. Hardcoded main categories (IDs 1-8) cannot be modified since they're organizational placeholders.
+- **Running Hours Inheritance (Issue #9)**: Components inherit Running Hours from parent or sibling RH authority. The `getComponents()` API now returns `effectiveRH` (inherited value) and `rhInherited` (boolean flag). Lookup supports both componentCode and UUID-based parentId references. UI displays "(Inherited)" indicator in blue when RH is inherited.
 
 ## Master-Slave Parity Protocol (MANDATORY)
 
