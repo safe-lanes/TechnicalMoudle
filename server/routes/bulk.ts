@@ -2126,6 +2126,14 @@ router.post('/import', async (req, res) => {
       }
     }
 
+    // Log import details for debugging Issue #11
+    console.log(`📦 [BULK_IMPORT] Starting import:`);
+    console.log(`   Type: ${type}`);
+    console.log(`   Mode: ${mode}`);
+    console.log(`   VesselId: ${vesselId}`);
+    console.log(`   Rows: ${dataToImport.length}`);
+    console.log(`   CachedType: ${cachedData.type}`);
+    
     // Create initial ImportHistory with status='in_progress'
     await storeImportHistory({
       id: historyId,

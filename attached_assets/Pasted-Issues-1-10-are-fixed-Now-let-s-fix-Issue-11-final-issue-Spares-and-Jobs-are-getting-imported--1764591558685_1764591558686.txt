@@ -1,0 +1,60 @@
+Issues #1-10 are fixed. Now let's fix Issue #11 (final issue): Spares and Jobs are getting imported, but they are incorrectly appearing in the Component section.
+
+Current behavior:
+1. Bulk import spares or jobs from Excel
+2. Data gets imported
+3. But the imported data appears in the Components section instead of Spares/Jobs sections
+
+Please investigate and fix:
+
+1. Find the bulk import handlers in server/routes/bulk.ts or server/routes.ts:
+   - Search for "upload", "import", "bulk"
+   - There should be separate endpoints for components, spares, and jobs imports
+
+2. Check if the import logic is correctly routing data to the right storage:
+   - Components should go to: storage.createComponent()
+   - Spares should go to: storage.createSpare()
+   - Jobs should go to: storage.createJob()
+   
+   Add logging:
+   console.log('[BULK_IMPORT] Importing', items.length, 'items as', importType);
+
+3. Check the Excel parsing logic:
+   - Is the importType/moduleType being correctly identified?
+   - Are column headers being mapped correctly?
+   - Log the detected type:
+   console.log('[BULK_IMPORT] Detected import type:', detectedType);
+
+4. Common issues:
+   - Single endpoint handling all imports but defaulting to components
+   - Import type not being passed from frontend
+   - Column detection logic incorrectly identifying spares/jobs as components
+
+5. In the client bulk upload pages (client/src/pages/admin/bulk/):
+   - Check SparesUpload.tsx, FleetJobsUpload.tsx
+   - Verify they're calling the correct API endpoint
+   - Verify they're passing the correct importType/moduleType parameter
+
+6. Fix the routing - ensure each import type has distinct handling:
+
+   if (importType === 'spares' || moduleType === 'spares') {
+     for (const item of parsedData) {
+       await storage.createSpare(item);
+     }
+   } else if (importType === 'jobs' || moduleType === 'jobs') {
+     for (const item of parsedData) {
+       await storage.createJob(item);
+     }
+   } else {
+     // Default to components
+     for (const item of parsedData) {
+       await storage.createComponent(item);
+     }
+   }
+
+Test by:
+1. Go to Admin > Bulk Import > Spares Upload
+2. Upload a spares Excel file
+3. Check server logs for import type
+4. Verify spares appear in Spares section, NOT Components
+5. Repeat for Jobs import
