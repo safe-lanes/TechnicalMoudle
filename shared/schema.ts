@@ -844,6 +844,9 @@ export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // Make workOrderNo optional since backend auto-generates it for unplanned WOs
+  workOrderNo: z.string().optional(),
 });
 
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
