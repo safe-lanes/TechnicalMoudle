@@ -4378,6 +4378,98 @@ export class PersistentFileStorage implements IStorage {
     
     console.log(`[RULE #17] Change request ${id} approved - Revision #${newRevisionNumber}`);
     
+    // Issue #8 FIX: Apply the approved changes to the target entity
+    if (existing.targetId && existing.proposedChangesJson) {
+      try {
+        const proposedChanges = existing.proposedChangesJson as Array<{field: string, oldValue: any, newValue: any}>;
+        console.log(`[CR_APPROVE] Applying ${proposedChanges.length} changes to ${existing.targetType} (${existing.targetId})`);
+        
+        // Build the update object from proposed changes
+        // ARCHITECT FIX #1: Strip known prefixes from field names (componentInfo., spareInfo., etc.)
+        const updateData: Record<string, any> = {};
+        for (const change of proposedChanges) {
+          if (change.field && change.newValue !== undefined) {
+            // Normalize field name by stripping common prefixes
+            let normalizedField = change.field;
+            const prefixesToStrip = ['componentInfo.', 'spareInfo.', 'jobInfo.', 'storeInfo.', 'workOrderInfo.'];
+            for (const prefix of prefixesToStrip) {
+              if (normalizedField.startsWith(prefix)) {
+                normalizedField = normalizedField.substring(prefix.length);
+                break;
+              }
+            }
+            updateData[normalizedField] = change.newValue;
+            console.log(`[CR_APPROVE] Field "${change.field}" -> "${normalizedField}": "${change.oldValue}" -> "${change.newValue}"`);
+          }
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          switch (existing.targetType) {
+            case 'component':
+              // First try direct ID lookup, then fallback to component code lookup
+              let componentToUpdate = this.data.components[existing.targetId];
+              let componentId = existing.targetId;
+              
+              if (!componentToUpdate) {
+                // ARCHITECT FIX #2: Fallback lookup by componentCode, but respect vesselId
+                console.log(`[CR_APPROVE] Component not found by ID, trying by code: ${existing.targetId} for vessel: ${existing.vesselId}`);
+                const componentByCode = Object.entries(this.data.components).find(
+                  ([_, comp]) => comp.componentCode === existing.targetId && 
+                    (existing.vesselId ? comp.vesselId === existing.vesselId : true)
+                );
+                if (componentByCode) {
+                  componentId = componentByCode[0];
+                  componentToUpdate = componentByCode[1];
+                  console.log(`[CR_APPROVE] Found component by code: ${componentId}`);
+                }
+              }
+              
+              // ARCHITECT FIX #3: Throw error if component not found instead of just logging
+              if (!componentToUpdate) {
+                throw new Error(`Component ${existing.targetId} not found by ID or code for vessel ${existing.vesselId}`);
+              }
+              
+              await this.updateComponent(componentId, updateData);
+              console.log(`[CR_APPROVE] Component ${componentId} updated successfully`);
+              break;
+            case 'spare':
+              // Check if targetId is a number or needs parsing
+              const spareId = typeof existing.targetId === 'number' 
+                ? existing.targetId 
+                : parseInt(existing.targetId);
+              if (!isNaN(spareId)) {
+                await this.updateSpare(spareId, updateData);
+                console.log(`[CR_APPROVE] Spare ${spareId} updated successfully`);
+              }
+              break;
+            case 'job':
+              await this.updateJob(existing.targetId, updateData);
+              console.log(`[CR_APPROVE] Job ${existing.targetId} updated successfully`);
+              break;
+            case 'work_order':
+              await this.updateWorkOrder(existing.targetId, updateData);
+              console.log(`[CR_APPROVE] Work Order ${existing.targetId} updated successfully`);
+              break;
+            case 'store':
+              const storeId = typeof existing.targetId === 'number' 
+                ? existing.targetId 
+                : parseInt(existing.targetId);
+              if (!isNaN(storeId)) {
+                await this.updateStoreItem(storeId, updateData);
+                console.log(`[CR_APPROVE] Store item ${storeId} updated successfully`);
+              }
+              break;
+            default:
+              console.log(`[CR_APPROVE] Unknown target type: ${existing.targetType}`);
+          }
+        }
+      } catch (applyError) {
+        console.error(`[CR_APPROVE] Failed to apply changes to ${existing.targetType}:`, applyError);
+        // Still approve the request but log the error
+        // The approval should not fail even if application fails
+      }
+    }
+    
     return this.updateChangeRequest(id, { 
       status: 'approved', 
       reviewedByUserId: reviewerId, 

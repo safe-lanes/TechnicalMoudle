@@ -1,0 +1,60 @@
+Issues #1-7 are fixed. Now let's fix Issue #8: In Modify PMS, even after approval, the changes made are not being reflected in the PMS system.
+
+Current behavior:
+1. Create a change request (e.g., modify a component field)
+2. Change request gets approved
+3. But the actual component/spare/job doesn't reflect the approved changes
+
+Please investigate and fix:
+
+1. Find the change request approval handler in server/routes/changeRequests.ts or server/routes.ts:
+   - Search for "approve" or "status.*approved" or PATCH on change requests
+   - Add logging:
+   console.log('[CR_APPROVE] Approving request:', changeRequestId);
+   console.log('[CR_APPROVE] Target:', { type: targetType, id: targetId });
+   console.log('[CR_APPROVE] Changes:', changeData);
+
+2. Check if approval only updates the change request status WITHOUT applying the actual changes:
+   - The approval handler should:
+     a) Update change request status to 'approved'
+     b) ALSO apply the changes to the target entity (component/spare/job)
+
+3. Add the entity update logic after approval. After status is set to 'approved':
+
+   // Apply the approved changes to the target entity
+   if (changeRequest.changeData && changeRequest.targetId) {
+     try {
+       const changes = typeof changeRequest.changeData === 'string' 
+         ? JSON.parse(changeRequest.changeData) 
+         : changeRequest.changeData;
+       
+       console.log('[CR_APPROVE] Applying changes to', changeRequest.targetType);
+       
+       switch(changeRequest.targetType) {
+         case 'component':
+           await storage.updateComponent(changeRequest.targetId, changes);
+           break;
+         case 'spare':
+           await storage.updateSpare(parseInt(changeRequest.targetId), changes);
+           break;
+         case 'job':
+           await storage.updateJob(changeRequest.targetId, changes);
+           break;
+       }
+       console.log('[CR_APPROVE] Changes applied successfully');
+     } catch (applyError) {
+       console.error('[CR_APPROVE] Failed to apply changes:', applyError);
+     }
+   }
+
+4. Verify the changeData structure:
+   - Check what format the changes are stored in
+   - Might be { fieldName: newValue } or { fieldName: { old: x, new: y } }
+   - Extract just the new values if needed
+
+Test by:
+1. Go to Modify PMS
+2. Create a change request for a component (e.g., change notes field)
+3. Approve the change request
+4. Go to Components page
+5. Verify the component now shows the approved change

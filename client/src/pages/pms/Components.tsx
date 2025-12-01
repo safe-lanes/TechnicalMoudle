@@ -2374,6 +2374,18 @@ const Components: React.FC = () => {
       return;
     }
 
+    // Prevent change requests for hardcoded main categories (1-8)
+    // These are organizational placeholders, not actual stored components
+    const mainCategoryIds = ["1", "2", "3", "4", "5", "6", "7", "8"];
+    if (mainCategoryIds.includes(selectedComponent.id)) {
+      toast({
+        title: "Cannot modify main category",
+        description: "Main categories are organizational placeholders. Please create sub-components to add editable items.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Build the proposed changes from actual modifications
     const proposedChanges = buildProposedChanges();
     

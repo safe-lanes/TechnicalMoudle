@@ -173,18 +173,31 @@ router.put("/:id/approve", async (req, res) => {
     const id = parseInt(req.params.id);
     const { comment, reviewerId } = req.body;
     
+    console.log(`[CR_ROUTE] Approving change request ${id}`);
+    console.log(`[CR_ROUTE] Request body:`, req.body);
+    
     if (!comment) {
       return res.status(400).json({ error: "Comment is required for approval" });
     }
+    
+    // Get the change request to log its details
+    const existing = await storage.getChangeRequest(id);
+    console.log(`[CR_ROUTE] Change request found:`, {
+      id: existing?.id,
+      targetType: existing?.targetType,
+      targetId: existing?.targetId,
+      proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+    });
     
     const updated = await storage.approveChangeRequest(
       id, 
       reviewerId || 'reviewer', 
       comment
     );
+    console.log(`[CR_ROUTE] Approval complete, status: ${updated.status}`);
     res.json(updated);
   } catch (error: any) {
-    console.error('Error approving change request:', error);
+    console.error('[CR_ROUTE] Error approving change request:', error);
     res.status(500).json({ error: error.message || 'Failed to approve change request' });
   }
 });

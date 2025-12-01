@@ -53,7 +53,7 @@
       "drawingNo": null,
       "department": null,
       "deptCategory": null,
-      "componentCategory": "Ship General",
+      "componentCategory": "Ship's Equipment",
       "eqptSystemDept": null,
       "location": null,
       "commissionedDate": null,
@@ -62,14 +62,14 @@
       "noOfUnits": null,
       "parentComponent": "40",
       "dimensionsSize": null,
-      "notes": "Test note - verification",
+      "notes": "Final Test y6Oh73",
       "runningHours": 500,
       "applicableVesselIds": null,
       "scopeNotes": null,
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-11-28T06:33:53.376Z",
-      "updatedAt": "2025-12-01T09:23:53.149Z"
+      "updatedAt": "2025-12-01T11:36:53.863Z"
     },
     "1764311633380_ofzlgvmlh": {
       "componentCode": "40",
@@ -8633,6 +8633,208 @@
             }
           ],
           "comments": "Request approved"
+        }
+      ]
+    },
+    "3": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Modify Component: 1 1 Ship General",
+      "reason": "Component modification request",
+      "targetType": "component",
+      "targetId": "1",
+      "snapshotBeforeJson": {
+        "displayKey": "1",
+        "displayName": "1 Ship General",
+        "displayPath": "1 1 Ship General",
+        "fields": {
+          "id": "1",
+          "code": "1",
+          "name": "1 Ship General",
+          "maker": "",
+          "model": "",
+          "serialNo": "",
+          "department": "",
+          "location": "",
+          "critical": "",
+          "classItem": "",
+          "commissionedDate": "",
+          "installationDate": "",
+          "rating": "",
+          "conditionBased": "",
+          "noOfUnits": "",
+          "eqptSystemDept": "",
+          "parentComponent": "",
+          "dimensionsSize": "",
+          "notes": ""
+        }
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.notes",
+          "oldValue": "Test Change qK_Br",
+          "newValue": "Test Change qK_Brw"
+        }
+      ],
+      "status": "approved",
+      "requestedByUserId": "current_user",
+      "id": 3,
+      "createdAt": "2025-12-01T11:04:48.770Z",
+      "updatedAt": "2025-12-01T11:04:48.770Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": "current_user",
+      "reviewedAt": "2025-12-01T11:06:48.952Z",
+      "revisionNumber": 1,
+      "revisionHistory": [
+        {
+          "revisionNumber": 1,
+          "approvedBy": "current_user",
+          "approvedAt": "2025-12-01T11:06:48.952Z",
+          "appliedChanges": [
+            {
+              "field": "componentInfo.notes",
+              "oldValue": "Test Change qK_Br",
+              "newValue": "Test Change qK_Brw"
+            }
+          ],
+          "comments": "Request approved"
+        }
+      ]
+    },
+    "4": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Modify Component: 1 1 Ship General",
+      "reason": "Component modification request",
+      "targetType": "component",
+      "targetId": "1",
+      "snapshotBeforeJson": {
+        "displayKey": "1",
+        "displayName": "1 Ship General",
+        "displayPath": "1 1 Ship General",
+        "fields": {
+          "id": "1",
+          "code": "1",
+          "name": "1 Ship General",
+          "maker": "",
+          "model": "",
+          "serialNo": "",
+          "department": "",
+          "location": "",
+          "critical": "",
+          "classItem": "",
+          "commissionedDate": "",
+          "installationDate": "",
+          "rating": "",
+          "conditionBased": "",
+          "noOfUnits": "",
+          "eqptSystemDept": "",
+          "parentComponent": "",
+          "dimensionsSize": "",
+          "notes": ""
+        }
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.notes",
+          "oldValue": "Approved Test Change V6mC",
+          "newValue": "Approved Test Change V6mCm0"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "current_user",
+      "id": 4,
+      "createdAt": "2025-12-01T11:12:56.053Z",
+      "updatedAt": "2025-12-01T11:12:56.053Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    },
+    "5": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Test CR for approval",
+      "reason": "Testing approval flow",
+      "targetType": "component",
+      "targetId": "1764311633376_82zdktlro",
+      "snapshotBeforeJson": {
+        "displayKey": "403"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "notes",
+          "oldValue": "",
+          "newValue": "API Test Notes"
+        }
+      ],
+      "status": "approved",
+      "requestedByUserId": "test_user",
+      "id": 5,
+      "createdAt": "2025-12-01T11:31:44.100Z",
+      "updatedAt": "2025-12-01T11:31:44.100Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": "api_tester",
+      "reviewedAt": "2025-12-01T11:31:53.653Z",
+      "revisionNumber": 1,
+      "revisionHistory": [
+        {
+          "revisionNumber": 1,
+          "approvedBy": "api_tester",
+          "approvedAt": "2025-12-01T11:31:53.653Z",
+          "appliedChanges": [
+            {
+              "field": "notes",
+              "oldValue": "",
+              "newValue": "API Test Notes"
+            }
+          ],
+          "comments": "API test approval"
+        }
+      ]
+    },
+    "6": {
+      "vesselId": "V001",
+      "category": "components",
+      "title": "Test CR for field prefix fix",
+      "reason": "Testing field prefix normalization",
+      "targetType": "component",
+      "targetId": "1764311633376_82zdktlro",
+      "snapshotBeforeJson": {
+        "displayKey": "403"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "componentInfo.notes",
+          "oldValue": "API Test Notes",
+          "newValue": "Prefix Test Notes"
+        }
+      ],
+      "status": "approved",
+      "requestedByUserId": "test_user",
+      "id": 6,
+      "createdAt": "2025-12-01T11:34:03.251Z",
+      "updatedAt": "2025-12-01T11:34:03.251Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": "api_tester",
+      "reviewedAt": "2025-12-01T11:34:16.079Z",
+      "revisionNumber": 1,
+      "revisionHistory": [
+        {
+          "revisionNumber": 1,
+          "approvedBy": "api_tester",
+          "approvedAt": "2025-12-01T11:34:16.079Z",
+          "appliedChanges": [
+            {
+              "field": "componentInfo.notes",
+              "oldValue": "API Test Notes",
+              "newValue": "Prefix Test Notes"
+            }
+          ],
+          "comments": "Testing prefix strip fix"
         }
       ]
     }
@@ -254144,7 +254346,7 @@
     "auditId": 5,
     "spareId": 20,
     "historyId": 6,
-    "changeRequestId": 3,
+    "changeRequestId": 7,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
