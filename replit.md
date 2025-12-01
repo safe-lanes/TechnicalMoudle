@@ -43,6 +43,26 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must always be kept in exact parity for fields, labels, and order to maintain the frozen snapshot rule for Work Order Part A.
 - **Change Request Approval (Issue #8)**: When change requests are approved, the approved changes are automatically applied to the target entity (component, spare, job, store). Field names with prefixes (e.g., `componentInfo.notes`) are normalized before update. Fallback lookup by componentCode respects vesselId. Hardcoded main categories (IDs 1-8) cannot be modified since they're organizational placeholders.
 - **Running Hours Inheritance (Issue #9)**: Components inherit Running Hours from parent or sibling RH authority. The `getComponents()` API now returns `effectiveRH` (inherited value) and `rhInherited` (boolean flag). Lookup supports both componentCode and UUID-based parentId references. UI displays "(Inherited)" indicator in blue when RH is inherited.
+- **Component Is Active Toggle (Issue #10)**: Component edit forms include "Is Active" dropdown with Active/Inactive options, plus "Vessel Code" and "Is Parent" fields for complete component management.
+- **Bulk Import Type Routing (Issue #11)**: Fleet Jobs and Fleet Spares bulk upload pages now use `UniformBulkUpload` component with proper `templateType` parameter, ensuring imports route to correct storage (jobs→jobs, spares→spares, not all to components).
+
+## Recent Bug Fixes (December 2024) - VERIFIED ✓
+
+The following 11 issues were identified, fixed, and verified via end-to-end testing:
+
+| Issue | Problem | Solution | Files Modified |
+|-------|---------|----------|----------------|
+| #1 | Component edits not persisting | Fixed API endpoint to call storage.updateComponent() | server/routes.ts |
+| #2 | New components not appearing in tree | Fixed parent ID lookup and tree refresh | server/persistentStorage.ts |
+| #3 | Spares ROB history not tracking | Added transaction logging for ROB updates | server/routes.ts |
+| #4 | Spares component tree not displaying | Fixed hierarchical tree rendering | SparesPage.tsx |
+| #5 | Counter-based WO validation error | Fixed validation for Running Hours jobs | WorkOrderFormPage.tsx |
+| #6 | Unplanned WO missing component list | Fixed component fetch for dropdown | WorkOrderFormPage.tsx |
+| #7 | Unplanned WO save failing | Fixed save payload construction | server/routes.ts |
+| #8 | Change request approval not applying | Added automatic entity update on approval | server/routes/modifyPms.ts |
+| #9 | Running Hours not inheriting | Added effectiveRH/rhInherited to API response | server/persistentStorage.ts |
+| #10 | Missing Is Active toggle | Added dropdown to ComponentRegisterAddEdit.tsx | ComponentRegisterAddEdit.tsx |
+| #11 | Bulk imports all going to components | Replaced mock implementations with UniformBulkUpload | FleetJobsUpload.tsx, FleetSparesUpload.tsx |
 
 ## Master-Slave Parity Protocol (MANDATORY)
 
