@@ -4013,19 +4013,17 @@ async function performImport(
         }
         
         // Get lastDoneRH from Excel or use component's current RH as starting point
+        // If neither is available, default to 0 (component starts fresh)
         const rawLastDoneRH = row['Last Done RH'];
         if (rawLastDoneRH !== undefined && rawLastDoneRH !== null && rawLastDoneRH !== '') {
           lastDoneRH = String(rawLastDoneRH).trim();
         } else if (component.runningHours !== undefined && component.runningHours !== null) {
           // Use component's current running hours as last done RH for new jobs
           lastDoneRH = String(component.runningHours);
-        }
-        
-        // VALIDATION: RH jobs require lastDoneRH or component.runningHours to calculate nextDueRH
-        if (!lastDoneRH) {
-          result.skipped++;
-          console.warn(`⚠️ Skipping RH job for component ${componentCode}: Missing Last Done RH and component has no runningHours`);
-          continue;
+        } else {
+          // Default to 0 when no running hours in system - treat as new component starting from zero
+          lastDoneRH = '0';
+          console.log(`ℹ️ Component ${componentCode} has no running hours - defaulting Last Done RH to 0`);
         }
         
         const lastRH = Number(lastDoneRH);
