@@ -298,7 +298,7 @@ export class ObjectStorageService {
     });
   }
 
-  // Upload a buffer directly to object storage
+  // Upload a buffer directly to object storage using signed URLs
   // Returns the object path that can be used for later retrieval
   async uploadBuffer(buffer: Buffer, fileName: string, folder: string = 'bulk-imports'): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
@@ -315,14 +315,27 @@ export class ObjectStorageService {
     const objectPath = `${privateObjectDir}/${folder}/${timestamp}_${safeFileName}`;
 
     const { bucketName, objectName } = parseObjectPath(objectPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-
-    // Upload the buffer
-    await file.save(buffer, {
-      contentType: this.getContentType(fileName),
-      resumable: false
+    
+    // Get a signed URL for upload
+    const signedUrl = await signObjectURL({
+      bucketName,
+      objectName,
+      method: 'PUT',
+      ttlSec: 300 // 5 minutes to complete upload
     });
+
+    // Upload the buffer using the signed URL
+    const response = await fetch(signedUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': this.getContentType(fileName),
+      },
+      body: buffer
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+    }
 
     console.log(`📤 File uploaded to object storage: ${objectPath}`);
     return objectPath;
@@ -343,19 +356,32 @@ export class ObjectStorageService {
     }
   }
 
-  // Download a file from object storage by path
+  // Download a file from object storage by path using signed URLs
   async downloadByPath(objectPath: string, res: Response): Promise<void> {
     try {
       const { bucketName, objectName } = parseObjectPath(objectPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
+      
+      // Get a signed URL for download
+      const signedUrl = await signObjectURL({
+        bucketName,
+        objectName,
+        method: 'GET',
+        ttlSec: 300 // 5 minutes to complete download
+      });
 
-      const [exists] = await file.exists();
-      if (!exists) {
-        throw new ObjectNotFoundError();
+      // Fetch the file content
+      const response = await fetch(signedUrl);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new ObjectNotFoundError();
+        }
+        throw new Error(`Failed to download file: ${response.status}`);
       }
 
-      await this.downloadObject(file, res);
+      // Stream the response to the client
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
     } catch (error) {
       if (error instanceof ObjectNotFoundError) {
         throw error;
@@ -365,14 +391,21 @@ export class ObjectStorageService {
     }
   }
 
-  // Check if a file exists in object storage
+  // Check if a file exists in object storage using signed URL HEAD request
   async fileExists(objectPath: string): Promise<boolean> {
     try {
       const { bucketName, objectName } = parseObjectPath(objectPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-      const [exists] = await file.exists();
-      return exists;
+      
+      // Get a signed URL for HEAD request
+      const signedUrl = await signObjectURL({
+        bucketName,
+        objectName,
+        method: 'HEAD',
+        ttlSec: 60
+      });
+
+      const response = await fetch(signedUrl, { method: 'HEAD' });
+      return response.ok;
     } catch {
       return false;
     }
