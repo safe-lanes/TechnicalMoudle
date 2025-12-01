@@ -66,6 +66,9 @@ export default function ComponentRegisterAddEdit({
     parentComponent: parentComponent?.id || "",
     notes: "",
     runningHours: "",
+    isActive: "Yes",
+    vesselCode: "",
+    isParent: "No",
   });
 
 
@@ -129,6 +132,9 @@ export default function ComponentRegisterAddEdit({
         parentComponent: comp.parentId || "",
         notes: comp.notes || "",
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
+        isActive: comp.isActive === false ? "No" : "Yes",
+        vesselCode: comp.vesselCode || "",
+        isParent: comp.isParent ? "Yes" : "No",
       });
       setSelectedTreeNode(comp.id);
 
@@ -391,6 +397,9 @@ export default function ComponentRegisterAddEdit({
         notes: componentData.notes || null,
         runningHours: componentData.runningHours ? parseFloat(componentData.runningHours) : null,
         vesselId: vesselId || "V001",
+        isActive: componentData.isActive === "Yes",
+        vesselCode: componentData.vesselCode || null,
+        isParent: componentData.isParent === "Yes",
       };
 
       if (isEditMode && componentId) {
@@ -455,6 +464,9 @@ export default function ComponentRegisterAddEdit({
       parentComponent: comp.parentId || "",
       notes: comp.notes || "",
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
+      isActive: comp.isActive === false ? "No" : "Yes",
+      vesselCode: comp.vesselCode || "",
+      isParent: comp.isParent ? "Yes" : "No",
     });
     
     const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
@@ -871,6 +883,45 @@ export default function ComponentRegisterAddEdit({
                     placeholder="Notes"
                     data-testid="textarea-notes"
                   />
+                </div>
+
+                {/* Row: Is Active, Vessel Code, Is Parent */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Is Active</label>
+                    <select
+                      value={componentData.isActive}
+                      onChange={(e) => handleFieldChange('isActive', e.target.value)}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-is-active"
+                    >
+                      <option value="Yes">Yes (Active)</option>
+                      <option value="No">No (Inactive)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Inactive components are hidden from active views</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Vessel Code</label>
+                    <Input
+                      value={componentData.vesselCode}
+                      onChange={(e) => handleFieldChange('vesselCode', e.target.value)}
+                      className="h-8 text-sm"
+                      placeholder="e.g., V001"
+                      data-testid="input-vessel-code"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Is Parent</label>
+                    <select
+                      value={componentData.isParent}
+                      onChange={(e) => handleFieldChange('isParent', e.target.value)}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-is-parent"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
