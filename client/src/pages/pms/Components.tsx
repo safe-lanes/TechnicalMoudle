@@ -1909,6 +1909,8 @@ const Components: React.FC = () => {
   
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
+    console.log('[TREE] Building tree from', fetchedComponents.length, 'components');
+    
     // Create a fresh clone of fetched components to avoid mutating React Query cache
     const clonedComponents = fetchedComponents.map(comp => ({ ...comp }));
     

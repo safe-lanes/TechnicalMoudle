@@ -3273,6 +3273,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/components", async (req, res) => {
     try {
       const component = await storage.createComponent(req.body);
+      console.log('[API_CREATE] New component:', { 
+        id: component.id, 
+        code: component.componentCode, 
+        parentId: component.parentId,
+        vesselId: component.vesselId 
+      });
       res.status(201).json(component);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to create component" });

@@ -258,17 +258,16 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         });
       }
 
-      // Refetch all component-related queries to ensure tree refreshes
-      console.log('🔄 Refetching component queries after save, vesselId:', vesselId);
-      await queryClient.refetchQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey[0];
-          const matches = typeof key === 'string' && key.startsWith('/api/components');
-          if (matches) console.log('🔄 Refetching query:', query.queryKey);
-          return matches;
-        }
+      // Invalidate all component-related queries to force fresh data fetch
+      console.log('🔄 Invalidating component queries after save, vesselId:', vesselId);
+      await queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+      
+      // Also invalidate the vessel-specific query
+      const currentVesselId = vesselId || 'V001';
+      await queryClient.invalidateQueries({ 
+        queryKey: [`/api/components/${currentVesselId}`] 
       });
-      console.log('✅ Component queries refetched');
+      console.log('[CREATE] Cache invalidated for vessel:', currentVesselId);
       onClose();
     } catch (error: any) {
       toast({
