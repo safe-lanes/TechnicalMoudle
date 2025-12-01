@@ -2577,6 +2577,8 @@ export class PersistentFileStorage implements IStorage {
     if (!spare) {
       throw new Error(`Spare ${id} not found`);
     }
+    
+    const oldRob = spare.rob ?? 0;
     const updated = { ...spare, ...data };
     
     // Keep rob synchronized with robLocationA + robLocationB
@@ -2591,6 +2593,47 @@ export class PersistentFileStorage implements IStorage {
       // Only total rob updated - put difference in Location A
       updated.robLocationA = data.rob;
       updated.robLocationB = 0;
+    }
+    
+    const newRob = updated.rob ?? 0;
+    const robChanged = oldRob !== newRob;
+    
+    console.log('[SPARE_UPDATE] ROB change:', { 
+      spareId: id, 
+      oldRob, 
+      newRob,
+      robChanged
+    });
+    
+    // Create history entry when ROB changes
+    if (robChanged) {
+      const qtyChange = newRob - oldRob;
+      const eventType = qtyChange > 0 ? 'RECEIVE' : qtyChange < 0 ? 'CONSUME' : 'ADJUST';
+      
+      const history: SpareHistory = {
+        id: this.data.counters.historyId++,
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId ?? "V001",
+        spareId: id,
+        partCode: spare.partCode,
+        partName: spare.partName,
+        componentId: spare.componentId ?? "",
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType,
+        qtyChange,
+        robAfter: newRob,
+        userId: 'system',
+        remarks: 'Manual ROB update',
+        reference: null,
+        dateLocal: null,
+        tz: null,
+        place: null
+      };
+      
+      this.data.sparesHistory.push(history);
+      console.log('[SPARE_UPDATE] History created:', { historyId: history.id, eventType, qtyChange });
     }
     
     this.data.spares[id] = updated;
@@ -2879,15 +2922,27 @@ export class PersistentFileStorage implements IStorage {
 
   // Spares History methods
   async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
-    return this.data.sparesHistory
-      .filter(h => h.vesselId === vesselId)
-      .sort((a, b) => b.timestampUTC.getTime() - a.timestampUTC.getTime());
+    console.log('[SPARE_HISTORY] Fetching history for vessel:', vesselId, 'total entries:', this.data.sparesHistory.length);
+    const filtered = this.data.sparesHistory.filter(h => h.vesselId === vesselId);
+    console.log('[SPARE_HISTORY] Filtered entries:', filtered.length);
+    
+    // Handle both Date objects and string timestamps from JSON
+    return filtered.sort((a, b) => {
+      const dateA = a.timestampUTC instanceof Date ? a.timestampUTC : new Date(a.timestampUTC);
+      const dateB = b.timestampUTC instanceof Date ? b.timestampUTC : new Date(b.timestampUTC);
+      return dateB.getTime() - dateA.getTime();
+    });
   }
 
   async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
-    return this.data.sparesHistory
-      .filter(h => h.spareId === spareId)
-      .sort((a, b) => b.timestampUTC.getTime() - a.timestampUTC.getTime());
+    const filtered = this.data.sparesHistory.filter(h => h.spareId === spareId);
+    
+    // Handle both Date objects and string timestamps from JSON
+    return filtered.sort((a, b) => {
+      const dateA = a.timestampUTC instanceof Date ? a.timestampUTC : new Date(a.timestampUTC);
+      const dateB = b.timestampUTC instanceof Date ? b.timestampUTC : new Date(b.timestampUTC);
+      return dateB.getTime() - dateA.getTime();
+    });
   }
 
   async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {

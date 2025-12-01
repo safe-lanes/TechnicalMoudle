@@ -3383,6 +3383,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // IMPORTANT: This route MUST come BEFORE /api/spares/:vesselId to avoid route conflict
+  // Route format: /api/spares/history/:vesselId (client-expected format)
+  app.get("/api/spares/history/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      console.log('[API] Fetching spare history for vessel:', vesselId);
+      const history = await storage.getSpareHistory(vesselId);
+      console.log('[API] Found', history.length, 'history entries');
+      res.json(history);
+    } catch (error) {
+      console.error('[API] Spare history error:', error);
+      res.status(500).json({ error: "Failed to fetch spare history" });
+    }
+  });
+  
   // Get spares for a vessel
   app.get("/api/spares/:vesselId", async (req, res) => {
     try {
@@ -3481,11 +3496,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Inventory history endpoints
+  // Route format: /api/spares/:vesselId/history (legacy)
   app.get("/api/spares/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
-      // getSpareHistory only takes vesselId as parameter
+      console.log('[API] Fetching spare history for vessel (legacy route):', vesselId);
       const history = await storage.getSpareHistory(vesselId);
+      console.log('[API] Found', history.length, 'history entries');
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch history" });
