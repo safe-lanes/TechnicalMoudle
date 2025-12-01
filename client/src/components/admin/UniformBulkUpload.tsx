@@ -81,9 +81,9 @@ interface ImportHistory {
   updated: number;
   skipped: number;
   archived: number;
-  startedAt: string;
+  date: string;
   status: string;
-  userId: string;
+  user: string;
   fileName?: string;
   originalName?: string;
   storedFilePath?: string | null;
@@ -832,7 +832,7 @@ export default function UniformBulkUpload({
                           <TableCell className="whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-gray-400" />
-                              {formatDate(h.startedAt)}
+                              {formatDate(h.date)}
                             </div>
                           </TableCell>
                           <TableCell className="max-w-xs truncate">
