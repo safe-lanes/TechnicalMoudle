@@ -62,14 +62,14 @@
       "noOfUnits": null,
       "parentComponent": "40",
       "dimensionsSize": null,
-      "notes": null,
-      "runningHours": null,
+      "notes": "Test note - verification",
+      "runningHours": 500,
       "applicableVesselIds": null,
       "scopeNotes": null,
       "conditionBased": false,
       "isActive": true,
       "createdAt": "2025-11-28T06:33:53.376Z",
-      "updatedAt": "2025-11-28T06:37:49.926Z"
+      "updatedAt": "2025-12-01T09:23:53.149Z"
     },
     "1764311633380_ofzlgvmlh": {
       "componentCode": "40",

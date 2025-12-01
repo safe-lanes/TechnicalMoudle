@@ -1197,6 +1197,13 @@ export class PersistentFileStorage implements IStorage {
     const updated = { ...component, ...data, updatedAt: new Date() };
     this.data.components[id] = updated;
     
+    console.log('[UPDATE_VERIFY] Component saved:', {
+      id: updated.id,
+      code: updated.componentCode,
+      name: updated.name,
+      parentId: updated.parentId
+    });
+    
     // CASCADE UPDATE: When componentCode changes, update all linked records (Rule #12)
     if (componentCodeChanged && oldComponentCode && newComponentCode) {
       const vesselKey = updated.vesselId ?? component.vesselId ?? 'global';
