@@ -2829,12 +2829,21 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Vessel Code'] = String(row['Vessel Code']).trim();
       }
       
-      // Component Code - required
+      // Component Code - required and must exist in vessel
       if (!row['Component Code']) {
         errors.push(`Row ${rowNum}: Component Code is required`);
       } else {
-        normalized['Component Code'] = String(row['Component Code']).trim();
-        // TODO: Check if component exists
+        const componentCode = String(row['Component Code']).trim();
+        normalized['Component Code'] = componentCode;
+        
+        // Validate that Component Code exists in the vessel
+        const vesselCode = row['Vessel Code'] ? String(row['Vessel Code']).trim() : null;
+        if (vesselCode) {
+          const component = await storage.getComponentByCode(componentCode, vesselCode);
+          if (!component) {
+            errors.push(`Row ${rowNum}: Component Code '${componentCode}' not found in vessel '${vesselCode}'. Job cannot be linked.`);
+          }
+        }
       }
 
       // Component Name is often auto-filled, but validate if provided
@@ -2847,16 +2856,9 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         normalized['Job Code'] = String(row['Job Code']).trim();
       }
       
-      // Fleet Equipment Code is optional but must exist in master data if provided
+      // Fleet Equipment Code is optional (fleet linkage will be done later)
       if (row['Fleet Equipment Code']) {
-        const fleetCode = String(row['Fleet Equipment Code']).trim();
-        normalized['Fleet Equipment Code'] = fleetCode;
-        
-        // Validate that Fleet Equipment Code exists in master data
-        const masterEntry = await storage.getMasterDataByFleetCode(fleetCode);
-        if (!masterEntry) {
-          warnings.push(`Row ${rowNum}: Fleet Equipment Code '${fleetCode}' not found in master data. Code will be accepted but not linked.`);
-        }
+        normalized['Fleet Equipment Code'] = String(row['Fleet Equipment Code']).trim();
       }
       
       // Fleet Equipment Name is optional
