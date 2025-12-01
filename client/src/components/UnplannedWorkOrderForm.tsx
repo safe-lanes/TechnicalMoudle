@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,40 +16,87 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, List } from "lucide-react";
+import { ArrowLeft, List, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { Component } from "@shared/schema";
 
 interface UnplannedWorkOrderFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit?: (formData: any) => void;
+  vesselId?: string;
 }
 
 const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  vesselId,
 }) => {
   const [activeSection, setActiveSection] = useState<'partA' | 'partB'>('partA');
   const [isPpeDialogOpen, setIsPpeDialogOpen] = useState(false);
   const [isPermitDialogOpen, setIsPermitDialogOpen] = useState(false);
   const [selectedPpeItems, setSelectedPpeItems] = useState<string[]>([]);
   const [selectedPermitItems, setSelectedPermitItems] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch active components from API for the component selector (Issue #6)
+  const { data: components = [], isLoading: componentsLoading } = useQuery<Component[]>({
+    queryKey: ['/api/components', vesselId],
+    queryFn: async () => {
+      if (!vesselId) return [];
+      const response = await fetch(`/api/components/${vesselId}`);
+      if (!response.ok) throw new Error('Failed to fetch components');
+      const allComponents = await response.json() as Component[];
+      // Filter to show only active components (isActive can be boolean or null)
+      const activeComponents = allComponents.filter(c => c.isActive === true);
+      console.log('[UNPLANNED_WO] Components loaded:', activeComponents.length);
+      return activeComponents;
+    },
+    enabled: isOpen && !!vesselId,
+  });
 
   const [formData, setFormData] = useState({
-    workOrder: "WOUP-2025-17",
+    workOrder: "",
     jobTitle: "",
-    component: "",
+    componentId: "",
+    componentCode: "",
+    componentName: "",
     maintenanceType: "Unplanned Maintenance",
     assignedTo: "",
     approver: "",
     jobCategory: "",
-    classRelated: "",
-    status: "",
+    classRelated: "No",
+    status: "Active",
     briefWorkDescription: "",
     ppeRequirements: "",
     permitRequirements: "",
     otherSafetyRequirements: "",
   });
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        workOrder: "",
+        jobTitle: "",
+        componentId: "",
+        componentCode: "",
+        componentName: "",
+        maintenanceType: "Unplanned Maintenance",
+        assignedTo: "",
+        approver: "",
+        jobCategory: "",
+        classRelated: "No",
+        status: "Active",
+        briefWorkDescription: "",
+        ppeRequirements: "",
+        permitRequirements: "",
+        otherSafetyRequirements: "",
+      });
+      setActiveSection('partA');
+    }
+  }, [isOpen]);
 
   const selectSection = (section: 'partA' | 'partB') => {
     setActiveSection(section);
@@ -112,10 +159,71 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
     setIsPermitDialogOpen(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.jobTitle) {
+      alert('Please enter a Job Title');
+      return;
+    }
+    if (!formData.componentId) {
+      alert('Please select a Component');
+      return;
+    }
+    if (!formData.briefWorkDescription) {
+      alert('Please enter a Brief Work Description');
+      return;
+    }
+
+    console.log('[UNPLANNED_WO] Submitting:', JSON.stringify(formData, null, 2));
+
     if (onSubmit) {
-      onSubmit(formData);
-      onClose();
+      setIsSubmitting(true);
+      try {
+        // Build the work order payload
+        const workOrderPayload = {
+          vesselId: vesselId,
+          componentId: formData.componentId,
+          componentCode: formData.componentCode,
+          componentName: formData.componentName,
+          jobTitle: formData.jobTitle,
+          workOrderType: 'Unplanned',
+          maintenanceType: formData.maintenanceType,
+          assignedTo: formData.assignedTo,
+          approver: formData.approver,
+          jobCategory: formData.jobCategory,
+          classRelated: formData.classRelated,
+          status: formData.status || 'Active',
+          briefWorkDescription: formData.briefWorkDescription,
+          safetyRequirements: {
+            ppeRequirements: formData.ppeRequirements ? formData.ppeRequirements.split('] [').map(s => s.replace(/[\[\]]/g, '').trim()).filter(Boolean) : [],
+            permitRequirements: formData.permitRequirements ? formData.permitRequirements.split('] [').map(s => s.replace(/[\[\]]/g, '').trim()).filter(Boolean) : [],
+            otherRequirements: formData.otherSafetyRequirements ? [formData.otherSafetyRequirements] : []
+          },
+          maintenanceBasis: 'Calendar',
+          frequencyValue: '',
+          frequencyUnit: '',
+        };
+        
+        await onSubmit(workOrderPayload);
+        onClose();
+      } catch (error) {
+        console.error('[UNPLANNED_WO] Error submitting:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  // Handle component selection - store both ID and display info
+  const handleComponentSelect = (componentId: string) => {
+    const selectedComponent = components.find(c => c.id === componentId);
+    if (selectedComponent) {
+      setFormData(prev => ({
+        ...prev,
+        componentId: componentId,
+        componentCode: selectedComponent.componentCode || '',
+        componentName: selectedComponent.name || '',
+      }));
     }
   };
 
@@ -127,8 +235,21 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
           <div className="flex items-center justify-between">
             <DialogTitle>Work Order Form - Unplanned Maintenance</DialogTitle>
             <div className="flex items-center gap-2">
-              <Button size="sm" className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white">
-                Save
+              <Button 
+                size="sm" 
+                className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                data-testid="button-save-unplanned-wo"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}
               </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
@@ -207,14 +328,30 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-[#8798ad]">Component</Label>
-                        <Select value={formData.component} onValueChange={(value) => handleInputChange('component', value)}>
-                          <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]">
-                            <SelectValue placeholder="601.002 Main Engine" />
+                        <Select 
+                          value={formData.componentId} 
+                          onValueChange={handleComponentSelect}
+                          disabled={componentsLoading}
+                        >
+                          <SelectTrigger className="text-sm border-[#52baf3] focus:border-[#52baf3] focus:ring-[#52baf3]" data-testid="select-component">
+                            <SelectValue placeholder={componentsLoading ? "Loading components..." : "Select Component"} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="601.002 Main Engine">601.002 Main Engine</SelectItem>
-                            <SelectItem value="602.001 Diesel Generator 1">602.001 Diesel Generator 1</SelectItem>
-                            <SelectItem value="603.001 Steering Gear">603.001 Steering Gear</SelectItem>
+                            {componentsLoading ? (
+                              <SelectItem value="loading" disabled>Loading...</SelectItem>
+                            ) : components.length === 0 ? (
+                              <SelectItem value="none" disabled>No active components found</SelectItem>
+                            ) : (
+                              components.map((component) => (
+                                <SelectItem 
+                                  key={component.id} 
+                                  value={component.id}
+                                  data-testid={`select-component-${component.id}`}
+                                >
+                                  {component.componentCode} - {component.name}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>

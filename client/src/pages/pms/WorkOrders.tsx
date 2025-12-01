@@ -559,6 +559,17 @@ const WorkOrders: React.FC = () => {
       <UnplannedWorkOrderForm
         isOpen={unplannedWorkOrderFormOpen}
         onClose={() => setUnplannedWorkOrderFormOpen(false)}
+        vesselId={vesselId}
+        onSubmit={async (formData) => {
+          console.log('[API_UNPLANNED_WO] Submitting unplanned WO:', formData);
+          try {
+            await createWorkOrderMutation.mutateAsync(formData);
+            setUnplannedWorkOrderFormOpen(false);
+          } catch (error) {
+            console.error('[API_UNPLANNED_WO] Error:', error);
+            throw error;
+          }
+        }}
       />
 
       {/* Modify Mode Sticky Footer */}
