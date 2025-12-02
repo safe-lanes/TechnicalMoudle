@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Plus, Edit2, ChevronRight, ChevronDown, Search, Upload, Eye, Download, Trash2, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getComponentCategory } from "@/utils/componentUtils";
 import { useVessels } from "@/hooks/useVessels";
+import type { ComponentDocument } from "@shared/schema";
 
 interface ComponentNode {
   id: string;
@@ -46,7 +47,12 @@ export default function ComponentRegisterAddEdit({
   const [isSaving, setIsSaving] = useState(false);
   const [criticalityFilter, setCriticalityFilter] = useState("all");
 
-  const isEditMode = !!componentId;
+  const isEditModeFromProp = !!componentId;
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(componentId || null);
+  
+  const isMainCategoryCheck = (id: string): boolean => /^[1-8]$/.test(id);
+  
+  const isEditMode = isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId));
 
   const [componentData, setComponentData] = useState({
     maker: "",
@@ -75,12 +81,17 @@ export default function ComponentRegisterAddEdit({
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [maintenanceHistory, setMaintenanceHistory] = useState<any[]>([]);
   const [spares, setSpares] = useState<any[]>([]);
-  const [documents, setDocuments] = useState([
-    { id: "1", type: "Equipment Drawing", fileName: "", uploaded: false },
-    { id: "2", type: "Maintenance Manual", fileName: "", uploaded: false },
-    { id: "3", type: "Installation Guide", fileName: "", uploaded: false },
-    { id: "4", type: "Trouble shooting Guide", fileName: "", uploaded: false },
-  ]);
+  
+  const documentTypes = [
+    { id: "1", type: "Equipment Drawing", fileType: "Drawing" },
+    { id: "2", type: "Maintenance Manual", fileType: "Manual" },
+    { id: "3", type: "Installation Guide", fileType: "Manual" },
+    { id: "4", type: "Trouble shooting Guide", fileType: "Manual" },
+  ];
+  
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  
   const [classRegData, setClassRegData] = useState({
     classificationSociety: "",
     certificateNo: "",
@@ -110,6 +121,167 @@ export default function ComponentRegisterAddEdit({
     queryKey: ['/api/spares'],
     enabled: isEditMode,
   });
+
+  const activeComponentId = componentId || selectedComponentId;
+  
+  const { data: componentDocuments = [], isLoading: isLoadingDocuments, refetch: refetchDocuments } = useQuery<ComponentDocument[]>({
+    queryKey: ['/api/component-documents', activeComponentId],
+    queryFn: async () => {
+      if (!activeComponentId) return [];
+      const response = await fetch(`/api/component-documents/${activeComponentId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error('Failed to fetch documents');
+      }
+      return response.json();
+    },
+    enabled: isEditMode && !!activeComponentId,
+  });
+
+  const getDocumentForType = (docType: string): ComponentDocument | undefined => {
+    return componentDocuments.find(doc => 
+      doc.fileName.toLowerCase().includes(docType.toLowerCase()) || 
+      doc.fileType.toLowerCase() === docType.toLowerCase() ||
+      doc.notes?.toLowerCase().includes(docType.toLowerCase())
+    );
+  };
+
+  const handleUploadClick = (docType: string) => {
+    const inputRef = fileInputRefs.current[docType];
+    if (inputRef) {
+      inputRef.click();
+    }
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, docType: string, fileType: string) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const compId = activeComponentId;
+    const compCode = componentData.componentCode;
+    const compVessel = componentData.vesselCode || vesselId;
+
+    if (!compId || !compCode) {
+      toast({
+        title: "Error",
+        description: "Please select a component first before uploading documents.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/msword'];
+    const maxSize = 25 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload PDF, Word, or image files only.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "File size must be less than 25MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingDocType(docType);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('componentId', compId);
+      formData.append('componentCode', compCode);
+      formData.append('vesselCode', compVessel);
+      formData.append('fileName', `${docType} - ${file.name}`);
+      formData.append('fileType', fileType);
+      formData.append('version', '1.0');
+      formData.append('canShipView', 'true');
+      formData.append('canShipDownload', 'true');
+      formData.append('notes', docType);
+
+      const response = await fetch('/api/component-documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload document');
+      }
+
+      toast({
+        title: "Document Uploaded",
+        description: `${docType} has been uploaded successfully.`,
+      });
+
+      refetchDocuments();
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload document",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDocType(null);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleViewDocument = async (docId: number) => {
+    try {
+      window.open(`/api/component-documents/${docId}/download`, '_blank');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to open document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteDocument = async (docId: number, docName: string) => {
+    if (!confirm(`Are you sure you want to delete "${docName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/component-documents/${docId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document');
+      }
+
+      toast({
+        title: "Document Deleted",
+        description: `${docName} has been deleted.`,
+      });
+
+      refetchDocuments();
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete document",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (isEditMode && existingComponent && !isLoadingComponent) {
@@ -231,10 +403,11 @@ export default function ComponentRegisterAddEdit({
         return;
       }
       const node: ComponentNode = {
-        id: code,
+        id: comp.id,
         code: code,
         name: comp.name,
         ...comp,
+        componentId: comp.id,
         critical: comp.critical === "Yes" || comp.critical === true,
         children: []
       };
@@ -442,9 +615,18 @@ export default function ComponentRegisterAddEdit({
   const isMainCategory = (id: string): boolean => {
     return /^[1-8]$/.test(id);
   };
+  
+  const isMainCategoryById = (id: string): boolean => {
+    return /^[1-8]$/.test(id);
+  };
 
   const loadComponentDataFromTree = (comp: any) => {
-    if (!comp || isMainCategory(comp.id)) return;
+    if (!comp || isMainCategory(comp.id)) {
+      setSelectedComponentId(null);
+      return;
+    }
+    
+    setSelectedComponentId(comp.id);
     
     setComponentData({
       maker: comp.maker || "",
@@ -593,16 +775,13 @@ export default function ComponentRegisterAddEdit({
                 parentComponent: parentId,
                 notes: "",
                 runningHours: "",
+                isActive: "Yes",
+                vesselCode: "",
+                isParent: "No",
               });
               setWorkOrders([]);
               setMaintenanceHistory([]);
               setSpares([]);
-              setDocuments([
-                { id: "1", type: "Equipment Drawing", fileName: "", uploaded: false },
-                { id: "2", type: "Maintenance Manual", fileName: "", uploaded: false },
-                { id: "3", type: "Installation Guide", fileName: "", uploaded: false },
-                { id: "4", type: "Trouble shooting Guide", fileName: "", uploaded: false },
-              ]);
               setClassRegData({
                 classificationSociety: "",
                 certificateNo: "",
@@ -1123,35 +1302,142 @@ export default function ComponentRegisterAddEdit({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">F. Drawings & Manuals</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs text-sky-600 border-sky-300"
-                    data-testid="button-add-document"
-                  >
-                    + Add Document
-                  </Button>
+                  {isLoadingDocuments && (
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3">
-                      <Input
-                        value={doc.type}
-                        className="h-8 text-sm flex-1 bg-yellow-50"
-                        readOnly
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs text-gray-500"
-                        data-testid={`button-upload-${doc.id}`}
-                      >
-                        <Upload className="h-3 w-3 mr-1" />
-                        Upload
-                      </Button>
-                    </div>
-                  ))}
+                  {documentTypes.map((docTypeInfo) => {
+                    const existingDoc = componentDocuments.find(doc => 
+                      doc.notes?.toLowerCase().includes(docTypeInfo.type.toLowerCase()) ||
+                      doc.fileName.toLowerCase().includes(docTypeInfo.type.toLowerCase())
+                    );
+                    const isUploading = uploadingDocType === docTypeInfo.type;
+                    
+                    return (
+                      <div key={docTypeInfo.id} className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          ref={(el) => { fileInputRefs.current[docTypeInfo.type] = el; }}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={(e) => handleFileSelected(e, docTypeInfo.type, docTypeInfo.fileType)}
+                          data-testid={`file-input-${docTypeInfo.id}`}
+                        />
+                        <Input
+                          value={docTypeInfo.type}
+                          className="h-8 text-sm flex-1 bg-yellow-50"
+                          readOnly
+                        />
+                        {existingDoc ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-green-600 flex items-center gap-1" title={existingDoc.fileName}>
+                              <FileText className="h-3 w-3" />
+                              Uploaded
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs text-sky-600"
+                              onClick={() => handleViewDocument(existingDoc.id)}
+                              data-testid={`button-view-${docTypeInfo.id}`}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs text-red-500 hover:text-red-700"
+                              onClick={() => handleDeleteDocument(existingDoc.id, existingDoc.fileName)}
+                              data-testid={`button-delete-${docTypeInfo.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs text-gray-500"
+                              onClick={() => handleUploadClick(docTypeInfo.type)}
+                              disabled={isUploading}
+                              data-testid={`button-replace-${docTypeInfo.id}`}
+                            >
+                              {isUploading ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <Upload className="h-3 w-3 mr-1" />
+                              )}
+                              Replace
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs text-gray-500"
+                            onClick={() => handleUploadClick(docTypeInfo.type)}
+                            disabled={isUploading || !isEditMode}
+                            title={!isEditMode ? "Save component first to upload documents" : ""}
+                            data-testid={`button-upload-${docTypeInfo.id}`}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-3 w-3 mr-1" />
+                                Upload
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+                
+                {componentDocuments.length > 0 && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded border">
+                    <h4 className="text-xs font-semibold text-gray-600 mb-2">All Uploaded Documents ({componentDocuments.length})</h4>
+                    <div className="space-y-1">
+                      {componentDocuments.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between text-xs py-1 border-b border-gray-200 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-700">{doc.fileName}</span>
+                            <span className="text-gray-400">({doc.fileType})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs text-sky-600 px-2"
+                              onClick={() => handleViewDocument(doc.id)}
+                              data-testid={`button-view-doc-${doc.id}`}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs text-red-500 px-2"
+                              onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
+                              data-testid={`button-delete-doc-${doc.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

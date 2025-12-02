@@ -142,6 +142,8 @@ interface PersistentData {
   bulkImportHistory: Record<number, BulkImportHistory>;
   bulkImportErrors: BulkImportError[];
   componentMaintenanceHistory: Record<number, any>;
+  componentDocuments: Record<number, any>;
+  componentClassRegulatory: Record<number, any>;
   
   // Counter state
   counters: {
@@ -178,6 +180,8 @@ interface PersistentData {
     bulkImportHistoryId: number;
     bulkImportErrorId: number;
     maintenanceHistoryId: number;
+    componentDocumentId: number;
+    componentClassRegulatoryId: number;
   };
 }
 
@@ -376,6 +380,8 @@ export class PersistentFileStorage implements IStorage {
           bulkImportHistory: loadedData.bulkImportHistory || {},
           bulkImportErrors: loadedData.bulkImportErrors || [],
           componentMaintenanceHistory: loadedData.componentMaintenanceHistory || {},
+          componentDocuments: loadedData.componentDocuments || {},
+          componentClassRegulatory: loadedData.componentClassRegulatory || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -409,7 +415,9 @@ export class PersistentFileStorage implements IStorage {
             fleetSpareVesselMappingId: loadedData.counters?.fleetSpareVesselMappingId || 1,
             bulkImportHistoryId: loadedData.counters?.bulkImportHistoryId || 1,
             bulkImportErrorId: loadedData.counters?.bulkImportErrorId || 1,
-            maintenanceHistoryId: loadedData.counters?.maintenanceHistoryId || 1
+            maintenanceHistoryId: loadedData.counters?.maintenanceHistoryId || 1,
+            componentDocumentId: loadedData.counters?.componentDocumentId || 1,
+            componentClassRegulatoryId: loadedData.counters?.componentClassRegulatoryId || 1
           }
         };
         
@@ -585,6 +593,8 @@ export class PersistentFileStorage implements IStorage {
       bulkImportHistory: {},
       bulkImportErrors: [],
       componentMaintenanceHistory: {},
+      componentDocuments: {},
+      componentClassRegulatory: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -618,7 +628,9 @@ export class PersistentFileStorage implements IStorage {
         fleetSpareVesselMappingId: 1,
         bulkImportHistoryId: 1,
         bulkImportErrorId: 1,
-        maintenanceHistoryId: 1
+        maintenanceHistoryId: 1,
+        componentDocumentId: 1,
+        componentClassRegulatoryId: 1
       }
     };
     
@@ -3313,6 +3325,160 @@ export class PersistentFileStorage implements IStorage {
     this.persistData();
     console.log(`✅ Created maintenance history record #${id} for component ${history.componentId}`);
     return newHistory;
+  }
+
+  // Component Documents methods
+  async getComponentDocuments(componentId: string): Promise<any[]> {
+    if (!this.data.componentDocuments) {
+      this.data.componentDocuments = {};
+    }
+    return Object.values(this.data.componentDocuments)
+      .filter(doc => doc !== null && doc.componentId === componentId && doc.isActive !== false)
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+
+  async getComponentDocument(id: number): Promise<any | undefined> {
+    if (!this.data.componentDocuments) {
+      this.data.componentDocuments = {};
+    }
+    return this.data.componentDocuments[id];
+  }
+
+  async createComponentDocument(doc: any): Promise<any> {
+    if (!this.data.componentDocuments) {
+      this.data.componentDocuments = {};
+    }
+    if (!this.data.counters.componentDocumentId) {
+      this.data.counters.componentDocumentId = 1;
+    }
+    
+    const id = this.data.counters.componentDocumentId++;
+    const newDoc = {
+      ...doc,
+      id,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentDocuments[id] = newDoc;
+    this.persistData();
+    console.log(`✅ Created component document #${id} for component ${doc.componentId}`);
+    return newDoc;
+  }
+
+  async updateComponentDocument(id: number, data: any): Promise<any> {
+    if (!this.data.componentDocuments) {
+      this.data.componentDocuments = {};
+    }
+    const existing = this.data.componentDocuments[id];
+    if (!existing) {
+      throw new Error(`Component document ${id} not found`);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentDocuments[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteComponentDocument(id: number): Promise<void> {
+    if (!this.data.componentDocuments) {
+      this.data.componentDocuments = {};
+    }
+    const existing = this.data.componentDocuments[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date().toISOString();
+      this.persistData();
+      console.log(`✅ Soft deleted component document #${id}`);
+    }
+  }
+
+  // Component Class Regulatory methods
+  async getComponentClassRegulatory(componentId: string): Promise<any[]> {
+    if (!this.data.componentClassRegulatory) {
+      this.data.componentClassRegulatory = {};
+    }
+    return Object.values(this.data.componentClassRegulatory)
+      .filter(item => item !== null && item.componentId === componentId && item.isActive !== false)
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+
+  async getComponentClassRegulatoryItem(id: number): Promise<any | undefined> {
+    if (!this.data.componentClassRegulatory) {
+      this.data.componentClassRegulatory = {};
+    }
+    return this.data.componentClassRegulatory[id];
+  }
+
+  async createComponentClassRegulatory(item: any): Promise<any> {
+    if (!this.data.componentClassRegulatory) {
+      this.data.componentClassRegulatory = {};
+    }
+    if (!this.data.counters.componentClassRegulatoryId) {
+      this.data.counters.componentClassRegulatoryId = 1;
+    }
+    
+    const id = this.data.counters.componentClassRegulatoryId++;
+    const newItem = {
+      ...item,
+      id,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentClassRegulatory[id] = newItem;
+    this.persistData();
+    console.log(`✅ Created class regulatory item #${id} for component ${item.componentId}`);
+    return newItem;
+  }
+
+  async updateComponentClassRegulatory(id: number, data: any): Promise<any> {
+    if (!this.data.componentClassRegulatory) {
+      this.data.componentClassRegulatory = {};
+    }
+    const existing = this.data.componentClassRegulatory[id];
+    if (!existing) {
+      throw new Error(`Component class regulatory item ${id} not found`);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentClassRegulatory[id] = updated;
+    this.persistData();
+    return updated;
+  }
+
+  async deleteComponentClassRegulatory(id: number): Promise<void> {
+    if (!this.data.componentClassRegulatory) {
+      this.data.componentClassRegulatory = {};
+    }
+    const existing = this.data.componentClassRegulatory[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date().toISOString();
+      this.persistData();
+      console.log(`✅ Soft deleted class regulatory item #${id}`);
+    }
   }
 
   // Jobs methods (Templates for maintenance jobs linked to components)

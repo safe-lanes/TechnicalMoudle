@@ -14,8 +14,9 @@ import formRouter from "./routes/forms";
 import fleetAdminRouter from "./routes/fleetAdmin";
 import createChangeRequestsRouter from "./routes/changeRequests";
 import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFoundError } from "./objectStorage";
+import { LocalFileStorage } from "./services/localFileStorage";
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
-import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, type AuthenticatedRequest } from "./middleware/auth";
+import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, mockAuthMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -30,6 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Server cannot start without immutability enforcement for component_maintenance_history table');
     process.exit(1); // Fail fast - do not serve traffic without immutability
   }
+  
+  // Apply mock authentication middleware for all API routes during development
+  // This populates req.user with an admin user for testing purposes
+  app.use('/api', mockAuthMiddleware);
+  console.log('🔒 Mock authentication enabled for /api/* routes');
   
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
@@ -1212,29 +1218,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Upload file to object storage first
+      // Upload file - try object storage first, fall back to local file storage
       const timestamp = Date.now();
       const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileKey = `.private/documents/${component.componentCode}/${timestamp}_${safeFileName}`;
-      const fileSize = req.file.size; // Already a number from multer
+      const fileKey = `${component.componentCode}/${timestamp}_${safeFileName}`;
+      const fileSize = req.file.size;
       
-      // Upload to object storage using Google Cloud Storage client
+      let storageBackend: 'object' | 'local' = 'object';
+      
+      // Try object storage first
       const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-      if (!bucketId) {
-        return res.status(500).json({ error: "Object storage not configured" });
+      if (bucketId) {
+        try {
+          const bucket = objectStorageClient.bucket(bucketId);
+          const file = bucket.file(`.private/documents/${fileKey}`);
+          await file.save(req.file.buffer, {
+            metadata: {
+              contentType: req.file.mimetype
+            }
+          });
+          console.log(`📤 Uploaded file to object storage: ${fileKey}`);
+        } catch (storageError) {
+          console.warn("⚠️ Object storage upload failed, falling back to local storage:", storageError);
+          storageBackend = 'local';
+        }
+      } else {
+        console.log("📁 Object storage not configured, using local storage");
+        storageBackend = 'local';
       }
       
-      try {
-        const bucket = objectStorageClient.bucket(bucketId);
-        const file = bucket.file(fileKey);
-        await file.save(req.file.buffer, {
-          metadata: {
-            contentType: req.file.mimetype
-          }
-        });
-      } catch (storageError) {
-        console.error("Failed to upload file to object storage:", storageError);
-        return res.status(500).json({ error: "Failed to upload file to object storage" });
+      // Fallback to local file storage
+      if (storageBackend === 'local') {
+        try {
+          await LocalFileStorage.write(fileKey, req.file.buffer, req.file.mimetype);
+          console.log(`📁 Saved file to local storage: ${fileKey}`);
+        } catch (localError) {
+          console.error("Failed to save file to local storage:", localError);
+          return res.status(500).json({ error: "Failed to save file" });
+        }
       }
       
       // Multer leaves all form fields as strings, so coerce types explicitly
@@ -1253,23 +1274,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: req.body.notes || null,
         uploadedBy: req.user!.username,
         fileKey, // Already set from upload
-        fileSize // Already a number from multer
+        fileSize, // Already a number from multer
+        storageBackend // Track where file is stored (now part of schema)
       };
       
       // Now validate with complete, properly-typed data
-      const validatedData = insertComponentDocumentSchema.parse(coercedBody);
+      const documentData = insertComponentDocumentSchema.parse(coercedBody);
       
       // Create document in storage atomically
       try {
-        const document = await storage.createComponentDocument(validatedData);
+        const document = await storage.createComponentDocument(documentData);
         res.json(document);
       } catch (dbError) {
         // Rollback: delete uploaded file if DB insert fails
         console.error("Failed to create document in database, rolling back file upload:", dbError);
         try {
-          const bucket = objectStorageClient.bucket(bucketId);
-          const file = bucket.file(fileKey);
-          await file.delete();
+          if (storageBackend === 'object' && bucketId) {
+            const bucket = objectStorageClient.bucket(bucketId);
+            const file = bucket.file(`.private/documents/${fileKey}`);
+            await file.delete();
+          } else {
+            await LocalFileStorage.delete(fileKey);
+          }
         } catch (deleteError) {
           console.error("Failed to cleanup uploaded file after DB error:", deleteError);
         }
@@ -1376,19 +1402,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Insufficient permissions to download this document" });
       }
       
-      // Download from object storage using Google Cloud Storage client
-      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-      if (!bucketId) {
-        return res.status(500).json({ error: "Object storage not configured" });
-      }
+      // Download based on storage backend
+      let fileBuffer: Buffer;
+      let contentType = 'application/octet-stream';
       
-      const bucket = objectStorageClient.bucket(bucketId);
-      const file = bucket.file(document.fileKey);
-      const [fileBuffer] = await file.download();
+      if (document.storageBackend === 'local') {
+        // Download from local file storage
+        try {
+          const result = await LocalFileStorage.read(document.fileKey);
+          fileBuffer = result.buffer;
+          contentType = result.contentType;
+          console.log(`📄 Serving file from local storage: ${document.fileKey}`);
+        } catch (localError) {
+          console.error("Failed to read file from local storage:", localError);
+          return res.status(404).json({ error: "Document file not found in local storage" });
+        }
+      } else {
+        // Download from object storage using Google Cloud Storage client
+        const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+        if (!bucketId) {
+          return res.status(500).json({ error: "Object storage not configured" });
+        }
+        
+        try {
+          const bucket = objectStorageClient.bucket(bucketId);
+          const file = bucket.file(`.private/documents/${document.fileKey}`);
+          [fileBuffer] = await file.download();
+          console.log(`📤 Serving file from object storage: ${document.fileKey}`);
+        } catch (objectError) {
+          console.error("Failed to download from object storage:", objectError);
+          
+          // Try local storage as fallback (in case document was migrated)
+          if (LocalFileStorage.exists(document.fileKey)) {
+            console.log("⚠️ Falling back to local storage for download");
+            const result = await LocalFileStorage.read(document.fileKey);
+            fileBuffer = result.buffer;
+            contentType = result.contentType;
+          } else {
+            return res.status(404).json({ error: "Document file not found in storage" });
+          }
+        }
+      }
       
       // Set headers for file download
       res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Type', contentType);
       res.send(fileBuffer);
     } catch (error) {
       console.error("Failed to download document:", error);

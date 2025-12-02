@@ -65,6 +65,23 @@ The application uses a modern full-stack architecture. The frontend is built wit
 | #12 | Work Order Part A editable for existing WOs | Changed isPartAReadOnly to check for ANY workOrderId | WorkOrderFormPage.tsx |
 | #13 | Duplicate "Assigned To" in Part A and Part B | Removed redundant editable "Assigned To" from Part B Section B2.1 | WorkOrderFormPage.tsx |
 | #14 | Stores/Spares bulk import undo not working | Added storesItem and spare entity types to undo conflict detection, state capture, and undo operations | server/routes/bulk.ts |
+| #15 | Component document uploads failing (Section F) | Fixed tree node IDs to use component.id, added storage methods for component documents, implemented local file storage fallback when object storage fails | ComponentRegisterAddEdit.tsx, persistentStorage.ts, routes.ts, localFileStorage.ts |
+
+## Component Document Storage (Section F: Drawings & Manuals)
+
+**Technical Implementation**:
+- Files are uploaded via POST /api/component-documents with multipart/form-data
+- System first attempts object storage (Google Cloud Storage), falls back to local filesystem if authentication fails
+- Local files saved to: `uploads/component-documents/{componentCode}/{timestamp}_{filename}`
+- Document metadata includes `storageBackend` field ('object' | 'local') to track storage location
+- Downloads check `storageBackend` and serve from appropriate location
+- Storage methods: getComponentDocuments, getComponentDocument, createComponentDocument, updateComponentDocument, deleteComponentDocument
+
+**Files Added/Modified**:
+- `server/services/localFileStorage.ts` - LocalFileStorage utility for filesystem operations
+- `server/persistentStorage.ts` - Added componentDocuments and componentClassRegulatory storage
+- `server/routes.ts` - Updated upload/download routes with fallback logic
+- `shared/schema.ts` - Added storageBackend field to componentDocuments table
 
 ## Part A vs Part B Field Separation (CRITICAL RULE)
 

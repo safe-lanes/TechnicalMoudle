@@ -1363,6 +1363,7 @@ export const componentDocuments = pgTable("component_documents", {
   canShipDownload: boolean("can_ship_download").notNull().default(false), // Ship users can download
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"), // Additional notes about the document
+  storageBackend: text("storage_backend").default("object"), // 'object' for cloud storage, 'local' for filesystem
 }, (table) => ({
   componentIdIdx: index("idx_doc_component_id").on(table.componentId),
   componentCodeIdx: index("idx_doc_component_code").on(table.componentCode),
