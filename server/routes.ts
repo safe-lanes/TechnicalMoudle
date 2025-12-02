@@ -1725,8 +1725,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      // Get component data (work orders store component ID in 'component' field)
-      const component = await storage.getComponent(workOrder.component);
+      // Get component data - work orders may store component ID, componentCode, or component name
+      // Try multiple lookup methods to ensure compatibility
+      let component = await storage.getComponent(workOrder.component);
+      
+      // Fallback: Try by componentCode if ID lookup fails
+      if (!component && workOrder.componentCode && workOrder.vesselId) {
+        component = await storage.getComponentByCode(workOrder.componentCode, workOrder.vesselId);
+      }
+      
+      // Fallback: Search by component name if still not found
+      if (!component) {
+        const allComponents = await storage.getComponents(workOrder.vesselId || undefined);
+        component = allComponents.find(c => 
+          c.name === workOrder.component || 
+          c.componentCode === workOrder.component ||
+          c.componentCode === workOrder.componentCode
+        );
+      }
+      
       if (!component) {
         return res.status(404).json({ error: "Component not found" });
       }

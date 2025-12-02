@@ -76,17 +76,33 @@ const JobsFormPage: React.FC = () => {
     if (jobContext) {
       const context = jobContext as any;
       if (context.templateData) {
+        const isRunningHours = context.templateData.maintenanceBasis === 'Running Hours';
         let normalizedFrequencyUnit = context.templateData.frequencyUnit;
-        if (context.templateData.maintenanceBasis === 'Running Hours') {
+        
+        if (isRunningHours) {
           normalizedFrequencyUnit = 'Hours';
         } else if (!normalizedFrequencyUnit || normalizedFrequencyUnit === 'Hours') {
           normalizedFrequencyUnit = 'Months';
         }
         
+        // For Running Hours jobs, use intervalRunningHour as frequency value
+        const frequencyValue = isRunningHours
+          ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
+          : (context.templateData.frequencyValue || '');
+        
         setTemplateData(prev => ({
           ...prev,
           ...context.templateData,
-          frequencyUnit: normalizedFrequencyUnit
+          // Map backend fields to frontend field names
+          woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
+          woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
+          componentName: context.templateData.componentName || '',
+          componentCode: context.templateData.componentCode || context.templateData.sfiCode || '',
+          frequencyValue: String(frequencyValue),
+          frequencyUnit: normalizedFrequencyUnit,
+          taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
+          nextDueReading: context.templateData.nextDueRH || '',
+          briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || ''
         }));
       }
     }
@@ -293,7 +309,15 @@ const JobsFormPage: React.FC = () => {
                   <ReadOnlyField label="Approver (Rank)" value={templateData.approver} />
                   <ReadOnlyField label="Job Priority" value={templateData.jobPriority} />
                   <ReadOnlyField label="Class Related" value={templateData.classRelated} />
-                  <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} />
+                  {/* Conditional Next Due field based on Maintenance Basis */}
+                  {templateData.maintenanceBasis === 'Running Hours' ? (
+                    <ReadOnlyField 
+                      label="Next Due RH" 
+                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'} 
+                    />
+                  ) : (
+                    <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} />
+                  )}
                   <ReadOnlyField label="Department" value={templateData.department} />
                   <ReadOnlyField label="Criticality" value={templateData.criticality} />
                   <ReadOnlyField label="Is Active" value={templateData.isActive} />

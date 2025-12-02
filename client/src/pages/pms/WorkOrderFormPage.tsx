@@ -362,7 +362,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       if (context.templateData) {
         // Determine the correct frequency unit based on maintenance basis
         let normalizedFrequencyUnit = context.templateData.frequencyUnit;
-        if (context.templateData.maintenanceBasis === 'Running Hours') {
+        const isRunningHours = context.templateData.maintenanceBasis === 'Running Hours';
+        
+        if (isRunningHours) {
           // Running Hours must always use Hours
           normalizedFrequencyUnit = 'Hours';
         } else if (!normalizedFrequencyUnit || normalizedFrequencyUnit === 'Hours') {
@@ -370,12 +372,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           normalizedFrequencyUnit = 'Months';
         }
         
+        // For Running Hours jobs, use intervalRunningHour as the frequency value
+        const frequencyValue = isRunningHours
+          ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
+          : (context.templateData.frequencyValue || '');
+        
         const normalizedTemplateData = {
           ...context.templateData,
+          // Map backend field names to frontend field names
+          woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
+          woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
+          componentName: context.templateData.componentName || '',
+          componentCode: context.templateData.componentCode || context.templateData.sfiCode || '',
           // Normalize frequency value from backend to ensure it's valid
-          frequencyValue: normalizeFrequencyValue(context.templateData.frequencyValue || ''),
+          frequencyValue: normalizeFrequencyValue(String(frequencyValue)),
           // Ensure frequency unit matches maintenance basis
-          frequencyUnit: normalizedFrequencyUnit
+          frequencyUnit: normalizedFrequencyUnit,
+          // For RH jobs, store the next due RH value
+          nextDueReading: context.templateData.nextDueRH || '',
+          // Map other fields
+          taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
+          assignedTo: context.templateData.assignedTo || '',
+          approver: context.templateData.approver || '',
+          department: context.templateData.department || '',
+          jobPriority: context.templateData.jobPriority || 'Medium',
+          classRelated: context.templateData.classRelated || 'No',
+          criticality: context.templateData.criticality || '',
+          isActive: context.templateData.isActive || 'Yes',
+          briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || '',
+          nextDueDate: context.templateData.nextDueDate || '',
+          requiredSpareParts: context.templateData.requiredSpareParts || [],
+          requiredTools: context.templateData.requiredTools || [],
+          safetyRequirements: context.templateData.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] }
         };
         
         setTemplateData(prev => ({
@@ -1450,17 +1478,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Next Due Date</Label>
-                  <Input
-                    type="date"
-                    value={templateData.nextDueDate}
-                    onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
-                    className="text-sm"
-                    disabled={isPartAReadOnly}
-                    data-testid="input-next-due-date"
-                  />
-                </div>
+                {/* Conditional Next Due field based on Maintenance Basis */}
+                {templateData.maintenanceBasis === 'Running Hours' ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Next Due RH</Label>
+                    <Input
+                      type="text"
+                      value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
+                      className="text-sm bg-gray-50"
+                      disabled={true}
+                      data-testid="input-next-due-rh"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-[#8798ad]">Next Due Date</Label>
+                    <Input
+                      type="date"
+                      value={templateData.nextDueDate}
+                      onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
+                      className="text-sm"
+                      disabled={isPartAReadOnly}
+                      data-testid="input-next-due-date"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]">Department</Label>
