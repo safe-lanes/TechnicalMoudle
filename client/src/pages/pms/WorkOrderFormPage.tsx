@@ -292,7 +292,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     completionDateTime: "",
     dateOfCompletion: "",
     runningHours: "",
-    assignedTo: "",
     performedBy: "",
     noOfPersons: "",
     totalTimeHours: "",
@@ -2252,23 +2251,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       placeholder="1045"
                       data-testid="input-start-time"
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Assigned To</Label>
-                    <Select
-                      value={executionData.assignedTo}
-                      onValueChange={(value) => handleExecutionChange('assignedTo', value)}
-                    >
-                      <SelectTrigger className="text-sm" data-testid="select-execution-assigned-to">
-                        <SelectValue placeholder="Select rank" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ranks.map((rank) => (
-                          <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="space-y-2">
