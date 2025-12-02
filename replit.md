@@ -107,6 +107,25 @@ Application should **ALWAYS** use `PersistentFileStorage` which saves all data t
    - Remove any fallback to `MemStorage`
    - Add clear logging to confirm which storage is active
 
+## Resilience Safeguards (December 2024)
+
+The following safeguards were implemented to prevent functionality regressions:
+
+| Safeguard | Location | Purpose |
+|-----------|----------|---------|
+| Cache Invalidation Helpers | `client/src/lib/cacheInvalidation.ts` | Domain-specific cache invalidation using predicate matching to catch all query patterns |
+| Finite staleTime | `client/src/lib/queryClient.ts` | Changed from Infinity to 2 minutes for eventual consistency |
+| Write Mutex | `server/persistentStorage.ts` | Queues file writes to prevent concurrent access corruption |
+| Data Normalization | `server/persistentStorage.ts` | Backfills missing fields in legacy records on load |
+| Form Hydration Guard | `client/src/pages/pms/WorkOrderFormPage.tsx` | Prevents late async data from overwriting user edits |
+
+**Usage after bulk imports/mutations:**
+```typescript
+import { invalidateAfterBulkImport } from '@/lib/cacheInvalidation';
+// After import succeeds:
+invalidateAfterBulkImport(templateType, vesselId);
+```
+
 ## Replit Error Prevention Strategies
 
 **1. Verification-first approach:**

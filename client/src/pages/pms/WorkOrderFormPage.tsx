@@ -230,6 +230,10 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
   
+  // Form hydration guard - prevent late async data from overwriting user edits
+  const hasUserTouchedForm = useRef(false);
+  const contextLoadedOnce = useRef(false);
+  
   // Approver workflow state
   const [currentWorkOrderStatus, setCurrentWorkOrderStatus] = useState<string>('');
   const [rejectionComments, setRejectionComments] = useState('');
@@ -356,8 +360,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   // Load work order data when workOrderContext is fetched
+  // HYDRATION GUARD: Only load context data once, and don't overwrite if user has touched the form
   useEffect(() => {
     if (workOrderContext) {
+      // Skip if user has already started editing the form
+      if (hasUserTouchedForm.current && contextLoadedOnce.current) {
+        console.log('[WorkOrderForm] Skipping context hydration - user has touched form');
+        return;
+      }
+      
       const context = workOrderContext as any;
       if (context.templateData) {
         // Determine the correct frequency unit based on maintenance basis
@@ -460,10 +471,16 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return prev;
         });
       }
+      
+      // Mark context as loaded once to prevent re-hydration
+      contextLoadedOnce.current = true;
     }
   }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
 
   const handleTemplateChange = (field: string, value: string) => {
+    // Mark form as touched by user to prevent late async data from overwriting
+    hasUserTouchedForm.current = true;
+    
     setTemplateData(prev => {
       let finalValue = value;
       

@@ -258,6 +258,10 @@ export class PersistentFileStorage implements IStorage {
   private importChangeLogs: ImportChangeLog[];
   private readonly MAX_IMPORTS_PER_VESSEL = 50;
   private componentCodeIndex: Map<string, Map<string, string>>; // vesselId → (componentCode → componentId)
+  
+  // Write mutex to prevent concurrent file writes from corrupting data
+  private writeLock: Promise<void> = Promise.resolve();
+  private writeCounter: number = 0;
 
   constructor(filePath: string = 'test-data.json', changeLogPath?: string) {
     this.dataFile = path.resolve(process.cwd(), filePath);
@@ -429,6 +433,101 @@ export class PersistentFileStorage implements IStorage {
             settings.locationBName = 'Location B';
           }
         });
+        
+        // =====================================================
+        // DATA NORMALIZATION - Backfill missing fields in legacy records
+        // This prevents "fixed" features from appearing broken due to
+        // old data formats missing new fields
+        // =====================================================
+        
+        // Normalize components - ensure all required fields exist
+        let componentsNormalized = 0;
+        Object.values(result.components).forEach((component: any) => {
+          if (!component) return;
+          let changed = false;
+          
+          // Ensure isActive field exists (default to true)
+          if (component.isActive === undefined) {
+            component.isActive = true;
+            changed = true;
+          }
+          
+          // Ensure runningHours is a number
+          if (component.runningHours === undefined || component.runningHours === null) {
+            component.runningHours = 0;
+            changed = true;
+          }
+          
+          // Ensure isParent field exists
+          if (component.isParent === undefined) {
+            component.isParent = component.parentId === null || component.parentId === undefined;
+            changed = true;
+          }
+          
+          if (changed) componentsNormalized++;
+        });
+        if (componentsNormalized > 0) {
+          console.log(`🔄 Normalized ${componentsNormalized} components with missing fields`);
+        }
+        
+        // Normalize jobs - ensure all required fields exist
+        let jobsNormalized = 0;
+        Object.values(result.jobs).forEach((job: any) => {
+          if (!job) return;
+          let changed = false;
+          
+          // Ensure frequency-related fields exist
+          if (job.frequencyValue === undefined && job.intervalValue !== undefined) {
+            job.frequencyValue = job.intervalValue;
+            changed = true;
+          }
+          if (job.frequencyValue === undefined && job.intervalRunningHour !== undefined) {
+            job.frequencyValue = job.intervalRunningHour;
+            changed = true;
+          }
+          
+          // Ensure isActive field exists
+          if (job.isActive === undefined) {
+            job.isActive = true;
+            changed = true;
+          }
+          
+          if (changed) jobsNormalized++;
+        });
+        if (jobsNormalized > 0) {
+          console.log(`🔄 Normalized ${jobsNormalized} jobs with missing fields`);
+        }
+        
+        // Normalize work orders - ensure consistent field names
+        let workOrdersNormalized = 0;
+        result.workOrders.forEach((wo: any) => {
+          if (!wo) return;
+          let changed = false;
+          
+          // Map legacy field names to current names
+          if (wo.woTemplateCode === undefined && wo.jobNo !== undefined) {
+            wo.woTemplateCode = wo.jobNo;
+            changed = true;
+          }
+          
+          // Ensure componentCode exists
+          if (wo.componentCode === undefined && wo.component !== undefined) {
+            // component might be a code or name - preserve it
+            wo.componentCode = wo.component;
+            changed = true;
+          }
+          
+          // Ensure status field exists
+          if (wo.status === undefined) {
+            wo.status = 'Active';
+            changed = true;
+          }
+          
+          if (changed) workOrdersNormalized++;
+        });
+        if (workOrdersNormalized > 0) {
+          console.log(`🔄 Normalized ${workOrdersNormalized} work orders with missing/legacy fields`);
+        }
         
         return result;
       } else {
@@ -989,15 +1088,29 @@ export class PersistentFileStorage implements IStorage {
   }
 
   private persistData(): void {
-    try {
-      const tempFile = `${this.dataFile}.tmp`;
-      fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2));
-      fs.renameSync(tempFile, this.dataFile);
-      this.saveChangeLogs();
-    } catch (error) {
-      console.error('❌ Error persisting data:', error);
-      throw error;
-    }
+    // Queue writes to prevent concurrent access to the file
+    const writeId = ++this.writeCounter;
+    
+    this.writeLock = this.writeLock.then(() => {
+      return new Promise<void>((resolve) => {
+        try {
+          const tempFile = `${this.dataFile}.tmp`;
+          fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2));
+          fs.renameSync(tempFile, this.dataFile);
+          this.saveChangeLogs();
+          resolve();
+        } catch (error) {
+          console.error(`❌ Error persisting data (write #${writeId}):`, error);
+          resolve(); // Resolve to not block subsequent writes
+        }
+      });
+    });
+  }
+  
+  // Async version that waits for the write to complete
+  private async persistDataAsync(): Promise<void> {
+    this.persistData();
+    await this.writeLock;
   }
 
   private loadChangeLogs(): ImportChangeLog[] {

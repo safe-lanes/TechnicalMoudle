@@ -48,6 +48,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { invalidateAfterBulkImport } from "@/lib/cacheInvalidation";
 import { LucideIcon } from "lucide-react";
 
 interface FieldMapping {
@@ -382,6 +383,9 @@ export default function UniformBulkUpload({
       
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', templateType] });
       
+      // Invalidate domain-specific caches to ensure fresh data displays
+      invalidateAfterBulkImport(templateType, vesselId);
+      
       if (onRefreshData) {
         onRefreshData();
       }
@@ -434,6 +438,9 @@ export default function UniformBulkUpload({
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', templateType] });
+      
+      // Invalidate domain-specific caches after undo
+      invalidateAfterBulkImport(templateType, vesselId);
       
       if (onRefreshData) {
         onRefreshData();
