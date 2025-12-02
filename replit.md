@@ -1,22 +1,23 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a comprehensive full-stack Technical Module for a maritime Planned Maintenance System (PMS). It provides robust solutions for managing technical equipment maintenance, scheduling, and performance tracking, with a focus on Certificate & Surveys, Defect Reporting, and core PMS operations. The system aims to offer a data-driven approach to maritime maintenance, improving efficiency and compliance for maritime professionals.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS), offering solutions for managing technical equipment maintenance, scheduling, and performance tracking. It focuses on Certificate & Surveys, Defect Reporting, and core PMS operations to provide a data-driven approach for improved efficiency and compliance in maritime maintenance.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
-The application utilizes a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter) for a mobile-first and responsive user experience. The backend is powered by Express.js (TypeScript).
+The application uses a modern full-stack architecture. The frontend is built with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter) for a mobile-first and responsive user experience. The backend is powered by Express.js (TypeScript).
 
 **UI/UX Decisions**:
 - Emphasizes a mobile-first, responsive design.
 - Uses AG Charts React for interactive data visualizations on the PMS Dashboard.
-- Work Order forms are designed as single scrollable pages with numbered subsections and professional maritime styling.
+- Work Order forms are single scrollable pages with numbered subsections and professional maritime styling.
 
 **Technical Implementations & Key Features**:
-- **Core PMS Business Logic**: Jobs are IMMUTABLE templates defining maintenance tasks, frequency, assigned rank, and resources. Work Orders are execution records generated from Jobs, following a lifecycle from Auto-Generated to Completed/Rejected.
+- **Core PMS Business Logic**: Jobs are immutable templates; Work Orders are execution records generated from Jobs with a defined lifecycle.
 - **Dual-Storage Architecture**: Dynamically switches between `PostgresStorage` (production) and `PersistentFileStorage` (development), managed by Drizzle ORM.
+- **PersistentFileStorage**: All data is saved to `test-data.json` and persists across application restarts.
 - **Vessel Context**: Dynamically fetches and auto-selects vessels.
 - **Service Layer Architecture**: Organizes business logic by domain.
 - **Component Hierarchy Design**: Components are structured hierarchically using a `parentId` field.
@@ -24,31 +25,29 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **PMS Submodules**: CRUD operations for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Per-Vessel PMS Settings**: Configurable lead times and grace periods per vessel.
-- **Job Cycle Updates**: Automatic updates to job fields (`lastDoneDate`, `nextDueDate`, `lastDoneRH`, `nextDueRH`) upon work order completion.
-- **Running Hours Module (Delta Propagation)**: When parent RH is updated, the delta is propagated to children's independent RH values. Child replacement resets RH to 0.
-- **Spare Parts Consumed**: Pre-loads required spares from jobs, allows manual entry, tracks consumption, and triggers inventory alerts.
+- **Job Cycle Updates**: Automatic updates to job fields upon work order completion.
+- **Running Hours Module (Delta Propagation)**: Updates to parent RH propagate delta to children's independent RH values. Child replacement resets RH to 0.
+- **Spare Parts Consumed**: Pre-loads required spares, allows manual entry, tracks consumption, and triggers inventory alerts.
 - **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management with dual locations, ROB/Min/Max, bulk upload, and transaction history.
 - **Work Order Sort Order**: Priority-based sorting.
 - **Auto-Generation Scheduler**: Automatically generates work orders for calendar and RH-based jobs.
 - **Components Module Job Display**: Displays relevant maintenance tasks from parent and descendant components.
 - **Admin Module**: Bulk data import, data purging, and a Fleet Admin Dashboard.
-- **Multi-Sheet Excel Bulk Import Templates**: Comprehensive 11-sheet system for Fleet and Vessel data with parsing for components, jobs, spares, and master data.
+- **Multi-Sheet Excel Bulk Import Templates**: 11-sheet system for Fleet and Vessel data with parsing for components, jobs, spares, and master data.
 - **Role-Based Access Control (RBAC)**: Implements three user roles (Ship, Office, PMS Admin) with `AuthContext`, `RoleGuard` components, and backend middleware for authorization and data isolation.
 - **Global Business Rules Compliance**: Enforces rules for Parent vs Sub-Component RH Authority, Jobs Belong to Sub-Components, Stores Module Isolation, Component Code Cascade Updates, Component Cascade Inactivate, RH Correction → WO Re-trigger, Grace Period → Overdue Transition, Job Frequency Change Impact, Spare Consumption Warning, and Multi-Department Approver Validation.
 - **Fleet Admin Workflow Enhancements**: Includes Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
-- **Database Schema Enhancements**: Introduction of new tables (e.g., `fleet_equipment_master`, `component_running_hours_log`, `audit_log`, `stores_items`, `pms_vessel_settings`) and enhancements to existing tables.
+- **Database Schema Enhancements**: Introduction of new tables and enhancements to existing tables.
 - **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only behavior for `component_maintenance_history`.
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values.
-- **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must always maintain exact parity for fields, labels, and order to preserve the frozen snapshot rule for Work Order Part A.
-- **Change Request Approval**: Approved changes are automatically applied to the target entity (component, spare, job, store).
+- **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must maintain exact parity for fields, labels, and order to preserve the frozen snapshot rule for Work Order Part A. Part A of Work Orders is read-only for existing work orders.
+- **Change Request Approval**: Approved changes are automatically applied to the target entity.
 - **Component Is Active Toggle**: Component edit forms include "Is Active" dropdown, "Vessel Code", and "Is Parent" fields.
 - **Bulk Import Type Routing**: Uses `UniformBulkUpload` component with `templateType` parameter for correct routing of Fleet Jobs and Fleet Spares imports.
-- **PersistentFileStorage**: The application uses `PersistentFileStorage` to save all data to `test-data.json`, ensuring data persists across application restarts.
+- **Resilience Safeguards**: Includes Cache Invalidation Helpers, finite staleTime for eventual consistency, Write Mutex for file writes, Data Normalization, and Form Hydration Guard.
 
-## Recent Bug Fixes (December 2024) - VERIFIED
-
-The following 12 issues were identified, fixed, and verified via end-to-end testing:
+## Recent Bug Fixes (December 2024)
 
 | Issue | Problem | Solution | Files Modified |
 |-------|---------|----------|----------------|
@@ -60,18 +59,49 @@ The following 12 issues were identified, fixed, and verified via end-to-end test
 | #6 | Unplanned WO missing component list | Fixed component fetch for dropdown | WorkOrderFormPage.tsx |
 | #7 | Unplanned WO save failing | Fixed save payload construction | server/routes.ts |
 | #8 | Change request approval not applying | Added automatic entity update on approval | server/routes/modifyPms.ts |
-| #9 | Running Hours delta propagation | Removed wrong inheritance logic, kept correct delta propagation in cascadeRunningHours | server/persistentStorage.ts |
+| #9 | Running Hours delta propagation | Removed wrong inheritance logic, kept correct delta propagation | server/persistentStorage.ts |
 | #10 | Missing Is Active toggle | Added dropdown to ComponentRegisterAddEdit.tsx | ComponentRegisterAddEdit.tsx |
 | #11 | Bulk imports all going to components | Replaced mock implementations with UniformBulkUpload | FleetJobsUpload.tsx, FleetSparesUpload.tsx |
-| #12 | Work Order Part A editable for existing WOs | Changed isPartAReadOnly to check for ANY workOrderId, not just linked jobs | WorkOrderFormPage.tsx |
+| #12 | Work Order Part A editable for existing WOs | Changed isPartAReadOnly to check for ANY workOrderId | WorkOrderFormPage.tsx |
+| #13 | Duplicate "Assigned To" in Part A and Part B | Removed redundant editable "Assigned To" from Part B Section B2.1 | WorkOrderFormPage.tsx |
+
+## Part A vs Part B Field Separation (CRITICAL RULE)
+
+**Work Order forms have TWO distinct sections with different purposes:**
+
+### Part A - Job Template Snapshot (READ-ONLY for existing WOs)
+Contains the frozen job template information captured at work order creation:
+- Job Title, Component Name, Component Code
+- Job Code, Maintenance Basis, Frequency
+- Task Type, **Assigned To (Rank)**, Approver (Rank)
+- Job Priority, Class Related, Next Due Date/RH
+- Department, Criticality, Is Active
+- Brief Work Description
+- Required Spare Parts, Required Tools, Safety Requirements
+
+**Part A "Assigned To (Rank)"** = WHO the job is ASSIGNED TO per the job template (IMMUTABLE)
+
+### Part B - Work Completion Record (EDITABLE)
+Contains execution-time information recorded when completing work:
+- Risk Assessment, Safety Checklists, Operational Forms
+- Start Date/Time, Completion Date/Time
+- **Performed By** = WHO ACTUALLY DID the work (NOT "Assigned To")
+- No of Persons, Total Time Taken, Manhours
+- Running Hours (if applicable)
+- Work Carried Out, Job Experience Notes
+- Spare Parts Consumed, Uploaded Documents
+
+**CRITICAL**: Part B does NOT have an "Assigned To" field. The assignment is already captured in Part A. Part B only has "Performed By" to record who actually executed the work.
+
+**DO NOT add "Assigned To" to Part B.** This was Bug #13 that was fixed by removing the duplicate field.
 
 ## Master-Slave Parity Protocol (MANDATORY)
 
 **THIS IS A NON-NEGOTIABLE RULE. NO EXCEPTIONS.**
 
-Jobs Form (`JobsFormPage.tsx`) is the **MASTER** template. Work Order Form Part A (`WorkOrderFormPage.tsx`) is the **SLAVE** that must mirror it exactly.
+`JobsFormPage.tsx` is the **MASTER** template. `WorkOrderFormPage.tsx` Part A is the **SLAVE** that must mirror it exactly.
 
-**Rule**: Any change to Jobs Form Part A MUST be immediately mirrored to Work Order Form Part A in the SAME action.
+**Rule**: Any change to Jobs Form Part A MUST be immediately mirrored to Work Order Form Part A.
 
 **Before completing ANY Part A modification:**
 1. Modify Jobs Form (master template)
@@ -79,50 +109,20 @@ Jobs Form (`JobsFormPage.tsx`) is the **MASTER** template. Work Order Form Part 
 3. Verify both forms display the same fields, labels, and order
 4. Never mark a Part A change as complete until BOTH forms are updated
 
-**Affected files that must always be updated together:**
+**Affected files:**
 - `client/src/pages/pms/JobsFormPage.tsx` (MASTER)
 - `client/src/pages/pms/WorkOrderFormPage.tsx` (SLAVE - Part A section only)
 
-**Checklist for Part A changes:**
-- [ ] Jobs Form templateData state updated
-- [ ] Work Order Form templateData state updated (identical fields)
-- [ ] Jobs Form labels updated
-- [ ] Work Order Form Part A labels updated (identical labels)
-- [ ] Jobs Form field order matches Work Order Form Part A field order
-- [ ] Both forms tested visually to confirm parity
-
-**Rationale**: Work Order Part A is a frozen snapshot of the Job template at creation time. If the forms diverge, the snapshot will be incomplete or inconsistent, violating the core PMS business logic.
-
 ## Part A Immutability Rule (CRITICAL)
 
-**Work Order Part A (Section A) is READ-ONLY for all existing work orders.**
+**Work Order Part A is READ-ONLY for all existing work orders.**
 
 - Part A contains the frozen snapshot of the job template
 - Once a work order is created, Part A fields CANNOT be modified
 - Only Part B (Work Completion Record) is editable
-- This is enforced by `isPartAReadOnly = resolvedMode === 'template' || !!workOrderId`
-- Part A is ONLY editable when creating a NEW work order (before first save)
+- Enforced by: `isPartAReadOnly = resolvedMode === 'template' || !!workOrderId`
 
-**NEVER modify Part A fields in WorkOrderFormPage.tsx to make them editable for existing work orders.**
-
-## Resilience Safeguards (December 2024)
-
-The following safeguards were implemented to prevent functionality regressions:
-
-| Safeguard | Location | Purpose |
-|-----------|----------|---------|
-| Cache Invalidation Helpers | `client/src/lib/cacheInvalidation.ts` | Domain-specific cache invalidation using predicate matching to catch all query patterns |
-| Finite staleTime | `client/src/lib/queryClient.ts` | Changed from Infinity to 2 minutes for eventual consistency |
-| Write Mutex | `server/persistentStorage.ts` | Queues file writes to prevent concurrent access corruption |
-| Data Normalization | `server/persistentStorage.ts` | Backfills missing fields in legacy records on load |
-| Form Hydration Guard | `client/src/pages/pms/WorkOrderFormPage.tsx` | Prevents late async data from overwriting user edits |
-
-**Usage after bulk imports/mutations:**
-```typescript
-import { invalidateAfterBulkImport } from '@/lib/cacheInvalidation';
-// After import succeeds:
-invalidateAfterBulkImport(templateType, vesselId);
-```
+**NEVER make Part A fields editable for existing work orders.**
 
 ## Database Persistence - JSON
 
@@ -155,11 +155,24 @@ Application should **ALWAYS** use `PersistentFileStorage` which saves all data t
 **3. Appropriate confidence levels:**
 - Use "I can see that..." for things I can directly observe in code
 - Use "Let me check..." for things that need verification
-- Avoid definitive claims without verification, especially for critical functionality like data persistence
+- Avoid definitive claims without verification
+
+**4. Honest acknowledgment:**
+- When discovering a previous response was wrong, immediately acknowledge it
+- Focus on fixing the actual problem rather than defending incorrect responses
 
 **Testing:**
-- During every test check if the saved data **actually appears** on the screen after a page reload
-- Be mindful of below root cause summary during testing
+- During every test check if saved data **actually appears** on the screen after a page reload
+
+## Root Cause Summary
+
+The system can **SAVE** data perfectly (backend works fine), but the frontend **NEVER LOADS** the saved data back. It's like saving files to a hard drive but never reading them - they're there in `test-data.json`, but the UI doesn't know they exist.
+
+**Always verify:**
+1. Data saves to storage (check `test-data.json`)
+2. API returns the saved data correctly
+3. Frontend fetches and displays the data
+4. Data persists after page reload
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
