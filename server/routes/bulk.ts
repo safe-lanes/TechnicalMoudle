@@ -3121,7 +3121,8 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
     } else if (warnings.length > 0) {
       status = 'warning';
       results.summary.warnings++;
-      console.log(`⚠️ Row ${rowNum} has warnings: ${JSON.stringify(warnings)}`);
+      results.summary.ok++;  // Rows with only warnings are still valid/importable
+      console.log(`⚠️ Row ${rowNum} has warnings (importable): ${JSON.stringify(warnings)}`);
     } else {
       results.summary.ok++;
       console.log(`✅ Row ${rowNum} is OK`);
