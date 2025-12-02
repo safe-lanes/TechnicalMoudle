@@ -15,7 +15,7 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - Work Order forms are designed as single scrollable pages with numbered subsections and professional maritime styling.
 
 **Technical Implementations & Key Features**:
-- **Core PMS Business Logic**: Jobs are immutable templates defining maintenance tasks, frequency, assigned rank, and resources. Work Orders are execution records generated from Jobs, following a lifecycle from Auto-Generated to Completed/Rejected.
+- **Core PMS Business Logic**: Jobs are IMMUTABLE templates defining maintenance tasks, frequency, assigned rank, and resources. Work Orders are execution records generated from Jobs, following a lifecycle from Auto-Generated to Completed/Rejected.
 - **Dual-Storage Architecture**: Dynamically switches between `PostgresStorage` (production) and `PersistentFileStorage` (development), managed by Drizzle ORM.
 - **Vessel Context**: Dynamically fetches and auto-selects vessels.
 - **Service Layer Architecture**: Organizes business logic by domain.
@@ -45,6 +45,121 @@ The application utilizes a modern full-stack architecture. The frontend is built
 - **Component Is Active Toggle**: Component edit forms include "Is Active" dropdown, "Vessel Code", and "Is Parent" fields.
 - **Bulk Import Type Routing**: Uses `UniformBulkUpload` component with `templateType` parameter for correct routing of Fleet Jobs and Fleet Spares imports.
 - **PersistentFileStorage**: The application uses `PersistentFileStorage` to save all data to `test-data.json`, ensuring data persists across application restarts.
+
+## Recent Bug Fixes (December 2024) - VERIFIED
+
+The following 12 issues were identified, fixed, and verified via end-to-end testing:
+
+| Issue | Problem | Solution | Files Modified |
+|-------|---------|----------|----------------|
+| #1 | Component edits not persisting | Fixed API endpoint to call storage.updateComponent() | server/routes.ts |
+| #2 | New components not appearing in tree | Fixed parent ID lookup and tree refresh | server/persistentStorage.ts |
+| #3 | Spares ROB history not tracking | Added transaction logging for ROB updates | server/routes.ts |
+| #4 | Spares component tree not displaying | Fixed hierarchical tree rendering | SparesPage.tsx |
+| #5 | Counter-based WO validation error | Fixed validation for Running Hours jobs | WorkOrderFormPage.tsx |
+| #6 | Unplanned WO missing component list | Fixed component fetch for dropdown | WorkOrderFormPage.tsx |
+| #7 | Unplanned WO save failing | Fixed save payload construction | server/routes.ts |
+| #8 | Change request approval not applying | Added automatic entity update on approval | server/routes/modifyPms.ts |
+| #9 | Running Hours delta propagation | Removed wrong inheritance logic, kept correct delta propagation in cascadeRunningHours | server/persistentStorage.ts |
+| #10 | Missing Is Active toggle | Added dropdown to ComponentRegisterAddEdit.tsx | ComponentRegisterAddEdit.tsx |
+| #11 | Bulk imports all going to components | Replaced mock implementations with UniformBulkUpload | FleetJobsUpload.tsx, FleetSparesUpload.tsx |
+| #12 | Work Order Part A editable for existing WOs | Changed isPartAReadOnly to check for ANY workOrderId, not just linked jobs | WorkOrderFormPage.tsx |
+
+## Master-Slave Parity Protocol (MANDATORY)
+
+**THIS IS A NON-NEGOTIABLE RULE. NO EXCEPTIONS.**
+
+Jobs Form (`JobsFormPage.tsx`) is the **MASTER** template. Work Order Form Part A (`WorkOrderFormPage.tsx`) is the **SLAVE** that must mirror it exactly.
+
+**Rule**: Any change to Jobs Form Part A MUST be immediately mirrored to Work Order Form Part A in the SAME action.
+
+**Before completing ANY Part A modification:**
+1. Modify Jobs Form (master template)
+2. **Immediately** modify Work Order Form Part A (frozen snapshot) with identical changes
+3. Verify both forms display the same fields, labels, and order
+4. Never mark a Part A change as complete until BOTH forms are updated
+
+**Affected files that must always be updated together:**
+- `client/src/pages/pms/JobsFormPage.tsx` (MASTER)
+- `client/src/pages/pms/WorkOrderFormPage.tsx` (SLAVE - Part A section only)
+
+**Checklist for Part A changes:**
+- [ ] Jobs Form templateData state updated
+- [ ] Work Order Form templateData state updated (identical fields)
+- [ ] Jobs Form labels updated
+- [ ] Work Order Form Part A labels updated (identical labels)
+- [ ] Jobs Form field order matches Work Order Form Part A field order
+- [ ] Both forms tested visually to confirm parity
+
+**Rationale**: Work Order Part A is a frozen snapshot of the Job template at creation time. If the forms diverge, the snapshot will be incomplete or inconsistent, violating the core PMS business logic.
+
+## Part A Immutability Rule (CRITICAL)
+
+**Work Order Part A (Section A) is READ-ONLY for all existing work orders.**
+
+- Part A contains the frozen snapshot of the job template
+- Once a work order is created, Part A fields CANNOT be modified
+- Only Part B (Work Completion Record) is editable
+- This is enforced by `isPartAReadOnly = resolvedMode === 'template' || !!workOrderId`
+- Part A is ONLY editable when creating a NEW work order (before first save)
+
+**NEVER modify Part A fields in WorkOrderFormPage.tsx to make them editable for existing work orders.**
+
+## Resilience Safeguards (December 2024)
+
+The following safeguards were implemented to prevent functionality regressions:
+
+| Safeguard | Location | Purpose |
+|-----------|----------|---------|
+| Cache Invalidation Helpers | `client/src/lib/cacheInvalidation.ts` | Domain-specific cache invalidation using predicate matching to catch all query patterns |
+| Finite staleTime | `client/src/lib/queryClient.ts` | Changed from Infinity to 2 minutes for eventual consistency |
+| Write Mutex | `server/persistentStorage.ts` | Queues file writes to prevent concurrent access corruption |
+| Data Normalization | `server/persistentStorage.ts` | Backfills missing fields in legacy records on load |
+| Form Hydration Guard | `client/src/pages/pms/WorkOrderFormPage.tsx` | Prevents late async data from overwriting user edits |
+
+**Usage after bulk imports/mutations:**
+```typescript
+import { invalidateAfterBulkImport } from '@/lib/cacheInvalidation';
+// After import succeeds:
+invalidateAfterBulkImport(templateType, vesselId);
+```
+
+## Database Persistence - JSON
+
+Application should **ALWAYS** use `PersistentFileStorage` which saves all data to `test-data.json` file, data persists across application restarts.
+
+**Technical Implementation:**
+1. Use PersistentFileStorage Class:
+   - Save all data to `test-data.json` in real-time
+   - Load existing data on application startup
+   - Handle all CRUD operations with automatic file updates
+
+2. Storage Initialization:
+   - Application should **ALWAYS** use `PersistentFileStorage`
+   - Remove any fallback to `MemStorage`
+   - Add clear logging to confirm which storage is active
+
+## Error Prevention Strategies
+
+**1. Verification-first approach:**
+- Always check actual code implementation before making claims about functionality
+- Test critical user workflows when possible rather than assuming they work
+- Use phrases like "Let me verify this" or "Based on the code I can examine" instead of definitive statements
+
+**2. Systematic checking for data persistence claims:**
+- Frontend: Verify save functions actually make API calls
+- Backend: Confirm API endpoints exist and persist to storage
+- Storage: Check that data actually gets written to `test-data.json`
+- End-to-end: Verify data survives application restarts
+
+**3. Appropriate confidence levels:**
+- Use "I can see that..." for things I can directly observe in code
+- Use "Let me check..." for things that need verification
+- Avoid definitive claims without verification, especially for critical functionality like data persistence
+
+**Testing:**
+- During every test check if the saved data **actually appears** on the screen after a page reload
+- Be mindful of below root cause summary during testing
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
