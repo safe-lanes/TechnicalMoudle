@@ -64,6 +64,7 @@ The application uses a modern full-stack architecture. The frontend is built wit
 | #11 | Bulk imports all going to components | Replaced mock implementations with UniformBulkUpload | FleetJobsUpload.tsx, FleetSparesUpload.tsx |
 | #12 | Work Order Part A editable for existing WOs | Changed isPartAReadOnly to check for ANY workOrderId | WorkOrderFormPage.tsx |
 | #13 | Duplicate "Assigned To" in Part A and Part B | Removed redundant editable "Assigned To" from Part B Section B2.1 | WorkOrderFormPage.tsx |
+| #14 | Stores/Spares bulk import undo not working | Added storesItem and spare entity types to undo conflict detection, state capture, and undo operations | server/routes/bulk.ts |
 
 ## Part A vs Part B Field Separation (CRITICAL RULE)
 

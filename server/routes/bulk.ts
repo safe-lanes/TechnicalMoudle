@@ -4670,6 +4670,10 @@ router.post('/undo/:historyId', async (req, res) => {
         currentEntity = await storage.getJob(log.entityId);
       } else if (log.entityType === 'workOrder') {
         currentEntity = await storage.getWorkOrder(log.entityId);
+      } else if (log.entityType === 'storesItem') {
+        currentEntity = await storage.getStoresItem(parseInt(log.entityId));
+      } else if (log.entityType === 'spare') {
+        currentEntity = await storage.getSpare(parseInt(log.entityId));
       }
       
       // If entity was deleted or doesn't exist (and it wasn't a created operation)
@@ -4742,6 +4746,10 @@ router.post('/undo/:historyId', async (req, res) => {
           currentState = await storage.getJob(log.entityId);
         } else if (log.entityType === 'workOrder') {
           currentState = await storage.getWorkOrder(log.entityId);
+        } else if (log.entityType === 'storesItem') {
+          currentState = await storage.getStoresItem(parseInt(log.entityId));
+        } else if (log.entityType === 'spare') {
+          currentState = await storage.getSpare(parseInt(log.entityId));
         }
         
         // Apply undo operation
@@ -4793,6 +4801,38 @@ router.post('/undo/:historyId', async (req, res) => {
             result.unarchived++;
             console.log(`  ✓ Unarchived work order ${log.entityId}`);
           }
+        } else if (log.entityType === 'storesItem') {
+          const storesItemId = parseInt(log.entityId);
+          if (log.operation === 'created') {
+            await storage.deleteStoresItem(storesItemId);
+            result.deleted++;
+            console.log(`  ✓ Deleted stores item ${log.entityId}`);
+          } else if (log.operation === 'updated') {
+            const previousData = log.previousData as any;
+            await storage.updateStoresItem(storesItemId, previousData);
+            result.restored++;
+            console.log(`  ✓ Restored stores item ${log.entityId}`);
+          } else if (log.operation === 'archived') {
+            await storage.updateStoresItem(storesItemId, { isActive: true, deleted: false });
+            result.unarchived++;
+            console.log(`  ✓ Unarchived stores item ${log.entityId}`);
+          }
+        } else if (log.entityType === 'spare') {
+          const spareId = parseInt(log.entityId);
+          if (log.operation === 'created') {
+            await storage.deleteSpare(spareId);
+            result.deleted++;
+            console.log(`  ✓ Deleted spare ${log.entityId}`);
+          } else if (log.operation === 'updated') {
+            const previousData = log.previousData as any;
+            await storage.updateSpare(spareId, previousData);
+            result.restored++;
+            console.log(`  ✓ Restored spare ${log.entityId}`);
+          } else if (log.operation === 'archived') {
+            await storage.updateSpare(spareId, { isActive: true });
+            result.unarchived++;
+            console.log(`  ✓ Unarchived spare ${log.entityId}`);
+          }
         }
         
         // Track this change for potential rollback
@@ -4836,6 +4876,12 @@ router.post('/undo/:historyId', async (req, res) => {
             } else if (change.log.entityType === 'workOrder') {
               await storage.updateWorkOrder(change.log.entityId, change.previousState);
               console.log(`  ↩️ Rolled back work order ${change.log.entityId}`);
+            } else if (change.log.entityType === 'storesItem') {
+              await storage.updateStoresItem(parseInt(change.log.entityId), change.previousState);
+              console.log(`  ↩️ Rolled back stores item ${change.log.entityId}`);
+            } else if (change.log.entityType === 'spare') {
+              await storage.updateSpare(parseInt(change.log.entityId), change.previousState);
+              console.log(`  ↩️ Rolled back spare ${change.log.entityId}`);
             }
           }
         } catch (rollbackError: any) {
