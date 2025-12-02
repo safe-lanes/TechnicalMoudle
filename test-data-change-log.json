@@ -3430,5 +3430,115 @@
     "newData": "{\"applicableVesselIds\":null,\"componentCode\":\"712.013.02\",\"componentId\":\"1764654582237_ogjjydukb\",\"componentName\":\"LO separator booster pumps No.02\",\"componentSpareCode\":\"SP-712.013.02-034\",\"createdAt\":\"2025-12-02T06:41:17.826Z\",\"critical\":\"No\",\"criticality\":null,\"dataScope\":\"vessel\",\"deleted\":false,\"drawingNo\":null,\"drawingNumber\":\"1001-2-R-9\",\"evidenceType\":null,\"fleetEquipmentCode\":null,\"fleetPartCode\":null,\"id\":34,\"ihm\":\"No\",\"isActive\":true,\"lastOrderDate\":null,\"leadTime\":null,\"location\":\"Engine Store\",\"location2\":\"Main Store\",\"maker\":\"Heishin Pump Wo\",\"makerCode\":\"MKR-000008\",\"manualName\":null,\"max\":null,\"min\":0,\"model\":null,\"note\":\"Original Equipment spare\",\"pageNumber\":\"33\",\"partCategory\":null,\"partCode\":\"SP-00034\",\"partName\":\"LO Sep Booster Pump Drive Coupling\",\"partNumber\":\"LSB-DC-902\",\"positionNumber\":\"8\",\"remarks\":null,\"rob\":6,\"robLocationA\":6,\"robLocationB\":0,\"scopeNotes\":null,\"specification\":\"Steel\",\"stockingNumber\":null,\"supplier\":null,\"unit\":null,\"unitCost\":null,\"uom\":\"SET\",\"updatedAt\":\"2025-12-02T06:41:17.826Z\",\"vesselId\":\"V001\"}",
     "checksum": "a2b4b13f5a7d39e614e0c9bc2b0b83e7fb9cf1e2121eddd44d350a65c7525d76",
     "createdAt": "2025-12-02T06:41:17.842Z"
+  },
+  {
+    "id": "b9b0427c-3970-41e3-ba94-69762f730e35",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "1",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.712Z\",\"deleted\":false,\"id\":1,\"isActive\":true,\"itemCode\":\"VS-001\",\"itemName\":\"Fire Extinguisher Powder ABC 6kg\",\"itemType\":\"stores\",\"locationA\":\"Bridge\",\"locationB\":\"Main Deck\",\"min\":\"16\",\"remarks\":null,\"rob\":\"24\",\"robLocationA\":\"12\",\"robLocationB\":\"8\",\"storesCategory\":null,\"uom\":\"pcs\",\"updatedAt\":\"2025-12-02T09:56:40.712Z\",\"vesselId\":\"V001\"}",
+    "checksum": "a5f3bbe6c7181aae1a3d2414ef5f960a419069ab428acf87dc2db9fe310dc825",
+    "createdAt": "2025-12-02T09:56:40.741Z"
+  },
+  {
+    "id": "f099def1-dcb0-4a07-87db-b25918694b3b",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "2",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.770Z\",\"deleted\":false,\"id\":2,\"isActive\":true,\"itemCode\":\"VS-002\",\"itemName\":\"Marine Paint Topside White 20L\",\"itemType\":\"stores\",\"locationA\":\"Paint Locker\",\"locationB\":\"Main Deck Locker\",\"min\":\"100\",\"remarks\":null,\"rob\":\"200\",\"robLocationA\":\"120\",\"robLocationB\":\"80\",\"storesCategory\":null,\"uom\":\"ltr\",\"updatedAt\":\"2025-12-02T09:56:40.770Z\",\"vesselId\":\"V001\"}",
+    "checksum": "f03a5914e8f8fd4df5eed61f1643d64fe41fb2eb6be14a327358a66b38ea3a35",
+    "createdAt": "2025-12-02T09:56:40.836Z"
+  },
+  {
+    "id": "a9c40569-5b39-4b14-96a7-e0d36fe5e423",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "3",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.855Z\",\"deleted\":false,\"id\":3,\"isActive\":true,\"itemCode\":\"VS-003\",\"itemName\":\"Electrical Cable NYY 2.5mm\",\"itemType\":\"stores\",\"locationA\":\"Electrical Store\",\"locationB\":\"Engine Store\",\"min\":\"400\",\"remarks\":null,\"rob\":\"800\",\"robLocationA\":\"500\",\"robLocationB\":\"300\",\"storesCategory\":null,\"uom\":\"m\",\"updatedAt\":\"2025-12-02T09:56:40.855Z\",\"vesselId\":\"V001\"}",
+    "checksum": "81e7b4bd1d03f493f10340cc7e0b3fb256ea79590ebebd5661a6ff606c782d3a",
+    "createdAt": "2025-12-02T09:56:40.881Z"
+  },
+  {
+    "id": "205e5d13-f6ea-49f2-81cc-16186350f43e",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "4",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.894Z\",\"deleted\":false,\"id\":4,\"isActive\":true,\"itemCode\":\"VS-004\",\"itemName\":\"Polypropylene Rope 16mm\",\"itemType\":\"stores\",\"locationA\":\"Bosun Locker\",\"locationB\":\"Forward Store\",\"min\":\"800\",\"remarks\":null,\"rob\":\"1500\",\"robLocationA\":\"900\",\"robLocationB\":\"600\",\"storesCategory\":null,\"uom\":\"m\",\"updatedAt\":\"2025-12-02T09:56:40.894Z\",\"vesselId\":\"V001\"}",
+    "checksum": "16a8f5043634bc88b40f947efbd1cc155fec838a76893dc65e0744d3b4f82279",
+    "createdAt": "2025-12-02T09:56:40.914Z"
+  },
+  {
+    "id": "620fcf56-dccf-45e9-9c8c-4bdf4ec9f16a",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "5",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.924Z\",\"deleted\":false,\"id\":5,\"isActive\":true,\"itemCode\":\"VS-005\",\"itemName\":\"First Aid Kit Complete\",\"itemType\":\"stores\",\"locationA\":\"Bridge\",\"locationB\":\"Main Deck\",\"min\":\"5\",\"remarks\":null,\"rob\":\"8\",\"robLocationA\":\"4\",\"robLocationB\":\"3\",\"storesCategory\":null,\"uom\":\"set\",\"updatedAt\":\"2025-12-02T09:56:40.924Z\",\"vesselId\":\"V001\"}",
+    "checksum": "bcbaaa1d0b486a2be3c72eeea06d735261aca3bee53e5fe35d34811a5872587d",
+    "createdAt": "2025-12-02T09:56:40.948Z"
+  },
+  {
+    "id": "653aea92-704b-476f-a00f-609cfbb328f9",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "6",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.963Z\",\"deleted\":false,\"id\":6,\"isActive\":true,\"itemCode\":\"VS-006\",\"itemName\":\"Safety Lifejacket Adult\",\"itemType\":\"stores\",\"locationA\":\"Life Jacket Locker\",\"locationB\":\"Bridge\",\"min\":\"35\",\"remarks\":null,\"rob\":\"50\",\"robLocationA\":\"30\",\"robLocationB\":\"20\",\"storesCategory\":null,\"uom\":\"pcs\",\"updatedAt\":\"2025-12-02T09:56:40.963Z\",\"vesselId\":\"V001\"}",
+    "checksum": "83a7ea2c5f2fc13013383ba66de0e044712db8ef0ae5ba4039fc66a4dd73b5b0",
+    "createdAt": "2025-12-02T09:56:40.987Z"
+  },
+  {
+    "id": "fb8ac5a8-a617-4184-b98d-30f27adb8434",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "7",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:40.998Z\",\"deleted\":false,\"id\":7,\"isActive\":true,\"itemCode\":\"VS-007\",\"itemName\":\"Marker Pen Black Permanent\",\"itemType\":\"stores\",\"locationA\":\"Stores Office\",\"locationB\":\"Bridge\",\"min\":\"40\",\"remarks\":null,\"rob\":\"80\",\"robLocationA\":\"50\",\"robLocationB\":\"30\",\"storesCategory\":null,\"uom\":\"box\",\"updatedAt\":\"2025-12-02T09:56:40.998Z\",\"vesselId\":\"V001\"}",
+    "checksum": "b3878e629b6325ee81d0d19ce23cda952ec6a2a78e81295df15b64aa9ba4b1b8",
+    "createdAt": "2025-12-02T09:56:41.025Z"
+  },
+  {
+    "id": "e868bee5-3f54-4a35-8eb9-0bbf0d08b605",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "8",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:41.036Z\",\"deleted\":false,\"id\":8,\"isActive\":true,\"itemCode\":\"VS-008\",\"itemName\":\"Sandpaper Sheet P240 Grit\",\"itemType\":\"stores\",\"locationA\":\"Paint Locker\",\"locationB\":\"Main Deck Locker\",\"min\":\"60\",\"remarks\":null,\"rob\":\"120\",\"robLocationA\":\"70\",\"robLocationB\":\"50\",\"storesCategory\":null,\"uom\":\"pack\",\"updatedAt\":\"2025-12-02T09:56:41.036Z\",\"vesselId\":\"V001\"}",
+    "checksum": "edf3c55fdc6c67235caa0218c3d4de5ed439ae4b4e27924ddec59b77d106fe90",
+    "createdAt": "2025-12-02T09:56:41.059Z"
+  },
+  {
+    "id": "37255e6e-dd5b-4fb2-a177-4426aa193d07",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "9",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:41.069Z\",\"deleted\":false,\"id\":9,\"isActive\":true,\"itemCode\":\"VS-009\",\"itemName\":\"Life Buoy Ring with Light\",\"itemType\":\"stores\",\"locationA\":\"Bridge\",\"locationB\":\"Stern Deck\",\"min\":\"8\",\"remarks\":null,\"rob\":\"12\",\"robLocationA\":\"6\",\"robLocationB\":\"4\",\"storesCategory\":null,\"uom\":\"pcs\",\"updatedAt\":\"2025-12-02T09:56:41.069Z\",\"vesselId\":\"V001\"}",
+    "checksum": "535b1f5a9742e8e27adbe8fbf3b273ab9873dfa0ba74c2a9178928cd6abf9670",
+    "createdAt": "2025-12-02T09:56:41.105Z"
+  },
+  {
+    "id": "80a991fd-ba83-46ee-aaa4-3a7c084c2051",
+    "importHistoryId": "33faf42c-6a3c-4787-a8f7-a3f7b82d08e2",
+    "operation": "created",
+    "entityType": "storesItem",
+    "entityId": "10",
+    "previousData": null,
+    "newData": "{\"applicationArea\":null,\"createdAt\":\"2025-12-02T09:56:41.137Z\",\"deleted\":false,\"id\":10,\"isActive\":true,\"itemCode\":\"VS-010\",\"itemName\":\"Electrical Fuse 32A Ceramic\",\"itemType\":\"stores\",\"locationA\":\"Electrical Store\",\"locationB\":\"Engine Store\",\"min\":\"100\",\"remarks\":null,\"rob\":\"200\",\"robLocationA\":\"120\",\"robLocationB\":\"80\",\"storesCategory\":null,\"uom\":\"box\",\"updatedAt\":\"2025-12-02T09:56:41.137Z\",\"vesselId\":\"V001\"}",
+    "checksum": "87aad30ed995b3c1a8628fbebc2509e5d9458cd58f9873ef974ae556d49227e7",
+    "createdAt": "2025-12-02T09:56:41.171Z"
   }
 ]
