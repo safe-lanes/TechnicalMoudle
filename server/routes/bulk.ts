@@ -3536,6 +3536,10 @@ async function performImport(
             totalRob = locARob + locBRob;
           }
           
+          // Parse individual ROB values for each location
+          const robLocationAVal = parseInt(row['Location A - ROB']) || 0;
+          const robLocationBVal = parseInt(row['Location B - ROB']) || 0;
+          
           const newSpare = await storage.createSpare({
             partCode: partCode,
             partName: String(row['Part Name']).trim(),
@@ -3545,6 +3549,8 @@ async function performImport(
             componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
             critical: criticalVal === 'Yes' || criticalVal === true ? 'Yes' : 'No',
             rob: totalRob,
+            robLocationA: robLocationAVal,
+            robLocationB: robLocationBVal,
             min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
             location: row['Location A'] ? String(row['Location A']).trim() : null,
             location2: row['Location B'] ? String(row['Location B']).trim() : null,
@@ -3597,6 +3603,10 @@ async function performImport(
             totalRobUpdate = locARob + locBRob;
           }
           
+          // Parse individual ROB values for each location
+          const robLocationAUpdate = row['Location A - ROB'] !== undefined ? (parseInt(row['Location A - ROB']) || 0) : existingSpare.robLocationA;
+          const robLocationBUpdate = row['Location B - ROB'] !== undefined ? (parseInt(row['Location B - ROB']) || 0) : existingSpare.robLocationB;
+          
           const updatedSpare = await storage.updateSpare(existingSpare.id, {
             partName: String(row['Part Name']).trim(),
             componentId: component.id,
@@ -3604,6 +3614,8 @@ async function performImport(
             componentName: component.name || '',
             critical: criticalValUpdate === 'Yes' || criticalValUpdate === true ? 'Yes' : 'No',
             rob: totalRobUpdate,
+            robLocationA: robLocationAUpdate,
+            robLocationB: robLocationBUpdate,
             min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
             location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
             location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
@@ -3647,6 +3659,10 @@ async function performImport(
             totalRobUpsert = locARob + locBRob;
           }
           
+          // Parse individual ROB values for each location
+          const robLocationAUpsert = parseInt(row['Location A - ROB']) || 0;
+          const robLocationBUpsert = parseInt(row['Location B - ROB']) || 0;
+          
           if (existingSpare) {
             // Update existing
             const updatedSpare = await storage.updateSpare(existingSpare.id, {
@@ -3656,6 +3672,8 @@ async function performImport(
               componentName: component.name || '',
               critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
               rob: totalRobUpsert || existingSpare.rob,
+              robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
+              robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
               min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
               location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
               location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
@@ -3693,6 +3711,8 @@ async function performImport(
               componentSpareCode: `SP-${componentCode}-${String(result.created + 1).padStart(3, '0')}`,
               critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
               rob: totalRobUpsert,
+              robLocationA: robLocationAUpsert,
+              robLocationB: robLocationBUpsert,
               min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : 0,
               location: row['Location A'] ? String(row['Location A']).trim() : null,
               location2: row['Location B'] ? String(row['Location B']).trim() : null,
