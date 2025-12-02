@@ -240,12 +240,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
   
   // Determine if Part A should be read-only (immutable)
+  // Per PMS business rules: Part A is a "frozen snapshot" of the job template
   // Part A is read-only when:
-  // 1. Viewing/editing an existing work order that's linked to a job (on-demand WO)
-  // 2. Viewing a job template (mode=template)
+  // 1. Viewing a job template (mode=template)
+  // 2. Editing ANY existing work order (has workOrderId) - Part A was frozen at creation
+  // Part A is ONLY editable when creating a NEW work order (no workOrderId)
   const context = workOrderContext as any;
-  const hasLinkedJob = !!(context?.job || context?.workOrder?.jobId);
-  const isPartAReadOnly = resolvedMode === 'template' || (!!workOrderId && hasLinkedJob);
+  const isPartAReadOnly = resolvedMode === 'template' || !!workOrderId;
   
   const isReadOnly = false; // General read-only flag (not currently used)
 
