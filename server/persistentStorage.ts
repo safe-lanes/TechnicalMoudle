@@ -4170,7 +4170,12 @@ export class PersistentFileStorage implements IStorage {
   }
 
   async createDefect(defect: InsertDefect): Promise<Defect> {
-    const id = String(this.data.counters.defectId++);
+    // Use provided ID if it follows the naming convention, otherwise generate a fallback
+    // The route layer should always provide a proper ID using generateDefectNumber()
+    const id = (defect as any).id && String((defect as any).id).match(/^DEF-[A-Z0-9]+-\d{4}-\d{3,}$/)
+      ? String((defect as any).id)
+      : String(this.data.counters.defectId++);
+    
     const newDefect: Defect = { 
       ...defect, 
       id,

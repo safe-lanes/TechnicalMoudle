@@ -2866,9 +2866,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/defects", async (req, res) => {
     try {
       const validatedData = insertDefectSchema.parse(req.body);
-      const defect = await storage.createDefect(validatedData);
+      
+      // Generate proper defect ID using naming convention
+      const { generateDefectNumber } = await import("./utils/defectNumbering");
+      const vesselId = validatedData.vesselId || 'UNKNOWN';
+      const generatedId = await generateDefectNumber(storage, vesselId);
+      
+      // Create defect with generated ID
+      const defectWithId = {
+        ...validatedData,
+        id: generatedId
+      };
+      
+      console.log(`[DefectRoutes] Creating defect with generated ID: ${generatedId} for vessel: ${vesselId}`);
+      
+      const defect = await storage.createDefect(defectWithId);
       res.status(201).json(defect);
     } catch (error: any) {
+      console.error('[DefectRoutes] Error creating defect:', error);
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid defect data", details: error.errors });
       }
