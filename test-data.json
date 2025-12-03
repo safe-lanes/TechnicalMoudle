@@ -8576,12 +8576,465 @@
       "descriptionHtml": null,
       "descriptionText": null,
       "equipment_key": "DECK|||"
+    },
+    "DEF-V001-2025-013": {
+      "vesselId": "V001",
+      "vesselName": "MV Test",
+      "issueDate": "2026-01-15",
+      "category": "Defect",
+      "defectType": "Pump / Compressor / Turbine Malfunction",
+      "description": "No.2 Ballast Pump mechanical seal failure - RECURRING ISSUE. Seal replaced in December 2025, now leaking again after only 30 days service. Symptoms identical to previous failure. Suggests underlying root cause not addressed - strainer upgrade was not completed.",
+      "descriptionHtml": "<p>No.2 Ballast Pump mechanical seal failure - <strong>RECURRING ISSUE</strong>. Seal replaced in December 2025, now leaking again after only 30 days service. Symptoms identical to previous failure. Suggests underlying root cause not addressed - strainer upgrade was not completed.</p>",
+      "descriptionText": "No.2 Ballast Pump mechanical seal failure - RECURRING ISSUE. Seal replaced in December 2025, now leaking again after only 30 days service. Symptoms identical to previous failure. Suggests underlying root cause not addressed - strainer upgrade was not completed.",
+      "actionTakenRequested": "Replace mechanical seal again. Complete strainer mesh upgrade as mandatory preventive action. Investigate root cause of premature seal failure.",
+      "targetCloseDate": "2026-02-15",
+      "dateCompleted": null,
+      "status": "In-Progress",
+      "priority": "High",
+      "critical": true,
+      "is_coc": false,
+      "severity": 3,
+      "source": "Internal",
+      "equipmentCategory": "Machinery",
+      "equipmentType": "Pump",
+      "equipmentMake": "Wartsila",
+      "equipmentModel": "W32",
+      "equipmentSerialNo": "WAR-BP-2020-0156",
+      "equipmentLocation": "Engine Room - Ballast Pump Room",
+      "equipmentSystem": "Ballast Water System",
+      "componentId": null,
+      "purchaseOrderRef": "PO-2026-0045",
+      "responsibleDept": "Chief Engineer",
+      "verifiedDate": null,
+      "defectCategory": "Ballast / Cargo / Tank Systems",
+      "viqVersion": "VIQ 7",
+      "viqRef": "6.4",
+      "viqChapter": "Cargo and Ballast Operations",
+      "viqSection": "Ballast Systems",
+      "sfiCodeRef": "522.1",
+      "immediateCause": {
+        "unsafeAct": [],
+        "unsafeCondition": [
+          "Seal wear due to abrasive particles in ballast water",
+          "Strainer mesh upgrade not completed as previously recommended"
+        ]
+      },
+      "immediateCauseExplanation": "Strainer upgrade recommended in previous defect was not completed due to parts availability. Abrasive particles continue to damage the seal.",
+      "rootCause": {
+        "individualFactor": [
+          "Previous preventive action not followed through"
+        ],
+        "systemFactor": [
+          "Preventive action tracking system not enforced",
+          "Parts procurement delay not escalated"
+        ]
+      },
+      "rootCauseExplanation": "Root cause analysis reveals that the strainer upgrade recommended in DEF-V001-2025-005 was not completed. This is a systemic failure in preventive action follow-up and parts procurement escalation.",
+      "equipment_key": "V001_BALLAST_PUMP_NO2",
+      "raisedById": "USR-CE-001",
+      "raisedByName": "John Peterson",
+      "raisedByRank": "Chief Engineer",
+      "operatingCondition": "PORT",
+      "locationText": "Singapore",
+      "occurrenceType": "BREAKDOWN",
+      "responsibleRole": "Chief Engineer",
+      "responsibleRoleId": "USR-CE-001",
+      "isDeferred": false,
+      "deferReason": null,
+      "deferNewTargetDate": null,
+      "deferApprovalRequired": true,
+      "reportToThirdParty": false,
+      "classReport": false,
+      "flagReport": false,
+      "portReport": false,
+      "reportReferenceNo": null,
+      "reportDate": null,
+      "vesselLocationType": "inPort",
+      "portName": "Singapore",
+      "latitude": "1.2900",
+      "longitude": "103.8500",
+      "vesselLocationDetail": "Jurong Port - Berth 5",
+      "reportedBy": "Chief Engineer",
+      "assignedTo": "2nd Engineer",
+      "reviewedBy": "Superintendent",
+      "closedBy": null,
+      "closedOn": null,
+      "closureComment": null,
+      "closureFiles": [],
+      "linkedDefects": [
+        "DEF-V001-2025-005"
+      ],
+      "notes": [
+        {
+          "noteId": "NOTE-013-1",
+          "noteText": "This is a recurring failure - same equipment, same failure mode as DEF-V001-2025-005 from November 2025. Escalated to Fleet Manager for review.",
+          "attachments": [],
+          "createdBy": "Chief Engineer",
+          "createdOn": "2026-01-15T08:00:00Z"
+        },
+        {
+          "noteId": "NOTE-013-2",
+          "noteText": "Fleet Manager confirmed: strainer upgrade now mandatory. Parts expedited from Rotterdam.",
+          "attachments": [],
+          "createdBy": "Fleet Manager",
+          "createdOn": "2026-01-16T14:30:00Z"
+        }
+      ],
+      "actions": [
+        {
+          "id": "ACT-013-1",
+          "actionType": "Corrective",
+          "proposedBy": "Chief Engineer",
+          "actionDescription": "Replace mechanical seal with upgraded high-grade silicon carbide seal",
+          "responsibility": "2nd Engineer",
+          "email": "2ndengineer@vessel.com",
+          "dueDate": "2026-01-20",
+          "dateCompleted": null,
+          "status": "In-Progress"
+        },
+        {
+          "id": "ACT-013-2",
+          "actionType": "Preventive",
+          "proposedBy": "Fleet Manager",
+          "actionDescription": "Install upgraded 100-micron strainer mesh (MANDATORY)",
+          "responsibility": "2nd Engineer",
+          "email": "2ndengineer@vessel.com",
+          "dueDate": "2026-01-25",
+          "dateCompleted": null,
+          "status": "Open"
+        },
+        {
+          "id": "ACT-013-3",
+          "actionType": "Preventive",
+          "proposedBy": "Superintendent",
+          "actionDescription": "Implement ballast water sediment sampling protocol",
+          "responsibility": "3rd Officer",
+          "email": "3rdofficer@vessel.com",
+          "dueDate": "2026-02-01",
+          "dateCompleted": null,
+          "status": "Open"
+        }
+      ],
+      "attachments": [
+        {
+          "name": "recurring_seal_failure_photo1.jpg",
+          "size": 2450000,
+          "type": "image/jpeg"
+        },
+        {
+          "name": "recurring_seal_failure_photo2.jpg",
+          "size": 1890000,
+          "type": "image/jpeg"
+        },
+        {
+          "name": "previous_defect_comparison.pdf",
+          "size": 540000,
+          "type": "application/pdf"
+        }
+      ],
+      "auditTrail": [
+        {
+          "action": "Created",
+          "userId": "USR-CE-001",
+          "userName": "John Peterson",
+          "timestamp": "2026-01-15T08:00:00Z",
+          "details": {
+            "status": "Open",
+            "linkedTo": "DEF-V001-2025-005"
+          }
+        },
+        {
+          "action": "Escalated",
+          "userId": "USR-CE-001",
+          "userName": "John Peterson",
+          "timestamp": "2026-01-15T08:30:00Z",
+          "details": {
+            "escalatedTo": "Fleet Manager",
+            "reason": "Recurring defect - systemic issue"
+          }
+        },
+        {
+          "action": "Updated",
+          "userId": "USR-FM-001",
+          "userName": "Robert Chen",
+          "timestamp": "2026-01-16T14:30:00Z",
+          "details": {
+            "status": "In-Progress",
+            "previousStatus": "Open",
+            "priority": "High"
+          }
+        }
+      ],
+      "id": "DEF-V001-2025-013",
+      "createdAt": "2025-12-03T10:41:37.431Z",
+      "updatedAt": "2025-12-03T10:43:12.958Z",
+      "holdReason": null,
+      "nextReviewDate": null,
+      "is_recurring": true
+    },
+    "DEF-V001-2025-014": {
+      "vesselId": "V001",
+      "vesselName": "MV Test",
+      "issueDate": "2026-01-20",
+      "category": "Defect",
+      "defectType": "Hydraulic System Fault",
+      "description": "Steering gear hydraulic oil high temperature alarm activated - RECURRING ISSUE. Temperature now reaching 62°C despite cooler cleaning performed in November 2025. Alarm set point is 60°C. Normal operating temp 40-45°C. Steering functionality unaffected but thermal stress on components increasing.",
+      "descriptionHtml": "<p>Steering gear hydraulic oil high temperature alarm activated - <strong>RECURRING ISSUE</strong>. Temperature now reaching 62°C despite cooler cleaning performed in November 2025. Alarm set point is 60°C. Normal operating temp 40-45°C. Steering functionality unaffected but thermal stress on components increasing.</p>",
+      "descriptionText": "Steering gear hydraulic oil high temperature alarm activated - RECURRING ISSUE. Temperature now reaching 62°C despite cooler cleaning performed in November 2025. Alarm set point is 60°C. Normal operating temp 40-45°C. Steering functionality unaffected but thermal stress on components increasing.",
+      "actionTakenRequested": "Replace hydraulic oil cooler completely. Conduct hydraulic oil analysis. Check relief valve settings and pump efficiency.",
+      "targetCloseDate": "2026-02-28",
+      "dateCompleted": null,
+      "status": "Open",
+      "priority": "High",
+      "critical": true,
+      "is_coc": false,
+      "severity": 3,
+      "source": "Internal",
+      "equipmentCategory": "Machinery",
+      "equipmentType": "Steering Gear",
+      "equipmentMake": "Rolls-Royce",
+      "equipmentModel": "Aquamaster US 205",
+      "equipmentSerialNo": "RR-SG-2018-0892",
+      "equipmentLocation": "Steering Gear Room",
+      "equipmentSystem": "Steering System",
+      "componentId": null,
+      "purchaseOrderRef": "PO-2026-0078",
+      "responsibleDept": "Chief Engineer",
+      "verifiedDate": null,
+      "defectCategory": "Steering Gear",
+      "viqVersion": "VIQ 7",
+      "viqRef": "5.9",
+      "viqChapter": "Navigation and Communications",
+      "viqSection": "Steering Arrangements",
+      "sfiCodeRef": "411.3",
+      "immediateCause": {
+        "unsafeAct": [],
+        "unsafeCondition": [
+          "Cooler tube scaling beyond surface cleaning capability",
+          "Hydraulic oil degradation affecting heat transfer"
+        ]
+      },
+      "immediateCauseExplanation": "Previous cleaning addressed external fouling but internal tube scaling remains. Hydraulic oil analysis pending to confirm oil condition.",
+      "rootCause": {
+        "individualFactor": [],
+        "systemFactor": [
+          "Cooler maintenance interval may be insufficient for current operating profile",
+          "Internal scaling not addressed during routine cleaning"
+        ]
+      },
+      "rootCauseExplanation": "The previous maintenance only addressed external fouling. Internal tube scaling requires chemical cleaning or replacement which was not performed. The cooler is approaching end of service life.",
+      "equipment_key": "V001_STEERING_GEAR",
+      "raisedById": "USR-CE-001",
+      "raisedByName": "John Peterson",
+      "raisedByRank": "Chief Engineer",
+      "operatingCondition": "SAILING",
+      "locationText": "Malacca Strait",
+      "occurrenceType": "ALARM",
+      "responsibleRole": "Chief Engineer",
+      "responsibleRoleId": "USR-CE-001",
+      "isDeferred": false,
+      "deferReason": null,
+      "deferNewTargetDate": null,
+      "deferApprovalRequired": true,
+      "reportToThirdParty": false,
+      "classReport": false,
+      "flagReport": false,
+      "portReport": false,
+      "reportReferenceNo": null,
+      "reportDate": null,
+      "vesselLocationType": "atSea",
+      "portName": null,
+      "latitude": "2.4500",
+      "longitude": "102.3000",
+      "vesselLocationDetail": "Malacca Strait - Westbound Traffic Lane",
+      "reportedBy": "Chief Engineer",
+      "assignedTo": "3rd Engineer",
+      "reviewedBy": null,
+      "closedBy": null,
+      "closedOn": null,
+      "closureComment": null,
+      "closureFiles": [],
+      "linkedDefects": [
+        "DEF-V001-2025-009"
+      ],
+      "notes": [
+        {
+          "noteId": "NOTE-014-1",
+          "noteText": "This is a recurrence of high temp issue from November 2025. Previous cleaning did not resolve the root cause. Cooler replacement now mandatory.",
+          "attachments": [],
+          "createdBy": "Chief Engineer",
+          "createdOn": "2026-01-20T06:00:00Z"
+        },
+        {
+          "noteId": "NOTE-014-2",
+          "noteText": "New cooler ordered from Rolls-Royce Singapore. Lead time 3 weeks. Meanwhile monitoring temp closely and reducing hydraulic pump output slightly.",
+          "attachments": [],
+          "createdBy": "Chief Engineer",
+          "createdOn": "2026-01-21T10:00:00Z"
+        },
+        {
+          "noteId": "NOTE-014-3",
+          "noteText": "Hydraulic oil sample sent to lab in Singapore. Results expected in 5 days.",
+          "attachments": [],
+          "createdBy": "2nd Engineer",
+          "createdOn": "2026-01-22T14:00:00Z"
+        }
+      ],
+      "actions": [
+        {
+          "id": "ACT-014-1",
+          "actionType": "Corrective",
+          "proposedBy": "Chief Engineer",
+          "actionDescription": "Replace hydraulic oil cooler with new unit",
+          "responsibility": "3rd Engineer",
+          "email": "3rdengineer@vessel.com",
+          "dueDate": "2026-02-15",
+          "dateCompleted": null,
+          "status": "Open"
+        },
+        {
+          "id": "ACT-014-2",
+          "actionType": "Investigation",
+          "proposedBy": "Chief Engineer",
+          "actionDescription": "Conduct hydraulic oil analysis to check for degradation",
+          "responsibility": "2nd Engineer",
+          "email": "2ndengineer@vessel.com",
+          "dueDate": "2026-01-28",
+          "dateCompleted": null,
+          "status": "In-Progress"
+        },
+        {
+          "id": "ACT-014-3",
+          "actionType": "Preventive",
+          "proposedBy": "Superintendent",
+          "actionDescription": "Update PMS to include annual chemical cleaning of cooler internals",
+          "responsibility": "Technical Superintendent",
+          "email": "techsupt@fleet.com",
+          "dueDate": "2026-03-01",
+          "dateCompleted": null,
+          "status": "Open"
+        },
+        {
+          "id": "ACT-014-4",
+          "actionType": "Monitoring",
+          "proposedBy": "Chief Engineer",
+          "actionDescription": "4-hourly temperature logging until cooler replacement",
+          "responsibility": "Watch Engineers",
+          "email": "engine@vessel.com",
+          "dueDate": "2026-02-15",
+          "dateCompleted": null,
+          "status": "In-Progress"
+        }
+      ],
+      "attachments": [
+        {
+          "name": "steering_gear_temp_trend.pdf",
+          "size": 890000,
+          "type": "application/pdf"
+        },
+        {
+          "name": "cooler_condition_photo.jpg",
+          "size": 3200000,
+          "type": "image/jpeg"
+        },
+        {
+          "name": "previous_defect_DEF-V001-2025-009_summary.pdf",
+          "size": 420000,
+          "type": "application/pdf"
+        },
+        {
+          "name": "oil_sample_request_form.pdf",
+          "size": 156000,
+          "type": "application/pdf"
+        }
+      ],
+      "auditTrail": [
+        {
+          "action": "Created",
+          "userId": "USR-CE-001",
+          "userName": "John Peterson",
+          "timestamp": "2026-01-20T06:00:00Z",
+          "details": {
+            "status": "Open",
+            "linkedTo": "DEF-V001-2025-009",
+            "recurring": true
+          }
+        },
+        {
+          "action": "Linked",
+          "userId": "USR-CE-001",
+          "userName": "John Peterson",
+          "timestamp": "2026-01-20T06:05:00Z",
+          "details": {
+            "linkedDefect": "DEF-V001-2025-009",
+            "relationship": "Recurring occurrence"
+          }
+        },
+        {
+          "action": "Action Added",
+          "userId": "USR-TS-001",
+          "userName": "David Wilson",
+          "timestamp": "2026-01-21T09:00:00Z",
+          "details": {
+            "actionId": "ACT-014-3",
+            "actionType": "Preventive"
+          }
+        }
+      ],
+      "id": "DEF-V001-2025-014",
+      "createdAt": "2025-12-03T10:42:45.405Z",
+      "updatedAt": "2025-12-03T10:43:14.715Z",
+      "holdReason": null,
+      "nextReviewDate": null,
+      "is_recurring": true
     }
   },
   "defectActions": [],
   "defectAttachments": [],
-  "recurringDefects": {},
-  "recurringDefectLinks": [],
+  "recurringDefects": {
+    "25": {
+      "id": 25,
+      "equipmentKey": "V001_BALLAST_PUMP_NO2",
+      "windowMonths": 12,
+      "occurrenceCount": 2,
+      "openCount": 2,
+      "vesselsAffected": 1,
+      "lastOccurrenceDate": "2026-01-15",
+      "hasCoc": false,
+      "mtbfDays": "61",
+      "updatedAt": "2025-12-03T10:43:51.567Z"
+    },
+    "26": {
+      "id": 26,
+      "equipmentKey": "V001_STEERING_GEAR",
+      "windowMonths": 12,
+      "occurrenceCount": 2,
+      "openCount": 2,
+      "vesselsAffected": 1,
+      "lastOccurrenceDate": "2026-01-20",
+      "hasCoc": false,
+      "mtbfDays": "56",
+      "updatedAt": "2025-12-03T10:43:51.589Z"
+    }
+  },
+  "recurringDefectLinks": [
+    {
+      "recurringId": 25,
+      "defectId": "DEF-V001-2025-005"
+    },
+    {
+      "recurringId": 25,
+      "defectId": "DEF-V001-2025-013"
+    },
+    {
+      "recurringId": 26,
+      "defectId": "DEF-V001-2025-009"
+    },
+    {
+      "recurringId": 26,
+      "defectId": "DEF-V001-2025-014"
+    }
+  ],
   "importHistory": [
     {
       "id": "dd012b53-aabf-494e-b52b-c5a8a80ef63d",
@@ -43323,7 +43776,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 25,
+    "recurringDefectId": 27,
     "auditLogId": 5,
     "pmsVesselSettingsId": 2,
     "storesItemId": 11,
