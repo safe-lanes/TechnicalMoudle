@@ -1,9 +1,38 @@
 import { storage } from "../storage";
-import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution } from "@shared/schema";
+import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
+
+/**
+ * Determine if a job is "critical" based on its jobPriority
+ * Critical and High priority jobs are considered critical for lead time purposes
+ */
+function isJobCritical(job: Job): boolean {
+  const priority = job.jobPriority?.toLowerCase() || '';
+  return priority === 'critical' || priority === 'high';
+}
+
+/**
+ * Get the appropriate calendar lead time in days for a job based on its priority
+ */
+function getCalendarLeadDays(job: Job, settings: PmsVesselSettings | null | undefined): number {
+  if (!settings) return 0; // No settings configured, use 0 lead time
+  return isJobCritical(job) 
+    ? settings.calendarLeadDaysCritical 
+    : settings.calendarLeadDaysNonCritical;
+}
+
+/**
+ * Get the appropriate RH lead time in hours for a job based on its priority
+ */
+function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined): number {
+  if (!settings) return 0; // No settings configured, use 0 lead time
+  return isJobCritical(job)
+    ? settings.rhLeadHoursCritical
+    : settings.rhLeadHoursNonCritical;
+}
 
 /**
  * Work Order Service
@@ -101,6 +130,7 @@ export class WorkOrderService {
 
   /**
    * Auto-generate work orders from due jobs (Calendar-based)
+   * Now properly applies configured vessel lead times for proactive WO generation
    * Returns statistics about how many work orders were generated
    */
   async autoGenerateWorkOrdersFromJobs(vesselId?: string): Promise<{
@@ -108,30 +138,53 @@ export class WorkOrderService {
     generated: number;
     workOrders: WorkOrder[];
   }> {
-    // Get all Calendar-based jobs that are due
-    const dueJobs = await jobService.getDueCalendarJobs(vesselId);
+    // Get ALL Calendar-based jobs (not just due ones - we apply lead time in the loop)
+    const allJobs = await jobService.getJobs(vesselId);
+    const calendarJobs = allJobs.filter(job => 
+      job.maintenanceBasis === 'Calendar' && 
+      job.nextDueDate
+    );
+    
+    // Fetch vessel PMS settings for lead time configuration
+    // Cache settings by vesselId to avoid repeated fetches
+    const settingsCache = new Map<string, PmsVesselSettings | null>();
+    const getSettingsForVessel = async (vId: string | null): Promise<PmsVesselSettings | null> => {
+      if (!vId) return null;
+      if (settingsCache.has(vId)) return settingsCache.get(vId) || null;
+      const settings = await storage.getPmsVesselSettings(vId);
+      settingsCache.set(vId, settings || null);
+      return settings || null;
+    };
     
     // Get all active work orders to prevent duplicates
+    // Key includes vesselId to prevent cross-vessel collision
     const allWorkOrders = await this.getWorkOrders(vesselId);
     const activeWorkOrderKeys = new Set(
       allWorkOrders
         .filter(wo => ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval'].includes(wo.status))
-        .map(wo => `${wo.componentCode}|${wo.jobTitle}`)
+        .map(wo => `${wo.vesselId}|${wo.componentCode}|${wo.jobTitle}`)
     );
     
     const results = {
-      checked: dueJobs.length,
+      checked: calendarJobs.length,
       generated: 0,
       workOrders: [] as WorkOrder[]
     };
     
-    // Check each job to see if it should generate a work order
-    for (const job of dueJobs) {
-      const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate);
+    // Check each job to see if it should generate a work order based on lead time
+    for (const job of calendarJobs) {
+      // Get vessel settings for this job's vessel
+      const settings = await getSettingsForVessel(job.vesselId);
+      
+      // Get appropriate lead time based on job priority
+      const leadTimeDays = getCalendarLeadDays(job, settings);
+      
+      // Apply lead time when checking if work order should be generated
+      const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate, new Date(), leadTimeDays);
       
       if (shouldGenerate) {
-        // O(1) duplicate check using Set
-        const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
+        // O(1) duplicate check using Set (key includes vesselId)
+        const workOrderKey = `${job.vesselId}|${job.componentCode}|${job.jobTitle}`;
         
         if (!activeWorkOrderKeys.has(workOrderKey)) {
           // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
@@ -168,12 +221,24 @@ export class WorkOrderService {
           results.generated++;
           results.workOrders.push(createdWO);
           
-          // Add to Set to prevent duplicate generation in same run
+          // Add to Set to prevent duplicate generation in same run (key includes vesselId)
           activeWorkOrderKeys.add(workOrderKey);
           
-          console.log(`✅ Auto-generated work order ${workOrderNo} for job ${job.jobNo} (${job.jobTitle})`);
+          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+          console.log(`✅ Auto-generated work order ${workOrderNo} for ${priorityLabel} job ${job.jobNo} (lead time: ${leadTimeDays} days)`);
         }
       }
+    }
+    
+    // Log settings used for transparency
+    if (settingsCache.size > 0) {
+      Array.from(settingsCache.entries()).forEach(([vId, settings]) => {
+        if (settings) {
+          console.log(`📋 [Calendar WO Gen] Vessel ${vId} lead times: Critical=${settings.calendarLeadDaysCritical}d, Non-Critical=${settings.calendarLeadDaysNonCritical}d`);
+        } else {
+          console.log(`⚠️ [Calendar WO Gen] Vessel ${vId} has no PMS settings configured, using 0 day lead time`);
+        }
+      });
     }
     
     return results;

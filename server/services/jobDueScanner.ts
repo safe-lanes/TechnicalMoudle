@@ -2,7 +2,26 @@ import { workOrderService } from "./workOrderService";
 import { jobService } from "./jobService";
 import { storage } from "../storage";
 import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
-import type { InsertWorkOrder, Job } from "@shared/schema";
+import type { InsertWorkOrder, Job, PmsVesselSettings } from "@shared/schema";
+
+/**
+ * Determine if a job is "critical" based on its jobPriority
+ * Critical and High priority jobs are considered critical for lead time purposes
+ */
+function isJobCritical(job: Job): boolean {
+  const priority = job.jobPriority?.toLowerCase() || '';
+  return priority === 'critical' || priority === 'high';
+}
+
+/**
+ * Get the appropriate RH lead time in hours for a job based on its priority
+ */
+function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined): number {
+  if (!settings) return 0; // No settings configured, use 0 lead time
+  return isJobCritical(job)
+    ? settings.rhLeadHoursCritical
+    : settings.rhLeadHoursNonCritical;
+}
 
 /**
  * Job Due Scanner Service
@@ -97,6 +116,7 @@ export class JobDueScannerService {
 
   /**
    * Process Running Hours-based jobs and generate work orders when due
+   * Now properly applies configured vessel lead times for proactive WO generation
    */
   private async processRunningHoursJobs(): Promise<{ checked: number; generated: number }> {
     const allJobs = await storage.getJobs();
@@ -106,12 +126,24 @@ export class JobDueScannerService {
       parseFloat(job.nextDueRH) > 0
     );
 
+    // Fetch vessel PMS settings for lead time configuration
+    // Cache settings by vesselId to avoid repeated fetches
+    const settingsCache = new Map<string, PmsVesselSettings | null>();
+    const getSettingsForVessel = async (vId: string | null): Promise<PmsVesselSettings | null> => {
+      if (!vId) return null;
+      if (settingsCache.has(vId)) return settingsCache.get(vId) || null;
+      const settings = await storage.getPmsVesselSettings(vId);
+      settingsCache.set(vId, settings || null);
+      return settings || null;
+    };
+
     // Get all active work orders to prevent duplicates
+    // Key includes vesselId to prevent cross-vessel collision
     const allWorkOrders = await storage.getWorkOrders();
     const activeWorkOrderKeys = new Set(
       allWorkOrders
         .filter(wo => ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval'].includes(wo.status))
-        .map(wo => `${wo.componentCode}|${wo.jobTitle}`)
+        .map(wo => `${wo.vesselId}|${wo.componentCode}|${wo.jobTitle}`)
     );
 
     let generated = 0;
@@ -133,9 +165,22 @@ export class JobDueScannerService {
       const currentRH = parseFloat(rhSource.runningHours || '0');
       const nextDueRH = parseFloat(job.nextDueRH || '0');
 
-      // Check if job is due (current RH >= next due RH)
-      if (currentRH >= nextDueRH) {
-        const workOrderKey = `${job.componentCode}|${job.jobTitle}`;
+      // Get vessel settings for this job's vessel
+      const settings = await getSettingsForVessel(job.vesselId);
+      
+      // Get appropriate lead time based on job priority
+      const leadTimeHours = getRhLeadHours(job, settings);
+      
+      // Calculate trigger threshold: nextDueRH - leadTimeHours
+      // Clamp to 0 to prevent negative triggers (e.g., if leadTime > nextDueRH)
+      // Work order generates when current RH reaches this threshold
+      const triggerRH = Math.max(0, nextDueRH - leadTimeHours);
+
+      // Check if job is due (current RH >= trigger threshold)
+      // This means WO generates leadTimeHours BEFORE reaching nextDueRH
+      if (currentRH >= triggerRH) {
+        // Duplicate key includes vesselId to prevent cross-vessel collision
+        const workOrderKey = `${job.vesselId}|${job.componentCode}|${job.jobTitle}`;
         
         if (!activeWorkOrderKeys.has(workOrderKey)) {
           // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
@@ -174,12 +219,24 @@ export class JobDueScannerService {
           await workOrderService.createWorkOrder(workOrderData);
           generated++;
           
-          // Add to Set to prevent duplicate generation in same run
+          // Add to Set to prevent duplicate generation in same run (key includes vesselId)
           activeWorkOrderKeys.add(workOrderKey);
           
-          console.log(`✅ Auto-generated RH work order ${workOrderNo} for job ${job.jobNo} (${job.jobTitle}) at ${currentRH} RH (due: ${nextDueRH} RH)`);
+          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+          console.log(`✅ Auto-generated RH work order ${workOrderNo} for ${priorityLabel} job ${job.jobNo} at ${currentRH} RH (trigger: ${triggerRH} RH, due: ${nextDueRH} RH, lead: ${leadTimeHours} hrs)`);
         }
       }
+    }
+
+    // Log settings used for transparency
+    if (settingsCache.size > 0) {
+      Array.from(settingsCache.entries()).forEach(([vId, settings]) => {
+        if (settings) {
+          console.log(`📋 [RH WO Gen] Vessel ${vId} lead times: Critical=${settings.rhLeadHoursCritical}hrs, Non-Critical=${settings.rhLeadHoursNonCritical}hrs`);
+        } else {
+          console.log(`⚠️ [RH WO Gen] Vessel ${vId} has no PMS settings configured, using 0 hour lead time`);
+        }
+      });
     }
 
     return { checked: rhJobs.length, generated };

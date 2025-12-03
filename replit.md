@@ -66,6 +66,7 @@ The application uses a modern full-stack architecture. The frontend is built wit
 | #13 | Duplicate "Assigned To" in Part A and Part B | Removed redundant editable "Assigned To" from Part B Section B2.1 | WorkOrderFormPage.tsx |
 | #14 | Stores/Spares bulk import undo not working | Added storesItem and spare entity types to undo conflict detection, state capture, and undo operations | server/routes/bulk.ts |
 | #15 | Component document uploads failing (Section F) | Fixed tree node IDs to use component.id, added storage methods for component documents, implemented local file storage fallback when object storage fails | ComponentRegisterAddEdit.tsx, persistentStorage.ts, routes.ts, localFileStorage.ts |
+| #16 | Work order auto-generation ignoring configured lead times | Updated autoGenerateWorkOrdersFromJobs and processRunningHoursJobs to fetch vessel PMS settings and apply lead times (7d/14d for calendar, 50hrs/100hrs for RH). Added vesselId to duplicate keys, clamped RH trigger to prevent negative values | workOrderService.ts, jobDueScanner.ts |
 
 ## Component Document Storage (Section F: Drawings & Manuals)
 
