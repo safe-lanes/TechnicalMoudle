@@ -12,6 +12,7 @@ import { storage, calculateRecordChecksum, sortObjectKeys } from '../storage';
 import { getSFIName } from '../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dateUtils';
 import { ObjectStorageService, ObjectNotFoundError } from '../objectStorage';
+import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from '../utils/workOrderNumbering';
 
 const router = Router();
 
@@ -4520,11 +4521,14 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
   
   // Auto-resolve jobId by matching component and jobTitle
   let jobId = null;
+  let matchingJob = null;
   const jobTitle = row['Job_Title'] || '';
-  if (component && jobTitle && vesselId) {
+  const effectiveVesselId = vesselId || 'V001';
+  
+  if (component && jobTitle) {
     try {
-      const jobs = await storage.getJobs(vesselId);
-      const matchingJob = jobs.find(j => 
+      const jobs = await storage.getJobs(effectiveVesselId);
+      matchingJob = jobs.find(j => 
         j.componentId === component.id && 
         j.jobTitle === jobTitle
       );
@@ -4534,16 +4538,28 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
       }
     } catch (error) {
       console.error('Failed to auto-resolve jobId during bulk import:', error);
-      // Continue without jobId if resolution fails
     }
   }
   
+  // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+  // Use job code from matched job, or from Excel row, or generate unplanned format
+  let workOrderNo: string;
+  const jobCode = matchingJob?.jobNo || row['Job_Code'];
+  
+  if (jobCode) {
+    // Planned work order: use job code to generate proper format
+    workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, effectiveVesselId);
+  } else {
+    // Unplanned work order: use UWO format
+    workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId);
+  }
+  
   const workOrderData = {
-    vesselId: vesselId || 'V001',
+    vesselId: effectiveVesselId,
     component: component?.name || row['Component_Name'] || componentCode,
     componentCode: componentCode,
-    jobId: jobId, // Store resolved jobId for reliable lead time hydration
-    workOrderNo: row['Job_Code'] || `WO-${Date.now()}`, // Use Job_Code if provided, else temporary
+    jobId: jobId,
+    workOrderNo: workOrderNo,
     templateCode: templateCode,
     jobTitle: jobTitle,
     assignedTo: row['Responsible_Rank'] || '',
@@ -4563,6 +4579,7 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
 }
 
 // Helper function to update work order from Excel row
+// NOTE: workOrderNo is NOT updated from Excel - it follows the spec format and is generated at creation time
 async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   const updateData: any = {};
   
@@ -4573,8 +4590,7 @@ async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   if (row['Responsible_Rank']) updateData.assignedTo = row['Responsible_Rank'];
   if (row['Criticality']) updateData.classRelated = row['Criticality'];
   if (row['Job_Description']) updateData.briefWorkDescription = row['Job_Description'];
-  // Map new fields to existing schema where possible
-  if (row['Job_Code']) updateData.workOrderNo = row['Job_Code'];
+  // NOTE: Do NOT update workOrderNo from Job_Code - WO numbers follow spec format and cannot be overwritten
 
   return await storage.updateWorkOrder(workOrderId, updateData);
 }

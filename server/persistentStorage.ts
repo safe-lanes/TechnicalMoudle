@@ -757,6 +757,9 @@ export class PersistentFileStorage implements IStorage {
     });
 
     // Add seed work orders
+    // NOTE: Using spec-compliant format <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+    // For seed data without job codes, we use a synthetic job code based on component
+    const currentYear = new Date().getFullYear();
     const seedWorkOrders: WorkOrder[] = [
       {
         id: "1",
@@ -764,7 +767,7 @@ export class PersistentFileStorage implements IStorage {
         component: "Main Engine",
         componentCode: "ME001",
         jobId: null,
-        workOrderNo: "WO-001",
+        workOrderNo: `ME001-SVC.WO-${currentYear}-001`,
         workOrderType: "Planned",
         templateCode: null,
         executionId: null,
@@ -845,7 +848,7 @@ export class PersistentFileStorage implements IStorage {
         component: "Auxiliary Engine #1",
         componentCode: "AE001",
         jobId: null,
-        workOrderNo: "WO-002",
+        workOrderNo: `AE001-SVC.WO-${currentYear}-001`,
         workOrderType: "Planned",
         templateCode: null,
         executionId: null,
@@ -2384,13 +2387,41 @@ export class PersistentFileStorage implements IStorage {
           // Only create WO if no active one exists
           if (!activeWOExists) {
             const today = new Date().toISOString().split('T')[0];
+            const woId = String(workingData.counters.workOrderId++);
+            
+            // Generate spec-compliant WO number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+            // Fallback chain: job.jobNo -> componentCode-JOB -> UNKNOWN-JOB
+            const jobCode = job.jobNo || (child.componentCode ? `${child.componentCode}-JOB` : 'UNKNOWN-JOB');
+            const currentYear = new Date().getFullYear();
+            const vesselIdForWO = child.vesselId || parent.vesselId || '';
+            
+            // Find existing WOs for this job in current year to determine running number
+            const existingWOsForJob = workingData.workOrders.filter(wo => {
+              const plannedPattern = new RegExp(`^${jobCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.WO-${currentYear}-(\\d+)$`);
+              return plannedPattern.test(wo.workOrderNo);
+            });
+            
+            let maxRunningNumber = 0;
+            existingWOsForJob.forEach(wo => {
+              const match = wo.workOrderNo.match(/-(\d+)$/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxRunningNumber) {
+                  maxRunningNumber = num;
+                }
+              }
+            });
+            
+            const nextRunningNumber = maxRunningNumber + 1;
+            const workOrderNo = `${jobCode}.WO-${currentYear}-${String(nextRunningNumber).padStart(3, '0')}`;
+            
             const newWO: WorkOrder = {
-              id: String(workingData.counters.workOrderId++),
-              vesselId: child.vesselId || parent.vesselId || '',
+              id: woId,
+              vesselId: vesselIdForWO,
               component: child.name || '',
               componentCode: child.componentCode || '',
               componentId: child.id,
-              workOrderNo: `WO-${String(workingData.counters.workOrderId).padStart(6, '0')}`,
+              workOrderNo: workOrderNo,
               templateCode: job.jobNo ?? null,
               executionId: null,
               jobTitle: job.jobTitle ?? '',

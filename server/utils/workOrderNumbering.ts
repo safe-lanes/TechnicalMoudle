@@ -23,12 +23,15 @@ export async function generatePlannedWorkOrderNumber(
 ): Promise<string> {
   const currentYear = new Date().getFullYear();
   
+  // Ensure job code is never empty - fallback to UNKNOWN-JOB if needed
+  const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : 'UNKNOWN-JOB';
+  
   // Find all WOs for this job in current year with planned numbering format
   const allWorkOrders = await storage.getWorkOrders(vesselId);
   
   const existingWOsForJob = allWorkOrders.filter(wo => {
     // Match planned WO format: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
-    const plannedPattern = new RegExp(`^${escapeRegex(jobCode)}\\.WO-${currentYear}-(\\d+)$`);
+    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}\\.WO-${currentYear}-(\\d+)$`);
     return plannedPattern.test(wo.workOrderNo);
   });
   
@@ -47,7 +50,7 @@ export async function generatePlannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${jobCode}.WO-${currentYear}-${paddedNumber}`;
+  return `${safeJobCode}.WO-${currentYear}-${paddedNumber}`;
 }
 
 /**
