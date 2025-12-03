@@ -1973,16 +1973,23 @@ export class PersistentFileStorage implements IStorage {
     let updated = 0;
     
     for (const component of components) {
-      const key = component.componentCode;
-      if (key && this.data.components[key]) {
+      const componentCode = component.componentCode;
+      const vesselId = component.vesselId || 'V001';
+      
+      // Find existing component by componentCode + vesselId (vessel-scoped uniqueness)
+      // This allows the same componentCode to exist in different vessels
+      const existing = componentCode ? Object.values(this.data.components).find(
+        c => c && c.componentCode === componentCode && c.vesselId === vesselId
+      ) : null;
+      
+      if (existing) {
         // Update existing component
-        const existing = this.data.components[key];
         const updatedComponent = {
           ...existing,
           ...component,
           id: existing.id // Preserve the original ID
         };
-        this.data.components[key] = updatedComponent;
+        this.data.components[existing.id] = updatedComponent;
         
         // Update index if vesselId changed
         if (component.vesselId !== undefined && component.vesselId !== existing.vesselId && existing.componentCode) {
@@ -3731,7 +3738,17 @@ export class PersistentFileStorage implements IStorage {
     const now = new Date();
     
     for (const { jobNo, data } of jobs) {
-      const job = Object.values(this.data.jobs).find(j => j.jobNo === jobNo);
+      // Find job by jobNo, scoped to vesselId if provided in data
+      // This allows the same jobNo to exist in different vessels
+      const vesselId = data.vesselId;
+      const job = Object.values(this.data.jobs).find(j => {
+        if (j.jobNo !== jobNo) return false;
+        // If vesselId provided in data, match it for vessel-scoped lookup
+        if (vesselId !== undefined) {
+          return j.vesselId === vesselId;
+        }
+        return true;
+      });
       if (job) {
         const updatedJob = {
           ...job,
@@ -3754,7 +3771,12 @@ export class PersistentFileStorage implements IStorage {
     const now = new Date();
     
     for (const job of jobs) {
-      const existingJob = Object.values(this.data.jobs).find(j => j.jobNo === job.jobNo);
+      // Find existing job by jobNo + vesselId (vessel-scoped uniqueness)
+      // This allows the same jobNo to exist in different vessels
+      const vesselId = job.vesselId;
+      const existingJob = Object.values(this.data.jobs).find(
+        j => j.jobNo === job.jobNo && j.vesselId === vesselId
+      );
       
       if (existingJob) {
         this.data.jobs[existingJob.id] = {
