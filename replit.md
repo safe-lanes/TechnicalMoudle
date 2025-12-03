@@ -40,6 +40,7 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Part A Immutability Rule**: Work Order Part A is READ-ONLY for all existing work orders, capturing a frozen snapshot of the job template.
 - **Component Document Storage (Section F)**: Handles file uploads with an object storage fallback to the local filesystem.
 - **Work Order Naming Rules**: All work orders must follow naming conventions: Planned = `<JOB CODE>.WO-<YEAR>-<NNN>` (e.g., `MKR-SE-00005.WO-2025-001`), Unplanned = `UWO-<VESSEL>-<YEAR>-<NNN>`. Use `generatePlannedWorkOrderNumber()` and `generateUnplannedWorkOrderNumber()` from `server/utils/workOrderNumbering.ts`. Storage layer logs warnings for non-compliant names but preserves data to maintain historical integrity.
+- **Defect ID Naming Convention**: All defects must follow the pattern `DEF-<VESSEL>-<YEAR>-<NNN>` (e.g., `DEF-V001-2025-001`). IDs are auto-generated in the backend POST route using `generateDefectNumber()` from `server/utils/defectNumbering.ts`. The storage layer validates provided IDs match this pattern before accepting them.
 - **Error Prevention Strategies**: Emphasizes verification-first, systematic data persistence checking, appropriate confidence levels, and honest acknowledgment of errors.
 - **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to `test-data.json` after page reloads.
 
