@@ -13,14 +13,13 @@ import {
   Ship,
   Calendar,
   Shield,
-  TrendingUp,
   Activity,
   AlertCircle,
   FileText,
   WrenchIcon,
   XCircle
 } from "lucide-react";
-import { startOfMonth, endOfMonth, isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
+import { isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
 import { formatForDisplay, parseDate } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 import {
@@ -35,11 +34,11 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  AreaChart,
-  Area
 } from "recharts";
 
-// KPI Card Component
+const ACTIVE_STATUSES = ['Open', 'In-Progress', 'Pending', 'Awaiting Parts', 'Deferred'];
+const RESOLVED_STATUSES = ['Closed', 'Cancelled'];
+
 interface KPICardProps {
   title: string;
   value: string | number;
@@ -85,15 +84,13 @@ const KPICard = ({ title, value, icon: Icon, color, change, changeType, subtitle
 
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
-  const [dateRange, setDateRange] = useState("last30days");
+  const [dateRange, setDateRange] = useState("thisyear");
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Fetch defects data
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
-    queryKey: ['/api/defects'],
+    queryKey: ['/api/defects?includeClosedDefects=true'],
   });
 
-  // Apply date range filter
   const getDateRangeStart = () => {
     const now = new Date();
     switch (dateRange) {
@@ -105,77 +102,72 @@ export default function DefectsDashboard() {
         return subDays(now, 90);
       case 'thisyear':
         return startOfYear(now);
+      case 'all':
+        return new Date(2000, 0, 1);
       default:
-        return subDays(now, 30); // Default to last 30 days
+        return startOfYear(now);
     }
   };
 
-  // Filter defects by vessel and date range
   const filteredDefects = defects.filter(d => {
-    // Vessel filter
     if (selectedVessel !== 'all' && d.vesselId !== selectedVessel) {
       return false;
     }
     
-    // Date range filter (based on issue date)
-    if (d.issueDate) {
+    if (dateRange !== 'all' && d.issueDate) {
       try {
         const issueDate = parseISO(d.issueDate);
         const rangeStart = getDateRangeStart();
         const rangeEnd = new Date();
         return isWithinInterval(issueDate, { start: rangeStart, end: rangeEnd });
       } catch {
-        return true; // Include if date parsing fails
+        return true;
       }
     }
     
-    return true; // Include defects without issue date
+    return true;
   });
 
-  // Calculate KPIs based on filtered defects
+  const activeDefects = filteredDefects.filter(d => ACTIVE_STATUSES.includes(d.status || ''));
+  const resolvedDefects = filteredDefects.filter(d => RESOLVED_STATUSES.includes(d.status || ''));
+
   const kpis = {
-    totalActive: filteredDefects.filter(d => d.status === 'Open').length,
-    resolvedThisMonth: filteredDefects.filter(d => {
-      if (d.status !== 'Closed' || !d.dateCompleted) return false;
-      try {
-        const completedDate = parseISO(d.dateCompleted);
-        const monthStart = startOfMonth(new Date());
-        const monthEnd = endOfMonth(new Date());
-        return completedDate >= monthStart && completedDate <= monthEnd;
-      } catch {
-        return false;
-      }
-    }).length,
-    conditionOfClass: filteredDefects.filter(d => d.is_coc && d.status === 'Open').length,
-    overdueDefects: filteredDefects.filter(d => {
-      if (d.status !== 'Open' || !d.targetCloseDate) return false;
+    totalActive: activeDefects.length,
+    totalResolved: resolvedDefects.length,
+    conditionOfClass: activeDefects.filter(d => d.is_coc).length,
+    overdueDefects: activeDefects.filter(d => {
+      if (!d.targetCloseDate) return false;
       try {
         return isAfter(new Date(), parseISO(d.targetCloseDate));
       } catch {
         return false;
       }
-    }).length
+    }).length,
+    highPriority: activeDefects.filter(d => d.priority === 'High' || d.critical).length,
   };
 
-  // Get unique vessels
+  const resolutionRate = kpis.totalActive + kpis.totalResolved > 0
+    ? Math.round((kpis.totalResolved / (kpis.totalActive + kpis.totalResolved)) * 100)
+    : 0;
+
   const vessels = Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean);
 
-  // Prepare chart data
   const statusData = [
     { name: 'Open', value: filteredDefects.filter(d => d.status === 'Open').length, color: '#ef4444' },
-    { name: 'In Progress', value: filteredDefects.filter(d => d.status === 'In Progress').length, color: '#f59e0b' },
+    { name: 'In-Progress', value: filteredDefects.filter(d => d.status === 'In-Progress').length, color: '#f59e0b' },
+    { name: 'Pending', value: filteredDefects.filter(d => d.status === 'Pending').length, color: '#8b5cf6' },
+    { name: 'Awaiting Parts', value: filteredDefects.filter(d => d.status === 'Awaiting Parts').length, color: '#06b6d4' },
+    { name: 'Deferred', value: filteredDefects.filter(d => d.status === 'Deferred').length, color: '#6366f1' },
     { name: 'Closed', value: filteredDefects.filter(d => d.status === 'Closed').length, color: '#10b981' },
-  ];
+  ].filter(s => s.value > 0);
 
   const vesselData = vessels.map(vessel => ({
     vessel,
-    open: filteredDefects.filter(d => d.vesselId === vessel && d.status === 'Open').length,
-    closed: filteredDefects.filter(d => d.vesselId === vessel && d.status === 'Closed').length
+    active: filteredDefects.filter(d => d.vesselId === vessel && ACTIVE_STATUSES.includes(d.status || '')).length,
+    closed: filteredDefects.filter(d => d.vesselId === vessel && RESOLVED_STATUSES.includes(d.status || '')).length
   }));
 
-  // Recent defects (last 5) from filtered data
-  const recentDefects = [...filteredDefects]
-    .filter(d => d.status === 'Open')
+  const recentDefects = [...activeDefects]
     .sort((a, b) => {
       if (!a.issueDate || !b.issueDate) return 0;
       return new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime();
@@ -188,12 +180,10 @@ export default function DefectsDashboard() {
   };
 
   const navigateToDefectLog = (filter?: string) => {
-    // Pass current vessel and date range filters along with specific filter
     const params = new URLSearchParams();
     if (selectedVessel !== 'all') {
       params.append('vessel', selectedVessel);
     }
-    params.append('dateRange', dateRange);
     if (filter) {
       params.append('filter', filter);
     }
@@ -203,7 +193,6 @@ export default function DefectsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
@@ -221,19 +210,18 @@ export default function DefectsDashboard() {
             <div className="text-sm text-gray-500">
               Last updated: {format(lastRefresh, 'HH:mm:ss')}
             </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Ship className="h-4 w-4 text-gray-500" />
               <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48" data-testid="select-vessel">
                   <SelectValue placeholder="Select vessel" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +238,7 @@ export default function DefectsDashboard() {
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48" data-testid="select-date-range">
                   <SelectValue placeholder="Select date range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,20 +246,22 @@ export default function DefectsDashboard() {
                   <SelectItem value="last30days">Last 30 Days</SelectItem>
                   <SelectItem value="last90days">Last 90 Days</SelectItem>
                   <SelectItem value="thisyear">This Year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {(selectedVessel !== 'all' || dateRange !== 'last30days') && (
+          {(selectedVessel !== 'all' || dateRange !== 'thisyear') && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setSelectedVessel('all');
-                setDateRange('last30days');
+                setDateRange('thisyear');
               }}
               className="flex items-center space-x-2"
+              data-testid="button-clear-filters"
             >
               <XCircle className="h-4 w-4" />
               <span>Clear Filters</span>
@@ -280,7 +270,6 @@ export default function DefectsDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
           title="Total Active Defects"
@@ -293,11 +282,11 @@ export default function DefectsDashboard() {
         />
         
         <KPICard
-          title="Resolved This Month"
-          value={kpis.resolvedThisMonth}
+          title="Total Resolved"
+          value={kpis.totalResolved}
           icon={CheckCircle}
           color="bg-green-50 text-green-600 border-green-200"
-          change={`${((kpis.resolvedThisMonth / (kpis.resolvedThisMonth + kpis.totalActive)) * 100).toFixed(0)}% resolution rate`}
+          change={`${resolutionRate}% resolution rate`}
           changeType="positive"
           onClick={() => navigateToDefectLog('resolved')}
         />
@@ -307,7 +296,7 @@ export default function DefectsDashboard() {
           value={kpis.conditionOfClass}
           icon={Shield}
           color="bg-blue-50 text-blue-600 border-blue-200"
-          change={kpis.conditionOfClass > 0 ? "Critical regulatory items" : "No CoC items"}
+          change={kpis.conditionOfClass > 0 ? "Active regulatory items" : "No active CoC items"}
           changeType={kpis.conditionOfClass > 0 ? "negative" : "positive"}
           subtitle="Regulatory compliance"
           onClick={() => navigateToDefectLog('coc')}
@@ -324,9 +313,7 @@ export default function DefectsDashboard() {
         />
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Status Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -335,29 +322,36 @@ export default function DefectsDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {statusData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                <CheckCircle className="h-12 w-12 mb-2" />
+                <p>No defects to display</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Vessel Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -366,21 +360,27 @@ export default function DefectsDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={vesselData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="open" fill="#ef4444" name="Open" />
-                <Bar dataKey="closed" fill="#10b981" name="Closed" />
-              </BarChart>
-            </ResponsiveContainer>
+            {vesselData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[250px] text-gray-400">
+                <Ship className="h-12 w-12 mb-2" />
+                <p>No vessel data</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={vesselData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="vessel" angle={-45} textAnchor="end" height={80} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="active" fill="#ef4444" name="Active" />
+                  <Bar dataKey="closed" fill="#10b981" name="Closed" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Critical Items */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -390,7 +390,7 @@ export default function DefectsDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Shield className="h-5 w-5 text-blue-500" />
                   <div>
@@ -424,8 +424,8 @@ export default function DefectsDashboard() {
                     <p className="text-sm text-gray-600">Immediate attention</p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  {defects.filter(d => d.status === 'Open' && d.priority === 'High').length}
+                <Badge variant={kpis.highPriority > 0 ? "destructive" : "secondary"} className={kpis.highPriority > 0 ? "" : "bg-yellow-100 text-yellow-800"}>
+                  {kpis.highPriority}
                 </Badge>
               </div>
             </div>
@@ -433,7 +433,6 @@ export default function DefectsDashboard() {
         </Card>
       </div>
 
-      {/* Recent Defects Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -441,7 +440,7 @@ export default function DefectsDashboard() {
               <FileText className="h-5 w-5" />
               <span>Recent Active Defects</span>
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => navigateToDefectLog()}>
+            <Button variant="outline" size="sm" onClick={() => navigateToDefectLog()} data-testid="button-view-all">
               View All
             </Button>
           </div>
@@ -466,13 +465,14 @@ export default function DefectsDashboard() {
                   <TableHead>Issue Date</TableHead>
                   <TableHead>Target Date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recentDefects.map((defect) => (
                   <TableRow key={defect.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigateToDefectLog()}>
-                    <TableCell className="font-medium">{defect.id}</TableCell>
-                    <TableCell>{defect.vesselId}</TableCell>
+                    <TableCell className="font-medium font-mono text-blue-600">{defect.id}</TableCell>
+                    <TableCell>{defect.vesselName || defect.vesselId}</TableCell>
                     <TableCell className="max-w-xs truncate">
                       <div className="flex items-center space-x-2">
                         {defect.is_coc && (
@@ -480,7 +480,7 @@ export default function DefectsDashboard() {
                             CoC
                           </Badge>
                         )}
-                        <span>{defect.description}</span>
+                        <span className="truncate">{defect.description}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -492,16 +492,36 @@ export default function DefectsDashboard() {
                         if (!targetDate) return '-';
                         const isOverdue = isAfter(new Date(), targetDate);
                         return (
-                          <span className={isOverdue ? 'text-red-600' : ''}>
+                          <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
                             {formatForDisplay(targetDate)}
                           </span>
                         );
                       })()}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={defect.status === 'Open' ? 'destructive' : 'secondary'}>
+                      <Badge 
+                        variant={defect.status === 'Open' ? 'destructive' : 'secondary'}
+                        className={
+                          defect.status === 'In-Progress' ? 'bg-yellow-100 text-yellow-800' :
+                          defect.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
+                          defect.status === 'Awaiting Parts' ? 'bg-cyan-100 text-cyan-800' :
+                          defect.status === 'Deferred' ? 'bg-indigo-100 text-indigo-800' :
+                          ''
+                        }
+                      >
                         {defect.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {defect.critical ? (
+                        <Badge variant="destructive">Critical</Badge>
+                      ) : defect.priority === 'High' ? (
+                        <Badge className="bg-orange-100 text-orange-800">High</Badge>
+                      ) : defect.priority === 'Medium' ? (
+                        <Badge className="bg-yellow-100 text-yellow-800">Medium</Badge>
+                      ) : (
+                        <Badge variant="secondary">Low</Badge>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
