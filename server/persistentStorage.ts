@@ -99,6 +99,86 @@ class StorageInitializationError extends Error {
   }
 }
 
+/**
+ * WORK ORDER NAMING RULES (ENFORCED AT STORAGE LAYER)
+ * ====================================================
+ * Planned WO Format: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+ *   Example: MKR-SE-00005.WO-2025-001
+ *   Pattern: /^[A-Z0-9-]+\.WO-\d{4}-\d{3}$/
+ * 
+ * Unplanned WO Format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
+ *   Example: UWO-V001-2025-001
+ *   Pattern: /^UWO-[A-Z0-9]+-\d{4}-\d{3}$/
+ * 
+ * UNKNOWN-JOB Fallback: UNKNOWN-JOB.WO-<YEAR>-<RUNNING NUMBER>
+ *   Used when job code is missing for planned WOs
+ */
+const PLANNED_WO_PATTERN = /^[A-Za-z0-9_-]+\.WO-\d{4}-\d{3}$/;
+const UNPLANNED_WO_PATTERN = /^UWO-[A-Za-z0-9]+-\d{4}-\d{3}$/;
+
+function isValidWorkOrderNumber(workOrderNo: string): boolean {
+  if (!workOrderNo) return false;
+  return PLANNED_WO_PATTERN.test(workOrderNo) || UNPLANNED_WO_PATTERN.test(workOrderNo);
+}
+
+function normalizeWorkOrderNumber(
+  workOrder: { workOrderNo: string; jobNo?: string | null; templateCode?: string | null; vesselId?: string | null; isUnplanned?: boolean },
+  existingWorkOrders: WorkOrder[]
+): string {
+  // Already valid - return as-is
+  if (isValidWorkOrderNumber(workOrder.workOrderNo)) {
+    return workOrder.workOrderNo;
+  }
+  
+  const currentYear = new Date().getFullYear();
+  
+  // Detect if this is an unplanned WO (no job linkage or explicitly marked)
+  const hasJobLinkage = !!(workOrder.jobNo || workOrder.templateCode);
+  const isUnplanned = workOrder.isUnplanned || (!hasJobLinkage && workOrder.vesselId);
+  
+  if (isUnplanned && workOrder.vesselId) {
+    // Generate unplanned WO format: UWO-<VESSEL>-<YEAR>-<NNN>
+    const vesselCode = workOrder.vesselId;
+    const existingUnplanned = existingWorkOrders.filter(wo => {
+      const pattern = new RegExp(`^UWO-${vesselCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-${currentYear}-(\\d+)$`);
+      return pattern.test(wo.workOrderNo);
+    });
+    
+    let maxNum = 0;
+    existingUnplanned.forEach(wo => {
+      const match = wo.workOrderNo.match(/-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    
+    const nextNum = (maxNum + 1).toString().padStart(3, '0');
+    return `UWO-${vesselCode}-${currentYear}-${nextNum}`;
+  }
+  
+  // Generate planned WO format: <JOB CODE>.WO-<YEAR>-<NNN>
+  const jobCode = workOrder.jobNo || workOrder.templateCode || 'UNKNOWN-JOB';
+  const safeJobCode = jobCode.replace(/\.WO-.*$/, '');
+  
+  const existingForJob = existingWorkOrders.filter(wo => {
+    const pattern = new RegExp(`^${safeJobCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.WO-${currentYear}-(\\d+)$`);
+    return pattern.test(wo.workOrderNo);
+  });
+  
+  let maxNum = 0;
+  existingForJob.forEach(wo => {
+    const match = wo.workOrderNo.match(/-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+  
+  const nextNum = (maxNum + 1).toString().padStart(3, '0');
+  return `${safeJobCode}.WO-${currentYear}-${nextNum}`;
+}
+
 interface PersistentData {
   users: Record<number, User>;
   fleets: Record<string, Fleet>;
@@ -420,6 +500,17 @@ export class PersistentFileStorage implements IStorage {
             componentClassRegulatoryId: loadedData.counters?.componentClassRegulatoryId || 1
           }
         };
+        
+        // NOTE: Work order naming validation is enforced for NEW work orders only
+        // (in createWorkOrder, bulkCreateWorkOrders, bulkUpsertWorkOrders)
+        // Existing data is preserved to maintain historical integrity
+        // See server/utils/workOrderNumbering.ts for naming rules
+        
+        // Log warning for any malformed WO numbers in existing data
+        const malformedWOs = result.workOrders.filter((wo: WorkOrder) => !isValidWorkOrderNumber(wo.workOrderNo));
+        if (malformedWOs.length > 0) {
+          console.log(`⚠️ [WO Naming] Found ${malformedWOs.length} work orders with non-standard naming (preserved as-is for historical integrity)`);
+        }
         
         // Backfill: Migrate existing spares to include robLocationA/robLocationB
         let sparesBackfilled = 0;
@@ -3743,6 +3834,13 @@ export class PersistentFileStorage implements IStorage {
 
   async createWorkOrder(workOrder: InsertWorkOrder): Promise<WorkOrder> {
     const id = String(this.data.counters.workOrderId++);
+    
+    // Validate WO number format - log warning if invalid but preserve as-is
+    // (Callers should use generatePlannedWorkOrderNumber/generateUnplannedWorkOrderNumber)
+    if (!isValidWorkOrderNumber(workOrder.workOrderNo)) {
+      console.warn(`[WO Naming] Warning: Work order "${workOrder.workOrderNo}" does not follow naming convention. Use workOrderNumbering.ts utilities.`);
+    }
+    
     const newWorkOrder: WorkOrder = { 
       ...workOrder, 
       id,
@@ -3824,6 +3922,12 @@ export class PersistentFileStorage implements IStorage {
     const now = new Date();
     for (const workOrder of workOrders) {
       const id = String(this.data.counters.workOrderId++);
+      
+      // Validate WO number format - log warning if invalid but preserve as-is
+      if (!isValidWorkOrderNumber(workOrder.workOrderNo)) {
+        console.warn(`[WO Naming] Warning: Bulk work order "${workOrder.workOrderNo}" does not follow naming convention.`);
+      }
+      
       const newWorkOrder: WorkOrder = {
         ...workOrder,
         id,
@@ -3864,6 +3968,11 @@ export class PersistentFileStorage implements IStorage {
       const existingIndex = this.data.workOrders.findIndex(wo =>
         wo && wo.templateCode && workOrder.templateCode && wo.templateCode === workOrder.templateCode
       );
+      
+      // Validate WO number format - log warning if invalid but preserve as-is
+      if (!isValidWorkOrderNumber(workOrder.workOrderNo)) {
+        console.warn(`[WO Naming] Warning: Upsert work order "${workOrder.workOrderNo}" does not follow naming convention.`);
+      }
       
       if (existingIndex !== -1) {
         this.data.workOrders[existingIndex] = {

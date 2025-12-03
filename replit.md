@@ -39,6 +39,7 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must maintain exact parity for fields, labels, and order.
 - **Part A Immutability Rule**: Work Order Part A is READ-ONLY for all existing work orders, capturing a frozen snapshot of the job template.
 - **Component Document Storage (Section F)**: Handles file uploads with an object storage fallback to the local filesystem.
+- **Work Order Naming Rules**: All work orders must follow naming conventions: Planned = `<JOB CODE>.WO-<YEAR>-<NNN>` (e.g., `MKR-SE-00005.WO-2025-001`), Unplanned = `UWO-<VESSEL>-<YEAR>-<NNN>`. Use `generatePlannedWorkOrderNumber()` and `generateUnplannedWorkOrderNumber()` from `server/utils/workOrderNumbering.ts`. Storage layer logs warnings for non-compliant names but preserves data to maintain historical integrity.
 - **Error Prevention Strategies**: Emphasizes verification-first, systematic data persistence checking, appropriate confidence levels, and honest acknowledgment of errors.
 - **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to `test-data.json` after page reloads.
 
