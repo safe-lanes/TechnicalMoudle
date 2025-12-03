@@ -3,10 +3,14 @@ import path from 'path';
 
 const testDataPath = path.join(process.cwd(), 'test-data.json');
 
-function generateDefectId(): string {
-  const now = Date.now();
-  const random = Math.random().toString(36).substring(2, 10);
-  return `DEF-${now}-${random}`;
+/**
+ * Generate defect ID following the naming convention similar to work orders
+ * Format: DEF-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
+ * Example: DEF-V001-2025-001
+ */
+function generateDefectId(vesselId: string, year: number, runningNumber: number): string {
+  const paddedNumber = runningNumber.toString().padStart(3, '0');
+  return `DEF-${vesselId}-${year}-${paddedNumber}`;
 }
 
 function generateDefectReference(index: number): string {
@@ -15,10 +19,12 @@ function generateDefectReference(index: number): string {
   return `DN/007/${year}/${num}/V`;
 }
 
+const currentYear = new Date().getFullYear();
+
 const defects = [
   // DEFECT 1: Recurring Defect #1 - Main Engine Fuel Pump (First occurrence)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 1),
     seedId: "SEED-DEF-001",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -170,7 +176,7 @@ const defects = [
 
   // DEFECT 2: Recurring Defect #2 - Main Engine Fuel Pump (Second occurrence - SAME equipment_key)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 2),
     seedId: "SEED-DEF-002",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -328,7 +334,7 @@ const defects = [
 
   // DEFECT 3: COC Defect #1 - Emergency Generator with Class Report
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 3),
     seedId: "SEED-DEF-003",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -502,7 +508,7 @@ const defects = [
 
   // DEFECT 4: COC Defect #2 - Lifeboat Davit with Class and Flag Reports
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 4),
     seedId: "SEED-DEF-004",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -693,7 +699,7 @@ const defects = [
 
   // DEFECT 5: Regular Defect - Ballast Pump (Awaiting Parts)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 5),
     seedId: "SEED-DEF-005",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -833,7 +839,7 @@ const defects = [
 
   // DEFECT 6: Regular Defect - Navigation Radar (Open)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 6),
     seedId: "SEED-DEF-006",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -955,7 +961,7 @@ const defects = [
 
   // DEFECT 7: Regular Defect - Sewage Treatment Plant (Deferred)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 7),
     seedId: "SEED-DEF-007",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -1102,7 +1108,7 @@ const defects = [
 
   // DEFECT 8: Regular Defect - Fire Detection Panel (Closed)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 8),
     seedId: "SEED-DEF-008",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -1270,7 +1276,7 @@ const defects = [
 
   // DEFECT 9: Regular Defect - Steering Gear (Pending)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 9),
     seedId: "SEED-DEF-009",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -1410,7 +1416,7 @@ const defects = [
 
   // DEFECT 10: Regular Defect - Mooring Winch (In-Progress)
   {
-    id: generateDefectId(),
+    id: generateDefectId("V001", currentYear, 10),
     seedId: "SEED-DEF-010",
     vesselId: "V001",
     vesselName: "MV Test",
@@ -1577,14 +1583,14 @@ async function seedDefects() {
     console.log('Reading test-data.json...');
     const data = JSON.parse(fs.readFileSync(testDataPath, 'utf-8'));
     
+    // Clear existing defects first
+    console.log('Clearing existing defects...');
+    data.defects = {};
+    
     console.log('Seeding 10 defects...');
     console.log('- 2 Recurring (same equipment_key: Main Engine Fuel Pump)');
     console.log('- 2 COC (with class/flag reports)');
     console.log('- 6 Regular defects with mixed statuses');
-    
-    if (!data.defects) {
-      data.defects = {};
-    }
     
     for (const defect of defects) {
       data.defects[defect.id] = {

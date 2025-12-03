@@ -6769,8 +6769,8 @@
   ],
   "workOrderExecutions": [],
   "defects": {
-    "DEF-1764749669756-g7yg0zxg": {
-      "id": "DEF-1764749669756-g7yg0zxg",
+    "DEF-V001-2025-001": {
+      "id": "DEF-V001-2025-001",
       "seedId": "SEED-DEF-001",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -6930,8 +6930,8 @@
       "createdAt": "2025-09-15T10:30:00.000Z",
       "updatedAt": "2025-10-10T14:30:00.000Z"
     },
-    "DEF-1764749669756-pbvzrn3p": {
-      "id": "DEF-1764749669756-pbvzrn3p",
+    "DEF-V001-2025-002": {
+      "id": "DEF-V001-2025-002",
       "seedId": "SEED-DEF-002",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7097,8 +7097,8 @@
       "createdAt": "2025-11-20T08:00:00.000Z",
       "updatedAt": "2025-11-22T10:00:00.000Z"
     },
-    "DEF-1764749669756-8evxxpj1": {
-      "id": "DEF-1764749669756-8evxxpj1",
+    "DEF-V001-2025-003": {
+      "id": "DEF-V001-2025-003",
       "seedId": "SEED-DEF-003",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7280,8 +7280,8 @@
       "createdAt": "2025-10-25T16:00:00.000Z",
       "updatedAt": "2025-10-28T10:00:00.000Z"
     },
-    "DEF-1764749669756-8ch9k6oz": {
-      "id": "DEF-1764749669756-8ch9k6oz",
+    "DEF-V001-2025-004": {
+      "id": "DEF-V001-2025-004",
       "seedId": "SEED-DEF-004",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7487,8 +7487,8 @@
       "createdAt": "2025-11-05T16:00:00.000Z",
       "updatedAt": "2025-11-08T18:00:00.000Z"
     },
-    "DEF-1764749669756-4hngwyt2": {
-      "id": "DEF-1764749669756-4hngwyt2",
+    "DEF-V001-2025-005": {
+      "id": "DEF-V001-2025-005",
       "seedId": "SEED-DEF-005",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7634,8 +7634,8 @@
       "createdAt": "2025-11-15T14:00:00.000Z",
       "updatedAt": "2025-11-16T10:00:00.000Z"
     },
-    "DEF-1764749669756-ex1tvtim": {
-      "id": "DEF-1764749669756-ex1tvtim",
+    "DEF-V001-2025-006": {
+      "id": "DEF-V001-2025-006",
       "seedId": "SEED-DEF-006",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7760,8 +7760,8 @@
       "createdAt": "2025-11-28T06:00:00.000Z",
       "updatedAt": "2025-11-29T10:00:00.000Z"
     },
-    "DEF-1764749669756-zethy889": {
-      "id": "DEF-1764749669756-zethy889",
+    "DEF-V001-2025-007": {
+      "id": "DEF-V001-2025-007",
       "seedId": "SEED-DEF-007",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -7915,8 +7915,8 @@
       "createdAt": "2025-10-10T10:00:00.000Z",
       "updatedAt": "2025-10-20T14:00:00.000Z"
     },
-    "DEF-1764749669756-wduw27dy": {
-      "id": "DEF-1764749669756-wduw27dy",
+    "DEF-V001-2025-008": {
+      "id": "DEF-V001-2025-008",
       "seedId": "SEED-DEF-008",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -8092,8 +8092,8 @@
       "createdAt": "2025-10-20T08:00:00.000Z",
       "updatedAt": "2025-10-28T16:00:00.000Z"
     },
-    "DEF-1764749669756-zsu2wkt9": {
-      "id": "DEF-1764749669756-zsu2wkt9",
+    "DEF-V001-2025-009": {
+      "id": "DEF-V001-2025-009",
       "seedId": "SEED-DEF-009",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -8239,8 +8239,8 @@
       "createdAt": "2025-11-25T10:00:00.000Z",
       "updatedAt": "2025-11-26T08:00:00.000Z"
     },
-    "DEF-1764749669756-dnvbh4cr": {
-      "id": "DEF-1764749669756-dnvbh4cr",
+    "DEF-V001-2025-010": {
+      "id": "DEF-V001-2025-010",
       "seedId": "SEED-DEF-010",
       "vesselId": "V001",
       "vesselName": "MV Test",
@@ -8413,8 +8413,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "13": {
-      "id": 13,
+    "18": {
+      "id": 18,
       "equipmentKey": "V001_MAIN_ENGINE_FUEL_PUMP_NO1",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -8423,17 +8423,17 @@
       "lastOccurrenceDate": "2025-11-20",
       "hasCoc": false,
       "mtbfDays": "66",
-      "updatedAt": "2025-12-03T08:43:24.321Z"
+      "updatedAt": "2025-12-03T09:01:15.454Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 13,
-      "defectId": "DEF-1764749669756-g7yg0zxg"
+      "recurringId": 18,
+      "defectId": "DEF-V001-2025-001"
     },
     {
-      "recurringId": 13,
-      "defectId": "DEF-1764749669756-pbvzrn3p"
+      "recurringId": 18,
+      "defectId": "DEF-V001-2025-002"
     }
   ],
   "importHistory": [
@@ -43177,7 +43177,7 @@
     "defectId": 1,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 14,
+    "recurringDefectId": 19,
     "auditLogId": 5,
     "pmsVesselSettingsId": 2,
     "storesItemId": 11,
