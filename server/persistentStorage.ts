@@ -4159,7 +4159,8 @@ export class PersistentFileStorage implements IStorage {
   async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number> {
     const defects = await this.getDefects({
       ...filters,
-      is_coc: filters?.isCoC
+      is_coc: filters?.isCoC,
+      includeClosedDefects: filters?.statusView === 'resolved'
     });
     return defects.length;
   }

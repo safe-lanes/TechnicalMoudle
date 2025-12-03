@@ -2822,7 +2822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
                    req.query.statusView as 'active' | 'resolved' | undefined, // Support both statusScope and statusView
         vesselId: req.query.vesselId as string,
-        isCoC: req.query.isCoC === 'true',
+        isCoC: req.query.isCoC !== undefined ? req.query.isCoC === 'true' : undefined,
         // Include all filter parameters to match list query filters
         category: req.query.category as string,
         search: req.query.search as string,

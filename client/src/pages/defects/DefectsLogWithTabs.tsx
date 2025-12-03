@@ -492,21 +492,36 @@ export default function DefectsLogWithTabs() {
           <TabsContent value={activeTab}>
             <Card>
               <CardContent className="p-0">
-                {/* Table Header */}
-                <div className="bg-sky-100 px-4 py-2 border-b">
-                  <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-700">
-                    <div className="col-span-1">ID</div>
-                    <div className="col-span-1">Vessel</div>
-                    <div className="col-span-1">Issue Date</div>
-                    <div className="col-span-1">Category</div>
-                    <div className="col-span-2">Description</div>
-                    <div className="col-span-2">Action Taken / Requested</div>
-                    <div className="col-span-1">Target Date</div>
-                    <div className="col-span-1">Date Compl.</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-1">Actions</div>
+                {/* Table Header - Different for recurring tab */}
+                {activeTab === 'recurring' ? (
+                  <div className="bg-sky-100 px-4 py-2 border-b">
+                    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-700">
+                      <div className="col-span-1">ID</div>
+                      <div className="col-span-3">Equipment Key</div>
+                      <div className="col-span-2">Occurrences</div>
+                      <div className="col-span-1">Open</div>
+                      <div className="col-span-2">Last Occurrence</div>
+                      <div className="col-span-1">MTBF (Days)</div>
+                      <div className="col-span-1">Has CoC</div>
+                      <div className="col-span-1">Actions</div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-sky-100 px-4 py-2 border-b">
+                    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-700">
+                      <div className="col-span-1">ID</div>
+                      <div className="col-span-1">Vessel</div>
+                      <div className="col-span-1">Issue Date</div>
+                      <div className="col-span-1">Category</div>
+                      <div className="col-span-2">Description</div>
+                      <div className="col-span-2">Action Taken / Requested</div>
+                      <div className="col-span-1">Target Date</div>
+                      <div className="col-span-1">Date Compl.</div>
+                      <div className="col-span-1">Status</div>
+                      <div className="col-span-1">Actions</div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Table Body */}
                 <div className="divide-y divide-gray-200">
@@ -519,6 +534,62 @@ export default function DefectsLogWithTabs() {
                         : activeTab === 'coc' ? 'No CoC defects'
                         : 'No recurring defects'}
                     </div>
+                  ) : activeTab === 'recurring' ? (
+                    defects.map((recurring: any, index: number) => (
+                      <div
+                        key={recurring.id}
+                        className={cn(
+                          "grid grid-cols-12 gap-4 px-4 py-3 text-xs hover:bg-gray-50",
+                          index % 2 === 0 ? "bg-white" : "bg-gray-25"
+                        )}
+                      >
+                        <div className="col-span-1 font-mono text-blue-600">{recurring.id}</div>
+                        <div className="col-span-3 text-gray-700 truncate" title={recurring.equipmentKey}>
+                          {recurring.equipmentKey?.replace(/_/g, ' ') || 'N/A'}
+                        </div>
+                        <div className="col-span-2 text-gray-700">
+                          <Badge variant="secondary" className="text-xs">
+                            {recurring.occurrenceCount} times in {recurring.windowMonths} months
+                          </Badge>
+                        </div>
+                        <div className="col-span-1 text-gray-700">
+                          {recurring.openCount > 0 ? (
+                            <Badge variant="destructive" className="text-xs">{recurring.openCount}</Badge>
+                          ) : (
+                            <span className="text-green-600">0</span>
+                          )}
+                        </div>
+                        <div className="col-span-2 text-gray-700">{recurring.lastOccurrenceDate}</div>
+                        <div className="col-span-1 text-gray-700">{recurring.mtbfDays || 'N/A'}</div>
+                        <div className="col-span-1">
+                          {recurring.hasCoc ? (
+                            <Badge variant="destructive" className="text-xs">Yes</Badge>
+                          ) : (
+                            <span className="text-gray-400">No</span>
+                          )}
+                        </div>
+                        <div className="col-span-1 flex items-center gap-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className="h-6 w-6 p-0 hover:bg-blue-50"
+                                  onClick={() => setLocation(`/defects/recurring/${recurring.id}`)}
+                                  data-testid={`button-view-recurring-${recurring.id}`}
+                                >
+                                  <Eye className="h-3 w-3 text-gray-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View Related Defects</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                    ))
                   ) : (
                     defects.map((defect: Defect, index: number) => (
                       <div

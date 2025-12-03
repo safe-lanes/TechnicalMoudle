@@ -8413,8 +8413,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "3": {
-      "id": 3,
+    "13": {
+      "id": 13,
       "equipmentKey": "V001_MAIN_ENGINE_FUEL_PUMP_NO1",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -8423,16 +8423,16 @@
       "lastOccurrenceDate": "2025-11-20",
       "hasCoc": false,
       "mtbfDays": "66",
-      "updatedAt": "2025-12-03T08:22:35.112Z"
+      "updatedAt": "2025-12-03T08:43:24.321Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 3,
+      "recurringId": 13,
       "defectId": "DEF-1764749669756-g7yg0zxg"
     },
     {
-      "recurringId": 3,
+      "recurringId": 13,
       "defectId": "DEF-1764749669756-pbvzrn3p"
     }
   ],
@@ -43177,7 +43177,7 @@
     "defectId": 1,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 4,
+    "recurringDefectId": 14,
     "auditLogId": 5,
     "pmsVesselSettingsId": 2,
     "storesItemId": 11,
