@@ -159,12 +159,10 @@ export const TechnicalModule: React.FC = () => {
             <DefectsReports />
           ) : selectedSubModule === "cert-surveys" ? (
             <div className="min-h-screen bg-gray-50">
-              <div className="bg-white border-b border-gray-200">
-                <div className="px-6 py-4">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    {selectedMenuItem === "certificates" ? "Certificates" : "Surveys"}
-                  </h1>
-                </div>
+              <div className="px-6 py-4">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {selectedMenuItem === "certificates" ? "Certificates" : "Surveys"}
+                </h1>
               </div>
             </div>
           ) : (
