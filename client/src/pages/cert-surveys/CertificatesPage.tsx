@@ -179,20 +179,18 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
   
   return (
     <div className="flex gap-1 justify-center items-center h-full">
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7 relative"
+      <button 
+        className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
         onClick={handleAttachmentClick}
         data-testid={`button-attachment-${params.data.id}`}
       >
         <Paperclip className="h-4 w-4 text-gray-500" />
         {attachmentCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-[#52baf3] text-white text-[10px] font-medium rounded-full h-4 w-4 flex items-center justify-center">
+          <span className="text-[11px] font-medium text-[#52baf3]">
             {attachmentCount}
           </span>
         )}
-      </Button>
+      </button>
     </div>
   );
 };
