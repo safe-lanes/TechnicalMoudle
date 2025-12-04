@@ -645,6 +645,13 @@ export interface IStorage {
   createCertificate(certificate: any): Promise<any>;
   updateCertificate(id: string, data: any): Promise<any>;
   deleteCertificate(id: string): Promise<void>;
+  
+  // Survey methods for Cert & Surveys module
+  getSurveys(): Promise<any[]>;
+  getSurvey(id: string): Promise<any | undefined>;
+  createSurvey(survey: any): Promise<any>;
+  updateSurvey(id: string, data: any): Promise<any>;
+  deleteSurvey(id: string): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure

@@ -225,6 +225,7 @@ interface PersistentData {
   componentDocuments: Record<number, any>;
   componentClassRegulatory: Record<number, any>;
   certificates: Record<string, any>;
+  surveys: Record<string, any>;
   
   // Counter state
   counters: {
@@ -464,6 +465,7 @@ export class PersistentFileStorage implements IStorage {
           componentDocuments: loadedData.componentDocuments || {},
           componentClassRegulatory: loadedData.componentClassRegulatory || {},
           certificates: loadedData.certificates || {},
+          surveys: loadedData.surveys || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -689,6 +691,7 @@ export class PersistentFileStorage implements IStorage {
       componentDocuments: {},
       componentClassRegulatory: {},
       certificates: {},
+      surveys: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -7826,5 +7829,53 @@ export class PersistentFileStorage implements IStorage {
     delete this.data.certificates[id];
     this.persistData();
     console.log(`📋 Certificate ${id} deleted via storage layer`);
+  }
+  
+  // =====================================================
+  // SURVEYS (CERT & SURVEYS MODULE)
+  // =====================================================
+  
+  async getSurveys(): Promise<any[]> {
+    return Object.values(this.data.surveys || {});
+  }
+  
+  async getSurvey(id: string): Promise<any | undefined> {
+    return this.data.surveys?.[id];
+  }
+  
+  async createSurvey(survey: any): Promise<any> {
+    const id = survey.id || `S${Date.now()}`;
+    const newSurvey = { ...survey, id };
+    if (!this.data.surveys) {
+      this.data.surveys = {};
+    }
+    this.data.surveys[id] = newSurvey;
+    this.persistData();
+    console.log(`📋 Survey ${id} created via storage layer`);
+    return newSurvey;
+  }
+  
+  async updateSurvey(id: string, data: any): Promise<any> {
+    if (!this.data.surveys?.[id]) {
+      throw new Error(`Survey with id ${id} not found`);
+    }
+    const updated = {
+      ...this.data.surveys[id],
+      ...data,
+      id, // Ensure ID doesn't change
+    };
+    this.data.surveys[id] = updated;
+    this.persistData();
+    console.log(`📋 Survey ${id} updated via storage layer:`, data);
+    return updated;
+  }
+  
+  async deleteSurvey(id: string): Promise<void> {
+    if (!this.data.surveys?.[id]) {
+      throw new Error(`Survey with id ${id} not found`);
+    }
+    delete this.data.surveys[id];
+    this.persistData();
+    console.log(`📋 Survey ${id} deleted via storage layer`);
   }
 }
