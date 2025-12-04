@@ -1454,6 +1454,50 @@ export const insertComponentMaintenanceHistorySchema = createInsertSchema(compon
 export type InsertComponentMaintenanceHistory = z.infer<typeof insertComponentMaintenanceHistorySchema>;
 export type ComponentMaintenanceHistory = typeof componentMaintenanceHistory.$inferSelect;
 
+// Component Requisitions Table - Purchase/service requisitions linked to components and spares
+export const componentRequisitions = pgTable("component_requisitions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  requisitionNo: text("requisition_no").notNull().unique(), // REQ-V001-2024-001 format
+  componentId: text("component_id").notNull(),
+  componentCode: text("component_code").notNull(),
+  vesselCode: text("vessel_code").notNull(),
+  raisedOn: text("raised_on").notNull(), // DD-MMM-YYYY format
+  itemOrService: text("item_or_service").notNull(), // Description of item or service requested
+  relatedPartCode: text("related_part_code"), // Link to spare part code from Section E
+  relatedPartName: text("related_part_name"), // Spare part name for display
+  quantity: integer("quantity").notNull().default(1),
+  uom: text("uom").default("EA"), // Unit of measure
+  status: text("status").notNull().default("Draft"), // 'Draft' | 'Submitted' | 'RFQ Sent' | 'PO Raised' | 'Ordered' | 'Delivered On Board' | 'Cancelled'
+  priority: text("priority").notNull().default("Normal"), // 'Normal' | 'Urgent' | 'Critical'
+  requestedBy: text("requested_by").notNull(),
+  approvedBy: text("approved_by"),
+  approvalDate: text("approval_date"),
+  purchaseOrderNo: text("purchase_order_no"), // PO reference once raised
+  expectedDelivery: text("expected_delivery"), // Expected delivery date
+  actualDelivery: text("actual_delivery"), // Actual delivery date
+  supplier: text("supplier"), // Selected supplier
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 10, scale: 2 }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  componentIdIdx: index("idx_req_component_id").on(table.componentId),
+  componentCodeIdx: index("idx_req_component_code").on(table.componentCode),
+  vesselCodeIdx: index("idx_req_vessel_code").on(table.vesselCode),
+  statusIdx: index("idx_req_status").on(table.status),
+  requisitionNoIdx: index("idx_req_no").on(table.requisitionNo),
+}));
+
+export const insertComponentRequisitionSchema = createInsertSchema(componentRequisitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertComponentRequisition = z.infer<typeof insertComponentRequisitionSchema>;
+export type ComponentRequisition = typeof componentRequisitions.$inferSelect;
+
 // PMS Vessel Settings - Per-vessel Lead Time & Grace Period configuration
 // Controls WO auto-generation timing and status transitions
 export const pmsVesselSettings = pgTable("pms_vessel_settings", {

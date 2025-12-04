@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { z } from "zod";
@@ -1531,6 +1531,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to delete component class regulatory:", error);
       res.status(500).json({ error: "Failed to delete component class regulatory" });
+    }
+  });
+  
+  // Component Requisitions API routes (Section H)
+  
+  // Get requisitions for a specific component (with vessel scoping for Ship users)
+  app.get("/api/component-requisitions/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // First, verify the component exists and check vessel access
+      const component = await storage.getComponent(req.params.componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (component.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access requisitions for components from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: component.vesselCode
+          });
+        }
+      }
+      
+      const requisitions = await storage.getComponentRequisitions(req.params.componentId);
+      res.json(requisitions);
+    } catch (error) {
+      console.error("Failed to get component requisitions:", error);
+      res.status(500).json({ error: "Failed to get component requisitions" });
+    }
+  });
+  
+  // Get all requisitions (optionally filtered by vessel, with vessel scoping for Ship users)
+  app.get("/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      let vesselCode = req.query.vesselCode as string | undefined;
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        vesselCode = req.user!.vesselId;
+      }
+      
+      const requisitions = await storage.getAllComponentRequisitions(vesselCode);
+      res.json(requisitions);
+    } catch (error) {
+      console.error("Failed to get all component requisitions:", error);
+      res.status(500).json({ error: "Failed to get component requisitions" });
+    }
+  });
+  
+  // Get a single requisition by id (with vessel scoping for Ship users)
+  app.get("/api/component-requisitions/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const item = await storage.getComponentRequisitionItem(parseInt(req.params.id));
+      if (!item) {
+        return res.status(404).json({ error: "Requisition not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (item.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access requisitions from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: item.vesselCode
+          });
+        }
+      }
+      
+      res.json(item);
+    } catch (error) {
+      console.error("Failed to get component requisition:", error);
+      res.status(500).json({ error: "Failed to get component requisition" });
+    }
+  });
+  
+  // Create a new requisition (Office/PMS Admin only can create)
+  app.post("/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Ship users can only create requisitions for their assigned vessel
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (req.body.vesselCode && req.body.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot create requisitions for other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: req.body.vesselCode
+          });
+        }
+        req.body.vesselCode = req.user!.vesselId;
+      }
+      
+      // Validate request body with Zod schema
+      const validatedData = insertComponentRequisitionSchema.parse({
+        ...req.body,
+        requestedBy: req.body.requestedBy || req.user!.username
+      });
+      
+      const result = await storage.createComponentRequisition(validatedData);
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error("Failed to create component requisition:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid requisition data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create component requisition" });
+    }
+  });
+  
+  // Update a requisition (with vessel scoping and Zod validation)
+  app.put("/api/component-requisitions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      // First check if requisition exists and verify vessel access
+      const existing = await storage.getComponentRequisitionItem(parseInt(req.params.id));
+      if (!existing) {
+        return res.status(404).json({ error: "Requisition not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (existing.vesselCode !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot update requisitions from other vessels",
+            assignedVessel: req.user!.vesselId,
+            requestedVessel: existing.vesselCode
+          });
+        }
+      }
+      
+      // Validate with partial schema for updates
+      const validatedData = insertComponentRequisitionSchema.partial().parse(req.body);
+      
+      // SECURITY: Prevent vesselCode modification - only PMS Admin can reassign vessels
+      // This prevents Ship users from transferring requisitions to other vessels
+      if (req.user!.role !== "PMS Admin") {
+        delete (validatedData as any).vesselCode;
+        delete (validatedData as any).componentId;  // Also prevent component reassignment
+      }
+      
+      const result = await storage.updateComponentRequisition(parseInt(req.params.id), validatedData);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Failed to update component requisition:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid requisition data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update component requisition" });
+    }
+  });
+  
+  // Delete a requisition (PMS Admin only)
+  app.delete("/api/component-requisitions/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.deleteComponentRequisition(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete component requisition:", error);
+      res.status(500).json({ error: "Failed to delete component requisition" });
     }
   });
   

@@ -224,6 +224,7 @@ interface PersistentData {
   componentMaintenanceHistory: Record<number, any>;
   componentDocuments: Record<number, any>;
   componentClassRegulatory: Record<number, any>;
+  componentRequisitions: Record<number, any>;
   certificates: Record<string, any>;
   surveys: Record<string, any>;
   
@@ -264,6 +265,7 @@ interface PersistentData {
     maintenanceHistoryId: number;
     componentDocumentId: number;
     componentClassRegulatoryId: number;
+    componentRequisitionId: number;
   };
 }
 
@@ -690,6 +692,7 @@ export class PersistentFileStorage implements IStorage {
       componentMaintenanceHistory: {},
       componentDocuments: {},
       componentClassRegulatory: {},
+      componentRequisitions: {},
       certificates: {},
       surveys: {},
       counters: {
@@ -727,7 +730,8 @@ export class PersistentFileStorage implements IStorage {
         bulkImportErrorId: 1,
         maintenanceHistoryId: 1,
         componentDocumentId: 1,
-        componentClassRegulatoryId: 1
+        componentClassRegulatoryId: 1,
+        componentRequisitionId: 1
       }
     };
     
@@ -3613,6 +3617,102 @@ export class PersistentFileStorage implements IStorage {
       existing.updatedAt = new Date().toISOString();
       this.persistData();
       console.log(`✅ Soft deleted class regulatory item #${id}`);
+    }
+  }
+
+  // Component Requisitions methods (Section H)
+  async getComponentRequisitions(componentId: string): Promise<any[]> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    return Object.values(this.data.componentRequisitions)
+      .filter(item => item !== null && item.componentId === componentId && item.isActive !== false)
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+
+  async getAllComponentRequisitions(vesselCode?: string): Promise<any[]> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    let items = Object.values(this.data.componentRequisitions)
+      .filter(item => item !== null && item.isActive !== false);
+    
+    if (vesselCode) {
+      items = items.filter((item: any) => item.vesselCode === vesselCode);
+    }
+    
+    return items.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+
+  async getComponentRequisitionItem(id: number): Promise<any | undefined> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    return this.data.componentRequisitions[id];
+  }
+
+  async createComponentRequisition(item: any): Promise<any> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    if (!this.data.counters.componentRequisitionId) {
+      this.data.counters.componentRequisitionId = 1;
+    }
+    
+    const id = this.data.counters.componentRequisitionId++;
+    const newItem = {
+      ...item,
+      id,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentRequisitions[id] = newItem;
+    this.persistData();
+    console.log(`✅ Created requisition #${id} (${item.requisitionNo}) for component ${item.componentId}`);
+    return newItem;
+  }
+
+  async updateComponentRequisition(id: number, data: any): Promise<any> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    const existing = this.data.componentRequisitions[id];
+    if (!existing) {
+      throw new Error(`Component requisition ${id} not found`);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    
+    this.data.componentRequisitions[id] = updated;
+    this.persistData();
+    console.log(`✅ Updated requisition #${id}`);
+    return updated;
+  }
+
+  async deleteComponentRequisition(id: number): Promise<void> {
+    if (!this.data.componentRequisitions) {
+      this.data.componentRequisitions = {};
+    }
+    const existing = this.data.componentRequisitions[id];
+    if (existing) {
+      existing.isActive = false;
+      existing.updatedAt = new Date().toISOString();
+      this.persistData();
+      console.log(`✅ Soft deleted requisition #${id}`);
     }
   }
 

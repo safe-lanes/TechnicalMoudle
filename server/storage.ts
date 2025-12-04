@@ -389,6 +389,14 @@ export interface IStorage {
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
   createComponentMaintenanceHistory(history: any): Promise<any>;
   
+  // Component Requisitions methods (Section H)
+  getComponentRequisitions(componentId: string): Promise<any[]>;
+  getAllComponentRequisitions(vesselCode?: string): Promise<any[]>;
+  getComponentRequisitionItem(id: number): Promise<any | undefined>;
+  createComponentRequisition(item: any): Promise<any>;
+  updateComponentRequisition(id: number, data: any): Promise<any>;
+  deleteComponentRequisition(id: number): Promise<void>;
+  
   // Jobs methods (Templates for maintenance jobs linked to components)
   getJobs(vesselId?: string, componentId?: string): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
