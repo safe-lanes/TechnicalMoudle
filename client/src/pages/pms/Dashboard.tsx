@@ -61,48 +61,98 @@ const Dashboard = () => {
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
 
+  const isAllVessels = vesselId === 'all';
+
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
     queryKey: ['/api/work-orders', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/work-orders?vesselId=${vesselId}`);
+      const url = isAllVessels 
+        ? '/api/work-orders' 
+        : `/api/work-orders?vesselId=${vesselId}`;
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
     },
     enabled: !!vesselId
   });
 
-  // Fetch spares data
+  // Fetch spares data - for all vessels, fetch each vessel's spares and combine
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
     queryKey: ['/api/spares', vesselId],
     queryFn: async () => {
+      if (isAllVessels) {
+        const allSpares: Spare[] = [];
+        for (const vessel of vessels) {
+          try {
+            const response = await fetch(`/api/spares/${vessel.id}`);
+            if (response.ok) {
+              const vesselSpares = await response.json();
+              allSpares.push(...vesselSpares);
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch spares for ${vessel.id}`);
+          }
+        }
+        return allSpares;
+      }
       const response = await fetch(`/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     },
-    enabled: !!vesselId
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
-  // Fetch stores data
+  // Fetch stores data - for all vessels, fetch each vessel's stores and combine
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
     queryKey: ['/api/stores', vesselId],
     queryFn: async () => {
+      if (isAllVessels) {
+        const allStores: StoresItem[] = [];
+        for (const vessel of vessels) {
+          try {
+            const response = await fetch(`/api/stores/${vessel.id}`);
+            if (response.ok) {
+              const vesselStores = await response.json();
+              allStores.push(...vesselStores);
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch stores for ${vessel.id}`);
+          }
+        }
+        return allStores;
+      }
       const response = await fetch(`/api/stores/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch stores');
       return response.json();
     },
-    enabled: !!vesselId
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
-  // Fetch components data
+  // Fetch components data - for all vessels, fetch each vessel's components and combine
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
     queryKey: ['/api/components', vesselId],
     queryFn: async () => {
+      if (isAllVessels) {
+        const allComponents: Component[] = [];
+        for (const vessel of vessels) {
+          try {
+            const response = await fetch(`/api/components/${vessel.id}`);
+            if (response.ok) {
+              const vesselComponents = await response.json();
+              allComponents.push(...vesselComponents);
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch components for ${vessel.id}`);
+          }
+        }
+        return allComponents;
+      }
       const response = await fetch(`/api/components/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       return response.json();
     },
-    enabled: !!vesselId
+    enabled: !!vesselId && (isAllVessels ? vessels.length > 0 : true)
   });
 
   // Helper: Calculate stock status
@@ -374,6 +424,9 @@ const Dashboard = () => {
                   <SelectValue placeholder="Select vessel" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all" data-testid="option-all-vessels">
+                    All Vessels
+                  </SelectItem>
                   {vessels.map(vessel => (
                     <SelectItem key={vessel.id} value={vessel.id}>
                       {vessel.id} - {vessel.name}

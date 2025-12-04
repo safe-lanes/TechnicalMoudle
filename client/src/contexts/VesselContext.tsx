@@ -28,7 +28,8 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (vessels.length > 0) {
-      const vesselExists = vessels.some(v => v.id === vesselId);
+      const isAllVessels = vesselId === 'all';
+      const vesselExists = isAllVessels || vessels.some(v => v.id === vesselId);
       if (!vesselId || !vesselExists) {
         const firstVessel = vessels[0];
         console.log(`🚢 Auto-selecting first vessel: ${firstVessel.id} (${firstVessel.name})${!vesselExists && vesselId ? ` (stored '${vesselId}' not found)` : ''}`);
