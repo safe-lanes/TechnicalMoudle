@@ -5426,6 +5426,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to create certificate" });
     }
   });
+
+  // ========================================
+  // SURVEYS API ROUTES
+  // ========================================
+  
+  // Initialize surveys with sample data if empty (uses storage layer)
+  const initializeSurveys = async () => {
+    const existingSurveys = await storage.getSurveys();
+    if (existingSurveys.length === 0) {
+      const sampleSurveys = [
+        {
+          id: 'S1',
+          surveyName: 'Ballast Water Management annual Survey',
+          type: 'Annual',
+          vessel: 'Vessel Name Extra Long 1',
+          surveyDate: '01 Sep 2019',
+          dueDate: '01 Sep 2024',
+          firstRangeDate: '01 Sep 2024',
+          secondRangeDate: '01 Sep 2024',
+          postponed: '01 Sep 2024',
+          lastEdit: '01 Sep 2024',
+          applicable: true,
+        },
+        {
+          id: 'S2',
+          surveyName: 'Ballast Water Management annual Survey',
+          type: 'Int',
+          vessel: 'Vessel Name Extra Long 1',
+          surveyDate: '',
+          dueDate: '',
+          firstRangeDate: '',
+          secondRangeDate: '',
+          postponed: '',
+          lastEdit: '',
+          applicable: true,
+        },
+        {
+          id: 'S3',
+          surveyName: 'Safety Equipment Survey',
+          type: 'Annual',
+          vessel: 'Pacific Explorer',
+          surveyDate: '15 Mar 2020',
+          dueDate: '15 Mar 2025',
+          firstRangeDate: '15 Mar 2024',
+          secondRangeDate: '15 Sep 2024',
+          postponed: '',
+          lastEdit: '20 Oct 2024',
+          applicable: true,
+        },
+        {
+          id: 'S4',
+          surveyName: 'Hull and Machinery Survey',
+          type: 'Int',
+          vessel: 'Atlantic Voyager',
+          surveyDate: '01 Jan 2021',
+          dueDate: '01 Jan 2026',
+          firstRangeDate: '01 Jan 2024',
+          secondRangeDate: '01 Jul 2024',
+          postponed: '01 Mar 2024',
+          lastEdit: '15 Nov 2024',
+          applicable: false,
+        },
+        {
+          id: 'S5',
+          surveyName: 'Load Line Survey',
+          type: 'Annual',
+          vessel: 'Northern Star',
+          surveyDate: '10 Jun 2022',
+          dueDate: '10 Jun 2027',
+          firstRangeDate: '10 Jun 2024',
+          secondRangeDate: '',
+          postponed: '',
+          lastEdit: '25 Sep 2024',
+          applicable: true,
+        },
+      ];
+      for (const survey of sampleSurveys) {
+        await storage.createSurvey(survey);
+      }
+      console.log('📋 Initialized surveys data with sample data via storage layer');
+    }
+  };
+  
+  // Initialize on startup (async)
+  initializeSurveys();
+  
+  // GET all surveys
+  app.get("/api/surveys", async (req, res) => {
+    try {
+      const surveys = await storage.getSurveys();
+      res.json(surveys);
+    } catch (error) {
+      console.error("Error fetching surveys:", error);
+      res.status(500).json({ error: "Failed to fetch surveys" });
+    }
+  });
+  
+  // GET single survey
+  app.get("/api/surveys/:id", async (req, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.id);
+      if (!survey) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      res.json(survey);
+    } catch (error) {
+      console.error("Error fetching survey:", error);
+      res.status(500).json({ error: "Failed to fetch survey" });
+    }
+  });
+  
+  // PATCH update survey (for toggling applicable status)
+  app.patch("/api/surveys/:id", async (req, res) => {
+    try {
+      const updatedSurvey = await storage.updateSurvey(req.params.id, req.body);
+      res.json(updatedSurvey);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: "Survey not found" });
+      }
+      console.error("Error updating survey:", error);
+      res.status(500).json({ error: "Failed to update survey" });
+    }
+  });
+  
+  // POST create new survey
+  app.post("/api/surveys", async (req, res) => {
+    try {
+      const newSurvey = await storage.createSurvey(req.body);
+      res.status(201).json(newSurvey);
+    } catch (error) {
+      console.error("Error creating survey:", error);
+      res.status(500).json({ error: "Failed to create survey" });
+    }
+  });
   
   const httpServer = createServer(app);
   

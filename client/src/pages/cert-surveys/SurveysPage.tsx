@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const defaultFilterValue: VesselFilterValue = {
@@ -31,83 +33,25 @@ interface SurveyData {
   applicable: boolean;
 }
 
-const sampleSurveys: SurveyData[] = [
-  {
-    id: 'S1',
-    surveyName: 'Ballast Water Management annual Survey',
-    type: 'Annual',
-    vessel: 'Vessel Name Extra Long 1',
-    surveyDate: '01 Sep 2019',
-    dueDate: '01 Sep 2024',
-    firstRangeDate: '01 Sep 2024',
-    secondRangeDate: '01 Sep 2024',
-    postponed: '01 Sep 2024',
-    lastEdit: '01 Sep 2024',
-    applicable: true,
-  },
-  {
-    id: 'S2',
-    surveyName: 'Ballast Water Management annual Survey',
-    type: 'Int',
-    vessel: 'Vessel Name Extra Long 1',
-    surveyDate: '',
-    dueDate: '',
-    firstRangeDate: '',
-    secondRangeDate: '',
-    postponed: '',
-    lastEdit: '',
-    applicable: true,
-  },
-  {
-    id: 'S3',
-    surveyName: 'Safety Equipment Survey',
-    type: 'Annual',
-    vessel: 'Pacific Explorer',
-    surveyDate: '15 Mar 2020',
-    dueDate: '15 Mar 2025',
-    firstRangeDate: '15 Mar 2024',
-    secondRangeDate: '15 Sep 2024',
-    postponed: '',
-    lastEdit: '20 Oct 2024',
-    applicable: true,
-  },
-  {
-    id: 'S4',
-    surveyName: 'Hull and Machinery Survey',
-    type: 'Int',
-    vessel: 'Atlantic Voyager',
-    surveyDate: '01 Jan 2021',
-    dueDate: '01 Jan 2026',
-    firstRangeDate: '01 Jan 2024',
-    secondRangeDate: '01 Jul 2024',
-    postponed: '01 Mar 2024',
-    lastEdit: '15 Nov 2024',
-    applicable: false,
-  },
-  {
-    id: 'S5',
-    surveyName: 'Load Line Survey',
-    type: 'Annual',
-    vessel: 'Northern Star',
-    surveyDate: '10 Jun 2022',
-    dueDate: '10 Jun 2027',
-    firstRangeDate: '10 Jun 2024',
-    secondRangeDate: '',
-    postponed: '',
-    lastEdit: '25 Sep 2024',
-    applicable: true,
-  },
-];
+interface ApplicableCellRendererProps extends ICellRendererParams {
+  onToggleApplicable?: (id: string, newValue: boolean) => void;
+}
 
-const ApplicableCellRenderer = (params: ICellRendererParams) => {
+const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   if (!params.colDef || !params.data) return null;
+  
+  const handleChange = (checked: boolean) => {
+    if (params.context?.onToggleApplicable) {
+      params.context.onToggleApplicable(params.data.id, checked);
+    }
+  };
   
   return (
     <div className="flex items-center justify-center h-full">
       <Checkbox 
         checked={params.value} 
-        disabled
-        className="data-[state=checked]:bg-[#52baf3] data-[state=checked]:border-[#52baf3]"
+        onCheckedChange={handleChange}
+        className="data-[state=checked]:bg-[#52baf3] data-[state=checked]:border-[#52baf3] cursor-pointer"
         data-testid={`checkbox-applicable-${params.data.id}`}
       />
     </div>
@@ -151,6 +95,7 @@ export default function SurveysPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const { toast } = useToast();
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
     queryKey: ['/api/vessels'],
@@ -160,9 +105,41 @@ export default function SurveysPage() {
     queryKey: ['/api/fleets'],
   });
 
+  const { data: surveys = [], isLoading } = useQuery<SurveyData[]>({
+    queryKey: ['/api/surveys'],
+  });
+
   const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
   const groupOptions: { id: string; name: string }[] = [];
+
+  const updateApplicableMutation = useMutation({
+    mutationFn: async ({ id, applicable }: { id: string; applicable: boolean }) => {
+      return apiRequest('PATCH', `/api/surveys/${id}`, { applicable });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
+      toast({
+        title: 'Updated',
+        description: 'Survey applicability updated successfully.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update survey',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
+    updateApplicableMutation.mutate({ id, applicable: newValue });
+  }, [updateApplicableMutation]);
+
+  const gridContext = useMemo(() => ({
+    onToggleApplicable: handleToggleApplicable,
+  }), [handleToggleApplicable]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
@@ -266,8 +243,12 @@ export default function SurveysPage() {
       width: 100,
       cellRenderer: ApplicableCellRenderer,
       cellClass: 'flex items-center justify-center',
-      filter: false,
-      sortable: false,
+      filter: 'agSetColumnFilter',
+      filterParams: {
+        values: [true, false],
+        valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
+      },
+      sortable: true,
       resizable: true,
     },
     {
@@ -333,27 +314,34 @@ export default function SurveysPage() {
       <div className="px-6 py-4">
         <Card className="border-0 shadow-none bg-[#f7fafc] rounded-lg">
           <CardContent className="p-4 bg-[#f7fafc]">
-            <AgGridTable
-              rowData={sampleSurveys}
-              columnDefs={columnDefs}
-              onGridReady={onGridReady}
-              autoHeight={true}
-              maxHeight="calc(100vh - 280px)"
-              minHeight="200px"
-              width="100%"
-              enableExport={true}
-              enableSideBar={true}
-              enableStatusBar={true}
-              enableRowGrouping={true}
-              enablePivoting={true}
-              enableAdvancedFilter={false}
-              rowSelection={false}
-              theme="alpine"
-            />
+            {isLoading ? (
+              <div className="flex items-center justify-center h-48">
+                <div className="text-gray-500">Loading surveys...</div>
+              </div>
+            ) : (
+              <AgGridTable
+                rowData={surveys}
+                columnDefs={columnDefs}
+                onGridReady={onGridReady}
+                context={gridContext}
+                autoHeight={true}
+                maxHeight="calc(100vh - 280px)"
+                minHeight="200px"
+                width="100%"
+                enableExport={true}
+                enableSideBar={true}
+                enableStatusBar={true}
+                enableRowGrouping={true}
+                enablePivoting={true}
+                enableAdvancedFilter={false}
+                rowSelection={false}
+                theme="alpine"
+              />
+            )}
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {sampleSurveys.length}
+                Rows: {surveys.length}
               </div>
               <div>
                 <AgGridTableActions 
