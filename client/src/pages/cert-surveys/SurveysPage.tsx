@@ -40,9 +40,10 @@ interface ApplicableCellRendererProps extends ICellRendererParams {
 const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   if (!params.colDef || !params.data) return null;
   
-  const handleChange = (checked: boolean) => {
+  const handleChange = (checked: boolean | 'indeterminate') => {
     if (params.context?.onToggleApplicable) {
-      params.context.onToggleApplicable(params.data.id, checked);
+      const boolValue = checked === true;
+      params.context.onToggleApplicable(params.data.id, boolValue);
     }
   };
   
