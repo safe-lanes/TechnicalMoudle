@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useMemo, useCallback, Component, createRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Download, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, ICellEditorParams } from 'ag-grid-community';
@@ -40,55 +40,77 @@ const formatToDisplayDate = (isoDate: string): string => {
   }
 };
 
-const DateCellEditor = forwardRef((props: ICellEditorParams, ref) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const valueRef = useRef(parseDisplayDate(props.value || ''));
-  const [displayValue, setDisplayValue] = useState(() => parseDisplayDate(props.value || ''));
+interface DateCellEditorState {
+  value: string;
+}
+
+class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
+  private inputRef = createRef<HTMLInputElement>();
   
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+  constructor(props: ICellEditorParams) {
+    super(props);
+    this.state = {
+      value: parseDisplayDate(props.value || '')
+    };
+  }
   
-  useImperativeHandle(ref, () => ({
-    getValue: () => {
-      const result = formatToDisplayDate(valueRef.current);
-      console.log('[DateCellEditor] getValue called, valueRef:', valueRef.current, 'result:', result);
-      return result;
-    },
-    isCancelBeforeStart: () => false,
-    isCancelAfterEnd: () => false,
-    isPopup: () => false,
-  }));
+  componentDidMount() {
+    setTimeout(() => {
+      if (this.inputRef.current) {
+        this.inputRef.current.focus();
+        this.inputRef.current.select();
+      }
+    }, 0);
+  }
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  getValue() {
+    const result = formatToDisplayDate(this.state.value);
+    console.log('[DateCellEditor] getValue called, state.value:', this.state.value, 'result:', result);
+    return result;
+  }
+  
+  isCancelBeforeStart() {
+    return false;
+  }
+  
+  isCancelAfterEnd() {
+    return false;
+  }
+  
+  isPopup() {
+    return false;
+  }
+  
+  handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     console.log('[DateCellEditor] onChange:', newValue);
-    valueRef.current = newValue;
-    setDisplayValue(newValue);
+    this.setState({ value: newValue });
   };
   
-  return (
-    <input
-      ref={inputRef}
-      type="date"
-      value={displayValue}
-      onChange={handleChange}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          console.log('[DateCellEditor] Enter pressed, stopping edit with value:', valueRef.current);
-          props.stopEditing();
-        }
-        if (e.key === 'Escape') {
-          console.log('[DateCellEditor] Escape pressed, canceling edit');
-          props.stopEditing(true);
-        }
-      }}
-      className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
-      style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
-    />
-  );
-});
-DateCellEditor.displayName = 'DateCellEditor';
+  handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      console.log('[DateCellEditor] Enter pressed, stopping edit with value:', this.state.value);
+      this.props.stopEditing();
+    } else if (e.key === 'Escape') {
+      console.log('[DateCellEditor] Escape pressed, canceling edit');
+      this.props.stopEditing(true);
+    }
+  };
+  
+  render() {
+    return (
+      <input
+        ref={this.inputRef}
+        type="date"
+        value={this.state.value}
+        onChange={this.handleChange}
+        onKeyDown={this.handleKeyDown}
+        className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
+        style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
+      />
+    );
+  }
+}
 
 const defaultFilterValue: VesselFilterValue = {
   mode: 'vessel',
