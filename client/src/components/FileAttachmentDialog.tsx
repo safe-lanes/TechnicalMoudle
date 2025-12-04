@@ -111,11 +111,26 @@ export function FileAttachmentDialog({
   };
 
   const handlePreview = (attachment: FileAttachment) => {
-    setPreviewUrl(attachment.data);
+    if (attachment.type === 'application/pdf') {
+      const byteCharacters = atob(attachment.data.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewUrl(blobUrl);
+    } else {
+      setPreviewUrl(attachment.data);
+    }
     setPreviewType(attachment.type);
   };
 
   const closePreview = () => {
+    if (previewUrl && previewType === 'application/pdf') {
+      URL.revokeObjectURL(previewUrl);
+    }
     setPreviewUrl(null);
     setPreviewType(null);
   };
