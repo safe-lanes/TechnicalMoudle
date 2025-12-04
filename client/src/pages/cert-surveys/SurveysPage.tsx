@@ -81,17 +81,24 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
       params.context.onOpenAttachments(params.data);
     }
   };
+
+  const attachmentCount = params.data.attachments?.length || 0;
   
   return (
     <div className="flex gap-1 justify-center items-center h-full">
       <Button 
         variant="ghost" 
         size="icon" 
-        className="h-7 w-7"
+        className="h-7 w-7 relative"
         onClick={handleAttachmentClick}
         data-testid={`button-attachment-${params.data.id}`}
       >
         <Paperclip className="h-4 w-4 text-gray-500" />
+        {attachmentCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-[#52baf3] text-white text-[10px] font-medium rounded-full h-4 w-4 flex items-center justify-center">
+            {attachmentCount}
+          </span>
+        )}
       </Button>
     </div>
   );
