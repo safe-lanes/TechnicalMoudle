@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Paperclip } from 'lucide-react';
-import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellEditingStoppedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
 import DateCellEditor from '@/components/AgGrid/DateCellEditor';
@@ -180,13 +180,23 @@ export default function SurveysPage() {
     }
   }, [selectedSurvey, updateSurveyMutation]);
 
-  const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
-    const { data, colDef, newValue, oldValue } = event;
+  const handleCellEditingStopped = useCallback((event: CellEditingStoppedEvent) => {
+    const { data, colDef, value, oldValue } = event;
     
-    if (newValue === oldValue) return;
+    console.log('[SurveysPage] onCellEditingStopped fired:', { 
+      field: colDef.field, 
+      oldValue, 
+      value, 
+      dataId: data?.id 
+    });
     
     const field = colDef.field;
     if (!field || !data?.id) return;
+    
+    if (value === oldValue) {
+      console.log('[SurveysPage] Value not changed, skipping update');
+      return;
+    }
     
     if (EDITABLE_DATE_FIELDS.includes(field)) {
       const today = new Date();
@@ -197,10 +207,12 @@ export default function SurveysPage() {
       const year = today.getFullYear();
       const lastEdit = `${day} ${month} ${year}`;
       
+      console.log('[SurveysPage] Sending PATCH request for survey:', data.id, 'field:', field, 'value:', value);
+      
       updateSurveyMutation.mutate({
         id: data.id,
         updates: {
-          [field]: newValue,
+          [field]: value,
           lastEdit,
         },
       });
@@ -439,7 +451,7 @@ export default function SurveysPage() {
                 rowData={filteredSurveys}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
-                onCellValueChanged={handleCellValueChanged}
+                onCellEditingStopped={handleCellEditingStopped}
                 context={gridContext}
                 autoHeight={true}
                 maxHeight="calc(100vh - 280px)"

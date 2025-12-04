@@ -7,7 +7,8 @@ import {
   ICellRendererParams, 
   ModuleRegistry,
   GridOptions,
-  CellValueChangedEvent
+  CellValueChangedEvent,
+  CellEditingStoppedEvent
 } from 'ag-grid-community';
 import { 
   AllEnterpriseModule,
@@ -84,6 +85,7 @@ export interface AgGridTableProps {
   columnDefs: ColDef[];
   onGridReady?: (event: GridReadyEvent) => void;
   onCellValueChanged?: (event: CellValueChangedEvent) => void;
+  onCellEditingStopped?: (event: CellEditingStoppedEvent) => void;
   context?: any;
   height?: string | number;
   width?: string | number;
@@ -116,6 +118,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   columnDefs,
   onGridReady,
   onCellValueChanged,
+  onCellEditingStopped,
   context,
   height = '500px',
   width = '100%',
@@ -443,6 +446,7 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
         context={context}
         onGridReady={handleGridReady}
         onCellValueChanged={onCellValueChanged}
+        onCellEditingStopped={onCellEditingStopped}
         singleClickEdit={singleClickEdit}
         stopEditingWhenCellsLoseFocus={stopEditingWhenCellsLoseFocus}
       />

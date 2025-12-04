@@ -83,7 +83,13 @@ class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
   }
   
   handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[DateCellEditor] handleChange called, new value:', e.target.value);
     this.setState({ value: e.target.value });
+  };
+  
+  handleBlur = () => {
+    console.log('[DateCellEditor] handleBlur called, current value:', this.state.value);
+    this.props.stopEditing();
   };
   
   handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -111,6 +117,7 @@ class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
         type="date"
         value={this.state.value}
         onChange={this.handleChange}
+        onBlur={this.handleBlur}
         onKeyDown={this.handleKeyDown}
         className="w-full h-full px-2 py-1 border-2 border-[#52baf3] rounded outline-none bg-white text-[13px] text-[#4f5863]"
         style={{ 

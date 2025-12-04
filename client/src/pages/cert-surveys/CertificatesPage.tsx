@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, Component, createRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Paperclip } from 'lucide-react';
-import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, ICellEditorParams } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, CellEditingStoppedEvent, ICellEditorParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
 import { Button } from '@/components/ui/button';
@@ -255,24 +255,24 @@ export default function CertificatesPage() {
     }
   }, [selectedCertificate, updateCertificateMutation]);
 
-  const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
-    const { data, colDef, newValue, oldValue } = event;
+  const handleCellEditingStopped = useCallback((event: CellEditingStoppedEvent) => {
+    const { data, colDef, value, oldValue } = event;
     
-    console.log('[CertificatesPage] onCellValueChanged fired:', { 
+    console.log('[CertificatesPage] onCellEditingStopped fired:', { 
       field: colDef.field, 
       oldValue, 
-      newValue, 
+      value, 
       dataId: data?.id 
     });
-    
-    if (newValue === oldValue) {
-      console.log('[CertificatesPage] Value unchanged, skipping update');
-      return;
-    }
     
     const field = colDef.field;
     if (!field || !data?.id) {
       console.log('[CertificatesPage] Missing field or data.id');
+      return;
+    }
+    
+    if (value === oldValue) {
+      console.log('[CertificatesPage] Value not changed, skipping update');
       return;
     }
     
@@ -285,12 +285,12 @@ export default function CertificatesPage() {
       const year = today.getFullYear();
       const lastEditUpload = `${day} ${month} ${year}`;
       
-      console.log('[CertificatesPage] Sending PATCH request for certificate:', data.id, 'field:', field, 'value:', newValue);
+      console.log('[CertificatesPage] Sending PATCH request for certificate:', data.id, 'field:', field, 'value:', value);
       
       updateCertificateMutation.mutate({
         id: data.id,
         updates: {
-          [field]: newValue,
+          [field]: value,
           lastEditUpload,
         },
       });
@@ -582,7 +582,7 @@ export default function CertificatesPage() {
                 rowData={filteredCertificates}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
-                onCellValueChanged={handleCellValueChanged}
+                onCellEditingStopped={handleCellEditingStopped}
                 context={gridContext}
                 autoHeight={true}
                 maxHeight="calc(100vh - 280px)"
