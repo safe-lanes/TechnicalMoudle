@@ -219,6 +219,31 @@ const Dashboard = () => {
     ].filter(d => d.count > 0);
   }, [sparesData]);
 
+  // Helper to parse dates in both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) formats
+  const parseFlexibleDate = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr || dateStr === '' || dateStr === '—') return null;
+    
+    // Try ISO format first (YYYY-MM-DD or full ISO timestamp)
+    let parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) return parsed;
+    
+    // Try DD-MMM-YYYY format (e.g., "22-Nov-2025")
+    const legacyMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (legacyMatch) {
+      const [, day, monthStr, year] = legacyMatch;
+      const monthMap: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const month = monthMap[monthStr];
+      if (month !== undefined) {
+        return new Date(parseInt(year), month, parseInt(day));
+      }
+    }
+    
+    return null;
+  };
+
   // Outstanding Tasks as Percentage of Monthly Planned Maintenance Tasks
   const outstandingTasksChartData = useMemo(() => {
     const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
@@ -229,8 +254,8 @@ const Dashboard = () => {
     // Filter planned maintenance tasks for current month (non-execution work orders)
     const monthlyPlannedTasks = safeWOs.filter(wo => {
       if (wo.isExecution) return false;
-      // Check if due date falls in current month
-      const dueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+      // Check if due date falls in current month - handle both date formats
+      const dueDate = parseFlexibleDate(wo.dueDate);
       if (!dueDate) return false;
       return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
     });
