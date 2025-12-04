@@ -75,6 +75,56 @@
   padding-bottom: 4px;
 }
 
+/* Hide the 3-dot column menu button */
+.ag-theme-alpine .ag-header-cell-menu-button {
+  display: none !important;
+}
+
+/* Make ONLY header icons white - scoped to header context only */
+.ag-theme-alpine .ag-header-cell .ag-header-icon {
+  color: white !important;
+}
+
+.ag-theme-alpine .ag-header-cell .ag-icon {
+  color: white !important;
+}
+
+.ag-theme-alpine .ag-header-cell .ag-icon-filter {
+  color: white !important;
+}
+
+.ag-theme-alpine .ag-header-cell .ag-icon-asc,
+.ag-theme-alpine .ag-header-cell .ag-icon-desc,
+.ag-theme-alpine .ag-header-cell .ag-icon-none {
+  color: white !important;
+}
+
+/* Header row icons (for filter row) */
+.ag-theme-alpine .ag-header-row .ag-icon {
+  color: white !important;
+}
+
+/* Hide the vertical separator/resize handle between columns */
+.ag-theme-alpine .ag-header-cell-resize {
+  width: 0;
+  opacity: 0;
+}
+
+/* Compact header cell layout - reduce internal spacing */
+.ag-theme-alpine .ag-header-cell-comp-wrapper {
+  gap: 2px;
+}
+
+/* Reduce filter button spacing */
+.ag-theme-alpine .ag-floating-filter-button {
+  margin-left: 2px;
+}
+
+/* Reduce header icon sizes slightly for compact look */
+.ag-theme-alpine .ag-header-cell .ag-icon {
+  font-size: 14px;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;
