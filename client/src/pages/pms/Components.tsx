@@ -1671,7 +1671,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   
   // Fetch documents for the selected component
   const { data: documents = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/component-documents', selectedComponent?.id],
+    queryKey: [`/api/component-documents/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -1785,7 +1785,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch class regulatory data for the selected component
   const { data: classRegData = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/component-class-regulatory', selectedComponent?.id],
+    queryKey: [`/api/component-class-regulatory/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -1865,19 +1865,82 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
 };
 
 const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
-  // Future enhancement - component-related requisitions
+  // Fetch requisitions for the selected component
+  const { data: requisitions = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/component-requisitions/${selectedComponent?.id}`],
+    enabled: !!selectedComponent?.id,
+  });
+  
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view requisitions</div>;
   }
   
-  return (
-    <div className="text-center py-8">
-      <div className="text-gray-400 text-sm">
-        Requisitions section - future enhancement
+  if (isLoading) {
+    return <div className="text-sm text-gray-500">Loading requisitions...</div>;
+  }
+  
+  if (requisitions.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-gray-400 text-sm">
+          No requisitions found for this component
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Requisitions for spares and services will appear here
+        </p>
       </div>
-      <p className="text-xs text-gray-500 mt-2">
-        Will display component-related purchase and service requisitions
-      </p>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold">{requisitions.length}</span> requisition(s)
+        </div>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Req. No</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Item/Service</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Qty</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Raised On</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Priority</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requisitions.map((req, index) => (
+              <tr key={index} className="border-b border-gray-100">
+                <td className="py-3 px-3 text-gray-900 font-medium">{req.requisitionNo}</td>
+                <td className="py-3 px-3 text-gray-900">{req.itemOrService}</td>
+                <td className="py-3 px-3 text-gray-900">{req.quantity} {req.uom}</td>
+                <td className="py-3 px-3 text-gray-900">{req.raisedOn}</td>
+                <td className="py-3 px-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    req.priority === 'Urgent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {req.priority}
+                  </span>
+                </td>
+                <td className="py-3 px-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    req.status === 'Delivered On Board' ? 'bg-green-100 text-green-800' :
+                    req.status === 'PO Raised' ? 'bg-blue-100 text-blue-800' :
+                    req.status === 'Draft' ? 'bg-gray-100 text-gray-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {req.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
