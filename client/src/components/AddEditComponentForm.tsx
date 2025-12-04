@@ -97,7 +97,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   // Fetch related data for sections B-H (only in edit mode)
   const { data: runningHoursAudit = [] } = useQuery<any[]>({
-    queryKey: ['/api/running-hours-audit', componentId],
+    queryKey: [`/api/running-hours/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
@@ -107,7 +107,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   });
 
   const { data: maintenanceHistory = [], isLoading: isLoadingHistory } = useQuery<any[]>({
-    queryKey: ['/api/component-maintenance-history', componentId],
+    queryKey: [`/api/component-maintenance-history/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
@@ -117,17 +117,17 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   });
 
   const { data: documents = [], isLoading: isLoadingDocs } = useQuery<any[]>({
-    queryKey: ['/api/component-documents', componentId],
+    queryKey: [`/api/component-documents/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: classRegData = [], isLoading: isLoadingClassReg } = useQuery<any[]>({
-    queryKey: ['/api/component-class-regulatory', componentId],
+    queryKey: [`/api/component-class-regulatory/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: requisitions = [], isLoading: isLoadingRequisitions } = useQuery<any[]>({
-    queryKey: ['/api/component-requisitions', componentId],
+    queryKey: [`/api/component-requisitions/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
