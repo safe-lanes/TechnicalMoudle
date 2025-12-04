@@ -17,7 +17,7 @@ The application features a modern full-stack architecture. The frontend is devel
 **Technical Implementations & Key Features**:
 - **Core PMS Business Logic**: Jobs are immutable templates; Work Orders are execution records with a defined lifecycle.
 - **PersistentFileStorage**: All data is saved to `test-data.json` and persists across application restarts.
-- **Vessel Context**: Dynamic fetching and auto-selection of vessels.
+- **Vessel Context**: Dynamic fetching and auto-selection of vessels. Supports "All Vessels" special value (`vesselId === 'all'`) for fleet-wide aggregated views on the PMS Dashboard.
 - **Service Layer Architecture**: Business logic is organized by domain.
 - **Component Hierarchy**: Components are structured using a `parentId` field.
 - **PMS Dashboard**: Professional analytics workspace with data visualizations.
