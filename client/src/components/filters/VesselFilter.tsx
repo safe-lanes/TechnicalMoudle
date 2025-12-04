@@ -131,7 +131,7 @@ export const VesselFilter = ({
     value.selectedGroups.length > 0;
 
   return (
-    <div className={`flex items-center gap-6 bg-[#1e3a5f] px-4 py-3 ${className}`}>
+    <div className={`flex items-center gap-6 px-4 py-3 ${className}`}>
       <RadioGroup 
         value={value.mode} 
         onValueChange={(val) => handleModeChange(val as FilterMode)}
@@ -141,12 +141,12 @@ export const VesselFilter = ({
           <RadioGroupItem 
             value="vessel" 
             id="filter-vessel" 
-            className="border-white text-white data-[state=checked]:bg-white data-[state=checked]:text-[#1e3a5f]"
+            className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-vessel"
           />
           <Label 
             htmlFor="filter-vessel" 
-            className="text-white text-sm font-normal cursor-pointer"
+            className="text-gray-700 text-sm font-normal cursor-pointer"
           >
             Vessel
           </Label>
@@ -155,7 +155,7 @@ export const VesselFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-vessel"
               >
                 <span className="truncate">{getVesselDisplayText()}</span>
@@ -199,12 +199,12 @@ export const VesselFilter = ({
           <RadioGroupItem 
             value="fleet" 
             id="filter-fleet" 
-            className="border-white text-white data-[state=checked]:bg-white data-[state=checked]:text-[#1e3a5f]"
+            className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-fleet"
           />
           <Label 
             htmlFor="filter-fleet" 
-            className="text-white text-sm font-normal cursor-pointer"
+            className="text-gray-700 text-sm font-normal cursor-pointer"
           >
             Fleet
           </Label>
@@ -213,7 +213,7 @@ export const VesselFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-fleet"
               >
                 <span className="truncate">{getFleetDisplayText()}</span>
@@ -257,12 +257,12 @@ export const VesselFilter = ({
           <RadioGroupItem 
             value="group" 
             id="filter-group" 
-            className="border-white text-white data-[state=checked]:bg-white data-[state=checked]:text-[#1e3a5f]"
+            className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-group"
           />
           <Label 
             htmlFor="filter-group" 
-            className="text-white text-sm font-normal cursor-pointer"
+            className="text-gray-700 text-sm font-normal cursor-pointer"
           >
             Add Group
           </Label>
@@ -271,7 +271,7 @@ export const VesselFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-group"
               >
                 <span className="truncate">{getGroupDisplayText()}</span>
@@ -315,7 +315,7 @@ export const VesselFilter = ({
       <Button
         variant="outline"
         onClick={handleClear}
-        className="h-8 px-4 text-xs bg-transparent border-white text-white hover:bg-white/10"
+        className="h-8 px-4 text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
         data-testid="button-clear-filters"
       >
         Clear
