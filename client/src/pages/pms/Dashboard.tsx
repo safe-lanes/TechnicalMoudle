@@ -219,6 +219,54 @@ const Dashboard = () => {
     ].filter(d => d.count > 0);
   }, [sparesData]);
 
+  // Outstanding Tasks as Percentage of Monthly Planned Maintenance Tasks
+  const outstandingTasksChartData = useMemo(() => {
+    const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Filter planned maintenance tasks for current month (non-execution work orders)
+    const monthlyPlannedTasks = safeWOs.filter(wo => {
+      if (wo.isExecution) return false;
+      // Check if due date falls in current month
+      const dueDate = wo.dueDate ? new Date(wo.dueDate) : null;
+      if (!dueDate) return false;
+      return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
+    });
+    
+    // Outstanding = not completed (Overdue, Due, Due (Grace P), Active, Pending Approval)
+    const outstandingTasks = monthlyPlannedTasks.filter(wo => {
+      const status = (wo as any).computedStatus;
+      return status !== 'Completed';
+    });
+    
+    // Completed tasks
+    const completedTasks = monthlyPlannedTasks.filter(wo => {
+      const status = (wo as any).computedStatus;
+      return status === 'Completed';
+    });
+    
+    const totalMonthly = monthlyPlannedTasks.length;
+    const outstandingCount = outstandingTasks.length;
+    const completedCount = completedTasks.length;
+    
+    // Calculate percentages
+    const outstandingPercent = totalMonthly > 0 ? Math.round((outstandingCount / totalMonthly) * 100) : 0;
+    const completedPercent = totalMonthly > 0 ? Math.round((completedCount / totalMonthly) * 100) : 0;
+    
+    return {
+      data: [
+        { status: 'Outstanding', count: outstandingCount, percent: outstandingPercent, color: '#ef4444' },
+        { status: 'Completed', count: completedCount, percent: completedPercent, color: '#10b981' }
+      ].filter(d => d.count > 0),
+      totalMonthly,
+      outstandingCount,
+      completedCount,
+      outstandingPercent
+    };
+  }, [workOrdersData]);
+
   // Navigation handlers
   const navigateToWorkOrders = (tab?: string) => {
     if (tab) {
@@ -419,7 +467,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Charts Row */}
+        {/* Charts Row - Work Order Status and Outstanding Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Work Order Status Donut - Clickable */}
           <Card data-testid="card-wo-status-chart">
@@ -462,6 +510,57 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Outstanding Tasks as Percentage of Monthly Planned Maintenance - NEW */}
+          <Card data-testid="card-outstanding-tasks-chart">
+            <CardHeader>
+              <CardTitle>Outstanding Tasks as % of Monthly Planned Maintenance</CardTitle>
+              <CardDescription>
+                {outstandingTasksChartData.totalMonthly > 0 
+                  ? `${outstandingTasksChartData.outstandingCount} of ${outstandingTasksChartData.totalMonthly} tasks outstanding (${outstandingTasksChartData.outstandingPercent}%)`
+                  : 'No planned maintenance tasks this month'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                {outstandingTasksChartData.data.length > 0 ? (
+                  <AgCharts options={{
+                    data: outstandingTasksChartData.data,
+                    series: [{
+                      type: 'donut',
+                      angleKey: 'count',
+                      calloutLabelKey: 'status',
+                      sectorLabelKey: 'percent',
+                      sectorLabel: {
+                        formatter: (params: any) => `${params.datum.percent}%`
+                      },
+                      innerRadiusRatio: 0.6,
+                      fills: outstandingTasksChartData.data.map(d => d.color),
+                      strokes: outstandingTasksChartData.data.map(d => d.color),
+                      listeners: {
+                        nodeClick: (event: any) => {
+                          const status = event.datum.status;
+                          if (status === 'Outstanding') {
+                            navigateToWorkOrders('All W.O');
+                          } else {
+                            navigateToWorkOrders('Completed');
+                          }
+                        }
+                      }
+                    } as any],
+                    legend: { enabled: true, position: 'bottom' }
+                  } as AgChartOptions} />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    No planned maintenance tasks this month
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Spares Stock Status Row - Moved Below */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Spares Stock Status Donut - Clickable */}
           <Card data-testid="card-spares-status-chart">
             <CardHeader>
