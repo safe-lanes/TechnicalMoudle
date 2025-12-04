@@ -120,11 +120,12 @@ export function FileAttachmentDialog({
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(blob);
-      setPreviewUrl(blobUrl);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } else {
       setPreviewUrl(attachment.data);
+      setPreviewType(attachment.type);
     }
-    setPreviewType(attachment.type);
   };
 
   const closePreview = () => {
