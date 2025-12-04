@@ -1038,7 +1038,7 @@ export class PersistentFileStorage implements IStorage {
       {
         id: "1",
         vesselId: "V001",
-        vesselName: "Vessel Name Extra Long 1",
+        vesselName: "MV Test",
         issueDate: "01-Sep-2019",
         category: "Defect",
         defectType: "Corrective",
@@ -1118,7 +1118,7 @@ export class PersistentFileStorage implements IStorage {
       {
         id: "2",
         vesselId: "V001",
-        vesselName: "Vessel Name Extra Long 2",
+        vesselName: "MV TEST 2",
         issueDate: "01-Sep-2019",
         category: "COC",
         defectType: "Routine",
