@@ -301,6 +301,20 @@ export default function CertificatesPage() {
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
   const groupOptions: { id: string; name: string }[] = [];
 
+  const filteredCertificates = useMemo(() => {
+    if (filterValue.selectedVessels.length === 0) {
+      return certificates;
+    }
+    
+    const selectedVesselNames = filterValue.selectedVessels
+      .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
+      .filter(Boolean);
+    
+    return certificates.filter(cert => 
+      selectedVesselNames.includes(cert.vessel)
+    );
+  }, [certificates, filterValue.selectedVessels, vessels]);
+
   const columnDefs: ColDef[] = useMemo(() => [
     {
       headerName: 'ID',
@@ -536,7 +550,7 @@ export default function CertificatesPage() {
               </div>
             ) : (
               <AgGridTable
-                rowData={certificates}
+                rowData={filteredCertificates}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
                 onCellValueChanged={handleCellValueChanged}
@@ -560,7 +574,7 @@ export default function CertificatesPage() {
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {certificates.length}
+                Rows: {filteredCertificates.length}
               </div>
               <div>
                 <AgGridTableActions 

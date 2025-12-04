@@ -126,6 +126,20 @@ export default function SurveysPage() {
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
   const groupOptions: { id: string; name: string }[] = [];
 
+  const filteredSurveys = useMemo(() => {
+    if (filterValue.selectedVessels.length === 0) {
+      return surveys;
+    }
+    
+    const selectedVesselNames = filterValue.selectedVessels
+      .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
+      .filter(Boolean);
+    
+    return surveys.filter(survey => 
+      selectedVesselNames.includes(survey.vessel)
+    );
+  }, [surveys, filterValue.selectedVessels, vessels]);
+
   const updateSurveyMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
       return apiRequest('PATCH', `/api/surveys/${id}`, updates);
@@ -393,7 +407,7 @@ export default function SurveysPage() {
               </div>
             ) : (
               <AgGridTable
-                rowData={surveys}
+                rowData={filteredSurveys}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
                 onCellValueChanged={handleCellValueChanged}
@@ -417,7 +431,7 @@ export default function SurveysPage() {
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {surveys.length}
+                Rows: {filteredSurveys.length}
               </div>
               <div>
                 <AgGridTableActions 
