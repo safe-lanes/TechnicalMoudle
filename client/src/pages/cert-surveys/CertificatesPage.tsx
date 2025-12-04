@@ -380,7 +380,36 @@ export default function CertificatesPage() {
       headerName: 'Expiry Date',
       field: 'expiryDate',
       width: 120,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellStyle: (params: any) => {
+        const baseStyle = { fontSize: '13px' };
+        if (!params.value) return { ...baseStyle, color: '#4f5863' };
+        
+        const months: { [key: string]: number } = { 
+          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+          'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 
+        };
+        const parts = params.value.split(' ');
+        if (parts.length !== 3) return { ...baseStyle, color: '#4f5863' };
+        
+        const day = parseInt(parts[0], 10);
+        const month = months[parts[1]];
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || month === undefined || isNaN(year)) return { ...baseStyle, color: '#4f5863' };
+        
+        const expiryDate = new Date(year, month, day);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const twoMonthsFromNow = new Date(today);
+        twoMonthsFromNow.setMonth(twoMonthsFromNow.getMonth() + 2);
+        
+        if (expiryDate < today) {
+          return { ...baseStyle, color: '#dc2626', fontWeight: '600' };
+        } else if (expiryDate <= twoMonthsFromNow) {
+          return { ...baseStyle, color: '#ea580c', fontWeight: '600' };
+        }
+        return { ...baseStyle, color: '#4f5863' };
+      },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
