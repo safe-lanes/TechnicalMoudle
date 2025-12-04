@@ -42,7 +42,8 @@ const formatToDisplayDate = (isoDate: string): string => {
 
 const DateCellEditor = forwardRef((props: ICellEditorParams, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState(() => parseDisplayDate(props.value || ''));
+  const valueRef = useRef(parseDisplayDate(props.value || ''));
+  const [displayValue, setDisplayValue] = useState(() => parseDisplayDate(props.value || ''));
   
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -50,22 +51,37 @@ const DateCellEditor = forwardRef((props: ICellEditorParams, ref) => {
   
   useImperativeHandle(ref, () => ({
     getValue: () => {
-      console.log('[DateCellEditor] getValue:', value, '->', formatToDisplayDate(value));
-      return formatToDisplayDate(value);
+      const result = formatToDisplayDate(valueRef.current);
+      console.log('[DateCellEditor] getValue called, valueRef:', valueRef.current, 'result:', result);
+      return result;
     },
     isCancelBeforeStart: () => false,
     isCancelAfterEnd: () => false,
+    isPopup: () => false,
   }));
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    console.log('[DateCellEditor] onChange:', newValue);
+    valueRef.current = newValue;
+    setDisplayValue(newValue);
+  };
   
   return (
     <input
       ref={inputRef}
       type="date"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
+      value={displayValue}
+      onChange={handleChange}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') props.stopEditing();
-        if (e.key === 'Escape') props.stopEditing(true);
+        if (e.key === 'Enter') {
+          console.log('[DateCellEditor] Enter pressed, stopping edit with value:', valueRef.current);
+          props.stopEditing();
+        }
+        if (e.key === 'Escape') {
+          console.log('[DateCellEditor] Escape pressed, canceling edit');
+          props.stopEditing(true);
+        }
       }}
       className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
       style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
