@@ -141,6 +141,20 @@
   background-color: #fff !important;
 }
 
+/* Allow overflow for attachment badge in Actions column */
+.ag-theme-alpine .ag-cell.overflow-visible,
+.ag-theme-alpine .ag-cell.overflow-visible .ag-cell-wrapper {
+  overflow: visible !important;
+}
+
+.ag-theme-alpine .ag-pinned-right-cols-container {
+  overflow: visible !important;
+}
+
+.ag-theme-alpine .ag-body-viewport .ag-pinned-right-cols-container .ag-row {
+  overflow: visible !important;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;
