@@ -43,6 +43,8 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Defect ID Naming Convention**: All defects must follow the pattern `DEF-<VESSEL>-<YEAR>-<NNN>` (e.g., `DEF-V001-2025-001`). IDs are auto-generated in the backend POST route using `generateDefectNumber()` from `server/utils/defectNumbering.ts`. The storage layer validates provided IDs match this pattern before accepting them.
 - **Error Prevention Strategies**: Emphasizes verification-first, systematic data persistence checking, appropriate confidence levels, and honest acknowledgment of errors.
 - **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to `test-data.json` after page reloads.
+- **Certificates & Surveys AG Grid Tables**: Both pages use AG Grid Enterprise with blue headers (#52baf3), Inter font at 13px, compact rows. Features include clickable "Applicable" checkboxes that persist to JSON storage, column filters on all 11 columns.
+- **Deferred: Date Cell Inline Editing**: Class-based `DateCellEditor` component is implemented in `CertificatesPage.tsx` for inline date editing on 5 date columns (Issue Date, Expiry Date, Last Annual, Last Interim, Endorsement Date). Currently deferred - AG Grid is not calling the `getValue()` method after editing, causing changes to revert. Needs debugging to fix the React/AG Grid integration issue.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
