@@ -219,10 +219,31 @@ export default function SurveysPage() {
     }
   }, [updateSurveyMutation]);
 
+  const handleDateChange = useCallback((id: string, field: string, newValue: string) => {
+    console.log('[SurveysPage] handleDateChange called:', { id, field, newValue });
+    
+    const today = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = months[today.getMonth()];
+    const year = today.getFullYear();
+    const lastEdit = `${day} ${month} ${year}`;
+    
+    updateSurveyMutation.mutate({
+      id,
+      updates: {
+        [field]: newValue,
+        lastEdit,
+      },
+    });
+  }, [updateSurveyMutation]);
+
   const gridContext = useMemo(() => ({
     onToggleApplicable: handleToggleApplicable,
     onOpenAttachments: handleOpenAttachments,
-  }), [handleToggleApplicable, handleOpenAttachments]);
+    onDateChange: handleDateChange,
+  }), [handleToggleApplicable, handleOpenAttachments, handleDateChange]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {

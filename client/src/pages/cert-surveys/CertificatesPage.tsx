@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Component, createRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, CellEditingStoppedEvent, ICellEditorParams } from 'ag-grid-community';
@@ -41,71 +41,103 @@ const formatToDisplayDate = (isoDate: string): string => {
   }
 };
 
-interface DateCellEditorState {
-  value: string;
+interface DateCellEditorHandle {
+  getValue: () => string;
+  isCancelBeforeStart: () => boolean;
+  isCancelAfterEnd: () => boolean;
+  isPopup: () => boolean;
 }
 
-class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
-  private inputRef = createRef<HTMLInputElement>();
+const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((props, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const initialValue = parseDisplayDate(props.value || '');
+  const [value, setValue] = useState(initialValue);
+  const valueRef = useRef(value);
+  const hasChangedRef = useRef(false);
   
-  constructor(props: ICellEditorParams) {
-    super(props);
-    this.state = {
-      value: parseDisplayDate(props.value || '')
-    };
-  }
+  useEffect(() => {
+    valueRef.current = value;
+    hasChangedRef.current = value !== initialValue;
+  }, [value, initialValue]);
   
-  componentDidMount() {
+  useEffect(() => {
     setTimeout(() => {
-      if (this.inputRef.current) {
-        this.inputRef.current.focus();
-        this.inputRef.current.select();
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
       }
     }, 0);
-  }
+  }, []);
   
-  getValue() {
-    return formatToDisplayDate(this.state.value);
-  }
+  useImperativeHandle(ref, () => ({
+    getValue: () => {
+      const result = formatToDisplayDate(valueRef.current);
+      console.log('[DateCellEditor] getValue called, returning:', result);
+      return result;
+    },
+    isCancelBeforeStart: () => false,
+    isCancelAfterEnd: () => false,
+    isPopup: () => false
+  }));
   
-  isCancelBeforeStart() {
-    return false;
-  }
-  
-  isCancelAfterEnd() {
-    return false;
-  }
-  
-  isPopup() {
-    return false;
-  }
-  
-  handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    this.setState({ value: e.target.value });
-  };
-  
-  handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      this.props.stopEditing();
-    } else if (e.key === 'Escape') {
-      this.props.stopEditing(true);
+  const commitAndSave = useCallback((cancelled: boolean = false) => {
+    if (cancelled || !hasChangedRef.current) {
+      console.log('[DateCellEditor] No changes or cancelled, skipping save');
+      props.stopEditing(cancelled);
+      return;
     }
-  };
+    
+    const newDisplayValue = formatToDisplayDate(valueRef.current);
+    const field = props.colDef?.field;
+    const rowId = props.data?.id;
+    
+    console.log('[DateCellEditor] Committing value:', newDisplayValue, 'for field:', field, 'row:', rowId);
+    
+    if (field && rowId && props.node && props.context?.onDateChange) {
+      props.node.setDataValue(field, newDisplayValue);
+      props.context.onDateChange(rowId, field, newDisplayValue);
+    }
+    
+    props.stopEditing();
+  }, [props]);
   
-  render() {
-    return (
-      <input
-        ref={this.inputRef}
-        type="date"
-        value={this.state.value}
-        onChange={this.handleChange}
-        onKeyDown={this.handleKeyDown}
-        className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
-        style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
-      />
-    );
-  }
-}
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[DateCellEditor] handleChange:', e.target.value);
+    setValue(e.target.value);
+    valueRef.current = e.target.value;
+    hasChangedRef.current = true;
+  }, []);
+  
+  const handleBlur = useCallback(() => {
+    console.log('[DateCellEditor] handleBlur, value:', valueRef.current);
+    commitAndSave(false);
+  }, [commitAndSave]);
+  
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitAndSave(false);
+    } else if (e.key === 'Escape') {
+      commitAndSave(true);
+    }
+  }, [commitAndSave]);
+  
+  return (
+    <input
+      ref={inputRef}
+      type="date"
+      value={value}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
+      style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
+      data-testid={`date-editor-${props.data?.id}-${props.colDef?.field}`}
+    />
+  );
+});
+
+DateCellEditor.displayName = 'DateCellEditor';
 
 const defaultFilterValue: VesselFilterValue = {
   mode: 'vessel',
@@ -295,6 +327,26 @@ export default function CertificatesPage() {
         },
       });
     }
+  }, [updateCertificateMutation]);
+
+  const handleDateChange = useCallback((id: string, field: string, newValue: string) => {
+    console.log('[CertificatesPage] handleDateChange called:', { id, field, newValue });
+    
+    const today = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = months[today.getMonth()];
+    const year = today.getFullYear();
+    const lastEditUpload = `${day} ${month} ${year}`;
+    
+    updateCertificateMutation.mutate({
+      id,
+      updates: {
+        [field]: newValue,
+        lastEditUpload,
+      },
+    });
   }, [updateCertificateMutation]);
 
   const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
@@ -539,7 +591,8 @@ export default function CertificatesPage() {
   const gridContext = useMemo(() => ({
     onToggleApplicable: handleToggleApplicable,
     onOpenAttachments: handleOpenAttachments,
-  }), [handleToggleApplicable, handleOpenAttachments]);
+    onDateChange: handleDateChange,
+  }), [handleToggleApplicable, handleOpenAttachments, handleDateChange]);
 
   return (
     <div className="min-h-screen bg-gray-50">
