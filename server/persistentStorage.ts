@@ -7890,8 +7890,10 @@ export class PersistentFileStorage implements IStorage {
   // =====================================================
   
   async getCertificates(): Promise<any[]> {
-    return Object.values(this.data.certificates || {}).map(cert => ({
+    const certs = this.data.certificates || {};
+    return Object.entries(certs).map(([key, cert]) => ({
       ...cert,
+      id: key,
       attachments: cert.attachments || []
     }));
   }
@@ -7899,7 +7901,7 @@ export class PersistentFileStorage implements IStorage {
   async getCertificate(id: string): Promise<any | undefined> {
     const cert = this.data.certificates?.[id];
     if (!cert) return undefined;
-    return { ...cert, attachments: cert.attachments || [] };
+    return { ...cert, id, attachments: cert.attachments || [] };
   }
   
   async createCertificate(certificate: any): Promise<any> {
@@ -7921,7 +7923,7 @@ export class PersistentFileStorage implements IStorage {
     const updated = {
       ...this.data.certificates[id],
       ...data,
-      id, // Ensure ID doesn't change
+      id,
     };
     this.data.certificates[id] = updated;
     this.persistData();
@@ -7943,8 +7945,10 @@ export class PersistentFileStorage implements IStorage {
   // =====================================================
   
   async getSurveys(): Promise<any[]> {
-    return Object.values(this.data.surveys || {}).map(survey => ({
+    const surveys = this.data.surveys || {};
+    return Object.entries(surveys).map(([key, survey]) => ({
       ...survey,
+      id: key,
       attachments: survey.attachments || []
     }));
   }
@@ -7952,7 +7956,7 @@ export class PersistentFileStorage implements IStorage {
   async getSurvey(id: string): Promise<any | undefined> {
     const survey = this.data.surveys?.[id];
     if (!survey) return undefined;
-    return { ...survey, attachments: survey.attachments || [] };
+    return { ...survey, id, attachments: survey.attachments || [] };
   }
   
   async createSurvey(survey: any): Promise<any> {
@@ -7974,7 +7978,7 @@ export class PersistentFileStorage implements IStorage {
     const updated = {
       ...this.data.surveys[id],
       ...data,
-      id, // Ensure ID doesn't change
+      id,
     };
     this.data.surveys[id] = updated;
     this.persistData();
