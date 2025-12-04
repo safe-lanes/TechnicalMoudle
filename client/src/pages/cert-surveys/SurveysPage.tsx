@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import AttachmentSheet, { AttachmentFile } from '@/components/AttachmentSheet';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const defaultFilterValue: VesselFilterValue = {
@@ -32,6 +33,7 @@ interface SurveyData {
   postponed: string;
   lastEdit: string;
   applicable: boolean;
+  attachments?: AttachmentFile[];
 }
 
 const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'secondRangeDate', 'postponed'];
@@ -62,8 +64,23 @@ const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   );
 };
 
-const ActionsCellRenderer = (params: ICellRendererParams) => {
+interface SurveyGridContext {
+  onOpenAttachments?: (survey: SurveyData) => void;
+  onToggleApplicable?: (id: string, newValue: boolean) => void;
+}
+
+interface ActionsCellRendererProps extends ICellRendererParams {
+  context: SurveyGridContext;
+}
+
+const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
   if (!params.colDef || !params.data) return null;
+  
+  const handleAttachmentClick = () => {
+    if (params.context?.onOpenAttachments) {
+      params.context.onOpenAttachments(params.data);
+    }
+  };
   
   return (
     <div className="flex gap-1 justify-center items-center h-full">
@@ -79,6 +96,7 @@ const ActionsCellRenderer = (params: ICellRendererParams) => {
         variant="ghost" 
         size="icon" 
         className="h-7 w-7"
+        onClick={handleAttachmentClick}
         data-testid={`button-attachment-${params.data.id}`}
       >
         <Paperclip className="h-4 w-4 text-gray-500" />
@@ -99,6 +117,8 @@ export default function SurveysPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
+  const [selectedSurvey, setSelectedSurvey] = useState<SurveyData | null>(null);
   const { toast } = useToast();
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
@@ -142,6 +162,21 @@ export default function SurveysPage() {
     updateSurveyMutation.mutate({ id, updates: { applicable: newValue } });
   }, [updateSurveyMutation]);
 
+  const handleOpenAttachments = useCallback((survey: SurveyData) => {
+    setSelectedSurvey(survey);
+    setAttachmentSheetOpen(true);
+  }, []);
+
+  const handleAttachmentsChange = useCallback((attachments: AttachmentFile[]) => {
+    if (selectedSurvey) {
+      updateSurveyMutation.mutate({
+        id: selectedSurvey.id,
+        updates: { attachments },
+      });
+      setSelectedSurvey(prev => prev ? { ...prev, attachments } : null);
+    }
+  }, [selectedSurvey, updateSurveyMutation]);
+
   const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
     const { data, colDef, newValue, oldValue } = event;
     
@@ -171,7 +206,8 @@ export default function SurveysPage() {
 
   const gridContext = useMemo(() => ({
     onToggleApplicable: handleToggleApplicable,
-  }), [handleToggleApplicable]);
+    onOpenAttachments: handleOpenAttachments,
+  }), [handleToggleApplicable, handleOpenAttachments]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
@@ -407,6 +443,14 @@ export default function SurveysPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AttachmentSheet
+        open={attachmentSheetOpen}
+        onOpenChange={setAttachmentSheetOpen}
+        title={selectedSurvey?.surveyName || ''}
+        attachments={selectedSurvey?.attachments || []}
+        onAttachmentsChange={handleAttachmentsChange}
+      />
     </div>
   );
 }

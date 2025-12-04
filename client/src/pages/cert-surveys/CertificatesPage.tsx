@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import AttachmentSheet, { AttachmentFile } from '@/components/AttachmentSheet';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const parseDisplayDate = (displayDate: string): string => {
@@ -125,6 +126,7 @@ interface CertificateData {
   endorsementDate: string;
   lastEditUpload: string;
   applicable: boolean;
+  attachments?: AttachmentFile[];
 }
 
 const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'lastInterm', 'endorsementDate'];
@@ -155,8 +157,21 @@ const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   );
 };
 
-const ActionsCellRenderer = (params: ICellRendererParams) => {
+interface ActionsCellRendererProps extends ICellRendererParams {
+  context?: {
+    onOpenAttachments?: (certificate: CertificateData) => void;
+    onToggleApplicable?: (id: string, newValue: boolean) => void;
+  };
+}
+
+const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
   if (!params.colDef || !params.data) return null;
+  
+  const handleAttachmentClick = () => {
+    if (params.context?.onOpenAttachments) {
+      params.context.onOpenAttachments(params.data);
+    }
+  };
   
   return (
     <div className="flex gap-1 justify-center items-center h-full">
@@ -188,6 +203,7 @@ const ActionsCellRenderer = (params: ICellRendererParams) => {
         variant="ghost" 
         size="icon" 
         className="h-7 w-7"
+        onClick={handleAttachmentClick}
         data-testid={`button-attachment-${params.data.id}`}
       >
         <Paperclip className="h-4 w-4 text-gray-500" />
@@ -200,6 +216,8 @@ export default function CertificatesPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
   const { toast } = useToast();
 
   const { data: certificates = [], isLoading: isLoadingCertificates } = useQuery<CertificateData[]>({
@@ -238,6 +256,21 @@ export default function CertificatesPage() {
   const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
     updateCertificateMutation.mutate({ id, updates: { applicable: newValue } });
   }, [updateCertificateMutation]);
+
+  const handleOpenAttachments = useCallback((certificate: CertificateData) => {
+    setSelectedCertificate(certificate);
+    setAttachmentSheetOpen(true);
+  }, []);
+
+  const handleAttachmentsChange = useCallback((attachments: AttachmentFile[]) => {
+    if (selectedCertificate) {
+      updateCertificateMutation.mutate({
+        id: selectedCertificate.id,
+        updates: { attachments },
+      });
+      setSelectedCertificate(prev => prev ? { ...prev, attachments } : null);
+    }
+  }, [selectedCertificate, updateCertificateMutation]);
 
   const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
     const { data, colDef, newValue, oldValue } = event;
@@ -478,7 +511,8 @@ export default function CertificatesPage() {
 
   const gridContext = useMemo(() => ({
     onToggleApplicable: handleToggleApplicable,
-  }), [handleToggleApplicable]);
+    onOpenAttachments: handleOpenAttachments,
+  }), [handleToggleApplicable, handleOpenAttachments]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -558,6 +592,14 @@ export default function CertificatesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AttachmentSheet
+        open={attachmentSheetOpen}
+        onOpenChange={setAttachmentSheetOpen}
+        title={selectedCertificate?.certificateName || ''}
+        attachments={selectedCertificate?.attachments || []}
+        onAttachmentsChange={handleAttachmentsChange}
+      />
     </div>
   );
 }
