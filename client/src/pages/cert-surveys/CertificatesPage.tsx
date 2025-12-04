@@ -378,6 +378,7 @@ export default function CertificatesPage() {
                 rowData={certificates}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
+                onCellValueChanged={handleCellValueChanged}
                 context={gridContext}
                 autoHeight={true}
                 maxHeight="calc(100vh - 280px)"
@@ -391,11 +392,8 @@ export default function CertificatesPage() {
                 enableAdvancedFilter={false}
                 rowSelection={false}
                 theme="alpine"
-                gridOptions={{
-                  onCellValueChanged: handleCellValueChanged,
-                  singleClickEdit: true,
-                  stopEditingWhenCellsLoseFocus: true,
-                }}
+                singleClickEdit={true}
+                stopEditingWhenCellsLoseFocus={true}
               />
             )}
             

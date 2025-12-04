@@ -1,14 +1,21 @@
-import { forwardRef, useImperativeHandle, useState, useRef, useEffect } from 'react';
-import type { ICellEditorParams, ICellEditorComp } from 'ag-grid-community';
+import { Component, createRef } from 'react';
+import type { ICellEditorParams } from 'ag-grid-community';
 
-interface DateCellEditorProps extends ICellEditorParams {
-  onDateChange?: (id: string, field: string, newValue: string) => void;
+interface DateCellEditorState {
+  value: string;
 }
 
-const DateCellEditor = forwardRef((props: DateCellEditorProps, ref) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
+  private inputRef = createRef<HTMLInputElement>();
   
-  const parseDisplayDate = (displayDate: string): string => {
+  constructor(props: ICellEditorParams) {
+    super(props);
+    this.state = {
+      value: this.parseDisplayDate(props.value || '')
+    };
+  }
+  
+  parseDisplayDate(displayDate: string): string {
     if (!displayDate) return '';
     
     const months: Record<string, string> = {
@@ -17,11 +24,11 @@ const DateCellEditor = forwardRef((props: DateCellEditorProps, ref) => {
       'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
     };
     
-    const match = displayDate.match(/(\d{2})\s([A-Za-z]{3})\s(\d{4})/);
+    const match = displayDate.match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})/);
     if (match) {
       const [, day, monthStr, year] = match;
       const month = months[monthStr] || '01';
-      return `${year}-${month}-${day}`;
+      return `${year}-${month}-${day.padStart(2, '0')}`;
     }
     
     if (/^\d{4}-\d{2}-\d{2}$/.test(displayDate)) {
@@ -29,9 +36,9 @@ const DateCellEditor = forwardRef((props: DateCellEditorProps, ref) => {
     }
     
     return '';
-  };
+  }
   
-  const formatToDisplayDate = (isoDate: string): string => {
+  formatToDisplayDate(isoDate: string): string {
     if (!isoDate) return '';
     
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
@@ -44,79 +51,74 @@ const DateCellEditor = forwardRef((props: DateCellEditorProps, ref) => {
     } catch {
       return isoDate;
     }
-  };
+  }
   
-  const [value, setValue] = useState(() => parseDisplayDate(props.value || ''));
-  
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, []);
-  
-  useImperativeHandle(ref, () => ({
-    getValue() {
-      return formatToDisplayDate(value);
-    },
-    
-    isCancelBeforeStart() {
-      return false;
-    },
-    
-    isCancelAfterEnd() {
-      return false;
-    },
-    
-    focusIn() {
-      if (inputRef.current) {
-        inputRef.current.focus();
+  componentDidMount() {
+    setTimeout(() => {
+      if (this.inputRef.current) {
+        this.inputRef.current.focus();
+        this.inputRef.current.select();
       }
-    },
-    
-    focusOut() {
-    }
-  }));
+    }, 0);
+  }
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
+  getValue() {
+    return this.formatToDisplayDate(this.state.value);
+  }
+  
+  isCancelBeforeStart() {
+    return false;
+  }
+  
+  isCancelAfterEnd() {
+    return false;
+  }
+  
+  focusIn() {
+    if (this.inputRef.current) {
+      this.inputRef.current.focus();
+    }
+  }
+  
+  handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ value: e.target.value });
   };
   
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      props.stopEditing();
+      this.props.stopEditing();
     } else if (e.key === 'Escape') {
-      props.stopEditing(true);
+      this.props.stopEditing(true);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      props.stopEditing();
-      if (props.api) {
+      this.props.stopEditing();
+      if (this.props.api) {
         if (e.shiftKey) {
-          props.api.tabToPreviousCell();
+          this.props.api.tabToPreviousCell();
         } else {
-          props.api.tabToNextCell();
+          this.props.api.tabToNextCell();
         }
       }
     }
   };
   
-  return (
-    <input
-      ref={inputRef}
-      type="date"
-      value={value}
-      onChange={handleChange}
-      onKeyDown={handleKeyDown}
-      className="w-full h-full px-2 py-1 border-2 border-[#52baf3] rounded outline-none bg-white text-[13px] text-[#4f5863]"
-      style={{ 
-        fontFamily: 'Inter, sans-serif',
-        minWidth: '140px'
-      }}
-      data-testid={`date-editor-${props.data?.id}-${props.colDef?.field}`}
-    />
-  );
-});
-
-DateCellEditor.displayName = 'DateCellEditor';
+  render() {
+    return (
+      <input
+        ref={this.inputRef}
+        type="date"
+        value={this.state.value}
+        onChange={this.handleChange}
+        onKeyDown={this.handleKeyDown}
+        className="w-full h-full px-2 py-1 border-2 border-[#52baf3] rounded outline-none bg-white text-[13px] text-[#4f5863]"
+        style={{ 
+          fontFamily: 'Inter, sans-serif',
+          minWidth: '140px'
+        }}
+        data-testid={`date-editor-${this.props.data?.id}-${this.props.colDef?.field}`}
+      />
+    );
+  }
+}
 
 export default DateCellEditor;

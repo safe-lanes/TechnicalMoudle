@@ -6,7 +6,8 @@ import {
   GridApi, 
   ICellRendererParams, 
   ModuleRegistry,
-  GridOptions
+  GridOptions,
+  CellValueChangedEvent
 } from 'ag-grid-community';
 import { 
   AllEnterpriseModule,
@@ -82,6 +83,7 @@ export interface AgGridTableProps {
   rowData: any[];
   columnDefs: ColDef[];
   onGridReady?: (event: GridReadyEvent) => void;
+  onCellValueChanged?: (event: CellValueChangedEvent) => void;
   context?: any;
   height?: string | number;
   width?: string | number;
@@ -105,12 +107,15 @@ export interface AgGridTableProps {
   enableRangeSelection?: boolean;
   enableCharts?: boolean;
   suppressRowClickSelection?: boolean;
+  singleClickEdit?: boolean;
+  stopEditingWhenCellsLoseFocus?: boolean;
 }
 
 export const AgGridTable: React.FC<AgGridTableProps> = ({
   rowData,
   columnDefs,
   onGridReady,
+  onCellValueChanged,
   context,
   height = '500px',
   width = '100%',
@@ -134,6 +139,8 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
   enableRangeSelection = false,
   enableCharts = false,
   suppressRowClickSelection = false,
+  singleClickEdit = false,
+  stopEditingWhenCellsLoseFocus = false,
 }) => {
   const viewport = useViewport();
   const viewportConfig = getViewportConfig(viewport);
@@ -433,7 +440,10 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
         rowData={rowData}
         columnDefs={columnDefs}
         onGridReady={handleGridReady}
+        onCellValueChanged={onCellValueChanged}
         context={context}
+        singleClickEdit={singleClickEdit}
+        stopEditingWhenCellsLoseFocus={stopEditingWhenCellsLoseFocus}
         {...finalGridOptions}
       />
     </div>

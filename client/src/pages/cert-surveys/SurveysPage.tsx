@@ -370,6 +370,7 @@ export default function SurveysPage() {
                 rowData={surveys}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
+                onCellValueChanged={handleCellValueChanged}
                 context={gridContext}
                 autoHeight={true}
                 maxHeight="calc(100vh - 280px)"
@@ -383,11 +384,8 @@ export default function SurveysPage() {
                 enableAdvancedFilter={false}
                 rowSelection={false}
                 theme="alpine"
-                gridOptions={{
-                  onCellValueChanged: handleCellValueChanged,
-                  singleClickEdit: true,
-                  stopEditingWhenCellsLoseFocus: true,
-                }}
+                singleClickEdit={true}
+                stopEditingWhenCellsLoseFocus={true}
               />
             )}
             
