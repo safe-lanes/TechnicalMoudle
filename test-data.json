@@ -55122,7 +55122,16 @@
       "lastInterm": "01 Sep 2024",
       "endorsementDate": "01 Sep 2024",
       "lastEditUpload": "01 Sep 2024",
-      "applicable": true
+      "applicable": true,
+      "attachments": [
+        {
+          "id": "ki8w5b0",
+          "name": "Sample certificate.pdf",
+          "size": 223798,
+          "type": "application/pdf",
+          "url": "blob:https://b6e6f0b6-8890-4b24-9e7a-3cef78a3dab3-00-3fl06fmm7ytez.sisko.replit.dev/d0b147ad-30ea-4557-a59e-ea0036be1626"
+        }
+      ]
     },
     "C2": {
       "id": "C2",
