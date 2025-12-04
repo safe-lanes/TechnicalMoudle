@@ -466,6 +466,7 @@ export class PersistentFileStorage implements IStorage {
           componentMaintenanceHistory: loadedData.componentMaintenanceHistory || {},
           componentDocuments: loadedData.componentDocuments || {},
           componentClassRegulatory: loadedData.componentClassRegulatory || {},
+          componentRequisitions: loadedData.componentRequisitions || {},
           certificates: loadedData.certificates || {},
           surveys: loadedData.surveys || {},
           counters: {
@@ -503,7 +504,8 @@ export class PersistentFileStorage implements IStorage {
             bulkImportErrorId: loadedData.counters?.bulkImportErrorId || 1,
             maintenanceHistoryId: loadedData.counters?.maintenanceHistoryId || 1,
             componentDocumentId: loadedData.counters?.componentDocumentId || 1,
-            componentClassRegulatoryId: loadedData.counters?.componentClassRegulatoryId || 1
+            componentClassRegulatoryId: loadedData.counters?.componentClassRegulatoryId || 1,
+            componentRequisitionId: loadedData.counters?.componentRequisitionId || 1
           }
         };
         
