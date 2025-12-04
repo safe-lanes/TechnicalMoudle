@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Paperclip } from 'lucide-react';
+import { Plus, Paperclip, Calendar } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellEditingStoppedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
@@ -8,11 +8,31 @@ import DateCellEditor from '@/components/AgGrid/DateCellEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import type { Vessel, Fleet } from '@shared/schema';
+
+type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
+
+const parseDisplayDate = (displayDate: string): string => {
+  if (!displayDate) return '';
+  const months: Record<string, string> = {
+    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+    'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+    'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+  };
+  const match = displayDate.match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})/);
+  if (match) {
+    const [, day, monthStr, year] = match;
+    const month = months[monthStr] || '01';
+    return `${year}-${month}-${day.padStart(2, '0')}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(displayDate)) return displayDate;
+  return '';
+};
 
 const defaultFilterValue: VesselFilterValue = {
   mode: 'vessel',
@@ -105,6 +125,7 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 export default function SurveysPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
+  const [dueInFilter, setDueInFilter] = useState<DueInFilter>('all');
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyData | null>(null);
@@ -127,18 +148,49 @@ export default function SurveysPage() {
   const groupOptions: { id: string; name: string }[] = [];
 
   const filteredSurveys = useMemo(() => {
-    if (filterValue.selectedVessels.length === 0) {
-      return surveys;
+    let result = surveys;
+    
+    if (filterValue.selectedVessels.length > 0) {
+      const selectedVesselNames = filterValue.selectedVessels
+        .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
+        .filter(Boolean);
+      
+      result = result.filter(survey => 
+        selectedVesselNames.includes(survey.vessel)
+      );
     }
     
-    const selectedVesselNames = filterValue.selectedVessels
-      .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
-      .filter(Boolean);
+    if (dueInFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = result.filter(survey => {
+        if (!survey.dueDate) return false;
+        
+        const dueDateStr = parseDisplayDate(survey.dueDate);
+        if (!dueDateStr) return false;
+        
+        const dueDate = new Date(dueDateStr);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        const isOverdue = dueDate < today;
+        
+        if (dueInFilter === 'overdue') {
+          return isOverdue;
+        }
+        
+        if (isOverdue) return true;
+        
+        const monthsAhead = dueInFilter === '3months' ? 3 : dueInFilter === '2months' ? 2 : 1;
+        const thresholdDate = new Date(today);
+        thresholdDate.setMonth(thresholdDate.getMonth() + monthsAhead);
+        
+        return dueDate <= thresholdDate;
+      });
+    }
     
-    return surveys.filter(survey => 
-      selectedVesselNames.includes(survey.vessel)
-    );
-  }, [surveys, filterValue.selectedVessels, vessels]);
+    return result;
+  }, [surveys, filterValue.selectedVessels, vessels, dueInFilter]);
 
   const updateSurveyMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
@@ -451,13 +503,33 @@ export default function SurveysPage() {
       </div>
 
       {showFilters && (
-        <VesselFilter
-          value={filterValue}
-          onChange={setFilterValue}
-          vessels={vesselOptions}
-          fleets={fleetOptions}
-          groups={groupOptions}
-        />
+        <div className="flex items-center gap-4 px-6">
+          <VesselFilter
+            value={filterValue}
+            onChange={setFilterValue}
+            vessels={vesselOptions}
+            fleets={fleetOptions}
+            groups={groupOptions}
+          />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500" />
+            <Select value={dueInFilter} onValueChange={(value: DueInFilter) => setDueInFilter(value)}>
+              <SelectTrigger 
+                className="w-[160px] h-8 text-xs bg-white border-gray-300"
+                data-testid="select-due-in-filter"
+              >
+                <SelectValue placeholder="Due in..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="option-due-all">All</SelectItem>
+                <SelectItem value="3months" data-testid="option-due-3months">Due in 3 months</SelectItem>
+                <SelectItem value="2months" data-testid="option-due-2months">Due in 2 months</SelectItem>
+                <SelectItem value="1month" data-testid="option-due-1month">Due in 1 month</SelectItem>
+                <SelectItem value="overdue" data-testid="option-due-overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       )}
 
       <div className="px-6 py-4">

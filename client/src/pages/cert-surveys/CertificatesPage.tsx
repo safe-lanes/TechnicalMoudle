@@ -1,17 +1,20 @@
 import { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Paperclip } from 'lucide-react';
+import { Plus, Paperclip, Calendar } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, CellEditingStoppedEvent, ICellEditorParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import type { Vessel, Fleet } from '@shared/schema';
+
+type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
 const parseDisplayDate = (displayDate: string): string => {
   if (!displayDate) return '';
@@ -230,6 +233,7 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 export default function CertificatesPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
+  const [dueInFilter, setDueInFilter] = useState<DueInFilter>('all');
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
@@ -354,18 +358,49 @@ export default function CertificatesPage() {
   const groupOptions: { id: string; name: string }[] = [];
 
   const filteredCertificates = useMemo(() => {
-    if (filterValue.selectedVessels.length === 0) {
-      return certificates;
+    let result = certificates;
+    
+    if (filterValue.selectedVessels.length > 0) {
+      const selectedVesselNames = filterValue.selectedVessels
+        .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
+        .filter(Boolean);
+      
+      result = result.filter(cert => 
+        selectedVesselNames.includes(cert.vessel)
+      );
     }
     
-    const selectedVesselNames = filterValue.selectedVessels
-      .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
-      .filter(Boolean);
+    if (dueInFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = result.filter(cert => {
+        if (!cert.expiryDate) return false;
+        
+        const expiryDateStr = parseDisplayDate(cert.expiryDate);
+        if (!expiryDateStr) return false;
+        
+        const expiryDate = new Date(expiryDateStr);
+        expiryDate.setHours(0, 0, 0, 0);
+        
+        const isOverdue = expiryDate < today;
+        
+        if (dueInFilter === 'overdue') {
+          return isOverdue;
+        }
+        
+        if (isOverdue) return true;
+        
+        const monthsAhead = dueInFilter === '3months' ? 3 : dueInFilter === '2months' ? 2 : 1;
+        const thresholdDate = new Date(today);
+        thresholdDate.setMonth(thresholdDate.getMonth() + monthsAhead);
+        
+        return expiryDate <= thresholdDate;
+      });
+    }
     
-    return certificates.filter(cert => 
-      selectedVesselNames.includes(cert.vessel)
-    );
-  }, [certificates, filterValue.selectedVessels, vessels]);
+    return result;
+  }, [certificates, filterValue.selectedVessels, vessels, dueInFilter]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
@@ -614,13 +649,33 @@ export default function CertificatesPage() {
       </div>
 
       {showFilters && (
-        <VesselFilter
-          value={filterValue}
-          onChange={setFilterValue}
-          vessels={vesselOptions}
-          fleets={fleetOptions}
-          groups={groupOptions}
-        />
+        <div className="flex items-center gap-4 px-6">
+          <VesselFilter
+            value={filterValue}
+            onChange={setFilterValue}
+            vessels={vesselOptions}
+            fleets={fleetOptions}
+            groups={groupOptions}
+          />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500" />
+            <Select value={dueInFilter} onValueChange={(value: DueInFilter) => setDueInFilter(value)}>
+              <SelectTrigger 
+                className="w-[160px] h-8 text-xs bg-white border-gray-300"
+                data-testid="select-due-in-filter"
+              >
+                <SelectValue placeholder="Due in..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="option-due-all">All</SelectItem>
+                <SelectItem value="3months" data-testid="option-due-3months">Due in 3 months</SelectItem>
+                <SelectItem value="2months" data-testid="option-due-2months">Due in 2 months</SelectItem>
+                <SelectItem value="1month" data-testid="option-due-1month">Due in 1 month</SelectItem>
+                <SelectItem value="overdue" data-testid="option-due-overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       )}
 
       <div className="px-6 py-4">
