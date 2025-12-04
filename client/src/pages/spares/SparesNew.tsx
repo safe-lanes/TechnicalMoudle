@@ -3,7 +3,8 @@ import { useVessel } from "@/contexts/VesselContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 // ComponentNode interface - matches the one used in Components.tsx
 interface ComponentNode {
   id: string;
@@ -781,6 +782,43 @@ const Spares: React.FC = () => {
     setSelectedComponentId(null);
   };
 
+  // Export spares to Excel
+  const exportSparesToExcel = () => {
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '_').slice(0, 15);
+    const filename = `spares_inventory_${vesselId}_${timestamp}.xlsx`;
+    
+    const data = filteredSpares.map((spare: Spare) => {
+      const stockStatus = getStockStatus(spare.rob, spare.min);
+      return {
+        'Part Code': spare.partCode,
+        'Part Name': spare.partName,
+        'Component': spare.componentName,
+        'Component Code': spare.componentCode || '-',
+        'Criticality': spare.critical,
+        'ROB': spare.rob,
+        'Min': spare.min,
+        'Stock Status': stockStatus.label,
+        'Location': spare.location || '-',
+        'Location 2': spare.location2 || '-',
+        'UOM': spare.uom || '-',
+        'Part Number': spare.partNumber || '-',
+        'Maker': spare.maker || '-',
+        'Remarks': spare.remarks || '-'
+      };
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Spares Inventory');
+    XLSX.writeFile(wb, filename);
+    
+    toast({ 
+      title: "Export Successful", 
+      description: `Exported ${data.length} spares to ${filename}` 
+    });
+  };
+
   // Open consume modal
   const openConsumeModal = (spare: Spare) => {
     setSelectedSpare(spare);
@@ -1052,7 +1090,16 @@ const Spares: React.FC = () => {
               History
             </button>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <Button 
+              variant="outline" 
+              className="flex items-center gap-2 text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3]/10"
+              onClick={exportSparesToExcel}
+              data-testid="button-export-spares"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Export
+            </Button>
             <Button className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)}>
               + Add Spare
             </Button>
