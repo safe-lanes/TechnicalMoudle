@@ -64,9 +64,7 @@ class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
   }
   
   getValue() {
-    const result = formatToDisplayDate(this.state.value);
-    console.log('[DateCellEditor] getValue called, state.value:', this.state.value, 'result:', result);
-    return result;
+    return formatToDisplayDate(this.state.value);
   }
   
   isCancelBeforeStart() {
@@ -82,17 +80,13 @@ class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
   }
   
   handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    console.log('[DateCellEditor] onChange:', newValue);
-    this.setState({ value: newValue });
+    this.setState({ value: e.target.value });
   };
   
   handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      console.log('[DateCellEditor] Enter pressed, stopping edit with value:', this.state.value);
       this.props.stopEditing();
     } else if (e.key === 'Escape') {
-      console.log('[DateCellEditor] Escape pressed, canceling edit');
       this.props.stopEditing(true);
     }
   };
