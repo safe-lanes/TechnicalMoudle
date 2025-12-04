@@ -406,7 +406,7 @@ export default function CertificatesPage() {
         if (expiryDate < today) {
           return { ...baseStyle, color: '#dc2626', fontWeight: '600' };
         } else if (expiryDate <= twoMonthsFromNow) {
-          return { ...baseStyle, color: '#ea580c', fontWeight: '600' };
+          return { ...baseStyle, color: '#f59e0b', fontWeight: '600' };
         }
         return { ...baseStyle, color: '#4f5863' };
       },

@@ -296,7 +296,7 @@ export default function SurveysPage() {
         if (dueDate < today) {
           return { ...baseStyle, color: '#dc2626', fontWeight: '600' };
         } else if (dueDate <= twoMonthsFromNow) {
-          return { ...baseStyle, color: '#ea580c', fontWeight: '600' };
+          return { ...baseStyle, color: '#f59e0b', fontWeight: '600' };
         }
         return { ...baseStyle, color: '#4f5863' };
       },
