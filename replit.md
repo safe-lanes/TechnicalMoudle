@@ -45,6 +45,8 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to `test-data.json` after page reloads.
 - **Certificates & Surveys AG Grid Tables**: Both pages use AG Grid Enterprise with blue headers (#52baf3), Inter font at 13px, compact rows. Features include clickable "Applicable" checkboxes that persist to JSON storage, column filters on all 11 columns.
 - **Deferred: Date Cell Inline Editing**: Class-based `DateCellEditor` component is implemented in `CertificatesPage.tsx` for inline date editing on 5 date columns (Issue Date, Expiry Date, Last Annual, Last Interim, Endorsement Date). Currently deferred - AG Grid is not calling the `getValue()` method after editing, causing changes to revert. Needs debugging to fix the React/AG Grid integration issue.
+- **PMS Dashboard - Outstanding Tasks Pie Chart**: New pie chart showing "Outstanding Tasks as % of Monthly Planned Maintenance". Displays completed vs outstanding work orders for the current month. Uses flexible date parsing (`parseFlexibleDate`) to handle both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) date formats. Spares Stock Status chart moved below.
+- **Running Hours Display in Work Orders Table**: RH-based work orders (without calendar due dates) now show remaining hours in the Due Date column instead of "—". Displays "X hrs remaining" (blue), "Due now" (amber), or "Overdue by X hrs" (red) based on `nextDueReading - currentReading` calculation.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
