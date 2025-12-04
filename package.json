@@ -73,6 +73,8 @@
     "framer-motion": "^11.13.1",
     "idb": "^8.0.3",
     "input-otp": "^1.4.2",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "lodash": "^4.17.21",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
