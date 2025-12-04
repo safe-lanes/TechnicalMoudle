@@ -175,12 +175,47 @@ const Stores: React.FC = () => {
     }
   }, [storesData, activeTab]);
   
+  // Fetch stores history from API
+  const { data: historyData = [], isLoading: historyLoading } = useQuery<any[]>({
+    queryKey: vesselId ? [`/api/stores/${vesselId}/history`, activeTab] : ['history-disabled'],
+    queryFn: async () => {
+      const response = await fetch(`/api/stores/${vesselId}/history?itemType=${activeTab}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      return response.json();
+    },
+    enabled: !!vesselId && viewMode === 'history',
+  });
+
+  // Map history API data to StoresHistoryItem format
+  const historyItems: StoresHistoryItem[] = useMemo(() => {
+    if (!historyData || historyData.length === 0) return [];
+    
+    return historyData.map((entry: any) => {
+      const storeItem = storesData.find((item: any) => item.id === entry.storesItemId);
+      return {
+        id: entry.id,
+        dateLocal: entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '',
+        eventType: entry.transactionType === 'issue' ? 'Consume' : 
+                   entry.transactionType === 'receive' ? 'Receive' : 
+                   entry.transactionType || 'Unknown',
+        itemName: storeItem?.itemName || `Item #${entry.storesItemId}`,
+        partCode: storeItem?.itemCode || '',
+        uom: storeItem?.uom || '',
+        qtyChange: entry.transactionType === 'issue' ? -Number(entry.quantity) : Number(entry.quantity),
+        robAfter: Number(entry.robAfter) || 0,
+        place: entry.place || '',
+        userId: entry.createdBy || 'System',
+        remarks: entry.reason || '',
+        ref: entry.purchaseOrderRef || '',
+      };
+    }).sort((a: StoresHistoryItem, b: StoresHistoryItem) => b.id - a.id);
+  }, [historyData, storesData]);
+
   // History filters
   const [historyDateFrom, setHistoryDateFrom] = useState("");
   const [historyDateTo, setHistoryDateTo] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [historyEventFilter, setHistoryEventFilter] = useState("all");
-  const [historyItems, setHistoryItems] = useState<StoresHistoryItem[]>([]);
   
   // Click outside handler for location dropdown
   useEffect(() => {
@@ -287,6 +322,8 @@ const Stores: React.FC = () => {
   });
 
   // Add to history function
+  // Note: History entries are now created by the backend API and fetched via useQuery
+  // This helper function can be kept for reference but the actual history is persisted server-side
   const addToHistory = (
     item: StoreItem,
     eventType: string,
@@ -296,31 +333,9 @@ const Stores: React.FC = () => {
     ref?: string,
     remarks?: string
   ) => {
-    const now = new Date();
-    const dateLocal = now.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).toUpperCase().replace(',', '');
-    
-    const historyEntry: StoresHistoryItem = {
-      id: Date.now(),
-      dateLocal,
-      eventType,
-      itemName: item.itemName,
-      partCode: item.itemCode,
-      uom: item.uom,
-      qtyChange,
-      robAfter,
-      place: place || '',
-      userId: 'Current User',
-      remarks: remarks || '',
-      ref: ref || ''
-    };
-    
-    setHistoryItems(prev => [historyEntry, ...prev]);
+    // History is now managed by the backend via /api/stores/:vesselId/batch-consume and /api/stores/:vesselId/batch-receive
+    // After a consume/receive action, invalidate the history query to refresh the data
+    queryClient.invalidateQueries({ queryKey: [`/api/stores/${vesselId}/history`, activeTab] });
   };
 
   // Calculate stock status based on ROB and Min
