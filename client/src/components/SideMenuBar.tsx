@@ -52,9 +52,8 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "reports", label: "Reports", icon: FileText },
   ],
   "cert-surveys": [
-    { id: "certificates", label: "Certificates", icon: FileText },
+    { id: "certificates", label: "Certificates", icon: FileSpreadsheet },
     { id: "surveys", label: "Surveys", icon: ClipboardList },
-    { id: "due-dates", label: "Due Dates", icon: Clock },
   ],
   defects: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -105,16 +104,15 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
       } else {
         setLocation(`/defects/${itemId}`);
       }
+    } else if (subModule === "cert-surveys") {
+      setLocation(`/cert-surveys/${itemId}`);
     }
     // Still call the callback for state management if provided
     onItemSelect?.(itemId);
   };
 
   return (
-    <div className={cn(
-      "min-h-screen flex flex-col items-center py-4 bg-[#16569e]",
-      subModule === "defects" ? "w-28" : "w-20"
-    )}>
+    <div className="min-h-screen flex flex-col items-center py-4 bg-[#16569e] w-20">
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isSelected = item.id === selectedItem;
@@ -124,8 +122,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
             key={item.id}
             onClick={() => handleItemClick(item.id)}
             className={cn(
-              "w-full mb-4 flex flex-col items-center justify-center transition-all duration-200 px-2",
-              subModule === "defects" ? "min-h-16 py-2" : "h-14",
+              "w-full mb-4 flex flex-col items-center justify-center transition-all duration-200 px-2 h-14",
               isSelected ? "bg-[#52baf3]" : "hover:bg-[#1d4ed8]",
               "group relative"
             )}
@@ -139,10 +136,7 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
                 isSelected ? "text-white" : "text-blue-100"
               )}
             />
-            <span className={cn(
-              "text-white text-center leading-tight break-words",
-              subModule === "defects" ? "text-xs" : "text-[10px]"
-            )}>
+            <span className="text-white text-center leading-tight break-words text-[10px]">
               {item.label}
             </span>
             {item.sublabel && (

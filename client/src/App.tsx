@@ -71,6 +71,9 @@ function App() {
                 <Route path="/admin" component={TechnicalModule} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 
+                <Route path="/cert-surveys" component={TechnicalModule} />
+                <Route path="/cert-surveys/:subpage" component={TechnicalModule} />
+                
                 <Route path="/test-e2e" component={TestE2E} />
                 <Route component={NotFound} />
               </Switch>

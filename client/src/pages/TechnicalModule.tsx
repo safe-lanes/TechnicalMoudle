@@ -56,6 +56,11 @@ export const TechnicalModule: React.FC = () => {
       return { subModule: "pms", menuItem: "stores" };
     } else if (location.startsWith("/reports")) {
       return { subModule: "pms", menuItem: "reports" };
+    } else if (location === "/cert-surveys") {
+      return { subModule: "cert-surveys", menuItem: "certificates" };
+    } else if (location.startsWith("/cert-surveys/")) {
+      const subpage = location.replace("/cert-surveys/", "");
+      return { subModule: "cert-surveys", menuItem: subpage };
     }
     return { subModule: "pms", menuItem: "dashboard" };
   };
@@ -152,6 +157,17 @@ export const TechnicalModule: React.FC = () => {
             <DefectsResolved />
           ) : selectedSubModule === "defects" && selectedMenuItem === "reports" ? (
             <DefectsReports />
+          ) : selectedSubModule === "cert-surveys" ? (
+            <div className="p-6">
+              <div className="bg-white rounded-lg shadow-sm p-6 min-h-[calc(100vh-150px)]">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                  {selectedMenuItem === "certificates" ? "Certificates" : "Surveys"}
+                </h2>
+                <p className="text-gray-500">
+                  Content coming soon.
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
