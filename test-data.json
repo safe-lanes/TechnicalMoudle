@@ -14548,8 +14548,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "511": {
-      "id": 511,
+    "513": {
+      "id": 513,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14558,10 +14558,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-04T18:15:39.521Z"
+      "updatedAt": "2025-12-04T18:42:52.413Z"
     },
-    "512": {
-      "id": 512,
+    "514": {
+      "id": 514,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14570,24 +14570,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-04T18:15:39.558Z"
+      "updatedAt": "2025-12-04T18:42:52.461Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 511,
+      "recurringId": 513,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 511,
+      "recurringId": 513,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 512,
+      "recurringId": 514,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 512,
+      "recurringId": 514,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -49545,8 +49545,8 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "3000",
-      "robLocationA": "1800",
+      "rob": "2850",
+      "robLocationA": "1650",
       "robLocationB": "1200",
       "min": "1500",
       "locationA": "Engine Store",
@@ -49557,7 +49557,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:24.662Z",
-      "updatedAt": "2025-12-04T18:11:24.662Z"
+      "updatedAt": "2025-12-04T18:43:35.559Z"
     },
     "22": {
       "id": 22,
@@ -49566,8 +49566,8 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "2500",
-      "robLocationA": "1500",
+      "rob": "2380",
+      "robLocationA": "1380",
       "robLocationB": "1000",
       "min": "1200",
       "locationA": "Engine Store",
@@ -49578,7 +49578,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:24.710Z",
-      "updatedAt": "2025-12-04T18:11:24.710Z"
+      "updatedAt": "2025-12-04T18:43:35.610Z"
     },
     "23": {
       "id": 23,
@@ -49587,8 +49587,8 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "1200",
-      "robLocationA": "700",
+      "rob": "1120",
+      "robLocationA": "620",
       "robLocationB": "500",
       "min": "600",
       "locationA": "Pump Room",
@@ -49599,7 +49599,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:24.758Z",
-      "updatedAt": "2025-12-04T18:11:24.758Z"
+      "updatedAt": "2025-12-04T18:43:35.610Z"
     },
     "24": {
       "id": 24,
@@ -49629,8 +49629,8 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "kg",
-      "rob": "250",
-      "robLocationA": "150",
+      "rob": "225",
+      "robLocationA": "125",
       "robLocationB": "100",
       "min": "125",
       "locationA": "Engine Store",
@@ -49641,7 +49641,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:24.856Z",
-      "updatedAt": "2025-12-04T18:11:24.856Z"
+      "updatedAt": "2025-12-04T18:43:35.610Z"
     },
     "26": {
       "id": 26,
@@ -49713,8 +49713,8 @@
       "itemType": "lubes",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "600",
-      "robLocationA": "350",
+      "rob": "550",
+      "robLocationA": "300",
       "robLocationB": "250",
       "min": "300",
       "locationA": "Main Deck Locker",
@@ -49725,7 +49725,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:25.088Z",
-      "updatedAt": "2025-12-04T18:11:25.088Z"
+      "updatedAt": "2025-12-04T18:43:35.656Z"
     },
     "30": {
       "id": 30,
@@ -49755,8 +49755,8 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "500",
-      "robLocationA": "300",
+      "rob": "450",
+      "robLocationA": "250",
       "robLocationB": "200",
       "min": "250",
       "locationA": "Engine Store",
@@ -49767,7 +49767,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:52.244Z",
-      "updatedAt": "2025-12-04T18:11:52.244Z"
+      "updatedAt": "2025-12-04T18:43:49.619Z"
     },
     "32": {
       "id": 32,
@@ -49776,8 +49776,8 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "kg",
-      "rob": "150",
-      "robLocationA": "90",
+      "rob": "135",
+      "robLocationA": "75",
       "robLocationB": "60",
       "min": "75",
       "locationA": "Boiler Room",
@@ -49788,7 +49788,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:52.331Z",
-      "updatedAt": "2025-12-04T18:11:52.331Z"
+      "updatedAt": "2025-12-04T18:43:49.667Z"
     },
     "33": {
       "id": 33,
@@ -49818,8 +49818,8 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "400",
-      "robLocationA": "250",
+      "rob": "360",
+      "robLocationA": "210",
       "robLocationB": "150",
       "min": "200",
       "locationA": "Main Deck Locker",
@@ -49830,7 +49830,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:52.421Z",
-      "updatedAt": "2025-12-04T18:11:52.421Z"
+      "updatedAt": "2025-12-04T18:43:49.667Z"
     },
     "35": {
       "id": 35,
@@ -49839,8 +49839,8 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "pcs",
-      "rob": "200",
-      "robLocationA": "120",
+      "rob": "180",
+      "robLocationA": "100",
       "robLocationB": "80",
       "min": "100",
       "locationA": "Paint Locker",
@@ -49851,7 +49851,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:52.476Z",
-      "updatedAt": "2025-12-04T18:11:52.476Z"
+      "updatedAt": "2025-12-04T18:43:49.667Z"
     },
     "36": {
       "id": 36,
@@ -49881,8 +49881,8 @@
       "itemType": "chemicals",
       "storesCategory": null,
       "uom": "kg",
-      "rob": "100",
-      "robLocationA": "60",
+      "rob": "90",
+      "robLocationA": "50",
       "robLocationB": "40",
       "min": "50",
       "locationA": "Tank Room",
@@ -49893,7 +49893,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:11:52.591Z",
-      "updatedAt": "2025-12-04T18:11:52.591Z"
+      "updatedAt": "2025-12-04T18:43:49.700Z"
     },
     "38": {
       "id": 38,
@@ -49965,8 +49965,8 @@
       "itemType": "others",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "400",
-      "robLocationA": "240",
+      "rob": "360",
+      "robLocationA": "200",
       "robLocationB": "160",
       "min": "200",
       "locationA": "Paint Locker",
@@ -49977,7 +49977,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:12:15.886Z",
-      "updatedAt": "2025-12-04T18:12:15.886Z"
+      "updatedAt": "2025-12-04T18:43:53.295Z"
     },
     "42": {
       "id": 42,
@@ -49986,8 +49986,8 @@
       "itemType": "others",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "350",
-      "robLocationA": "210",
+      "rob": "315",
+      "robLocationA": "175",
       "robLocationB": "140",
       "min": "175",
       "locationA": "Paint Locker",
@@ -49998,7 +49998,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:12:15.943Z",
-      "updatedAt": "2025-12-04T18:12:15.943Z"
+      "updatedAt": "2025-12-04T18:43:53.329Z"
     },
     "43": {
       "id": 43,
@@ -50007,8 +50007,8 @@
       "itemType": "others",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "300",
-      "robLocationA": "180",
+      "rob": "270",
+      "robLocationA": "150",
       "robLocationB": "120",
       "min": "150",
       "locationA": "Paint Locker",
@@ -50019,7 +50019,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:12:15.984Z",
-      "updatedAt": "2025-12-04T18:12:15.984Z"
+      "updatedAt": "2025-12-04T18:43:53.329Z"
     },
     "44": {
       "id": 44,
@@ -50070,8 +50070,8 @@
       "itemType": "others",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "120",
-      "robLocationA": "70",
+      "rob": "108",
+      "robLocationA": "58",
       "robLocationB": "50",
       "min": "60",
       "locationA": "Paint Locker",
@@ -50082,7 +50082,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:12:16.154Z",
-      "updatedAt": "2025-12-04T18:12:16.154Z"
+      "updatedAt": "2025-12-04T18:43:53.330Z"
     },
     "47": {
       "id": 47,
@@ -50112,8 +50112,8 @@
       "itemType": "others",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "150",
-      "robLocationA": "90",
+      "rob": "135",
+      "robLocationA": "75",
       "robLocationB": "60",
       "min": "75",
       "locationA": "Paint Locker",
@@ -50124,7 +50124,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-04T18:12:16.237Z",
-      "updatedAt": "2025-12-04T18:12:16.237Z"
+      "updatedAt": "2025-12-04T18:43:53.398Z"
     },
     "49": {
       "id": 49,
@@ -50169,7 +50169,248 @@
       "updatedAt": "2025-12-04T18:12:16.346Z"
     }
   },
-  "storesLedger": [],
+  "storesLedger": [
+    {
+      "id": 1,
+      "storesItemId": 21,
+      "transactionType": "issue",
+      "quantity": "150",
+      "location": "A",
+      "robAfter": "2850",
+      "robLocationAAfter": "1650",
+      "robLocationBAfter": "1200",
+      "reason": "Main Engine routine top-up",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:35.559Z"
+    },
+    {
+      "id": 2,
+      "storesItemId": 22,
+      "transactionType": "issue",
+      "quantity": "120",
+      "location": "A",
+      "robAfter": "2380",
+      "robLocationAAfter": "1380",
+      "robLocationBAfter": "1000",
+      "reason": "Aux Engine oil change",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:35.610Z"
+    },
+    {
+      "id": 3,
+      "storesItemId": 23,
+      "transactionType": "issue",
+      "quantity": "80",
+      "location": "A",
+      "robAfter": "1120",
+      "robLocationAAfter": "620",
+      "robLocationBAfter": "500",
+      "reason": "Hydraulic system replenishment",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:35.610Z"
+    },
+    {
+      "id": 4,
+      "storesItemId": 25,
+      "transactionType": "issue",
+      "quantity": "25",
+      "location": "A",
+      "robAfter": "225",
+      "robLocationAAfter": "125",
+      "robLocationBAfter": "100",
+      "reason": "Stern tube bearing greasing",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:35.610Z"
+    },
+    {
+      "id": 5,
+      "storesItemId": 29,
+      "transactionType": "issue",
+      "quantity": "50",
+      "location": "A",
+      "robAfter": "550",
+      "robLocationAAfter": "300",
+      "robLocationBAfter": "250",
+      "reason": "Gearbox oil top-up",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:35.656Z"
+    },
+    {
+      "id": 6,
+      "storesItemId": 31,
+      "transactionType": "issue",
+      "quantity": "50",
+      "location": "A",
+      "robAfter": "450",
+      "robLocationAAfter": "250",
+      "robLocationBAfter": "200",
+      "reason": "Bilge well cleaning",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:49.619Z"
+    },
+    {
+      "id": 7,
+      "storesItemId": 32,
+      "transactionType": "issue",
+      "quantity": "15",
+      "location": "A",
+      "robAfter": "135",
+      "robLocationAAfter": "75",
+      "robLocationBAfter": "60",
+      "reason": "Boiler water treatment routine",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:49.667Z"
+    },
+    {
+      "id": 8,
+      "storesItemId": 34,
+      "transactionType": "issue",
+      "quantity": "40",
+      "location": "A",
+      "robAfter": "360",
+      "robLocationAAfter": "210",
+      "robLocationBAfter": "150",
+      "reason": "Deck washing operations",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:49.667Z"
+    },
+    {
+      "id": 9,
+      "storesItemId": 35,
+      "transactionType": "issue",
+      "quantity": "20",
+      "location": "A",
+      "robAfter": "180",
+      "robLocationAAfter": "100",
+      "robLocationBAfter": "80",
+      "reason": "Machinery rust prevention",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:49.667Z"
+    },
+    {
+      "id": 10,
+      "storesItemId": 37,
+      "transactionType": "issue",
+      "quantity": "10",
+      "location": "A",
+      "robAfter": "90",
+      "robLocationAAfter": "50",
+      "robLocationBAfter": "40",
+      "reason": "Water tank treatment",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:49.700Z"
+    },
+    {
+      "id": 11,
+      "storesItemId": 41,
+      "transactionType": "issue",
+      "quantity": "40",
+      "location": "A",
+      "robAfter": "360",
+      "robLocationAAfter": "200",
+      "robLocationBAfter": "160",
+      "reason": "Superstructure touch-up painting",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:53.295Z"
+    },
+    {
+      "id": 12,
+      "storesItemId": 42,
+      "transactionType": "issue",
+      "quantity": "35",
+      "location": "A",
+      "robAfter": "315",
+      "robLocationAAfter": "175",
+      "robLocationBAfter": "140",
+      "reason": "Hull maintenance painting",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:53.329Z"
+    },
+    {
+      "id": 13,
+      "storesItemId": 43,
+      "transactionType": "issue",
+      "quantity": "30",
+      "location": "A",
+      "robAfter": "270",
+      "robLocationAAfter": "150",
+      "robLocationBAfter": "120",
+      "reason": "Deck repainting work",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:53.329Z"
+    },
+    {
+      "id": 14,
+      "storesItemId": 46,
+      "transactionType": "issue",
+      "quantity": "12",
+      "location": "A",
+      "robAfter": "108",
+      "robLocationAAfter": "58",
+      "robLocationBAfter": "50",
+      "reason": "Safety marking painting",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:53.330Z"
+    },
+    {
+      "id": 15,
+      "storesItemId": 48,
+      "transactionType": "issue",
+      "quantity": "15",
+      "location": "A",
+      "robAfter": "135",
+      "robLocationAAfter": "75",
+      "robLocationBAfter": "60",
+      "reason": "Funnel maintenance",
+      "place": null,
+      "dateLocal": null,
+      "tz": null,
+      "createdBy": "1",
+      "createdAt": "2025-12-04T18:43:53.398Z"
+    }
+  ],
   "makersList": {
     "1": {
       "id": 1,
@@ -56526,11 +56767,11 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 513,
+    "recurringDefectId": 515,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
-    "storesLedgerId": 1,
+    "storesLedgerId": 16,
     "makersListId": 9,
     "sfiDetailsListId": 1,
     "masterDataId": 1,
