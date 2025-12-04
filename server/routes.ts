@@ -5471,6 +5471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endorsementDate: '01 Sep 2024',
           lastEditUpload: '01 Sep 2024',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'C2',
@@ -5484,6 +5485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endorsementDate: '',
           lastEditUpload: '',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'C3',
@@ -5497,6 +5499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endorsementDate: '15 Mar 2024',
           lastEditUpload: '20 Oct 2024',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'C4',
@@ -5510,6 +5513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endorsementDate: '01 Jan 2024',
           lastEditUpload: '15 Nov 2024',
           applicable: false,
+          attachments: [],
         },
         {
           id: 'C5',
@@ -5523,6 +5527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endorsementDate: '10 Jun 2024',
           lastEditUpload: '25 Sep 2024',
           applicable: true,
+          attachments: [],
         },
       ];
       for (const cert of sampleCertificates) {
@@ -5606,6 +5611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           postponed: '01 Sep 2024',
           lastEdit: '01 Sep 2024',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'S2',
@@ -5619,6 +5625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           postponed: '',
           lastEdit: '',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'S3',
@@ -5632,6 +5639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           postponed: '',
           lastEdit: '20 Oct 2024',
           applicable: true,
+          attachments: [],
         },
         {
           id: 'S4',
@@ -5645,6 +5653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           postponed: '01 Mar 2024',
           lastEdit: '15 Nov 2024',
           applicable: false,
+          attachments: [],
         },
         {
           id: 'S5',
@@ -5658,6 +5667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           postponed: '',
           lastEdit: '25 Sep 2024',
           applicable: true,
+          attachments: [],
         },
       ];
       for (const survey of sampleSurveys) {

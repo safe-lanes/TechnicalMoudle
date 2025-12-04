@@ -7890,16 +7890,21 @@ export class PersistentFileStorage implements IStorage {
   // =====================================================
   
   async getCertificates(): Promise<any[]> {
-    return Object.values(this.data.certificates || {});
+    return Object.values(this.data.certificates || {}).map(cert => ({
+      ...cert,
+      attachments: cert.attachments || []
+    }));
   }
   
   async getCertificate(id: string): Promise<any | undefined> {
-    return this.data.certificates?.[id];
+    const cert = this.data.certificates?.[id];
+    if (!cert) return undefined;
+    return { ...cert, attachments: cert.attachments || [] };
   }
   
   async createCertificate(certificate: any): Promise<any> {
     const id = certificate.id || `C${Date.now()}`;
-    const newCert = { ...certificate, id };
+    const newCert = { ...certificate, id, attachments: certificate.attachments || [] };
     if (!this.data.certificates) {
       this.data.certificates = {};
     }
@@ -7938,16 +7943,21 @@ export class PersistentFileStorage implements IStorage {
   // =====================================================
   
   async getSurveys(): Promise<any[]> {
-    return Object.values(this.data.surveys || {});
+    return Object.values(this.data.surveys || {}).map(survey => ({
+      ...survey,
+      attachments: survey.attachments || []
+    }));
   }
   
   async getSurvey(id: string): Promise<any | undefined> {
-    return this.data.surveys?.[id];
+    const survey = this.data.surveys?.[id];
+    if (!survey) return undefined;
+    return { ...survey, attachments: survey.attachments || [] };
   }
   
   async createSurvey(survey: any): Promise<any> {
     const id = survey.id || `S${Date.now()}`;
-    const newSurvey = { ...survey, id };
+    const newSurvey = { ...survey, id, attachments: survey.attachments || [] };
     if (!this.data.surveys) {
       this.data.surveys = {};
     }
