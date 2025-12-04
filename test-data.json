@@ -9275,8 +9275,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "121": {
-      "id": 121,
+    "147": {
+      "id": 147,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -9285,10 +9285,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-04T07:19:32.401Z"
+      "updatedAt": "2025-12-04T07:50:22.167Z"
     },
-    "122": {
-      "id": 122,
+    "148": {
+      "id": 148,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -9297,24 +9297,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-04T07:19:32.448Z"
+      "updatedAt": "2025-12-04T07:50:22.201Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 121,
+      "recurringId": 147,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 121,
+      "recurringId": 147,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 122,
+      "recurringId": 148,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 122,
+      "recurringId": 148,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -44293,6 +44293,73 @@
     }
   },
   "componentClassRegulatory": {},
+  "certificates": {
+    "C1": {
+      "id": "C1",
+      "certificateName": "International Ballast Water Management Certificate",
+      "type": "Flag",
+      "vessel": "Vessel Name Extra Long 1",
+      "issueDate": "01 Sep 2019",
+      "expiryDate": "01 Sep 2024",
+      "lastAnnual": "01 Sep 2024",
+      "lastInterm": "01 Sep 2024",
+      "endorsementDate": "01 Sep 2024",
+      "lastEditUpload": "01 Sep 2024",
+      "applicable": true
+    },
+    "C2": {
+      "id": "C2",
+      "certificateName": "International Ballast Water Management Certificate",
+      "type": "Flag",
+      "vessel": "Vessel Name Extra Long 1",
+      "issueDate": "01 Sep 2019",
+      "expiryDate": "",
+      "lastAnnual": "",
+      "lastInterm": "",
+      "endorsementDate": "",
+      "lastEditUpload": "",
+      "applicable": true
+    },
+    "C3": {
+      "id": "C3",
+      "certificateName": "Safety Management Certificate",
+      "type": "Class",
+      "vessel": "Pacific Explorer",
+      "issueDate": "15 Mar 2020",
+      "expiryDate": "15 Mar 2025",
+      "lastAnnual": "15 Mar 2024",
+      "lastInterm": "15 Sep 2023",
+      "endorsementDate": "15 Mar 2024",
+      "lastEditUpload": "20 Oct 2024",
+      "applicable": true
+    },
+    "C4": {
+      "id": "C4",
+      "certificateName": "International Oil Pollution Prevention Certificate",
+      "type": "Flag",
+      "vessel": "Atlantic Voyager",
+      "issueDate": "01 Jan 2021",
+      "expiryDate": "01 Jan 2026",
+      "lastAnnual": "01 Jan 2024",
+      "lastInterm": "01 Jul 2023",
+      "endorsementDate": "01 Jan 2024",
+      "lastEditUpload": "15 Nov 2024",
+      "applicable": false
+    },
+    "C5": {
+      "id": "C5",
+      "certificateName": "Cargo Ship Safety Equipment Certificate",
+      "type": "Class",
+      "vessel": "Northern Star",
+      "issueDate": "10 Jun 2022",
+      "expiryDate": "10 Jun 2027",
+      "lastAnnual": "10 Jun 2024",
+      "lastInterm": "",
+      "endorsementDate": "10 Jun 2024",
+      "lastEditUpload": "25 Sep 2024",
+      "applicable": true
+    }
+  },
   "counters": {
     "userId": 1,
     "auditId": 20,
@@ -44312,7 +44379,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 123,
+    "recurringDefectId": 149,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 21,

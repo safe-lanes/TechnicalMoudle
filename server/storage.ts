@@ -638,6 +638,13 @@ export interface IStorage {
   assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel>;
   getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>>;
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
+  
+  // Certificate methods for Cert & Surveys module
+  getCertificates(): Promise<any[]>;
+  getCertificate(id: string): Promise<any | undefined>;
+  createCertificate(certificate: any): Promise<any>;
+  updateCertificate(id: string, data: any): Promise<any>;
+  deleteCertificate(id: string): Promise<void>;
 }
 
 // Helper function to normalize and validate immediateCause structure

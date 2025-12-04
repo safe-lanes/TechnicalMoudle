@@ -224,6 +224,7 @@ interface PersistentData {
   componentMaintenanceHistory: Record<number, any>;
   componentDocuments: Record<number, any>;
   componentClassRegulatory: Record<number, any>;
+  certificates: Record<string, any>;
   
   // Counter state
   counters: {
@@ -462,6 +463,7 @@ export class PersistentFileStorage implements IStorage {
           componentMaintenanceHistory: loadedData.componentMaintenanceHistory || {},
           componentDocuments: loadedData.componentDocuments || {},
           componentClassRegulatory: loadedData.componentClassRegulatory || {},
+          certificates: loadedData.certificates || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -686,6 +688,7 @@ export class PersistentFileStorage implements IStorage {
       componentMaintenanceHistory: {},
       componentDocuments: {},
       componentClassRegulatory: {},
+      certificates: {},
       counters: {
         userId: 1,
         auditId: 1,
@@ -7775,5 +7778,53 @@ export class PersistentFileStorage implements IStorage {
       totalFleetComponents: fleetComponents,
       totalMasterLists: activeMasterLists,
     };
+  }
+  
+  // =====================================================
+  // CERTIFICATES (CERT & SURVEYS MODULE)
+  // =====================================================
+  
+  async getCertificates(): Promise<any[]> {
+    return Object.values(this.data.certificates || {});
+  }
+  
+  async getCertificate(id: string): Promise<any | undefined> {
+    return this.data.certificates?.[id];
+  }
+  
+  async createCertificate(certificate: any): Promise<any> {
+    const id = certificate.id || `C${Date.now()}`;
+    const newCert = { ...certificate, id };
+    if (!this.data.certificates) {
+      this.data.certificates = {};
+    }
+    this.data.certificates[id] = newCert;
+    this.persistData();
+    console.log(`📋 Certificate ${id} created via storage layer`);
+    return newCert;
+  }
+  
+  async updateCertificate(id: string, data: any): Promise<any> {
+    if (!this.data.certificates?.[id]) {
+      throw new Error(`Certificate with id ${id} not found`);
+    }
+    const updated = {
+      ...this.data.certificates[id],
+      ...data,
+      id, // Ensure ID doesn't change
+    };
+    this.data.certificates[id] = updated;
+    this.persistData();
+    console.log(`📋 Certificate ${id} updated via storage layer:`, data);
+    return updated;
+  }
+  
+  async deleteCertificate(id: string): Promise<void> {
+    if (!this.data.certificates?.[id]) {
+      throw new Error(`Certificate with id ${id} not found`);
+    }
+    delete this.data.certificates[id];
+    this.persistData();
+    console.log(`📋 Certificate ${id} deleted via storage layer`);
   }
 }

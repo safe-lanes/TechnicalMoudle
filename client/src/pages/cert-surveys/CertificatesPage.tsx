@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Download, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const defaultFilterValue: VesselFilterValue = {
@@ -31,83 +33,25 @@ interface CertificateData {
   applicable: boolean;
 }
 
-const sampleCertificates: CertificateData[] = [
-  {
-    id: 'C1',
-    certificateName: 'International Ballast Water Management Certificate',
-    type: 'Flag',
-    vessel: 'Vessel Name Extra Long 1',
-    issueDate: '01 Sep 2019',
-    expiryDate: '01 Sep 2024',
-    lastAnnual: '01 Sep 2024',
-    lastInterm: '01 Sep 2024',
-    endorsementDate: '01 Sep 2024',
-    lastEditUpload: '01 Sep 2024',
-    applicable: true,
-  },
-  {
-    id: 'C2',
-    certificateName: 'International Ballast Water Management Certificate',
-    type: 'Flag',
-    vessel: 'Vessel Name Extra Long 1',
-    issueDate: '01 Sep 2019',
-    expiryDate: '',
-    lastAnnual: '',
-    lastInterm: '',
-    endorsementDate: '',
-    lastEditUpload: '',
-    applicable: true,
-  },
-  {
-    id: 'C3',
-    certificateName: 'Safety Management Certificate',
-    type: 'Class',
-    vessel: 'Pacific Explorer',
-    issueDate: '15 Mar 2020',
-    expiryDate: '15 Mar 2025',
-    lastAnnual: '15 Mar 2024',
-    lastInterm: '15 Sep 2023',
-    endorsementDate: '15 Mar 2024',
-    lastEditUpload: '20 Oct 2024',
-    applicable: true,
-  },
-  {
-    id: 'C4',
-    certificateName: 'International Oil Pollution Prevention Certificate',
-    type: 'Flag',
-    vessel: 'Atlantic Voyager',
-    issueDate: '01 Jan 2021',
-    expiryDate: '01 Jan 2026',
-    lastAnnual: '01 Jan 2024',
-    lastInterm: '01 Jul 2023',
-    endorsementDate: '01 Jan 2024',
-    lastEditUpload: '15 Nov 2024',
-    applicable: false,
-  },
-  {
-    id: 'C5',
-    certificateName: 'Cargo Ship Safety Equipment Certificate',
-    type: 'Class',
-    vessel: 'Northern Star',
-    issueDate: '10 Jun 2022',
-    expiryDate: '10 Jun 2027',
-    lastAnnual: '10 Jun 2024',
-    lastInterm: '',
-    endorsementDate: '10 Jun 2024',
-    lastEditUpload: '25 Sep 2024',
-    applicable: true,
-  },
-];
+interface ApplicableCellRendererProps extends ICellRendererParams {
+  onToggleApplicable?: (id: string, newValue: boolean) => void;
+}
 
-const ApplicableCellRenderer = (params: ICellRendererParams) => {
+const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   if (!params.colDef || !params.data) return null;
+  
+  const handleChange = (checked: boolean) => {
+    if (params.context?.onToggleApplicable) {
+      params.context.onToggleApplicable(params.data.id, checked);
+    }
+  };
   
   return (
     <div className="flex items-center justify-center h-full">
       <Checkbox 
         checked={params.value} 
-        disabled
-        className="data-[state=checked]:bg-[#52baf3] data-[state=checked]:border-[#52baf3]"
+        onCheckedChange={handleChange}
+        className="data-[state=checked]:bg-[#52baf3] data-[state=checked]:border-[#52baf3] cursor-pointer"
         data-testid={`checkbox-applicable-${params.data.id}`}
       />
     </div>
@@ -159,6 +103,11 @@ export default function CertificatesPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const { toast } = useToast();
+
+  const { data: certificates = [], isLoading: isLoadingCertificates } = useQuery<CertificateData[]>({
+    queryKey: ['/api/certificates'],
+  });
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
     queryKey: ['/api/vessels'],
@@ -167,6 +116,30 @@ export default function CertificatesPage() {
   const { data: fleets = [] } = useQuery<Fleet[]>({
     queryKey: ['/api/fleets'],
   });
+
+  const updateApplicableMutation = useMutation({
+    mutationFn: async ({ id, applicable }: { id: string; applicable: boolean }) => {
+      return apiRequest('PATCH', `/api/certificates/${id}`, { applicable });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/certificates'] });
+      toast({
+        title: 'Updated',
+        description: 'Certificate applicability updated successfully.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update certificate',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
+    updateApplicableMutation.mutate({ id, applicable: newValue });
+  }, [updateApplicableMutation]);
 
   const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
@@ -274,8 +247,12 @@ export default function CertificatesPage() {
       width: 100,
       cellRenderer: ApplicableCellRenderer,
       cellClass: 'flex items-center justify-center',
-      filter: false,
-      sortable: false,
+      filter: 'agSetColumnFilter',
+      filterParams: {
+        values: [true, false],
+        valueFormatter: (params: any) => params.value ? 'Yes' : 'No',
+      },
+      sortable: true,
       resizable: true,
     },
     {
@@ -309,6 +286,10 @@ export default function CertificatesPage() {
     };
   }, []);
 
+  const gridContext = useMemo(() => ({
+    onToggleApplicable: handleToggleApplicable,
+  }), [handleToggleApplicable]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-6 py-4 flex items-center justify-between">
@@ -341,27 +322,34 @@ export default function CertificatesPage() {
       <div className="px-6 py-4">
         <Card className="border-0 shadow-none bg-[#f7fafc] rounded-lg">
           <CardContent className="p-4 bg-[#f7fafc]">
-            <AgGridTable
-              rowData={sampleCertificates}
-              columnDefs={columnDefs}
-              onGridReady={onGridReady}
-              autoHeight={true}
-              maxHeight="calc(100vh - 280px)"
-              minHeight="200px"
-              width="100%"
-              enableExport={true}
-              enableSideBar={true}
-              enableStatusBar={true}
-              enableRowGrouping={true}
-              enablePivoting={true}
-              enableAdvancedFilter={false}
-              rowSelection={false}
-              theme="alpine"
-            />
+            {isLoadingCertificates ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-gray-500">Loading certificates...</div>
+              </div>
+            ) : (
+              <AgGridTable
+                rowData={certificates}
+                columnDefs={columnDefs}
+                onGridReady={onGridReady}
+                context={gridContext}
+                autoHeight={true}
+                maxHeight="calc(100vh - 280px)"
+                minHeight="200px"
+                width="100%"
+                enableExport={true}
+                enableSideBar={true}
+                enableStatusBar={true}
+                enableRowGrouping={true}
+                enablePivoting={true}
+                enableAdvancedFilter={false}
+                rowSelection={false}
+                theme="alpine"
+              />
+            )}
             
             <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
-                Rows: {sampleCertificates.length}
+                Rows: {certificates.length}
               </div>
               <div>
                 <AgGridTableActions 

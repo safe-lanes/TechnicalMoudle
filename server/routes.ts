@@ -5291,6 +5291,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // ========================================
+  // CERTIFICATES API ROUTES
+  // ========================================
+  
+  // Initialize certificates with sample data if empty (uses storage layer)
+  const initializeCertificates = async () => {
+    const existingCerts = await storage.getCertificates();
+    if (existingCerts.length === 0) {
+      const sampleCertificates = [
+        {
+          id: 'C1',
+          certificateName: 'International Ballast Water Management Certificate',
+          type: 'Flag',
+          vessel: 'Vessel Name Extra Long 1',
+          issueDate: '01 Sep 2019',
+          expiryDate: '01 Sep 2024',
+          lastAnnual: '01 Sep 2024',
+          lastInterm: '01 Sep 2024',
+          endorsementDate: '01 Sep 2024',
+          lastEditUpload: '01 Sep 2024',
+          applicable: true,
+        },
+        {
+          id: 'C2',
+          certificateName: 'International Ballast Water Management Certificate',
+          type: 'Flag',
+          vessel: 'Vessel Name Extra Long 1',
+          issueDate: '01 Sep 2019',
+          expiryDate: '',
+          lastAnnual: '',
+          lastInterm: '',
+          endorsementDate: '',
+          lastEditUpload: '',
+          applicable: true,
+        },
+        {
+          id: 'C3',
+          certificateName: 'Safety Management Certificate',
+          type: 'Class',
+          vessel: 'Pacific Explorer',
+          issueDate: '15 Mar 2020',
+          expiryDate: '15 Mar 2025',
+          lastAnnual: '15 Mar 2024',
+          lastInterm: '15 Sep 2023',
+          endorsementDate: '15 Mar 2024',
+          lastEditUpload: '20 Oct 2024',
+          applicable: true,
+        },
+        {
+          id: 'C4',
+          certificateName: 'International Oil Pollution Prevention Certificate',
+          type: 'Flag',
+          vessel: 'Atlantic Voyager',
+          issueDate: '01 Jan 2021',
+          expiryDate: '01 Jan 2026',
+          lastAnnual: '01 Jan 2024',
+          lastInterm: '01 Jul 2023',
+          endorsementDate: '01 Jan 2024',
+          lastEditUpload: '15 Nov 2024',
+          applicable: false,
+        },
+        {
+          id: 'C5',
+          certificateName: 'Cargo Ship Safety Equipment Certificate',
+          type: 'Class',
+          vessel: 'Northern Star',
+          issueDate: '10 Jun 2022',
+          expiryDate: '10 Jun 2027',
+          lastAnnual: '10 Jun 2024',
+          lastInterm: '',
+          endorsementDate: '10 Jun 2024',
+          lastEditUpload: '25 Sep 2024',
+          applicable: true,
+        },
+      ];
+      for (const cert of sampleCertificates) {
+        await storage.createCertificate(cert);
+      }
+      console.log('📋 Initialized certificates data with sample data via storage layer');
+    }
+  };
+  
+  // Initialize on startup (async)
+  initializeCertificates();
+  
+  // GET all certificates
+  app.get("/api/certificates", async (req, res) => {
+    try {
+      const certificates = await storage.getCertificates();
+      res.json(certificates);
+    } catch (error) {
+      console.error("Error fetching certificates:", error);
+      res.status(500).json({ error: "Failed to fetch certificates" });
+    }
+  });
+  
+  // GET single certificate
+  app.get("/api/certificates/:id", async (req, res) => {
+    try {
+      const certificate = await storage.getCertificate(req.params.id);
+      if (!certificate) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      res.json(certificate);
+    } catch (error) {
+      console.error("Error fetching certificate:", error);
+      res.status(500).json({ error: "Failed to fetch certificate" });
+    }
+  });
+  
+  // PATCH update certificate (for toggling applicable status)
+  app.patch("/api/certificates/:id", async (req, res) => {
+    try {
+      const updatedCertificate = await storage.updateCertificate(req.params.id, req.body);
+      res.json(updatedCertificate);
+    } catch (error: any) {
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      console.error("Error updating certificate:", error);
+      res.status(500).json({ error: "Failed to update certificate" });
+    }
+  });
+  
+  // POST create new certificate
+  app.post("/api/certificates", async (req, res) => {
+    try {
+      const newCertificate = await storage.createCertificate(req.body);
+      res.status(201).json(newCertificate);
+    } catch (error) {
+      console.error("Error creating certificate:", error);
+      res.status(500).json({ error: "Failed to create certificate" });
+    }
+  });
   
   const httpServer = createServer(app);
   
