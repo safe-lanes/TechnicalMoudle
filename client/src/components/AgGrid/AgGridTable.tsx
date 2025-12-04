@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { 
   ColDef, 
@@ -33,37 +33,46 @@ import {
 } from 'ag-grid-enterprise';
 import { useViewport, getViewportConfig } from '@/hooks/useViewport';
 
-// Set AG Grid Enterprise License - check both possible environment variable names
-const licenseKey = import.meta.env.VITE_AG_GRID_LICENSE_KEY || import.meta.env.AG_GRID_LICENSE_KEY;
-if (licenseKey) {
-  LicenseManager.setLicenseKey(licenseKey);
-} else {
-  console.warn('AG Grid Enterprise license key not found. Please set VITE_AG_GRID_LICENSE_KEY environment variable.');
+// Set AG Grid Enterprise License with error handling
+// Note: AG Grid Enterprise runs in trial mode without a license key
+try {
+  const licenseKey = import.meta.env.VITE_AG_GRID_LICENSE_KEY || import.meta.env.AG_GRID_LICENSE_KEY;
+  if (licenseKey) {
+    LicenseManager.setLicenseKey(licenseKey);
+  } else if (typeof window !== 'undefined') {
+    console.warn('AG Grid Enterprise license key not found. Please set VITE_AG_GRID_LICENSE_KEY environment variable.');
+  }
+} catch (e) {
+  // Silently handle license-related errors
 }
 
-// Register AG Grid Enterprise modules
-ModuleRegistry.registerModules([
-  AllEnterpriseModule,
-  SetFilterModule,
-  MultiFilterModule,
-  MenuModule,
-  ColumnsToolPanelModule,
-  FiltersToolPanelModule,
-  StatusBarModule,
-  SideBarModule,
-  RangeSelectionModule,
-  RowGroupingModule,
-  AggregationModule,
-  PivotModule,
-  MasterDetailModule,
-  ViewportRowModelModule,
-  ServerSideRowModelModule,
-  InfiniteRowModelModule,
-  ExcelExportModule,
-  CsvExportModule,
-  ClipboardModule,
-  AdvancedFilterModule
-]);
+// Register AG Grid Enterprise modules with error handling
+try {
+  ModuleRegistry.registerModules([
+    AllEnterpriseModule,
+    SetFilterModule,
+    MultiFilterModule,
+    MenuModule,
+    ColumnsToolPanelModule,
+    FiltersToolPanelModule,
+    StatusBarModule,
+    SideBarModule,
+    RangeSelectionModule,
+    RowGroupingModule,
+    AggregationModule,
+    PivotModule,
+    MasterDetailModule,
+    ViewportRowModelModule,
+    ServerSideRowModelModule,
+    InfiniteRowModelModule,
+    ExcelExportModule,
+    CsvExportModule,
+    ClipboardModule,
+    AdvancedFilterModule
+  ]);
+} catch (e) {
+  // Silently handle module registration errors
+}
 
 export interface AgGridTableProps {
   rowData: any[];
@@ -363,15 +372,21 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
     // Calculate default domLayout, but allow override from gridOptions
     const defaultDomLayout = needsScroll ? ('normal' as const) : ('autoHeight' as const);
     
+    // Filter out any data-* attributes that may be injected by wrappers
+    // AG Grid doesn't accept these and will show warnings
+    const filteredGridOptions = Object.fromEntries(
+      Object.entries(gridOptions).filter(([key]) => !key.startsWith('data-'))
+    );
+    
     return {
       ...defaultGridOptions,
-      ...gridOptions,
+      ...filteredGridOptions,
       // Only set these defaults if not explicitly provided in gridOptions
-      alwaysShowVerticalScroll: gridOptions.alwaysShowVerticalScroll ?? false,
-      suppressHorizontalScroll: gridOptions.suppressHorizontalScroll ?? false,
-      suppressScrollOnNewData: gridOptions.suppressScrollOnNewData ?? true,
+      alwaysShowVerticalScroll: filteredGridOptions.alwaysShowVerticalScroll ?? false,
+      suppressHorizontalScroll: filteredGridOptions.suppressHorizontalScroll ?? false,
+      suppressScrollOnNewData: filteredGridOptions.suppressScrollOnNewData ?? true,
       // Allow domLayout override from gridOptions, otherwise use calculated default
-      domLayout: gridOptions.domLayout ?? defaultDomLayout
+      domLayout: filteredGridOptions.domLayout ?? defaultDomLayout
     };
   }, [defaultGridOptions, gridOptions, autoHeight, rowData.length, enableStatusBar]);
 
