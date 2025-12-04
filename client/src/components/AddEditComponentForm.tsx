@@ -51,6 +51,9 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   const { canViewDocument, canDownloadDocument } = useAuth();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A"]));
   const [isSaving, setIsSaving] = useState(false);
+  // Track which sections show all rows (default: only 2 rows preview)
+  const [showAllRows, setShowAllRows] = useState<Set<string>>(new Set());
+  const PREVIEW_ROW_LIMIT = 2;
 
   const isEditMode = !!componentId;
 
@@ -120,6 +123,11 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   const { data: classRegData = [], isLoading: isLoadingClassReg } = useQuery<any[]>({
     queryKey: ['/api/component-class-regulatory', componentId],
+    enabled: isEditMode && !!componentId,
+  });
+
+  const { data: requisitions = [], isLoading: isLoadingRequisitions } = useQuery<any[]>({
+    queryKey: ['/api/component-requisitions', componentId],
     enabled: isEditMode && !!componentId,
   });
 
@@ -290,6 +298,24 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       }
       return newSet;
     });
+  };
+
+  const toggleShowAllRows = (sectionId: string) => {
+    setShowAllRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper to get limited data for preview
+  const getPreviewData = <T,>(data: T[], sectionId: string): T[] => {
+    if (showAllRows.has(sectionId)) return data;
+    return data.slice(0, PREVIEW_ROW_LIMIT);
   };
 
   const formSections = [
@@ -743,7 +769,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     </td>
                                   </tr>
                                 ) : (
-                                  componentJobs.map((job, index) => (
+                                  getPreviewData(componentJobs, "C").map((job, index) => (
                                     <tr
                                       key={index}
                                       className="border-b border-gray-100 hover:bg-gray-50"
@@ -760,6 +786,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                 )}
                               </tbody>
                             </table>
+                            {componentJobs.length > PREVIEW_ROW_LIMIT && (
+                              <div className="text-center mt-2">
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => toggleShowAllRows("C")}
+                                  className="text-[#16569e] text-xs"
+                                  data-testid="button-toggle-jobs"
+                                >
+                                  {showAllRows.has("C") ? `Show Less` : `View More (${componentJobs.length - PREVIEW_ROW_LIMIT} more)`}
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -808,7 +847,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {maintenanceHistory.map((record, index) => (
+                                    {getPreviewData(maintenanceHistory, "D").map((record, index) => (
                                       <tr
                                         key={index}
                                         className="border-b border-gray-100 hover:bg-blue-50"
@@ -830,10 +869,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     ))}
                                   </tbody>
                                 </table>
-                              </div>
-
-                              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                                💡 Click on a record to view full details including work description, spares used, and remarks (feature coming soon)
+                                {maintenanceHistory.length > PREVIEW_ROW_LIMIT && (
+                                  <div className="text-center mt-2">
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      onClick={() => toggleShowAllRows("D")}
+                                      className="text-[#16569e] text-xs"
+                                      data-testid="button-toggle-maintenance"
+                                    >
+                                      {showAllRows.has("D") ? `Show Less` : `View More (${maintenanceHistory.length - PREVIEW_ROW_LIMIT} more)`}
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -874,7 +922,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {componentSpares.map((spare, index) => (
+                                  {getPreviewData(componentSpares, "E").map((spare, index) => (
                                     <tr key={index} className="border-b border-gray-100">
                                       <td className="py-3 px-3 text-gray-900">{spare.partCode}</td>
                                       <td className="py-3 px-3 text-gray-900">{spare.partName}</td>
@@ -906,6 +954,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                   ))}
                                 </tbody>
                               </table>
+                              {componentSpares.length > PREVIEW_ROW_LIMIT && (
+                                <div className="text-center mt-2">
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => toggleShowAllRows("E")}
+                                    className="text-[#16569e] text-xs"
+                                    data-testid="button-toggle-spares"
+                                  >
+                                    {showAllRows.has("E") ? `Show Less` : `View More (${componentSpares.length - PREVIEW_ROW_LIMIT} more)`}
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -946,7 +1007,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                               </div>
 
                               <div className="grid grid-cols-2 gap-3">
-                                {documents.filter(doc => canViewDocument(doc)).map((doc, index) => {
+                                {getPreviewData(documents.filter(doc => canViewDocument(doc)), "F").map((doc, index) => {
                                   const IconComponent = getFileTypeIcon(doc.fileType);
                                   const hasDownloadAccess = canDownloadDocument(doc);
 
@@ -973,10 +1034,19 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                   );
                                 })}
                               </div>
-
-                              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                                💡 Document access is controlled by role-based permissions
-                              </div>
+                              {documents.filter(doc => canViewDocument(doc)).length > PREVIEW_ROW_LIMIT && (
+                                <div className="text-center mt-2">
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => toggleShowAllRows("F")}
+                                    className="text-[#16569e] text-xs"
+                                    data-testid="button-toggle-documents"
+                                  >
+                                    {showAllRows.has("F") ? `Show Less` : `View More (${documents.filter(doc => canViewDocument(doc)).length - PREVIEW_ROW_LIMIT} more)`}
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1029,7 +1099,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {classRegData.map((item, index) => (
+                                    {getPreviewData(classRegData, "G").map((item, index) => (
                                       <tr key={index} className="border-b border-gray-100">
                                         <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
                                         <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
@@ -1047,21 +1117,107 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                     ))}
                                   </tbody>
                                 </table>
+                                {classRegData.length > PREVIEW_ROW_LIMIT && (
+                                  <div className="text-center mt-2">
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      onClick={() => toggleShowAllRows("G")}
+                                      className="text-[#16569e] text-xs"
+                                      data-testid="button-toggle-classreg"
+                                    >
+                                      {showAllRows.has("G") ? `Show Less` : `View More (${classRegData.length - PREVIEW_ROW_LIMIT} more)`}
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
                         </div>
                       )}
 
-                      {/* Section H: Requisitions - EXACT REPLICA */}
+                      {/* Section H: Requisitions */}
                       {section.id === "H" && (
-                        <div className="text-center py-8">
-                          <div className="text-gray-400 text-sm">
-                            Requisitions section - future enhancement
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Will display component-related purchase and service requisitions
-                          </p>
+                        <div>
+                          {!isEditMode ? (
+                            <div className="text-sm text-gray-500">
+                              Requisitions will be available after component is created
+                            </div>
+                          ) : isLoadingRequisitions ? (
+                            <div className="text-sm text-gray-500">Loading requisitions...</div>
+                          ) : requisitions.length === 0 ? (
+                            <div className="text-center py-8">
+                              <div className="text-gray-400 text-sm">
+                                No requisitions found for this component
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2">
+                                Requisitions for spares and services will appear here
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="text-sm text-gray-600">
+                                  <span className="font-semibold">{requisitions.length}</span> requisition(s)
+                                </div>
+                              </div>
+
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-gray-200">
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Req. No</th>
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Item/Service</th>
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Qty</th>
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Raised On</th>
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Priority</th>
+                                      <th className="text-left py-2 px-3 font-medium text-gray-600">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {getPreviewData(requisitions, "H").map((req, index) => (
+                                      <tr key={index} className="border-b border-gray-100">
+                                        <td className="py-3 px-3 text-gray-900 font-medium">{req.requisitionNo}</td>
+                                        <td className="py-3 px-3 text-gray-900">{req.itemOrService}</td>
+                                        <td className="py-3 px-3 text-gray-900">{req.quantity} {req.uom}</td>
+                                        <td className="py-3 px-3 text-gray-900">{req.raisedOn}</td>
+                                        <td className="py-3 px-3">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            req.priority === "Urgent" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
+                                          }`}>
+                                            {req.priority}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-3">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            req.status === "Delivered On Board" ? "bg-green-100 text-green-800" :
+                                            req.status === "PO Raised" ? "bg-blue-100 text-blue-800" :
+                                            req.status === "Draft" ? "bg-gray-100 text-gray-800" :
+                                            "bg-yellow-100 text-yellow-800"
+                                          }`}>
+                                            {req.status}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {requisitions.length > PREVIEW_ROW_LIMIT && (
+                                  <div className="text-center mt-2">
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      onClick={() => toggleShowAllRows("H")}
+                                      className="text-[#16569e] text-xs"
+                                      data-testid="button-toggle-requisitions"
+                                    >
+                                      {showAllRows.has("H") ? `Show Less` : `View More (${requisitions.length - PREVIEW_ROW_LIMIT} more)`}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
