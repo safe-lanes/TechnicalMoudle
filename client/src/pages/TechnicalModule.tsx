@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { TopMenuBar } from "@/components/TopMenuBar";
 import { SideMenuBar } from "@/components/SideMenuBar";
 import Dashboard from "./pms/Dashboard";
@@ -19,9 +19,11 @@ import DefectsReports from "./defects/DefectsReports";
 import DefectsCoC from "./defects/DefectsCoC";
 import DefectFormWizard from "./defects/DefectFormWizard";
 import RecurringDefects from "./RecurringDefects";
+import CertificatesPage from "./cert-surveys/CertificatesPage";
+import SurveysPage from "./cert-surveys/SurveysPage";
 import { useLocation, useParams } from "wouter";
 
-export const TechnicalModule: React.FC = () => {
+export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
   const params = useParams();
   
@@ -157,14 +159,10 @@ export const TechnicalModule: React.FC = () => {
             <DefectsResolved />
           ) : selectedSubModule === "defects" && selectedMenuItem === "reports" ? (
             <DefectsReports />
-          ) : selectedSubModule === "cert-surveys" ? (
-            <div className="min-h-screen bg-gray-50">
-              <div className="px-6 py-4">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {selectedMenuItem === "certificates" ? "Certificates" : "Surveys"}
-                </h1>
-              </div>
-            </div>
+          ) : selectedSubModule === "cert-surveys" && selectedMenuItem === "certificates" ? (
+            <CertificatesPage />
+          ) : selectedSubModule === "cert-surveys" && selectedMenuItem === "surveys" ? (
+            <SurveysPage />
           ) : (
             <div className="p-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
