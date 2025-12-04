@@ -437,14 +437,14 @@ export const AgGridTable: React.FC<AgGridTableProps> = ({
       }}
     >
       <AgGridReact
+        {...finalGridOptions}
         rowData={rowData}
         columnDefs={columnDefs}
+        context={context}
         onGridReady={handleGridReady}
         onCellValueChanged={onCellValueChanged}
-        context={context}
         singleClickEdit={singleClickEdit}
         stopEditingWhenCellsLoseFocus={stopEditingWhenCellsLoseFocus}
-        {...finalGridOptions}
       />
     </div>
   );

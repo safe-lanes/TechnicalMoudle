@@ -63,7 +63,9 @@ class DateCellEditor extends Component<ICellEditorParams, DateCellEditorState> {
   }
   
   getValue() {
-    return this.formatToDisplayDate(this.state.value);
+    const result = this.formatToDisplayDate(this.state.value);
+    console.log('[DateCellEditor] getValue called, returning:', result, 'from input value:', this.state.value);
+    return result;
   }
   
   isCancelBeforeStart() {
