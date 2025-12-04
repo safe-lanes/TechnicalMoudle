@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Eye, FileText, Paperclip } from 'lucide-react';
+import { Plus, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
@@ -88,26 +88,10 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
         variant="ghost" 
         size="icon" 
         className="h-7 w-7"
-        data-testid={`button-notes-${params.data.id}`}
-      >
-        <FileText className="h-4 w-4 text-gray-500" />
-      </Button>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7"
         onClick={handleAttachmentClick}
         data-testid={`button-attachment-${params.data.id}`}
       >
         <Paperclip className="h-4 w-4 text-gray-500" />
-      </Button>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7"
-        data-testid={`button-view-${params.data.id}`}
-      >
-        <Eye className="h-4 w-4 text-gray-500" />
       </Button>
     </div>
   );
@@ -337,7 +321,7 @@ export default function SurveysPage() {
     {
       headerName: 'Actions',
       field: 'actions',
-      width: 120,
+      width: 80,
       cellRenderer: ActionsCellRenderer,
       sortable: false,
       filter: false,
