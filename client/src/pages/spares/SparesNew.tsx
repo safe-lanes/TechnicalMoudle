@@ -1092,18 +1092,19 @@ const Spares: React.FC = () => {
           </div>
           <div className="flex gap-2 items-center">
             <Button 
-              variant="outline" 
-              className="flex items-center gap-2 text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3]/10"
+              variant="ghost" 
+              size="sm"
+              className="text-blue-600"
               onClick={exportSparesToExcel}
               data-testid="button-export-spares"
             >
-              <FileSpreadsheet className="h-4 w-4" />
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
               Export
             </Button>
-            <Button className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)}>
+            <Button size="sm" className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)}>
               + Add Spare
             </Button>
-            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={openBulkUpdateModal}>
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={openBulkUpdateModal}>
               🔄 Bulk Update Spares
             </Button>
           </div>
