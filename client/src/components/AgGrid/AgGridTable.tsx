@@ -33,6 +33,10 @@ import {
 } from 'ag-grid-enterprise';
 import { useViewport, getViewportConfig } from '@/hooks/useViewport';
 
+// Import AG Grid CSS - required for proper styling
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+
 // Set AG Grid Enterprise License with error handling
 // Note: AG Grid Enterprise runs in trial mode without a license key
 try {
