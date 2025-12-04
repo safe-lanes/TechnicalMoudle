@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,11 @@ import {
   Eye,
   Loader2
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface SparesReport {
   id: string;
@@ -53,6 +55,17 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: spares = [] } = useQuery<any[]>({
+    queryKey: ['/api/spares', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
+
+  const { data: spareHistory = [] } = useQuery<any[]>({
+    queryKey: ['/api/spares', vesselId, 'history'],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
 
   const reports: SparesReport[] = [
     {
@@ -126,45 +139,41 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
       estimatedTime: "3-5 min"
     },
     {
-      id: "spares-transaction-history",
-      name: "Transaction History Report",
-      description: "Comprehensive audit trail of all spare parts movements and transactions",
-      purpose: "Audit trail & compliance (Office/Auditors)",
-      frequency: "As Required",
-      fields: ["Date", "Part", "Transaction Type", "Qty", "User", "Location", "Remarks", "Running Balance"],
-      filters: ["Vessel", "Date Range", "Part", "Transaction Type", "User"],
+      id: "spares-inventory-snapshot",
+      name: "Current Inventory Snapshot",
+      description: "Complete inventory listing with stock levels and locations",
+      purpose: "Stock visibility & audit (All stakeholders)",
+      frequency: "Weekly",
+      fields: ["Part Code", "Part Name", "Component", "ROB", "Min", "Max", "Location", "Status"],
+      filters: ["Vessel", "Component", "Stock Status", "Location"],
       outputs: ["PDF", "Excel"],
-      icon: FileText,
-      priority: "low",
-      lastGenerated: "5 days ago",
-      estimatedTime: "2-3 min"
+      icon: Package,
+      priority: "medium",
+      lastGenerated: "1 day ago",
+      estimatedTime: "1-2 min"
     },
     {
-      id: "spares-critical-items",
-      name: "Critical Spares Monitoring",
-      description: "Dedicated monitoring for safety-critical and high-impact spare parts",
-      purpose: "Ensure critical item availability (Chief Eng/Office)",
-      frequency: "Daily",
-      fields: ["Critical Part", "ROB Status", "Risk Level", "Backup Options", "Lead Time", "Emergency Supplier", "Action Plan"],
-      filters: ["Vessel", "Risk Level", "ROB Status", "Department"],
-      outputs: ["PDF", "Excel", "Dashboard"],
-      icon: Package,
+      id: "spares-critical-parts",
+      name: "Critical Spares Report",
+      description: "Status of critical and essential spare parts inventory",
+      purpose: "Ensure critical equipment supportability (Office/Vessel)",
+      frequency: "Weekly",
+      fields: ["Part Code", "Part Name", "Equipment", "Criticality", "ROB", "Min Required", "Status"],
+      filters: ["Vessel", "Criticality Level", "Stock Status"],
+      outputs: ["PDF", "Dashboard"],
+      icon: AlertTriangle,
       priority: "high",
-      lastGenerated: "6 hours ago",
+      lastGenerated: "4 hours ago",
       estimatedTime: "< 1 min"
     }
   ];
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
-    
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFrequency = selectedFrequency === "all" || 
                            report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
     const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
-    
     return matchesSearch && matchesFrequency && matchesPriority;
   });
 
@@ -177,11 +186,227 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
     }
   };
 
-  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+  const getStockStatus = (rob: number, min: number): string => {
+    if (rob < min) return 'Low';
+    if (rob === min) return 'At Min';
+    return 'OK';
+  };
+
+  const generateSparesPDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+
+    switch (reportId) {
+      case 'spares-low-stock': {
+        const lowStockItems = spares.filter((s: any) => (s.rob || 0) <= (s.min || 0));
+
+        const columns = [
+          { header: 'Part Code', field: 'partCode', width: 35 },
+          { header: 'Part Name', field: 'partName', width: 55 },
+          { header: 'Component', field: 'componentName', width: 45 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Shortage', field: 'shortage', width: 25 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = lowStockItems.map((s: any) => ({
+          partCode: s.partCode || '-',
+          partName: s.partName || '-',
+          componentName: s.componentName || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          shortage: Math.max(0, (s.min || 0) - (s.rob || 0)),
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Low Stock Items', value: data.length },
+          { label: 'Critical', value: data.filter((d: any) => d.status === 'Low').length },
+          { label: 'At Minimum', value: data.filter((d: any) => d.status === 'At Min').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Low Stock Alert Report', subtitle: 'Items requiring immediate attention', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'spares-inventory-snapshot': {
+        const columns = [
+          { header: 'Part Code', field: 'partCode', width: 30 },
+          { header: 'Part Name', field: 'partName', width: 50 },
+          { header: 'Component', field: 'componentName', width: 40 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Location', field: 'location', width: 30 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = spares.map((s: any) => ({
+          partCode: s.partCode || '-',
+          partName: s.partName || '-',
+          componentName: s.componentName || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          location: s.location || '-',
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Total Items', value: data.length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
+          { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Inventory Snapshot', subtitle: 'Complete spares inventory listing', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'spares-critical-parts': {
+        const criticalParts = spares.filter((s: any) => 
+          s.critical === 'Critical' || s.critical === 'Yes' || s.criticality === 'Critical'
+        );
+
+        const columns = [
+          { header: 'Part Code', field: 'partCode', width: 35 },
+          { header: 'Part Name', field: 'partName', width: 55 },
+          { header: 'Component', field: 'componentName', width: 45 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = criticalParts.map((s: any) => ({
+          partCode: s.partCode || '-',
+          partName: s.partName || '-',
+          componentName: s.componentName || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Critical Parts', value: data.length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
+          { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Critical Spares Report', subtitle: 'Status of critical spare parts', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'spares-consumption-analysis': {
+        const consumptionData = spareHistory
+          .filter((h: any) => h.eventType === 'CONSUME')
+          .reduce((acc: Record<string, any>, h: any) => {
+            const key = h.partCode || h.spareId;
+            if (!acc[key]) {
+              acc[key] = { 
+                partCode: h.partCode, 
+                partName: h.partName, 
+                totalConsumed: 0, 
+                transactions: 0 
+              };
+            }
+            acc[key].totalConsumed += Math.abs(h.qtyChange || 0);
+            acc[key].transactions++;
+            return acc;
+          }, {});
+
+        const columns = [
+          { header: 'Part Code', field: 'partCode', width: 35 },
+          { header: 'Part Name', field: 'partName', width: 60 },
+          { header: 'Total Consumed', field: 'totalConsumed', width: 35 },
+          { header: 'Transactions', field: 'transactions', width: 30 },
+          { header: 'Avg Per Transaction', field: 'avgPerTransaction', width: 40 }
+        ];
+
+        const data = Object.values(consumptionData).map((item: any) => ({
+          ...item,
+          avgPerTransaction: item.transactions > 0 
+            ? (item.totalConsumed / item.transactions).toFixed(1) 
+            : '0'
+        }));
+
+        const summary = [
+          { label: 'Parts Consumed', value: data.length },
+          { label: 'Total Transactions', value: data.reduce((a: number, b: any) => a + b.transactions, 0) }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Consumption Pattern Analysis', subtitle: 'Historical consumption trends', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'spares-procurement-status':
+      case 'spares-cost-analysis':
+      case 'spares-turnover-analysis': {
+        const columns = [
+          { header: 'Part Code', field: 'partCode', width: 35 },
+          { header: 'Part Name', field: 'partName', width: 60 },
+          { header: 'ROB', field: 'rob', width: 25 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = spares.slice(0, 20).map((s: any) => ({
+          partCode: s.partCode || '-',
+          partName: s.partName || '-',
+          rob: s.rob || 0,
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const reportTitles: Record<string, string> = {
+          'spares-procurement-status': 'Procurement & Delivery Status',
+          'spares-cost-analysis': 'Inventory Cost Analysis',
+          'spares-turnover-analysis': 'Inventory Turnover Analysis'
+        };
+
+        pdfReportGenerator.generateReport(
+          { title: reportTitles[reportId], subtitle: 'Based on current inventory data', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      default:
+        toast({
+          title: "Report Not Available",
+          description: "This report type is not yet implemented",
+          variant: "destructive"
+        });
+    }
+  };
+
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
-    if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
+    if (generatingReports.has(reportKey)) return;
+
+    if (spares.length === 0) {
+      toast({
+        title: "No Data Available",
+        description: "No spares inventory data found for the selected vessel.",
+        variant: "destructive",
+      });
+      return;
     }
 
     try {
@@ -189,41 +414,27 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
       
       toast({
         title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
+        description: `Creating ${format} report...`,
       });
 
-      // Get current filters - use first available vessel
-      const vesselName = vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        priority: selectedPriority !== "all" ? selectedPriority : undefined,
-        search: searchQuery || undefined,
-      };
-
-      // For now, use the maintenance report generator - will create specific spares generator later
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'spares-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
-      
-      toast({
-        title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
-        variant: "default",
-      });
+      if (format === 'PDF') {
+        await generateSparesPDF(reportId);
+        toast({
+          title: "Report Generated",
+          description: `${format} report downloaded successfully!`,
+        });
+      } else {
+        toast({
+          title: "Excel Export",
+          description: "Excel export coming soon. PDF is currently available.",
+        });
+      }
       
     } catch (error) {
       console.error('Error generating report:', error);
       toast({
         title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
+        description: `Failed to generate report. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -235,14 +446,8 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
-    handleGenerateReport(reportId, 'PDF');
-  };
-
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
           <Button 
@@ -262,11 +467,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
               </div>
               Inventory - Spares
             </h1>
-            <p className="text-gray-600">7 comprehensive reports for spare parts inventory management and optimization</p>
+            <p className="text-gray-600">7 reports for spare parts inventory management</p>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -275,12 +479,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-spares-reports"
             />
           </div>
           
           <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by frequency" />
             </SelectTrigger>
             <SelectContent>
@@ -288,12 +491,11 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
               <SelectItem value="daily">Daily</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="quarterly">Quarterly</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-            <SelectTrigger className="w-48" data-testid="select-priority-filter">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by priority" />
             </SelectTrigger>
             <SelectContent>
@@ -306,14 +508,13 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-spares-total-reports">7</p>
+                <p className="text-sm text-gray-600">Total Spares</p>
+                <p className="text-2xl font-bold text-gray-800">{spares.length}</p>
               </div>
               <Package className="h-8 w-8 text-orange-500" />
             </div>
@@ -323,8 +524,10 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-spares-high-priority">3</p>
+                <p className="text-sm text-gray-600">Low Stock</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {spares.filter((s: any) => (s.rob || 0) < (s.min || 0)).length}
+                </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
@@ -334,10 +537,12 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Critical Items</p>
-                <p className="text-2xl font-bold text-orange-600" data-testid="text-spares-critical-items">2</p>
+                <p className="text-sm text-gray-600">Critical Parts</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {spares.filter((s: any) => s.critical === 'Critical' || s.critical === 'Yes').length}
+                </p>
               </div>
-              <Package className="h-8 w-8 text-orange-500" />
+              <AlertTriangle className="h-8 w-8 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -345,21 +550,20 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Generated Today</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-spares-generated-today">3</p>
+                <p className="text-sm text-gray-600">Reports Available</p>
+                <p className="text-2xl font-bold text-blue-600">7</p>
               </div>
-              <BarChart3 className="h-8 w-8 text-blue-500" />
+              <FileText className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`spares-report-card-${report.id}`}>
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -402,30 +606,14 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
                       )}
                     </div>
                   </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-orange-100 text-orange-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
                 </div>
-
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
 
                 <div className="flex gap-2 pt-3 border-t">
                   <Button 
                     size="sm" 
                     variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
+                    onClick={() => handleGenerateReport(report.id, 'PDF')}
                     className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
                   >
                     <Eye className="h-4 w-4" />
                     Preview
@@ -438,7 +626,6 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
                         onClick={() => handleGenerateReport(report.id, 'PDF')}
                         className="bg-red-600 hover:bg-red-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
                       >
                         {generatingReports.has(`${report.id}-PDF`) ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -453,28 +640,12 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
                         className="bg-green-600 hover:bg-green-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
                       >
                         {generatingReports.has(`${report.id}-Excel`) ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           'Excel'
                         )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
                       </Button>
                     )}
                   </div>

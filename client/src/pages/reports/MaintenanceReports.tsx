@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,6 @@ import {
 import {
   ArrowLeft,
   Calendar,
-  Download,
-  Filter,
   Search,
   AlertTriangle,
   Clock,
@@ -24,12 +22,13 @@ import {
   Users,
   Settings,
   Eye,
-  Play,
   Loader2
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator, fetchReportData, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface MaintenanceReport {
   id: string;
@@ -63,6 +62,15 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: workOrders = [] } = useQuery<any[]>({
+    queryKey: ['/api/work-orders'],
+  });
+
+  const { data: jobs = [] } = useQuery<any[]>({
+    queryKey: ['/api/jobs', vesselId],
+  });
 
   const reports: MaintenanceReport[] = [
     {
@@ -101,7 +109,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       frequency: "Weekly/Monthly",
       fields: ["WO", "Component", "Dates (Start/Finish)", "Man-Hours", "Performed By", "Part-B Notes", "Attachments"],
       filters: ["Vessel", "Dept", "Date Range", "Component"],
-      outputs: ["PDF bundle", "Excel"],
+      outputs: ["PDF", "Excel"],
       icon: CheckCircle,
       priority: "medium",
       lastGenerated: "1 day ago",
@@ -124,12 +132,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     {
       id: "critical-equipment",
       name: "Critical Equipment Status",
-      description: "Status monitoring for safety-critical components",
-      purpose: "Safety-critical control (Office/Vessel)",
+      description: "Status report for SOLAS-critical and class-critical systems",
+      purpose: "Regulatory compliance & risk (All stakeholders)",
       frequency: "Weekly",
-      fields: ["List of Critical Components", "Due/Completed/Overdue Counts", "Top Overdue with risk notes"],
-      filters: ["Vessel", "Dept"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["System/Component", "Total WOs", "Due Now", "Overdue", "Last Done Date", "Next Due", "Risk Level"],
+      filters: ["Vessel", "Critical System List", "Status"],
+      outputs: ["PDF", "Dashboard"],
       icon: Settings,
       priority: "high",
       lastGenerated: "6 hours ago",
@@ -138,27 +146,27 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     {
       id: "unplanned-jobs",
       name: "Unplanned/Breakdown Jobs",
-      description: "Analysis of corrective maintenance and equipment failures",
-      purpose: "Track corrective maintenance (Tech Office)",
+      description: "Analysis of breakdown maintenance and unplanned work",
+      purpose: "Identify reliability issues (Office/RCA)",
       frequency: "Monthly",
-      fields: ["WO", "Failure Category", "Root Cause", "Time to Repair", "Recurrence Flag", "Follow-up Actions"],
-      filters: ["Vessel", "Dept", "Date Range"],
-      outputs: ["Excel", "PDF"],
+      fields: ["WO", "Failure Category", "Root-Cause (if known)", "Time-to-Repair", "Recurrence Flag"],
+      filters: ["Vessel", "Dept", "Failure Category", "Date Range"],
+      outputs: ["PDF", "Excel"],
       icon: AlertTriangle,
       priority: "medium",
       lastGenerated: "1 week ago",
-      estimatedTime: "2-4 min"
+      estimatedTime: "2-3 min"
     },
     {
       id: "postponement-log",
       name: "Job Postponement Log",
-      description: "Governance tracking of deferred maintenance work",
-      purpose: "Governance of deferrals (QA/Office)",
+      description: "Audit trail of all postponed jobs with justifications",
+      purpose: "Audit trail for deferred work (Vessel/Office)",
       frequency: "Monthly",
-      fields: ["WO", "Original Due", "New Due", "Reason", "Approver", "Justification"],
-      filters: ["Vessel", "Dept", "Period"],
-      outputs: ["Excel", "PDF"],
-      icon: Calendar,
+      fields: ["WO", "Original Due", "New Due", "Postponement Reason", "Approver", "Office Approval"],
+      filters: ["Vessel", "Dept", "Approval Status", "Date Range"],
+      outputs: ["PDF", "Excel"],
+      icon: Clock,
       priority: "medium",
       lastGenerated: "2 days ago",
       estimatedTime: "1-2 min"
@@ -166,12 +174,12 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     {
       id: "priority-performance",
       name: "Work Priority Performance",
-      description: "Analysis of work execution versus assigned priorities",
-      purpose: "Execution vs priority (Office)",
+      description: "Performance analysis by work order priority levels",
+      purpose: "Ensure critical jobs get attention (Office)",
       frequency: "Monthly",
-      fields: ["On-time % by Priority", "Late Buckets", "Exception Notes"],
-      filters: ["Vessel", "Dept", "Priority"],
-      outputs: ["Dashboard", "Excel"],
+      fields: ["Priority", "On-time %", "Avg Days Late", "Trend"],
+      filters: ["Vessel", "Dept", "Date Range"],
+      outputs: ["PDF", "Dashboard"],
       icon: TrendingUp,
       priority: "low",
       lastGenerated: "5 days ago",
@@ -185,7 +193,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       frequency: "Monthly",
       fields: ["WO", "Planned Hrs", "Actual Hrs", "Variance", "Rank Mix", "Comments"],
       filters: ["Vessel", "Dept", "Date Range"],
-      outputs: ["Excel", "PDF"],
+      outputs: ["PDF", "Excel"],
       icon: Users,
       priority: "medium",
       lastGenerated: "1 week ago",
@@ -199,7 +207,7 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       frequency: "Monthly",
       fields: ["Jobs/Hours by Assignee/Rank", "Overtime Flags", "Backlog by Rank"],
       filters: ["Vessel", "Dept", "Period"],
-      outputs: ["Dashboard", "Excel"],
+      outputs: ["PDF", "Excel", "Dashboard"],
       icon: Users,
       priority: "low",
       lastGenerated: "1 week ago",
@@ -229,11 +237,397 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
     }
   };
 
+  const generateMaintenancePDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    const vesselWorkOrders = vesselId && vesselId !== 'all' 
+      ? workOrders.filter((wo: any) => wo.vesselId === vesselId)
+      : workOrders;
+
+    switch (reportId) {
+      case 'due-jobs-7': {
+        const dueJobs = vesselWorkOrders.filter((wo: any) => {
+          if (!wo.dueDate) return false;
+          const dueDate = new Date(wo.dueDate);
+          return wo.status !== 'Completed' && dueDate <= sevenDaysFromNow && dueDate >= now;
+        });
+
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Priority', field: 'priority', width: 25 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 30 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = dueJobs.map((wo: any) => ({
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          title: wo.title || wo.jobTitle || '-',
+          component: wo.component || wo.componentName || '-',
+          priority: wo.priority || 'Normal',
+          formattedDueDate: formatDate(wo.dueDate),
+          status: wo.status || 'Open'
+        }));
+
+        const summary = [
+          { label: 'Total Due', value: data.length },
+          { label: 'High Priority', value: data.filter((d: any) => d.priority === 'High' || d.priority === 'Critical').length },
+          { label: 'This Week', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Due Jobs (7 Days)', subtitle: 'Work orders due in the next 7 days', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'overdue-jobs': {
+        const overdueJobs = vesselWorkOrders.filter((wo: any) => {
+          if (!wo.dueDate || wo.status === 'Completed') return false;
+          return new Date(wo.dueDate) < now;
+        });
+
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Days Overdue', field: 'daysOverdue', width: 30 },
+          { header: 'Priority', field: 'priority', width: 25 },
+          { header: 'Original Due', field: 'formattedDueDate', width: 30 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = overdueJobs.map((wo: any) => {
+          const dueDate = new Date(wo.dueDate);
+          const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            workOrderNumber: wo.workOrderNumber || wo.id,
+            component: wo.component || wo.componentName || '-',
+            daysOverdue: daysOverdue,
+            priority: wo.priority || 'Normal',
+            formattedDueDate: formatDate(wo.dueDate),
+            status: wo.status || 'Overdue'
+          };
+        });
+
+        const summary = [
+          { label: 'Total Overdue', value: data.length },
+          { label: 'Critical', value: data.filter((d: any) => d.priority === 'Critical').length },
+          { label: 'Avg Days Late', value: data.length > 0 ? Math.round(data.reduce((a: number, b: any) => a + b.daysOverdue, 0) / data.length) : 0 }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Overdue Jobs Report', subtitle: 'Work orders past their due dates', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'completed-jobs': {
+        const completedJobs = vesselWorkOrders.filter((wo: any) => wo.status === 'Completed');
+
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Completed Date', field: 'formattedCompletedDate', width: 30 },
+          { header: 'Performed By', field: 'performedBy', width: 40 }
+        ];
+
+        const data = completedJobs.map((wo: any) => ({
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          title: wo.title || wo.jobTitle || '-',
+          component: wo.component || wo.componentName || '-',
+          formattedCompletedDate: formatDate(wo.completedDate || wo.updatedAt),
+          performedBy: wo.performedBy || wo.assignee || '-'
+        }));
+
+        const summary = [
+          { label: 'Total Completed', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Completed Jobs Register', subtitle: 'All completed maintenance work', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'monthly-summary': {
+        const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyWOs = vesselWorkOrders.filter((wo: any) => {
+          const woDate = new Date(wo.dueDate || wo.createdAt);
+          return woDate >= thisMonth;
+        });
+
+        const completed = monthlyWOs.filter((wo: any) => wo.status === 'Completed').length;
+        const total = monthlyWOs.length;
+        const overdue = monthlyWOs.filter((wo: any) => {
+          if (!wo.dueDate || wo.status === 'Completed') return false;
+          return new Date(wo.dueDate) < now;
+        }).length;
+
+        const columns = [
+          { header: 'Metric', field: 'metric', width: 60 },
+          { header: 'Value', field: 'value', width: 40 },
+          { header: 'Percentage', field: 'percentage', width: 40 }
+        ];
+
+        const data = [
+          { metric: 'Total Work Orders', value: total, percentage: '100%' },
+          { metric: 'Completed', value: completed, percentage: total > 0 ? `${Math.round(completed/total*100)}%` : '0%' },
+          { metric: 'In Progress', value: total - completed - overdue, percentage: total > 0 ? `${Math.round((total - completed - overdue)/total*100)}%` : '0%' },
+          { metric: 'Overdue', value: overdue, percentage: total > 0 ? `${Math.round(overdue/total*100)}%` : '0%' }
+        ];
+
+        const summary = [
+          { label: 'Completion Rate', value: total > 0 ? `${Math.round(completed/total*100)}%` : 'N/A' },
+          { label: 'Total WOs', value: total },
+          { label: 'Overdue', value: overdue }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Monthly Maintenance Summary', subtitle: `Performance metrics for ${now.toLocaleString('default', { month: 'long', year: 'numeric' })}`, vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'critical-equipment': {
+        const criticalWOs = vesselWorkOrders.filter((wo: any) => 
+          wo.priority === 'Critical' || wo.priority === 'High'
+        );
+
+        const columns = [
+          { header: 'Component', field: 'component', width: 60 },
+          { header: 'Priority', field: 'priority', width: 30 },
+          { header: 'Status', field: 'status', width: 30 },
+          { header: 'Due Date', field: 'formattedDueDate', width: 35 },
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 }
+        ];
+
+        const data = criticalWOs.map((wo: any) => ({
+          component: wo.component || wo.componentName || '-',
+          priority: wo.priority || 'High',
+          status: wo.status || 'Open',
+          formattedDueDate: formatDate(wo.dueDate),
+          workOrderNumber: wo.workOrderNumber || wo.id
+        }));
+
+        const summary = [
+          { label: 'Critical Items', value: data.filter((d: any) => d.priority === 'Critical').length },
+          { label: 'High Priority', value: data.filter((d: any) => d.priority === 'High').length },
+          { label: 'Total', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Critical Equipment Status', subtitle: 'SOLAS-critical and class-critical systems', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'unplanned-jobs': {
+        const unplannedWOs = vesselWorkOrders.filter((wo: any) => 
+          wo.type === 'Unplanned' || wo.type === 'Breakdown' || wo.workOrderNumber?.startsWith('UWO')
+        );
+
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Component', field: 'component', width: 50 },
+          { header: 'Type', field: 'type', width: 30 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = unplannedWOs.map((wo: any) => ({
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          title: wo.title || wo.jobTitle || '-',
+          component: wo.component || wo.componentName || '-',
+          type: wo.type || 'Unplanned',
+          status: wo.status || 'Open'
+        }));
+
+        const summary = [
+          { label: 'Total Unplanned', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Unplanned/Breakdown Jobs', subtitle: 'Analysis of breakdown maintenance', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'postponement-log': {
+        const postponedWOs = vesselWorkOrders.filter((wo: any) => 
+          wo.status === 'Postponed' || wo.postponedDate
+        );
+
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Original Due', field: 'originalDue', width: 30 },
+          { header: 'New Due', field: 'newDue', width: 30 },
+          { header: 'Reason', field: 'reason', width: 50 }
+        ];
+
+        const data = postponedWOs.map((wo: any) => ({
+          workOrderNumber: wo.workOrderNumber || wo.id,
+          title: wo.title || wo.jobTitle || '-',
+          originalDue: formatDate(wo.originalDueDate || wo.dueDate),
+          newDue: formatDate(wo.postponedDate || wo.newDueDate),
+          reason: wo.postponementReason || wo.remarks || '-'
+        }));
+
+        const summary = [
+          { label: 'Total Postponed', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Job Postponement Log', subtitle: 'Audit trail of postponed jobs', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'priority-performance': {
+        const priorityGroups: Record<string, { total: number; completed: number; overdue: number }> = {};
+        
+        vesselWorkOrders.forEach((wo: any) => {
+          const priority = wo.priority || 'Normal';
+          if (!priorityGroups[priority]) {
+            priorityGroups[priority] = { total: 0, completed: 0, overdue: 0 };
+          }
+          priorityGroups[priority].total++;
+          if (wo.status === 'Completed') priorityGroups[priority].completed++;
+          if (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed') {
+            priorityGroups[priority].overdue++;
+          }
+        });
+
+        const columns = [
+          { header: 'Priority', field: 'priority', width: 40 },
+          { header: 'Total WOs', field: 'total', width: 30 },
+          { header: 'Completed', field: 'completed', width: 30 },
+          { header: 'On-Time %', field: 'onTimePercent', width: 30 },
+          { header: 'Overdue', field: 'overdue', width: 30 }
+        ];
+
+        const data = Object.entries(priorityGroups).map(([priority, stats]) => ({
+          priority,
+          total: stats.total,
+          completed: stats.completed,
+          onTimePercent: stats.total > 0 ? `${Math.round((stats.completed / stats.total) * 100)}%` : '0%',
+          overdue: stats.overdue
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Work Priority Performance', subtitle: 'Performance analysis by priority levels', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      case 'manhours-analysis': {
+        const columns = [
+          { header: 'WO Number', field: 'workOrderNumber', width: 40 },
+          { header: 'Title', field: 'title', width: 60 },
+          { header: 'Planned Hrs', field: 'plannedHours', width: 30 },
+          { header: 'Actual Hrs', field: 'actualHours', width: 30 },
+          { header: 'Variance', field: 'variance', width: 30 }
+        ];
+
+        const data = vesselWorkOrders
+          .filter((wo: any) => wo.status === 'Completed')
+          .map((wo: any) => {
+            const planned = wo.plannedHours || wo.estimatedHours || 0;
+            const actual = wo.actualHours || wo.hoursSpent || planned;
+            return {
+              workOrderNumber: wo.workOrderNumber || wo.id,
+              title: wo.title || wo.jobTitle || '-',
+              plannedHours: planned,
+              actualHours: actual,
+              variance: actual - planned
+            };
+          });
+
+        pdfReportGenerator.generateReport(
+          { title: 'Man-Hours Analysis', subtitle: 'Planned vs Actual hours comparison', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      case 'workload-distribution': {
+        const assigneeGroups: Record<string, { count: number; completed: number }> = {};
+        
+        vesselWorkOrders.forEach((wo: any) => {
+          const assignee = wo.assignee || wo.performedBy || wo.responsibleRank || 'Unassigned';
+          if (!assigneeGroups[assignee]) {
+            assigneeGroups[assignee] = { count: 0, completed: 0 };
+          }
+          assigneeGroups[assignee].count++;
+          if (wo.status === 'Completed') assigneeGroups[assignee].completed++;
+        });
+
+        const columns = [
+          { header: 'Assignee/Rank', field: 'assignee', width: 50 },
+          { header: 'Total Assigned', field: 'total', width: 35 },
+          { header: 'Completed', field: 'completed', width: 35 },
+          { header: 'Pending', field: 'pending', width: 35 },
+          { header: 'Completion %', field: 'completionPercent', width: 35 }
+        ];
+
+        const data = Object.entries(assigneeGroups).map(([assignee, stats]) => ({
+          assignee,
+          total: stats.count,
+          completed: stats.completed,
+          pending: stats.count - stats.completed,
+          completionPercent: stats.count > 0 ? `${Math.round((stats.completed / stats.count) * 100)}%` : '0%'
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Crew Workload Distribution', subtitle: 'Task distribution across ranks', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      default:
+        toast({
+          title: "Report Not Available",
+          description: "This report type is not yet implemented",
+          variant: "destructive"
+        });
+    }
+  };
+
   const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
     const reportKey = `${reportId}-${format}`;
     
     if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
+      return;
     }
 
     try {
@@ -241,33 +635,22 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
       
       toast({
         title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
+        description: `Creating ${format} report...`,
       });
 
-      // Get current filters - use globalFilters vessel or first available vessel
-      const vesselName = globalFilters?.vessel || vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        priority: selectedPriority !== "all" ? selectedPriority : undefined,
-        search: searchQuery || undefined,
-      };
-
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'maintenance-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
+      if (format === 'PDF') {
+        await generateMaintenancePDF(reportId);
+      } else {
+        toast({
+          title: "Excel Export",
+          description: "Excel export coming soon. PDF is currently available.",
+        });
+        return;
+      }
       
       toast({
         title: "Report Generated",
         description: `${format} report downloaded successfully!`,
-        variant: "default",
       });
       
     } catch (error) {
@@ -287,13 +670,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   };
 
   const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
     handleGenerateReport(reportId, 'PDF');
   };
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
           <Button 
@@ -317,7 +698,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -356,7 +736,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         </div>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
@@ -395,8 +774,8 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Generated Today</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-maintenance-generated-today">4</p>
+                <p className="text-sm text-gray-600">Work Orders</p>
+                <p className="text-2xl font-bold text-blue-600" data-testid="text-maintenance-work-orders">{workOrders.length}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-blue-500" />
             </div>
@@ -404,7 +783,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
@@ -464,10 +842,6 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
                     </div>
                   </div>
                 </div>
-
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
 
                 <div className="flex gap-2 pt-3 border-t">
                   <Button 

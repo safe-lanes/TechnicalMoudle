@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +21,11 @@ import {
   Eye,
   Loader2
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface StoresReport {
   id: string;
@@ -32,11 +34,9 @@ interface StoresReport {
   purpose: string;
   frequency: string;
   fields: string[];
-  filters: string[];
   outputs: string[];
   icon: React.ElementType;
   priority: 'high' | 'medium' | 'low';
-  lastGenerated?: string;
   estimatedTime: string;
   category: 'stores' | 'lubes' | 'chemicals';
 }
@@ -47,11 +47,16 @@ interface StoresReportsProps {
 
 const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: storesItems = [] } = useQuery<any[]>({
+    queryKey: ['/api/stores', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
 
   const reports: StoresReport[] = [
     {
@@ -60,12 +65,10 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
       description: "Comprehensive overview of all store items with stock levels, consumption trends, and reorder requirements",
       purpose: "Monitor stock levels & plan procurement (Chief Steward/Office)",
       frequency: "Weekly",
-      fields: ["Item Code/Name", "Category", "Current Stock", "Min Level", "Consumption Rate", "Last Received", "Expiry Dates"],
-      filters: ["Vessel", "Category", "Stock Status", "Expiry Alert", "Date Range"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Item Code/Name", "Category", "Current Stock", "Min Level", "Status"],
+      outputs: ["PDF", "Excel"],
       icon: Store,
       priority: "high",
-      lastGenerated: "2 hours ago",
       estimatedTime: "2-3 min",
       category: "stores"
     },
@@ -73,75 +76,61 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
       id: "lubes-oil-analysis",
       name: "Lubricants & Oil Analysis Report",
       description: "Detailed analysis of lubricant consumption, oil testing results, and machinery lubrication schedules",
-      purpose: "Optimize lubrication & prevent machinery damage (Chief Eng)",
+      purpose: "Track oil quality & optimize lubrication (Chief Eng/Office)",
       frequency: "Monthly",
-      fields: ["Oil Type", "Equipment", "Last Change", "Analysis Results", "Viscosity", "Contamination Level", "Next Due"],
-      filters: ["Vessel", "Oil Type", "Equipment", "Test Results", "Due Soon"],
+      fields: ["Lube Type", "Grade", "ROB", "Consumption Rate", "Status"],
       outputs: ["PDF", "Excel"],
       icon: Droplets,
       priority: "high",
-      lastGenerated: "1 week ago",
-      estimatedTime: "3-5 min",
+      estimatedTime: "3-4 min",
       category: "lubes"
     },
     {
-      id: "chemicals-consumption",
-      name: "Chemicals Consumption & Safety Report",
-      description: "Tracking of chemical usage, safety data sheets compliance, and disposal requirements",
-      purpose: "Safety compliance & regulatory adherence (Chief Eng/Safety)",
+      id: "chemicals-tracking",
+      name: "Chemicals Inventory & Expiry Report",
+      description: "Track chemical inventory, expiry dates, and safety data sheet compliance",
+      purpose: "Safety compliance & inventory freshness (All departments)",
       frequency: "Monthly",
-      fields: ["Chemical Name", "Usage Rate", "Safety Category", "MSDS Status", "Storage Conditions", "Disposal Requirements"],
-      filters: ["Vessel", "Chemical Type", "Safety Level", "MSDS Expiry", "Usage Pattern"],
+      fields: ["Chemical Name", "ROB", "Expiry Date", "MSDS Status", "Hazard Class"],
       outputs: ["PDF", "Excel"],
       icon: Beaker,
       priority: "high",
-      lastGenerated: "3 days ago",
-      estimatedTime: "2-4 min",
+      estimatedTime: "2-3 min",
       category: "chemicals"
     },
     {
-      id: "stores-expiry-monitoring",
-      name: "Expiry & Shelf Life Monitoring",
-      description: "Critical monitoring of expiry dates for food, chemicals, and medical supplies with disposal tracking",
-      purpose: "Prevent waste & ensure safety compliance (Chief Steward/Safety)",
-      frequency: "Daily",
-      fields: ["Item", "Category", "Expiry Date", "Days Remaining", "Disposal Method", "Cost Impact", "Action Required"],
-      filters: ["Vessel", "Category", "Days to Expiry", "Risk Level", "Item Type"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      id: "stores-low-stock",
+      name: "Low Stock Alert Report",
+      description: "Items below minimum levels requiring immediate attention",
+      purpose: "Prevent stockouts (All stakeholders)",
+      frequency: "Daily/Weekly",
+      fields: ["Item", "Category", "ROB", "Min", "Shortage", "Status"],
+      outputs: ["PDF", "Excel"],
       icon: AlertTriangle,
       priority: "high",
-      lastGenerated: "6 hours ago",
       estimatedTime: "< 1 min",
       category: "stores"
     },
     {
-      id: "stores-cost-analysis",
-      name: "Stores Cost Analysis & Budget Report",
-      description: "Financial analysis of stores spending, budget variance, and cost optimization opportunities",
-      purpose: "Cost control & budget management (Office/Finance)",
+      id: "stores-consumption-analysis",
+      name: "Consumption Pattern Analysis",
+      description: "Historical consumption trends and forecasting",
+      purpose: "Optimize stock levels & ordering frequency",
       frequency: "Monthly",
-      fields: ["Category", "Monthly Spend", "Budget vs Actual", "Cost/Unit Trends", "Supplier Analysis", "Savings Opportunities"],
-      filters: ["Vessel", "Category", "Cost Threshold", "Budget Period", "Supplier"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Item", "Monthly Consumption", "Trend", "Forecast"],
+      outputs: ["PDF", "Excel"],
       icon: BarChart3,
       priority: "medium",
-      lastGenerated: "2 weeks ago",
-      estimatedTime: "3-4 min",
+      estimatedTime: "3-5 min",
       category: "stores"
     }
   ];
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFrequency = selectedFrequency === "all" || 
-                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || report.category === selectedCategory;
-    
-    return matchesSearch && matchesFrequency && matchesCategory;
+    return matchesSearch && matchesCategory;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -153,75 +142,215 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'stores': return 'bg-blue-100 text-blue-800';
-      case 'lubes': return 'bg-purple-100 text-purple-800';
-      case 'chemicals': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getStockStatus = (rob: number, min: number): string => {
+    if (rob < min) return 'Low';
+    if (rob === min) return 'At Min';
+    return 'OK';
+  };
+
+  const generateStoresPDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+
+    switch (reportId) {
+      case 'stores-inventory-status': {
+        const columns = [
+          { header: 'Item Code', field: 'itemCode', width: 30 },
+          { header: 'Item Name', field: 'itemName', width: 55 },
+          { header: 'Category', field: 'category', width: 30 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Location', field: 'location', width: 30 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = storesItems.map((s: any) => ({
+          itemCode: s.itemCode || '-',
+          itemName: s.itemName || '-',
+          category: s.category || s.itemType || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          location: s.location || '-',
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Total Items', value: data.length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length },
+          { label: 'OK', value: data.filter((d: any) => d.status === 'OK').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Stores Inventory Status', subtitle: 'Complete inventory listing', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'lubes-oil-analysis': {
+        const lubesItems = storesItems.filter((s: any) => s.itemType === 'lubes');
+
+        const columns = [
+          { header: 'Item Code', field: 'itemCode', width: 30 },
+          { header: 'Item Name', field: 'itemName', width: 60 },
+          { header: 'ROB', field: 'rob', width: 25 },
+          { header: 'Min', field: 'min', width: 25 },
+          { header: 'UOM', field: 'uom', width: 25 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = lubesItems.map((s: any) => ({
+          itemCode: s.itemCode || '-',
+          itemName: s.itemName || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          uom: s.uom || 'L',
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Total Lubes', value: data.length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Lubricants & Oil Analysis', subtitle: 'Stock levels and status', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'chemicals-tracking': {
+        const chemicalsItems = storesItems.filter((s: any) => s.itemType === 'chemicals');
+
+        const columns = [
+          { header: 'Item Code', field: 'itemCode', width: 30 },
+          { header: 'Item Name', field: 'itemName', width: 60 },
+          { header: 'ROB', field: 'rob', width: 25 },
+          { header: 'Min', field: 'min', width: 25 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = chemicalsItems.map((s: any) => ({
+          itemCode: s.itemCode || '-',
+          itemName: s.itemName || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Total Chemicals', value: data.length },
+          { label: 'Low Stock', value: data.filter((d: any) => d.status === 'Low').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Chemicals Inventory & Expiry', subtitle: 'Chemical stock tracking', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'stores-low-stock': {
+        const lowStockItems = storesItems.filter((s: any) => (s.rob || 0) <= (s.min || 0));
+
+        const columns = [
+          { header: 'Item Code', field: 'itemCode', width: 30 },
+          { header: 'Item Name', field: 'itemName', width: 55 },
+          { header: 'Category', field: 'category', width: 30 },
+          { header: 'ROB', field: 'rob', width: 20 },
+          { header: 'Min', field: 'min', width: 20 },
+          { header: 'Shortage', field: 'shortage', width: 25 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const data = lowStockItems.map((s: any) => ({
+          itemCode: s.itemCode || '-',
+          itemName: s.itemName || '-',
+          category: s.category || s.itemType || '-',
+          rob: s.rob || 0,
+          min: s.min || 0,
+          shortage: Math.max(0, (s.min || 0) - (s.rob || 0)),
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        const summary = [
+          { label: 'Low Stock Items', value: data.length },
+          { label: 'Critical', value: data.filter((d: any) => d.shortage > 5).length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Low Stock Alert Report', subtitle: 'Items requiring reorder', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'stores-consumption-analysis': {
+        const columns = [
+          { header: 'Item Code', field: 'itemCode', width: 30 },
+          { header: 'Item Name', field: 'itemName', width: 60 },
+          { header: 'Category', field: 'category', width: 30 },
+          { header: 'ROB', field: 'rob', width: 25 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = storesItems.map((s: any) => ({
+          itemCode: s.itemCode || '-',
+          itemName: s.itemName || '-',
+          category: s.category || s.itemType || '-',
+          rob: s.rob || 0,
+          status: getStockStatus(s.rob || 0, s.min || 0)
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Consumption Pattern Analysis', subtitle: 'Historical consumption trends', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      default:
+        toast({
+          title: "Report Not Available",
+          description: "This report type is not yet implemented",
+          variant: "destructive"
+        });
     }
   };
 
-  const getCategoryStats = () => {
-    const stores = reports.filter(r => r.category === 'stores').length;
-    const lubes = reports.filter(r => r.category === 'lubes').length;
-    const chemicals = reports.filter(r => r.category === 'chemicals').length;
-    const highPriority = reports.filter(r => r.priority === 'high').length;
-    
-    return { stores, lubes, chemicals, highPriority };
-  };
-
-  const stats = getCategoryStats();
-
-  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
-    if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
+    if (generatingReports.has(reportKey)) return;
+
+    if (storesItems.length === 0) {
+      toast({ title: "No Data Available", description: "No stores inventory data found for the selected vessel.", variant: "destructive" });
+      return;
     }
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
-      toast({
-        title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
-      });
+      toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
-      // Get current filters - use first available vessel
-      const vesselName = vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        category: selectedCategory !== "all" ? selectedCategory : undefined,
-        search: searchQuery || undefined,
-      };
-
-      // For now, use the maintenance report generator - will create specific stores generator later
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'stores-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
-      
-      toast({
-        title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
-        variant: "default",
-      });
+      if (format === 'PDF') {
+        await generateStoresPDF(reportId);
+        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
+      } else {
+        toast({ title: "Excel Export", description: "Excel export coming soon. PDF is currently available." });
+      }
       
     } catch (error) {
       console.error('Error generating report:', error);
-      toast({
-        title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
-        variant: "destructive",
-      });
+      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);
@@ -231,64 +360,43 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
-    handleGenerateReport(reportId, 'PDF');
-  };
+  const lubesCount = storesItems.filter((s: any) => s.itemType === 'lubes').length;
+  const chemicalsCount = storesItems.filter((s: any) => s.itemType === 'chemicals').length;
+  const lowStockCount = storesItems.filter((s: any) => (s.rob || 0) < (s.min || 0)).length;
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-reports"
-          >
+          <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Reports
           </Button>
           <div className="h-6 border-l border-gray-300" />
           <div>
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-cyan-500 text-white">
+              <div className="p-2 rounded-lg bg-purple-500 text-white">
                 <Store className="h-5 w-5" />
               </div>
               Inventory - Stores/Lubes/Chemicals
             </h1>
-            <p className="text-gray-600">5 comprehensive reports for stores, lubricants, and chemicals inventory management</p>
+            <p className="text-gray-600">5 reports for stores inventory management</p>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="Search stores/lubes/chemicals reports..."
+              placeholder="Search stores reports..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-stores-reports"
             />
           </div>
-          
-          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
-              <SelectValue placeholder="Filter by frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48" data-testid="select-category-filter">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by category" />
             </SelectTrigger>
             <SelectContent>
@@ -301,16 +409,15 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-stores-total-reports">5</p>
+                <p className="text-sm text-gray-600">Total Items</p>
+                <p className="text-2xl font-bold text-gray-800">{storesItems.length}</p>
               </div>
-              <Store className="h-8 w-8 text-cyan-500" />
+              <Store className="h-8 w-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
@@ -318,8 +425,8 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-stores-high-priority">{stats.highPriority}</p>
+                <p className="text-sm text-gray-600">Low Stock</p>
+                <p className="text-2xl font-bold text-red-600">{lowStockCount}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
@@ -329,10 +436,10 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Stores Items</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-stores-stores-count">{stats.stores}</p>
+                <p className="text-sm text-gray-600">Lubricants</p>
+                <p className="text-2xl font-bold text-blue-600">{lubesCount}</p>
               </div>
-              <Store className="h-8 w-8 text-blue-500" />
+              <Droplets className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
@@ -341,36 +448,30 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Chemicals</p>
-                <p className="text-2xl font-bold text-orange-600" data-testid="text-stores-chemicals-count">{stats.chemicals}</p>
+                <p className="text-2xl font-bold text-green-600">{chemicalsCount}</p>
               </div>
-              <Beaker className="h-8 w-8 text-orange-500" />
+              <Beaker className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`stores-report-card-${report.id}`}>
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-cyan-100 text-cyan-600">
+                    <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{report.name}</CardTitle>
-                      <div className="flex gap-2 mt-1">
-                        <Badge className={getPriorityColor(report.priority)} variant="secondary">
-                          {report.priority.toUpperCase()}
-                        </Badge>
-                        <Badge className={getCategoryColor(report.category)} variant="secondary">
-                          {report.category.toUpperCase()}
-                        </Badge>
-                      </div>
+                      <Badge className={getPriorityColor(report.priority)} variant="secondary">
+                        {report.priority.toUpperCase()}
+                      </Badge>
                     </div>
                   </div>
                   <div className="text-right text-sm text-gray-500">
@@ -386,97 +487,38 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
                   <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {report.fields.slice(0, 3).map((field, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {field}
-                        </Badge>
-                      ))}
-                      {report.fields.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{report.fields.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-cyan-100 text-cyan-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {report.fields.slice(0, 4).map((field, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">{field}</Badge>
+                    ))}
                   </div>
                 </div>
 
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
-
                 <div className="flex gap-2 pt-3 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
-                    className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handleGenerateReport(report.id, 'PDF')} className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
                     Preview
                   </Button>
                   
                   <div className="flex gap-1">
-                    {report.outputs.includes('PDF') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3"
-                        disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
-                      >
-                        {generatingReports.has(`${report.id}-PDF`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'PDF'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Excel') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'Excel')}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3"
-                        disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
-                      >
-                        {generatingReports.has(`${report.id}-Excel`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Excel'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3"
+                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                    >
+                      {generatingReports.has(`${report.id}-PDF`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleGenerateReport(report.id, 'Excel')}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3"
+                      disabled={generatingReports.has(`${report.id}-Excel`)}
+                    >
+                      {generatingReports.has(`${report.id}-Excel`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excel'}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -484,14 +526,6 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
           );
         })}
       </div>
-
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
-        </div>
-      )}
     </div>
   );
 };

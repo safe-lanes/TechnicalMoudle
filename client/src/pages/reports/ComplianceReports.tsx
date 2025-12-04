@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +21,11 @@ import {
   Eye,
   Loader2
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface ComplianceReport {
   id: string;
@@ -32,13 +34,10 @@ interface ComplianceReport {
   purpose: string;
   frequency: string;
   fields: string[];
-  filters: string[];
   outputs: string[];
   icon: React.ElementType;
   priority: 'high' | 'medium' | 'low';
-  lastGenerated?: string;
   estimatedTime: string;
-  complianceArea: 'certificates' | 'class' | 'safety' | 'security' | 'environmental';
 }
 
 interface ComplianceReportsProps {
@@ -51,103 +50,92 @@ interface ComplianceReportsProps {
   };
 }
 
-const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFilters }) => {
+const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
-  const [selectedArea, setSelectedArea] = useState<string>("all");
+  const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: certificates = [] } = useQuery<any[]>({
+    queryKey: ['/api/certificates', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
+
+  const { data: surveys = [] } = useQuery<any[]>({
+    queryKey: ['/api/surveys', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
 
   const reports: ComplianceReport[] = [
     {
       id: "certificates-status",
       name: "Certificates Status & Renewal Report",
-      description: "Comprehensive overview of all vessel certificates with expiry dates, renewal requirements, and compliance status",
+      description: "Comprehensive overview of all vessel certificates with expiry dates and renewal requirements",
       purpose: "Monitor certificate validity & plan renewals (Captain/Office)",
       frequency: "Monthly",
-      fields: ["Certificate Name", "Issue Date", "Expiry Date", "Days to Expiry", "Issuing Authority", "Status", "Action Required"],
-      filters: ["Vessel", "Certificate Type", "Expiry Period", "Authority", "Status"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Certificate Name", "Issue Date", "Expiry Date", "Days to Expiry", "Status"],
+      outputs: ["PDF", "Excel"],
       icon: FileCheck,
       priority: "high",
-      lastGenerated: "1 day ago",
-      estimatedTime: "2-3 min",
-      complianceArea: "certificates"
+      estimatedTime: "2-3 min"
     },
     {
-      id: "class-surveys-schedule",
-      name: "Class Surveys & Inspections Schedule",
-      description: "Detailed schedule of classification society surveys, inspections due, and survey preparation requirements",
-      purpose: "Survey planning & class compliance (Captain/Chief Eng)",
-      frequency: "Weekly",
-      fields: ["Survey Type", "Due Date", "Class Society", "Scope", "Preparation Required", "Last Survey", "Next Milestone"],
-      filters: ["Vessel", "Survey Type", "Class Society", "Due Period", "Status"],
+      id: "surveys-due",
+      name: "Surveys Due Report",
+      description: "Upcoming and overdue class and statutory surveys",
+      purpose: "Plan survey activities (Office/Vessel)",
+      frequency: "Monthly",
+      fields: ["Survey Type", "Due Date", "Status", "Last Completed", "Notes"],
       outputs: ["PDF", "Excel"],
-      icon: Shield,
+      icon: Calendar,
       priority: "high",
-      lastGenerated: "3 days ago",
-      estimatedTime: "3-4 min",
-      complianceArea: "class"
+      estimatedTime: "2-3 min"
     },
     {
-      id: "safety-compliance-audit",
-      name: "Safety Compliance Audit Report",
-      description: "Comprehensive safety compliance status including SOLAS, MARPOL, and flag state requirements",
-      purpose: "Safety compliance monitoring & audit preparation (Captain/Safety)",
-      frequency: "Quarterly",
-      fields: ["Regulation", "Compliance Status", "Last Check", "Non-Conformities", "Corrective Actions", "Deadline", "Risk Level"],
-      filters: ["Vessel", "Regulation Type", "Compliance Status", "Risk Level", "Due Actions"],
-      outputs: ["PDF", "Excel"],
+      id: "expiring-certificates",
+      name: "Expiring Certificates Alert",
+      description: "Certificates expiring within the next 90 days",
+      purpose: "Urgent renewal planning (Captain/Office)",
+      frequency: "Weekly",
+      fields: ["Certificate", "Expiry Date", "Days Remaining", "Priority", "Action"],
+      outputs: ["PDF", "Dashboard"],
       icon: AlertTriangle,
       priority: "high",
-      lastGenerated: "1 week ago",
-      estimatedTime: "4-5 min",
-      complianceArea: "safety"
+      estimatedTime: "< 1 min"
     },
     {
-      id: "security-drills-training",
-      name: "Security Drills & Training Compliance",
-      description: "ISPS Code compliance tracking including security drills, training records, and security assessment status",
-      purpose: "Security compliance & crew training monitoring (Captain/CSO)",
+      id: "compliance-summary",
+      name: "Compliance Summary Report",
+      description: "Overall compliance status across all regulatory areas",
+      purpose: "Management overview (Office)",
       frequency: "Monthly",
-      fields: ["Drill Type", "Last Conducted", "Next Due", "Participants", "Training Status", "Certificate Validity", "Compliance Notes"],
-      filters: ["Vessel", "Drill Type", "Training Status", "Due Period", "Compliance Level"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Area", "Total Items", "Compliant", "Non-Compliant", "Percentage"],
+      outputs: ["PDF", "Dashboard"],
       icon: Shield,
       priority: "medium",
-      lastGenerated: "2 weeks ago",
-      estimatedTime: "2-3 min",
-      complianceArea: "security"
+      estimatedTime: "3-5 min"
     },
     {
-      id: "environmental-compliance",
-      name: "Environmental Compliance Report",
-      description: "Environmental regulatory compliance including emissions, waste management, and ballast water treatment",
-      purpose: "Environmental compliance & reporting (Chief Eng/Captain)",
-      frequency: "Monthly",
-      fields: ["Regulation", "Compliance Parameter", "Current Status", "Monitoring Results", "Limits", "Actions Required", "Reporting Due"],
-      filters: ["Vessel", "Regulation Type", "Compliance Status", "Parameter", "Action Required"],
+      id: "certificate-history",
+      name: "Certificate Renewal History",
+      description: "Historical record of certificate renewals and amendments",
+      purpose: "Audit trail (Office/Auditors)",
+      frequency: "Quarterly",
+      fields: ["Certificate", "Renewal Date", "Previous Expiry", "New Expiry", "Authority"],
       outputs: ["PDF", "Excel"],
       icon: CheckCircle,
-      priority: "medium",
-      lastGenerated: "5 days ago",
-      estimatedTime: "3-4 min",
-      complianceArea: "environmental"
+      priority: "low",
+      estimatedTime: "2-3 min"
     }
   ];
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFrequency = selectedFrequency === "all" || 
-                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
-    const matchesArea = selectedArea === "all" || report.complianceArea === selectedArea;
-    
-    return matchesSearch && matchesFrequency && matchesArea;
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
+    return matchesSearch && matchesPriority;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -159,77 +147,232 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     }
   };
 
-  const getAreaColor = (area: string) => {
-    switch (area) {
-      case 'certificates': return 'bg-purple-100 text-purple-800';
-      case 'class': return 'bg-blue-100 text-blue-800';
-      case 'safety': return 'bg-red-100 text-red-800';
-      case 'security': return 'bg-orange-100 text-orange-800';
-      case 'environmental': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getDaysToExpiry = (expiryDate: string | Date | null): number => {
+    if (!expiryDate) return 999;
+    const expiry = new Date(expiryDate);
+    const today = new Date();
+    return Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getExpiryStatus = (daysToExpiry: number): string => {
+    if (daysToExpiry < 0) return 'Expired';
+    if (daysToExpiry <= 30) return 'Critical';
+    if (daysToExpiry <= 90) return 'Due Soon';
+    return 'Valid';
+  };
+
+  const generateCompliancePDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+
+    switch (reportId) {
+      case 'certificates-status': {
+        const columns = [
+          { header: 'Certificate', field: 'name', width: 55 },
+          { header: 'Issue Date', field: 'issueDate', width: 30 },
+          { header: 'Expiry Date', field: 'expiryDate', width: 30 },
+          { header: 'Days to Expiry', field: 'daysToExpiry', width: 35 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = certificates.map((c: any) => {
+          const days = getDaysToExpiry(c.expiryDate);
+          return {
+            name: c.name || c.certificateName || '-',
+            issueDate: formatDate(c.issueDate),
+            expiryDate: formatDate(c.expiryDate),
+            daysToExpiry: days,
+            status: getExpiryStatus(days)
+          };
+        });
+
+        const summary = [
+          { label: 'Total Certificates', value: data.length },
+          { label: 'Valid', value: data.filter((d: any) => d.status === 'Valid').length },
+          { label: 'Expiring Soon', value: data.filter((d: any) => d.status === 'Due Soon' || d.status === 'Critical').length },
+          { label: 'Expired', value: data.filter((d: any) => d.status === 'Expired').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Certificates Status Report', subtitle: 'Certificate validity overview', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'surveys-due': {
+        const columns = [
+          { header: 'Survey Type', field: 'name', width: 55 },
+          { header: 'Due Date', field: 'dueDate', width: 35 },
+          { header: 'Days to Due', field: 'daysToDue', width: 30 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = surveys.map((s: any) => {
+          const days = getDaysToExpiry(s.dueDate || s.expiryDate);
+          return {
+            name: s.name || s.surveyType || '-',
+            dueDate: formatDate(s.dueDate || s.expiryDate),
+            daysToDue: days,
+            status: getExpiryStatus(days)
+          };
+        });
+
+        const summary = [
+          { label: 'Total Surveys', value: data.length },
+          { label: 'Due Soon', value: data.filter((d: any) => d.daysToDue <= 90 && d.daysToDue >= 0).length },
+          { label: 'Overdue', value: data.filter((d: any) => d.daysToDue < 0).length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Surveys Due Report', subtitle: 'Upcoming and overdue surveys', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'expiring-certificates': {
+        const expiringCerts = certificates.filter((c: any) => {
+          const days = getDaysToExpiry(c.expiryDate);
+          return days <= 90 && days >= 0;
+        });
+
+        const columns = [
+          { header: 'Certificate', field: 'name', width: 60 },
+          { header: 'Expiry Date', field: 'expiryDate', width: 35 },
+          { header: 'Days Remaining', field: 'daysRemaining', width: 35 },
+          { header: 'Priority', field: 'priority', width: 30 }
+        ];
+
+        const data = expiringCerts.map((c: any) => {
+          const days = getDaysToExpiry(c.expiryDate);
+          return {
+            name: c.name || c.certificateName || '-',
+            expiryDate: formatDate(c.expiryDate),
+            daysRemaining: days,
+            priority: days <= 30 ? 'Critical' : 'High'
+          };
+        });
+
+        const summary = [
+          { label: 'Expiring Soon', value: data.length },
+          { label: 'Critical (<30 days)', value: data.filter((d: any) => d.daysRemaining <= 30).length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Expiring Certificates Alert', subtitle: 'Certificates requiring urgent attention', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'compliance-summary': {
+        const totalCerts = certificates.length;
+        const totalSurveys = surveys.length;
+        const expiredCerts = certificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
+        const expiredSurveys = surveys.filter((s: any) => getDaysToExpiry(s.dueDate || s.expiryDate) < 0).length;
+
+        const columns = [
+          { header: 'Area', field: 'area', width: 50 },
+          { header: 'Total', field: 'total', width: 30 },
+          { header: 'Compliant', field: 'compliant', width: 30 },
+          { header: 'Non-Compliant', field: 'nonCompliant', width: 35 },
+          { header: 'Compliance %', field: 'percentage', width: 35 }
+        ];
+
+        const data = [
+          {
+            area: 'Certificates',
+            total: totalCerts,
+            compliant: totalCerts - expiredCerts,
+            nonCompliant: expiredCerts,
+            percentage: totalCerts > 0 ? `${Math.round((totalCerts - expiredCerts) / totalCerts * 100)}%` : 'N/A'
+          },
+          {
+            area: 'Surveys',
+            total: totalSurveys,
+            compliant: totalSurveys - expiredSurveys,
+            nonCompliant: expiredSurveys,
+            percentage: totalSurveys > 0 ? `${Math.round((totalSurveys - expiredSurveys) / totalSurveys * 100)}%` : 'N/A'
+          }
+        ];
+
+        const overallCompliance = (totalCerts + totalSurveys) > 0 
+          ? Math.round(((totalCerts - expiredCerts) + (totalSurveys - expiredSurveys)) / (totalCerts + totalSurveys) * 100)
+          : 100;
+
+        const summary = [
+          { label: 'Overall Compliance', value: `${overallCompliance}%` },
+          { label: 'Total Items', value: totalCerts + totalSurveys },
+          { label: 'Non-Compliant', value: expiredCerts + expiredSurveys }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Compliance Summary Report', subtitle: 'Overall compliance status', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'certificate-history': {
+        const columns = [
+          { header: 'Certificate', field: 'name', width: 60 },
+          { header: 'Issue Date', field: 'issueDate', width: 35 },
+          { header: 'Expiry Date', field: 'expiryDate', width: 35 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = certificates.map((c: any) => ({
+          name: c.name || c.certificateName || '-',
+          issueDate: formatDate(c.issueDate),
+          expiryDate: formatDate(c.expiryDate),
+          status: getExpiryStatus(getDaysToExpiry(c.expiryDate))
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Certificate Renewal History', subtitle: 'Historical record of certificates', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      default:
+        toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
     }
   };
 
-  const getAreaStats = () => {
-    const certificates = reports.filter(r => r.complianceArea === 'certificates').length;
-    const classReports = reports.filter(r => r.complianceArea === 'class').length;
-    const safety = reports.filter(r => r.complianceArea === 'safety').length;
-    const highPriority = reports.filter(r => r.priority === 'high').length;
-    
-    return { certificates, classReports, safety, highPriority };
-  };
-
-  const stats = getAreaStats();
-
-  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
-    if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
+    if (generatingReports.has(reportKey)) return;
+
+    if (certificates.length === 0 && surveys.length === 0) {
+      toast({ title: "No Data Available", description: "No certificates or surveys data found for the selected vessel.", variant: "destructive" });
+      return;
     }
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
-      toast({
-        title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
-      });
+      toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
-      // Get current filters - use globalFilters vessel or first available vessel
-      const vesselName = globalFilters?.vessel || vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        area: selectedArea !== "all" ? selectedArea : undefined,
-        search: searchQuery || undefined,
-      };
-
-      // For now, use the maintenance report generator - will create specific compliance generator later
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'compliance-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
-      
-      toast({
-        title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
-        variant: "default",
-      });
+      if (format === 'PDF') {
+        await generateCompliancePDF(reportId);
+        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
+      } else {
+        toast({ title: "Excel Export", description: "Excel export coming soon." });
+      }
       
     } catch (error) {
       console.error('Error generating report:', error);
-      toast({
-        title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
-        variant: "destructive",
-      });
+      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);
@@ -239,38 +382,33 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
-    handleGenerateReport(reportId, 'PDF');
-  };
+  const expiringCertificates = certificates.filter((c: any) => {
+    const days = getDaysToExpiry(c.expiryDate);
+    return days <= 90 && days >= 0;
+  }).length;
+
+  const expiredCertificates = certificates.filter((c: any) => getDaysToExpiry(c.expiryDate) < 0).length;
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-reports"
-          >
+          <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Reports
           </Button>
           <div className="h-6 border-l border-gray-300" />
           <div>
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500 text-white">
-                <Shield className="h-5 w-5" />
+              <div className="p-2 rounded-lg bg-teal-500 text-white">
+                <FileCheck className="h-5 w-5" />
               </div>
               Compliance, Class & Certificates
             </h1>
-            <p className="text-gray-600">5 comprehensive reports for regulatory compliance, classification, and certification management</p>
+            <p className="text-gray-600">5 reports for compliance monitoring</p>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -279,48 +417,32 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-compliance-reports"
             />
           </div>
-          
-          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
-              <SelectValue placeholder="Filter by frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="quarterly">Quarterly</SelectItem>
-            </SelectContent>
-          </Select>
 
-          <Select value={selectedArea} onValueChange={setSelectedArea}>
-            <SelectTrigger className="w-48" data-testid="select-area-filter">
-              <SelectValue placeholder="Filter by area" />
+          <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Areas</SelectItem>
-              <SelectItem value="certificates">Certificates</SelectItem>
-              <SelectItem value="class">Class Surveys</SelectItem>
-              <SelectItem value="safety">Safety</SelectItem>
-              <SelectItem value="security">Security</SelectItem>
-              <SelectItem value="environmental">Environmental</SelectItem>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="high">High Priority</SelectItem>
+              <SelectItem value="medium">Medium Priority</SelectItem>
+              <SelectItem value="low">Low Priority</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-compliance-total-reports">5</p>
+                <p className="text-sm text-gray-600">Total Certificates</p>
+                <p className="text-2xl font-bold text-gray-800">{certificates.length}</p>
               </div>
-              <Shield className="h-8 w-8 text-purple-500" />
+              <FileCheck className="h-8 w-8 text-teal-500" />
             </div>
           </CardContent>
         </Card>
@@ -328,8 +450,19 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-compliance-high-priority">{stats.highPriority}</p>
+                <p className="text-sm text-gray-600">Expiring Soon</p>
+                <p className="text-2xl font-bold text-yellow-600">{expiringCertificates}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Expired</p>
+                <p className="text-2xl font-bold text-red-600">{expiredCertificates}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
@@ -339,48 +472,31 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Certificates</p>
-                <p className="text-2xl font-bold text-purple-600" data-testid="text-compliance-certificates-count">{stats.certificates}</p>
+                <p className="text-sm text-gray-600">Surveys</p>
+                <p className="text-2xl font-bold text-blue-600">{surveys.length}</p>
               </div>
-              <FileCheck className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Safety Reports</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-compliance-safety-count">{stats.safety}</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-500" />
+              <Calendar className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`compliance-report-card-${report.id}`}>
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
+                    <div className="p-2 rounded-lg bg-teal-100 text-teal-600">
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{report.name}</CardTitle>
-                      <div className="flex gap-2 mt-1">
-                        <Badge className={getPriorityColor(report.priority)} variant="secondary">
-                          {report.priority.toUpperCase()}
-                        </Badge>
-                        <Badge className={getAreaColor(report.complianceArea)} variant="secondary">
-                          {report.complianceArea.toUpperCase()}
-                        </Badge>
-                      </div>
+                      <Badge className={getPriorityColor(report.priority)} variant="secondary">
+                        {report.priority.toUpperCase()}
+                      </Badge>
                     </div>
                   </div>
                   <div className="text-right text-sm text-gray-500">
@@ -396,95 +512,38 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
                   <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {report.fields.slice(0, 3).map((field, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {field}
-                        </Badge>
-                      ))}
-                      {report.fields.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{report.fields.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-purple-100 text-purple-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {report.fields.slice(0, 4).map((field, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">{field}</Badge>
+                    ))}
                   </div>
                 </div>
 
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
-
                 <div className="flex gap-2 pt-3 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
-                    className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handleGenerateReport(report.id, 'PDF')} className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
                     Preview
                   </Button>
                   
                   <div className="flex gap-1">
-                    {report.outputs.includes('PDF') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3"
-                        disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
-                      >
-                        {generatingReports.has(`${report.id}-PDF`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'PDF'
-                        )}
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3"
+                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                    >
+                      {generatingReports.has(`${report.id}-PDF`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
+                    </Button>
                     {report.outputs.includes('Excel') && (
                       <Button 
                         size="sm" 
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
                         className="bg-green-600 hover:bg-green-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
                       >
-                        {generatingReports.has(`${report.id}-Excel`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Excel'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
+                        {generatingReports.has(`${report.id}-Excel`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excel'}
                       </Button>
                     )}
                   </div>
@@ -494,14 +553,6 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack, globalFil
           );
         })}
       </div>
-
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
-        </div>
-      )}
     </div>
   );
 };

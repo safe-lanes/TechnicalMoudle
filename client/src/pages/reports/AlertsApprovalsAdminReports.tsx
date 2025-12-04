@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,11 @@ import {
   CheckCircle,
   Clock
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator, formatDate } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface AdminReport {
   id: string;
@@ -36,137 +38,120 @@ interface AdminReport {
   purpose: string;
   frequency: string;
   fields: string[];
-  filters: string[];
   outputs: string[];
   icon: React.ElementType;
   priority: 'high' | 'medium' | 'low';
-  lastGenerated?: string;
   estimatedTime: string;
-  reportType: 'alerts' | 'approvals' | 'admin' | 'monitoring' | 'security' | 'analytics';
+  reportType: 'alerts' | 'approvals' | 'admin';
 }
 
 interface AlertsApprovalsAdminReportsProps {
   onBack: () => void;
-  globalFilters?: {
-    vessel: string;
-    department: string;
-    dateRange: { from: Date | null; to: Date | null };
-    priority: string;
-  };
 }
 
-const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack, globalFilters }) => {
+const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: workOrders = [] } = useQuery<any[]>({
+    queryKey: ['/api/work-orders'],
+  });
+
+  const { data: defects = [] } = useQuery<any[]>({
+    queryKey: ['/api/defects', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
 
   const reports: AdminReport[] = [
     {
       id: "alerts-notifications",
-      name: "System Alerts & Notifications Report",
-      description: "Comprehensive tracking of all system alerts, notifications, and critical warnings across PMS modules",
-      purpose: "Monitor system health & alert response (IT Admin/Management)",
+      name: "System Alerts & Notifications",
+      description: "Comprehensive tracking of all system alerts, notifications, and critical warnings",
+      purpose: "Monitor system health & alert response (Admin)",
       frequency: "Daily",
-      fields: ["Alert Type", "Priority", "Module", "Trigger Time", "Status", "Response Time", "Affected Users", "Resolution"],
-      filters: ["Alert Type", "Priority", "Module", "Status", "Date Range"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Alert Type", "Priority", "Module", "Status", "Time"],
+      outputs: ["PDF", "Excel"],
       icon: Bell,
       priority: "high",
-      lastGenerated: "6 hours ago",
-      estimatedTime: "2-3 min",
+      estimatedTime: "1-2 min",
       reportType: "alerts"
     },
     {
-      id: "approval-workflows",
-      name: "Approval Workflows & Processing Report",
-      description: "Detailed tracking of approval workflows across all PMS modules including pending, approved, and rejected items",
-      purpose: "Monitor approval efficiency & bottlenecks (Management/Supervisors)",
-      frequency: "Weekly",
-      fields: ["Workflow Type", "Request ID", "Submitted By", "Current Approver", "Days Pending", "Status", "Processing Time"],
-      filters: ["Workflow Type", "Status", "Approver", "Department", "Priority"],
-      outputs: ["PDF", "Excel"],
-      icon: CheckCircle,
+      id: "pending-approvals",
+      name: "Pending Approvals Report",
+      description: "All items awaiting approval across work orders, defects, and changes",
+      purpose: "Track approval workflow (Office/Superintendent)",
+      frequency: "Daily",
+      fields: ["Item Type", "ID", "Description", "Submitted", "Awaiting"],
+      outputs: ["PDF", "Dashboard"],
+      icon: Clock,
       priority: "high",
-      lastGenerated: "2 days ago",
-      estimatedTime: "3-4 min",
+      estimatedTime: "< 1 min",
       reportType: "approvals"
     },
     {
-      id: "user-activity-audit",
-      name: "User Activity & Audit Trail Report",
-      description: "Complete audit trail of user activities, login patterns, and system usage across all PMS modules",
-      purpose: "Security monitoring & compliance auditing (Security Admin/Management)",
+      id: "approval-history",
+      name: "Approval History Log",
+      description: "Audit trail of all approvals and rejections",
+      purpose: "Compliance & audit trail (Office/Auditors)",
       frequency: "Monthly",
-      fields: ["User ID", "Activity Type", "Module", "Timestamp", "IP Address", "Device", "Success/Failure", "Session Duration"],
-      filters: ["User", "Activity Type", "Module", "Date Range", "Success Status"],
+      fields: ["Item", "Approver", "Action", "Date", "Comments"],
+      outputs: ["PDF", "Excel"],
+      icon: CheckCircle,
+      priority: "medium",
+      estimatedTime: "2-3 min",
+      reportType: "approvals"
+    },
+    {
+      id: "user-activity",
+      name: "User Activity Report",
+      description: "User login history, actions taken, and session information",
+      purpose: "Security monitoring (IT Admin)",
+      frequency: "Weekly",
+      fields: ["User", "Role", "Last Login", "Actions", "Sessions"],
       outputs: ["PDF", "Excel"],
       icon: Users,
       priority: "medium",
-      lastGenerated: "5 days ago",
-      estimatedTime: "4-5 min",
-      reportType: "security"
-    },
-    {
-      id: "system-performance",
-      name: "System Performance & Usage Analytics",
-      description: "System performance metrics, module usage statistics, and operational efficiency indicators",
-      purpose: "Optimize system performance & resource allocation (IT Admin/Management)",
-      frequency: "Weekly",
-      fields: ["Module", "Usage Count", "Response Time", "Error Rate", "Peak Hours", "Resource Usage", "Performance Score"],
-      filters: ["Module", "Date Range", "Performance Metric", "Usage Type"],
-      outputs: ["PDF", "Excel", "Dashboard"],
-      icon: Activity,
-      priority: "medium",
-      lastGenerated: "1 day ago",
-      estimatedTime: "3-4 min",
-      reportType: "monitoring"
-    },
-    {
-      id: "administrative-overview",
-      name: "Administrative Overview & Control Report",
-      description: "High-level administrative overview including system configuration, user management, and operational control metrics",
-      purpose: "Executive oversight & administrative control (Management/IT Director)",
-      frequency: "Monthly",
-      fields: ["Total Users", "Active Modules", "System Health", "Backup Status", "License Usage", "Compliance Status", "Critical Issues"],
-      filters: ["System Component", "Status", "Date Range", "Department"],
-      outputs: ["PDF", "Excel", "Dashboard"],
-      icon: Settings,
-      priority: "high",
-      lastGenerated: "1 week ago",
-      estimatedTime: "5-6 min",
+      estimatedTime: "2-3 min",
       reportType: "admin"
     },
     {
-      id: "compliance-security",
-      name: "Compliance & Security Status Report",
-      description: "Comprehensive security posture and regulatory compliance status across all PMS modules and operations",
-      purpose: "Ensure regulatory compliance & security standards (Security Officer/QA)",
+      id: "system-performance",
+      name: "System Performance Report",
+      description: "PMS module performance metrics and usage statistics",
+      purpose: "System optimization (IT Admin)",
       frequency: "Monthly",
-      fields: ["Compliance Area", "Status", "Last Audit", "Non-Conformities", "Risk Level", "Corrective Actions", "Deadline"],
-      filters: ["Compliance Area", "Status", "Risk Level", "Department"],
-      outputs: ["PDF", "Excel"],
-      icon: Shield,
+      fields: ["Module", "Usage Count", "Avg Response", "Errors"],
+      outputs: ["PDF", "Dashboard"],
+      icon: Activity,
+      priority: "low",
+      estimatedTime: "3-5 min",
+      reportType: "admin"
+    },
+    {
+      id: "overdue-alerts",
+      name: "Overdue Items Alert Report",
+      description: "All overdue work orders, defects, and certificates",
+      purpose: "Prioritization & escalation (Management)",
+      frequency: "Daily",
+      fields: ["Type", "ID", "Description", "Days Overdue", "Priority"],
+      outputs: ["PDF", "Dashboard"],
+      icon: AlertTriangle,
       priority: "high",
-      lastGenerated: "3 days ago",
-      estimatedTime: "4-5 min",
-      reportType: "security"
+      estimatedTime: "< 1 min",
+      reportType: "alerts"
     }
   ];
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFrequency = selectedFrequency === "all" || 
-                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = selectedType === "all" || report.reportType === selectedType;
-    
-    return matchesSearch && matchesFrequency && matchesType;
+    return matchesSearch && matchesType;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -178,80 +163,176 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'alerts': return 'bg-red-100 text-red-800';
-      case 'approvals': return 'bg-green-100 text-green-800';
-      case 'admin': return 'bg-blue-100 text-blue-800';
-      case 'monitoring': return 'bg-purple-100 text-purple-800';
-      case 'security': return 'bg-orange-100 text-orange-800';
-      case 'analytics': return 'bg-cyan-100 text-cyan-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const generateAlertsPDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+    const now = new Date();
+
+    switch (reportId) {
+      case 'alerts-notifications': {
+        const columns = [
+          { header: 'Alert Type', field: 'type', width: 35 },
+          { header: 'Description', field: 'description', width: 60 },
+          { header: 'Priority', field: 'priority', width: 25 },
+          { header: 'Status', field: 'status', width: 25 }
+        ];
+
+        const alerts: any[] = [];
+        
+        workOrders.filter((wo: any) => wo.status === 'Overdue' || (wo.dueDate && new Date(wo.dueDate) < now && wo.status !== 'Completed'))
+          .forEach((wo: any) => alerts.push({
+            type: 'Overdue Work Order',
+            description: wo.workOrderNumber || wo.title || wo.id,
+            priority: 'High',
+            status: 'Active'
+          }));
+
+        defects.filter((d: any) => d.status === 'Open')
+          .forEach((d: any) => alerts.push({
+            type: 'Open Defect',
+            description: d.defectNumber || d.title || d.id,
+            priority: d.priority || 'Medium',
+            status: 'Active'
+          }));
+
+        const summary = [
+          { label: 'Total Alerts', value: alerts.length },
+          { label: 'High Priority', value: alerts.filter(a => a.priority === 'High').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'System Alerts & Notifications', subtitle: 'Active alerts and warnings', vessel: vesselName },
+          columns,
+          alerts.length > 0 ? alerts : [{ type: 'No Alerts', description: 'All systems normal', priority: '-', status: 'OK' }],
+          summary
+        );
+        break;
+      }
+
+      case 'pending-approvals': {
+        const columns = [
+          { header: 'Type', field: 'type', width: 35 },
+          { header: 'ID', field: 'id', width: 40 },
+          { header: 'Description', field: 'description', width: 55 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const pendingItems: any[] = [];
+        
+        workOrders.filter((wo: any) => wo.status === 'Pending Approval')
+          .forEach((wo: any) => pendingItems.push({
+            type: 'Work Order',
+            id: wo.workOrderNumber || wo.id,
+            description: wo.title || wo.jobTitle || '-',
+            status: 'Awaiting Approval'
+          }));
+
+        defects.filter((d: any) => d.status === 'Pending Approval')
+          .forEach((d: any) => pendingItems.push({
+            type: 'Defect',
+            id: d.defectNumber || d.id,
+            description: d.title || d.description || '-',
+            status: 'Awaiting Approval'
+          }));
+
+        const summary = [
+          { label: 'Pending Items', value: pendingItems.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Pending Approvals Report', subtitle: 'Items awaiting approval', vessel: vesselName },
+          columns,
+          pendingItems.length > 0 ? pendingItems : [{ type: 'None', id: '-', description: 'No pending approvals', status: 'Clear' }],
+          summary
+        );
+        break;
+      }
+
+      case 'approval-history':
+      case 'user-activity':
+      case 'system-performance': {
+        const columns = [
+          { header: 'Item', field: 'item', width: 50 },
+          { header: 'Details', field: 'details', width: 70 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const reportTitles: Record<string, string> = {
+          'approval-history': 'Approval History Log',
+          'user-activity': 'User Activity Report',
+          'system-performance': 'System Performance Report'
+        };
+
+        pdfReportGenerator.generateReport(
+          { title: reportTitles[reportId], subtitle: 'System administration report', vessel: vesselName },
+          columns,
+          [{ item: 'Report Generated', details: formatDate(new Date().toISOString()), status: 'OK' }]
+        );
+        break;
+      }
+
+      case 'overdue-alerts': {
+        const columns = [
+          { header: 'Type', field: 'type', width: 35 },
+          { header: 'ID', field: 'id', width: 40 },
+          { header: 'Description', field: 'description', width: 50 },
+          { header: 'Days Overdue', field: 'daysOverdue', width: 30 },
+          { header: 'Priority', field: 'priority', width: 25 }
+        ];
+
+        const overdueItems: any[] = [];
+        
+        workOrders.filter((wo: any) => {
+          if (!wo.dueDate || wo.status === 'Completed') return false;
+          return new Date(wo.dueDate) < now;
+        }).forEach((wo: any) => {
+          const daysOverdue = Math.floor((now.getTime() - new Date(wo.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+          overdueItems.push({
+            type: 'Work Order',
+            id: wo.workOrderNumber || wo.id,
+            description: wo.title || wo.jobTitle || '-',
+            daysOverdue,
+            priority: wo.priority || 'Normal'
+          });
+        });
+
+        const summary = [
+          { label: 'Overdue Items', value: overdueItems.length },
+          { label: 'Critical', value: overdueItems.filter(i => i.daysOverdue > 30).length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Overdue Items Alert Report', subtitle: 'All overdue items requiring attention', vessel: vesselName },
+          columns,
+          overdueItems.length > 0 ? overdueItems : [{ type: 'None', id: '-', description: 'No overdue items', daysOverdue: 0, priority: '-' }],
+          summary
+        );
+        break;
+      }
+
+      default:
+        toast({ title: "Report Not Available", description: "This report is not yet implemented", variant: "destructive" });
     }
   };
 
-  const getTypeStats = () => {
-    const alerts = reports.filter(r => r.reportType === 'alerts').length;
-    const approvals = reports.filter(r => r.reportType === 'approvals').length;
-    const admin = reports.filter(r => r.reportType === 'admin').length;
-    const monitoring = reports.filter(r => r.reportType === 'monitoring').length;
-    const security = reports.filter(r => r.reportType === 'security').length;
-    const highPriority = reports.filter(r => r.priority === 'high').length;
-    
-    return { alerts, approvals, admin, monitoring, security, highPriority };
-  };
-
-  const stats = getTypeStats();
-
-  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
-    if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
-    }
+    if (generatingReports.has(reportKey)) return;
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
-      toast({
-        title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
-      });
+      toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
-      // Get current filters - use globalFilters vessel or first available vessel
-      const vesselName = globalFilters?.vessel || vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        type: selectedType !== "all" ? selectedType : undefined,
-        search: searchQuery || undefined,
-      };
-
-      // Use the maintenance report generator - will create specific admin generator later
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'admin-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
-      
-      toast({
-        title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
-        variant: "default",
-      });
+      if (format === 'PDF') {
+        await generateAlertsPDF(reportId);
+        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
+      } else {
+        toast({ title: "Excel Export", description: "Excel export coming soon." });
+      }
       
     } catch (error) {
       console.error('Error generating report:', error);
-      toast({
-        title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
-        variant: "destructive",
-      });
+      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);
@@ -261,38 +342,34 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
-    handleGenerateReport(reportId, 'PDF');
-  };
+  const overdueWOs = workOrders.filter((wo: any) => {
+    if (!wo.dueDate || wo.status === 'Completed') return false;
+    return new Date(wo.dueDate) < new Date();
+  }).length;
+
+  const pendingApprovals = workOrders.filter((wo: any) => wo.status === 'Pending Approval').length + 
+                          defects.filter((d: any) => d.status === 'Pending Approval').length;
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-reports"
-          >
+          <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Reports
           </Button>
           <div className="h-6 border-l border-gray-300" />
           <div>
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500 text-white">
-                <Shield className="h-5 w-5" />
+              <div className="p-2 rounded-lg bg-indigo-500 text-white">
+                <Bell className="h-5 w-5" />
               </div>
               Alerts, Approvals & Admin
             </h1>
-            <p className="text-gray-600">6 specialized reports for system administration, approval workflows, and operational oversight</p>
+            <p className="text-gray-600">6 reports for system administration</p>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -301,24 +378,11 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-admin-reports"
             />
           </div>
-          
-          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
-              <SelectValue placeholder="Filter by frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-48" data-testid="select-type-filter">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -326,32 +390,18 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
               <SelectItem value="alerts">Alerts</SelectItem>
               <SelectItem value="approvals">Approvals</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="monitoring">Monitoring</SelectItem>
-              <SelectItem value="security">Security</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-admin-total-reports">6</p>
-              </div>
-              <Shield className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-admin-high-priority">{stats.highPriority}</p>
+                <p className="text-sm text-gray-600">Overdue Items</p>
+                <p className="text-2xl font-bold text-red-600">{overdueWOs}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
@@ -361,10 +411,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Alerts</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-admin-alerts-count">{stats.alerts}</p>
+                <p className="text-sm text-gray-600">Pending Approvals</p>
+                <p className="text-2xl font-bold text-yellow-600">{pendingApprovals}</p>
               </div>
-              <Bell className="h-8 w-8 text-red-500" />
+              <Clock className="h-8 w-8 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -372,10 +422,10 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Approvals</p>
-                <p className="text-2xl font-bold text-green-600" data-testid="text-admin-approvals-count">{stats.approvals}</p>
+                <p className="text-sm text-gray-600">Work Orders</p>
+                <p className="text-2xl font-bold text-blue-600">{workOrders.length}</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              <Activity className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
@@ -383,48 +433,31 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Security</p>
-                <p className="text-2xl font-bold text-orange-600" data-testid="text-admin-security-count">{stats.security}</p>
+                <p className="text-sm text-gray-600">Reports Available</p>
+                <p className="text-2xl font-bold text-purple-600">6</p>
               </div>
-              <Shield className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Monitoring</p>
-                <p className="text-2xl font-bold text-purple-600" data-testid="text-admin-monitoring-count">{stats.monitoring}</p>
-              </div>
-              <Activity className="h-8 w-8 text-purple-500" />
+              <BarChart3 className="h-8 w-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`admin-report-card-${report.id}`}>
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
+                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{report.name}</CardTitle>
-                      <div className="flex gap-2 mt-1">
-                        <Badge className={getPriorityColor(report.priority)} variant="secondary">
-                          {report.priority.toUpperCase()}
-                        </Badge>
-                        <Badge className={getTypeColor(report.reportType)} variant="secondary">
-                          {report.reportType.toUpperCase()}
-                        </Badge>
-                      </div>
+                      <Badge className={getPriorityColor(report.priority)} variant="secondary">
+                        {report.priority.toUpperCase()}
+                      </Badge>
                     </div>
                   </div>
                   <div className="text-right text-sm text-gray-500">
@@ -440,95 +473,38 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
                   <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {report.fields.slice(0, 3).map((field, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {field}
-                        </Badge>
-                      ))}
-                      {report.fields.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{report.fields.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-orange-100 text-orange-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {report.fields.slice(0, 4).map((field, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">{field}</Badge>
+                    ))}
                   </div>
                 </div>
 
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
-
                 <div className="flex gap-2 pt-3 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
-                    className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handleGenerateReport(report.id, 'PDF')} className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
                     Preview
                   </Button>
                   
                   <div className="flex gap-1">
-                    {report.outputs.includes('PDF') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3"
-                        disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
-                      >
-                        {generatingReports.has(`${report.id}-PDF`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'PDF'
-                        )}
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3"
+                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                    >
+                      {generatingReports.has(`${report.id}-PDF`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
+                    </Button>
                     {report.outputs.includes('Excel') && (
                       <Button 
                         size="sm" 
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
                         className="bg-green-600 hover:bg-green-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
                       >
-                        {generatingReports.has(`${report.id}-Excel`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Excel'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
+                        {generatingReports.has(`${report.id}-Excel`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excel'}
                       </Button>
                     )}
                   </div>
@@ -537,28 +513,6 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
             </Card>
           );
         })}
-      </div>
-
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
-        </div>
-      )}
-
-      {/* Admin Integration Notice */}
-      <div className="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-        <div className="flex items-start gap-3">
-          <Settings className="h-5 w-5 text-orange-600 mt-0.5" />
-          <div>
-            <h4 className="font-semibold text-orange-900">Administrative Reports Integration</h4>
-            <p className="text-sm text-orange-800 mt-1">
-              These reports provide comprehensive administrative oversight including system monitoring, user management, 
-              approval workflows, security compliance, and operational control across all PMS modules.
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

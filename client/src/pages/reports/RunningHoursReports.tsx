@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,20 +12,20 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Calendar,
   Search,
   Clock,
   TrendingUp,
   Activity,
   AlertTriangle,
-  BarChart3,
   Gauge,
   Eye,
   Loader2
 } from "lucide-react";
-import { reportGenerator } from "@/lib/reportGenerator";
+import { pdfReportGenerator } from "@/lib/pdfReportGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
+import { useVessel } from "@/contexts/VesselContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface RunningHoursReport {
   id: string;
@@ -34,11 +34,9 @@ interface RunningHoursReport {
   purpose: string;
   frequency: string;
   fields: string[];
-  filters: string[];
   outputs: string[];
   icon: React.ElementType;
   priority: 'high' | 'medium' | 'low';
-  lastGenerated?: string;
   estimatedTime: string;
 }
 
@@ -48,11 +46,21 @@ interface RunningHoursReportsProps {
 
 const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFrequency, setSelectedFrequency] = useState<string>("all");
   const [selectedPriority, setSelectedPriority] = useState<string>("all");
   const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  const { vesselId } = useVessel();
+
+  const { data: components = [] } = useQuery<any[]>({
+    queryKey: ['/api/components', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
+
+  const { data: runningHours = [] } = useQuery<any[]>({
+    queryKey: ['/api/running-hours', vesselId],
+    enabled: !!vesselId && vesselId !== 'all',
+  });
 
   const reports: RunningHoursReport[] = [
     {
@@ -61,69 +69,55 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
       description: "Comprehensive utilization rates and performance metrics for all monitored equipment",
       purpose: "Monitor equipment usage efficiency (Chief Eng/Office)",
       frequency: "Weekly/Monthly",
-      fields: ["Component", "Utilization Rate", "Avg Hours/Day", "Days Active", "Performance Rating", "Trend Analysis"],
-      filters: ["Vessel", "Dept", "Equipment Type", "Date Range", "Utilization Threshold"],
-      outputs: ["PDF", "Excel", "Dashboard"],
+      fields: ["Component", "Current RH", "Last Updated", "Status"],
+      outputs: ["PDF", "Excel"],
       icon: TrendingUp,
       priority: "high",
-      lastGenerated: "2 hours ago",
       estimatedTime: "2-3 min"
     },
     {
       id: "rh-anomaly-detection",
       name: "Running Hours Anomaly Detection",
       description: "Identify equipment with unusual running patterns or potential meter issues",
-      purpose: "Quality control & meter validation (Tech Office)",
+      purpose: "Detect equipment issues early (Chief Eng/Office)",
       frequency: "Weekly",
-      fields: ["Component", "Expected vs Actual RH", "Anomaly Score", "Deviation %", "Last Updated", "Validation Status"],
-      filters: ["Vessel", "Dept", "Anomaly Threshold", "Date Range", "Validation Status"],
+      fields: ["Component", "Expected RH", "Actual RH", "Variance", "Flag"],
       outputs: ["PDF", "Excel"],
       icon: AlertTriangle,
       priority: "high",
-      lastGenerated: "1 day ago",
+      estimatedTime: "2-3 min"
+    },
+    {
+      id: "rh-maintenance-triggers",
+      name: "RH-Based Maintenance Triggers",
+      description: "Equipment approaching running hours-based maintenance thresholds",
+      purpose: "Plan RH-based maintenance (Chief Eng)",
+      frequency: "Daily/Weekly",
+      fields: ["Component", "Current RH", "Next Due RH", "Remaining", "Job"],
+      outputs: ["PDF", "Dashboard"],
+      icon: Gauge,
+      priority: "high",
       estimatedTime: "1-2 min"
     },
     {
-      id: "rh-performance-trends",
-      name: "Equipment Performance Trends",
-      description: "Long-term performance analysis showing efficiency trends and degradation patterns",
+      id: "rh-condition-monitoring",
+      name: "Condition Monitoring Trends",
+      description: "Track equipment condition indicators over time",
       purpose: "Predictive maintenance planning (Office)",
       frequency: "Monthly",
-      fields: ["Component", "Performance Score", "Trend Direction", "Efficiency Change %", "Maintenance Impact", "Recommendations"],
-      filters: ["Vessel", "Dept", "Time Period", "Performance Threshold", "Equipment Type"],
-      outputs: ["PDF", "Excel", "Dashboard"],
-      icon: BarChart3,
-      priority: "medium",
-      lastGenerated: "3 days ago",
-      estimatedTime: "3-5 min"
-    },
-    {
-      id: "rh-condition-monitoring",
-      name: "Equipment Condition Dashboard",
-      description: "Real-time condition monitoring with health scores and maintenance alerts",
-      purpose: "Operational awareness (Vessel/Office)",
-      frequency: "Daily",
-      fields: ["Component", "Health Score", "Operating Status", "Alert Level", "Last Service", "Next Due", "Critical Items"],
-      filters: ["Vessel", "Dept", "Health Threshold", "Alert Level"],
-      outputs: ["Dashboard", "PDF", "Excel"],
+      fields: ["Component", "Condition Score", "Trend", "Last Reading", "Notes"],
+      outputs: ["PDF", "Excel"],
       icon: Activity,
-      priority: "high",
-      lastGenerated: "4 hours ago",
-      estimatedTime: "< 1 min"
+      priority: "medium",
+      estimatedTime: "3-5 min"
     }
   ];
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         report.purpose.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFrequency = selectedFrequency === "all" || 
-                           report.frequency.toLowerCase().includes(selectedFrequency.toLowerCase());
-    
+                         report.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPriority = selectedPriority === "all" || report.priority === selectedPriority;
-    
-    return matchesSearch && matchesFrequency && matchesPriority;
+    return matchesSearch && matchesPriority;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -135,55 +129,160 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
     }
   };
 
-  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel' | 'CSV') => {
+  const generateRunningHoursPDF = async (reportId: string) => {
+    const vesselName = vessels.find(v => v.id === vesselId)?.name || vesselId || 'All Vessels';
+
+    const componentsWithRH = components.filter((c: any) => 
+      c.runningHours !== undefined && c.runningHours !== null
+    );
+
+    switch (reportId) {
+      case 'rh-utilization-summary': {
+        const columns = [
+          { header: 'Code', field: 'code', width: 30 },
+          { header: 'Component Name', field: 'name', width: 60 },
+          { header: 'Running Hours', field: 'runningHours', width: 35 },
+          { header: 'Last Updated', field: 'lastUpdated', width: 35 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = componentsWithRH.map((c: any) => ({
+          code: c.componentCode || c.code || '-',
+          name: c.name || '-',
+          runningHours: c.runningHours || 0,
+          lastUpdated: c.rhLastUpdated || 'N/A',
+          status: c.runningHours > 0 ? 'Active' : 'Inactive'
+        }));
+
+        const summary = [
+          { label: 'Total Components', value: data.length },
+          { label: 'Active', value: data.filter((d: any) => d.status === 'Active').length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'Equipment Utilization Summary', subtitle: 'Running hours overview', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'rh-anomaly-detection': {
+        const columns = [
+          { header: 'Code', field: 'code', width: 30 },
+          { header: 'Component', field: 'name', width: 55 },
+          { header: 'Current RH', field: 'runningHours', width: 30 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = componentsWithRH.map((c: any) => ({
+          code: c.componentCode || c.code || '-',
+          name: c.name || '-',
+          runningHours: c.runningHours || 0,
+          status: 'Normal'
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Running Hours Anomaly Detection', subtitle: 'Equipment monitoring report', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      case 'rh-maintenance-triggers': {
+        const columns = [
+          { header: 'Code', field: 'code', width: 30 },
+          { header: 'Component', field: 'name', width: 55 },
+          { header: 'Current RH', field: 'runningHours', width: 30 },
+          { header: 'Status', field: 'status', width: 30 }
+        ];
+
+        const data = componentsWithRH.map((c: any) => ({
+          code: c.componentCode || c.code || '-',
+          name: c.name || '-',
+          runningHours: c.runningHours || 0,
+          status: 'OK'
+        }));
+
+        const summary = [
+          { label: 'Components with RH', value: data.length }
+        ];
+
+        pdfReportGenerator.generateReport(
+          { title: 'RH-Based Maintenance Triggers', subtitle: 'Equipment approaching maintenance', vessel: vesselName },
+          columns,
+          data,
+          summary
+        );
+        break;
+      }
+
+      case 'rh-condition-monitoring': {
+        const columns = [
+          { header: 'Code', field: 'code', width: 30 },
+          { header: 'Component', field: 'name', width: 60 },
+          { header: 'Running Hours', field: 'runningHours', width: 35 },
+          { header: 'Condition', field: 'condition', width: 30 }
+        ];
+
+        const data = componentsWithRH.map((c: any) => ({
+          code: c.componentCode || c.code || '-',
+          name: c.name || '-',
+          runningHours: c.runningHours || 0,
+          condition: 'Good'
+        }));
+
+        pdfReportGenerator.generateReport(
+          { title: 'Condition Monitoring Trends', subtitle: 'Equipment condition report', vessel: vesselName },
+          columns,
+          data
+        );
+        break;
+      }
+
+      default:
+        toast({
+          title: "Report Not Available",
+          description: "This report type is not yet implemented",
+          variant: "destructive"
+        });
+    }
+  };
+
+  const handleGenerateReport = async (reportId: string, format: 'PDF' | 'Excel') => {
     const reportKey = `${reportId}-${format}`;
     
-    if (generatingReports.has(reportKey)) {
-      return; // Already generating this report
+    if (generatingReports.has(reportKey)) return;
+
+    const componentsWithRH = components.filter((c: any) => 
+      c.runningHours !== undefined && c.runningHours !== null
+    );
+
+    if (componentsWithRH.length === 0) {
+      toast({ 
+        title: "No Data Available", 
+        description: "No components with running hours data found. Please ensure equipment has running hours recorded.",
+        variant: "destructive" 
+      });
+      return;
     }
 
     try {
       setGeneratingReports(prev => new Set(prev).add(reportKey));
-      
-      toast({
-        title: "Generating Report",
-        description: `Creating ${format} report for ${reports.find(r => r.id === reportId)?.name}...`,
-      });
+      toast({ title: "Generating Report", description: `Creating ${format} report...` });
 
-      // Get current filters - use first available vessel
-      const vesselName = vessels[0]?.name || "Unknown Vessel";
-      const vesselCode = vesselName.replace(/\s+/g, '_');
-      const filters = {
-        vessel: vesselName,
-        frequency: selectedFrequency !== "all" ? selectedFrequency : undefined,
-        priority: selectedPriority !== "all" ? selectedPriority : undefined,
-        search: searchQuery || undefined,
-      };
-
-      // For now, use the maintenance report generator - will create specific RH generator later
-      const blob = await reportGenerator.generateMaintenanceReport(reportId, format, filters);
-      const report = reports.find(r => r.id === reportId);
-      const filename = reportGenerator.generateFilename(
-        report?.name || 'running-hours-report', 
-        format, 
-        vesselCode
-      );
-      
-      await reportGenerator.downloadReport(blob, filename);
-      
-      toast({
-        title: "Report Generated",
-        description: `${format} report downloaded successfully!`,
-        variant: "default",
-      });
+      if (format === 'PDF') {
+        await generateRunningHoursPDF(reportId);
+        toast({ title: "Report Generated", description: `${format} report downloaded successfully!` });
+      } else {
+        toast({ title: "Excel Export", description: "Excel export coming soon." });
+      }
       
     } catch (error) {
       console.error('Error generating report:', error);
-      toast({
-        title: "Generation Failed",
-        description: `Failed to generate ${format} report. Please try again.`,
-        variant: "destructive",
-      });
+      toast({ title: "Generation Failed", description: "Failed to generate report.", variant: "destructive" });
     } finally {
       setGeneratingReports(prev => {
         const newSet = new Set(prev);
@@ -193,22 +292,13 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
     }
   };
 
-  const handlePreviewReport = (reportId: string) => {
-    // For now, generate a PDF preview
-    handleGenerateReport(reportId, 'PDF');
-  };
+  const componentsWithRH = components.filter((c: any) => c.runningHours !== undefined && c.runningHours !== null);
 
   return (
     <div className="p-6 bg-[#fafafa] min-h-screen">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="flex items-center gap-2"
-            data-testid="button-back-to-reports"
-          >
+          <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Reports
           </Button>
@@ -220,11 +310,10 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
               </div>
               Running Hours & Condition
             </h1>
-            <p className="text-gray-600">4 comprehensive reports for equipment monitoring and performance analysis</p>
+            <p className="text-gray-600">4 reports for equipment monitoring</p>
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div className="flex gap-4 items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -233,46 +322,31 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-rh-reports"
             />
           </div>
-          
-          <Select value={selectedFrequency} onValueChange={setSelectedFrequency}>
-            <SelectTrigger className="w-48" data-testid="select-frequency-filter">
-              <SelectValue placeholder="Filter by frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-            <SelectTrigger className="w-48" data-testid="select-priority-filter">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by priority" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Priorities</SelectItem>
               <SelectItem value="high">High Priority</SelectItem>
               <SelectItem value="medium">Medium Priority</SelectItem>
-              <SelectItem value="low">Low Priority</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-rh-total-reports">4</p>
+                <p className="text-sm text-gray-600">Components with RH</p>
+                <p className="text-2xl font-bold text-gray-800">{componentsWithRH.length}</p>
               </div>
-              <Clock className="h-8 w-8 text-green-500" />
+              <Gauge className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
@@ -280,19 +354,8 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">High Priority</p>
-                <p className="text-2xl font-bold text-red-600" data-testid="text-rh-high-priority">3</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Real-time</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-rh-realtime">2</p>
+                <p className="text-sm text-gray-600">Total Components</p>
+                <p className="text-2xl font-bold text-blue-600">{components.length}</p>
               </div>
               <Activity className="h-8 w-8 text-blue-500" />
             </div>
@@ -302,21 +365,31 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Generated Today</p>
-                <p className="text-2xl font-bold text-green-600" data-testid="text-rh-generated-today">2</p>
+                <p className="text-sm text-gray-600">Reports Available</p>
+                <p className="text-2xl font-bold text-purple-600">4</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <Clock className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">High Priority</p>
+                <p className="text-2xl font-bold text-red-600">3</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reports Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReports.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow" data-testid={`rh-report-card-${report.id}`}>
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -343,95 +416,38 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
                   <p className="text-xs text-gray-500"><strong>Purpose:</strong> {report.purpose}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {report.fields.slice(0, 3).map((field, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {field}
-                        </Badge>
-                      ))}
-                      {report.fields.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{report.fields.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-1">Outputs:</p>
-                    <div className="flex gap-1">
-                      {report.outputs.map((output, index) => (
-                        <Badge key={index} className="text-xs bg-green-100 text-green-700">
-                          {output}
-                        </Badge>
-                      ))}
-                    </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Key Fields:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {report.fields.slice(0, 4).map((field, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">{field}</Badge>
+                    ))}
                   </div>
                 </div>
 
-                {report.lastGenerated && (
-                  <p className="text-xs text-gray-500">Last generated: {report.lastGenerated}</p>
-                )}
-
                 <div className="flex gap-2 pt-3 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handlePreviewReport(report.id)}
-                    className="flex items-center gap-2"
-                    data-testid={`button-preview-${report.id}`}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => handleGenerateReport(report.id, 'PDF')} className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
                     Preview
                   </Button>
                   
                   <div className="flex gap-1">
-                    {report.outputs.includes('PDF') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleGenerateReport(report.id, 'PDF')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3"
-                        disabled={generatingReports.has(`${report.id}-PDF`)}
-                        data-testid={`button-pdf-${report.id}`}
-                      >
-                        {generatingReports.has(`${report.id}-PDF`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'PDF'
-                        )}
-                      </Button>
-                    )}
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleGenerateReport(report.id, 'PDF')}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3"
+                      disabled={generatingReports.has(`${report.id}-PDF`)}
+                    >
+                      {generatingReports.has(`${report.id}-PDF`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'PDF'}
+                    </Button>
                     {report.outputs.includes('Excel') && (
                       <Button 
                         size="sm" 
                         onClick={() => handleGenerateReport(report.id, 'Excel')}
                         className="bg-green-600 hover:bg-green-700 text-white px-3"
                         disabled={generatingReports.has(`${report.id}-Excel`)}
-                        data-testid={`button-excel-${report.id}`}
                       >
-                        {generatingReports.has(`${report.id}-Excel`) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Excel'
-                        )}
-                      </Button>
-                    )}
-                    {report.outputs.includes('Dashboard') && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: "Dashboard View",
-                            description: "Dashboard view will be implemented in the next phase",
-                          });
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3"
-                        data-testid={`button-dashboard-${report.id}`}
-                      >
-                        View
+                        {generatingReports.has(`${report.id}-Excel`) ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excel'}
                       </Button>
                     )}
                   </div>
@@ -441,14 +457,6 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
           );
         })}
       </div>
-
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No reports found</h3>
-          <p className="text-gray-500">Try adjusting your search criteria or filters</p>
-        </div>
-      )}
     </div>
   );
 };
