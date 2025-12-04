@@ -149,10 +149,23 @@ export default function CertificatesPage() {
   const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
     const { data, colDef, newValue, oldValue } = event;
     
-    if (newValue === oldValue) return;
+    console.log('[CertificatesPage] onCellValueChanged fired:', { 
+      field: colDef.field, 
+      oldValue, 
+      newValue, 
+      dataId: data?.id 
+    });
+    
+    if (newValue === oldValue) {
+      console.log('[CertificatesPage] Value unchanged, skipping update');
+      return;
+    }
     
     const field = colDef.field;
-    if (!field || !data?.id) return;
+    if (!field || !data?.id) {
+      console.log('[CertificatesPage] Missing field or data.id');
+      return;
+    }
     
     if (EDITABLE_DATE_FIELDS.includes(field)) {
       const today = new Date();
@@ -162,6 +175,8 @@ export default function CertificatesPage() {
       const month = months[today.getMonth()];
       const year = today.getFullYear();
       const lastEditUpload = `${day} ${month} ${year}`;
+      
+      console.log('[CertificatesPage] Sending PATCH request for certificate:', data.id, 'field:', field, 'value:', newValue);
       
       updateCertificateMutation.mutate({
         id: data.id,
@@ -230,6 +245,13 @@ export default function CertificatesPage() {
       editable: true,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.issueDate = params.newValue;
+          return true;
+        }
+        return false;
+      },
     },
     {
       headerName: 'Expiry Date',
@@ -242,6 +264,13 @@ export default function CertificatesPage() {
       editable: true,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.expiryDate = params.newValue;
+          return true;
+        }
+        return false;
+      },
     },
     {
       headerName: 'Last Annual',
@@ -254,6 +283,13 @@ export default function CertificatesPage() {
       editable: true,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.lastAnnual = params.newValue;
+          return true;
+        }
+        return false;
+      },
     },
     {
       headerName: 'Last Interm',
@@ -266,6 +302,13 @@ export default function CertificatesPage() {
       editable: true,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.lastInterm = params.newValue;
+          return true;
+        }
+        return false;
+      },
     },
     {
       headerName: 'Endorsement Date',
@@ -278,6 +321,13 @@ export default function CertificatesPage() {
       editable: true,
       cellEditor: DateCellEditor,
       cellClass: 'editable-date-cell',
+      valueSetter: (params: any) => {
+        if (params.newValue !== params.oldValue) {
+          params.data.endorsementDate = params.newValue;
+          return true;
+        }
+        return false;
+      },
     },
     {
       headerName: 'Last Edit/ Upload',
