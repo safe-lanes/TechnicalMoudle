@@ -125,6 +125,22 @@
   font-size: 14px;
 }
 
+/* Editable date cell styling - visual indicator for clickable cells */
+.ag-theme-alpine .editable-date-cell {
+  cursor: pointer;
+}
+
+.ag-theme-alpine .editable-date-cell:hover {
+  background-color: #e8f4fc !important;
+}
+
+/* Cell editing focus styling */
+.ag-theme-alpine .ag-cell-inline-editing {
+  border: 2px solid #52baf3 !important;
+  border-radius: 4px;
+  background-color: #fff !important;
+}
+
 @layer components {
   .all-\[unset\] {
     all: unset;

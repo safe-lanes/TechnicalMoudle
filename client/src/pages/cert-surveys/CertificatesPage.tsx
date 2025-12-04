@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Download, Paperclip } from 'lucide-react';
-import { ColDef, GridReadyEvent, GridApi, ICellRendererParams } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
+import DateCellEditor from '@/components/AgGrid/DateCellEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,6 +33,8 @@ interface CertificateData {
   lastEditUpload: string;
   applicable: boolean;
 }
+
+const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'lastInterm', 'endorsementDate'];
 
 interface ApplicableCellRendererProps extends ICellRendererParams {
   onToggleApplicable?: (id: string, newValue: boolean) => void;
@@ -118,15 +121,15 @@ export default function CertificatesPage() {
     queryKey: ['/api/fleets'],
   });
 
-  const updateApplicableMutation = useMutation({
-    mutationFn: async ({ id, applicable }: { id: string; applicable: boolean }) => {
-      return apiRequest('PATCH', `/api/certificates/${id}`, { applicable });
+  const updateCertificateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<CertificateData> }) => {
+      return apiRequest('PATCH', `/api/certificates/${id}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/certificates'] });
       toast({
         title: 'Updated',
-        description: 'Certificate applicability updated successfully.',
+        description: 'Certificate updated successfully.',
       });
     },
     onError: (error: any) => {
@@ -135,12 +138,40 @@ export default function CertificatesPage() {
         description: error.message || 'Failed to update certificate',
         variant: 'destructive',
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/certificates'] });
     },
   });
 
   const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
-    updateApplicableMutation.mutate({ id, applicable: newValue });
-  }, [updateApplicableMutation]);
+    updateCertificateMutation.mutate({ id, updates: { applicable: newValue } });
+  }, [updateCertificateMutation]);
+
+  const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
+    const { data, colDef, newValue, oldValue } = event;
+    
+    if (newValue === oldValue) return;
+    
+    const field = colDef.field;
+    if (!field || !data?.id) return;
+    
+    if (EDITABLE_DATE_FIELDS.includes(field)) {
+      const today = new Date();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = months[today.getMonth()];
+      const year = today.getFullYear();
+      const lastEditUpload = `${day} ${month} ${year}`;
+      
+      updateCertificateMutation.mutate({
+        id: data.id,
+        updates: {
+          [field]: newValue,
+          lastEditUpload,
+        },
+      });
+    }
+  }, [updateCertificateMutation]);
 
   const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
@@ -191,53 +222,68 @@ export default function CertificatesPage() {
     {
       headerName: 'Issue Date',
       field: 'issueDate',
-      width: 100,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
-      filter: 'agDateColumnFilter',
-      sortable: true,
-      resizable: true,
-    },
-    {
-      headerName: 'Expiry Date',
-      field: 'expiryDate',
-      width: 100,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
-      filter: 'agDateColumnFilter',
-      sortable: true,
-      resizable: true,
-    },
-    {
-      headerName: 'Last Annual',
-      field: 'lastAnnual',
-      width: 100,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
-      filter: 'agDateColumnFilter',
-      sortable: true,
-      resizable: true,
-    },
-    {
-      headerName: 'Last Interm',
-      field: 'lastInterm',
-      width: 100,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
-      filter: 'agDateColumnFilter',
-      sortable: true,
-      resizable: true,
-    },
-    {
-      headerName: 'Endorsement Date',
-      field: 'endorsementDate',
       width: 120,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+    },
+    {
+      headerName: 'Expiry Date',
+      field: 'expiryDate',
+      width: 120,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+    },
+    {
+      headerName: 'Last Annual',
+      field: 'lastAnnual',
+      width: 120,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+    },
+    {
+      headerName: 'Last Interm',
+      field: 'lastInterm',
+      width: 120,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
+    },
+    {
+      headerName: 'Endorsement Date',
+      field: 'endorsementDate',
+      width: 130,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: 'Last Edit/ Upload',
       field: 'lastEditUpload',
       width: 110,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellStyle: { fontSize: '13px', color: '#888', fontStyle: 'italic' } as any,
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
@@ -345,6 +391,11 @@ export default function CertificatesPage() {
                 enableAdvancedFilter={false}
                 rowSelection={false}
                 theme="alpine"
+                gridOptions={{
+                  onCellValueChanged: handleCellValueChanged,
+                  singleClickEdit: true,
+                  stopEditingWhenCellsLoseFocus: true,
+                }}
               />
             )}
             

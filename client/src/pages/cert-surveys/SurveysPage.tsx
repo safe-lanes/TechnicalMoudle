@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Paperclip } from 'lucide-react';
-import { ColDef, GridReadyEvent, GridApi, ICellRendererParams } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
+import DateCellEditor from '@/components/AgGrid/DateCellEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,6 +33,8 @@ interface SurveyData {
   lastEdit: string;
   applicable: boolean;
 }
+
+const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'secondRangeDate', 'postponed'];
 
 interface ApplicableCellRendererProps extends ICellRendererParams {
   onToggleApplicable?: (id: string, newValue: boolean) => void;
@@ -114,15 +117,15 @@ export default function SurveysPage() {
   const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
   const groupOptions: { id: string; name: string }[] = [];
 
-  const updateApplicableMutation = useMutation({
-    mutationFn: async ({ id, applicable }: { id: string; applicable: boolean }) => {
-      return apiRequest('PATCH', `/api/surveys/${id}`, { applicable });
+  const updateSurveyMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
+      return apiRequest('PATCH', `/api/surveys/${id}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
       toast({
         title: 'Updated',
-        description: 'Survey applicability updated successfully.',
+        description: 'Survey updated successfully.',
       });
     },
     onError: (error: any) => {
@@ -131,12 +134,40 @@ export default function SurveysPage() {
         description: error.message || 'Failed to update survey',
         variant: 'destructive',
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
     },
   });
 
   const handleToggleApplicable = useCallback((id: string, newValue: boolean) => {
-    updateApplicableMutation.mutate({ id, applicable: newValue });
-  }, [updateApplicableMutation]);
+    updateSurveyMutation.mutate({ id, updates: { applicable: newValue } });
+  }, [updateSurveyMutation]);
+
+  const handleCellValueChanged = useCallback((event: CellValueChangedEvent) => {
+    const { data, colDef, newValue, oldValue } = event;
+    
+    if (newValue === oldValue) return;
+    
+    const field = colDef.field;
+    if (!field || !data?.id) return;
+    
+    if (EDITABLE_DATE_FIELDS.includes(field)) {
+      const today = new Date();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = months[today.getMonth()];
+      const year = today.getFullYear();
+      const lastEdit = `${day} ${month} ${year}`;
+      
+      updateSurveyMutation.mutate({
+        id: data.id,
+        updates: {
+          [field]: newValue,
+          lastEdit,
+        },
+      });
+    }
+  }, [updateSurveyMutation]);
 
   const gridContext = useMemo(() => ({
     onToggleApplicable: handleToggleApplicable,
@@ -187,53 +218,68 @@ export default function SurveysPage() {
     {
       headerName: 'Survey Date',
       field: 'surveyDate',
-      width: 100,
+      width: 120,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: 'Due Date',
       field: 'dueDate',
-      width: 100,
+      width: 120,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: '1st Range Date',
       field: 'firstRangeDate',
-      width: 110,
+      width: 130,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: '2nd Range Date',
       field: 'secondRangeDate',
-      width: 115,
+      width: 130,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: 'Postponed',
       field: 'postponed',
-      width: 100,
+      width: 120,
       cellStyle: { fontSize: '13px', color: '#4f5863' },
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
+      editable: true,
+      cellEditor: DateCellEditor,
+      cellClass: 'editable-date-cell',
     },
     {
       headerName: 'Last Edit',
       field: 'lastEdit',
       width: 100,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellStyle: { fontSize: '13px', color: '#888', fontStyle: 'italic' } as any,
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true,
@@ -337,6 +383,11 @@ export default function SurveysPage() {
                 enableAdvancedFilter={false}
                 rowSelection={false}
                 theme="alpine"
+                gridOptions={{
+                  onCellValueChanged: handleCellValueChanged,
+                  singleClickEdit: true,
+                  stopEditingWhenCellsLoseFocus: true,
+                }}
               />
             )}
             
