@@ -14548,8 +14548,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "393": {
-      "id": 393,
+    "395": {
+      "id": 395,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14558,10 +14558,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-04T15:25:27.195Z"
+      "updatedAt": "2025-12-04T15:27:14.760Z"
     },
-    "394": {
-      "id": 394,
+    "396": {
+      "id": 396,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14570,24 +14570,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-04T15:25:27.264Z"
+      "updatedAt": "2025-12-04T15:27:14.796Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 393,
+      "recurringId": 395,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 393,
+      "recurringId": 395,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 394,
+      "recurringId": 396,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 394,
+      "recurringId": 396,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -55225,7 +55225,7 @@
       "id": "S2",
       "surveyName": "Ballast Water Management annual Survey",
       "type": "Int",
-      "vessel": "MV Test",
+      "vessel": "MT Liberty Gas",
       "surveyDate": "",
       "dueDate": "",
       "firstRangeDate": "",
@@ -55293,7 +55293,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 395,
+    "recurringDefectId": 397,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 21,
