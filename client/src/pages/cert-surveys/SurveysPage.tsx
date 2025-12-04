@@ -11,7 +11,7 @@ const defaultFilterValue: VesselFilterValue = {
 };
 
 export default function SurveysPage() {
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
@@ -45,38 +45,6 @@ export default function SurveysPage() {
           groups={groupOptions}
         />
       )}
-
-      <div className="px-6 py-4">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <p className="text-gray-600">
-            Surveys content will be displayed here.
-          </p>
-          {(filterValue.selectedVessels.length > 0 || 
-            filterValue.selectedFleets.length > 0 || 
-            filterValue.selectedGroups.length > 0) && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Active Filters:</strong>
-                {filterValue.selectedVessels.length > 0 && (
-                  <span className="ml-2">
-                    Vessels: {filterValue.selectedVessels.join(', ')}
-                  </span>
-                )}
-                {filterValue.selectedFleets.length > 0 && (
-                  <span className="ml-2">
-                    Fleets: {filterValue.selectedFleets.join(', ')}
-                  </span>
-                )}
-                {filterValue.selectedGroups.length > 0 && (
-                  <span className="ml-2">
-                    Groups: {filterValue.selectedGroups.join(', ')}
-                  </span>
-                )}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
