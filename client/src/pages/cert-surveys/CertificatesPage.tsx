@@ -1,10 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Plus, Eye, FileText, Download, Paperclip } from 'lucide-react';
-import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, ICellEditorParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
-import DateCellEditor from '@/components/AgGrid/DateCellEditor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +11,68 @@ import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/fil
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { Vessel, Fleet } from '@shared/schema';
+
+const parseDisplayDate = (displayDate: string): string => {
+  if (!displayDate) return '';
+  const months: Record<string, string> = {
+    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+    'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+    'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+  };
+  const match = displayDate.match(/(\d{1,2})\s([A-Za-z]{3})\s(\d{4})/);
+  if (match) {
+    const [, day, monthStr, year] = match;
+    const month = months[monthStr] || '01';
+    return `${year}-${month}-${day.padStart(2, '0')}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(displayDate)) return displayDate;
+  return '';
+};
+
+const formatToDisplayDate = (isoDate: string): string => {
+  if (!isoDate) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  try {
+    const [year, month, day] = isoDate.split('-');
+    return `${day} ${months[parseInt(month, 10) - 1]} ${year}`;
+  } catch {
+    return isoDate;
+  }
+};
+
+const DateCellEditor = forwardRef((props: ICellEditorParams, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(() => parseDisplayDate(props.value || ''));
+  
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, []);
+  
+  useImperativeHandle(ref, () => ({
+    getValue: () => {
+      console.log('[DateCellEditor] getValue:', value, '->', formatToDisplayDate(value));
+      return formatToDisplayDate(value);
+    },
+    isCancelBeforeStart: () => false,
+    isCancelAfterEnd: () => false,
+  }));
+  
+  return (
+    <input
+      ref={inputRef}
+      type="date"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') props.stopEditing();
+        if (e.key === 'Escape') props.stopEditing(true);
+      }}
+      className="w-full h-full px-2 border-2 border-[#52baf3] rounded bg-white text-[13px]"
+      style={{ fontFamily: 'Inter, sans-serif', minWidth: '130px' }}
+    />
+  );
+});
+DateCellEditor.displayName = 'DateCellEditor';
 
 const defaultFilterValue: VesselFilterValue = {
   mode: 'vessel',
