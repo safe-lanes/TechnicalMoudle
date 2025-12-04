@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import AttachmentSheet, { AttachmentFile } from '@/components/AttachmentSheet';
+import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const parseDisplayDate = (displayDate: string): string => {
@@ -126,7 +126,7 @@ interface CertificateData {
   endorsementDate: string;
   lastEditUpload: string;
   applicable: boolean;
-  attachments?: AttachmentFile[];
+  attachments?: FileAttachment[];
 }
 
 const EDITABLE_DATE_FIELDS = ['issueDate', 'expiryDate', 'lastAnnual', 'lastInterm', 'endorsementDate'];
@@ -157,11 +157,13 @@ const ApplicableCellRenderer = (params: ApplicableCellRendererProps) => {
   );
 };
 
+interface CertificateGridContext {
+  onOpenAttachments?: (certificate: CertificateData) => void;
+  onToggleApplicable?: (id: string, newValue: boolean) => void;
+}
+
 interface ActionsCellRendererProps extends ICellRendererParams {
-  context?: {
-    onOpenAttachments?: (certificate: CertificateData) => void;
-    onToggleApplicable?: (id: string, newValue: boolean) => void;
-  };
+  context: CertificateGridContext;
 }
 
 const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
@@ -262,7 +264,7 @@ export default function CertificatesPage() {
     setAttachmentSheetOpen(true);
   }, []);
 
-  const handleAttachmentsChange = useCallback((attachments: AttachmentFile[]) => {
+  const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
     if (selectedCertificate) {
       updateCertificateMutation.mutate({
         id: selectedCertificate.id,
@@ -593,10 +595,10 @@ export default function CertificatesPage() {
         </Card>
       </div>
 
-      <AttachmentSheet
+      <FileAttachmentDialog
         open={attachmentSheetOpen}
         onOpenChange={setAttachmentSheetOpen}
-        title={selectedCertificate?.certificateName || ''}
+        itemName={selectedCertificate?.certificateName || ''}
         attachments={selectedCertificate?.attachments || []}
         onAttachmentsChange={handleAttachmentsChange}
       />

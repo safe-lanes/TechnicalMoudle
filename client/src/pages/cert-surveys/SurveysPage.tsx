@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import AttachmentSheet, { AttachmentFile } from '@/components/AttachmentSheet';
+import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
 import type { Vessel, Fleet } from '@shared/schema';
 
 const defaultFilterValue: VesselFilterValue = {
@@ -33,7 +33,7 @@ interface SurveyData {
   postponed: string;
   lastEdit: string;
   applicable: boolean;
-  attachments?: AttachmentFile[];
+  attachments?: FileAttachment[];
 }
 
 const EDITABLE_DATE_FIELDS = ['surveyDate', 'dueDate', 'firstRangeDate', 'secondRangeDate', 'postponed'];
@@ -167,7 +167,7 @@ export default function SurveysPage() {
     setAttachmentSheetOpen(true);
   }, []);
 
-  const handleAttachmentsChange = useCallback((attachments: AttachmentFile[]) => {
+  const handleAttachmentsChange = useCallback((attachments: FileAttachment[]) => {
     if (selectedSurvey) {
       updateSurveyMutation.mutate({
         id: selectedSurvey.id,
@@ -444,10 +444,10 @@ export default function SurveysPage() {
         </Card>
       </div>
 
-      <AttachmentSheet
+      <FileAttachmentDialog
         open={attachmentSheetOpen}
         onOpenChange={setAttachmentSheetOpen}
-        title={selectedSurvey?.surveyName || ''}
+        itemName={selectedSurvey?.surveyName || ''}
         attachments={selectedSurvey?.attachments || []}
         onAttachmentsChange={handleAttachmentsChange}
       />
