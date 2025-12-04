@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, Component, createRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Plus, Eye, FileText, Download, Paperclip } from 'lucide-react';
+import { Plus, Paperclip } from 'lucide-react';
 import { ColDef, GridReadyEvent, GridApi, ICellRendererParams, CellValueChangedEvent, ICellEditorParams } from 'ag-grid-community';
 import AgGridTable from '@/components/AgGrid/AgGridTable';
 import AgGridTableActions from '@/components/AgGrid/AgGridTableActions';
@@ -177,30 +177,6 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
   
   return (
     <div className="flex gap-1 justify-center items-center h-full">
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7"
-        data-testid={`button-view-${params.data.id}`}
-      >
-        <Eye className="h-4 w-4 text-gray-500" />
-      </Button>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7"
-        data-testid={`button-notes-${params.data.id}`}
-      >
-        <FileText className="h-4 w-4 text-gray-500" />
-      </Button>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7"
-        data-testid={`button-download-${params.data.id}`}
-      >
-        <Download className="h-4 w-4 text-gray-500" />
-      </Button>
       <Button 
         variant="ghost" 
         size="icon" 
@@ -483,7 +459,7 @@ export default function CertificatesPage() {
     {
       headerName: 'Actions',
       field: 'actions',
-      width: 150,
+      width: 80,
       cellRenderer: ActionsCellRenderer,
       sortable: false,
       filter: false,
