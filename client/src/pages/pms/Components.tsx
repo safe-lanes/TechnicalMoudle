@@ -1843,16 +1843,17 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
               <tr key={index} className="border-b border-gray-100">
                 <td className="py-3 px-3 text-gray-900">{item.classificationSociety}</td>
                 <td className="py-3 px-3 text-gray-900">{item.surveyType}</td>
-                <td className="py-3 px-3 text-gray-900">{item.certificateNo}</td>
-                <td className="py-3 px-3 text-gray-900">{item.lastSurveyDate}</td>
-                <td className="py-3 px-3 text-gray-900">{item.nextDueDate}</td>
+                <td className="py-3 px-3 text-gray-900">{item.certificateNumber}</td>
+                <td className="py-3 px-3 text-gray-900">{item.lastClassSurvey}</td>
+                <td className="py-3 px-3 text-gray-900">{item.nextSurveyDue}</td>
                 <td className="py-3 px-3">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    item.status === 'Valid' ? 'bg-green-100 text-green-800' :
-                    item.status === 'Due Soon' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
+                    item.surveyStatus === 'Active' ? 'bg-green-100 text-green-800' :
+                    item.surveyStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                    item.surveyStatus === 'Expired' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
                   }`}>
-                    {item.status || 'Valid'}
+                    {item.surveyStatus || 'Active'}
                   </span>
                 </td>
               </tr>
