@@ -478,6 +478,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
+      // Add dummy data for demo job MKR-IN-00004 (component 401.005)
+      let dummySpareParts = job.requiredSpareParts || [];
+      let dummyTools = job.requiredTools || [];
+      let dummySafetyReqs = job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] };
+      let dummyWorkHistory = workHistory;
+      
+      if (job.jobNo === 'MKR-IN-00004') {
+        // A2: Required Spare Parts (3 rows with codes matching Spares module)
+        dummySpareParts = [
+          { partNo: 'SP-00001', description: 'Rudder Shaft Bearing', quantityRequired: '2', remarks: 'For hydraulic pump replacement' },
+          { partNo: 'SP-00002', description: 'Rudder Pintle Bush', quantityRequired: '1', remarks: 'Spare for inspection' },
+          { partNo: 'SP-00003', description: 'Rudder Carrier Bearing', quantityRequired: '1', remarks: 'Preventive replacement' }
+        ];
+        
+        // A3: Required Tools & Equipment (3 rows)
+        dummyTools = [
+          { toolName: 'Hydraulic Jack 50T', quantity: '1', remarks: 'For lifting rudder assembly' },
+          { toolName: 'Torque Wrench 100-500 Nm', quantity: '2', remarks: 'For bolt tightening' },
+          { toolName: 'Dial Indicator Set', quantity: '1', remarks: 'For alignment measurement' }
+        ];
+        
+        // A4: Safety Requirements (3 items each)
+        dummySafetyReqs = {
+          ppeRequirements: ['Safety Helmet', 'Safety Shoes', 'Safety Gloves'],
+          permitRequirements: ['Hot Work Permit', 'Confined Space Entry', 'Lock Out Tag Out (LOTO)'],
+          otherRequirements: ['Vessel at anchor or alongside', 'Steering gear isolated', 'Bridge informed']
+        };
+        
+        // A5: Work History (3 rows with proper work order numbers and completed status)
+        dummyWorkHistory = [
+          { woNo: 'MKR-IN-00004.WO-2025-001', assignedTo: '2nd Engineer', performedBy: '2nd Engineer', workDate: '2025-06-15', runDate: '', completionDate: '2025-06-15', status: 'Completed', description: 'Rudder inspection - hydraulic pump check', remarks: 'No wear detected, pump in good condition' },
+          { woNo: 'MKR-IN-00004.WO-2024-003', assignedTo: 'Chief Engineer', performedBy: 'Chief Engineer', workDate: '2024-12-20', runDate: '', completionDate: '2024-12-20', status: 'Completed', description: 'Rudder bearing clearance check', remarks: 'Clearance within limits' },
+          { woNo: 'MKR-IN-00004.WO-2024-001', assignedTo: '2nd Engineer', performedBy: '3rd Engineer', workDate: '2024-06-10', runDate: '', completionDate: '2024-06-12', status: 'Completed', description: 'Annual rudder system inspection', remarks: 'Bearing replaced, alignment verified' }
+        ];
+      }
+      
       // Build template data from job fields (matching work order form structure)
       const templateData = {
         woTitle: job.jobTitle,
@@ -504,11 +540,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nextDueRH: job.nextDueRH?.toString() || '',
         briefWorkDescription: job.briefWorkDescription || job.jobDescription,
         jobDescription: job.jobDescription,
-        requiredSpareParts: job.requiredSpareParts || [],
-        requiredTools: job.requiredTools || [],
-        safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
+        requiredSpareParts: dummySpareParts,
+        requiredTools: dummyTools,
+        safetyRequirements: dummySafetyReqs,
         vesselId: job.vesselId,
-        workHistory: workHistory
+        workHistory: dummyWorkHistory
       };
       
       res.json({
