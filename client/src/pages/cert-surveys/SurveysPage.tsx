@@ -484,8 +484,8 @@ export default function SurveysPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-6 py-4 flex items-center justify-between">
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+      <div className="px-6 py-4 flex items-center justify-between flex-shrink-0">
         <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
         <div className="flex items-center gap-2">
           <FiltersToggle 
@@ -503,7 +503,7 @@ export default function SurveysPage() {
       </div>
 
       {showFilters && (
-        <div className="flex items-center gap-4 px-6">
+        <div className="flex items-center gap-4 px-6 flex-shrink-0">
           <VesselFilter
             value={filterValue}
             onChange={setFilterValue}
@@ -532,38 +532,41 @@ export default function SurveysPage() {
         </div>
       )}
 
-      <div className="px-6 py-4">
-        <Card className="border-0 shadow-none bg-[#f7fafc] rounded-lg">
-          <CardContent className="p-4 bg-[#f7fafc]">
+      <div className="px-6 py-4 flex-1 flex flex-col min-h-0">
+        <Card className="border-0 shadow-none bg-[#f7fafc] rounded-lg flex-1 flex flex-col min-h-0">
+          <CardContent className="p-4 bg-[#f7fafc] flex-1 flex flex-col min-h-0">
             {isLoading ? (
               <div className="flex items-center justify-center h-48">
                 <div className="text-gray-500">Loading surveys...</div>
               </div>
             ) : (
-              <AgGridTable
-                rowData={filteredSurveys}
-                columnDefs={columnDefs}
-                onGridReady={onGridReady}
-                onCellEditingStopped={handleCellEditingStopped}
-                context={gridContext}
-                autoHeight={true}
-                maxHeight="calc(100vh - 280px)"
-                minHeight="200px"
-                width="100%"
-                enableExport={true}
-                enableSideBar={true}
-                enableStatusBar={true}
-                enableRowGrouping={true}
-                enablePivoting={true}
-                enableAdvancedFilter={false}
-                rowSelection={false}
-                theme="alpine"
-                singleClickEdit={true}
-                stopEditingWhenCellsLoseFocus={true}
-              />
+              <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
+                <AgGridTable
+                  rowData={filteredSurveys}
+                  columnDefs={columnDefs}
+                  onGridReady={onGridReady}
+                  onCellEditingStopped={handleCellEditingStopped}
+                  context={gridContext}
+                  autoHeight={false}
+                  height="100%"
+                  minHeight="300px"
+                  width="100%"
+                  enableExport={true}
+                  enableSideBar={true}
+                  enableStatusBar={true}
+                  enableRowGrouping={true}
+                  enablePivoting={true}
+                  enableAdvancedFilter={false}
+                  rowSelection={false}
+                  theme="alpine"
+                  singleClickEdit={true}
+                  stopEditingWhenCellsLoseFocus={true}
+                  gridOptions={{ domLayout: 'normal' }}
+                />
+              </div>
             )}
             
-            <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center" style={{ marginTop: '-1px' }}>
+            <div className="bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-center flex-shrink-0" style={{ marginTop: '-1px' }}>
               <div className="text-xs font-normal font-['Mulish',Helvetica] text-black">
                 Rows: {filteredSurveys.length}
               </div>

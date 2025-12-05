@@ -686,7 +686,7 @@ export default function CertificatesPage() {
                 <div className="text-gray-500">Loading certificates...</div>
               </div>
             ) : (
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
                 <AgGridTable
                   rowData={filteredCertificates}
                   columnDefs={columnDefs}
@@ -695,7 +695,7 @@ export default function CertificatesPage() {
                   context={gridContext}
                   autoHeight={false}
                   height="100%"
-                  minHeight="200px"
+                  minHeight="300px"
                   width="100%"
                   enableExport={true}
                   enableSideBar={true}
@@ -707,6 +707,7 @@ export default function CertificatesPage() {
                   theme="alpine"
                   singleClickEdit={true}
                   stopEditingWhenCellsLoseFocus={true}
+                  gridOptions={{ domLayout: 'normal' }}
                 />
               </div>
             )}
