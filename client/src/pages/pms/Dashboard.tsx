@@ -545,8 +545,8 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Charts Row - Work Order Status and Outstanding Tasks */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Charts Row - Work Order Status, Outstanding Tasks, and Spares Stock */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Work Order Status Donut - Clickable */}
           <Card data-testid="card-wo-status-chart">
             <CardHeader>
@@ -635,10 +635,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Spares Stock Status Row - Moved Below */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Spares Stock Status Donut - Clickable */}
           <Card data-testid="card-spares-status-chart">
             <CardHeader>
