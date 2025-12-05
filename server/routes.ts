@@ -1586,19 +1586,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: "Delivered On Board",
             requestedBy: "2nd Engineer",
             vesselCode: "V001"
-          },
-          {
-            id: 1003,
-            requisitionNo: "REQ-401.005-003",
-            componentId: "401.005",
-            itemOrService: "Rudder Seal Assembly",
-            quantity: 1,
-            uom: "PC",
-            raisedOn: "2025-12-03",
-            priority: "Normal",
-            status: "Draft",
-            requestedBy: "Chief Engineer",
-            vesselCode: "V001"
           }
         ];
       }
