@@ -433,9 +433,7 @@ const WorkOrders: React.FC = () => {
           <thead className="bg-[#52baf3] text-white sticky top-0">
             <tr>
               <th className="text-left py-3 px-4 font-medium">Component</th>
-              <th className="text-left py-3 px-4 font-medium">
-                {activeTab === "Pending Approval" || activeTab === "Completed" ? "WO Execution ID" : "Work Order No"}
-              </th>
+              <th className="text-left py-3 px-4 font-medium">Work Order No</th>
               {activeTab === "Pending Approval" && (
                 <th className="text-left py-3 px-4 font-medium">WO Template Code</th>
               )}
