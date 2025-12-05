@@ -2133,7 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Build executionData from work order (Part B - editable execution record)
-      const executionData = {
+      let executionData = {
         // B1 - Risk Assessment, Checklists & Records
         riskAssessmentStatus: workOrder.riskAssessmentStatus || '',
         safetyChecklistsStatus: workOrder.safetyChecklistsStatus || '',
@@ -2164,9 +2164,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completionRemarks: workOrder.completionRemarks || ''
       };
       
+      // Add dummy data for demo work orders MKR-IN-00001.WO-2025-003 and MKR-SE-00001.WO-2025-001
+      let finalTemplateData = { ...templateData };
+      if (workOrder.workOrderNo === 'MKR-IN-00001.WO-2025-003' || workOrder.workOrderNo === 'MKR-SE-00001.WO-2025-001') {
+        // A2: Required Spare Parts (2 rows)
+        finalTemplateData.requiredSpareParts = [
+          { partNo: 'SP-00004', description: 'Impressed Current Anode', quantityRequired: '2', remarks: 'Annual replacement' },
+          { partNo: 'SP-00005', description: 'Reference Cell Electrode', quantityRequired: '1', remarks: 'Check and replace if corroded' }
+        ];
+        
+        // A3: Required Tools & Equipment (2 rows)
+        finalTemplateData.requiredTools = [
+          { toolName: 'Digital Multimeter', quantity: '1', remarks: 'For voltage measurement' },
+          { toolName: 'Insulation Tester (Megger)', quantity: '1', remarks: 'For insulation resistance check' }
+        ];
+        
+        // A4: Safety Requirements (2 items each)
+        finalTemplateData.safetyRequirements = {
+          ppeRequirements: ['Safety Gloves (Electrical)', 'Safety Goggles'],
+          permitRequirements: ['Electrical Work Permit', 'Diving Operations Permit'],
+          otherRequirements: ['System isolated before work', 'Vessel grounded properly']
+        };
+        
+        // A5: Work History (2 rows with completed status)
+        finalTemplateData.workHistory = [
+          { woNo: 'MKR-IN-00001.WO-2024-002', assignedTo: '2nd Engineer', performedBy: '2nd Engineer', workDate: '2024-11-15', runDate: '', completionDate: '2024-11-15', status: 'Completed', description: 'Impressed current system inspection', remarks: 'All anodes functional' },
+          { woNo: 'MKR-IN-00001.WO-2024-001', assignedTo: '3rd Engineer', performedBy: '3rd Engineer', workDate: '2024-05-20', runDate: '', completionDate: '2024-05-22', status: 'Completed', description: 'Annual anode replacement', remarks: '2 anodes replaced' }
+        ];
+        
+        // B3: Running Hours (dummy values)
+        executionData.previousReading = '8500';
+        executionData.currentReading = '8750';
+        
+        // B4: Spare Parts Consumed (2 rows - same as A2 but editable)
+        executionData.consumedSpareParts = [
+          { partNo: 'SP-00004', description: 'Impressed Current Anode', quantityConsumed: '2', comments: 'Replaced worn anodes' },
+          { partNo: 'SP-00005', description: 'Reference Cell Electrode', quantityConsumed: '1', comments: 'Corroded electrode replaced' }
+        ];
+      }
+      
       res.json({
         workOrder,
-        templateData,
+        templateData: finalTemplateData,
         executionData,
         job,
         component: {
