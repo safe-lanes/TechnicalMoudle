@@ -1558,13 +1558,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let requisitions = await storage.getComponentRequisitions(req.params.componentId);
       
-      // Add dummy data for demo component 401.005
-      if (req.params.componentId === "401.005" && requisitions.length === 0) {
+      // Add dummy data for demo component 401.005 (check component code, not ID)
+      if ((component.componentCode === "401.005" || component.code === "401.005") && requisitions.length === 0) {
         requisitions = [
           {
             id: 1001,
             requisitionNo: "REQ-401.005-001",
-            componentId: "401.005",
+            componentId: req.params.componentId,
             itemOrService: "Rudder Shaft Bearing (SP-00001)",
             quantity: 2,
             uom: "PC",
@@ -1572,12 +1572,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "Normal",
             status: "PO Raised",
             requestedBy: "Chief Engineer",
-            vesselCode: "V001"
+            vesselCode: component.vesselCode
           },
           {
             id: 1002,
             requisitionNo: "REQ-401.005-002",
-            componentId: "401.005",
+            componentId: req.params.componentId,
             itemOrService: "Rudder Actuator Service",
             quantity: 1,
             uom: "SRV",
@@ -1585,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "Urgent",
             status: "Delivered On Board",
             requestedBy: "2nd Engineer",
-            vesselCode: "V001"
+            vesselCode: component.vesselCode
           }
         ];
       }
