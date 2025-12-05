@@ -1556,7 +1556,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const requisitions = await storage.getComponentRequisitions(req.params.componentId);
+      let requisitions = await storage.getComponentRequisitions(req.params.componentId);
+      
+      // Add dummy data for demo component 401.005
+      if (req.params.componentId === "401.005" && requisitions.length === 0) {
+        requisitions = [
+          {
+            id: 1001,
+            requisitionNo: "REQ-401.005-001",
+            componentId: "401.005",
+            itemOrService: "Rudder Shaft Bearing (SP-00001)",
+            quantity: 2,
+            uom: "PC",
+            raisedOn: "2025-12-01",
+            priority: "Normal",
+            status: "PO Raised",
+            requestedBy: "Chief Engineer",
+            vesselCode: "V001"
+          },
+          {
+            id: 1002,
+            requisitionNo: "REQ-401.005-002",
+            componentId: "401.005",
+            itemOrService: "Rudder Actuator Service",
+            quantity: 1,
+            uom: "SRV",
+            raisedOn: "2025-12-02",
+            priority: "Urgent",
+            status: "Delivered On Board",
+            requestedBy: "2nd Engineer",
+            vesselCode: "V001"
+          },
+          {
+            id: 1003,
+            requisitionNo: "REQ-401.005-003",
+            componentId: "401.005",
+            itemOrService: "Rudder Seal Assembly",
+            quantity: 1,
+            uom: "PC",
+            raisedOn: "2025-12-03",
+            priority: "Normal",
+            status: "Draft",
+            requestedBy: "Chief Engineer",
+            vesselCode: "V001"
+          }
+        ];
+      }
+      
       res.json(requisitions);
     } catch (error) {
       console.error("Failed to get component requisitions:", error);
