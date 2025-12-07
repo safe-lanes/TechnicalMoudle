@@ -435,26 +435,48 @@ export function ModifyPMS() {
               )}
             </div>
 
-            {/* Proposed Changes */}
-            {viewingRequest.proposedChangesJson && Array.isArray(viewingRequest.proposedChangesJson) && viewingRequest.proposedChangesJson.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium text-gray-500">Proposed Changes</Label>
-                <div className="mt-2 space-y-2">
+            {/* Proposed Changes - Highlighted in Red */}
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Eye className="w-5 h-5 text-red-600" />
+                <Label className="text-base font-semibold text-gray-800">Changes Made</Label>
+              </div>
+              {viewingRequest.proposedChangesJson && Array.isArray(viewingRequest.proposedChangesJson) && viewingRequest.proposedChangesJson.length > 0 ? (
+                <div className="space-y-3">
                   {viewingRequest.proposedChangesJson.map((change: any, index: number) => (
-                    <div key={index} className="bg-blue-50 p-3 rounded-lg border">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-gray-700">{change.field || change.fieldName}</span>
-                        <div className="flex items-center space-x-2 text-sm">
-                          <span className="text-gray-600">"{change.oldValue || change.originalValue}"</span>
-                          <span className="text-gray-400">→</span>
-                          <span className="text-blue-600 font-medium">"{change.newValue || change.currentValue}"</span>
+                    <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
+                      <div className="mb-2">
+                        <span className="font-semibold text-gray-800 text-sm uppercase tracking-wide">
+                          {change.field || change.fieldName || change.label || `Field ${index + 1}`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-xs text-gray-500 block mb-1">Previous Value</span>
+                          <span className="text-gray-700 bg-white px-2 py-1 rounded border inline-block">
+                            {change.oldValue !== undefined ? String(change.oldValue) : 
+                             change.originalValue !== undefined ? String(change.originalValue) : 
+                             change.previousValue !== undefined ? String(change.previousValue) : '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500 block mb-1">New Value</span>
+                          <span className="text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-300 inline-block">
+                            {change.newValue !== undefined ? String(change.newValue) : 
+                             change.currentValue !== undefined ? String(change.currentValue) : 
+                             change.proposedValue !== undefined ? String(change.proposedValue) : '—'}
+                          </span>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-gray-500 text-center">
+                  No specific field changes recorded for this request.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
