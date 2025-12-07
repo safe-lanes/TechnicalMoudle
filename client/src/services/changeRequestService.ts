@@ -1,7 +1,7 @@
 // Change Request interfaces (duplicated here to avoid import issues)
 export interface ChangeRequest {
   id: number;
-  category: "components" | "work-orders" | "spares" | "stores";
+  category: "components" | "work-orders" | "spares" | "stores" | "jobs";
   requestTitle: string;
   requestedBy: string;
   requestDate: string;
@@ -42,8 +42,8 @@ let changeRequests: ChangeRequest[] = [
   },
   {
     id: 2,
-    category: "work-orders",
-    requestTitle: "Update Steering System Component Details",
+    category: "jobs",
+    requestTitle: "Update Steering System Job Details",
     requestedBy: "2nd Engineer",
     requestDate: "2025-05-18",
     status: "Approved",

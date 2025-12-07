@@ -22,8 +22,8 @@ export function ChangeRequestModal({ open, onClose }: ChangeRequestModalProps) {
       iconColor: "text-blue-600"
     },
     {
-      id: "work_orders", 
-      title: "Planned Work Orders",
+      id: "jobs", 
+      title: "Jobs",
       description: "Update maintenance schedules, procedures, and requirements",
       icon: Wrench,
       color: "bg-green-50 hover:bg-green-100 border-green-200", 
@@ -54,8 +54,8 @@ export function ChangeRequestModal({ open, onClose }: ChangeRequestModalProps) {
       case "components":
         setLocation("/pms/components?modify=1");
         break;
-      case "work_orders":
-        setLocation("/pms/work-orders?modify=1");
+      case "jobs":
+        setLocation("/pms/modify-pms/jobs");
         break;
       case "spares":
         setLocation("/pms/spares?modify=1");

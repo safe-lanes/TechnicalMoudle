@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FileText, ArrowLeft, Menu } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -16,6 +19,8 @@ import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
 import { SectionBlock } from "@/components/SectionBlock";
 import { PartHeader } from "@/components/PartHeader";
 import { StatusPill } from "@/components/StatusPill";
+import { changeRequestService } from "@/services/changeRequestService";
+import { useToast } from "@/hooks/use-toast";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined }> = ({ label, value }) => (
   <div className="space-y-1">
@@ -26,10 +31,75 @@ const ReadOnlyField: React.FC<{ label: string; value: string | undefined }> = ({
   </div>
 );
 
+interface EditableFieldProps {
+  label: string;
+  field: string;
+  value: string | undefined;
+  originalValue: string | undefined;
+  onChange: (field: string, value: string) => void;
+  isModifyMode: boolean;
+  type?: "text" | "select" | "textarea";
+  options?: string[];
+}
+
+const EditableField: React.FC<EditableFieldProps> = ({ 
+  label, 
+  field,
+  value, 
+  originalValue,
+  onChange, 
+  isModifyMode,
+  type = "text",
+  options = []
+}) => {
+  const isChanged = value !== originalValue;
+  
+  if (!isModifyMode) {
+    return <ReadOnlyField label={label} value={value} />;
+  }
+  
+  return (
+    <div className="space-y-1">
+      <Label className={`text-sm ${isChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`}>
+        {label} {isChanged && '(Modified)'}
+      </Label>
+      {type === "select" ? (
+        <Select value={value || ''} onValueChange={(val) => onChange(field, val)}>
+          <SelectTrigger className={`text-sm ${isChanged ? 'border-red-500 bg-red-50' : ''}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(opt => (
+              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : type === "textarea" ? (
+        <Textarea
+          value={value || ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          className={`text-sm ${isChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+          rows={3}
+        />
+      ) : (
+        <Input
+          value={value || ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          className={`text-sm ${isChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+        />
+      )}
+      {isChanged && (
+        <p className="text-xs text-gray-500">Original: {originalValue || '-'}</p>
+      )}
+    </div>
+  );
+};
+
 const JobsFormPage: React.FC = () => {
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/job/:id");
   const jobId = params?.id;
+  const { toast } = useToast();
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -37,10 +107,15 @@ const JobsFormPage: React.FC = () => {
   const navSteps = [{ id: 'part-a', label: 'A', title: 'Job Details' }];
   const [activeStep, setActiveStep] = useState('part-a');
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isModifyMode = urlParams.get('modify') === '1';
+
   const { data: jobContext, isLoading } = useQuery({
     queryKey: [`/api/jobs/${jobId}/context`],
     enabled: !!jobId
   });
+  
+  const [originalData, setOriginalData] = useState<Record<string, any>>({});
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -85,15 +160,12 @@ const JobsFormPage: React.FC = () => {
           normalizedFrequencyUnit = 'Months';
         }
         
-        // For Running Hours jobs, use intervalRunningHour as frequency value
         const frequencyValue = isRunningHours
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
         
-        setTemplateData(prev => ({
-          ...prev,
+        const newTemplateData = {
           ...context.templateData,
-          // Map backend fields to frontend field names
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
           componentName: context.templateData.componentName || '',
@@ -103,13 +175,81 @@ const JobsFormPage: React.FC = () => {
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
           nextDueReading: context.templateData.nextDueRH || '',
           briefWorkDescription: context.templateData.briefWorkDescription || context.templateData.jobDescription || ''
+        };
+        
+        setTemplateData(prev => ({
+          ...prev,
+          ...newTemplateData
         }));
+        
+        if (isModifyMode) {
+          setOriginalData(newTemplateData);
+        }
       }
     }
-  }, [jobContext]);
+  }, [jobContext, isModifyMode]);
+
+  const handleFieldChange = (field: string, value: string) => {
+    setTemplateData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const getChangedFields = (): string[] => {
+    const changedFields: string[] = [];
+    const fieldsToCheck = ['woTitle', 'assignedTo', 'approver', 'jobPriority', 'classRelated', 'briefWorkDescription', 'frequencyValue', 'frequencyUnit', 'taskType', 'isActive'];
+    
+    for (const field of fieldsToCheck) {
+      if (templateData[field as keyof typeof templateData] !== originalData[field]) {
+        changedFields.push(field);
+      }
+    }
+    return changedFields;
+  };
+
+  const handleSaveForApproval = () => {
+    const changedFields = getChangedFields();
+    
+    if (changedFields.length === 0) {
+      toast({
+        title: "No changes detected",
+        description: "Please make some changes before submitting for approval.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    changeRequestService.createChangeRequest({
+      category: "jobs",
+      requestTitle: `Job Change: ${templateData.woTemplateCode || templateData.woTitle || 'Unknown'}`,
+      requestedBy: "Current User",
+      requestDate: new Date().toISOString().split('T')[0],
+      status: "Pending Approval",
+      originalData: originalData,
+      newData: { ...templateData, jobId },
+      changedFields: changedFields,
+      comments: `Modification request for job ${templateData.woTemplateCode}`
+    });
+    
+    toast({
+      title: "Change request submitted",
+      description: "Your modification request has been submitted for approval."
+    });
+    
+    navigate("/pms/modify-pms");
+  };
 
   const handleBack = () => {
-    navigate("/pms/components");
+    if (isModifyMode) {
+      navigate("/pms/modify-pms/jobs");
+    } else {
+      navigate("/pms/components");
+    }
+  };
+
+  const handleCancelModify = () => {
+    navigate("/pms/modify-pms");
   };
 
   const formatFrequency = () => {
@@ -165,8 +305,20 @@ const JobsFormPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Modification Mode Banner */}
+      {isModifyMode && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <span className="text-amber-800 font-medium">
+              Modification Mode: Changes will be submitted for approval. Modified fields appear in red.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Bar */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className={`bg-white border-b shadow-sm ${isModifyMode ? 'border-amber-300' : 'border-gray-200'}`}>
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 md:gap-6">
@@ -227,9 +379,23 @@ const JobsFormPage: React.FC = () => {
                   </nav>
                 </SheetContent>
               </Sheet>
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Jobs Form</h1>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">
+                {isModifyMode ? 'Modify Job' : 'Jobs Form'}
+              </h1>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              {isModifyMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelModify}
+                  className="text-gray-600 hover:text-gray-900"
+                  data-testid="button-cancel-modify"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -298,18 +464,76 @@ const JobsFormPage: React.FC = () => {
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ReadOnlyField label="Job Title" value={templateData.woTitle} />
+                  <EditableField 
+                    label="Job Title" 
+                    field="woTitle"
+                    value={templateData.woTitle} 
+                    originalValue={originalData.woTitle}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                  />
                   <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} />
                   <ReadOnlyField label="Component Code" value={templateData.componentCode} />
                   <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} />
                   <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} />
-                  <ReadOnlyField label="Frequency" value={formatFrequency()} />
-                  <ReadOnlyField label="Task Type" value={templateData.taskType} />
-                  <ReadOnlyField label="Assigned To (Rank)" value={templateData.assignedTo} />
-                  <ReadOnlyField label="Approver (Rank)" value={templateData.approver} />
-                  <ReadOnlyField label="Job Priority" value={templateData.jobPriority} />
-                  <ReadOnlyField label="Class Related" value={templateData.classRelated} />
-                  {/* Conditional Next Due field based on Maintenance Basis */}
+                  <EditableField 
+                    label="Frequency" 
+                    field="frequencyValue"
+                    value={templateData.frequencyValue} 
+                    originalValue={originalData.frequencyValue}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                  />
+                  <EditableField 
+                    label="Task Type" 
+                    field="taskType"
+                    value={templateData.taskType} 
+                    originalValue={originalData.taskType}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['Inspection', 'Overhaul', 'Service', 'Repair', 'Test', 'Calibration', 'Survey', 'Other']}
+                  />
+                  <EditableField 
+                    label="Assigned To (Rank)" 
+                    field="assignedTo"
+                    value={templateData.assignedTo} 
+                    originalValue={originalData.assignedTo}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Electrician', 'Fitter', 'Bosun', 'Chief Officer', '2nd Officer']}
+                  />
+                  <EditableField 
+                    label="Approver (Rank)" 
+                    field="approver"
+                    value={templateData.approver} 
+                    originalValue={originalData.approver}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['Chief Engineer', 'Master', 'Technical Superintendent', '2nd Engineer']}
+                  />
+                  <EditableField 
+                    label="Job Priority" 
+                    field="jobPriority"
+                    value={templateData.jobPriority} 
+                    originalValue={originalData.jobPriority}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['High', 'Medium', 'Low']}
+                  />
+                  <EditableField 
+                    label="Class Related" 
+                    field="classRelated"
+                    value={templateData.classRelated} 
+                    originalValue={originalData.classRelated}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['Yes', 'No']}
+                  />
                   {templateData.maintenanceBasis === 'Running Hours' ? (
                     <ReadOnlyField 
                       label="Next Due RH" 
@@ -320,15 +544,27 @@ const JobsFormPage: React.FC = () => {
                   )}
                   <ReadOnlyField label="Department" value={templateData.department} />
                   <ReadOnlyField label="Criticality" value={templateData.criticality} />
-                  <ReadOnlyField label="Is Active" value={templateData.isActive} />
+                  <EditableField 
+                    label="Is Active" 
+                    field="isActive"
+                    value={templateData.isActive} 
+                    originalValue={originalData.isActive}
+                    onChange={handleFieldChange}
+                    isModifyMode={isModifyMode}
+                    type="select"
+                    options={['Yes', 'No']}
+                  />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
-                  <div className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[80px] whitespace-pre-wrap">
-                    {templateData.briefWorkDescription || '-'}
-                  </div>
-                </div>
+                <EditableField 
+                  label="Brief Work Description" 
+                  field="briefWorkDescription"
+                  value={templateData.briefWorkDescription} 
+                  originalValue={originalData.briefWorkDescription}
+                  onChange={handleFieldChange}
+                  isModifyMode={isModifyMode}
+                  type="textarea"
+                />
               </div>
             </SectionBlock>
 
@@ -515,6 +751,38 @@ const JobsFormPage: React.FC = () => {
                 </table>
               </div>
             </SectionBlock>
+
+            {/* Save for Approval Button (only in modify mode) */}
+            {isModifyMode && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Submit Changes for Approval</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Review your changes above, then submit for approval. Modified fields are highlighted in red.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelModify}
+                      data-testid="button-cancel-changes"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveForApproval}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                      data-testid="button-save-for-approval"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save for Approval
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

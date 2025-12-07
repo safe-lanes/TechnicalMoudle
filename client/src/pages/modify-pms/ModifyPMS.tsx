@@ -5,6 +5,7 @@ import { Plus, Eye, Check, X, ArrowLeft } from "lucide-react";
 import { changeRequestService } from "@/services/changeRequestService";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { ChangeRequest } from "@/services/changeRequestService";
+import { useLocation } from "wouter";
 
 import { Separator } from "@/components/ui/separator";
 import ComponentChangeRequestForm from "@/components/change-request-forms/ComponentChangeRequestForm";
@@ -16,7 +17,7 @@ import WorkOrdersChangeRequestForm from "@/components/change-request-forms/WorkO
 
 const categories = [
   { id: 1, name: "Components" },
-  { id: 2, name: "Work orders" },
+  { id: 2, name: "Jobs" },
   { id: 3, name: "Spares" },
   { id: 4, name: "Stores" }
 ];
@@ -24,6 +25,7 @@ const categories = [
 
 
 const ModifyPMS: React.FC = () => {
+  const [, navigate] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchStatus, setSearchStatus] = useState("");
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -36,12 +38,13 @@ const ModifyPMS: React.FC = () => {
   const { currentUser, enterChangeRequestMode, exitChangeRequestMode } = useChangeRequest();
 
   useEffect(() => {
-    // Load change requests from service
     setRequests(changeRequestService.getAllChangeRequests());
   }, []);
 
   const filteredRequests = requests.filter(request => {
-    const matchesCategory = !selectedCategory || request.category === selectedCategory.toLowerCase().replace(' ', '-');
+    const matchesCategory = !selectedCategory || 
+      request.category === selectedCategory.toLowerCase().replace(' ', '-') ||
+      (selectedCategory === "Jobs" && request.category === "jobs");
     const matchesSearch = !searchStatus || request.status.toLowerCase().includes(searchStatus.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -52,10 +55,13 @@ const ModifyPMS: React.FC = () => {
       return;
     }
 
-    // Enable change request mode
+    if (selectedCategory === "Jobs") {
+      navigate("/pms/modify-pms/jobs");
+      return;
+    }
+
     enterChangeRequestMode(selectedCategory, {});
     
-    // Set form category and show modal
     setFormCategory(selectedCategory);
     setShowFormModal(true);
   };
@@ -409,24 +415,24 @@ const ModifyPMS: React.FC = () => {
                 }}
               />
             )}
-            {formCategory === "Work orders" && (
+            {formCategory === "Jobs" && (
               <WorkOrdersChangeRequestForm 
                 onClose={handleCloseFormModal}
-                onSubmit={(workOrderData) => {
+                onSubmit={(jobData) => {
                   const newRequest = changeRequestService.createChangeRequest({
-                    category: "work-orders",
-                    requestTitle: `Work Order Change: ${workOrderData.workOrderNo || workOrderData.title || 'Unknown'}`,
+                    category: "jobs",
+                    requestTitle: `Job Change: ${jobData.jobNo || jobData.title || 'Unknown'}`,
                     requestedBy: currentUser.name,
                     requestDate: new Date().toISOString().split('T')[0],
                     status: "Pending Approval",
                     originalData: {
-                      workOrderNo: workOrderData.workOrderNo,
-                      title: workOrderData.title,
-                      status: workOrderData.status,
+                      jobNo: jobData.jobNo,
+                      title: jobData.title,
+                      status: jobData.status,
                     },
-                    newData: workOrderData,
-                    changedFields: Object.keys(workOrderData),
-                    comments: workOrderData.briefWorkDescription || "Work order modification request"
+                    newData: jobData,
+                    changedFields: Object.keys(jobData),
+                    comments: jobData.briefWorkDescription || "Job modification request"
                   });
                   setRequests(changeRequestService.getAllChangeRequests());
                   handleCloseFormModal();
