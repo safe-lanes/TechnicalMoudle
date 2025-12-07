@@ -38,7 +38,7 @@ const menuConfigs: Record<string, MenuItem[]> = {
   pms: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "components", label: "Components", icon: Package },
-    { id: "work-orders", label: "Work Orders", icon: ClipboardList },
+    { id: "work-orders", label: "Jobs", icon: ClipboardList },
     { id: "running-hrs", label: "Running Hrs", icon: Clock },
     { id: "spares", label: "Spares", icon: Archive },
     { id: "stores", label: "Stores", icon: Store },
