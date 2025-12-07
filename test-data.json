@@ -9639,7 +9639,93 @@
       "tz": "UTC"
     }
   ],
-  "changeRequests": {},
+  "changeRequests": {
+    "1": {
+      "vesselId": "V001",
+      "category": "jobs",
+      "title": "Job Change: MKR-IN-00001",
+      "reason": "Modification request for job MKR-IN-00001",
+      "targetType": "job",
+      "targetId": "vd3lBtYI2dVNqCrkr0JKG",
+      "snapshotBeforeJson": {
+        "woTitle": "Impressed current systems check test",
+        "jobTitle": "Impressed current systems check test",
+        "jobNo": "MKR-IN-00001",
+        "component": "1764654581178_ausr9ghau",
+        "componentCode": "278.010.01",
+        "componentName": "Impressed current systems No.01",
+        "sfiCode": "278.010.01",
+        "maintenanceBasis": "Calendar",
+        "maintenanceType": "Overhaul",
+        "frequencyValue": "1",
+        "frequencyUnit": "Weeks",
+        "intervalRunningHour": "",
+        "assignedTo": "2nd Engineer",
+        "approver": "Chief Engineer",
+        "department": "Engine",
+        "jobPriority": "Low",
+        "classRelated": "No",
+        "criticality": "No",
+        "lastDoneDate": "2025-11-15",
+        "nextDueDate": "2025-11-22",
+        "lastDoneRH": "",
+        "nextDueRH": "",
+        "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+        "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+        "requiredSpareParts": [
+          {
+            "partNo": "",
+            "description": "test",
+            "quantityRequired": "",
+            "remarks": ""
+          }
+        ],
+        "requiredTools": [
+          {
+            "toolName": "test",
+            "quantity": "",
+            "remarks": ""
+          }
+        ],
+        "safetyRequirements": {
+          "ppeRequirements": [
+            "test"
+          ],
+          "permitRequirements": [
+            "test"
+          ],
+          "otherRequirements": [
+            "test"
+          ]
+        },
+        "vesselId": "V001",
+        "workHistory": [],
+        "woTemplateCode": "MKR-IN-00001",
+        "taskType": "Overhaul",
+        "nextDueReading": ""
+      },
+      "proposedChangesJson": [
+        {
+          "field": "jobPriority",
+          "oldValue": "Low",
+          "newValue": "High"
+        },
+        {
+          "field": "isActive",
+          "newValue": "Yes"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 1,
+      "createdAt": "2025-12-07T18:29:10.220Z",
+      "updatedAt": "2025-12-07T18:29:10.220Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    }
+  },
   "changeRequestAttachments": [],
   "changeRequestComments": [],
   "alertPolicies": {},
@@ -14694,8 +14780,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "653": {
-      "id": 653,
+    "661": {
+      "id": 661,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14704,10 +14790,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-07T17:57:24.057Z"
+      "updatedAt": "2025-12-07T18:29:25.457Z"
     },
-    "654": {
-      "id": 654,
+    "662": {
+      "id": 662,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14716,24 +14802,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-07T17:57:24.099Z"
+      "updatedAt": "2025-12-07T18:29:25.521Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 653,
+      "recurringId": 661,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 653,
+      "recurringId": 661,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 654,
+      "recurringId": 662,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 654,
+      "recurringId": 662,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -56908,7 +56994,7 @@
     "auditId": 20,
     "spareId": 69,
     "historyId": 3,
-    "changeRequestId": 1,
+    "changeRequestId": 2,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
@@ -56922,7 +57008,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 655,
+    "recurringDefectId": 663,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,

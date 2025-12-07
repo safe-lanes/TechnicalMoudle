@@ -19,8 +19,8 @@ import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
 import { SectionBlock } from "@/components/SectionBlock";
 import { PartHeader } from "@/components/PartHeader";
 import { StatusPill } from "@/components/StatusPill";
-import { changeRequestService } from "@/services/changeRequestService";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined }> = ({ label, value }) => (
   <div className="space-y-1">
@@ -208,7 +208,7 @@ const JobsFormPage: React.FC = () => {
     return changedFields;
   };
 
-  const handleSaveForApproval = () => {
+  const handleSaveForApproval = async () => {
     const changedFields = getChangedFields();
     
     if (changedFields.length === 0) {
@@ -220,24 +220,45 @@ const JobsFormPage: React.FC = () => {
       return;
     }
     
-    changeRequestService.createChangeRequest({
-      category: "jobs",
-      requestTitle: `Job Change: ${templateData.woTemplateCode || templateData.woTitle || 'Unknown'}`,
-      requestedBy: "Current User",
-      requestDate: new Date().toISOString().split('T')[0],
-      status: "Pending Approval",
-      originalData: originalData,
-      newData: { ...templateData, jobId },
-      changedFields: changedFields,
-      comments: `Modification request for job ${templateData.woTemplateCode}`
-    });
-    
-    toast({
-      title: "Change request submitted",
-      description: "Your modification request has been submitted for approval."
-    });
-    
-    navigate("/pms/modify-pms");
+    try {
+      // Build the proposed changes array
+      const proposedChanges = changedFields.map(field => ({
+        field,
+        oldValue: originalData[field],
+        newValue: templateData[field as keyof typeof templateData]
+      }));
+      
+      // Create change request via backend API
+      await apiRequest('POST', '/api/change-requests', {
+        vesselId: 'V001',
+        category: 'jobs',
+        title: `Job Change: ${templateData.woTemplateCode || templateData.woTitle || 'Unknown'}`,
+        reason: `Modification request for job ${templateData.woTemplateCode}`,
+        targetType: 'job',
+        targetId: jobId,
+        snapshotBeforeJson: originalData,
+        proposedChangesJson: proposedChanges,
+        status: 'submitted',
+        requestedByUserId: 'Current User'
+      });
+      
+      // Invalidate change requests cache so ModifyPMS shows the new request
+      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      
+      toast({
+        title: "Change request submitted",
+        description: "Your modification request has been submitted for approval."
+      });
+      
+      navigate("/pms/modify-pms");
+    } catch (error) {
+      console.error('Error submitting change request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit change request. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleBack = () => {
