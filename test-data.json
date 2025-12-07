@@ -9724,6 +9724,323 @@
       "submittedAt": null,
       "reviewedByUserId": null,
       "reviewedAt": null
+    },
+    "2": {
+      "vesselId": "V001",
+      "category": "jobs",
+      "title": "Job Change: MKR-IN-00001",
+      "reason": "Modification request for job MKR-IN-00001",
+      "targetType": "job",
+      "targetId": "vd3lBtYI2dVNqCrkr0JKG",
+      "snapshotBeforeJson": {
+        "woTitle": "Impressed current systems check test",
+        "jobTitle": "Impressed current systems check test",
+        "jobNo": "MKR-IN-00001",
+        "component": "1764654581178_ausr9ghau",
+        "componentCode": "278.010.01",
+        "componentName": "Impressed current systems No.01",
+        "sfiCode": "278.010.01",
+        "maintenanceBasis": "Calendar",
+        "maintenanceType": "Overhaul",
+        "frequencyValue": "1",
+        "frequencyUnit": "Weeks",
+        "intervalRunningHour": "",
+        "assignedTo": "2nd Engineer",
+        "approver": "Chief Engineer",
+        "department": "Engine",
+        "jobPriority": "Low",
+        "classRelated": "No",
+        "criticality": "No",
+        "lastDoneDate": "2025-11-15",
+        "nextDueDate": "2025-11-22",
+        "lastDoneRH": "",
+        "nextDueRH": "",
+        "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+        "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+        "requiredSpareParts": [
+          {
+            "partNo": "",
+            "description": "test",
+            "quantityRequired": "",
+            "remarks": ""
+          }
+        ],
+        "requiredTools": [
+          {
+            "toolName": "test",
+            "quantity": "",
+            "remarks": ""
+          }
+        ],
+        "safetyRequirements": {
+          "ppeRequirements": [
+            "test"
+          ],
+          "permitRequirements": [
+            "test"
+          ],
+          "otherRequirements": [
+            "test"
+          ]
+        },
+        "vesselId": "V001",
+        "workHistory": [],
+        "woTemplateCode": "MKR-IN-00001",
+        "taskType": "Overhaul",
+        "nextDueReading": ""
+      },
+      "proposedChangesJson": [
+        {
+          "field": "jobPriority",
+          "oldValue": "Low",
+          "newValue": "Medium"
+        },
+        {
+          "field": "isActive",
+          "newValue": "Yes"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 2,
+      "createdAt": "2025-12-07T18:58:51.240Z",
+      "updatedAt": "2025-12-07T18:58:51.240Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    },
+    "3": {
+      "vesselId": "V001",
+      "category": "spares",
+      "title": "Spare Change: SP-00001 - Rudder Shaft Bearing",
+      "reason": "Modification request for spare part SP-00001",
+      "targetType": "spare",
+      "targetId": "1",
+      "snapshotBeforeJson": {
+        "partCode": "SP-00001",
+        "partName": "Rudder Shaft Bearing",
+        "componentId": "1764654580841_zrtzncuz0",
+        "componentCode": "401.005",
+        "componentName": "Rudders w/nozzle",
+        "componentSpareCode": "SP-401.005-001",
+        "critical": "No",
+        "rob": 2,
+        "min": 2,
+        "location": "Engine Store",
+        "location2": "Main Store",
+        "vesselId": "V001",
+        "partNumber": "RUD-SB-001",
+        "uom": "SET",
+        "maker": "Japan Hamworthy & Co Ltd",
+        "makerCode": "MKR-000003",
+        "specification": "Stainless steel",
+        "drawingNumber": "401-2-F-0",
+        "positionNumber": "1",
+        "note": "Original Equipment spare",
+        "manualName": "erf",
+        "pageNumber": "24",
+        "isActive": true,
+        "ihm": "No",
+        "remarks": null,
+        "dataScope": "vessel",
+        "id": 1,
+        "deleted": false,
+        "fleetEquipmentCode": null,
+        "robLocationA": 2,
+        "robLocationB": 0,
+        "model": null,
+        "drawingNo": null,
+        "unit": null,
+        "fleetPartCode": null,
+        "leadTime": null,
+        "lastOrderDate": null,
+        "partCategory": null,
+        "max": null,
+        "unitCost": null,
+        "stockingNumber": null,
+        "supplier": null,
+        "criticality": null,
+        "evidenceType": null,
+        "applicableVesselIds": null,
+        "scopeNotes": null,
+        "createdAt": "2025-12-02T06:41:17.018Z",
+        "updatedAt": "2025-12-02T07:07:11.030Z"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "min",
+          "oldValue": "2",
+          "newValue": "5"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 3,
+      "createdAt": "2025-12-07T19:04:12.967Z",
+      "updatedAt": "2025-12-07T19:04:12.967Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    },
+    "4": {
+      "vesselId": "V001",
+      "category": "stores",
+      "title": "Store Change: VS-001 - Fire Extinguisher Powder ABC 6kg",
+      "reason": "Modification request for store item VS-001",
+      "targetType": "store",
+      "targetId": "11",
+      "snapshotBeforeJson": {
+        "id": 11,
+        "itemCode": "VS-001",
+        "itemName": "Fire Extinguisher Powder ABC 6kg",
+        "storesCategory": "",
+        "uom": "pcs",
+        "rob": 20,
+        "min": 16,
+        "stock": "OK",
+        "location": "Bridge",
+        "category": "stores",
+        "notes": "",
+        "isArchived": false,
+        "robLocationA": 12,
+        "robLocationB": 8,
+        "ihmPresence": "Unknown",
+        "ihmEvidenceType": "None"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "notes",
+          "oldValue": "",
+          "newValue": "Change request: update notes via test"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 4,
+      "createdAt": "2025-12-07T19:05:03.045Z",
+      "updatedAt": "2025-12-07T19:05:03.045Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    },
+    "5": {
+      "vesselId": "V001",
+      "category": "spares",
+      "title": "Spare Change: SP-00001 - Rudder Shaft Bearing",
+      "reason": "Modification request for spare part SP-00001",
+      "targetType": "spare",
+      "targetId": "1",
+      "snapshotBeforeJson": {
+        "partCode": "SP-00001",
+        "partName": "Rudder Shaft Bearing",
+        "componentId": "1764654580841_zrtzncuz0",
+        "componentCode": "401.005",
+        "componentName": "Rudders w/nozzle",
+        "componentSpareCode": "SP-401.005-001",
+        "critical": "No",
+        "rob": 2,
+        "min": 2,
+        "location": "Engine Store",
+        "location2": "Main Store",
+        "vesselId": "V001",
+        "partNumber": "RUD-SB-001",
+        "uom": "SET",
+        "maker": "Japan Hamworthy & Co Ltd",
+        "makerCode": "MKR-000003",
+        "specification": "Stainless steel",
+        "drawingNumber": "401-2-F-0",
+        "positionNumber": "1",
+        "note": "Original Equipment spare",
+        "manualName": "erf",
+        "pageNumber": "24",
+        "isActive": true,
+        "ihm": "No",
+        "remarks": null,
+        "dataScope": "vessel",
+        "id": 1,
+        "deleted": false,
+        "fleetEquipmentCode": null,
+        "robLocationA": 2,
+        "robLocationB": 0,
+        "model": null,
+        "drawingNo": null,
+        "unit": null,
+        "fleetPartCode": null,
+        "leadTime": null,
+        "lastOrderDate": null,
+        "partCategory": null,
+        "max": null,
+        "unitCost": null,
+        "stockingNumber": null,
+        "supplier": null,
+        "criticality": null,
+        "evidenceType": null,
+        "applicableVesselIds": null,
+        "scopeNotes": null,
+        "createdAt": "2025-12-02T06:41:17.018Z",
+        "updatedAt": "2025-12-02T07:07:11.030Z"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "min",
+          "oldValue": "2",
+          "newValue": "3"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 5,
+      "createdAt": "2025-12-07T19:14:20.308Z",
+      "updatedAt": "2025-12-07T19:14:20.308Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
+    },
+    "6": {
+      "vesselId": "V001",
+      "category": "stores",
+      "title": "Store Change: VS-001 - Fire Extinguisher Powder ABC 6kg",
+      "reason": "Modification request for store item VS-001",
+      "targetType": "store",
+      "targetId": "11",
+      "snapshotBeforeJson": {
+        "id": 11,
+        "itemCode": "VS-001",
+        "itemName": "Fire Extinguisher Powder ABC 6kg",
+        "storesCategory": "",
+        "uom": "pcs",
+        "rob": 20,
+        "min": 16,
+        "stock": "OK",
+        "location": "Bridge",
+        "category": "stores",
+        "notes": "",
+        "isArchived": false,
+        "robLocationA": 12,
+        "robLocationB": 8,
+        "ihmPresence": "Unknown",
+        "ihmEvidenceType": "None"
+      },
+      "proposedChangesJson": [
+        {
+          "field": "notes",
+          "oldValue": "",
+          "newValue": "Automated test note: please approve"
+        }
+      ],
+      "status": "submitted",
+      "requestedByUserId": "Current User",
+      "id": 6,
+      "createdAt": "2025-12-07T19:15:02.453Z",
+      "updatedAt": "2025-12-07T19:15:02.453Z",
+      "movePreviewJson": null,
+      "submittedAt": null,
+      "reviewedByUserId": null,
+      "reviewedAt": null
     }
   },
   "changeRequestAttachments": [],
@@ -14780,8 +15097,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "661": {
-      "id": 661,
+    "699": {
+      "id": 699,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14790,10 +15107,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-07T18:29:25.457Z"
+      "updatedAt": "2025-12-07T19:15:12.695Z"
     },
-    "662": {
-      "id": 662,
+    "700": {
+      "id": 700,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14802,24 +15119,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-07T18:29:25.521Z"
+      "updatedAt": "2025-12-07T19:15:12.735Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 661,
+      "recurringId": 699,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 661,
+      "recurringId": 699,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 662,
+      "recurringId": 700,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 662,
+      "recurringId": 700,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -56994,7 +57311,7 @@
     "auditId": 20,
     "spareId": 69,
     "historyId": 3,
-    "changeRequestId": 2,
+    "changeRequestId": 7,
     "attachmentId": 1,
     "commentId": 1,
     "alertPolicyId": 1,
@@ -57008,7 +57325,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 663,
+    "recurringDefectId": 701,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,

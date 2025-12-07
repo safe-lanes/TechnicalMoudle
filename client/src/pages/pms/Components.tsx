@@ -1432,7 +1432,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               <td className="py-3 px-3 text-gray-900">
                 {isModifyMode ? (
                   <ModifyFieldWrapper
-                    originalValue={originalSpares[index].partCode}
+                    originalValue={originalSpares?.[index]?.partCode ?? spare.partCode}
                     currentValue={spare.partCode}
                     fieldName={`partCode-${index}`}
                     isModifyMode={isModifyMode}
@@ -1452,7 +1452,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               <td className="py-3 px-3 text-gray-900">
                 {isModifyMode ? (
                   <ModifyFieldWrapper
-                    originalValue={originalSpares[index].partName}
+                    originalValue={originalSpares?.[index]?.partName ?? spare.partName}
                     currentValue={spare.partName}
                     fieldName={`partName-${index}`}
                     isModifyMode={isModifyMode}
@@ -1472,7 +1472,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               <td className="py-3 px-3">
                 {isModifyMode ? (
                   <ModifyFieldWrapper
-                    originalValue={originalSpares[index].critical}
+                    originalValue={originalSpares?.[index]?.critical ?? spare.critical}
                     currentValue={spare.critical}
                     fieldName={`critical-${index}`}
                     isModifyMode={isModifyMode}
@@ -1498,7 +1498,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               <td className="py-3 px-3 text-gray-900">
                 {isModifyMode ? (
                   <ModifyFieldWrapper
-                    originalValue={originalSpares[index].rob}
+                    originalValue={originalSpares?.[index]?.rob ?? spare.rob}
                     currentValue={spare.rob}
                     fieldName={`rob-${index}`}
                     isModifyMode={isModifyMode}
@@ -1518,7 +1518,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               <td className="py-3 px-3 text-gray-900">
                 {isModifyMode ? (
                   <ModifyFieldWrapper
-                    originalValue={originalSpares[index].min}
+                    originalValue={originalSpares?.[index]?.min ?? spare.min}
                     currentValue={spare.min}
                     fieldName={`min-${index}`}
                     isModifyMode={isModifyMode}

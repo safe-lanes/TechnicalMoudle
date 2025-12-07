@@ -1,10 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download } from "lucide-react";
 import * as XLSX from "xlsx";
+import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 // ComponentNode interface - matches the one used in Components.tsx
 interface ComponentNode {
   id: string;
@@ -77,6 +80,7 @@ interface SpareHistory {
 }
 
 const Spares: React.FC = () => {
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
@@ -92,6 +96,20 @@ const Spares: React.FC = () => {
   });
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
+  
+  // Modify mode state - use proper hook for reactivity
+  const { isModifyMode } = useModifyMode();
+  const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
+  const [originalSpareData, setOriginalSpareData] = useState<Spare | null>(null);
+  const [modifiedSpareData, setModifiedSpareData] = useState<Partial<Spare>>({});
+  const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
+  
+  // Enable modify footer when in modify mode
+  useEffect(() => {
+    if (isModifyMode) {
+      setShowModifySubmitFooter(true);
+    }
+  }, [isModifyMode]);
   
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
@@ -306,7 +324,117 @@ const Spares: React.FC = () => {
       ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
       ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
     });
+    
+    // In modify mode, store original data for change tracking
+    if (isModifyMode) {
+      setOriginalSpareData(spare);
+      setModifiedSpareData({});
+    }
+    
     setIsEditModalOpen(true);
+  };
+  
+  // Track changes in modify mode
+  const trackModifyChange = (field: keyof Spare, value: any) => {
+    if (isModifyMode && originalSpareData) {
+      setModifiedSpareData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+  };
+  
+  // Get changed fields for modify mode
+  const getSpareChangedFields = (): Array<{field: string, oldValue: any, newValue: any}> => {
+    if (!originalSpareData || !selectedSpare) return [];
+    
+    const changes: Array<{field: string, oldValue: any, newValue: any}> = [];
+    const fieldsToCheck: (keyof typeof addSpareForm)[] = ['partCode', 'partName', 'componentId', 'critical', 'rob', 'min', 'location'];
+    
+    for (const field of fieldsToCheck) {
+      const originalValue = String(originalSpareData[field as keyof Spare] ?? '');
+      const newValue = String(addSpareForm[field] ?? '');
+      
+      if (originalValue !== newValue) {
+        changes.push({
+          field,
+          oldValue: originalValue,
+          newValue
+        });
+      }
+    }
+    
+    return changes;
+  };
+  
+  // Handle submit change request for spares
+  const handleModifySubmit = async () => {
+    if (!selectedSpare || !originalSpareData) {
+      toast({
+        title: "No spare selected",
+        description: "Please select and edit a spare to submit for approval.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const changes = getSpareChangedFields();
+    
+    if (changes.length === 0) {
+      toast({
+        title: "No changes detected",
+        description: "Please make some changes before submitting for approval.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmittingChangeRequest(true);
+    
+    try {
+      await apiRequest('POST', '/api/change-requests', {
+        vesselId: vesselId || 'V001',
+        category: 'spares',
+        title: `Spare Change: ${originalSpareData.partCode} - ${originalSpareData.partName}`,
+        reason: `Modification request for spare part ${originalSpareData.partCode}`,
+        targetType: 'spare',
+        targetId: String(originalSpareData.id),
+        snapshotBeforeJson: originalSpareData,
+        proposedChangesJson: changes,
+        status: 'submitted',
+        requestedByUserId: 'Current User'
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      
+      toast({
+        title: "Change request submitted",
+        description: "Your modification request has been submitted for approval."
+      });
+      
+      // Close edit modal and navigate back
+      setIsEditModalOpen(false);
+      setOriginalSpareData(null);
+      setModifiedSpareData({});
+      navigate("/pms/modify-pms");
+    } catch (error) {
+      console.error('Error submitting change request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit change request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingChangeRequest(false);
+    }
+  };
+  
+  // Cancel modify mode
+  const handleCancelModify = () => {
+    setShowModifySubmitFooter(false);
+    setOriginalSpareData(null);
+    setModifiedSpareData({});
+    navigate("/pms/modify-pms");
   };
 
   // Open consume/receive modal
@@ -1070,9 +1198,16 @@ const Spares: React.FC = () => {
     <div className="h-full p-6 bg-[#fafafa]">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-4">
-          {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
-        </h1>
+        <div className="flex items-center gap-4 mb-4">
+          <h1 className="text-2xl font-semibold text-gray-800">
+            {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
+          </h1>
+          {isModifyMode && (
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full border border-blue-300">
+              Modify Mode
+            </span>
+          )}
+        </div>
         
         {/* Navigation Tabs with Buttons */}
         <div className="flex justify-between items-center mb-4">
@@ -2018,13 +2153,24 @@ const Spares: React.FC = () => {
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => {
-              // TODO: Implement update mutation
-              toast({ title: "Info", description: "Edit functionality to be implemented" });
-              setIsEditModalOpen(false);
-            }}>
-              Save Changes
-            </Button>
+            {isModifyMode ? (
+              <Button 
+                onClick={handleModifySubmit}
+                disabled={isSubmittingChangeRequest}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-save-for-approval"
+              >
+                {isSubmittingChangeRequest ? "Submitting..." : "Save for Approval"}
+              </Button>
+            ) : (
+              <Button onClick={() => {
+                // TODO: Implement update mutation
+                toast({ title: "Info", description: "Edit functionality to be implemented" });
+                setIsEditModalOpen(false);
+              }}>
+                Save Changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2374,6 +2520,16 @@ const Spares: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Modify Mode Footer */}
+      <ModifyStickyFooter
+        isVisible={isModifyMode && showModifySubmitFooter}
+        hasChanges={originalSpareData !== null && getSpareChangedFields().length > 0}
+        changedFieldsCount={getSpareChangedFields().length}
+        onCancel={handleCancelModify}
+        onSubmitChangeRequest={handleModifySubmit}
+        isSubmitting={isSubmittingChangeRequest}
+      />
     </div>
   );
 };

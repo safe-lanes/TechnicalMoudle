@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Minus, Archive, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import { FEATURES } from "@/config/features";
 import { useVessels } from "@/hooks/useVessels";
+import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 
 // IHM constants
 const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
@@ -90,6 +93,7 @@ interface StoresApiItem {
 }
 
 const Stores: React.FC = () => {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
@@ -110,6 +114,19 @@ const Stores: React.FC = () => {
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [items, setItems] = useState<StoreItem[]>([]);
+  
+  // Modify mode state - use proper hook for reactivity
+  const { isModifyMode } = useModifyMode();
+  const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
+  const [originalStoreData, setOriginalStoreData] = useState<StoreItem | null>(null);
+  const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
+  
+  // Enable modify footer when in modify mode
+  useEffect(() => {
+    if (isModifyMode) {
+      setShowModifySubmitFooter(true);
+    }
+  }, [isModifyMode]);
   
   // Location dropdown state
   const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
@@ -568,7 +585,109 @@ const Stores: React.FC = () => {
       ihmPresence: 'Unknown',
       ihmEvidenceType: 'None'
     });
+    
+    // In modify mode, store original data for change tracking
+    if (isModifyMode) {
+      setOriginalStoreData(item);
+    }
+    
     setIsEditModalOpen(true);
+  };
+  
+  // Get changed fields for modify mode
+  const getStoreChangedFields = (): Array<{field: string, oldValue: any, newValue: any}> => {
+    if (!originalStoreData || !editingItem) return [];
+    
+    const changes: Array<{field: string, oldValue: any, newValue: any}> = [];
+    const uom = editForm.uom === "Other" ? editForm.customUom : editForm.uom;
+    
+    const fieldsToCheck = [
+      { key: 'itemName', original: originalStoreData.itemName, current: editForm.itemName },
+      { key: 'uom', original: originalStoreData.uom, current: uom },
+      { key: 'min', original: String(originalStoreData.min), current: String(editForm.min) },
+      { key: 'location', original: originalStoreData.location, current: editForm.location },
+      { key: 'notes', original: originalStoreData.notes || '', current: editForm.notes }
+    ];
+    
+    for (const field of fieldsToCheck) {
+      if (String(field.original || '') !== String(field.current || '')) {
+        changes.push({
+          field: field.key,
+          oldValue: field.original || '',
+          newValue: field.current || ''
+        });
+      }
+    }
+    
+    return changes;
+  };
+  
+  // Handle submit change request for stores
+  const handleModifySubmit = async () => {
+    if (!editingItem || !originalStoreData) {
+      toast({
+        title: "No store item selected",
+        description: "Please select and edit a store item to submit for approval.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const changes = getStoreChangedFields();
+    
+    if (changes.length === 0) {
+      toast({
+        title: "No changes detected",
+        description: "Please make some changes before submitting for approval.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmittingChangeRequest(true);
+    
+    try {
+      await apiRequest('POST', '/api/change-requests', {
+        vesselId: vesselId || 'V001',
+        category: 'stores',
+        title: `Store Change: ${originalStoreData.itemCode} - ${originalStoreData.itemName}`,
+        reason: `Modification request for store item ${originalStoreData.itemCode}`,
+        targetType: 'store',
+        targetId: String(originalStoreData.id),
+        snapshotBeforeJson: originalStoreData,
+        proposedChangesJson: changes,
+        status: 'submitted',
+        requestedByUserId: 'Current User'
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      
+      toast({
+        title: "Change request submitted",
+        description: "Your modification request has been submitted for approval."
+      });
+      
+      // Close edit modal and navigate back
+      setIsEditModalOpen(false);
+      setOriginalStoreData(null);
+      navigate("/pms/modify-pms");
+    } catch (error) {
+      console.error('Error submitting change request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit change request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingChangeRequest(false);
+    }
+  };
+  
+  // Cancel modify mode
+  const handleCancelModify = () => {
+    setShowModifySubmitFooter(false);
+    setOriginalStoreData(null);
+    navigate("/pms/modify-pms");
   };
   
   const saveEditItem = () => {
@@ -760,11 +879,18 @@ const Stores: React.FC = () => {
     <div className="flex-1 p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          {activeTab === "stores" ? "Stores Inventory" : 
-           activeTab === "lubes" ? "Lubes Inventory" :
-           activeTab === "chemicals" ? "Chemicals Inventory" : "Others Inventory"}
-        </h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-800">
+            {activeTab === "stores" ? "Stores Inventory" : 
+             activeTab === "lubes" ? "Lubes Inventory" :
+             activeTab === "chemicals" ? "Chemicals Inventory" : "Others Inventory"}
+          </h1>
+          {isModifyMode && (
+            <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full border border-blue-300">
+              Modify Mode
+            </span>
+          )}
+        </div>
         <Button className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={openBulkUpdateModal}>
           + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
         </Button>
@@ -1349,7 +1475,18 @@ const Stores: React.FC = () => {
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveEditItem}>Save Changes</Button>
+            {isModifyMode ? (
+              <Button 
+                onClick={handleModifySubmit}
+                disabled={isSubmittingChangeRequest}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-save-for-approval"
+              >
+                {isSubmittingChangeRequest ? "Submitting..." : "Save for Approval"}
+              </Button>
+            ) : (
+              <Button onClick={saveEditItem}>Save Changes</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1676,6 +1813,16 @@ const Stores: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Modify Mode Footer */}
+      <ModifyStickyFooter
+        isVisible={isModifyMode && showModifySubmitFooter}
+        hasChanges={originalStoreData !== null && getStoreChangedFields().length > 0}
+        changedFieldsCount={getStoreChangedFields().length}
+        onCancel={handleCancelModify}
+        onSubmitChangeRequest={handleModifySubmit}
+        isSubmitting={isSubmittingChangeRequest}
+      />
     </div>
   );
 };
