@@ -115,7 +115,8 @@ export const SideMenuBar: React.FC<SideMenuBarProps> = ({
     <div className="min-h-screen flex flex-col items-center py-4 bg-[#16569e] w-20">
       {menuItems.map((item) => {
         const Icon = item.icon;
-        const isSelected = item.id === selectedItem;
+        const isSelected = item.id === selectedItem || 
+          (item.id === "modify-pms" && selectedItem?.startsWith("modify-pms/"));
 
         return (
           <button

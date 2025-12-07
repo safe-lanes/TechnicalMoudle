@@ -45,6 +45,7 @@ function App() {
                   {() => <JobsFormPage />}
                 </Route>
                 
+                <Route path="/pms/modify-pms/jobs" component={TechnicalModule} />
                 <Route path="/pms/:subpage" component={TechnicalModule} />
                 <Route path="/spares" component={TechnicalModule} />
                 <Route path="/stores" component={TechnicalModule} />

@@ -82,6 +82,9 @@ interface ChangeRequest {
   reviewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  proposedChangesJson?: any[];
+  targetType?: string;
+  targetId?: string;
 }
 
 export function ModifyPMS() {

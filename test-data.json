@@ -14694,8 +14694,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "637": {
-      "id": 637,
+    "641": {
+      "id": 641,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14704,10 +14704,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-07T17:02:16.280Z"
+      "updatedAt": "2025-12-07T17:34:27.763Z"
     },
-    "638": {
-      "id": 638,
+    "642": {
+      "id": 642,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14716,24 +14716,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-07T17:02:16.315Z"
+      "updatedAt": "2025-12-07T17:34:27.801Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 637,
+      "recurringId": 641,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 637,
+      "recurringId": 641,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 638,
+      "recurringId": 642,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 638,
+      "recurringId": 642,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -56922,7 +56922,7 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 639,
+    "recurringDefectId": 643,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
