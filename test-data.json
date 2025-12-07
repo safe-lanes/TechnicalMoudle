@@ -11209,42 +11209,111 @@
       "assignedTo": "3rd Engineer",
       "dueDate": "2025-12-02",
       "status": "Overdue",
-      "dateCompleted": null,
+      "dateCompleted": "",
       "submittedDate": null,
       "formData": null,
       "taskType": "Cleaning",
       "maintenanceBasis": "Running Hours",
-      "frequencyValue": 500,
+      "frequencyValue": "500",
       "frequencyUnit": "Hours",
       "approverRemarks": null,
       "isExecution": false,
       "templateId": null,
-      "approver": null,
+      "approver": "Chief Engineer",
       "approvalDate": null,
       "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": "1000",
+      "nextDueDate": "",
+      "nextDueReading": "500",
       "currentReading": "1000",
       "dataScope": "vessel",
       "fleetEquipmentCode": "403.006.AA",
       "fleetJobCode": null,
       "department": "Engine",
-      "isActive": true,
+      "isActive": "Yes",
       "applicableVesselIds": null,
       "classRelated": "No",
       "jobPriority": "Low",
       "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 264, 265\r\nChapter: 7 Maintenance\r\nSection: 7.2 Maintenance On Each Unit\r\n\r\nDESCRIPTION\r\n===========\r\n1. Lubricate the band radiator, main shaft drive gear and encoder shaft drive gear.\r\n2. Apply paint to the mounting legs and coaxial cable.",
       "jobGroup": null,
       "jobCategory": null,
-      "sfiCode": null,
+      "sfiCode": "403.006.02",
       "maintenanceIntervalValue": null,
       "maintenanceIntervalUnit": null,
-      "intervalRunningHour": 500,
+      "intervalRunningHour": "500",
       "scopeNotes": null,
       "criticality": "No",
       "createdAt": "2025-12-02T05:52:18.680Z",
       "updatedAt": "2025-12-02T05:52:18.680Z",
-      "woTemplateCode": "MKR-IN-00005"
+      "woTemplateCode": "MKR-IN-00005",
+      "woTitle": "PUMP OVERHAUL",
+      "componentName": "Hydr. oil pumps No.02",
+      "requiredSpareParts": [
+        {
+          "partNo": "32SDF",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "workHistory": [],
+      "maintenanceType": "Cleaning",
+      "lastDoneDate": "2025-11-27",
+      "lastDoneRH": "0",
+      "nextDueRH": "500",
+      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 264, 265\r\nChapter: 7 Maintenance\r\nSection: 7.2 Maintenance On Each Unit\r\n\r\nDESCRIPTION\r\n===========\r\n1. Lubricate the band radiator, main shaft drive gear and encoder shaft drive gear.\r\n2. Apply paint to the mounting legs and coaxial cable.",
+      "woExecutionId": "WO-EXE-3581911",
+      "riskAssessment": "No",
+      "safetyChecklists": "No",
+      "operationalForms": "No",
+      "startDateTime": "",
+      "completionDateTime": "",
+      "dateOfCompletion": "",
+      "runningHours": "1000",
+      "performedBy": "",
+      "noOfPersons": "",
+      "totalTimeHours": "",
+      "manhours": "",
+      "workCarriedOut": "",
+      "jobExperienceNotes": "",
+      "previousReading": "1000.00",
+      "uploadedDocuments": [],
+      "consumedSpareParts": [],
+      "ihmUpdate": {
+        "enabled": false,
+        "action": "",
+        "targetComponent": "",
+        "targetSpare": "",
+        "quantity": "",
+        "location": "",
+        "materials": [],
+        "remarks": ""
+      },
+      "riskAssessmentStatus": "",
+      "safetyChecklistsStatus": "",
+      "operationalFormsStatus": "",
+      "executionAssignedTo": "",
+      "runningHoursDifference": "",
+      "readingDate": "",
+      "remarks": "",
+      "completionRemarks": ""
     },
     {
       "id": "5",
@@ -12292,6 +12361,83 @@
       "id": "16",
       "createdAt": "2025-12-04T12:43:39.519Z",
       "updatedAt": "2025-12-04T12:43:39.519Z",
+      "dataScope": "vessel",
+      "executionId": null,
+      "dateCompleted": null,
+      "submittedDate": null,
+      "formData": null,
+      "approverRemarks": null,
+      "templateId": null,
+      "approver": null,
+      "approvalDate": null,
+      "rejectionDate": null,
+      "nextDueDate": null,
+      "nextDueReading": null,
+      "currentReading": null,
+      "fleetEquipmentCode": null,
+      "fleetJobCode": null,
+      "isActive": null,
+      "applicableVesselIds": null,
+      "jobGroup": null,
+      "jobCategory": null,
+      "sfiCode": null,
+      "maintenanceIntervalValue": null,
+      "maintenanceIntervalUnit": null,
+      "intervalRunningHour": null,
+      "scopeNotes": null,
+      "criticality": null,
+      "uploadedDocuments": [],
+      "consumedSpareParts": [],
+      "rejectionComments": null,
+      "approvalAction": null
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "workOrderNo": "MKR-SE-00004.WO-2025-001",
+      "templateCode": "MKR-SE-00004.WO-2025-001",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Active",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "id": "17",
+      "createdAt": "2025-12-07T00:51:57.133Z",
+      "updatedAt": "2025-12-07T00:51:57.133Z",
       "dataScope": "vessel",
       "executionId": null,
       "dateCompleted": null,
@@ -14548,8 +14694,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "609": {
-      "id": 609,
+    "623": {
+      "id": 623,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14558,10 +14704,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-05T18:03:51.884Z"
+      "updatedAt": "2025-12-07T16:13:49.373Z"
     },
-    "610": {
-      "id": 610,
+    "624": {
+      "id": 624,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -14570,24 +14716,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-05T18:03:51.937Z"
+      "updatedAt": "2025-12-07T16:13:49.421Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 609,
+      "recurringId": 623,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 609,
+      "recurringId": 623,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 610,
+      "recurringId": 624,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 610,
+      "recurringId": 624,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -56771,12 +56917,12 @@
     "alertConfigId": 1,
     "formDefinitionId": 1,
     "formVersionId": 1,
-    "workOrderId": 17,
+    "workOrderId": 18,
     "executionId": 1,
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 611,
+    "recurringDefectId": 625,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
