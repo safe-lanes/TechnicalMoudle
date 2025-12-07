@@ -45,11 +45,11 @@ const modifyOptions: ModifyOption[] = [
     route: '/pms/components?modify=1'
   },
   {
-    id: 'work-orders',
-    title: 'Work Orders Planned',
+    id: 'jobs',
+    title: 'Jobs',
     description: 'Edit planned maintenance schedules',
     icon: <FileText className="h-6 w-6" />,
-    route: '/pms/work-orders?modify=1'
+    route: '/pms/modify-pms/jobs'
   },
   {
     id: 'spares',
@@ -211,14 +211,14 @@ export function ModifyPMS() {
                 1. Components
               </button>
               <button
-                onClick={() => setCategoryFilter('work_orders')}
+                onClick={() => setCategoryFilter('jobs')}
                 className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
-                  categoryFilter === 'work_orders'
+                  categoryFilter === 'jobs'
                     ? 'bg-[#52BAF3] text-white font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                2. Work orders
+                2. Jobs
               </button>
               <button
                 onClick={() => setCategoryFilter('spares')}
