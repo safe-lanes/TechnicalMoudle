@@ -260,6 +260,10 @@ export default function FleetDataView() {
   const [selectedMappingIds, setSelectedMappingIds] = useState<Set<number>>(new Set());
   const [mappingSearchQuery, setMappingSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedVesselForDetail, setSelectedVesselForDetail] = useState<ComponentVesselMapping | null>(null);
+  const [detailSearchQuery, setDetailSearchQuery] = useState("");
+  const [selectedDetailMappingIds, setSelectedDetailMappingIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
@@ -426,6 +430,29 @@ export default function FleetDataView() {
     return mappings;
   }, [selectedComponent, componentVesselMappings, mappingSearchQuery]);
 
+  const filteredDetailMappings = useMemo(() => {
+    if (!selectedVesselForDetail || !selectedComponent || !componentVesselMappings) return [];
+    
+    let mappings = componentVesselMappings.filter(
+      (m) => (m.vesselCode === selectedVesselForDetail.vesselCode || 
+              m.vesselId === selectedVesselForDetail.vesselId) &&
+             (m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+              m.componentId === String(selectedComponent.id))
+    );
+    
+    if (detailSearchQuery.trim()) {
+      const query = detailSearchQuery.toLowerCase();
+      mappings = mappings.filter(
+        (m) => 
+          m.vesselName?.toLowerCase().includes(query) ||
+          (m.componentCode || m.fleetEquipmentCode || "").toLowerCase().includes(query) ||
+          (m.componentName || "").toLowerCase().includes(query)
+      );
+    }
+    
+    return mappings;
+  }, [selectedVesselForDetail, selectedComponent, componentVesselMappings, detailSearchQuery]);
+
   const handleMappingCheckboxChange = (mappingId: number, checked: boolean) => {
     setSelectedMappingIds((prev) => {
       const newSet = new Set(prev);
@@ -449,6 +476,49 @@ export default function FleetDataView() {
   const handleRemoveMappings = () => {
     if (selectedMappingIds.size === 0) return;
     removeMappingsMutation.mutate(Array.from(selectedMappingIds));
+  };
+
+  const handleDetailMappingCheckboxChange = (mappingId: number, checked: boolean) => {
+    setSelectedDetailMappingIds((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(mappingId);
+      } else {
+        newSet.delete(mappingId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllDetailMappings = (checked: boolean) => {
+    if (checked) {
+      setSelectedDetailMappingIds(new Set(filteredDetailMappings.map((m) => m.id)));
+    } else {
+      setSelectedDetailMappingIds(new Set());
+    }
+  };
+
+  const handleRemoveDetailMappings = () => {
+    if (selectedDetailMappingIds.size === 0) return;
+    removeMappingsMutation.mutate(Array.from(selectedDetailMappingIds), {
+      onSuccess: () => {
+        setSelectedDetailMappingIds(new Set());
+        setIsDetailDialogOpen(false);
+        setSelectedVesselForDetail(null);
+        queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+        toast({
+          title: "Success",
+          description: "Selected mappings have been removed",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to remove mappings. Please try again.",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleOpenMappingDialog = () => {
@@ -853,13 +923,125 @@ export default function FleetDataView() {
                         />
                       </td>
                       <td className="py-2 px-2">{mapping.vesselCode || mapping.vesselId}</td>
-                      <td className="py-2 px-2">{mapping.vesselName}</td>
+                      <td 
+                        className="py-2 px-2 cursor-pointer text-blue-600 hover:underline"
+                        onClick={() => {
+                          setSelectedVesselForDetail(mapping);
+                          setSelectedDetailMappingIds(new Set());
+                          setDetailSearchQuery("");
+                          setIsDetailDialogOpen(true);
+                        }}
+                        data-testid={`vessel-name-${mapping.id}`}
+                      >
+                        {mapping.vesselName}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td colSpan={3} className="py-8 text-center text-gray-500">
                       No vessel mappings found for this component
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={isDetailDialogOpen} 
+        onOpenChange={(open) => {
+          setIsDetailDialogOpen(open);
+          if (!open) {
+            setDetailSearchQuery("");
+            setSelectedDetailMappingIds(new Set());
+            setSelectedVesselForDetail(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-700 border border-gray-300 px-3 py-1 rounded">
+              Vessel Component Mapping Overview
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRemoveDetailMappings}
+                disabled={selectedDetailMappingIds.size === 0 || removeMappingsMutation.isPending}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-detail-remove-mapping"
+              >
+                Remove Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                data-testid="btn-detail-component-mapping"
+              >
+                ComponentMapping
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className="py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search components..."
+                value={detailSearchQuery}
+                onChange={(e) => setDetailSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-detail-search"
+              />
+            </div>
+          </div>
+
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">
+                    <Checkbox
+                      checked={
+                        filteredDetailMappings.length > 0 &&
+                        filteredDetailMappings.every((m) => selectedDetailMappingIds.has(m.id))
+                      }
+                      onCheckedChange={handleSelectAllDetailMappings}
+                      data-testid="checkbox-detail-select-all"
+                    />
+                  </th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDetailMappings.length > 0 ? (
+                  filteredDetailMappings.map((mapping) => (
+                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedDetailMappingIds.has(mapping.id)}
+                          onCheckedChange={(checked) =>
+                            handleDetailMappingCheckboxChange(mapping.id, checked as boolean)
+                          }
+                          data-testid={`checkbox-detail-row-${mapping.id}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{mapping.vesselName}</td>
+                      <td className="py-2 px-2">{mapping.componentCode || mapping.fleetEquipmentCode || selectedComponent?.fleetEquipmentCode}</td>
+                      <td className="py-2 px-2">{mapping.componentName || selectedComponent?.fleetEquipmentName || "Main Engine"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                      No matching components found
                     </td>
                   </tr>
                 )}
