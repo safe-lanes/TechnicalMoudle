@@ -264,6 +264,9 @@ export default function FleetDataView() {
   const [selectedVesselForDetail, setSelectedVesselForDetail] = useState<ComponentVesselMapping | null>(null);
   const [detailSearchQuery, setDetailSearchQuery] = useState("");
   const [selectedDetailMappingIds, setSelectedDetailMappingIds] = useState<Set<number>>(new Set());
+  const [isVesselMappingDialogOpen, setIsVesselMappingDialogOpen] = useState(false);
+  const [vesselMappingSearchQuery, setVesselMappingSearchQuery] = useState("");
+  const [selectedVesselsToMap, setSelectedVesselsToMap] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
@@ -452,6 +455,82 @@ export default function FleetDataView() {
     
     return mappings;
   }, [selectedVesselForDetail, selectedComponent, componentVesselMappings, detailSearchQuery]);
+
+  const unmappedVessels = useMemo(() => {
+    if (!selectedComponent || !vessels) return [];
+    
+    const mappedVesselCodes = new Set(
+      (componentVesselMappings || [])
+        .filter(m => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+                     m.componentId === String(selectedComponent.id))
+        .map(m => m.vesselCode)
+    );
+    
+    let available = vessels.filter(v => !mappedVesselCodes.has(v.code || v.id));
+    
+    if (vesselMappingSearchQuery.trim()) {
+      const query = vesselMappingSearchQuery.toLowerCase();
+      available = available.filter(v => 
+        v.name?.toLowerCase().includes(query) ||
+        (v.code || v.id)?.toLowerCase().includes(query)
+      );
+    }
+    
+    return available;
+  }, [selectedComponent, vessels, componentVesselMappings, vesselMappingSearchQuery]);
+
+  const handleVesselMappingCheckboxChange = (vesselCode: string, checked: boolean) => {
+    setSelectedVesselsToMap((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(vesselCode);
+      } else {
+        newSet.delete(vesselCode);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllVesselsToMap = (checked: boolean) => {
+    if (checked) {
+      setSelectedVesselsToMap(new Set(unmappedVessels.map(v => v.code || v.id)));
+    } else {
+      setSelectedVesselsToMap(new Set());
+    }
+  };
+
+  const handleMapVessels = () => {
+    if (selectedVesselsToMap.size === 0 || !selectedComponent) return;
+    
+    const vesselsToMap = unmappedVessels.filter(v => selectedVesselsToMap.has(v.code || v.id));
+    
+    Promise.all(
+      vesselsToMap.map(vessel => 
+        addMappingMutation.mutateAsync({
+          fleetEquipmentCode: selectedComponent.fleetEquipmentCode,
+          vesselCode: vessel.code || vessel.id,
+          vesselName: vessel.name,
+          componentCode: selectedComponent.fleetEquipmentCode,
+          componentName: selectedComponent.fleetEquipmentName,
+        })
+      )
+    ).then(() => {
+      setSelectedVesselsToMap(new Set());
+      setVesselMappingSearchQuery("");
+      setIsVesselMappingDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      toast({
+        title: "Success",
+        description: `${vesselsToMap.length} vessel(s) have been mapped`,
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to map vessels. Please try again.",
+        variant: "destructive",
+      });
+    });
+  };
 
   const handleMappingCheckboxChange = (mappingId: number, checked: boolean) => {
     setSelectedMappingIds((prev) => {
@@ -861,6 +940,11 @@ export default function FleetDataView() {
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  setSelectedVesselsToMap(new Set());
+                  setVesselMappingSearchQuery("");
+                  setIsVesselMappingDialogOpen(true);
+                }}
                 data-testid="btn-vessel-mapping"
               >
                 Vessel Mapping
@@ -1019,6 +1103,86 @@ export default function FleetDataView() {
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-gray-500">
                       No matching components found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={isVesselMappingDialogOpen} 
+        onOpenChange={(open) => {
+          setIsVesselMappingDialogOpen(open);
+          if (!open) {
+            setVesselMappingSearchQuery("");
+            setSelectedVesselsToMap(new Set());
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Vessel Mapping
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search..."
+                  value={vesselMappingSearchQuery}
+                  onChange={(e) => setVesselMappingSearchQuery(e.target.value)}
+                  className="w-32 pr-8"
+                  data-testid="input-vessel-mapping-search"
+                />
+                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                onClick={handleMapVessels}
+                disabled={selectedVesselsToMap.size === 0 || addMappingMutation.isPending}
+                data-testid="btn-map-vessels"
+              >
+                Map
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="h-[300px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">
+                    <span className="text-gray-600">Select</span>
+                  </th>
+                  <th className="text-left py-2 px-2 font-normal text-blue-600">Vessel Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unmappedVessels.length > 0 ? (
+                  unmappedVessels.map((vessel) => (
+                    <tr key={vessel.code || vessel.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedVesselsToMap.has(vessel.code || vessel.id)}
+                          onCheckedChange={(checked) =>
+                            handleVesselMappingCheckboxChange(vessel.code || vessel.id, checked as boolean)
+                          }
+                          data-testid={`checkbox-vessel-map-${vessel.code || vessel.id}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{vessel.code || vessel.id}</td>
+                      <td className="py-2 px-2">{vessel.name}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                      No vessels available to map
                     </td>
                   </tr>
                 )}
