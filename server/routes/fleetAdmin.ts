@@ -278,6 +278,41 @@ router.get('/component-vessel-mappings', async (req, res) => {
   }
 });
 
+// Create new component-vessel mapping
+const createComponentVesselMappingSchema = z.object({
+  fleetEquipmentCode: z.string(),
+  vesselCode: z.string(),
+  vesselName: z.string(),
+  componentCode: z.string().optional(),
+  componentName: z.string().optional(),
+});
+
+router.post('/component-vessel-mappings', async (req, res) => {
+  try {
+    const validatedData = createComponentVesselMappingSchema.parse(req.body);
+    const newMapping = await storage.createComponentVesselMapping(validatedData);
+    res.status(201).json(newMapping);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error creating component-vessel mapping:', error);
+    res.status(500).json({ error: 'Failed to create component-vessel mapping' });
+  }
+});
+
+// Delete component-vessel mapping
+router.delete('/component-vessel-mappings/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await storage.deleteComponentVesselMapping(id);
+    res.json({ success: true, message: 'Component-vessel mapping deleted' });
+  } catch (error) {
+    console.error('Error deleting component-vessel mapping:', error);
+    res.status(500).json({ error: 'Failed to delete component-vessel mapping' });
+  }
+});
+
 // ============================================================
 // FLEET-COMPONENT MAPPING
 // ============================================================

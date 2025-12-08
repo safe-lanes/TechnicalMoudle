@@ -602,6 +602,14 @@ export interface IStorage {
   
   // Component Vessel Mapping - For Fleet Data View vessel mappings
   getComponentVesselMappings(): Promise<any[]>;
+  createComponentVesselMapping(data: { 
+    fleetEquipmentCode: string; 
+    vesselCode: string; 
+    vesselName: string; 
+    componentCode?: string; 
+    componentName?: string;
+  }): Promise<any>;
+  deleteComponentVesselMapping(id: number): Promise<void>;
   
   // Fleet Component Mapping - Links Fleet Equipment to Vessel Components
   getFleetComponentMappings(fleetEquipmentCode?: string): Promise<FleetComponentMapping[]>;

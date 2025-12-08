@@ -1,9 +1,14 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Component, Job, Spare, MasterData } from "@shared/schema";
 
 interface MappedFleetComponent {
@@ -103,7 +108,7 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
 
   const groupedByPrefix = new Map<string, FleetComponent[]>();
   components.forEach((comp) => {
-    const code = comp.fleetEquipmentCode || comp.componentCode || comp.id;
+    const code = String(comp.fleetEquipmentCode || comp.componentCode || comp.id);
     if (!code) return;
     const prefix = code.charAt(0);
     if (!groupedByPrefix.has(prefix)) {
@@ -117,7 +122,7 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
     if (parentNode) {
       const subGroups = new Map<string, FleetComponent[]>();
       items.forEach((item) => {
-        const code = item.fleetEquipmentCode || item.componentCode || item.id;
+        const code = String(item.fleetEquipmentCode || item.componentCode || item.id);
         if (!code) return;
         const parts = code.split(".");
         const subPrefix = parts.length > 0 ? parts[0] : code;
@@ -131,7 +136,7 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
         if (subItems.length === 1 && subCode.length <= 2) {
           const item = subItems[0];
           const childNode: TreeNode = {
-            code: item.fleetEquipmentCode || item.componentCode || item.id,
+            code: String(item.fleetEquipmentCode || item.componentCode || item.id),
             name: item.fleetEquipmentName || item.name || "Unknown",
             children: [],
             data: item,
@@ -148,7 +153,7 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
 
           subItems.forEach((item) => {
             const leafNode: TreeNode = {
-              code: item.fleetEquipmentCode || item.componentCode || item.id,
+              code: String(item.fleetEquipmentCode || item.componentCode || item.id),
               name: item.fleetEquipmentName || item.name || "Unknown",
               children: [],
               data: item,
@@ -234,9 +239,27 @@ function TreeItem({
   );
 }
 
+interface ComponentVesselMapping {
+  id: number;
+  componentId: string;
+  fleetEquipmentCode: string;
+  vesselId: string;
+  vesselCode: string;
+  vesselName: string;
+  componentCode?: string;
+  componentName?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export default function FleetDataView() {
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
+  const [selectedMappingIds, setSelectedMappingIds] = useState<Set<number>>(new Set());
+  const [mappingSearchQuery, setMappingSearchQuery] = useState("");
+  const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
     items: MasterData[];
@@ -257,8 +280,52 @@ export default function FleetDataView() {
     queryKey: ["/api/vessels"],
   });
 
-  const { data: componentVesselMappings } = useQuery<{ componentId: string; fleetEquipmentCode: string; vesselId: string; vesselCode: string; vesselName: string }[]>({
+  const { data: componentVesselMappings } = useQuery<ComponentVesselMapping[]>({
     queryKey: ["/api/fleet-admin/component-vessel-mappings"],
+  });
+
+  const removeMappingsMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.all(
+        ids.map(id => apiRequest("DELETE", `/api/fleet-admin/component-vessel-mappings/${id}`))
+      );
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      setSelectedMappingIds(new Set());
+      toast({
+        title: "Success",
+        description: "Selected mappings have been removed",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to remove mappings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addMappingMutation = useMutation({
+    mutationFn: async (data: { fleetEquipmentCode: string; vesselCode: string; vesselName: string; componentCode?: string; componentName?: string }) => {
+      return apiRequest("POST", "/api/fleet-admin/component-vessel-mappings", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      toast({
+        title: "Success",
+        description: "Component mapping has been added",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to add component mapping",
+        variant: "destructive",
+      });
+    },
   });
 
   const mappedComponents = useMemo(() => {
@@ -285,6 +352,11 @@ export default function FleetDataView() {
 
   const selectedComponent = selectedNode?.data;
 
+  useEffect(() => {
+    setSelectedMappingIds(new Set());
+    setMappingSearchQuery("");
+  }, [selectedComponent?.id, selectedComponent?.fleetEquipmentCode]);
+
   const relatedJobs = useMemo(() => {
     if (!selectedComponent || !fleetJobs) return [];
     return fleetJobs.filter(
@@ -310,7 +382,7 @@ export default function FleetDataView() {
     if (componentVesselMappings && componentVesselMappings.length > 0) {
       const mappings = componentVesselMappings.filter(
         (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
-               m.componentId === selectedComponent.id
+               m.componentId === String(selectedComponent.id)
       );
       if (mappings.length > 0) {
         return mappings.map(m => ({
@@ -330,6 +402,61 @@ export default function FleetDataView() {
     
     return [];
   }, [selectedComponent, vessels, componentVesselMappings]);
+
+  const filteredMappingsForDialog = useMemo(() => {
+    if (!selectedComponent || !componentVesselMappings) return [];
+    
+    let mappings = componentVesselMappings.filter(
+      (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+             m.componentId === String(selectedComponent.id)
+    );
+    
+    if (mappingSearchQuery.trim()) {
+      const query = mappingSearchQuery.toLowerCase();
+      mappings = mappings.filter(
+        (m) => 
+          m.vesselName?.toLowerCase().includes(query) ||
+          m.vesselCode?.toLowerCase().includes(query) ||
+          m.componentCode?.toLowerCase().includes(query) ||
+          m.componentName?.toLowerCase().includes(query)
+      );
+    }
+    
+    return mappings;
+  }, [selectedComponent, componentVesselMappings, mappingSearchQuery]);
+
+  const handleMappingCheckboxChange = (mappingId: number, checked: boolean) => {
+    setSelectedMappingIds((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(mappingId);
+      } else {
+        newSet.delete(mappingId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllMappings = (checked: boolean) => {
+    if (checked) {
+      setSelectedMappingIds(new Set(filteredMappingsForDialog.map((m) => m.id)));
+    } else {
+      setSelectedMappingIds(new Set());
+    }
+  };
+
+  const handleRemoveMappings = () => {
+    if (selectedMappingIds.size === 0) return;
+    removeMappingsMutation.mutate(Array.from(selectedMappingIds));
+  };
+
+  const handleOpenMappingDialog = () => {
+    if (selectedComponent) {
+      setSelectedMappingIds(new Set());
+      setMappingSearchQuery("");
+      setIsMappingDialogOpen(true);
+    }
+  };
 
   return (
     <div className="flex h-[calc(100vh-140px)] bg-gray-50">
@@ -383,7 +510,11 @@ export default function FleetDataView() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-cyan-600">
+                <CardTitle 
+                  className="text-base font-semibold text-cyan-600 cursor-pointer hover:underline inline-block border border-cyan-600 px-2 py-1 rounded"
+                  onClick={handleOpenMappingDialog}
+                  data-testid="btn-fleet-component-info-header"
+                >
                   Fleet Component Information
                 </CardTitle>
               </CardHeader>
@@ -628,6 +759,106 @@ export default function FleetDataView() {
           </div>
         )}
       </div>
+
+      <Dialog 
+        open={isMappingDialogOpen} 
+        onOpenChange={(open) => {
+          setIsMappingDialogOpen(open);
+          if (!open) {
+            setSelectedMappingIds(new Set());
+            setMappingSearchQuery("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-700 border border-gray-300 px-3 py-1 rounded">
+              Vessel Component Mapping Overview
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRemoveMappings}
+                disabled={selectedMappingIds.size === 0 || removeMappingsMutation.isPending}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-remove-mapping"
+              >
+                Remove Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                data-testid="btn-component-mapping"
+              >
+                ComponentMapping
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className="py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search components..."
+                value={mappingSearchQuery}
+                onChange={(e) => setMappingSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-mapping-search"
+              />
+            </div>
+          </div>
+
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">
+                    <Checkbox
+                      checked={
+                        filteredMappingsForDialog.length > 0 &&
+                        filteredMappingsForDialog.every((m) => selectedMappingIds.has(m.id))
+                      }
+                      onCheckedChange={handleSelectAllMappings}
+                      data-testid="checkbox-select-all"
+                    />
+                  </th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMappingsForDialog.length > 0 ? (
+                  filteredMappingsForDialog.map((mapping) => (
+                    <tr key={mapping.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedMappingIds.has(mapping.id)}
+                          onCheckedChange={(checked) =>
+                            handleMappingCheckboxChange(mapping.id, checked as boolean)
+                          }
+                          data-testid={`checkbox-mapping-${mapping.id}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{mapping.vesselName || mapping.vesselCode}</td>
+                      <td className="py-2 px-2">{mapping.componentCode || mapping.fleetEquipmentCode}</td>
+                      <td className="py-2 px-2">{mapping.componentName || selectedComponent?.fleetEquipmentName || "—"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                      No vessel mappings found for this component
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

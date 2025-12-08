@@ -7614,6 +7614,46 @@ export class PersistentFileStorage implements IStorage {
     }
     return Object.values(this.data.componentVesselMappings).filter((m: any) => m.isActive !== false);
   }
+
+  async createComponentVesselMapping(data: { 
+    fleetEquipmentCode: string; 
+    vesselCode: string; 
+    vesselName: string; 
+    componentCode?: string; 
+    componentName?: string;
+  }): Promise<any> {
+    if (!this.data.componentVesselMappings) {
+      this.data.componentVesselMappings = {};
+    }
+    const id = this.data.counters.fleetVesselMappingId++;
+    const now = new Date().toISOString();
+    const newMapping = {
+      id,
+      componentId: data.fleetEquipmentCode,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      vesselId: data.vesselCode,
+      vesselCode: data.vesselCode,
+      vesselName: data.vesselName,
+      componentCode: data.componentCode || data.fleetEquipmentCode,
+      componentName: data.componentName || null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.componentVesselMappings[id] = newMapping;
+    this.persistData();
+    return newMapping;
+  }
+
+  async deleteComponentVesselMapping(id: number): Promise<void> {
+    if (!this.data.componentVesselMappings) {
+      this.data.componentVesselMappings = {};
+    }
+    if (this.data.componentVesselMappings[id]) {
+      this.data.componentVesselMappings[id].isActive = false;
+      this.persistData();
+    }
+  }
   
   async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
     const id = this.data.counters.fleetVesselMappingId++;
