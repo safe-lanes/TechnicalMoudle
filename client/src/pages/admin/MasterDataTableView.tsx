@@ -66,7 +66,10 @@ const initialFormState: NewMasterDataForm = {
 export default function MasterDataTableView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [formData, setFormData] = useState<NewMasterDataForm>(initialFormState);
+  const [editFormData, setEditFormData] = useState<NewMasterDataForm>(initialFormState);
+  const [selectedRow, setSelectedRow] = useState<MasterDataEntry | null>(null);
   const { toast } = useToast();
 
   const addMasterDataMutation = useMutation({
@@ -105,8 +108,49 @@ export default function MasterDataTableView() {
     },
   });
 
+  const editMasterDataMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: NewMasterDataForm }) => {
+      const payload = {
+        makerName: data.makerName,
+        makerCode: data.makerCode,
+        countMaker: data.countMaker ? parseInt(data.countMaker, 10) : 0,
+        model: data.model,
+        modelCode: data.modelCode,
+        countSfiCode: data.countSfiCode ? parseInt(data.countSfiCode, 10) : 0,
+        fleetEquipmentCode: data.fleetEquipmentCode,
+        sfiCode: data.sfiCode,
+        assignedSubCode: data.assignedSubCode,
+        vesselName: data.vesselName,
+        equipmentName: data.equipmentName,
+        isActive: true,
+      };
+      return apiRequest('PATCH', `/api/fleet-admin/master-data/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'] });
+      setIsEditDialogOpen(false);
+      setEditFormData(initialFormState);
+      setSelectedRow(null);
+      toast({
+        title: "Success",
+        description: "Master equipment updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update master equipment.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleInputChange = (field: keyof NewMasterDataForm, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditInputChange = (field: keyof NewMasterDataForm, value: string) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = () => {
@@ -124,6 +168,53 @@ export default function MasterDataTableView() {
   const handleCancel = () => {
     setIsAddDialogOpen(false);
     setFormData(initialFormState);
+  };
+
+  const handleRowClick = (item: MasterDataEntry) => {
+    setSelectedRow(item);
+  };
+
+  const handleEditClick = () => {
+    if (!selectedRow) {
+      toast({
+        title: "No Row Selected",
+        description: "Please select a row to edit by clicking on it.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditFormData({
+      makerName: selectedRow.makerName || "",
+      makerCode: selectedRow.makerCode || "",
+      countMaker: selectedRow.countMaker?.toString() || "",
+      model: selectedRow.model || "",
+      modelCode: selectedRow.modelCode || "",
+      countSfiCode: selectedRow.countSfiCode?.toString() || "",
+      fleetEquipmentCode: selectedRow.fleetEquipmentCode || "",
+      sfiCode: selectedRow.sfiCode || "",
+      assignedSubCode: selectedRow.assignedSubCode || "",
+      vesselName: selectedRow.vesselName || "",
+      equipmentName: selectedRow.equipmentName || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSave = () => {
+    if (!selectedRow) return;
+    if (!editFormData.makerName || !editFormData.makerCode || !editFormData.fleetEquipmentCode || !editFormData.sfiCode || !editFormData.equipmentName) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields (Maker Name, Maker Code, Fleet Equipment Code, SFI Code, Equipment Name).",
+        variant: "destructive",
+      });
+      return;
+    }
+    editMasterDataMutation.mutate({ id: selectedRow.id, data: editFormData });
+  };
+
+  const handleEditCancel = () => {
+    setIsEditDialogOpen(false);
+    setEditFormData(initialFormState);
   };
 
   const { data: masterDataResponse, isLoading } = useQuery<MasterDataResponse>({
@@ -190,7 +281,8 @@ export default function MasterDataTableView() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {}}
+                onClick={handleEditClick}
+                disabled={!selectedRow}
                 data-testid="button-edit-master-data"
               >
                 <Edit className="h-4 w-4 mr-2" />
@@ -261,7 +353,16 @@ export default function MasterDataTableView() {
                     </TableRow>
                   ) : (
                     filteredData.map((item, index) => (
-                      <TableRow key={item.id || index} className="hover:bg-gray-50" data-testid={`row-master-data-${item.id || index}`}>
+                      <TableRow 
+                        key={item.id || index} 
+                        className={`cursor-pointer transition-colors ${
+                          selectedRow?.id === item.id 
+                            ? 'bg-blue-100 hover:bg-blue-100' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleRowClick(item)}
+                        data-testid={`row-master-data-${item.id || index}`}
+                      >
                         <TableCell className="text-sm">{item.makerName || '-'}</TableCell>
                         <TableCell className="text-sm">{item.makerCode || '-'}</TableCell>
                         <TableCell className="text-sm">{item.countMaker || 0}</TableCell>
@@ -433,6 +534,152 @@ export default function MasterDataTableView() {
                   onChange={(e) => handleInputChange('equipmentName', e.target.value)}
                   className="bg-white"
                   data-testid="input-equipment-name"
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden" data-testid="dialog-edit-master-equipment">
+          <DialogHeader className="bg-gray-700 text-white px-6 py-4">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-medium">Edit Master Equipment</DialogTitle>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEditCancel}
+                  className="bg-white text-gray-700 hover:bg-gray-100"
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleEditSave}
+                  disabled={editMasterDataMutation.isPending}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                  data-testid="button-save-edit-master-equipment"
+                >
+                  {editMasterDataMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-6 bg-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Maker Name</Label>
+                <Input
+                  value={editFormData.makerName}
+                  onChange={(e) => handleEditInputChange('makerName', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-maker-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Maker Code</Label>
+                <Input
+                  value={editFormData.makerCode}
+                  onChange={(e) => handleEditInputChange('makerCode', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-maker-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Count_Maker</Label>
+                <Input
+                  value={editFormData.countMaker}
+                  onChange={(e) => handleEditInputChange('countMaker', e.target.value)}
+                  className="bg-white"
+                  type="number"
+                  data-testid="edit-input-count-maker"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Model</Label>
+                <Input
+                  value={editFormData.model}
+                  onChange={(e) => handleEditInputChange('model', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-model"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Model Code</Label>
+                <Input
+                  value={editFormData.modelCode}
+                  onChange={(e) => handleEditInputChange('modelCode', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-model-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Count_SFI</Label>
+                <Input
+                  value={editFormData.countSfiCode}
+                  onChange={(e) => handleEditInputChange('countSfiCode', e.target.value)}
+                  className="bg-white"
+                  type="number"
+                  data-testid="edit-input-count-sfi"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Fleet Equipment Code</Label>
+                <Input
+                  value={editFormData.fleetEquipmentCode}
+                  onChange={(e) => handleEditInputChange('fleetEquipmentCode', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-fleet-equipment-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">SFI Code</Label>
+                <Input
+                  value={editFormData.sfiCode}
+                  onChange={(e) => handleEditInputChange('sfiCode', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-sfi-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Sub Code</Label>
+                <Input
+                  value={editFormData.assignedSubCode}
+                  onChange={(e) => handleEditInputChange('assignedSubCode', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-sub-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Vessel Name</Label>
+                <Input
+                  value={editFormData.vesselName}
+                  onChange={(e) => handleEditInputChange('vesselName', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-vessel-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-blue-600 font-medium text-sm">Equipment Name</Label>
+                <Input
+                  value={editFormData.equipmentName}
+                  onChange={(e) => handleEditInputChange('equipmentName', e.target.value)}
+                  className="bg-white"
+                  data-testid="edit-input-equipment-name"
                 />
               </div>
             </div>
