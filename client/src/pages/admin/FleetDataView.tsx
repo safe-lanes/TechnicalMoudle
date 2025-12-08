@@ -2,47 +2,13 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Edit } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Component, Job, Spare } from "@shared/schema";
 
-interface FleetComponent {
-  id?: number;
-  fleetEquipmentCode: string;
-  fleetEquipmentName: string;
-  sfiCode?: string;
-  assignedSubCode?: string;
-  makerName?: string;
-  makerCode?: string;
-  model?: string;
-  modelCode?: string;
-  parentCode?: string;
-  componentCategory?: string;
-  location?: string;
-  rating?: string;
-  department?: string;
-  notes?: string;
-  vesselName?: string;
-}
-
-interface FleetJob {
-  jobCode: string;
-  jobTitle: string;
-  taskType: string;
-  frequency: string;
-}
-
-interface FleetSpare {
-  partCode: string;
-  partName: string;
-  partNumber: string;
-  maker: string;
-  unit: string;
-}
-
-interface VesselMapping {
-  vesselCode: string;
-  vesselName: string;
-}
+type FleetComponent = Component;
+type FleetJob = Job;
+type FleetSpare = Spare;
 
 interface TreeNode {
   code: string;
@@ -80,7 +46,8 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
 
   const groupedByPrefix = new Map<string, FleetComponent[]>();
   components.forEach((comp) => {
-    const code = comp.sfiCode || comp.fleetEquipmentCode;
+    const code = comp.fleetEquipmentCode || comp.componentCode || comp.id;
+    if (!code) return;
     const prefix = code.charAt(0);
     if (!groupedByPrefix.has(prefix)) {
       groupedByPrefix.set(prefix, []);
@@ -93,7 +60,8 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
     if (parentNode) {
       const subGroups = new Map<string, FleetComponent[]>();
       items.forEach((item) => {
-        const code = item.sfiCode || item.fleetEquipmentCode;
+        const code = item.fleetEquipmentCode || item.componentCode || item.id;
+        if (!code) return;
         const parts = code.split(".");
         const subPrefix = parts.length > 0 ? parts[0] : code;
         if (!subGroups.has(subPrefix)) {
@@ -106,24 +74,25 @@ function buildTree(components: FleetComponent[]): TreeNode[] {
         if (subItems.length === 1 && subCode.length <= 2) {
           const item = subItems[0];
           const childNode: TreeNode = {
-            code: item.sfiCode || item.fleetEquipmentCode,
-            name: item.fleetEquipmentName,
+            code: item.fleetEquipmentCode || item.componentCode || item.id,
+            name: item.fleetEquipmentName || item.name || "Unknown",
             children: [],
             data: item,
           };
           parentNode.children.push(childNode);
         } else {
+          const firstItem = subItems[0];
           const subNode: TreeNode = {
             code: subCode,
-            name: subItems[0]?.fleetEquipmentName || `Group ${subCode}`,
+            name: firstItem?.fleetEquipmentName || firstItem?.name || `Group ${subCode}`,
             children: [],
             isExpanded: false,
           };
 
           subItems.forEach((item) => {
             const leafNode: TreeNode = {
-              code: item.sfiCode || item.fleetEquipmentCode,
-              name: item.fleetEquipmentName,
+              code: item.fleetEquipmentCode || item.componentCode || item.id,
+              name: item.fleetEquipmentName || item.name || "Unknown",
               children: [],
               data: item,
             };
@@ -216,12 +185,7 @@ export default function FleetDataView() {
     items: FleetComponent[];
     total: number;
   }>({
-    queryKey: ["/api/fleet-admin/master-data", "fleet-data"],
-    queryFn: async () => {
-      const response = await fetch("/api/fleet-admin/master-data?limit=1000");
-      if (!response.ok) throw new Error("Failed to fetch fleet data");
-      return response.json();
-    },
+    queryKey: ["/api/fleet-admin/master-data?limit=1000"],
   });
 
   const { data: fleetJobs } = useQuery<FleetJob[]>({
@@ -257,19 +221,19 @@ export default function FleetDataView() {
 
   const relatedJobs = useMemo(() => {
     if (!selectedComponent || !fleetJobs) return [];
-    return (fleetJobs as any[]).filter(
-      (job: any) =>
-        job.componentCode === selectedComponent.fleetEquipmentCode ||
-        job.sfiCode === selectedComponent.sfiCode
+    return fleetJobs.filter(
+      (job: FleetJob) =>
+        job.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+        job.componentCode === selectedComponent.fleetEquipmentCode
     );
   }, [selectedComponent, fleetJobs]);
 
   const relatedSpares = useMemo(() => {
     if (!selectedComponent || !fleetSpares) return [];
-    return (fleetSpares as any[]).filter(
-      (spare: any) =>
-        spare.componentCode === selectedComponent.fleetEquipmentCode ||
-        spare.sfiCode === selectedComponent.sfiCode
+    return fleetSpares.filter(
+      (spare: FleetSpare) =>
+        spare.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+        spare.componentCode === selectedComponent.fleetEquipmentCode
     );
   }, [selectedComponent, fleetSpares]);
 
@@ -342,7 +306,7 @@ export default function FleetDataView() {
                   <div>
                     <div className="text-gray-500 text-xs">Maker</div>
                     <div className="font-medium">
-                      {selectedComponent.makerName || "—"}
+                      {selectedComponent.maker || "—"}
                     </div>
                   </div>
                   <div>
@@ -375,8 +339,8 @@ export default function FleetDataView() {
                   <div>
                     <div className="text-gray-500 text-xs">Parent Code</div>
                     <div className="font-medium">
-                      {selectedComponent.parentCode ||
-                        selectedComponent.sfiCode?.split(".")[0] ||
+                      {selectedComponent.parentFleetEquipmentCode ||
+                        selectedComponent.fleetEquipmentCode?.split(".")[0] ||
                         "—"}
                     </div>
                   </div>
@@ -385,7 +349,7 @@ export default function FleetDataView() {
                       Fleet Equipment Name
                     </div>
                     <div className="font-medium">
-                      {selectedComponent.fleetEquipmentName || "—"}
+                      {selectedComponent.fleetEquipmentName || selectedComponent.name || "—"}
                     </div>
                   </div>
 
@@ -394,7 +358,7 @@ export default function FleetDataView() {
                       Component Category
                     </div>
                     <div className="font-medium">
-                      {selectedComponent.componentCategory || "—"}
+                      {selectedComponent.componentCategory || selectedComponent.category || "—"}
                     </div>
                   </div>
                   <div>
@@ -414,14 +378,14 @@ export default function FleetDataView() {
                       Eqpt / System Department
                     </div>
                     <div className="font-medium">
-                      {selectedComponent.department || "—"}
+                      {selectedComponent.eqptSystemDept || selectedComponent.department || "—"}
                     </div>
                   </div>
 
                   <div className="col-span-4">
-                    <div className="text-gray-500 text-xs">Notes</div>
+                    <div className="text-gray-500 text-xs">Serial No</div>
                     <div className="font-medium">
-                      {selectedComponent.notes || "—"}
+                      {selectedComponent.serialNo || "—"}
                     </div>
                   </div>
                 </div>
@@ -452,19 +416,21 @@ export default function FleetDataView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {relatedJobs.map((job: any, index: number) => (
+                      {relatedJobs.map((job: FleetJob, index: number) => (
                         <tr key={index} className="border-b last:border-0">
-                          <td className="py-2">{job.jobCode || job.id}</td>
+                          <td className="py-2">{job.fleetJobCode || job.jobNo || job.id}</td>
                           <td className="py-2">
-                            {job.jobTitle || job.title || "—"}
+                            {job.jobTitle || "—"}
                           </td>
                           <td className="py-2">
-                            {job.taskType || job.jobType || "—"}
+                            {job.maintenanceType || "—"}
                           </td>
                           <td className="py-2">
-                            {job.frequency ||
-                              `${job.intervalValue} ${job.intervalUnit}` ||
-                              "—"}
+                            {job.frequencyValue && job.frequencyUnit 
+                              ? `${job.frequencyValue} ${job.frequencyUnit}` 
+                              : job.intervalRunningHour 
+                                ? `${job.intervalRunningHour} RH` 
+                                : "—"}
                           </td>
                         </tr>
                       ))}
@@ -505,17 +471,17 @@ export default function FleetDataView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {relatedSpares.map((spare: any, index: number) => (
+                      {relatedSpares.map((spare: FleetSpare, index: number) => (
                         <tr key={index} className="border-b last:border-0">
                           <td className="py-2">
-                            {spare.partCode || spare.spareCode}
+                            {spare.fleetPartCode || spare.partCode}
                           </td>
                           <td className="py-2">
-                            {spare.partName || spare.spareName}
+                            {spare.partName || "—"}
                           </td>
                           <td className="py-2">{spare.partNumber || "—"}</td>
                           <td className="py-2">{spare.maker || "—"}</td>
-                          <td className="py-2">{spare.unit || spare.uom}</td>
+                          <td className="py-2">{spare.uom || spare.unit || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
