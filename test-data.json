@@ -15171,8 +15171,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "751": {
-      "id": 751,
+    "757": {
+      "id": 757,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15181,10 +15181,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-08T05:04:26.121Z"
+      "updatedAt": "2025-12-08T05:22:54.349Z"
     },
-    "752": {
-      "id": 752,
+    "758": {
+      "id": 758,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15193,24 +15193,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-08T05:04:26.169Z"
+      "updatedAt": "2025-12-08T05:22:54.410Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 751,
+      "recurringId": 757,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 751,
+      "recurringId": 757,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 752,
+      "recurringId": 758,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 752,
+      "recurringId": 758,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -51145,7 +51145,27 @@
     }
   },
   "sfiDetailsList": {},
-  "masterDataList": {},
+  "masterDataList": {
+    "1": {
+      "id": 1,
+      "slNo": null,
+      "makerName": "Test Maker",
+      "makerCode": "TM001",
+      "countMaker": 5,
+      "model": "Test Model",
+      "modelCode": "TMC001",
+      "countSfiCode": 3,
+      "fleetEquipmentCode": "FEC-TEST-001",
+      "sfiCode": "511.01",
+      "assignedSubCode": "A1",
+      "vesselName": "Test Vessel",
+      "vesselCode": null,
+      "equipmentName": "Test Equipment",
+      "isActive": true,
+      "createdAt": "2025-12-08T05:22:40.984Z",
+      "updatedAt": "2025-12-08T05:22:40.984Z"
+    }
+  },
   "fleetVesselMappings": {},
   "fleetComponentMappings": {},
   "fleetJobVesselMappings": {},
@@ -57427,14 +57447,14 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 753,
+    "recurringDefectId": 759,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
     "storesLedgerId": 16,
     "makersListId": 11,
     "sfiDetailsListId": 1,
-    "masterDataId": 1,
+    "masterDataId": 2,
     "fleetVesselMappingId": 1,
     "fleetComponentMappingId": 1,
     "fleetJobVesselMappingId": 1,
