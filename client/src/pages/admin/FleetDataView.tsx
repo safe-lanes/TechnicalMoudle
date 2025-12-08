@@ -267,6 +267,9 @@ export default function FleetDataView() {
   const [isVesselMappingDialogOpen, setIsVesselMappingDialogOpen] = useState(false);
   const [vesselMappingSearchQuery, setVesselMappingSearchQuery] = useState("");
   const [selectedVesselsToMap, setSelectedVesselsToMap] = useState<Set<string>>(new Set());
+  const [isComponentMappingDialogOpen, setIsComponentMappingDialogOpen] = useState(false);
+  const [componentMappingSearchQuery, setComponentMappingSearchQuery] = useState("");
+  const [selectedComponentsToMap, setSelectedComponentsToMap] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
@@ -528,6 +531,91 @@ export default function FleetDataView() {
       toast({
         title: "Error",
         description: "Failed to map vessels. Please try again.",
+        variant: "destructive",
+      });
+    });
+  };
+
+  const unmappedComponentsForVessel = useMemo(() => {
+    if (!selectedVesselForDetail || !selectedComponent || !mappedComponents) return [];
+    
+    const mappedComponentCodes = new Set(
+      (componentVesselMappings || [])
+        .filter(m => m.vesselCode === selectedVesselForDetail.vesselCode || 
+                     m.vesselId === selectedVesselForDetail.vesselId)
+        .map(m => m.fleetEquipmentCode || m.componentCode)
+    );
+    
+    let available = mappedComponents.filter(c => {
+      const code = c.fleetEquipmentCode || c.componentCode;
+      return code && 
+             code.startsWith(selectedComponent.fleetEquipmentCode + ".") &&
+             !mappedComponentCodes.has(code);
+    });
+    
+    if (componentMappingSearchQuery.trim()) {
+      const query = componentMappingSearchQuery.toLowerCase();
+      available = available.filter(c => 
+        c.fleetEquipmentCode?.toLowerCase().includes(query) ||
+        c.fleetEquipmentName?.toLowerCase().includes(query) ||
+        c.componentCode?.toLowerCase().includes(query) ||
+        c.name?.toLowerCase().includes(query)
+      );
+    }
+    
+    return available;
+  }, [selectedVesselForDetail, selectedComponent, mappedComponents, componentVesselMappings, componentMappingSearchQuery]);
+
+  const handleComponentMappingCheckboxChange = (componentCode: string, checked: boolean) => {
+    setSelectedComponentsToMap((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(componentCode);
+      } else {
+        newSet.delete(componentCode);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllComponentsToMap = (checked: boolean) => {
+    if (checked) {
+      setSelectedComponentsToMap(new Set(unmappedComponentsForVessel.map(c => c.fleetEquipmentCode)));
+    } else {
+      setSelectedComponentsToMap(new Set());
+    }
+  };
+
+  const handleMapComponents = () => {
+    if (selectedComponentsToMap.size === 0 || !selectedVesselForDetail) return;
+    
+    const componentsToMap = unmappedComponentsForVessel.filter(c => 
+      selectedComponentsToMap.has(c.fleetEquipmentCode)
+    );
+    
+    Promise.all(
+      componentsToMap.map(component => 
+        addMappingMutation.mutateAsync({
+          fleetEquipmentCode: component.fleetEquipmentCode,
+          vesselCode: selectedVesselForDetail.vesselCode,
+          vesselName: selectedVesselForDetail.vesselName,
+          componentCode: component.fleetEquipmentCode,
+          componentName: component.fleetEquipmentName,
+        })
+      )
+    ).then(() => {
+      setSelectedComponentsToMap(new Set());
+      setComponentMappingSearchQuery("");
+      setIsComponentMappingDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      toast({
+        title: "Success",
+        description: `${componentsToMap.length} component(s) have been mapped`,
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to map components. Please try again.",
         variant: "destructive",
       });
     });
@@ -1055,6 +1143,11 @@ export default function FleetDataView() {
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  setSelectedComponentsToMap(new Set());
+                  setComponentMappingSearchQuery("");
+                  setIsComponentMappingDialogOpen(true);
+                }}
                 data-testid="btn-detail-component-mapping"
               >
                 ComponentMapping
@@ -1197,6 +1290,86 @@ export default function FleetDataView() {
                   <tr>
                     <td colSpan={3} className="py-8 text-center text-gray-500">
                       No vessels available to map
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={isComponentMappingDialogOpen} 
+        onOpenChange={(open) => {
+          setIsComponentMappingDialogOpen(open);
+          if (!open) {
+            setComponentMappingSearchQuery("");
+            setSelectedComponentsToMap(new Set());
+          }
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Component Mapping
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder={selectedComponent?.fleetEquipmentCode || "Search..."}
+                  value={componentMappingSearchQuery}
+                  onChange={(e) => setComponentMappingSearchQuery(e.target.value)}
+                  className="w-32 pr-8"
+                  data-testid="input-component-mapping-search"
+                />
+                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                onClick={handleMapComponents}
+                disabled={selectedComponentsToMap.size === 0 || addMappingMutation.isPending}
+                data-testid="btn-map-components"
+              >
+                Map
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="h-[300px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">
+                    <span className="text-gray-600">Select</span>
+                  </th>
+                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unmappedComponentsForVessel.length > 0 ? (
+                  unmappedComponentsForVessel.map((component) => (
+                    <tr key={component.fleetEquipmentCode} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedComponentsToMap.has(component.fleetEquipmentCode)}
+                          onCheckedChange={(checked) =>
+                            handleComponentMappingCheckboxChange(component.fleetEquipmentCode, checked as boolean)
+                          }
+                          data-testid={`checkbox-component-map-${component.fleetEquipmentCode}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{component.fleetEquipmentCode}</td>
+                      <td className="py-2 px-2">{component.fleetEquipmentName}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                      No sub-components available to map
                     </td>
                   </tr>
                 )}
