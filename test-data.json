@@ -15390,8 +15390,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "803": {
-      "id": 803,
+    "817": {
+      "id": 817,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15400,10 +15400,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-08T07:25:21.620Z"
+      "updatedAt": "2025-12-08T07:37:55.835Z"
     },
-    "804": {
-      "id": 804,
+    "818": {
+      "id": 818,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15412,24 +15412,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-08T07:25:21.670Z"
+      "updatedAt": "2025-12-08T07:37:55.926Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 803,
+      "recurringId": 817,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 803,
+      "recurringId": 817,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 804,
+      "recurringId": 818,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 804,
+      "recurringId": 818,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -51393,6 +51393,82 @@
       "isActive": true,
       "createdAt": "2025-12-08T05:22:40.984Z",
       "updatedAt": "2025-12-08T05:38:07.130Z"
+    },
+    "2": {
+      "id": 2,
+      "slNo": 1,
+      "makerName": "MAN B&W",
+      "makerCode": "MBW001",
+      "countMaker": 1,
+      "model": "6S60MC-C8.2",
+      "modelCode": "MBW001-6S60MC",
+      "countSfiCode": 1,
+      "fleetEquipmentCode": "601.001",
+      "sfiCode": "601.001",
+      "assignedSubCode": "AA",
+      "vesselName": "MV Test",
+      "vesselCode": "V001",
+      "equipmentName": "Main Engine",
+      "isActive": true,
+      "createdAt": "2025-12-08T07:00:00.000Z",
+      "updatedAt": "2025-12-08T07:00:00.000Z"
+    },
+    "3": {
+      "id": 3,
+      "slNo": 2,
+      "makerName": "MAN B&W",
+      "makerCode": "MBW001",
+      "countMaker": 1,
+      "model": "S50MC-C8",
+      "modelCode": "MBW001-S50MC",
+      "countSfiCode": 2,
+      "fleetEquipmentCode": "601.002",
+      "sfiCode": "601.002",
+      "assignedSubCode": "AA",
+      "vesselName": "Test Vessel_01",
+      "vesselCode": "MV0001",
+      "equipmentName": "ME Cylinder Covers",
+      "isActive": true,
+      "createdAt": "2025-12-08T07:00:00.000Z",
+      "updatedAt": "2025-12-08T07:00:00.000Z"
+    },
+    "4": {
+      "id": 4,
+      "slNo": 3,
+      "makerName": "Wartsila",
+      "makerCode": "WTS001",
+      "countMaker": 1,
+      "model": "W6L46F",
+      "modelCode": "WTS001-W6L46F",
+      "countSfiCode": 1,
+      "fleetEquipmentCode": "611.001",
+      "sfiCode": "611.001",
+      "assignedSubCode": "AA",
+      "vesselName": "MV Test",
+      "vesselCode": "V001",
+      "equipmentName": "Auxiliary Engine No.1",
+      "isActive": true,
+      "createdAt": "2025-12-08T07:00:00.000Z",
+      "updatedAt": "2025-12-08T07:00:00.000Z"
+    },
+    "5": {
+      "id": 5,
+      "slNo": 4,
+      "makerName": "Wartsila",
+      "makerCode": "WTS001",
+      "countMaker": 1,
+      "model": "W6L46F",
+      "modelCode": "WTS001-W6L46F",
+      "countSfiCode": 2,
+      "fleetEquipmentCode": "611.002",
+      "sfiCode": "611.002",
+      "assignedSubCode": "AA",
+      "vesselName": "MV Test",
+      "vesselCode": "V001",
+      "equipmentName": "Auxiliary Engine No.2",
+      "isActive": true,
+      "createdAt": "2025-12-08T07:00:00.000Z",
+      "updatedAt": "2025-12-08T07:00:00.000Z"
     }
   },
   "fleetVesselMappings": {},
@@ -57676,14 +57752,14 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 805,
+    "recurringDefectId": 819,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
     "storesLedgerId": 16,
     "makersListId": 11,
     "sfiDetailsListId": 1,
-    "masterDataId": 2,
+    "masterDataId": 6,
     "fleetVesselMappingId": 1,
     "fleetComponentMappingId": 1,
     "fleetJobVesselMappingId": 1,

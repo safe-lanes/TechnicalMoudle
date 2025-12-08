@@ -4,9 +4,53 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight, ChevronDown, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Component, Job, Spare } from "@shared/schema";
+import type { Component, Job, Spare, MasterData } from "@shared/schema";
 
-type FleetComponent = Component;
+interface MappedFleetComponent {
+  id: string | number;
+  fleetEquipmentCode: string;
+  fleetEquipmentName: string;
+  componentCode?: string | null;
+  name?: string | null;
+  maker?: string | null;
+  makerCode?: string | null;
+  model?: string | null;
+  modelCode?: string | null;
+  location?: string | null;
+  rating?: string | null;
+  notes?: string | null;
+  category?: string | null;
+  componentCategory?: string | null;
+  department?: string | null;
+  eqptSystemDept?: string | null;
+  parentFleetEquipmentCode?: string | null;
+  sfiCode?: string | null;
+}
+
+function mapMasterDataToFleetComponent(item: MasterData): MappedFleetComponent {
+  return {
+    id: item.id,
+    fleetEquipmentCode: item.fleetEquipmentCode,
+    fleetEquipmentName: item.equipmentName,
+    componentCode: item.fleetEquipmentCode,
+    name: item.equipmentName,
+    maker: item.makerName,
+    makerCode: item.makerCode,
+    model: item.model,
+    modelCode: item.modelCode,
+    sfiCode: item.sfiCode,
+    location: null,
+    rating: null,
+    notes: null,
+    category: item.sfiCode?.substring(0, 1) || null,
+    componentCategory: null,
+    department: null,
+    eqptSystemDept: null,
+    parentFleetEquipmentCode: item.sfiCode?.split('.').slice(0, -1).join('.') || null,
+  };
+}
+
+type FleetComponent = MappedFleetComponent;
 type FleetJob = Job;
 type FleetSpare = Spare;
 
@@ -182,7 +226,7 @@ export default function FleetDataView() {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
-    items: FleetComponent[];
+    items: MasterData[];
     total: number;
   }>({
     queryKey: ["/api/fleet-admin/master-data?limit=1000"],
@@ -204,10 +248,15 @@ export default function FleetDataView() {
     queryKey: ["/api/fleet-admin/component-vessel-mappings"],
   });
 
-  const treeData = useMemo(() => {
+  const mappedComponents = useMemo(() => {
     if (!masterDataResponse?.items) return [];
-    return buildTree(masterDataResponse.items);
+    return masterDataResponse.items.map(mapMasterDataToFleetComponent);
   }, [masterDataResponse?.items]);
+
+  const treeData = useMemo(() => {
+    if (!mappedComponents.length) return [];
+    return buildTree(mappedComponents);
+  }, [mappedComponents]);
 
   const handleToggle = (code: string) => {
     setExpandedNodes((prev) => {
