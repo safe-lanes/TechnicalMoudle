@@ -227,6 +227,7 @@ interface PersistentData {
   componentRequisitions: Record<number, any>;
   certificates: Record<string, any>;
   surveys: Record<string, any>;
+  componentVesselMappings: Record<number, any>;
   
   // Counter state
   counters: {
@@ -469,6 +470,7 @@ export class PersistentFileStorage implements IStorage {
           componentRequisitions: loadedData.componentRequisitions || {},
           certificates: loadedData.certificates || {},
           surveys: loadedData.surveys || {},
+          componentVesselMappings: loadedData.componentVesselMappings || {},
           counters: {
             userId: loadedData.counters?.userId || 1,
             auditId: loadedData.counters?.auditId || 1,
@@ -697,6 +699,7 @@ export class PersistentFileStorage implements IStorage {
       componentRequisitions: {},
       certificates: {},
       surveys: {},
+      componentVesselMappings: {},
       counters: {
         userId: 1,
         auditId: 1,

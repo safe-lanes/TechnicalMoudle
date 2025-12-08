@@ -9726,6 +9726,30 @@
       "createdAt": "2025-12-04T12:40:52.721Z",
       "updatedAt": "2025-12-04T12:40:52.721Z"
     },
+    "69": {
+      "id": 69,
+      "dataScope": "fleet",
+      "fleetEquipmentCode": "601.001",
+      "fleetPartCode": "MV0001-00001",
+      "partCode": "MV0001-00001",
+      "partName": "O-Ring",
+      "partNumber": "0103-0875",
+      "maker": "MAN B&W",
+      "unit": "Pcs",
+      "uom": "Pcs",
+      "componentCode": "601.001",
+      "componentName": "Main Engine",
+      "rob": 10,
+      "min": 2,
+      "max": 20,
+      "vesselId": null,
+      "deleted": false,
+      "isActive": true,
+      "createdAt": "2025-12-08T07:52:27.767Z",
+      "updatedAt": "2025-12-08T07:52:27.767Z",
+      "robLocationA": 10,
+      "robLocationB": 0
+    },
     "fleet_spare_mv0001_00001": {
       "id": "fleet_spare_mv0001_00001",
       "partCode": "MV0001-00001",
@@ -13163,6 +13187,54 @@
       "consumedSpareParts": [],
       "rejectionComments": null,
       "approvalAction": null
+    },
+    {
+      "id": "18",
+      "dataScope": "fleet",
+      "fleetEquipmentCode": "601.001",
+      "fleetJobCode": "MKR-OV-00001",
+      "jobNo": "MKR-OV-00001",
+      "jobTitle": "ME Cylinder Head Overhaul - 16000 RHS",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Running Hours",
+      "frequencyValue": 16000,
+      "frequencyUnit": "RHS",
+      "componentCode": "601.001",
+      "component": "Main Engine",
+      "department": "Engine",
+      "criticality": "Critical",
+      "jobCategory": "Maintenance",
+      "status": "Template",
+      "isExecution": false,
+      "isActive": true,
+      "vesselId": null,
+      "createdAt": "2025-12-08T07:52:27.767Z",
+      "updatedAt": "2025-12-08T07:52:27.767Z",
+      "woTemplateCode": "MKR-OV-00001"
+    },
+    {
+      "id": "19",
+      "dataScope": "fleet",
+      "fleetEquipmentCode": "601.001",
+      "fleetJobCode": "MKR-IN-00001",
+      "jobNo": "MKR-IN-00001",
+      "jobTitle": "ME Cylinder Head Routine Inspection- 4000 RHS",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Running Hours",
+      "frequencyValue": 4000,
+      "frequencyUnit": "RHS",
+      "componentCode": "601.001",
+      "component": "Main Engine",
+      "department": "Engine",
+      "criticality": "Non-Critical",
+      "jobCategory": "Inspection",
+      "status": "Template",
+      "isExecution": false,
+      "isActive": true,
+      "vesselId": null,
+      "createdAt": "2025-12-08T07:52:27.767Z",
+      "updatedAt": "2025-12-08T07:52:27.767Z",
+      "woTemplateCode": "MKR-IN-00001"
     }
   ],
   "workOrderExecutions": [],
@@ -15390,8 +15462,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "819": {
-      "id": 819,
+    "843": {
+      "id": 843,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15400,10 +15472,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-08T07:39:57.014Z"
+      "updatedAt": "2025-12-08T08:03:48.714Z"
     },
-    "820": {
-      "id": 820,
+    "844": {
+      "id": 844,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15412,24 +15484,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-08T07:39:57.058Z"
+      "updatedAt": "2025-12-08T08:03:48.743Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 819,
+      "recurringId": 843,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 819,
+      "recurringId": 843,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 820,
+      "recurringId": 844,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 820,
+      "recurringId": 844,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -57733,10 +57805,34 @@
       "attachments": []
     }
   },
+  "componentVesselMappings": {
+    "1": {
+      "id": 1,
+      "componentId": "601.001",
+      "fleetEquipmentCode": "601.001",
+      "vesselId": "MV0001",
+      "vesselCode": "MV0001",
+      "vesselName": "Test Vessel_01",
+      "isActive": true,
+      "createdAt": "2025-12-08T08:01:18.587Z",
+      "updatedAt": "2025-12-08T08:01:18.587Z"
+    },
+    "2": {
+      "id": 2,
+      "componentId": "601.001",
+      "fleetEquipmentCode": "601.001",
+      "vesselId": "MV0002",
+      "vesselCode": "MV0002",
+      "vesselName": "Test Vessel_02",
+      "isActive": true,
+      "createdAt": "2025-12-08T08:01:18.587Z",
+      "updatedAt": "2025-12-08T08:01:18.587Z"
+    }
+  },
   "counters": {
     "userId": 1,
     "auditId": 20,
-    "spareId": 69,
+    "spareId": 70,
     "historyId": 3,
     "changeRequestId": 8,
     "attachmentId": 1,
@@ -57747,12 +57843,12 @@
     "alertConfigId": 1,
     "formDefinitionId": 1,
     "formVersionId": 1,
-    "workOrderId": 18,
+    "workOrderId": 20,
     "executionId": 1,
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 821,
+    "recurringDefectId": 845,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
@@ -57760,7 +57856,7 @@
     "makersListId": 11,
     "sfiDetailsListId": 1,
     "masterDataId": 6,
-    "fleetVesselMappingId": 1,
+    "fleetVesselMappingId": 3,
     "fleetComponentMappingId": 1,
     "fleetJobVesselMappingId": 1,
     "fleetSpareVesselMappingId": 1,
