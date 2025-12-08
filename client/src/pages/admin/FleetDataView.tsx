@@ -196,8 +196,12 @@ export default function FleetDataView() {
     queryKey: ["/api/fleet/spares"],
   });
 
-  const { data: vessels } = useQuery<{ id: string; name: string }[]>({
+  const { data: vessels } = useQuery<{ id: string; code?: string; name: string }[]>({
     queryKey: ["/api/vessels"],
+  });
+
+  const { data: componentVesselMappings } = useQuery<{ componentId: string; fleetEquipmentCode: string; vesselId: string; vesselCode: string; vesselName: string }[]>({
+    queryKey: ["/api/fleet-admin/component-vessel-mappings"],
   });
 
   const treeData = useMemo(() => {
@@ -238,12 +242,32 @@ export default function FleetDataView() {
   }, [selectedComponent, fleetSpares]);
 
   const relatedVessels = useMemo(() => {
-    if (!selectedComponent || !vessels) return [];
-    if (selectedComponent.vesselName) {
-      return vessels.filter((v) => v.name === selectedComponent.vesselName);
+    if (!selectedComponent) return [];
+    
+    // First check if we have component-vessel mappings
+    if (componentVesselMappings && componentVesselMappings.length > 0) {
+      const mappings = componentVesselMappings.filter(
+        (m) => m.fleetEquipmentCode === selectedComponent.fleetEquipmentCode ||
+               m.componentId === selectedComponent.id
+      );
+      if (mappings.length > 0) {
+        return mappings.map(m => ({
+          id: m.vesselCode,
+          name: m.vesselName
+        }));
+      }
     }
-    return vessels.slice(0, 5);
-  }, [selectedComponent, vessels]);
+    
+    // Fallback: if component has vesselId, find that vessel
+    if (selectedComponent.vesselId && vessels) {
+      const vessel = vessels.find((v) => v.id === selectedComponent.vesselId);
+      if (vessel) {
+        return [{ id: vessel.code || vessel.id, name: vessel.name }];
+      }
+    }
+    
+    return [];
+  }, [selectedComponent, vessels, componentVesselMappings]);
 
   return (
     <div className="flex h-[calc(100vh-140px)] bg-gray-50">
@@ -383,9 +407,9 @@ export default function FleetDataView() {
                   </div>
 
                   <div className="col-span-4">
-                    <div className="text-gray-500 text-xs">Serial No</div>
+                    <div className="text-gray-500 text-xs">Notes</div>
                     <div className="font-medium">
-                      {selectedComponent.serialNo || "—"}
+                      {selectedComponent.notes || "—"}
                     </div>
                   </div>
                 </div>

@@ -264,6 +264,21 @@ router.delete('/fleet-vessel-mappings/:id', async (req, res) => {
 });
 
 // ============================================================
+// COMPONENT-VESSEL MAPPINGS (for Fleet Data View)
+// ============================================================
+
+// Get all component-vessel mappings
+router.get('/component-vessel-mappings', async (req, res) => {
+  try {
+    const mappings = await storage.getComponentVesselMappings();
+    res.json(mappings);
+  } catch (error) {
+    console.error('Error fetching component-vessel mappings:', error);
+    res.status(500).json({ error: 'Failed to fetch component-vessel mappings' });
+  }
+});
+
+// ============================================================
 // FLEET-COMPONENT MAPPING
 // ============================================================
 

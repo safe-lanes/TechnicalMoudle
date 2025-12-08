@@ -7604,6 +7604,13 @@ export class PersistentFileStorage implements IStorage {
     return Object.values(this.data.fleetVesselMappings)
       .filter(m => m.vesselCode === vesselCode && m.isActive);
   }
+
+  async getComponentVesselMappings(): Promise<any[]> {
+    if (!this.data.componentVesselMappings) {
+      this.data.componentVesselMappings = {};
+    }
+    return Object.values(this.data.componentVesselMappings).filter((m: any) => m.isActive !== false);
+  }
   
   async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
     const id = this.data.counters.fleetVesselMappingId++;
