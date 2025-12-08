@@ -25,14 +25,23 @@ interface MappedFleetComponent {
   eqptSystemDept?: string | null;
   parentFleetEquipmentCode?: string | null;
   sfiCode?: string | null;
+  vesselId?: string | null;
+  vesselName?: string | null;
+  vesselCode?: string | null;
+  assignedSubCode?: string | null;
 }
 
 function mapMasterDataToFleetComponent(item: MasterData): MappedFleetComponent {
+  const fleetCode = item.fleetEquipmentCode;
+  const parentCode = item.assignedSubCode 
+    ? fleetCode.replace(new RegExp(`\\.${item.assignedSubCode}$`), '') 
+    : (fleetCode.includes('.') ? fleetCode.split('.').slice(0, -1).join('.') : null);
+  
   return {
     id: item.id,
-    fleetEquipmentCode: item.fleetEquipmentCode,
+    fleetEquipmentCode: fleetCode,
     fleetEquipmentName: item.equipmentName,
-    componentCode: item.fleetEquipmentCode,
+    componentCode: fleetCode,
     name: item.equipmentName,
     maker: item.makerName,
     makerCode: item.makerCode,
@@ -46,7 +55,11 @@ function mapMasterDataToFleetComponent(item: MasterData): MappedFleetComponent {
     componentCategory: null,
     department: null,
     eqptSystemDept: null,
-    parentFleetEquipmentCode: item.sfiCode?.split('.').slice(0, -1).join('.') || null,
+    parentFleetEquipmentCode: parentCode,
+    vesselId: item.vesselCode || null,
+    vesselName: item.vesselName || null,
+    vesselCode: item.vesselCode || null,
+    assignedSubCode: item.assignedSubCode || null,
   };
 }
 
