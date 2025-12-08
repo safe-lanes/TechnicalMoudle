@@ -1596,7 +1596,7 @@ export default function FleetDataView() {
                         <td className="py-2 px-2">{job.assignedTo || "—"}</td>
                         <td className="py-2 px-2">{job.approver || "—"}</td>
                         <td className="py-2 px-2">{job.jobPriority || "—"}</td>
-                        <td className="py-2 px-2">{job.classRelated ? "Yes" : "No"}</td>
+                        <td className="py-2 px-2">{job.classRelated || "No"}</td>
                         <td className="py-2 px-2">{job.department || "—"}</td>
                         <td className="py-2 px-2">{job.criticality || "—"}</td>
                       </tr>
@@ -1759,7 +1759,7 @@ export default function FleetDataView() {
                 </div>
                 <div>
                   <div className="text-blue-600 text-xs font-medium mb-1">Class Related</div>
-                  <div className="text-sm font-medium">{selectedJobForDetail.classRelated ? "Yes" : "No"}</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.classRelated || "No"}</div>
                 </div>
               </div>
 
@@ -1822,66 +1822,199 @@ export default function FleetDataView() {
 
       {/* Edit Job Dialog */}
       <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Edit Job</DialogTitle>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Edit Job Details</DialogTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsEditJobDialogOpen(false)}
+                data-testid="btn-cancel-edit-job"
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  toast({ title: "Success", description: "Job updated successfully" });
+                  setIsEditJobDialogOpen(false);
+                }}
+                data-testid="btn-save-job"
+              >
+                Save
+              </Button>
+            </div>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Job Title</label>
-              <Input
-                value={jobFormData.jobTitle || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
-                data-testid="input-edit-job-title"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Task Type</label>
-              <Input
-                value={jobFormData.maintenanceType || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
-                data-testid="input-edit-task-type"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 1: Job No., Job Title, Task Type */}
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Frequency Value</label>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Job No.</label>
                 <Input
+                  placeholder="Input Field"
+                  value={jobFormData.fleetJobCode || jobFormData.jobNo || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-job-no"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Job Title</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.jobTitle || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-job-title"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Task Type</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.maintenanceType || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-task-type"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Maintenance Basis, Interval Value, Unit, Interval Running Hour */}
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Maintenance Basis</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.maintenanceBasis || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-maint-basis"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Value</label>
+                <Input
+                  placeholder="Input Field"
                   value={jobFormData.frequencyValue || ""}
                   onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
-                  data-testid="input-edit-freq-value"
+                  className="h-9"
+                  data-testid="input-edit-interval-value"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Frequency Unit</label>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Unit</label>
                 <Input
+                  placeholder="Input Field"
                   value={jobFormData.frequencyUnit || ""}
                   onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
-                  data-testid="input-edit-freq-unit"
+                  className="h-9"
+                  data-testid="input-edit-unit"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Interval Running Hour</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.intervalRunningHour?.toString() || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value, 10) || 0 : undefined }))}
+                  className="h-9"
+                  data-testid="input-edit-interval-rh"
                 />
               </div>
             </div>
+
+            {/* Row 3: Assigned To, Approver, Job Priority, Class Related */}
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Assigned To</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.assignedTo || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-assigned-to"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Approver</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.approver || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, approver: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-approver"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Job Priority</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.jobPriority || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-priority"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Class Related</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.classRelated || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-class-related"
+                />
+              </div>
+            </div>
+
+            {/* Row 4: Department, Criticality, Is Active */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Department</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.department || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, department: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-department"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Criticality</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.criticality || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-edit-criticality"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-blue-600 mb-1 block">Is Active</label>
+                <Input
+                  placeholder="Input Field"
+                  value={jobFormData.isActive === true ? "Yes" : jobFormData.isActive === false ? "No" : ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, isActive: e.target.value.toLowerCase() === "yes" }))}
+                  className="h-9"
+                  data-testid="input-edit-is-active"
+                />
+              </div>
+            </div>
+
+            {/* Row 5: Brief Work Description */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Description</label>
+              <label className="text-xs font-medium text-blue-600 mb-1 block">Brief Work Description</label>
               <Input
+                placeholder="Input Field"
                 value={jobFormData.jobDescription || ""}
                 onChange={(e) => setJobFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
+                className="h-9"
                 data-testid="input-edit-job-desc"
               />
             </div>
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-3">
-            <Button variant="outline" onClick={() => setIsEditJobDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                toast({ title: "Success", description: "Job updated successfully" });
-                setIsEditJobDialogOpen(false);
-              }}
-              data-testid="btn-save-job"
-            >
-              Save
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
