@@ -845,51 +845,28 @@ export default function FleetDataView() {
         <DialogContent className="max-w-md max-h-[80vh]">
           <DialogHeader className="flex flex-row items-center justify-between pb-3">
             <DialogTitle className="text-base font-semibold text-gray-800">
-              Vessel Mapping
+              Vessel Mapping Overview
             </DialogTitle>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="px-3"
-                onClick={() => setIsSearchOpen(!isSearchOpen)}
-                data-testid="btn-search-mapping"
-              >
-                <Search className="h-4 w-4 mr-1" />
-                Search
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRemoveMappings}
                 disabled={selectedMappingIds.size === 0 || removeMappingsMutation.isPending}
                 className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-remove-map"
+                data-testid="btn-remove-mapping"
               >
-                Remove Map
+                Remove Mapping
               </Button>
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                data-testid="btn-map"
+                data-testid="btn-vessel-mapping"
               >
-                Map
+                Vessel Mapping
               </Button>
             </div>
           </DialogHeader>
-
-          {isSearchOpen && (
-            <div className="py-2">
-              <Input
-                type="text"
-                placeholder="Search vessels..."
-                value={mappingSearchQuery}
-                onChange={(e) => setMappingSearchQuery(e.target.value)}
-                className="w-full"
-                data-testid="input-mapping-search"
-              />
-            </div>
-          )}
 
           <ScrollArea className="h-[300px]">
             <table className="w-full text-sm">
