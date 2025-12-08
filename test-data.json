@@ -15171,8 +15171,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "709": {
-      "id": 709,
+    "731": {
+      "id": 731,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15181,10 +15181,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-08T04:07:44.159Z"
+      "updatedAt": "2025-12-08T04:35:48.087Z"
     },
-    "710": {
-      "id": 710,
+    "732": {
+      "id": 732,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15193,24 +15193,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-08T04:07:44.331Z"
+      "updatedAt": "2025-12-08T04:35:48.158Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 709,
+      "recurringId": 731,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 709,
+      "recurringId": 731,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 710,
+      "recurringId": 732,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 710,
+      "recurringId": 732,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -49598,7 +49598,17 @@
       "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1764871936402_OTHERS.xlsx"
     }
   ],
-  "makers": [],
+  "makers": [
+    {
+      "id": 1,
+      "makerCode": "MKR-000001",
+      "makerName": "Test Maker 2",
+      "address": "456 New St",
+      "addressId": "ADDR-002",
+      "createdAt": "2025-12-08T04:36:16.449Z",
+      "updatedAt": "2025-12-08T04:36:16.449Z"
+    }
+  ],
   "masterLists": [],
   "auditLogs": [
     {
@@ -51114,6 +51124,24 @@
       "isActive": true,
       "createdAt": "2025-12-01T16:32:04.684Z",
       "updatedAt": "2025-12-01T16:32:04.684Z"
+    },
+    "9": {
+      "id": 9,
+      "makerName": "Test Maker ABC123",
+      "address": "123 Test Street, City",
+      "addressId": "ADDR-001",
+      "isActive": true,
+      "createdAt": "2025-12-08T04:29:13.534Z",
+      "updatedAt": "2025-12-08T04:29:13.534Z"
+    },
+    "10": {
+      "id": 10,
+      "makerName": "Test Maker",
+      "address": "123 Test St",
+      "addressId": "ADDR-001",
+      "isActive": true,
+      "createdAt": "2025-12-08T04:31:18.439Z",
+      "updatedAt": "2025-12-08T04:31:18.439Z"
     }
   },
   "sfiDetailsList": {},
@@ -57399,12 +57427,12 @@
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 711,
+    "recurringDefectId": 733,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,
     "storesLedgerId": 16,
-    "makersListId": 9,
+    "makersListId": 11,
     "sfiDetailsListId": 1,
     "masterDataId": 1,
     "fleetVesselMappingId": 1,

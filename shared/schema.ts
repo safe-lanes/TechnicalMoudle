@@ -1211,6 +1211,7 @@ export const makers = pgTable("makers", {
   makerCode: text("maker_code").notNull().unique(), // Auto-generated: MKR-000001
   makerName: text("maker_name").notNull(),
   address: text("address"),
+  addressId: text("address_id"), // Address identifier code
   contactPerson: text("contact_person"),
   email: text("email"),
   phone: text("phone"),

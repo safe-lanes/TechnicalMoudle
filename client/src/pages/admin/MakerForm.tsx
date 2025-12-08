@@ -33,6 +33,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
     defaultValues: {
       makerName: maker?.makerName || "",
       address: maker?.address || "",
+      addressId: maker?.addressId || "",
       contactPerson: maker?.contactPerson || "",
       email: maker?.email || "",
       phone: maker?.phone || "",
@@ -102,6 +103,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
       form.reset({
         makerName: maker.makerName || "",
         address: maker.address || "",
+        addressId: maker.addressId || "",
         contactPerson: maker.contactPerson || "",
         email: maker.email || "",
         phone: maker.phone || "",
@@ -145,6 +147,17 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
               placeholder="Enter address"
               rows={3}
               data-testid="input-address"
+            />
+          </div>
+
+          {/* Address ID */}
+          <div className="space-y-2">
+            <Label htmlFor="addressId">Address ID</Label>
+            <Input
+              id="addressId"
+              {...form.register("addressId")}
+              placeholder="Enter address identifier"
+              data-testid="input-address-id"
             />
           </div>
 

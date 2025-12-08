@@ -138,25 +138,23 @@ export default function MakerManagement() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Maker Code</TableHead>
-                      <TableHead>Maker Name</TableHead>
-                      <TableHead>Address</TableHead>
-                      <TableHead>Contact Person</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3]">
+                      <TableHead className="text-white font-medium">S.No</TableHead>
+                      <TableHead className="text-white font-medium">Maker Code</TableHead>
+                      <TableHead className="text-white font-medium">Maker Name</TableHead>
+                      <TableHead className="text-white font-medium">Address</TableHead>
+                      <TableHead className="text-white font-medium">Address ID</TableHead>
+                      <TableHead className="text-white font-medium text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMakers.map((maker) => (
+                    {filteredMakers.map((maker, index) => (
                       <TableRow key={maker.id} data-testid={`row-maker-${maker.id}`}>
+                        <TableCell className="font-medium">{index + 1}</TableCell>
                         <TableCell className="font-mono text-sm">{maker.makerCode}</TableCell>
                         <TableCell className="font-medium">{maker.makerName}</TableCell>
                         <TableCell className="max-w-xs truncate">{maker.address || "-"}</TableCell>
-                        <TableCell>{maker.contactPerson || "-"}</TableCell>
-                        <TableCell>{maker.email || "-"}</TableCell>
-                        <TableCell>{maker.phone || "-"}</TableCell>
+                        <TableCell>{maker.addressId || "-"}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button

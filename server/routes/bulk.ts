@@ -3264,7 +3264,7 @@ async function performImport(
       const newMakerCode = `MKR-${String(maxMakerNum).padStart(6, '0')}`;
       
       try {
-        const newMaker = await storage.createMaker({
+        const newMaker = await storage.createMakerListItem({
           makerCode: newMakerCode,
           makerName: makerInfo.makerName,
           address: makerInfo.address || null
@@ -4969,7 +4969,7 @@ router.get('/makers', async (req, res) => {
 // Get maker by ID
 router.get('/makers/:id', async (req, res) => {
   try {
-    const maker = await storage.getMaker(parseInt(req.params.id));
+    const maker = await storage.getMakerListItem(parseInt(req.params.id));
     if (!maker) {
       return res.status(404).json({ error: 'Maker not found' });
     }
@@ -4990,12 +4990,12 @@ router.post('/makers', async (req, res) => {
     }
     
     // Check if maker code already exists
-    const existing = await storage.getMakerByCode(makerCode);
+    const existing = await storage.getMakerListByCode(makerCode);
     if (existing) {
       return res.status(409).json({ error: `Maker Code '${makerCode}' already exists` });
     }
     
-    const maker = await storage.createMaker({
+    const maker = await storage.createMakerListItem({
       makerCode,
       makerName,
       address: address || null,
@@ -5015,20 +5015,20 @@ router.patch('/makers/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const { makerCode, makerName, address, addressId } = req.body;
     
-    const existing = await storage.getMaker(id);
+    const existing = await storage.getMakerListItem(id);
     if (!existing) {
       return res.status(404).json({ error: 'Maker not found' });
     }
     
     // If changing maker code, check for duplicates
     if (makerCode && makerCode !== existing.makerCode) {
-      const duplicate = await storage.getMakerByCode(makerCode);
+      const duplicate = await storage.getMakerListByCode(makerCode);
       if (duplicate && duplicate.id !== id) {
         return res.status(409).json({ error: `Maker Code '${makerCode}' already exists` });
       }
     }
     
-    const updated = await storage.updateMaker(id, {
+    const updated = await storage.updateMakerListItem(id, {
       makerCode: makerCode || existing.makerCode,
       makerName: makerName || existing.makerName,
       address: address !== undefined ? address : existing.address,
@@ -5047,12 +5047,12 @@ router.delete('/makers/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
-    const existing = await storage.getMaker(id);
+    const existing = await storage.getMakerListItem(id);
     if (!existing) {
       return res.status(404).json({ error: 'Maker not found' });
     }
     
-    await storage.deleteMaker(id);
+    await storage.deleteMakerListItem(id);
     res.json({ message: 'Maker deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting maker:', error);
@@ -5098,15 +5098,15 @@ router.post('/makers/import', upload.single('file'), async (req, res) => {
       }
       
       try {
-        const existing = await storage.getMakerByCode(String(makerCode).trim());
+        const existing = await storage.getMakerListByCode(String(makerCode).trim());
         if (existing) {
-          await storage.updateMaker(existing.id, {
+          await storage.updateMakerListItem(existing.id, {
             makerName: String(makerName).trim(),
             address: address ? String(address).trim() : null
           });
           results.updated++;
         } else {
-          await storage.createMaker({
+          await storage.createMakerListItem({
             makerCode: String(makerCode).trim(),
             makerName: String(makerName).trim(),
             address: address ? String(address).trim() : null

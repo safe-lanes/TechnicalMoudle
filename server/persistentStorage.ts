@@ -7387,15 +7387,15 @@ export class PersistentFileStorage implements IStorage {
     return Object.values(this.data.makersList).filter(m => m.isActive);
   }
   
-  async getMaker(id: number): Promise<MakerList | undefined> {
+  async getMakerListItem(id: number): Promise<MakerList | undefined> {
     return this.data.makersList[id];
   }
   
-  async getMakerByCode(makerCode: string): Promise<MakerList | undefined> {
+  async getMakerListByCode(makerCode: string): Promise<MakerList | undefined> {
     return Object.values(this.data.makersList).find(m => m.makerCode === makerCode);
   }
   
-  async createMaker(maker: InsertMakerList): Promise<MakerList> {
+  async createMakerListItem(maker: InsertMakerList): Promise<MakerList> {
     const id = this.data.counters.makersListId++;
     const now = new Date();
     const newMaker: MakerList = {
@@ -7413,10 +7413,10 @@ export class PersistentFileStorage implements IStorage {
     return newMaker;
   }
   
-  async updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList> {
+  async updateMakerListItem(id: number, data: Partial<MakerList>): Promise<MakerList> {
     const existing = this.data.makersList[id];
     if (!existing) {
-      throw new Error(`Maker with id ${id} not found`);
+      throw new Error(`Maker list item with id ${id} not found`);
     }
     const updated: MakerList = {
       ...existing,
@@ -7428,7 +7428,7 @@ export class PersistentFileStorage implements IStorage {
     return updated;
   }
   
-  async deleteMaker(id: number): Promise<void> {
+  async deleteMakerListItem(id: number): Promise<void> {
     const existing = this.data.makersList[id];
     if (existing) {
       existing.isActive = false;

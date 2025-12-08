@@ -570,11 +570,11 @@ export interface IStorage {
   
   // Maker List - Master data for manufacturers
   getMakerList(): Promise<MakerList[]>;
-  getMaker(id: number): Promise<MakerList | undefined>;
-  getMakerByCode(makerCode: string): Promise<MakerList | undefined>;
-  createMaker(maker: InsertMakerList): Promise<MakerList>;
-  updateMaker(id: number, data: Partial<MakerList>): Promise<MakerList>;
-  deleteMaker(id: number): Promise<void>;
+  getMakerListItem(id: number): Promise<MakerList | undefined>;
+  getMakerListByCode(makerCode: string): Promise<MakerList | undefined>;
+  createMakerListItem(maker: InsertMakerList): Promise<MakerList>;
+  updateMakerListItem(id: number, data: Partial<MakerList>): Promise<MakerList>;
+  deleteMakerListItem(id: number): Promise<void>;
   
   // SFI Details - SFI Code lookup table
   getSfiDetails(): Promise<SfiDetails[]>;
