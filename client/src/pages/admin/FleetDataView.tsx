@@ -395,7 +395,8 @@ export default function FleetDataView() {
       if (mappings.length > 0) {
         return mappings.map(m => ({
           id: m.vesselCode,
-          name: m.vesselName
+          name: m.vesselName,
+          mapping: m
         }));
       }
     }
@@ -404,7 +405,7 @@ export default function FleetDataView() {
     if (selectedComponent.vesselId && vessels) {
       const vessel = vessels.find((v) => v.id === selectedComponent.vesselId);
       if (vessel) {
-        return [{ id: vessel.code || vessel.id, name: vessel.name }];
+        return [{ id: vessel.code || vessel.id, name: vessel.name, mapping: null }];
       }
     }
     
@@ -884,7 +885,20 @@ export default function FleetDataView() {
                       {relatedVessels.map((vessel, index) => (
                         <tr key={index} className="border-b last:border-0">
                           <td className="py-2">{vessel.id}</td>
-                          <td className="py-2">{vessel.name}</td>
+                          <td 
+                            className="py-2 cursor-pointer text-blue-600 hover:underline"
+                            onClick={() => {
+                              if (vessel.mapping) {
+                                setSelectedVesselForDetail(vessel.mapping);
+                                setSelectedDetailMappingIds(new Set());
+                                setDetailSearchQuery("");
+                                setIsDetailDialogOpen(true);
+                              }
+                            }}
+                            data-testid={`main-vessel-name-${vessel.id}`}
+                          >
+                            {vessel.name}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
