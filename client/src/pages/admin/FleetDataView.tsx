@@ -259,6 +259,7 @@ export default function FleetDataView() {
   const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
   const [selectedMappingIds, setSelectedMappingIds] = useState<Set<number>>(new Set());
   const [mappingSearchQuery, setMappingSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
@@ -767,50 +768,60 @@ export default function FleetDataView() {
           if (!open) {
             setSelectedMappingIds(new Set());
             setMappingSearchQuery("");
+            setIsSearchOpen(false);
           }
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-gray-700 border border-gray-300 px-3 py-1 rounded">
-              Vessel Component Mapping Overview
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Vessel Mapping
             </DialogTitle>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="px-3"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                data-testid="btn-search-mapping"
+              >
+                <Search className="h-4 w-4 mr-1" />
+                Search
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRemoveMappings}
                 disabled={selectedMappingIds.size === 0 || removeMappingsMutation.isPending}
                 className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-remove-mapping"
+                data-testid="btn-remove-map"
               >
-                Remove Mapping
+                Remove Map
               </Button>
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                data-testid="btn-component-mapping"
+                data-testid="btn-map"
               >
-                ComponentMapping
+                Map
               </Button>
             </div>
           </DialogHeader>
-          
-          <div className="py-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+
+          {isSearchOpen && (
+            <div className="py-2">
               <Input
                 type="text"
-                placeholder="Search components..."
+                placeholder="Search vessels..."
                 value={mappingSearchQuery}
                 onChange={(e) => setMappingSearchQuery(e.target.value)}
-                className="pl-9"
+                className="w-full"
                 data-testid="input-mapping-search"
               />
             </div>
-          </div>
+          )}
 
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-[300px]">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b text-gray-500 text-xs">
@@ -824,9 +835,8 @@ export default function FleetDataView() {
                       data-testid="checkbox-select-all"
                     />
                   </th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
                   <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
-                  <th className="text-left py-2 px-2 font-normal">Component Code</th>
-                  <th className="text-left py-2 px-2 font-normal">Component Name</th>
                 </tr>
               </thead>
               <tbody>
@@ -842,14 +852,13 @@ export default function FleetDataView() {
                           data-testid={`checkbox-mapping-${mapping.id}`}
                         />
                       </td>
-                      <td className="py-2 px-2">{mapping.vesselName || mapping.vesselCode}</td>
-                      <td className="py-2 px-2">{mapping.componentCode || mapping.fleetEquipmentCode}</td>
-                      <td className="py-2 px-2">{mapping.componentName || selectedComponent?.fleetEquipmentName || "—"}</td>
+                      <td className="py-2 px-2">{mapping.vesselCode || mapping.vesselId}</td>
+                      <td className="py-2 px-2">{mapping.vesselName}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
                       No vessel mappings found for this component
                     </td>
                   </tr>
