@@ -1653,9 +1653,8 @@ export default function FleetDataView() {
               <div>
                 <label className="text-sm font-medium text-gray-700">Frequency Value</label>
                 <Input
-                  type="number"
                   value={jobFormData.frequencyValue || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: parseInt(e.target.value) || undefined }))}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
                   data-testid="input-edit-freq-value"
                 />
               </div>
@@ -1671,8 +1670,8 @@ export default function FleetDataView() {
             <div>
               <label className="text-sm font-medium text-gray-700">Description</label>
               <Input
-                value={jobFormData.description || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, description: e.target.value }))}
+                value={jobFormData.jobDescription || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
                 data-testid="input-edit-job-desc"
               />
             </div>
@@ -1728,9 +1727,8 @@ export default function FleetDataView() {
               <div>
                 <label className="text-sm font-medium text-gray-700">Frequency Value</label>
                 <Input
-                  type="number"
                   value={jobFormData.frequencyValue || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: parseInt(e.target.value) || undefined }))}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
                   data-testid="input-new-freq-value"
                 />
               </div>
@@ -1746,8 +1744,8 @@ export default function FleetDataView() {
             <div>
               <label className="text-sm font-medium text-gray-700">Description</label>
               <Input
-                value={jobFormData.description || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, description: e.target.value }))}
+                value={jobFormData.jobDescription || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
                 data-testid="input-new-job-desc"
               />
             </div>
@@ -1956,8 +1954,8 @@ export default function FleetDataView() {
                 <div className="font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
               </div>
               <div>
-                <div className="text-gray-500 text-xs">Min Stock</div>
-                <div className="font-medium">{selectedSpareForDetail.minStock || "—"}</div>
+                <div className="text-gray-500 text-xs">Min ROB</div>
+                <div className="font-medium">{selectedSpareForDetail.minROB || "—"}</div>
               </div>
             </div>
           )}
