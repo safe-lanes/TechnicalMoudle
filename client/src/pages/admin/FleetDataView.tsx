@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -280,6 +280,8 @@ export default function FleetDataView() {
   const [selectedJobForDetail, setSelectedJobForDetail] = useState<FleetJob | null>(null);
   const [selectedJobVesselIds, setSelectedJobVesselIds] = useState<Set<string>>(new Set());
   const [jobFormData, setJobFormData] = useState<Partial<FleetJob>>({});
+  const [jobSearchQuery, setJobSearchQuery] = useState("");
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   
   // Fleet Spare Information state
   const [isSpareInfoDialogOpen, setIsSpareInfoDialogOpen] = useState(false);
@@ -406,6 +408,17 @@ export default function FleetDataView() {
         spare.componentCode === selectedComponent.fleetEquipmentCode
     );
   }, [selectedComponent, fleetSpares]);
+
+  const filteredRelatedJobs = useMemo(() => {
+    if (!jobSearchQuery.trim()) return relatedJobs;
+    const query = jobSearchQuery.toLowerCase();
+    return relatedJobs.filter((job: FleetJob) => {
+      const jobNo = (job.fleetJobCode || job.jobNo || job.id || "").toString().toLowerCase();
+      const jobTitle = (job.jobTitle || "").toLowerCase();
+      const taskType = (job.maintenanceType || "").toLowerCase();
+      return jobNo.includes(query) || jobTitle.includes(query) || taskType.includes(query);
+    });
+  }, [relatedJobs, jobSearchQuery]);
 
   const relatedVessels = useMemo(() => {
     if (!selectedComponent) return [];
@@ -1425,21 +1438,37 @@ export default function FleetDataView() {
       </Dialog>
 
       {/* Fleet Job Information Dialog */}
-      <Dialog open={isJobInfoDialogOpen} onOpenChange={setIsJobInfoDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
-            <DialogTitle className="text-base font-semibold text-orange-500 border border-orange-500 px-3 py-1 rounded">
+      <Dialog open={isJobInfoDialogOpen} onOpenChange={(open) => {
+        setIsJobInfoDialogOpen(open);
+        if (!open) {
+          setJobSearchQuery("");
+          setSelectedJobIds(new Set());
+        }
+      }}>
+        <DialogContent className="max-w-6xl max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-lg font-semibold text-blue-500">
               Fleet Job Information
             </DialogTitle>
             <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search Job Title/Job No./Task Type"
+                  value={jobSearchQuery}
+                  onChange={(e) => setJobSearchQuery(e.target.value)}
+                  className="pl-9 w-80"
+                  data-testid="input-job-search"
+                />
+              </div>
               <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsJobVesselMappingDialogOpen(true)}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                data-testid="btn-job-vessel-mapping"
+                variant="ghost"
+                size="icon"
+                className="text-gray-600 hover:text-red-600"
+                disabled={selectedJobIds.size === 0}
+                data-testid="btn-delete-jobs"
               >
-                Vessel Mapping
+                <Trash2 className="h-5 w-5" />
               </Button>
               <Button
                 size="sm"
@@ -1450,49 +1479,94 @@ export default function FleetDataView() {
                 }}
                 data-testid="btn-add-new-job"
               >
-                <Plus className="h-4 w-4 mr-1" />
                 Add New Job
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setIsJobVesselMappingDialogOpen(true)}
+                data-testid="btn-job-vessel-mapping"
+              >
+                Vessel Mapping
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-green-600 hover:text-green-700"
+                data-testid="btn-export-jobs-excel"
+              >
+                <FileSpreadsheet className="h-5 w-5" />
               </Button>
             </div>
           </DialogHeader>
           <ScrollArea className="h-[400px]">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b text-gray-500 text-xs">
-                  <th className="text-left py-2 px-2 font-normal">Job No.</th>
-                  <th className="text-left py-2 px-2 font-normal">Job Title</th>
-                  <th className="text-left py-2 px-2 font-normal">Task Type</th>
-                  <th className="text-left py-2 px-2 font-normal">Frequency</th>
+              <thead className="sticky top-0 bg-white border-b">
+                <tr className="text-gray-600 text-xs">
+                  <th className="text-left py-2 px-2 font-medium">Select</th>
+                  <th className="text-left py-2 px-2 font-medium">Job No.</th>
+                  <th className="text-left py-2 px-2 font-medium">Job Title</th>
+                  <th className="text-left py-2 px-2 font-medium">Task Type</th>
+                  <th className="text-left py-2 px-2 font-medium">Frequency</th>
+                  <th className="text-left py-2 px-2 font-medium">Assigned To</th>
+                  <th className="text-left py-2 px-2 font-medium">Approver</th>
+                  <th className="text-left py-2 px-2 font-medium">Job Priority</th>
+                  <th className="text-left py-2 px-2 font-medium">Class Related</th>
+                  <th className="text-left py-2 px-2 font-medium">Department</th>
+                  <th className="text-left py-2 px-2 font-medium">Criticality</th>
                 </tr>
               </thead>
               <tbody>
-                {relatedJobs.length > 0 ? (
-                  relatedJobs.map((job: FleetJob, index: number) => (
-                    <tr 
-                      key={index} 
-                      className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
-                      onDoubleClick={() => {
-                        setSelectedJobForDetail(job);
-                        setIsJobDetailsDialogOpen(true);
-                      }}
-                      data-testid={`job-popup-row-${index}`}
-                    >
-                      <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
-                      <td className="py-2 px-2">{job.jobTitle || "—"}</td>
-                      <td className="py-2 px-2">{job.maintenanceType || "—"}</td>
-                      <td className="py-2 px-2">
-                        {job.frequencyValue && job.frequencyUnit 
-                          ? `${job.frequencyValue} ${job.frequencyUnit}` 
-                          : job.intervalRunningHour 
-                            ? `${job.intervalRunningHour} RH` 
-                            : "—"}
-                      </td>
-                    </tr>
-                  ))
+                {filteredRelatedJobs.length > 0 ? (
+                  filteredRelatedJobs.map((job: FleetJob, index: number) => {
+                    const jobId = job.fleetJobCode || job.jobNo || job.id;
+                    return (
+                      <tr 
+                        key={index} 
+                        className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                        onDoubleClick={() => {
+                          setSelectedJobForDetail(job);
+                          setIsJobDetailsDialogOpen(true);
+                        }}
+                        data-testid={`job-popup-row-${index}`}
+                      >
+                        <td className="py-2 px-2">
+                          <Checkbox
+                            checked={selectedJobIds.has(String(jobId))}
+                            onCheckedChange={(checked) => {
+                              setSelectedJobIds(prev => {
+                                const newSet = new Set(prev);
+                                if (checked) newSet.add(String(jobId));
+                                else newSet.delete(String(jobId));
+                                return newSet;
+                              });
+                            }}
+                            data-testid={`checkbox-job-${index}`}
+                          />
+                        </td>
+                        <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                        <td className="py-2 px-2">{job.jobTitle || "—"}</td>
+                        <td className="py-2 px-2">{job.maintenanceType || "—"}</td>
+                        <td className="py-2 px-2">
+                          {job.frequencyValue && job.frequencyUnit 
+                            ? `${job.frequencyValue} ${job.frequencyUnit}` 
+                            : job.intervalRunningHour 
+                              ? `${job.intervalRunningHour} RH` 
+                              : "—"}
+                        </td>
+                        <td className="py-2 px-2">{job.assignedTo || "—"}</td>
+                        <td className="py-2 px-2">{job.approver || "—"}</td>
+                        <td className="py-2 px-2">{job.jobPriority || "—"}</td>
+                        <td className="py-2 px-2">{job.classRelated ? "Yes" : "No"}</td>
+                        <td className="py-2 px-2">{job.department || "—"}</td>
+                        <td className="py-2 px-2">{job.criticality || "—"}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-gray-500">
-                      No jobs linked to this component
+                    <td colSpan={11} className="py-8 text-center text-gray-500">
+                      {relatedJobs.length === 0 ? "No jobs linked to this component" : "No jobs match your search"}
                     </td>
                   </tr>
                 )}
@@ -1954,8 +2028,8 @@ export default function FleetDataView() {
                 <div className="font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
               </div>
               <div>
-                <div className="text-gray-500 text-xs">Min ROB</div>
-                <div className="font-medium">{selectedSpareForDetail.minROB || "—"}</div>
+                <div className="text-gray-500 text-xs">Location</div>
+                <div className="font-medium">{selectedSpareForDetail.location || "—"}</div>
               </div>
             </div>
           )}
