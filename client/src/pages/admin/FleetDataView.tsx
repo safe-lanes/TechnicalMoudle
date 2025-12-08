@@ -280,6 +280,7 @@ export default function FleetDataView() {
   const [selectedJobForDetail, setSelectedJobForDetail] = useState<FleetJob | null>(null);
   const [selectedJobVesselIds, setSelectedJobVesselIds] = useState<Set<string>>(new Set());
   const [jobFormData, setJobFormData] = useState<Partial<FleetJob>>({});
+  const [newJobFormData, setNewJobFormData] = useState<Partial<FleetJob>>({});
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   
@@ -357,6 +358,34 @@ export default function FleetDataView() {
       toast({
         title: "Error",
         description: "Failed to add component mapping",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createFleetJobMutation = useMutation({
+    mutationFn: async (data: Partial<FleetJob> & { fleetEquipmentCode: string }) => {
+      return apiRequest("POST", "/api/fleet/jobs", {
+        ...data,
+        dataScope: "fleet",
+        componentCode: data.fleetEquipmentCode,
+        componentName: selectedComponent?.fleetEquipmentName || data.fleetEquipmentCode,
+        title: data.jobTitle || "New Fleet Job",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fleet/jobs"] });
+      setIsAddJobDialogOpen(false);
+      setNewJobFormData({});
+      toast({
+        title: "Success",
+        description: "New job has been created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create fleet job",
         variant: "destructive",
       });
     },
@@ -1474,7 +1503,7 @@ export default function FleetDataView() {
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => {
-                  setJobFormData({});
+                  setNewJobFormData({});
                   setIsAddJobDialogOpen(true);
                 }}
                 data-testid="btn-add-new-job"
@@ -1766,76 +1795,225 @@ export default function FleetDataView() {
         </DialogContent>
       </Dialog>
 
-      {/* Add New Job Dialog */}
-      <Dialog open={isAddJobDialogOpen} onOpenChange={setIsAddJobDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Add New Job</DialogTitle>
+      {/* Add New Job Information Dialog */}
+      <Dialog open={isAddJobDialogOpen} onOpenChange={(open) => {
+        setIsAddJobDialogOpen(open);
+        if (!open) setNewJobFormData({});
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Add New Job Information</DialogTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setIsAddJobDialogOpen(false);
+                  setNewJobFormData({});
+                }}
+                data-testid="btn-cancel-new-job"
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={createFleetJobMutation.isPending || !selectedComponent}
+                onClick={() => {
+                  if (!selectedComponent) {
+                    toast({ 
+                      title: "Error", 
+                      description: "No component selected", 
+                      variant: "destructive" 
+                    });
+                    return;
+                  }
+                  createFleetJobMutation.mutate({
+                    ...newJobFormData,
+                    fleetEquipmentCode: selectedComponent.fleetEquipmentCode,
+                  });
+                }}
+                data-testid="btn-save-new-job"
+              >
+                {createFleetJobMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Job Code</label>
-              <Input
-                value={jobFormData.fleetJobCode || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
-                data-testid="input-new-job-code"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Job Title</label>
-              <Input
-                value={jobFormData.jobTitle || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
-                data-testid="input-new-job-title"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Task Type</label>
-              <Input
-                value={jobFormData.maintenanceType || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
-                data-testid="input-new-task-type"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 1: Job No., Job Title, Task Type */}
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Frequency Value</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Job No.</label>
                 <Input
-                  value={jobFormData.frequencyValue || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
-                  data-testid="input-new-freq-value"
+                  placeholder="Input Field"
+                  value={newJobFormData.fleetJobCode || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-job-no"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Frequency Unit</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Job Title</label>
                 <Input
-                  value={jobFormData.frequencyUnit || ""}
-                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
-                  data-testid="input-new-freq-unit"
+                  placeholder="Input Field"
+                  value={newJobFormData.jobTitle || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-job-title"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Task Type</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.maintenanceType || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-task-type"
                 />
               </div>
             </div>
+
+            {/* Row 2: Maintenance Basis, Interval Value, Unit, Interval Running Hour */}
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Maintenance Basis</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.maintenanceBasis || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, maintenanceBasis: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-maint-basis"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Interval Value</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.frequencyValue || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, frequencyValue: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-interval-value"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Unit</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.frequencyUnit || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-unit"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Interval Running Hour</label>
+                <Input
+                  placeholder="Input Field"
+                  type="number"
+                  value={newJobFormData.intervalRunningHour || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, intervalRunningHour: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  className="h-9"
+                  data-testid="input-new-interval-rh"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Assigned To, Approver, Job Priority, Class Related */}
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Assigned To</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.assignedTo || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-assigned-to"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Approver</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.approver || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, approver: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-approver"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Job Priority</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.jobPriority || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, jobPriority: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-priority"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Class Related</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.classRelated || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, classRelated: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-class-related"
+                />
+              </div>
+            </div>
+
+            {/* Row 4: Department, Criticality, Is Active */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Department</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.department || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, department: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-department"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Criticality</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.criticality || ""}
+                  onChange={(e) => setNewJobFormData(prev => ({ ...prev, criticality: e.target.value }))}
+                  className="h-9"
+                  data-testid="input-new-criticality"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Is Active</label>
+                <Input
+                  placeholder="Input Field"
+                  value={newJobFormData.isActive === true ? "Yes" : newJobFormData.isActive === false ? "No" : ""}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase();
+                    setNewJobFormData(prev => ({ 
+                      ...prev, 
+                      isActive: val === 'yes' || val === 'true' ? true : val === 'no' || val === 'false' ? false : undefined 
+                    }));
+                  }}
+                  className="h-9"
+                  data-testid="input-new-is-active"
+                />
+              </div>
+            </div>
+
+            {/* Row 5: Brief Work Description */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Description</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Brief Work Description</label>
               <Input
-                value={jobFormData.jobDescription || ""}
-                onChange={(e) => setJobFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
-                data-testid="input-new-job-desc"
+                placeholder="Input Field"
+                value={newJobFormData.briefWorkDescription || ""}
+                onChange={(e) => setNewJobFormData(prev => ({ ...prev, briefWorkDescription: e.target.value }))}
+                className="h-9"
+                data-testid="input-new-work-desc"
               />
             </div>
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-3">
-            <Button variant="outline" onClick={() => setIsAddJobDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                toast({ title: "Success", description: "New job added successfully" });
-                setIsAddJobDialogOpen(false);
-              }}
-              data-testid="btn-save-new-job"
-            >
-              Save
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
