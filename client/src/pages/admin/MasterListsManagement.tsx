@@ -33,6 +33,7 @@ export default function MasterListsManagement() {
   const [selectedListType, setSelectedListType] = useState<string>("department");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MasterList | null>(null);
+  const [selectedRowItem, setSelectedRowItem] = useState<MasterList | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MasterList | null>(null);
 
@@ -100,6 +101,7 @@ export default function MasterListsManagement() {
       });
       setIsFormOpen(false);
       setSelectedItem(null);
+      setSelectedRowItem(null);
     },
     onError: (error: Error) => {
       toast({
@@ -123,6 +125,7 @@ export default function MasterListsManagement() {
       });
       setDeleteDialogOpen(false);
       setItemToDelete(null);
+      setSelectedRowItem(null);
     },
     onError: (error: Error) => {
       toast({
@@ -186,14 +189,17 @@ export default function MasterListsManagement() {
           <p className="text-gray-600 mt-2">Configure dropdown options and system classifications</p>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>Master List Items</CardTitle>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <CardTitle className="text-lg font-semibold">Master List Items</CardTitle>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
                 {/* List Type Selector */}
-                <Select value={selectedListType} onValueChange={setSelectedListType}>
-                  <SelectTrigger className="w-full sm:w-[250px]" data-testid="select-list-type">
+                <Select value={selectedListType} onValueChange={(value) => {
+                  setSelectedListType(value);
+                  setSelectedRowItem(null);
+                }}>
+                  <SelectTrigger className="w-full sm:w-[200px] bg-white" data-testid="select-list-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -204,10 +210,19 @@ export default function MasterListsManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Edit Button - for selected row */}
+                <Button
+                  onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
+                  disabled={!selectedRowItem}
+                  className="whitespace-nowrap bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+                  data-testid="button-edit-selected"
+                >
+                  Edit
+                </Button>
                 {/* Add New Button */}
                 <Button
                   onClick={handleAddNew}
-                  className="whitespace-nowrap"
+                  className="whitespace-nowrap bg-green-500 hover:bg-green-600 text-white"
                   data-testid="button-add-master-list"
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -248,16 +263,25 @@ export default function MasterListsManagement() {
                   </TableHeader>
                   <TableBody>
                     {masterLists.map((item) => (
-                      <TableRow key={item.id} data-testid={`row-master-list-${item.id}`}>
-                        <TableCell className="font-mono text-sm">{item.listKey}</TableCell>
+                      <TableRow 
+                        key={item.id} 
+                        data-testid={`row-master-list-${item.id}`}
+                        onClick={() => setSelectedRowItem(selectedRowItem?.id === item.id ? null : item)}
+                        className={`cursor-pointer hover:bg-gray-50 ${
+                          selectedRowItem?.id === item.id 
+                            ? 'bg-blue-50 hover:bg-blue-100' 
+                            : ''
+                        }`}
+                      >
+                        <TableCell className="font-mono text-sm text-blue-600">{item.listKey}</TableCell>
                         <TableCell className="font-medium">{item.listValue}</TableCell>
                         <TableCell>{item.displayOrder}</TableCell>
                         <TableCell>
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               item.isActive
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
                             }`}
                           >
                             {item.isActive ? "Active" : "Inactive"}
@@ -268,7 +292,11 @@ export default function MasterListsManagement() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleEdit(item)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(item);
+                              }}
+                              className="text-gray-500 hover:text-gray-700"
                               data-testid={`button-edit-${item.id}`}
                             >
                               <Pencil className="h-4 w-4" />
@@ -276,8 +304,11 @@ export default function MasterListsManagement() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteClick(item)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(item);
+                              }}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
                               data-testid={`button-delete-${item.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
