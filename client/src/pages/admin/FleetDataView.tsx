@@ -1574,7 +1574,17 @@ export default function FleetDataView() {
                           />
                         </td>
                         <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
-                        <td className="py-2 px-2">{job.jobTitle || "—"}</td>
+                        <td 
+                          className="py-2 px-2 text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedJobForDetail(job);
+                            setIsJobDetailsDialogOpen(true);
+                          }}
+                          data-testid={`job-title-link-${index}`}
+                        >
+                          {job.jobTitle || "—"}
+                        </td>
                         <td className="py-2 px-2">{job.maintenanceType || "—"}</td>
                         <td className="py-2 px-2">
                           {job.frequencyValue && job.frequencyUnit 
@@ -1685,44 +1695,125 @@ export default function FleetDataView() {
             </DialogTitle>
             <Button
               size="sm"
-              variant="outline"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => {
                 setJobFormData(selectedJobForDetail || {});
                 setIsEditJobDialogOpen(true);
               }}
               data-testid="btn-edit-job"
             >
-              <Pencil className="h-4 w-4 mr-1" />
               Edit
             </Button>
           </DialogHeader>
           {selectedJobForDetail && (
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div>
-                <div className="text-gray-500 text-xs">Job No.</div>
-                <div className="font-medium">{selectedJobForDetail.fleetJobCode || selectedJobForDetail.jobNo || "—"}</div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-xs">Job Title</div>
-                <div className="font-medium">{selectedJobForDetail.jobTitle || "—"}</div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-xs">Task Type</div>
-                <div className="font-medium">{selectedJobForDetail.maintenanceType || "—"}</div>
-              </div>
-              <div>
-                <div className="text-gray-500 text-xs">Frequency</div>
-                <div className="font-medium">
-                  {selectedJobForDetail.frequencyValue && selectedJobForDetail.frequencyUnit 
-                    ? `${selectedJobForDetail.frequencyValue} ${selectedJobForDetail.frequencyUnit}` 
-                    : selectedJobForDetail.intervalRunningHour 
-                      ? `${selectedJobForDetail.intervalRunningHour} RH` 
-                      : "—"}
+            <div className="py-4 space-y-6">
+              {/* Row 1: Job No., Job Title, Task Type */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Job No.</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.fleetJobCode || selectedJobForDetail.jobNo || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Job Title</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.jobTitle || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Task Type</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.maintenanceType || "—"}</div>
                 </div>
               </div>
-              <div className="col-span-2">
-                <div className="text-gray-500 text-xs">Description</div>
-                <div className="font-medium">{selectedJobForDetail.jobDescription || "—"}</div>
+
+              {/* Row 2: Maintenance Basis, Interval Value, Unit, Interval Running Hour */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Maintenance Basis</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.maintenanceBasis || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Interval Value</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.frequencyValue || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Unit</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.frequencyUnit || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Interval Running Hour</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.intervalRunningHour || "—"}</div>
+                </div>
+              </div>
+
+              {/* Row 3: Assigned To, Approver, Job Priority, Class Related */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Assigned To</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.assignedTo || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Approver</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.approver || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Job Priority</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.jobPriority || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Class Related</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.classRelated ? "Yes" : "No"}</div>
+                </div>
+              </div>
+
+              {/* Row 4: Department, Criticality, Is Active */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Department</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.department || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Criticality</div>
+                  <div className="text-sm font-medium">{selectedJobForDetail.criticality || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Is Active</div>
+                  <div className="text-sm font-medium">
+                    {selectedJobForDetail.isActive === true ? "Yes" : selectedJobForDetail.isActive === false ? "No" : "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 5: Brief Work Description */}
+              <div>
+                <div className="text-blue-600 text-xs font-medium mb-1">Brief Work Description</div>
+                <div className="text-sm font-medium">{selectedJobForDetail.jobDescription || "—"}</div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t pt-4">
+                <h4 className="text-base font-semibold text-gray-800 mb-3">Job Mapped Vessel Detail</h4>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-blue-600 text-xs">
+                      <th className="text-left py-2 font-medium">Vessel Code</th>
+                      <th className="text-left py-2 font-medium">Vessel Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relatedVessels.length > 0 ? (
+                      relatedVessels.map((vessel, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="py-2">{vessel.id}</td>
+                          <td className="py-2">{vessel.name}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t">
+                        <td colSpan={2} className="py-4 text-center text-gray-500">
+                          No vessels mapped to this job
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
