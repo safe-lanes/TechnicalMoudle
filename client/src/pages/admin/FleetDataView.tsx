@@ -510,11 +510,7 @@ export default function FleetDataView() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle 
-                  className="text-base font-semibold text-cyan-600 cursor-pointer hover:underline inline-block border border-cyan-600 px-2 py-1 rounded"
-                  onClick={handleOpenMappingDialog}
-                  data-testid="btn-fleet-component-info-header"
-                >
+                <CardTitle className="text-base font-semibold text-cyan-600">
                   Fleet Component Information
                 </CardTitle>
               </CardHeader>
@@ -713,7 +709,11 @@ export default function FleetDataView() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-purple-600">
+                <CardTitle 
+                  className="text-base font-semibold text-purple-600 cursor-pointer hover:underline inline-block border border-purple-600 px-2 py-1 rounded"
+                  onClick={handleOpenMappingDialog}
+                  data-testid="btn-vessel-mapping-overview-header"
+                >
                   Vessel Mapping Overview
                 </CardTitle>
               </CardHeader>
