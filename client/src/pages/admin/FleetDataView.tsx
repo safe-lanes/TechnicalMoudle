@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -270,6 +270,27 @@ export default function FleetDataView() {
   const [isComponentMappingDialogOpen, setIsComponentMappingDialogOpen] = useState(false);
   const [componentMappingSearchQuery, setComponentMappingSearchQuery] = useState("");
   const [selectedComponentsToMap, setSelectedComponentsToMap] = useState<Set<string>>(new Set());
+  
+  // Fleet Job Information state
+  const [isJobInfoDialogOpen, setIsJobInfoDialogOpen] = useState(false);
+  const [isJobVesselMappingDialogOpen, setIsJobVesselMappingDialogOpen] = useState(false);
+  const [isJobDetailsDialogOpen, setIsJobDetailsDialogOpen] = useState(false);
+  const [isEditJobDialogOpen, setIsEditJobDialogOpen] = useState(false);
+  const [isAddJobDialogOpen, setIsAddJobDialogOpen] = useState(false);
+  const [selectedJobForDetail, setSelectedJobForDetail] = useState<FleetJob | null>(null);
+  const [selectedJobVesselIds, setSelectedJobVesselIds] = useState<Set<string>>(new Set());
+  const [jobFormData, setJobFormData] = useState<Partial<FleetJob>>({});
+  
+  // Fleet Spare Information state
+  const [isSpareInfoDialogOpen, setIsSpareInfoDialogOpen] = useState(false);
+  const [isSpareVesselMappingDialogOpen, setIsSpareVesselMappingDialogOpen] = useState(false);
+  const [isSpareDetailsDialogOpen, setIsSpareDetailsDialogOpen] = useState(false);
+  const [isEditSpareDialogOpen, setIsEditSpareDialogOpen] = useState(false);
+  const [isAddSpareDialogOpen, setIsAddSpareDialogOpen] = useState(false);
+  const [selectedSpareForDetail, setSelectedSpareForDetail] = useState<FleetSpare | null>(null);
+  const [selectedSpareVesselIds, setSelectedSpareVesselIds] = useState<Set<string>>(new Set());
+  const [spareFormData, setSpareFormData] = useState<Partial<FleetSpare>>({});
+  
   const { toast } = useToast();
 
   const { data: masterDataResponse, isLoading: isComponentsLoading } = useQuery<{
@@ -846,7 +867,11 @@ export default function FleetDataView() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-orange-500">
+                <CardTitle 
+                  className="text-base font-semibold text-orange-500 cursor-pointer hover:underline inline-block border border-orange-500 px-2 py-1 rounded"
+                  onClick={() => setIsJobInfoDialogOpen(true)}
+                  data-testid="btn-fleet-job-info-header"
+                >
                   Fleet Job Information
                 </CardTitle>
               </CardHeader>
@@ -869,7 +894,15 @@ export default function FleetDataView() {
                     </thead>
                     <tbody>
                       {relatedJobs.map((job: FleetJob, index: number) => (
-                        <tr key={index} className="border-b last:border-0">
+                        <tr 
+                          key={index} 
+                          className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                          onDoubleClick={() => {
+                            setSelectedJobForDetail(job);
+                            setIsJobDetailsDialogOpen(true);
+                          }}
+                          data-testid={`job-row-${index}`}
+                        >
                           <td className="py-2">{job.fleetJobCode || job.jobNo || job.id}</td>
                           <td className="py-2">
                             {job.jobTitle || "—"}
@@ -898,7 +931,11 @@ export default function FleetDataView() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-green-600">
+                <CardTitle 
+                  className="text-base font-semibold text-green-600 cursor-pointer hover:underline inline-block border border-green-600 px-2 py-1 rounded"
+                  onClick={() => setIsSpareInfoDialogOpen(true)}
+                  data-testid="btn-fleet-spare-info-header"
+                >
                   Fleet Spares Information
                 </CardTitle>
               </CardHeader>
@@ -924,7 +961,15 @@ export default function FleetDataView() {
                     </thead>
                     <tbody>
                       {relatedSpares.map((spare: FleetSpare, index: number) => (
-                        <tr key={index} className="border-b last:border-0">
+                        <tr 
+                          key={index} 
+                          className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                          onDoubleClick={() => {
+                            setSelectedSpareForDetail(spare);
+                            setIsSpareDetailsDialogOpen(true);
+                          }}
+                          data-testid={`spare-row-${index}`}
+                        >
                           <td className="py-2">
                             {spare.fleetPartCode || spare.partCode}
                           </td>
@@ -1376,6 +1421,666 @@ export default function FleetDataView() {
               </tbody>
             </table>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fleet Job Information Dialog */}
+      <Dialog open={isJobInfoDialogOpen} onOpenChange={setIsJobInfoDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-orange-500 border border-orange-500 px-3 py-1 rounded">
+              Fleet Job Information
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsJobVesselMappingDialogOpen(true)}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-job-vessel-mapping"
+              >
+                Vessel Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  setJobFormData({});
+                  setIsAddJobDialogOpen(true);
+                }}
+                data-testid="btn-add-new-job"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add New Job
+              </Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal">Job No.</th>
+                  <th className="text-left py-2 px-2 font-normal">Job Title</th>
+                  <th className="text-left py-2 px-2 font-normal">Task Type</th>
+                  <th className="text-left py-2 px-2 font-normal">Frequency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relatedJobs.length > 0 ? (
+                  relatedJobs.map((job: FleetJob, index: number) => (
+                    <tr 
+                      key={index} 
+                      className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                      onDoubleClick={() => {
+                        setSelectedJobForDetail(job);
+                        setIsJobDetailsDialogOpen(true);
+                      }}
+                      data-testid={`job-popup-row-${index}`}
+                    >
+                      <td className="py-2 px-2">{job.fleetJobCode || job.jobNo || job.id}</td>
+                      <td className="py-2 px-2">{job.jobTitle || "—"}</td>
+                      <td className="py-2 px-2">{job.maintenanceType || "—"}</td>
+                      <td className="py-2 px-2">
+                        {job.frequencyValue && job.frequencyUnit 
+                          ? `${job.frequencyValue} ${job.frequencyUnit}` 
+                          : job.intervalRunningHour 
+                            ? `${job.intervalRunningHour} RH` 
+                            : "—"}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-500">
+                      No jobs linked to this component
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Vessel Mapping Dialog */}
+      <Dialog open={isJobVesselMappingDialogOpen} onOpenChange={setIsJobVesselMappingDialogOpen}>
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Vessel Mapping
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedJobVesselIds.size === 0}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-job-remove-vessel"
+              >
+                Remove Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={selectedJobVesselIds.size === 0}
+                data-testid="btn-job-map-vessel"
+              >
+                Map
+              </Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="h-[300px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">Select</th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relatedVessels.length > 0 ? (
+                  relatedVessels.map((vessel, index) => (
+                    <tr key={index} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedJobVesselIds.has(vessel.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedJobVesselIds(prev => {
+                              const newSet = new Set(prev);
+                              if (checked) newSet.add(vessel.id);
+                              else newSet.delete(vessel.id);
+                              return newSet;
+                            });
+                          }}
+                          data-testid={`checkbox-job-vessel-${vessel.id}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{vessel.id}</td>
+                      <td className="py-2 px-2">{vessel.name}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                      No vessels linked to this equipment
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Details Dialog */}
+      <Dialog open={isJobDetailsDialogOpen} onOpenChange={setIsJobDetailsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Job Details
+            </DialogTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setJobFormData(selectedJobForDetail || {});
+                setIsEditJobDialogOpen(true);
+              }}
+              data-testid="btn-edit-job"
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          </DialogHeader>
+          {selectedJobForDetail && (
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div>
+                <div className="text-gray-500 text-xs">Job No.</div>
+                <div className="font-medium">{selectedJobForDetail.fleetJobCode || selectedJobForDetail.jobNo || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Job Title</div>
+                <div className="font-medium">{selectedJobForDetail.jobTitle || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Task Type</div>
+                <div className="font-medium">{selectedJobForDetail.maintenanceType || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Frequency</div>
+                <div className="font-medium">
+                  {selectedJobForDetail.frequencyValue && selectedJobForDetail.frequencyUnit 
+                    ? `${selectedJobForDetail.frequencyValue} ${selectedJobForDetail.frequencyUnit}` 
+                    : selectedJobForDetail.intervalRunningHour 
+                      ? `${selectedJobForDetail.intervalRunningHour} RH` 
+                      : "—"}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-gray-500 text-xs">Description</div>
+                <div className="font-medium">{selectedJobForDetail.jobDescription || "—"}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Job Dialog */}
+      <Dialog open={isEditJobDialogOpen} onOpenChange={setIsEditJobDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Edit Job</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Job Title</label>
+              <Input
+                value={jobFormData.jobTitle || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                data-testid="input-edit-job-title"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Task Type</label>
+              <Input
+                value={jobFormData.maintenanceType || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                data-testid="input-edit-task-type"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Frequency Value</label>
+                <Input
+                  type="number"
+                  value={jobFormData.frequencyValue || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: parseInt(e.target.value) || undefined }))}
+                  data-testid="input-edit-freq-value"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Frequency Unit</label>
+                <Input
+                  value={jobFormData.frequencyUnit || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
+                  data-testid="input-edit-freq-unit"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <Input
+                value={jobFormData.description || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, description: e.target.value }))}
+                data-testid="input-edit-job-desc"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-3">
+            <Button variant="outline" onClick={() => setIsEditJobDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                toast({ title: "Success", description: "Job updated successfully" });
+                setIsEditJobDialogOpen(false);
+              }}
+              data-testid="btn-save-job"
+            >
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Job Dialog */}
+      <Dialog open={isAddJobDialogOpen} onOpenChange={setIsAddJobDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Add New Job</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Job Code</label>
+              <Input
+                value={jobFormData.fleetJobCode || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, fleetJobCode: e.target.value }))}
+                data-testid="input-new-job-code"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Job Title</label>
+              <Input
+                value={jobFormData.jobTitle || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                data-testid="input-new-job-title"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Task Type</label>
+              <Input
+                value={jobFormData.maintenanceType || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, maintenanceType: e.target.value }))}
+                data-testid="input-new-task-type"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Frequency Value</label>
+                <Input
+                  type="number"
+                  value={jobFormData.frequencyValue || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyValue: parseInt(e.target.value) || undefined }))}
+                  data-testid="input-new-freq-value"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Frequency Unit</label>
+                <Input
+                  value={jobFormData.frequencyUnit || ""}
+                  onChange={(e) => setJobFormData(prev => ({ ...prev, frequencyUnit: e.target.value }))}
+                  data-testid="input-new-freq-unit"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <Input
+                value={jobFormData.description || ""}
+                onChange={(e) => setJobFormData(prev => ({ ...prev, description: e.target.value }))}
+                data-testid="input-new-job-desc"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-3">
+            <Button variant="outline" onClick={() => setIsAddJobDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                toast({ title: "Success", description: "New job added successfully" });
+                setIsAddJobDialogOpen(false);
+              }}
+              data-testid="btn-save-new-job"
+            >
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fleet Spare Information Dialog */}
+      <Dialog open={isSpareInfoDialogOpen} onOpenChange={setIsSpareInfoDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-green-600 border border-green-600 px-3 py-1 rounded">
+              Fleet Spares Information
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSpareVesselMappingDialogOpen(true)}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-spare-vessel-mapping"
+              >
+                Vessel Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  setSpareFormData({});
+                  setIsAddSpareDialogOpen(true);
+                }}
+                data-testid="btn-add-new-spare"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add New Spare
+              </Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="h-[400px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal">Part Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Part Name</th>
+                  <th className="text-left py-2 px-2 font-normal">Part Number</th>
+                  <th className="text-left py-2 px-2 font-normal">Maker</th>
+                  <th className="text-left py-2 px-2 font-normal">Unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relatedSpares.length > 0 ? (
+                  relatedSpares.map((spare: FleetSpare, index: number) => (
+                    <tr 
+                      key={index} 
+                      className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                      onDoubleClick={() => {
+                        setSelectedSpareForDetail(spare);
+                        setIsSpareDetailsDialogOpen(true);
+                      }}
+                      data-testid={`spare-popup-row-${index}`}
+                    >
+                      <td className="py-2 px-2">{spare.fleetPartCode || spare.partCode}</td>
+                      <td className="py-2 px-2">{spare.partName || "—"}</td>
+                      <td className="py-2 px-2">{spare.partNumber || "—"}</td>
+                      <td className="py-2 px-2">{spare.maker || "—"}</td>
+                      <td className="py-2 px-2">{spare.uom || spare.unit || "—"}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                      No spares linked to this component
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Spare Vessel Mapping Dialog */}
+      <Dialog open={isSpareVesselMappingDialogOpen} onOpenChange={setIsSpareVesselMappingDialogOpen}>
+        <DialogContent className="max-w-md max-h-[80vh]">
+          <DialogHeader className="flex flex-row items-center justify-between pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Vessel Mapping
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedSpareVesselIds.size === 0}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                data-testid="btn-spare-remove-vessel"
+              >
+                Remove Mapping
+              </Button>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={selectedSpareVesselIds.size === 0}
+                data-testid="btn-spare-map-vessel"
+              >
+                Map
+              </Button>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="h-[300px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-gray-500 text-xs">
+                  <th className="text-left py-2 px-2 font-normal w-12">Select</th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Code</th>
+                  <th className="text-left py-2 px-2 font-normal">Vessel Name</th>
+                </tr>
+              </thead>
+              <tbody>
+                {relatedVessels.length > 0 ? (
+                  relatedVessels.map((vessel, index) => (
+                    <tr key={index} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2 px-2">
+                        <Checkbox
+                          checked={selectedSpareVesselIds.has(vessel.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedSpareVesselIds(prev => {
+                              const newSet = new Set(prev);
+                              if (checked) newSet.add(vessel.id);
+                              else newSet.delete(vessel.id);
+                              return newSet;
+                            });
+                          }}
+                          data-testid={`checkbox-spare-vessel-${vessel.id}`}
+                        />
+                      </td>
+                      <td className="py-2 px-2">{vessel.id}</td>
+                      <td className="py-2 px-2">{vessel.name}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                      No vessels linked to this equipment
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Spare Details Dialog */}
+      <Dialog open={isSpareDetailsDialogOpen} onOpenChange={setIsSpareDetailsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold text-gray-800">
+              Spare Details
+            </DialogTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSpareFormData(selectedSpareForDetail || {});
+                setIsEditSpareDialogOpen(true);
+              }}
+              data-testid="btn-edit-spare"
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          </DialogHeader>
+          {selectedSpareForDetail && (
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div>
+                <div className="text-gray-500 text-xs">Part Code</div>
+                <div className="font-medium">{selectedSpareForDetail.fleetPartCode || selectedSpareForDetail.partCode || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Part Name</div>
+                <div className="font-medium">{selectedSpareForDetail.partName || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Part Number</div>
+                <div className="font-medium">{selectedSpareForDetail.partNumber || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Maker</div>
+                <div className="font-medium">{selectedSpareForDetail.maker || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Unit of Measurement</div>
+                <div className="font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 text-xs">Min Stock</div>
+                <div className="font-medium">{selectedSpareForDetail.minStock || "—"}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Spare Dialog */}
+      <Dialog open={isEditSpareDialogOpen} onOpenChange={setIsEditSpareDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Edit Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Part Name</label>
+              <Input
+                value={spareFormData.partName || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
+                data-testid="input-edit-part-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Part Number</label>
+              <Input
+                value={spareFormData.partNumber || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                data-testid="input-edit-part-number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Maker</label>
+              <Input
+                value={spareFormData.maker || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
+                data-testid="input-edit-maker"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Unit of Measurement</label>
+              <Input
+                value={spareFormData.uom || spareFormData.unit || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                data-testid="input-edit-uom"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-3">
+            <Button variant="outline" onClick={() => setIsEditSpareDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                toast({ title: "Success", description: "Spare updated successfully" });
+                setIsEditSpareDialogOpen(false);
+              }}
+              data-testid="btn-save-spare"
+            >
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Spare Dialog */}
+      <Dialog open={isAddSpareDialogOpen} onOpenChange={setIsAddSpareDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Add New Spare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Part Code</label>
+              <Input
+                value={spareFormData.fleetPartCode || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
+                data-testid="input-new-part-code"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Part Name</label>
+              <Input
+                value={spareFormData.partName || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
+                data-testid="input-new-part-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Part Number</label>
+              <Input
+                value={spareFormData.partNumber || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                data-testid="input-new-part-number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Maker</label>
+              <Input
+                value={spareFormData.maker || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
+                data-testid="input-new-maker"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Unit of Measurement</label>
+              <Input
+                value={spareFormData.uom || ""}
+                onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                data-testid="input-new-uom"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-3">
+            <Button variant="outline" onClick={() => setIsAddSpareDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                toast({ title: "Success", description: "New spare added successfully" });
+                setIsAddSpareDialogOpen(false);
+              }}
+              data-testid="btn-save-new-spare"
+            >
+              Save
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
