@@ -4855,7 +4855,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/fleet/makers", async (req, res) => {
     try {
       const validatedData = insertMakerSchema.parse(req.body);
-      const maker = await storage.createMaker(validatedData);
+      
+      // Auto-generate makerCode if not provided or empty
+      let makerCode = validatedData.makerCode;
+      if (!makerCode || makerCode.trim() === '') {
+        const existingMakers = await storage.getMakers();
+        let maxNum = 0;
+        for (const m of existingMakers) {
+          const match = m.makerCode?.match(/MKR-(\d+)/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+        makerCode = `MKR-${String(maxNum + 1).padStart(6, '0')}`;
+      }
+      
+      const maker = await storage.createMaker({ ...validatedData, makerCode });
       res.status(201).json(maker);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -4871,6 +4887,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const partialMakerSchema = insertMakerSchema.partial();
       const validatedData = partialMakerSchema.parse(req.body);
+      
+      // Prevent clearing makerCode - remove it from update if empty
+      if (validatedData.makerCode !== undefined && validatedData.makerCode.trim() === '') {
+        delete validatedData.makerCode;
+      }
+      
       const maker = await storage.updateMaker(parseInt(req.params.id), validatedData);
       res.json(maker);
     } catch (error: any) {

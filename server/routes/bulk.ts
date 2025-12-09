@@ -4983,10 +4983,25 @@ router.get('/makers/:id', async (req, res) => {
 // Create maker
 router.post('/makers', async (req, res) => {
   try {
-    const { makerCode, makerName, address, addressId } = req.body;
+    let { makerCode, makerName, address, addressId } = req.body;
     
-    if (!makerCode || !makerName) {
-      return res.status(400).json({ error: 'Maker Code and Maker Name are required' });
+    if (!makerName) {
+      return res.status(400).json({ error: 'Maker Name is required' });
+    }
+    
+    // Auto-generate makerCode if not provided or empty
+    if (!makerCode || makerCode.trim() === '') {
+      // Get all existing makers to determine the next code
+      const existingMakers = await storage.getMakerList();
+      let maxNum = 0;
+      for (const m of existingMakers) {
+        const match = m.makerCode?.match(/MKR-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+      makerCode = `MKR-${String(maxNum + 1).padStart(6, '0')}`;
     }
     
     // Check if maker code already exists

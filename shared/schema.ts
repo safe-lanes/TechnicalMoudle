@@ -1224,9 +1224,10 @@ export const makers = pgTable("makers", {
 
 export const insertMakerSchema = createInsertSchema(makers).omit({
   id: true,
-  makerCode: true, // Auto-generated
   createdAt: true,
   updatedAt: true,
+}).extend({
+  makerCode: z.string().optional(), // Optional - auto-generated if not provided
 });
 
 export type InsertMaker = z.infer<typeof insertMakerSchema>;

@@ -32,6 +32,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
     resolver: zodResolver(makerFormSchema),
     defaultValues: {
       makerName: maker?.makerName || "",
+      makerCode: maker?.makerCode || "",
       address: maker?.address || "",
       addressId: maker?.addressId || "",
       contactPerson: maker?.contactPerson || "",
@@ -102,6 +103,7 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
     } else if (maker) {
       form.reset({
         makerName: maker.makerName || "",
+        makerCode: maker.makerCode || "",
         address: maker.address || "",
         addressId: maker.addressId || "",
         contactPerson: maker.contactPerson || "",
@@ -136,6 +138,17 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
             {form.formState.errors.makerName && (
               <p className="text-sm text-red-500">{form.formState.errors.makerName.message}</p>
             )}
+          </div>
+
+          {/* Maker Code */}
+          <div className="space-y-2">
+            <Label htmlFor="makerCode">Maker Code</Label>
+            <Input
+              id="makerCode"
+              {...form.register("makerCode")}
+              placeholder="Enter maker code (auto-generated if empty)"
+              data-testid="input-maker-code"
+            />
           </div>
 
           {/* Address */}
