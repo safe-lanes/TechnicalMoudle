@@ -1,0 +1,51 @@
+Provide a complete Local Development Setup Guide for setting up the entire codebase in VS Code.
+Include all required steps such as:
+1. Environment Setup
+Required tools (Node.js version, npm/yarn, PostgreSQL/MySQL, Redis if applicable).
+Global packages needed.
+VS Code extensions required.
+How to clone the repository.
+How to install dependencies.
+How to configure .env file with sample values.
+How to run the development server (frontend + backend).
+How to run database migrations, seeders, and utility scripts.
+How to run linting, formatting, and build steps.
+2. Project Structure Overview
+Provide a clear breakdown of the entire current codebase structure, including folders such as:
+/frontend (Angular / Next.js if applicable)
+/backend (Node.js / NestJS)
+/database (migrations, seeds)
+/config
+/services
+/modules
+/interfaces
+/middlewares
+/utils
+/scripts
+Explain the purpose of each directory in detail.
+3. Full Architectural Flow of the Module Developed Till Now
+Explain the complete architecture and flow of the module(s) already developed, including:
+Application Architecture
+High-level architecture (Frontend → Backend → Database).
+Which technologies and frameworks are used.
+How API communication is happening.
+Authentication/authorization flow (if implemented).
+Module-Level Flow
+For every module built so far:
+Purpose of the module.
+Component → Service → API request flow (frontend).
+Controller → Service → Repository → Database flow (backend).
+Data flow lifecycle (request → process → validate → persist → respond).
+State management used (if any).
+Error handling architecture.
+Caching, sockets, schedulers (if present).
+4. Developer Productivity Guide
+Recommended VS Code settings.
+Debugging guide for both frontend & backend.
+Folder naming conventions.
+Code style rules (Prettier, ESLint, Husky, lint-staged).
+Common development commands.
+5. Output Requirements
+Format the entire output as a clean technical documentation.
+Use headings, code blocks, bullet points, tables where needed.
+Ensure the generated guide is ready to paste into a README.md.
