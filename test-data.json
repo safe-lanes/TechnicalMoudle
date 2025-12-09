@@ -50269,8 +50269,8 @@
       "itemType": "stores",
       "storesCategory": null,
       "uom": "pcs",
-      "rob": 20,
-      "robLocationA": 12,
+      "rob": 18,
+      "robLocationA": 10,
       "robLocationB": 8,
       "min": "16",
       "locationA": "Bridge",
@@ -50281,7 +50281,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-03T11:39:38.195Z",
-      "updatedAt": "2025-12-05T09:47:25.902Z"
+      "updatedAt": "2025-12-09T06:40:32.621Z"
     },
     "12": {
       "id": 12,
@@ -50290,9 +50290,9 @@
       "itemType": "stores",
       "storesCategory": null,
       "uom": "ltr",
-      "rob": "200",
-      "robLocationA": "120",
-      "robLocationB": "80",
+      "rob": 200,
+      "robLocationA": 120,
+      "robLocationB": 80,
       "min": "100",
       "locationA": "Paint Locker",
       "locationB": "Main Deck Locker",
@@ -50302,7 +50302,7 @@
       "deleted": false,
       "isActive": true,
       "createdAt": "2025-12-03T11:39:38.245Z",
-      "updatedAt": "2025-12-03T11:39:38.245Z"
+      "updatedAt": "2025-12-09T06:52:09.963Z"
     },
     "13": {
       "id": 13,
@@ -57856,7 +57856,7 @@
     "makersListId": 11,
     "sfiDetailsListId": 1,
     "masterDataId": 6,
-    "fleetVesselMappingId": 3,
+    "fleetVesselMappingId": 5,
     "fleetComponentMappingId": 1,
     "fleetJobVesselMappingId": 1,
     "fleetSpareVesselMappingId": 1,
