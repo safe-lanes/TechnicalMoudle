@@ -671,32 +671,6 @@ export default function Admin4Dashboard() {
             <Button
               variant="outline"
               className="justify-start h-auto py-4 px-6"
-              onClick={() => setCurrentView('master-data')}
-              data-testid="link-manage-master-data"
-            >
-              <FileCode2 className="mr-3 h-5 w-5 text-indigo-600" />
-              <div className="text-left">
-                <div className="font-medium">Fleet Equipment Codes</div>
-                <div className="text-sm text-gray-500">Equipment code mappings</div>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="justify-start h-auto py-4 px-6"
-              onClick={() => setCurrentView('equipment-tree')}
-              data-testid="link-equipment-tree"
-            >
-              <FolderTree className="mr-3 h-5 w-5 text-emerald-600" />
-              <div className="text-left">
-                <div className="font-medium">Equipment Tree View</div>
-                <div className="text-sm text-gray-500">Hierarchical equipment data</div>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="justify-start h-auto py-4 px-6"
               onClick={() => setCurrentView('components')}
               data-testid="link-manage-components"
             >
