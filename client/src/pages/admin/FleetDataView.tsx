@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Component, Job, Spare, MasterData } from "@shared/schema";
@@ -1005,15 +1006,20 @@ export default function FleetDataView() {
                       {relatedSpares.map((spare: FleetSpare, index: number) => (
                         <tr 
                           key={index} 
-                          className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
-                          onDoubleClick={() => {
-                            setSelectedSpareForDetail(spare);
-                            setIsSpareDetailsDialogOpen(true);
-                          }}
+                          className="border-b last:border-0 hover:bg-gray-50"
                           data-testid={`spare-row-${index}`}
                         >
                           <td className="py-2">
-                            {spare.fleetPartCode || spare.partCode}
+                            <button
+                              className="text-blue-600 hover:text-blue-800 underline text-left"
+                              onClick={() => {
+                                setSelectedSpareForDetail(spare);
+                                setIsSpareDetailsDialogOpen(true);
+                              }}
+                              data-testid={`btn-spare-detail-${index}`}
+                            >
+                              {spare.fleetPartCode || spare.partCode}
+                            </button>
                           </td>
                           <td className="py-2">
                             {spare.partName || "—"}
@@ -2289,14 +2295,21 @@ export default function FleetDataView() {
                   relatedSpares.map((spare: FleetSpare, index: number) => (
                     <tr 
                       key={index} 
-                      className="border-b last:border-0 cursor-pointer hover:bg-gray-50"
-                      onDoubleClick={() => {
-                        setSelectedSpareForDetail(spare);
-                        setIsSpareDetailsDialogOpen(true);
-                      }}
+                      className="border-b last:border-0 hover:bg-gray-50"
                       data-testid={`spare-popup-row-${index}`}
                     >
-                      <td className="py-2 px-2">{spare.fleetPartCode || spare.partCode}</td>
+                      <td className="py-2 px-2">
+                        <button
+                          className="text-blue-600 hover:text-blue-800 underline text-left"
+                          onClick={() => {
+                            setSelectedSpareForDetail(spare);
+                            setIsSpareDetailsDialogOpen(true);
+                          }}
+                          data-testid={`btn-spare-popup-detail-${index}`}
+                        >
+                          {spare.fleetPartCode || spare.partCode}
+                        </button>
+                      </td>
                       <td className="py-2 px-2">{spare.partName || "—"}</td>
                       <td className="py-2 px-2">{spare.partNumber || "—"}</td>
                       <td className="py-2 px-2">{spare.maker || "—"}</td>
@@ -2396,7 +2409,7 @@ export default function FleetDataView() {
             </DialogTitle>
             <Button
               size="sm"
-              variant="outline"
+              className="bg-blue-500 hover:bg-blue-600 text-white"
               onClick={() => {
                 setSpareFormData(selectedSpareForDetail || {});
                 setIsEditSpareDialogOpen(true);
@@ -2408,30 +2421,108 @@ export default function FleetDataView() {
             </Button>
           </DialogHeader>
           {selectedSpareForDetail && (
-            <div className="grid grid-cols-2 gap-4 py-4">
-              <div>
-                <div className="text-gray-500 text-xs">Part Code</div>
-                <div className="font-medium">{selectedSpareForDetail.fleetPartCode || selectedSpareForDetail.partCode || "—"}</div>
+            <div className="py-4 space-y-6">
+              {/* Row 1: Part Code, Part Name, Part Number, Drawing Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Part Code</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.fleetPartCode || selectedSpareForDetail.partCode || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Part Name</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.partName || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Part Number</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.partNumber || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Drawing Number</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.drawingNumber || "—"}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-gray-500 text-xs">Part Name</div>
-                <div className="font-medium">{selectedSpareForDetail.partName || "—"}</div>
+
+              {/* Row 2: Maker, Maker Code, Is Active, Position Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Maker</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.maker || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Maker Code</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.makerCode || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Is Active</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.isActive ? "Yes" : "No"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Position Number</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.positionNumber || "—"}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-gray-500 text-xs">Part Number</div>
-                <div className="font-medium">{selectedSpareForDetail.partNumber || "—"}</div>
+
+              {/* Row 3: Criticality, Unit Of Measurement, Specification */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Criticality</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.criticality || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Unit Of Measurement</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-blue-600 text-xs font-medium mb-1">Specification</div>
+                  <div className="text-sm font-medium">{selectedSpareForDetail.specification || "—"}</div>
+                </div>
               </div>
+
+              {/* Row 4: Note */}
               <div>
-                <div className="text-gray-500 text-xs">Maker</div>
-                <div className="font-medium">{selectedSpareForDetail.maker || "—"}</div>
+                <div className="text-blue-600 text-xs font-medium mb-1">Note</div>
+                <div className="text-sm font-medium">{selectedSpareForDetail.note || "—"}</div>
               </div>
-              <div>
-                <div className="text-gray-500 text-xs">Unit of Measurement</div>
-                <div className="font-medium">{selectedSpareForDetail.uom || selectedSpareForDetail.unit || "—"}</div>
+
+              {/* Anchor Icon Divider */}
+              <div className="flex items-center justify-center py-2 gap-4">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <Anchor className="h-5 w-5 text-blue-500" />
+                <div className="flex-1 h-px bg-gray-200"></div>
               </div>
+
+              {/* Spare Mapped Vessel Details */}
               <div>
-                <div className="text-gray-500 text-xs">Location</div>
-                <div className="font-medium">{selectedSpareForDetail.location || "—"}</div>
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">Spare Mapped Vessel Details</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-2 text-blue-600 font-medium">Vessel Code</th>
+                      <th className="py-2 text-blue-600 font-medium">Vessel Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const mappedVessels = (vessels || []).filter(v => 
+                        v.id === selectedSpareForDetail.vesselId
+                      );
+                      return mappedVessels.length > 0 ? (
+                        mappedVessels.map((vessel, idx) => (
+                          <tr key={idx} className="border-b last:border-0">
+                            <td className="py-2">{vessel.id}</td>
+                            <td className="py-2">{vessel.name}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={2} className="py-4 text-center text-gray-500">
+                            No vessels mapped to this spare
+                          </td>
+                        </tr>
+                      );
+                    })()}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -2440,57 +2531,153 @@ export default function FleetDataView() {
 
       {/* Edit Spare Dialog */}
       <Dialog open={isEditSpareDialogOpen} onOpenChange={setIsEditSpareDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Edit Spare</DialogTitle>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Edit Spare Details</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditSpareDialogOpen(false)} data-testid="btn-cancel-edit-spare">
+                Cancel
+              </Button>
+              <Button 
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  toast({ title: "Success", description: "Spare updated successfully" });
+                  setIsEditSpareDialogOpen(false);
+                }}
+                data-testid="btn-save-spare"
+              >
+                Save
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Part Name</label>
-              <Input
-                value={spareFormData.partName || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
-                data-testid="input-edit-part-name"
-              />
+          <ScrollArea className="max-h-[60vh]">
+            <div className="py-4 space-y-4">
+              {/* Row 1: Part Code, Part Name, Part Number, Drawing Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Code</label>
+                  <Input
+                    value={spareFormData.fleetPartCode || spareFormData.partCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
+                    data-testid="input-edit-part-code"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Name</label>
+                  <Input
+                    value={spareFormData.partName || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
+                    data-testid="input-edit-part-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Number</label>
+                  <Input
+                    value={spareFormData.partNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                    data-testid="input-edit-part-number"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Drawing Number</label>
+                  <Input
+                    value={spareFormData.drawingNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
+                    data-testid="input-edit-drawing-number"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Maker, Maker Code, Is Active, Position Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker</label>
+                  <Input
+                    value={spareFormData.maker || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
+                    data-testid="input-edit-maker"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
+                  <Input
+                    value={spareFormData.makerCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+                    data-testid="input-edit-maker-code"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Is Active</label>
+                  <Select
+                    value={spareFormData.isActive ? "Yes" : "No"}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, isActive: value === "Yes" }))}
+                  >
+                    <SelectTrigger data-testid="select-edit-spare-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Position Number</label>
+                  <Input
+                    value={spareFormData.positionNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
+                    data-testid="input-edit-position-number"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Criticality, Unit Of Measurement, Specification */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Criticality</label>
+                  <Select
+                    value={spareFormData.criticality || ""}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, criticality: value }))}
+                  >
+                    <SelectTrigger data-testid="select-edit-spare-criticality">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                      <SelectItem value="Non-Critical">Non-Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Unit Of Measurement</label>
+                  <Input
+                    value={spareFormData.uom || spareFormData.unit || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                    data-testid="input-edit-uom"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Specification</label>
+                  <Input
+                    value={spareFormData.specification || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, specification: e.target.value }))}
+                    data-testid="input-edit-specification"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Note */}
+              <div>
+                <label className="text-blue-600 text-xs font-medium mb-1 block">Note</label>
+                <Input
+                  value={spareFormData.note || ""}
+                  onChange={(e) => setSpareFormData(prev => ({ ...prev, note: e.target.value }))}
+                  data-testid="input-edit-note"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Part Number</label>
-              <Input
-                value={spareFormData.partNumber || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
-                data-testid="input-edit-part-number"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Maker</label>
-              <Input
-                value={spareFormData.maker || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
-                data-testid="input-edit-maker"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Unit of Measurement</label>
-              <Input
-                value={spareFormData.uom || spareFormData.unit || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
-                data-testid="input-edit-uom"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-3">
-            <Button variant="outline" onClick={() => setIsEditSpareDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                toast({ title: "Success", description: "Spare updated successfully" });
-                setIsEditSpareDialogOpen(false);
-              }}
-              data-testid="btn-save-spare"
-            >
-              Save
-            </Button>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
