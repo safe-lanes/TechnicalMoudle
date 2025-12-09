@@ -2683,65 +2683,153 @@ export default function FleetDataView() {
 
       {/* Add New Spare Dialog */}
       <Dialog open={isAddSpareDialogOpen} onOpenChange={setIsAddSpareDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-base font-semibold">Add New Spare</DialogTitle>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="flex flex-row items-center justify-between border-b pb-3">
+            <DialogTitle className="text-base font-semibold">Add New Spare Information</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsAddSpareDialogOpen(false)} data-testid="btn-cancel-add-spare">
+                Cancel
+              </Button>
+              <Button 
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  toast({ title: "Success", description: "New spare added successfully" });
+                  setIsAddSpareDialogOpen(false);
+                }}
+                data-testid="btn-save-new-spare"
+              >
+                Save
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Part Code</label>
-              <Input
-                value={spareFormData.fleetPartCode || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
-                data-testid="input-new-part-code"
-              />
+          <ScrollArea className="max-h-[60vh]">
+            <div className="py-4 space-y-4">
+              {/* Row 1: Part Code, Part Name, Part Number, Drawing Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Code</label>
+                  <Input
+                    value={spareFormData.fleetPartCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, fleetPartCode: e.target.value }))}
+                    data-testid="input-new-part-code"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Name</label>
+                  <Input
+                    value={spareFormData.partName || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
+                    data-testid="input-new-part-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Part Number</label>
+                  <Input
+                    value={spareFormData.partNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                    data-testid="input-new-part-number"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Drawing Number</label>
+                  <Input
+                    value={spareFormData.drawingNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, drawingNumber: e.target.value }))}
+                    data-testid="input-new-drawing-number"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Maker, Maker Code, Is Active, Position Number */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker</label>
+                  <Input
+                    value={spareFormData.maker || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
+                    data-testid="input-new-maker"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Maker Code</label>
+                  <Input
+                    value={spareFormData.makerCode || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, makerCode: e.target.value }))}
+                    data-testid="input-new-maker-code"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Is Active</label>
+                  <Select
+                    value={spareFormData.isActive !== false ? "Yes" : "No"}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, isActive: value === "Yes" }))}
+                  >
+                    <SelectTrigger data-testid="select-new-spare-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Position Number</label>
+                  <Input
+                    value={spareFormData.positionNumber || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, positionNumber: e.target.value }))}
+                    data-testid="input-new-position-number"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Criticality, Unit Of Measurement, Specification */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Criticality</label>
+                  <Select
+                    value={spareFormData.criticality || ""}
+                    onValueChange={(value) => setSpareFormData(prev => ({ ...prev, criticality: value }))}
+                  >
+                    <SelectTrigger data-testid="select-new-spare-criticality">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                      <SelectItem value="Non-Critical">Non-Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Unit Of Measurement</label>
+                  <Input
+                    value={spareFormData.uom || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
+                    data-testid="input-new-uom"
+                  />
+                </div>
+                <div>
+                  <label className="text-blue-600 text-xs font-medium mb-1 block">Specification</label>
+                  <Input
+                    value={spareFormData.specification || ""}
+                    onChange={(e) => setSpareFormData(prev => ({ ...prev, specification: e.target.value }))}
+                    data-testid="input-new-specification"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Note */}
+              <div>
+                <label className="text-blue-600 text-xs font-medium mb-1 block">Note</label>
+                <Input
+                  value={spareFormData.note || ""}
+                  onChange={(e) => setSpareFormData(prev => ({ ...prev, note: e.target.value }))}
+                  data-testid="input-new-note"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Part Name</label>
-              <Input
-                value={spareFormData.partName || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, partName: e.target.value }))}
-                data-testid="input-new-part-name"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Part Number</label>
-              <Input
-                value={spareFormData.partNumber || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, partNumber: e.target.value }))}
-                data-testid="input-new-part-number"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Maker</label>
-              <Input
-                value={spareFormData.maker || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, maker: e.target.value }))}
-                data-testid="input-new-maker"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Unit of Measurement</label>
-              <Input
-                value={spareFormData.uom || ""}
-                onChange={(e) => setSpareFormData(prev => ({ ...prev, uom: e.target.value }))}
-                data-testid="input-new-uom"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-3">
-            <Button variant="outline" onClick={() => setIsAddSpareDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                toast({ title: "Success", description: "New spare added successfully" });
-                setIsAddSpareDialogOpen(false);
-              }}
-              data-testid="btn-save-new-spare"
-            >
-              Save
-            </Button>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
