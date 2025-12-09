@@ -14,6 +14,7 @@ import TestE2E from "./pages/TestE2E";
 import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
 import JobsFormPage from "./pages/pms/JobsFormPage";
+import AddEditFleetComponent from "./pages/admin/AddEditFleetComponent";
 
 import NotFound from "./pages/not-found";
 
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/defects/:subpage" component={TechnicalModule} />
                 
                 <Route path="/admin" component={TechnicalModule} />
+                <Route path="/admin/fleet-component-editor" component={AddEditFleetComponent} />
                 <Route path="/admin/:subpage" component={TechnicalModule} />
                 
                 <Route path="/cert-surveys" component={TechnicalModule} />

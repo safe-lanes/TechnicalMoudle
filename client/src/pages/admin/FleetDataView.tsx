@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight, ChevronDown, Plus, Search, Pencil, X, FileSpreadsheet, Trash2, Anchor } from "lucide-react";
@@ -255,6 +256,7 @@ interface ComponentVesselMapping {
 }
 
 export default function FleetDataView() {
+  const [, setLocation] = useLocation();
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
@@ -804,6 +806,7 @@ export default function FleetDataView() {
               </h2>
               <Button
                 className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={() => setLocation("/admin/fleet-component-editor")}
                 data-testid="button-add-edit-fleet-component"
               >
                 <Plus className="h-4 w-4 mr-1" />
@@ -1093,13 +1096,25 @@ export default function FleetDataView() {
             </Card>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <div className="text-center">
-              <FolderTree className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg">Select a component from the tree</p>
-              <p className="text-sm">
-                to view its details, jobs, spares, and vessel mappings
-              </p>
+          <div className="h-full flex flex-col">
+            <div className="flex justify-end mb-4">
+              <Button
+                className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={() => setLocation("/admin/fleet-component-editor")}
+                data-testid="button-add-edit-fleet-component"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add / Edit Fleet Component
+              </Button>
+            </div>
+            <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="text-center">
+                <FolderTree className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <p className="text-lg">Select a component from the tree</p>
+                <p className="text-sm">
+                  to view its details, jobs, spares, and vessel mappings
+                </p>
+              </div>
             </div>
           </div>
         )}
