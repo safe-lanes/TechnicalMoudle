@@ -1352,46 +1352,190 @@ No JSONB fields - fully normalized.
 
 ## Summary
 
+### Complete Table Inventory (50 Tables)
+
+| # | Table Name | Primary Module | Shared With |
+|---|------------|----------------|-------------|
+| 1 | `users` | Core Reference Data | All modules |
+| 2 | `fleets` | Core Reference Data | Fleet Mappings |
+| 3 | `vessels` | Core Reference Data | All modules |
+| 4 | `pms_vessel_settings` | Core Reference Data | PMS (Work Orders) |
+| 5 | `components` | PMS (Components) | Jobs, Spares, Defects, IHM, Running Hours |
+| 6 | `component_documents` | PMS (Components) | - |
+| 7 | `component_class_regulatory` | PMS (Components) | Certificates & Surveys |
+| 8 | `component_maintenance_history` | PMS (Components) | Work Orders (creates on approval) |
+| 9 | `component_requisitions` | PMS (Components) | Spares |
+| 10 | `component_running_hours_log` | PMS (Components) | Running Hours |
+| 11 | `jobs` | PMS (Jobs) | Work Orders, Fleet Mappings |
+| 12 | `work_orders` | PMS (Work Orders) | Jobs, Components, Spares, IHM |
+| 13 | `work_order_executions` | PMS (Work Orders) | - |
+| 14 | `running_hours_audit` | Running Hours | Components, Jobs |
+| 15 | `spares` | Spares | Components, Work Orders, IHM |
+| 16 | `spares_history` | Spares | - |
+| 17 | `stores_items` | Stores | - (Isolated) |
+| 18 | `stores_ledger` | Stores | - (Isolated) |
+| 19 | `defects` | Defects | Components |
+| 20 | `defect_actions` | Defects | - |
+| 21 | `defect_attachments` | Defects | - |
+| 22 | `recurring_defects` | Defects | - |
+| 23 | `recurring_defect_links` | Defects | - |
+| 24 | `alert_policies` | Alerts | - |
+| 25 | `alert_events` | Alerts | Work Orders, Components, Spares |
+| 26 | `alert_deliveries` | Alerts | - |
+| 27 | `alert_config` | Alerts | Vessels |
+| 28 | `change_request` | Change Requests | Components, Work Orders, Spares, Stores |
+| 29 | `change_request_attachment` | Change Requests | - |
+| 30 | `change_request_comment` | Change Requests | - |
+| 31 | `ihm_items` | IHM | Components, Spares |
+| 32 | `ihm_maintenance_log` | IHM | Work Orders |
+| 33 | `form_definitions` | Form Engine | - |
+| 34 | `form_versions` | Form Engine | - |
+| 35 | `form_version_usage` | Form Engine | - |
+| 36 | `makers` | Fleet Admin | Components, Spares |
+| 37 | `master_lists` | Fleet Admin | All modules (dropdowns) |
+| 38 | `fleet_equipment_master` | Fleet Admin | Components |
+| 39 | `maker_list` | Master Data | Components, Spares |
+| 40 | `sfi_details` | Master Data | Components |
+| 41 | `master_data` | Master Data | Fleet Mappings |
+| 42 | `fleet_vessel_mapping` | Fleet Sync | Vessels |
+| 43 | `fleet_component_mapping` | Fleet Sync | Components |
+| 44 | `fleet_job_vessel_mapping` | Fleet Sync | Jobs |
+| 45 | `fleet_spare_vessel_mapping` | Fleet Sync | Spares |
+| 46 | `import_history` | Import Engine | - |
+| 47 | `import_change_log` | Import Engine | Components, Jobs, Spares, Stores |
+| 48 | `bulk_import_history` | Import Engine | - |
+| 49 | `bulk_import_errors` | Import Engine | - |
+| 50 | `audit_log` | Audit Log | All modules |
+
 ### Table Count by Module
 
-| Module | Tables |
-|--------|--------|
-| PMS (Components) | 6 |
-| PMS (Jobs) | 1 |
-| PMS (Work Orders) | 2 |
-| Running Hours | 2 (+ components) |
-| Spares | 2 |
-| Stores | 2 |
-| Defects | 5 |
-| Alerts | 4 |
-| Certificates & Surveys | 1 |
-| Change Requests | 3 |
-| IHM | 2 |
-| Form Engine | 3 |
-| Fleet Admin | 3 |
-| Master Data | 3 |
-| Import Engine | 4 |
-| Audit Log | 1 |
-| Fleet Sync & Vessel Mapping | 4 |
-| Core Reference Data | 4 |
-| **TOTAL** | **~52 tables** |
+| Module | Tables | Notes |
+|--------|--------|-------|
+| PMS (Components) | 6 | Core equipment registry with 5 satellite tables |
+| PMS (Jobs) | 1 | Maintenance job templates |
+| PMS (Work Orders) | 2 | Work orders + executions |
+| Running Hours | 2 | Audit table + detailed log (shares `components`) |
+| Spares | 2 | Inventory + history |
+| Stores | 2 | Completely isolated from PMS |
+| Defects | 5 | Defects + actions + attachments + recurring detection |
+| Alerts | 4 | Policies + events + deliveries + config |
+| Certificates & Surveys | 0 | Uses `component_class_regulatory` (counted in Components) |
+| Change Requests | 3 | Modify PMS workflow |
+| IHM | 2 | Hazardous materials tracking |
+| Form Engine | 3 | Dynamic form configuration |
+| Fleet Admin | 3 | Makers, master lists, equipment master |
+| Master Data | 3 | SFI codes, maker list, equipment code generation |
+| Import Engine | 4 | Import tracking + change log + bulk import + errors |
+| Audit Log | 1 | System-wide audit trail |
+| Fleet Sync & Vessel Mapping | 4 | Fleet-to-vessel data mapping |
+| Core Reference Data | 4 | Users, fleets, vessels, settings |
+| **TOTAL (Unique)** | **50** | |
 
 ### Key Cross-Module Dependencies
 
-1. **Components** → Central to PMS, Jobs, Work Orders, Spares, Defects, IHM
-2. **Vessels** → Referenced by almost all modules
-3. **Fleet Equipment Code** → Bridges Fleet and Vessel data
-4. **Audit Log** → Receives entries from all modules
+```
+                    ┌─────────────────────────────────────────────────────────────────┐
+                    │                         AUDIT_LOG                               │
+                    │    (Receives entries from ALL modules on create/update/delete)  │
+                    └─────────────────────────────────────────────────────────────────┘
+                                                   ▲
+                                                   │
+        ┌──────────────────────────────────────────┼──────────────────────────────────────────┐
+        │                                          │                                          │
+        ▼                                          ▼                                          ▼
+┌───────────────┐                          ┌───────────────┐                          ┌───────────────┐
+│    VESSELS    │◄─────────────────────────│  COMPONENTS   │──────────────────────────►│     JOBS      │
+│  (+ fleets)   │                          │               │                          │               │
+└───────┬───────┘                          └───────┬───────┘                          └───────┬───────┘
+        │                                          │                                          │
+        │                                          ├───────────► SPARES                       │
+        │                                          │             (rob, history)               │
+        │                                          │                                          │
+        │                                          ├───────────► DEFECTS                      │
+        │                                          │             (actions, attachments)       │
+        │                                          │                                          │
+        │                                          ├───────────► IHM_ITEMS                    │
+        │                                          │                                          │
+        │                                          ├───────────► COMPONENT_DOCUMENTS          │
+        │                                          │                                          │
+        │                                          ├───────────► COMPONENT_CLASS_REGULATORY   │
+        │                                          │                                          │
+        │                                          └───────────► RUNNING_HOURS_AUDIT          │
+        │                                                                                     │
+        │                                                                                     ▼
+        │                                                                            ┌───────────────┐
+        │                                                                            │  WORK_ORDERS  │
+        │                                                                            │               │
+        │                                                                            └───────┬───────┘
+        │                                                                                    │
+        │                                                    ┌───────────────────────────────┤
+        │                                                    │                               │
+        │                                                    ▼                               ▼
+        │                                           COMPONENT_MAINTENANCE_HISTORY    IHM_MAINTENANCE_LOG
+        │
+        │
+        ▼
+┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     FLEET MAPPING TABLES                                          │
+│  fleet_vessel_mapping ─► fleet_component_mapping ─► fleet_job_vessel_mapping                     │
+│                                                   ─► fleet_spare_vessel_mapping                   │
+└───────────────────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                        MASTER DATA                                                │
+│           master_data ◄─── sfi_details, maker_list, makers, fleet_equipment_master               │
+└───────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+ISOLATED MODULE:
+┌───────────────────────────────────────────┐
+│              STORES                        │
+│  stores_items ◄──► stores_ledger           │
+│  (NO links to components/jobs/work_orders) │
+└───────────────────────────────────────────┘
+```
 
 ### Critical Transaction Boundaries
 
-1. **Work Order Approval** - Most complex, touches 5+ tables
-2. **Running Hours Cascade** - Updates multiple components + jobs
-3. **Import Undo** - Reverses potentially hundreds of changes
-4. **Fleet Sync** - Creates multiple entity types at once
+| Transaction | Tables Touched | Complexity |
+|-------------|----------------|------------|
+| Work Order Approval | `work_orders`, `component_maintenance_history`, `spares`, `spares_history`, `jobs`, `audit_log` | HIGH (6+ tables) |
+| Running Hours Cascade | `components` (parent + N children), `running_hours_audit`, `component_running_hours_log`, `jobs` | HIGH (N+3 tables) |
+| Import Undo | `import_change_log`, target table (components/jobs/spares/stores), `import_history` | MEDIUM (3 tables) |
+| Fleet Sync to Vessel | `components`, `jobs`, `spares`, `fleet_*_mapping` (4 tables) | HIGH (7+ tables) |
+| Defect with Actions | `defects`, `defect_actions`, `defect_attachments`, `audit_log` | MEDIUM (4 tables) |
+| Change Request Approval | `change_request`, target table, `audit_log` | MEDIUM (3 tables) |
+
+### Data Integrity Rules Summary
+
+| Rule | Enforcement |
+|------|-------------|
+| `component_maintenance_history` is IMMUTABLE | No UPDATE/DELETE operations allowed |
+| `running_hours_audit` is APPEND-ONLY | No UPDATE/DELETE operations allowed |
+| `audit_log` is APPEND-ONLY | No UPDATE/DELETE operations allowed |
+| Stores has ZERO PMS linkages | No component_id, job_id, or work_order_id fields |
+| Soft deletes for Components, Spares, Stores | `is_active=false` or `deleted=true` |
+| Unique fleet equipment codes | `fleet_equipment_code` + `data_scope` constraint |
+| Unique job numbers | Global unique on `jobs.job_no` |
+| Vessel-scoped uniqueness | Various codes unique within vessel context |
+
+### JSONB Field Locations
+
+| Table | JSONB Fields | Purpose |
+|-------|--------------|---------|
+| `jobs` | `required_spare_parts`, `required_tools`, `safety_requirements` | Template data |
+| `work_orders` | `form_data`, `required_spare_parts`, `required_tools`, `safety_requirements`, `uploaded_documents`, `consumed_spare_parts` | Form + execution data |
+| `defects` | `notes`, `actions`, `attachments`, `audit_trail`, `immediate_cause`, `root_cause` | Inline complex data |
+| `change_request` | `snapshot_before_json`, `proposed_changes_json`, `move_preview_json`, `revision_history` | Change tracking |
+| `import_change_log` | `previous_data`, `new_data` | Undo snapshots |
+| `bulk_import_errors` | `raw_row_data` | Debug data |
+| `component_maintenance_history` | `spares_used` | Parts consumption |
+| `audit_log` | `payload` | Additional context |
 
 ---
 
-*Document Version: 1.0*
-*Created: December 2025*
+*Document Version: 1.1*
+*Last Updated: December 2025*
 *Status: ANALYSIS ONLY - NOT APPLIED*
+*Verification: All 50 tables cross-checked against shared/schema.ts*
