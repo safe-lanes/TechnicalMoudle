@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import * as fs from "fs";
+import * as path from "path";
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
@@ -36,6 +38,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This populates req.user with an admin user for testing purposes
   app.use('/api', mockAuthMiddleware);
   console.log('🔒 Mock authentication enabled for /api/* routes');
+  
+  // Documentation download endpoint
+  app.get("/download/docs/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const allowedFiles = ['STORAGE_ANALYSIS.md', 'LOCAL_DEVELOPMENT_SETUP.md'];
+    if (!allowedFiles.includes(filename)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    const filePath = path.resolve(process.cwd(), filename);
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'text/markdown');
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
+  });
   
   // Start Job Due Scanner - scans jobs and auto-generates work orders when due
   const { jobDueScanner } = await import("./services/jobDueScanner");
