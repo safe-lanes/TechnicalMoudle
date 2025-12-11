@@ -40,14 +40,17 @@ class StorageFactory {
   static async getStorageAsync(): Promise<IStorage> {
     const currentMode = getStorageMode();
     
-    if (this.instance && this.mode === currentMode) {
-      return this.instance;
-    }
-
     if (this.initializationPromise) {
       return this.initializationPromise;
     }
 
+    if (this.instance && this.mode === currentMode && currentMode !== 'hybrid') {
+      return this.instance;
+    }
+
+    this.instance = null;
+    this.mode = null;
+    
     this.initializationPromise = this.initializeStorage(currentMode);
     return this.initializationPromise;
   }
@@ -94,16 +97,9 @@ class StorageFactory {
 
   static getStorage(): IStorage {
     if (!this.instance) {
-      console.warn('[StorageFactory] getStorage() called before async initialization - using sync fallback');
-      const mode = getStorageMode();
-      
-      if (mode === 'hybrid' && isPostgresAvailable()) {
-        console.log('[StorageFactory] Creating HybridStorage synchronously - initialize() must be called');
-        this.instance = new HybridStorage();
-      } else {
-        this.instance = new PersistentFileStorage();
-      }
-      this.mode = mode;
+      console.warn('[StorageFactory] getStorage() called before async initialization - using file storage as safe default');
+      this.instance = new PersistentFileStorage();
+      this.mode = 'file';
     }
     return this.instance!;
   }
