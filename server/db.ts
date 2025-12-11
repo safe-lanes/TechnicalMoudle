@@ -1,10 +1,7 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 import { resolvePostgres, getPostgresClient } from './postgresClient';
-
-neonConfig.webSocketConstructor = ws;
 
 /**
  * DEPRECATED: Use getDb() or getPool() instead
@@ -18,7 +15,7 @@ if (process.env.DATABASE_URL) {
   // Only initialize if DATABASE_URL is available
   // This allows the module to be imported without crashing in file-storage mode
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzle({ client: pool, schema });
+  db = drizzle(pool, { schema });
 }
 
 export { pool, db };

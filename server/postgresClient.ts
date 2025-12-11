@@ -1,10 +1,7 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
-import ws from "ws";
 import * as schema from "@shared/schema";
-
-neonConfig.webSocketConstructor = ws;
 
 // Cached PostgreSQL client to avoid connection pool leaks
 let cachedPostgres: { db: ReturnType<typeof drizzle>, pool: Pool } | null = null;
@@ -32,9 +29,9 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
   }
 
   try {
-    // Create connection pool (only once)
+    // Create connection pool (only once) using native pg driver
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    const db = drizzle({ client: pool, schema });
+    const db = drizzle(pool, { schema });
 
     // Lightweight connection test - verify database is accessible
     await db.execute(sql`SELECT 1`);
