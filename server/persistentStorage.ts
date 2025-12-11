@@ -7514,6 +7514,10 @@ export class PersistentFileStorage implements IStorage {
   async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
     return Object.values(this.data.masterDataList).find(m => m.fleetEquipmentCode === fleetEquipmentCode);
   }
+
+  async getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined> {
+    return Object.values(this.data.masterDataList).find(m => m.makerCode === makerCode && m.model === model);
+  }
   
   async createMasterData(data: InsertMasterData): Promise<MasterData> {
     const id = this.data.counters.masterDataId++;
