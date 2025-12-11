@@ -709,27 +709,35 @@ function normalizeRootCause(data: any): { individualFactor: string[], systemFact
   return null;
 }
 
-// Dynamic storage selection
-import { PersistentFileStorage } from "./persistentStorage";
+// Dynamic storage selection using StorageFactory
+import { getStorage, initializeStorage } from "./storageFactory";
 
 let storage: IStorage;
+let storageInitialized = false;
 
-// Debug: Check if DATABASE_URL is available
-console.log(`🔍 DATABASE_URL check: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
-if (process.env.DATABASE_URL) {
-  console.log(`📊 DATABASE_URL length: ${process.env.DATABASE_URL.length} characters`);
+// Initialize storage using the factory
+// This supports HybridStorage when DATABASE_URL is available
+async function initStorage(): Promise<void> {
+  if (storageInitialized) return;
+  
+  console.log('🔧 Initializing storage...');
+  console.log(`🔍 DATABASE_URL check: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
+  
+  try {
+    storage = await initializeStorage();
+    storageInitialized = true;
+    console.log('✅ Storage initialization complete');
+  } catch (error: any) {
+    console.error('❌ Storage initialization failed:', error.message);
+    storage = getStorage();
+    storageInitialized = true;
+  }
 }
 
-// IMPORTANT: PostgresStorage has been deprecated and moved to postgresStorage.stub.ts
-// The application now exclusively uses PersistentFileStorage for all data persistence.
-// When production PostgreSQL support is needed, PostgresStorage must be rebuilt from scratch.
-if (process.env.DATABASE_URL) {
-  console.warn("⚠️ DATABASE_URL detected but PostgresStorage is deprecated. Using PersistentFileStorage instead.");
-  console.warn("⚠️ See server/postgresStorage.stub.ts for reference if PostgreSQL support is needed.");
-}
+// For synchronous access (backward compatibility)
+// Uses sync fallback if async init hasn't completed
+storage = getStorage();
 
-storage = new PersistentFileStorage('test-data.json');
-console.log("✅ Application configured with PersistentFileStorage - all data will persist to test-data.json");
-
-export { storage };
+// Export initialization function for server startup
+export { storage, initStorage };
 // Note: calculateRecordChecksum and sortObjectKeys are already exported via 'export function' declarations above
