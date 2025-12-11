@@ -1552,8 +1552,8 @@ export const makerList = pgTable("maker_list", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-  makerCodeIdx: index("idx_maker_code").on(table.makerCode),
-  makerNameIdx: index("idx_maker_name").on(table.makerName),
+  makerCodeIdx: index("idx_maker_list_code").on(table.makerCode),
+  makerNameIdx: index("idx_maker_list_name").on(table.makerName),
 }));
 
 export const insertMakerListSchema = createInsertSchema(makerList).omit({
