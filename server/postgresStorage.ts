@@ -20,6 +20,29 @@ import {
   workOrders,
   spares,
   sparesHistory,
+  storesItems,
+  storesLedger,
+  defects,
+  defectActions,
+  defectAttachments,
+  recurringDefects,
+  recurringDefectLinks,
+  alertPolicies,
+  alertEvents,
+  alertDeliveries,
+  alertConfig,
+  formDefinitions,
+  formVersions,
+  formVersionUsage,
+  changeRequest,
+  changeRequestAttachment,
+  changeRequestComment,
+  ihmItems,
+  ihmMaintenanceLog,
+  fleetVesselMapping,
+  fleetComponentMapping,
+  fleetJobVesselMapping,
+  fleetSpareVesselMapping,
   type User,
   type InsertUser,
   type Fleet,
@@ -58,6 +81,52 @@ import {
   type InsertSpare,
   type SpareHistory,
   type InsertSpareHistory,
+  type StoresItem,
+  type InsertStoresItem,
+  type StoresLedger,
+  type InsertStoresLedger,
+  type Defect,
+  type InsertDefect,
+  type DefectAction,
+  type InsertDefectAction,
+  type DefectAttachment,
+  type InsertDefectAttachment,
+  type RecurringDefect,
+  type InsertRecurringDefect,
+  type RecurringDefectLink,
+  type InsertRecurringDefectLink,
+  type AlertPolicy,
+  type InsertAlertPolicy,
+  type AlertEvent,
+  type InsertAlertEvent,
+  type AlertDelivery,
+  type InsertAlertDelivery,
+  type AlertConfig,
+  type InsertAlertConfig,
+  type FormDefinition,
+  type InsertFormDefinition,
+  type FormVersion,
+  type InsertFormVersion,
+  type FormVersionUsage,
+  type InsertFormVersionUsage,
+  type ChangeRequest,
+  type InsertChangeRequest,
+  type ChangeRequestAttachment,
+  type InsertChangeRequestAttachment,
+  type ChangeRequestComment,
+  type InsertChangeRequestComment,
+  type IhmItem,
+  type InsertIhmItem,
+  type IhmMaintenanceLog,
+  type InsertIhmMaintenanceLog,
+  type FleetVesselMapping,
+  type InsertFleetVesselMapping,
+  type FleetComponentMapping,
+  type InsertFleetComponentMapping,
+  type FleetJobVesselMapping,
+  type InsertFleetJobVesselMapping,
+  type FleetSpareVesselMapping,
+  type InsertFleetSpareVesselMapping,
 } from '@shared/schema';
 
 /**
@@ -1654,6 +1723,1273 @@ export class PostgresStorage {
     const db = await getDb();
     const result = await db.insert(sparesHistory).values(history).returning();
     return result[0];
+  }
+
+  // ============= MODULE 8: STORES ITEMS =============
+
+  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+    const db = await getDb();
+    if (itemType) {
+      return await db.select().from(storesItems)
+        .where(and(
+          eq(storesItems.vesselId, vesselId),
+          eq(storesItems.itemType, itemType),
+          eq(storesItems.deleted, false)
+        ));
+    }
+    return await db.select().from(storesItems)
+      .where(and(
+        eq(storesItems.vesselId, vesselId),
+        eq(storesItems.deleted, false)
+      ));
+  }
+
+  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(storesItems).where(eq(storesItems.id, id));
+    return result[0];
+  }
+
+  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+    const db = await getDb();
+    const result = await db.insert(storesItems).values({
+      ...item,
+      rob: item.rob || '0',
+      robLocationA: item.robLocationA || '0',
+      robLocationB: item.robLocationB || '0',
+      min: item.min || '0',
+    }).returning();
+    return result[0];
+  }
+
+  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+    const db = await getDb();
+    const result = await db.update(storesItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(storesItems.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteStoresItem(id: number): Promise<void> {
+    const db = await getDb();
+    await db.update(storesItems)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(eq(storesItems.id, id));
+  }
+
+  async consumeStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await getDb();
+    const item = await this.getStoresItem(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA || 0) : Number(item.robLocationB || 0);
+    const actualConsumed = Math.min(qtyNum, locationRob);
+    const newLocationRob = Math.max(0, locationRob - qtyNum);
+    const newTotalRob = Math.max(0, Number(item.rob || 0) - actualConsumed);
+
+    const updated = await db.update(storesItems)
+      .set({
+        rob: String(newTotalRob),
+        ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+        updatedAt: new Date()
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'CONSUME',
+      qtyChangeBase: String(-actualConsumed),
+      qtyDisplay: String(-actualConsumed),
+      robAfterBase: String(newTotalRob),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place,
+      userId: userId,
+      remarks: remarks,
+    });
+
+    return updated[0];
+  }
+
+  async receiveStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    ref?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await getDb();
+    const item = await this.getStoresItem(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    
+    const qtyNum = Number(quantity);
+    const locationRob = location === 'A' ? Number(item.robLocationA || 0) : Number(item.robLocationB || 0);
+    const newLocationRob = locationRob + qtyNum;
+    const newTotalRob = Number(item.rob || 0) + qtyNum;
+
+    const updated = await db.update(storesItems)
+      .set({
+        rob: String(newTotalRob),
+        ...(location === 'A' ? { robLocationA: String(newLocationRob) } : { robLocationB: String(newLocationRob) }),
+        updatedAt: new Date()
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'RECEIVE',
+      qtyChangeBase: String(qtyNum),
+      qtyDisplay: String(qtyNum),
+      robAfterBase: String(newTotalRob),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place,
+      ref: ref,
+      userId: userId,
+      remarks: remarks,
+    });
+
+    return updated[0];
+  }
+
+  // ============= MODULE 8: STORES LEDGER =============
+
+  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+    const db = await getDb();
+    if (itemType) {
+      return await db.select().from(storesLedger)
+        .where(and(
+          eq(storesLedger.vesselId, vesselId),
+          eq(storesLedger.section, itemType)
+        ))
+        .orderBy(desc(storesLedger.timestampUTC));
+    }
+    return await db.select().from(storesLedger)
+      .where(eq(storesLedger.vesselId, vesselId))
+      .orderBy(desc(storesLedger.timestampUTC));
+  }
+
+  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+    const db = await getDb();
+    return await db.select().from(storesLedger)
+      .where(eq(storesLedger.itemId, itemId))
+      .orderBy(desc(storesLedger.timestampUTC));
+  }
+
+  // ============= MODULE 9: DEFECTS =============
+
+  async getDefects(filters?: { 
+    statusView?: 'active' | 'resolved';
+    vesselId?: string;
+    isCoC?: boolean;
+    category?: string;
+    priority?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<Defect[]> {
+    const db = await getDb();
+    const conditions: any[] = [];
+    
+    if (filters?.vesselId && filters.vesselId !== 'all') {
+      conditions.push(eq(defects.vesselId, filters.vesselId));
+    }
+    
+    if (filters?.statusView === 'active') {
+      conditions.push(or(
+        eq(defects.status, 'Open'),
+        eq(defects.status, 'Pending'),
+        eq(defects.status, 'In-Progress'),
+        eq(defects.status, 'Awaiting Parts'),
+        eq(defects.status, 'Deferred')
+      ));
+    } else if (filters?.statusView === 'resolved') {
+      conditions.push(or(
+        eq(defects.status, 'Closed'),
+        eq(defects.status, 'Cancelled')
+      ));
+    }
+    
+    if (filters?.isCoC !== undefined) {
+      conditions.push(eq(defects.is_coc, filters.isCoC));
+    }
+    
+    if (filters?.category) {
+      conditions.push(eq(defects.category, filters.category));
+    }
+    
+    if (filters?.priority) {
+      conditions.push(eq(defects.priority, filters.priority));
+    }
+    
+    let query = db.select().from(defects);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    query = query.orderBy(desc(defects.issueDate)) as any;
+    
+    if (filters?.page !== undefined && filters?.pageSize !== undefined) {
+      const offset = (filters.page - 1) * filters.pageSize;
+      query = query.limit(filters.pageSize).offset(offset) as any;
+    }
+    
+    return await query;
+  }
+
+  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number> {
+    const db = await getDb();
+    const conditions: any[] = [];
+    
+    if (filters?.vesselId && filters.vesselId !== 'all') {
+      conditions.push(eq(defects.vesselId, filters.vesselId));
+    }
+    
+    if (filters?.statusView === 'active') {
+      conditions.push(or(
+        eq(defects.status, 'Open'),
+        eq(defects.status, 'Pending'),
+        eq(defects.status, 'In-Progress'),
+        eq(defects.status, 'Awaiting Parts'),
+        eq(defects.status, 'Deferred')
+      ));
+    } else if (filters?.statusView === 'resolved') {
+      conditions.push(or(
+        eq(defects.status, 'Closed'),
+        eq(defects.status, 'Cancelled')
+      ));
+    }
+    
+    if (filters?.isCoC !== undefined) {
+      conditions.push(eq(defects.is_coc, filters.isCoC));
+    }
+    
+    let query = db.select({ count: sql<number>`count(*)` }).from(defects);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    const result = await query;
+    return Number(result[0]?.count || 0);
+  }
+
+  async getDefect(id: string): Promise<Defect | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(defects).where(eq(defects.id, id));
+    return result[0];
+  }
+
+  async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(defects).where(eq(defects.seedId, seedId));
+    return result[0];
+  }
+
+  async createDefect(defect: InsertDefect): Promise<Defect> {
+    const db = await getDb();
+    const id = `DEF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(defects).values({
+      ...defect,
+      id,
+    }).returning();
+    return result[0];
+  }
+
+  async updateDefect(id: string, data: Partial<InsertDefect>): Promise<Defect> {
+    const db = await getDb();
+    const result = await db.update(defects)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(defects.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Defect ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteDefect(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(defects).where(eq(defects.id, id));
+  }
+
+  async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
+    const db = await getDb();
+    const defect = await this.getDefect(defectId);
+    if (!defect) {
+      throw new Error(`Defect ${defectId} not found`);
+    }
+    
+    const newNote = {
+      noteId: `NOTE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      noteText: note.noteText,
+      attachments: note.attachments,
+      createdBy: note.createdBy,
+      createdOn: new Date().toISOString(),
+    };
+    
+    const existingNotes = Array.isArray(defect.notes) ? defect.notes : [];
+    const updatedNotes = [...existingNotes, newNote];
+    
+    const result = await db.update(defects)
+      .set({ notes: updatedNotes, updatedAt: new Date() })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect> {
+    const db = await getDb();
+    const defect = await this.getDefect(defectId);
+    if (!defect) {
+      throw new Error(`Defect ${defectId} not found`);
+    }
+    
+    const existingLinks = Array.isArray(defect.linkedDefects) ? defect.linkedDefects : [];
+    const mergedLinks = [...new Set([...existingLinks, ...linkedDefectIds])];
+    
+    const result = await db.update(defects)
+      .set({ linkedDefects: mergedLinks, updatedAt: new Date() })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async closeDefect(defectId: string, closure: { 
+    closedBy: string; 
+    closureComment?: string; 
+    closureFiles?: string[];
+  }): Promise<Defect> {
+    const db = await getDb();
+    const result = await db.update(defects)
+      .set({
+        status: 'Closed',
+        closedBy: closure.closedBy,
+        closedOn: new Date().toISOString(),
+        closureComment: closure.closureComment,
+        closureFiles: closure.closureFiles,
+        dateCompleted: new Date().toISOString().split('T')[0],
+        updatedAt: new Date(),
+      })
+      .where(eq(defects.id, defectId))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error(`Defect ${defectId} not found`);
+    }
+    return result[0];
+  }
+
+  // ============= MODULE 9: DEFECT ACTIONS =============
+
+  async getDefectActions(defectId: string): Promise<DefectAction[]> {
+    const db = await getDb();
+    return await db.select().from(defectActions)
+      .where(eq(defectActions.defectId, defectId))
+      .orderBy(desc(defectActions.createdAt));
+  }
+
+  async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
+    const db = await getDb();
+    const result = await db.insert(defectActions).values(action).returning();
+    return result[0];
+  }
+
+  async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    const db = await getDb();
+    const result = await db.update(defectActions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(defectActions.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Defect action ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteDefectAction(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(defectActions).where(eq(defectActions.id, id));
+  }
+
+  // ============= MODULE 9: DEFECT ATTACHMENTS =============
+
+  async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
+    const db = await getDb();
+    return await db.select().from(defectAttachments)
+      .where(eq(defectAttachments.defectId, defectId));
+  }
+
+  async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
+    const db = await getDb();
+    const result = await db.insert(defectAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  async deleteDefectAttachment(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(defectAttachments).where(eq(defectAttachments.id, id));
+  }
+
+  // ============= MODULE 9: RECURRING DEFECTS =============
+
+  async getRecurringDefects(filters?: { 
+    windowMonths?: number; 
+    minOccurrences?: number; 
+    hasCoc?: boolean; 
+    equipmentKey?: string 
+  }): Promise<RecurringDefect[]> {
+    const db = await getDb();
+    const conditions: any[] = [];
+    
+    if (filters?.windowMonths !== undefined) {
+      conditions.push(eq(recurringDefects.windowMonths, filters.windowMonths));
+    }
+    
+    if (filters?.minOccurrences !== undefined) {
+      conditions.push(gte(recurringDefects.occurrenceCount, filters.minOccurrences));
+    }
+    
+    if (filters?.hasCoc !== undefined) {
+      conditions.push(eq(recurringDefects.hasCoc, filters.hasCoc));
+    }
+    
+    if (filters?.equipmentKey) {
+      conditions.push(eq(recurringDefects.equipmentKey, filters.equipmentKey));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(recurringDefects)
+        .where(and(...conditions))
+        .orderBy(desc(recurringDefects.occurrenceCount));
+    }
+    
+    return await db.select().from(recurringDefects)
+      .orderBy(desc(recurringDefects.occurrenceCount));
+  }
+
+  async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(recurringDefects).where(eq(recurringDefects.id, id));
+    return result[0];
+  }
+
+  async createRecurringDefect(recurring: InsertRecurringDefect): Promise<RecurringDefect> {
+    const db = await getDb();
+    const result = await db.insert(recurringDefects).values(recurring).returning();
+    return result[0];
+  }
+
+  async updateRecurringDefect(id: number, data: Partial<InsertRecurringDefect>): Promise<RecurringDefect> {
+    const db = await getDb();
+    const result = await db.update(recurringDefects)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(recurringDefects.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Recurring defect ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteRecurringDefect(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(recurringDefects).where(eq(recurringDefects.id, id));
+  }
+
+  // ============= MODULE 9: RECURRING DEFECT LINKS =============
+
+  async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    const db = await getDb();
+    return await db.select().from(recurringDefectLinks)
+      .where(eq(recurringDefectLinks.recurringId, recurringId));
+  }
+
+  async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
+    const db = await getDb();
+    const links = await this.getRecurringDefectLinks(recurringId);
+    if (links.length === 0) {
+      return [];
+    }
+    const defectIds = links.map(l => l.defectId);
+    return await db.select().from(defects)
+      .where(inArray(defects.id, defectIds))
+      .orderBy(desc(defects.issueDate));
+  }
+
+  async createRecurringDefectLink(link: InsertRecurringDefectLink): Promise<RecurringDefectLink> {
+    const db = await getDb();
+    const result = await db.insert(recurringDefectLinks).values(link).returning();
+    return result[0];
+  }
+
+  async deleteRecurringDefectLink(recurringId: number, defectId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(recurringDefectLinks)
+      .where(and(
+        eq(recurringDefectLinks.recurringId, recurringId),
+        eq(recurringDefectLinks.defectId, defectId)
+      ));
+  }
+
+  // ============= MODULE 10: ALERT POLICIES =============
+
+  async getAlertPolicies(): Promise<AlertPolicy[]> {
+    const db = await getDb();
+    return await db.select().from(alertPolicies).orderBy(desc(alertPolicies.createdAt));
+  }
+
+  async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(alertPolicies).where(eq(alertPolicies.id, id));
+    return result[0];
+  }
+
+  async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
+    const db = await getDb();
+    const result = await db.insert(alertPolicies).values(policy).returning();
+    return result[0];
+  }
+
+  async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
+    const db = await getDb();
+    const result = await db.update(alertPolicies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(alertPolicies.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Alert policy ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteAlertPolicy(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(alertPolicies).where(eq(alertPolicies.id, id));
+  }
+
+  // ============= MODULE 10: ALERT EVENTS =============
+
+  async getAlertEvents(filters?: {
+    policyId?: number;
+    alertType?: string;
+    vesselId?: string;
+    acknowledged?: boolean;
+  }): Promise<AlertEvent[]> {
+    const db = await getDb();
+    const conditions: any[] = [];
+    
+    if (filters?.policyId !== undefined) {
+      conditions.push(eq(alertEvents.policyId, filters.policyId));
+    }
+    
+    if (filters?.alertType) {
+      conditions.push(eq(alertEvents.alertType, filters.alertType));
+    }
+    
+    if (filters?.vesselId) {
+      conditions.push(eq(alertEvents.vesselId, filters.vesselId));
+    }
+    
+    if (filters?.acknowledged !== undefined) {
+      if (filters.acknowledged) {
+        conditions.push(sql`${alertEvents.ackBy} IS NOT NULL`);
+      } else {
+        conditions.push(sql`${alertEvents.ackBy} IS NULL`);
+      }
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(alertEvents)
+        .where(and(...conditions))
+        .orderBy(desc(alertEvents.createdAt));
+    }
+    
+    return await db.select().from(alertEvents).orderBy(desc(alertEvents.createdAt));
+  }
+
+  async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    return result[0];
+  }
+
+  async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
+    const db = await getDb();
+    const result = await db.insert(alertEvents).values(event).returning();
+    return result[0];
+  }
+
+  async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
+    const db = await getDb();
+    const result = await db.update(alertEvents)
+      .set({ ackBy: userId, ackAt: new Date() })
+      .where(eq(alertEvents.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Alert event ${id} not found`);
+    }
+    return result[0];
+  }
+
+  // ============= MODULE 10: ALERT DELIVERIES =============
+
+  async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
+    const db = await getDb();
+    return await db.select().from(alertDeliveries)
+      .where(eq(alertDeliveries.eventId, eventId))
+      .orderBy(desc(alertDeliveries.createdAt));
+  }
+
+  async createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery> {
+    const db = await getDb();
+    const result = await db.insert(alertDeliveries).values(delivery).returning();
+    return result[0];
+  }
+
+  async updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery> {
+    const db = await getDb();
+    const updateData: any = { status };
+    
+    if (status === 'sent') {
+      updateData.sentAt = new Date();
+    }
+    
+    if (status === 'acknowledged') {
+      updateData.acknowledgedAt = new Date();
+    }
+    
+    if (errorMessage !== undefined) {
+      updateData.errorMessage = errorMessage;
+    }
+    
+    const result = await db.update(alertDeliveries)
+      .set(updateData)
+      .where(eq(alertDeliveries.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Alert delivery ${id} not found`);
+    }
+    return result[0];
+  }
+
+  // ============= MODULE 10: ALERT CONFIG =============
+
+  async getAlertConfig(vesselId: string): Promise<AlertConfig | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(alertConfig)
+      .where(eq(alertConfig.vesselId, vesselId));
+    return result[0];
+  }
+
+  async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
+    const db = await getDb();
+    const existing = await this.getAlertConfig(config.vesselId);
+    
+    if (existing) {
+      const result = await db.update(alertConfig)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(alertConfig.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(alertConfig).values(config).returning();
+      return result[0];
+    }
+  }
+
+  // ============= MODULE 11: FORM DEFINITIONS =============
+
+  async getFormDefinitions(): Promise<FormDefinition[]> {
+    const db = await getDb();
+    return await db.select().from(formDefinitions);
+  }
+
+  async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(formDefinitions)
+      .where(eq(formDefinitions.id, id));
+    return result[0];
+  }
+
+  async getFormDefinitionByName(name: string): Promise<FormDefinition | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(formDefinitions)
+      .where(eq(formDefinitions.name, name));
+    return result[0];
+  }
+
+  async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
+    const db = await getDb();
+    const result = await db.insert(formDefinitions).values(form).returning();
+    return result[0];
+  }
+
+  // ============= MODULE 11: FORM VERSIONS =============
+
+  async getFormVersions(formId: number): Promise<FormVersion[]> {
+    const db = await getDb();
+    return await db.select().from(formVersions)
+      .where(eq(formVersions.formId, formId))
+      .orderBy(desc(formVersions.versionNo));
+  }
+
+  async getFormVersion(id: number): Promise<FormVersion | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(formVersions)
+      .where(eq(formVersions.id, id));
+    return result[0];
+  }
+
+  async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(formVersions)
+      .where(and(
+        eq(formVersions.formId, formId),
+        eq(formVersions.status, 'PUBLISHED')
+      ))
+      .orderBy(desc(formVersions.versionNo))
+      .limit(1);
+    return result[0];
+  }
+
+  async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
+    const form = await this.getFormDefinitionByName(name);
+    if (!form) return undefined;
+    return this.getLatestPublishedVersion(form.id);
+  }
+
+  async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
+    const db = await getDb();
+    const result = await db.insert(formVersions).values(version).returning();
+    return result[0];
+  }
+
+  async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
+    const db = await getDb();
+    const result = await db.update(formVersions)
+      .set(data)
+      .where(eq(formVersions.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Form version ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
+    const db = await getDb();
+    const result = await db.update(formVersions)
+      .set({ 
+        status: 'PUBLISHED',
+        authorUserId: userId,
+        changelog,
+        versionDate: new Date()
+      })
+      .where(eq(formVersions.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Form version ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async discardFormVersion(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(formVersions).where(eq(formVersions.id, id));
+  }
+
+  // ============= MODULE 11: FORM VERSION USAGE =============
+
+  async createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage> {
+    const db = await getDb();
+    const result = await db.insert(formVersionUsage).values(usage).returning();
+    return result[0];
+  }
+
+  async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
+    const db = await getDb();
+    return await db.select().from(formVersionUsage)
+      .where(eq(formVersionUsage.formVersionId, formVersionId));
+  }
+
+  async seedForms(): Promise<void> {
+    // Check if forms already exist
+    const existingForms = await this.getFormDefinitions();
+    if (existingForms.length > 0) {
+      return; // Already seeded
+    }
+    
+    // Seed default form definitions
+    const defaultForms = [
+      { name: 'ADD_COMPONENT', subgroup: 'components' },
+      { name: 'EDIT_COMPONENT', subgroup: 'components' },
+      { name: 'WO_PLANNED', subgroup: 'work_orders' },
+      { name: 'WO_UNPLANNED', subgroup: 'work_orders' },
+      { name: 'ADD_JOB', subgroup: 'jobs' },
+      { name: 'EDIT_JOB', subgroup: 'jobs' },
+    ];
+    
+    for (const form of defaultForms) {
+      await this.createFormDefinition(form);
+    }
+  }
+
+  // ============= MODULE 12: CHANGE REQUESTS =============
+
+  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+    const db = await getDb();
+    let conditions: any[] = [];
+    
+    if (filters?.category) {
+      conditions.push(eq(changeRequest.category, filters.category));
+    }
+    if (filters?.status) {
+      conditions.push(eq(changeRequest.status, filters.status));
+    }
+    if (filters?.vesselId) {
+      conditions.push(eq(changeRequest.vesselId, filters.vesselId));
+    }
+    if (filters?.q) {
+      conditions.push(ilike(changeRequest.title, `%${filters.q}%`));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(changeRequest)
+        .where(and(...conditions))
+        .orderBy(desc(changeRequest.createdAt));
+    }
+    return await db.select().from(changeRequest).orderBy(desc(changeRequest.createdAt));
+  }
+
+  async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(changeRequest)
+      .where(eq(changeRequest.id, id));
+    return result[0];
+  }
+
+  async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
+    const db = await getDb();
+    const result = await db.insert(changeRequest).values({
+      ...request,
+      targetType: request.targetType || null,
+      targetId: request.targetId || null,
+      snapshotBeforeJson: request.snapshotBeforeJson || null,
+      proposedChangesJson: request.proposedChangesJson || null,
+      movePreviewJson: request.movePreviewJson || null,
+      submittedAt: request.submittedAt || null,
+      reviewedByUserId: request.reviewedByUserId || null,
+      reviewedAt: request.reviewedAt || null,
+    }).returning();
+    return result[0];
+  }
+
+  async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
+    const db = await getDb();
+    const result = await db.update(changeRequest)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(changeRequest.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Change request ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { targetType, targetId, snapshotBeforeJson });
+  }
+
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { proposedChangesJson, movePreviewJson });
+  }
+
+  async deleteChangeRequest(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(changeRequest).where(eq(changeRequest.id, id));
+  }
+
+  async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { 
+      status: 'submitted', 
+      submittedAt: new Date(), 
+      requestedByUserId: userId 
+    });
+  }
+
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    const existing = await this.getChangeRequest(id);
+    if (!existing) throw new Error('Change request not found');
+    
+    const now = new Date();
+    const newRevisionNumber = (existing.revisionNumber || 0) + 1;
+    const revisionHistoryEntry = {
+      revisionNumber: newRevisionNumber,
+      approvedBy: reviewerId,
+      approvedAt: now.toISOString(),
+      appliedChanges: existing.proposedChangesJson || [],
+      comments: comment
+    };
+    const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
+    
+    return this.updateChangeRequest(id, { 
+      status: 'approved', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: now,
+      revisionNumber: newRevisionNumber,
+      revisionHistory: updatedHistory
+    });
+  }
+
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { 
+      status: 'rejected', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: new Date() 
+    });
+  }
+
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    return this.updateChangeRequest(id, { 
+      status: 'returned', 
+      reviewedByUserId: reviewerId, 
+      reviewedAt: new Date() 
+    });
+  }
+
+  // ============= MODULE 12: CHANGE REQUEST ATTACHMENTS =============
+
+  async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
+    const db = await getDb();
+    return await db.select().from(changeRequestAttachment)
+      .where(eq(changeRequestAttachment.changeRequestId, changeRequestId));
+  }
+
+  async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
+    const db = await getDb();
+    const result = await db.insert(changeRequestAttachment).values(attachment).returning();
+    return result[0];
+  }
+
+  // ============= MODULE 12: CHANGE REQUEST COMMENTS =============
+
+  async getChangeRequestComments(changeRequestId: number): Promise<ChangeRequestComment[]> {
+    const db = await getDb();
+    return await db.select().from(changeRequestComment)
+      .where(eq(changeRequestComment.changeRequestId, changeRequestId))
+      .orderBy(asc(changeRequestComment.createdAt));
+  }
+
+  async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
+    const db = await getDb();
+    const result = await db.insert(changeRequestComment).values(comment).returning();
+    return result[0];
+  }
+
+  // ============= MODULE 13: IHM ITEMS =============
+
+  async getIhmItem(id: string, type: 'component' | 'spare'): Promise<IhmItem | undefined> {
+    const db = await getDb();
+    let result: IhmItem[];
+    
+    if (type === 'component') {
+      result = await db.select().from(ihmItems).where(eq(ihmItems.componentId, id));
+    } else {
+      result = await db.select().from(ihmItems).where(eq(ihmItems.spareId, id));
+    }
+    
+    return result[0];
+  }
+
+  async getIhmItems(vesselId?: string): Promise<IhmItem[]> {
+    const db = await getDb();
+    if (vesselId) {
+      return await db.select().from(ihmItems).where(eq(ihmItems.vesselId, vesselId));
+    }
+    return await db.select().from(ihmItems);
+  }
+
+  async upsertIhmItem(item: InsertIhmItem): Promise<IhmItem> {
+    const db = await getDb();
+    
+    // Check if item exists
+    let existing: IhmItem | undefined;
+    if (item.componentId) {
+      const results = await db.select().from(ihmItems).where(eq(ihmItems.componentId, item.componentId));
+      existing = results[0];
+    } else if (item.spareId) {
+      const results = await db.select().from(ihmItems).where(eq(ihmItems.spareId, item.spareId));
+      existing = results[0];
+    }
+    
+    if (existing) {
+      // Update existing item
+      const result = await db.update(ihmItems)
+        .set({ ...item, updatedAt: new Date() })
+        .where(eq(ihmItems.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      // Insert new item
+      const result = await db.insert(ihmItems).values(item).returning();
+      return result[0];
+    }
+  }
+
+  async deleteIhmItem(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(ihmItems).where(eq(ihmItems.id, id));
+  }
+
+  // ============= MODULE 13: IHM MAINTENANCE LOG =============
+
+  async getIhmMaintenanceLog(filters: { vesselId?: string; componentId?: string; spareId?: string; workOrderId?: string }): Promise<IhmMaintenanceLog[]> {
+    const db = await getDb();
+    let conditions: any[] = [];
+    
+    if (filters.vesselId) {
+      conditions.push(eq(ihmMaintenanceLog.vesselId, filters.vesselId));
+    }
+    if (filters.componentId) {
+      conditions.push(eq(ihmMaintenanceLog.componentId, filters.componentId));
+    }
+    if (filters.spareId) {
+      conditions.push(eq(ihmMaintenanceLog.spareId, filters.spareId));
+    }
+    if (filters.workOrderId) {
+      conditions.push(eq(ihmMaintenanceLog.workOrderId, filters.workOrderId));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(ihmMaintenanceLog)
+        .where(and(...conditions))
+        .orderBy(desc(ihmMaintenanceLog.createdAt));
+    }
+    return await db.select().from(ihmMaintenanceLog).orderBy(desc(ihmMaintenanceLog.createdAt));
+  }
+
+  async createIhmMaintenanceLogEntry(entry: InsertIhmMaintenanceLog): Promise<IhmMaintenanceLog> {
+    const db = await getDb();
+    const result = await db.insert(ihmMaintenanceLog).values(entry).returning();
+    return result[0];
+  }
+
+  async getIhmStatusReport(vesselId: string): Promise<IhmItem[]> {
+    const db = await getDb();
+    return await db.select().from(ihmItems)
+      .where(eq(ihmItems.vesselId, vesselId));
+  }
+
+  // ============= MODULE 14: FLEET VESSEL MAPPING =============
+
+  async getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]> {
+    const db = await getDb();
+    if (fleetEquipmentCode) {
+      return await db.select().from(fleetVesselMapping)
+        .where(and(
+          eq(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+          eq(fleetVesselMapping.isActive, true)
+        ));
+    }
+    return await db.select().from(fleetVesselMapping)
+      .where(eq(fleetVesselMapping.isActive, true));
+  }
+
+  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+    const db = await getDb();
+    return await db.select().from(fleetVesselMapping)
+      .where(and(
+        eq(fleetVesselMapping.vesselCode, vesselCode),
+        eq(fleetVesselMapping.isActive, true)
+      ));
+  }
+
+  async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
+    const db = await getDb();
+    const result = await db.insert(fleetVesselMapping).values({
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      isActive: mapping.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetVesselMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetVesselMapping.vesselCode, vesselCode)
+      ));
+  }
+
+  // ============= MODULE 14: FLEET COMPONENT MAPPING =============
+
+  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+    const db = await getDb();
+    return await db.select().from(fleetComponentMapping)
+      .where(and(
+        eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetComponentMapping.isActive, true)
+      ));
+  }
+
+  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+    const db = await getDb();
+    return await db.select().from(fleetComponentMapping)
+      .where(and(
+        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.isActive, true)
+      ));
+  }
+
+  async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
+    const db = await getDb();
+    const result = await db.insert(fleetComponentMapping).values({
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      vesselCode: mapping.vesselCode,
+      componentCode: mapping.componentCode,
+      componentId: mapping.componentId ?? null,
+      componentName: mapping.componentName ?? null,
+      mappedBy: mapping.mappedBy,
+      isActive: mapping.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetComponentMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetComponentMapping.fleetEquipmentCode, fleetEquipmentCode),
+        eq(fleetComponentMapping.vesselCode, vesselCode),
+        eq(fleetComponentMapping.componentCode, componentCode)
+      ));
+  }
+
+  // ============= MODULE 14: FLEET JOB VESSEL MAPPING =============
+
+  async getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]> {
+    const db = await getDb();
+    let conditions: any[] = [eq(fleetJobVesselMapping.isActive, true)];
+    
+    if (fleetEquipmentCode) {
+      conditions.push(eq(fleetJobVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    }
+    if (jobCode) {
+      conditions.push(eq(fleetJobVesselMapping.jobCode, jobCode));
+    }
+    
+    return await db.select().from(fleetJobVesselMapping)
+      .where(and(...conditions));
+  }
+
+  async createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping> {
+    const db = await getDb();
+    const result = await db.insert(fleetJobVesselMapping).values({
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      jobCode: mapping.jobCode,
+      jobId: mapping.jobId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      isActive: mapping.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetJobVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetJobVesselMapping.jobCode, jobCode),
+        eq(fleetJobVesselMapping.vesselCode, vesselCode)
+      ));
+  }
+
+  // ============= MODULE 14: FLEET SPARE VESSEL MAPPING =============
+
+  async getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]> {
+    const db = await getDb();
+    let conditions: any[] = [eq(fleetSpareVesselMapping.isActive, true)];
+    
+    if (fleetEquipmentCode) {
+      conditions.push(eq(fleetSpareVesselMapping.fleetEquipmentCode, fleetEquipmentCode));
+    }
+    if (partCode) {
+      conditions.push(eq(fleetSpareVesselMapping.partCode, partCode));
+    }
+    
+    return await db.select().from(fleetSpareVesselMapping)
+      .where(and(...conditions));
+  }
+
+  async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
+    const db = await getDb();
+    const result = await db.insert(fleetSpareVesselMapping).values({
+      fleetEquipmentCode: mapping.fleetEquipmentCode,
+      partCode: mapping.partCode,
+      spareId: mapping.spareId ?? null,
+      vesselCode: mapping.vesselCode,
+      vesselName: mapping.vesselName ?? null,
+      mappedBy: mapping.mappedBy,
+      isActive: mapping.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+    const db = await getDb();
+    await db.update(fleetSpareVesselMapping)
+      .set({ isActive: false })
+      .where(and(
+        eq(fleetSpareVesselMapping.partCode, partCode),
+        eq(fleetSpareVesselMapping.vesselCode, vesselCode)
+      ));
   }
 }
 

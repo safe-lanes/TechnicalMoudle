@@ -41,6 +41,50 @@ import type {
   InsertSpare,
   SpareHistory,
   InsertSpareHistory,
+  StoresItem,
+  InsertStoresItem,
+  StoresLedger,
+  Defect,
+  InsertDefect,
+  DefectAction,
+  InsertDefectAction,
+  DefectAttachment,
+  InsertDefectAttachment,
+  RecurringDefect,
+  InsertRecurringDefect,
+  RecurringDefectLink,
+  AlertPolicy,
+  InsertAlertPolicy,
+  AlertEvent,
+  InsertAlertEvent,
+  AlertDelivery,
+  InsertAlertDelivery,
+  AlertConfig,
+  InsertAlertConfig,
+  FormDefinition,
+  InsertFormDefinition,
+  FormVersion,
+  InsertFormVersion,
+  FormVersionUsage,
+  InsertFormVersionUsage,
+  ChangeRequest,
+  InsertChangeRequest,
+  ChangeRequestAttachment,
+  InsertChangeRequestAttachment,
+  ChangeRequestComment,
+  InsertChangeRequestComment,
+  IhmItem,
+  InsertIhmItem,
+  IhmMaintenanceLog,
+  InsertIhmMaintenanceLog,
+  FleetVesselMapping,
+  InsertFleetVesselMapping,
+  FleetComponentMapping,
+  InsertFleetComponentMapping,
+  FleetJobVesselMapping,
+  InsertFleetJobVesselMapping,
+  FleetSpareVesselMapping,
+  InsertFleetSpareVesselMapping,
 } from '@shared/schema';
 
 /**
@@ -77,6 +121,43 @@ import type {
  * - spares (vessel & fleet)
  * - spares_history
  * 
+ * Module 8 entities (routed to PostgresStorage):
+ * - stores_items
+ * - stores_ledger
+ * 
+ * Module 9 entities (routed to PostgresStorage):
+ * - defects
+ * - defect_actions
+ * - defect_attachments
+ * - recurring_defects
+ * - recurring_defect_links
+ * 
+ * Module 10 entities (routed to PostgresStorage):
+ * - alert_policies
+ * - alert_events
+ * - alert_deliveries
+ * - alert_config
+ * 
+ * Module 11 entities (routed to PostgresStorage):
+ * - form_definitions
+ * - form_versions
+ * - form_version_usage
+ * 
+ * Module 12 entities (routed to PostgresStorage):
+ * - change_request
+ * - change_request_attachment
+ * - change_request_comment
+ * 
+ * Module 13 entities (routed to PostgresStorage):
+ * - ihm_items
+ * - ihm_maintenance_log
+ * 
+ * Module 14 entities (routed to PostgresStorage):
+ * - fleet_vessel_mapping
+ * - fleet_component_mapping
+ * - fleet_job_vessel_mapping
+ * - fleet_spare_vessel_mapping
+ * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
 export class HybridStorage implements IStorage {
@@ -103,23 +184,7 @@ export class HybridStorage implements IStorage {
     // archiveSparesByIds remains in file storage for now (complex bulk operation)
     this.archiveSparesByIds = fs.archiveSparesByIds.bind(fs);
     
-    this.getChangeRequests = fs.getChangeRequests.bind(fs);
-    this.getChangeRequest = fs.getChangeRequest.bind(fs);
-    this.createChangeRequest = fs.createChangeRequest.bind(fs);
-    this.updateChangeRequest = fs.updateChangeRequest.bind(fs);
-    this.updateChangeRequestTarget = fs.updateChangeRequestTarget.bind(fs);
-    this.updateChangeRequestProposed = fs.updateChangeRequestProposed.bind(fs);
-    this.deleteChangeRequest = fs.deleteChangeRequest.bind(fs);
-    this.submitChangeRequest = fs.submitChangeRequest.bind(fs);
-    this.approveChangeRequest = fs.approveChangeRequest.bind(fs);
-    this.rejectChangeRequest = fs.rejectChangeRequest.bind(fs);
-    this.returnChangeRequest = fs.returnChangeRequest.bind(fs);
-    
-    this.getChangeRequestAttachments = fs.getChangeRequestAttachments.bind(fs);
-    this.createChangeRequestAttachment = fs.createChangeRequestAttachment.bind(fs);
-    
-    this.getChangeRequestComments = fs.getChangeRequestComments.bind(fs);
-    this.createChangeRequestComment = fs.createChangeRequestComment.bind(fs);
+    // Module 12 Change Requests methods - now have explicit PostgreSQL routing below
     
     this.bulkCreateComponents = fs.bulkCreateComponents.bind(fs);
     this.bulkUpdateComponents = fs.bulkUpdateComponents.bind(fs);
@@ -136,48 +201,11 @@ export class HybridStorage implements IStorage {
     this.archiveJob = fs.archiveJob.bind(fs);
     this.archiveWorkOrder = fs.archiveWorkOrder.bind(fs);
     
-    this.getAlertPolicies = fs.getAlertPolicies.bind(fs);
-    this.getAlertPolicy = fs.getAlertPolicy.bind(fs);
-    this.createAlertPolicy = fs.createAlertPolicy.bind(fs);
-    this.updateAlertPolicy = fs.updateAlertPolicy.bind(fs);
-    this.deleteAlertPolicy = fs.deleteAlertPolicy.bind(fs);
+    // Module 10 Alerts methods - now have explicit PostgreSQL routing below
     
-    this.getAlertEvents = fs.getAlertEvents.bind(fs);
-    this.getAlertEvent = fs.getAlertEvent.bind(fs);
-    this.createAlertEvent = fs.createAlertEvent.bind(fs);
-    this.acknowledgeAlertEvent = fs.acknowledgeAlertEvent.bind(fs);
+    // Module 11 Forms methods - now have explicit PostgreSQL routing below
     
-    this.getAlertDeliveries = fs.getAlertDeliveries.bind(fs);
-    this.createAlertDelivery = fs.createAlertDelivery.bind(fs);
-    this.updateAlertDeliveryStatus = fs.updateAlertDeliveryStatus.bind(fs);
-    
-    this.getAlertConfig = fs.getAlertConfig.bind(fs);
-    this.createOrUpdateAlertConfig = fs.createOrUpdateAlertConfig.bind(fs);
-    
-    this.getFormDefinitions = fs.getFormDefinitions.bind(fs);
-    this.getFormDefinition = fs.getFormDefinition.bind(fs);
-    this.getFormDefinitionByName = fs.getFormDefinitionByName.bind(fs);
-    this.createFormDefinition = fs.createFormDefinition.bind(fs);
-    
-    this.getFormVersions = fs.getFormVersions.bind(fs);
-    this.getFormVersion = fs.getFormVersion.bind(fs);
-    this.getLatestPublishedVersion = fs.getLatestPublishedVersion.bind(fs);
-    this.getLatestPublishedVersionByName = fs.getLatestPublishedVersionByName.bind(fs);
-    this.createFormVersion = fs.createFormVersion.bind(fs);
-    this.updateFormVersion = fs.updateFormVersion.bind(fs);
-    this.publishFormVersion = fs.publishFormVersion.bind(fs);
-    this.discardFormVersion = fs.discardFormVersion.bind(fs);
-    
-    this.createFormVersionUsage = fs.createFormVersionUsage.bind(fs);
-    this.getFormVersionUsage = fs.getFormVersionUsage.bind(fs);
-    
-    this.seedForms = fs.seedForms.bind(fs);
-    
-    this.getIhmItem = fs.getIhmItem.bind(fs);
-    this.upsertIhmItem = fs.upsertIhmItem.bind(fs);
-    this.getIhmMaintenanceLog = fs.getIhmMaintenanceLog.bind(fs);
-    this.createIhmMaintenanceLogEntry = fs.createIhmMaintenanceLogEntry.bind(fs);
-    this.getIhmStatusReport = fs.getIhmStatusReport.bind(fs);
+    // Module 13 IHM methods - now have explicit PostgreSQL routing below
     
     // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
     // now have explicit PostgreSQL routing below
@@ -191,34 +219,10 @@ export class HybridStorage implements IStorage {
     this.createWorkOrderExecution = fs.createWorkOrderExecution.bind(fs);
     this.updateWorkOrderExecution = fs.updateWorkOrderExecution.bind(fs);
     
-    this.getDefects = fs.getDefects.bind(fs);
-    this.getDefectsCount = fs.getDefectsCount.bind(fs);
-    this.getDefect = fs.getDefect.bind(fs);
-    this.createDefect = fs.createDefect.bind(fs);
-    this.updateDefect = fs.updateDefect.bind(fs);
-    this.deleteDefect = fs.deleteDefect.bind(fs);
-    
-    this.getDefectActions = fs.getDefectActions.bind(fs);
-    this.createDefectAction = fs.createDefectAction.bind(fs);
-    this.updateDefectAction = fs.updateDefectAction.bind(fs);
-    this.deleteDefectAction = fs.deleteDefectAction.bind(fs);
-    
-    this.getDefectAttachments = fs.getDefectAttachments.bind(fs);
-    this.createDefectAttachment = fs.createDefectAttachment.bind(fs);
-    this.deleteDefectAttachment = fs.deleteDefectAttachment.bind(fs);
-    
-    this.addDefectNote = fs.addDefectNote.bind(fs);
-    this.linkDefects = fs.linkDefects.bind(fs);
-    this.closeDefect = fs.closeDefect.bind(fs);
-    
-    this.getRecurringDefects = fs.getRecurringDefects.bind(fs);
-    this.getRecurringDefect = fs.getRecurringDefect.bind(fs);
+    // Module 9 Defects methods - now have explicit PostgreSQL routing below
+    // Only complex recalculation methods remain delegated
     this.calculateAndUpdateRecurringDefects = fs.calculateAndUpdateRecurringDefects.bind(fs);
-    this.getRecurringDefectLinks = fs.getRecurringDefectLinks.bind(fs);
-    this.getDefectsForRecurring = fs.getDefectsForRecurring.bind(fs);
     this.recalculateAllRecurringDefects = fs.recalculateAllRecurringDefects.bind(fs);
-    
-    this.getDefectBySeedId = fs.getDefectBySeedId.bind(fs);
     
     this.createImportHistory = fs.createImportHistory.bind(fs);
     this.getImportHistory = fs.getImportHistory.bind(fs);
@@ -233,17 +237,9 @@ export class HybridStorage implements IStorage {
     
     this.purgeJobsAndLinkedData = fs.purgeJobsAndLinkedData.bind(fs);
     
-    this.getStoresItems = fs.getStoresItems.bind(fs);
-    this.getStoresItem = fs.getStoresItem.bind(fs);
-    this.createStoresItem = fs.createStoresItem.bind(fs);
-    this.updateStoresItem = fs.updateStoresItem.bind(fs);
-    this.deleteStoresItem = fs.deleteStoresItem.bind(fs);
-    this.consumeStoresItem = fs.consumeStoresItem.bind(fs);
-    this.receiveStoresItem = fs.receiveStoresItem.bind(fs);
-    this.getStoresTransactionHistory = fs.getStoresTransactionHistory.bind(fs);
-    this.getStoresItemHistory = fs.getStoresItemHistory.bind(fs);
+    // Module 8 Stores methods - now have explicit PostgreSQL routing below
     
-    this.getFleetVesselMappings = fs.getFleetVesselMappings.bind(fs);
+    // Legacy fleet vessel mappings (kept on file storage for compatibility)
     this.createFleetVesselMappings = fs.createFleetVesselMappings.bind(fs);
     this.deleteFleetVesselMapping = fs.deleteFleetVesselMapping.bind(fs);
     
@@ -252,26 +248,12 @@ export class HybridStorage implements IStorage {
     
     // Module 2 methods (MakerList, SfiDetails, MasterData) have explicit PostgreSQL routing below
     
-    this.getFleetVesselMappingsByVessel = fs.getFleetVesselMappingsByVessel.bind(fs);
-    this.createFleetVesselMappingRecord = fs.createFleetVesselMappingRecord.bind(fs);
-    this.removeFleetVesselMappingRecord = fs.removeFleetVesselMappingRecord.bind(fs);
+    // Module 14 Fleet Mappings - now have explicit PostgreSQL routing below
     
+    // Legacy component vessel mappings (kept on file storage for compatibility)
     this.getComponentVesselMappings = fs.getComponentVesselMappings.bind(fs);
     this.createComponentVesselMapping = fs.createComponentVesselMapping.bind(fs);
     this.deleteComponentVesselMapping = fs.deleteComponentVesselMapping.bind(fs);
-    
-    this.getFleetComponentMappings = fs.getFleetComponentMappings.bind(fs);
-    this.getFleetComponentMappingsByVessel = fs.getFleetComponentMappingsByVessel.bind(fs);
-    this.createFleetComponentMappingRecord = fs.createFleetComponentMappingRecord.bind(fs);
-    this.removeFleetComponentMappingRecord = fs.removeFleetComponentMappingRecord.bind(fs);
-    
-    this.getFleetJobVesselMappings = fs.getFleetJobVesselMappings.bind(fs);
-    this.createFleetJobVesselMappingRecord = fs.createFleetJobVesselMappingRecord.bind(fs);
-    this.removeFleetJobVesselMappingRecord = fs.removeFleetJobVesselMappingRecord.bind(fs);
-    
-    this.getFleetSpareVesselMappings = fs.getFleetSpareVesselMappings.bind(fs);
-    this.createFleetSpareVesselMappingRecord = fs.createFleetSpareVesselMappingRecord.bind(fs);
-    this.removeFleetSpareVesselMappingRecord = fs.removeFleetSpareVesselMappingRecord.bind(fs);
     
     this.getBulkImportHistory = fs.getBulkImportHistory.bind(fs);
     this.getBulkImportHistoryItem = fs.getBulkImportHistoryItem.bind(fs);
@@ -1319,6 +1301,726 @@ export class HybridStorage implements IStorage {
     return this.fileStorage.createSpareHistory(history);
   }
 
+  // ============= MODULE 8: STORES (PostgreSQL) =============
+
+  async getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getStoresItems(vesselId, itemType);
+    }
+    return this.fileStorage.getStoresItems(vesselId, itemType);
+  }
+
+  async getStoresItem(id: number): Promise<StoresItem | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getStoresItem(id);
+    }
+    return this.fileStorage.getStoresItem(id);
+  }
+
+  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createStoresItem(item);
+    }
+    return this.fileStorage.createStoresItem(item);
+  }
+
+  async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateStoresItem(id, data);
+    }
+    return this.fileStorage.updateStoresItem(id, data);
+  }
+
+  async deleteStoresItem(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteStoresItem(id);
+    }
+    return this.fileStorage.deleteStoresItem(id);
+  }
+
+  async consumeStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.consumeStoresItem(id, quantity, location, userId, remarks, place, dateLocal, tz);
+    }
+    return this.fileStorage.consumeStoresItem(id, quantity, location, userId, remarks, place, dateLocal, tz);
+  }
+
+  async receiveStoresItem(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    ref?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.receiveStoresItem(id, quantity, location, userId, remarks, ref, place, dateLocal, tz);
+    }
+    return this.fileStorage.receiveStoresItem(id, quantity, location, userId, remarks, ref, place, dateLocal, tz);
+  }
+
+  async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getStoresTransactionHistory(vesselId, itemType);
+    }
+    return this.fileStorage.getStoresTransactionHistory(vesselId, itemType);
+  }
+
+  async getStoresItemHistory(itemId: number): Promise<StoresLedger[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getStoresItemHistory(itemId);
+    }
+    return this.fileStorage.getStoresItemHistory(itemId);
+  }
+
+  // ============= MODULE 9: DEFECTS =============
+
+  async getDefects(filters?: { 
+    statusView?: 'active' | 'resolved';
+    vesselId?: string;
+    isCoC?: boolean;
+    category?: string;
+    priority?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<Defect[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefects(filters);
+    }
+    return this.fileStorage.getDefects(filters);
+  }
+
+  async getDefectsCount(filters?: { statusView?: 'active' | 'resolved'; vesselId?: string; isCoC?: boolean }): Promise<number> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefectsCount(filters);
+    }
+    return this.fileStorage.getDefectsCount(filters);
+  }
+
+  async getDefect(id: string): Promise<Defect | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefect(id);
+    }
+    return this.fileStorage.getDefect(id);
+  }
+
+  async getDefectBySeedId(seedId: string): Promise<Defect | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefectBySeedId(seedId);
+    }
+    return this.fileStorage.getDefectBySeedId(seedId);
+  }
+
+  async createDefect(defect: InsertDefect): Promise<Defect> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createDefect(defect);
+    }
+    return this.fileStorage.createDefect(defect);
+  }
+
+  async updateDefect(id: string, data: Partial<InsertDefect>): Promise<Defect> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateDefect(id, data);
+    }
+    return this.fileStorage.updateDefect(id, data);
+  }
+
+  async deleteDefect(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteDefect(id);
+    }
+    return this.fileStorage.deleteDefect(id);
+  }
+
+  async addDefectNote(defectId: string, note: { noteText: string; attachments: string[]; createdBy: string }): Promise<Defect> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.addDefectNote(defectId, note);
+    }
+    return this.fileStorage.addDefectNote(defectId, note);
+  }
+
+  async linkDefects(defectId: string, linkedDefectIds: string[]): Promise<Defect> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.linkDefects(defectId, linkedDefectIds);
+    }
+    return this.fileStorage.linkDefects(defectId, linkedDefectIds);
+  }
+
+  async closeDefect(defectId: string, closure: { closedBy: string; closureComment?: string; closureFiles?: string[] }): Promise<Defect> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.closeDefect(defectId, closure);
+    }
+    return this.fileStorage.closeDefect(defectId, closure);
+  }
+
+  // ============= MODULE 9: DEFECT ACTIONS =============
+
+  async getDefectActions(defectId: string): Promise<DefectAction[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefectActions(defectId);
+    }
+    return this.fileStorage.getDefectActions(defectId);
+  }
+
+  async createDefectAction(action: InsertDefectAction): Promise<DefectAction> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createDefectAction(action);
+    }
+    return this.fileStorage.createDefectAction(action);
+  }
+
+  async updateDefectAction(id: number, updates: Partial<InsertDefectAction>): Promise<DefectAction> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateDefectAction(id, updates);
+    }
+    return this.fileStorage.updateDefectAction(id, updates);
+  }
+
+  async deleteDefectAction(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteDefectAction(id);
+    }
+    return this.fileStorage.deleteDefectAction(id);
+  }
+
+  // ============= MODULE 9: DEFECT ATTACHMENTS =============
+
+  async getDefectAttachments(defectId: string): Promise<DefectAttachment[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefectAttachments(defectId);
+    }
+    return this.fileStorage.getDefectAttachments(defectId);
+  }
+
+  async createDefectAttachment(attachment: InsertDefectAttachment): Promise<DefectAttachment> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createDefectAttachment(attachment);
+    }
+    return this.fileStorage.createDefectAttachment(attachment);
+  }
+
+  async deleteDefectAttachment(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteDefectAttachment(id);
+    }
+    return this.fileStorage.deleteDefectAttachment(id);
+  }
+
+  // ============= MODULE 9: RECURRING DEFECTS =============
+
+  async getRecurringDefects(filters?: { windowMonths?: number; minOccurrences?: number; hasCoc?: boolean; equipmentKey?: string }): Promise<RecurringDefect[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getRecurringDefects(filters);
+    }
+    return this.fileStorage.getRecurringDefects(filters);
+  }
+
+  async getRecurringDefect(id: number): Promise<RecurringDefect | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getRecurringDefect(id);
+    }
+    return this.fileStorage.getRecurringDefect(id);
+  }
+
+  async getRecurringDefectLinks(recurringId: number): Promise<RecurringDefectLink[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getRecurringDefectLinks(recurringId);
+    }
+    return this.fileStorage.getRecurringDefectLinks(recurringId);
+  }
+
+  async getDefectsForRecurring(recurringId: number): Promise<Defect[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getDefectsForRecurring(recurringId);
+    }
+    return this.fileStorage.getDefectsForRecurring(recurringId);
+  }
+
+  // ============= MODULE 10: ALERT POLICIES (PostgreSQL) =============
+
+  async getAlertPolicies(): Promise<AlertPolicy[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertPolicies();
+    }
+    return this.fileStorage.getAlertPolicies();
+  }
+
+  async getAlertPolicy(id: number): Promise<AlertPolicy | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertPolicy(id);
+    }
+    return this.fileStorage.getAlertPolicy(id);
+  }
+
+  async createAlertPolicy(policy: InsertAlertPolicy): Promise<AlertPolicy> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createAlertPolicy(policy);
+    }
+    return this.fileStorage.createAlertPolicy(policy);
+  }
+
+  async updateAlertPolicy(id: number, data: Partial<AlertPolicy>): Promise<AlertPolicy> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateAlertPolicy(id, data);
+    }
+    return this.fileStorage.updateAlertPolicy(id, data);
+  }
+
+  async deleteAlertPolicy(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteAlertPolicy(id);
+    }
+    return this.fileStorage.deleteAlertPolicy(id);
+  }
+
+  // ============= MODULE 10: ALERT EVENTS (PostgreSQL) =============
+
+  async getAlertEvents(filters?: any): Promise<AlertEvent[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertEvents(filters);
+    }
+    return this.fileStorage.getAlertEvents(filters);
+  }
+
+  async getAlertEvent(id: number): Promise<AlertEvent | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertEvent(id);
+    }
+    return this.fileStorage.getAlertEvent(id);
+  }
+
+  async createAlertEvent(event: InsertAlertEvent): Promise<AlertEvent> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createAlertEvent(event);
+    }
+    return this.fileStorage.createAlertEvent(event);
+  }
+
+  async acknowledgeAlertEvent(id: number, userId: string): Promise<AlertEvent> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.acknowledgeAlertEvent(id, userId);
+    }
+    return this.fileStorage.acknowledgeAlertEvent(id, userId);
+  }
+
+  // ============= MODULE 10: ALERT DELIVERIES (PostgreSQL) =============
+
+  async getAlertDeliveries(eventId: number): Promise<AlertDelivery[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertDeliveries(eventId);
+    }
+    return this.fileStorage.getAlertDeliveries(eventId);
+  }
+
+  async createAlertDelivery(delivery: InsertAlertDelivery): Promise<AlertDelivery> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createAlertDelivery(delivery);
+    }
+    return this.fileStorage.createAlertDelivery(delivery);
+  }
+
+  async updateAlertDeliveryStatus(id: number, status: string, errorMessage?: string): Promise<AlertDelivery> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateAlertDeliveryStatus(id, status, errorMessage);
+    }
+    return this.fileStorage.updateAlertDeliveryStatus(id, status, errorMessage);
+  }
+
+  // ============= MODULE 10: ALERT CONFIG (PostgreSQL) =============
+
+  async getAlertConfig(vesselId: string): Promise<AlertConfig | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAlertConfig(vesselId);
+    }
+    return this.fileStorage.getAlertConfig(vesselId);
+  }
+
+  async createOrUpdateAlertConfig(config: InsertAlertConfig): Promise<AlertConfig> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createOrUpdateAlertConfig(config);
+    }
+    return this.fileStorage.createOrUpdateAlertConfig(config);
+  }
+
+  // ============= MODULE 11: FORM DEFINITIONS (PostgreSQL) =============
+
+  async getFormDefinitions(): Promise<FormDefinition[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormDefinitions();
+    }
+    return this.fileStorage.getFormDefinitions();
+  }
+
+  async getFormDefinition(id: number): Promise<FormDefinition | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormDefinition(id);
+    }
+    return this.fileStorage.getFormDefinition(id);
+  }
+
+  async getFormDefinitionByName(name: string): Promise<FormDefinition | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormDefinitionByName(name);
+    }
+    return this.fileStorage.getFormDefinitionByName(name);
+  }
+
+  async createFormDefinition(form: InsertFormDefinition): Promise<FormDefinition> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFormDefinition(form);
+    }
+    return this.fileStorage.createFormDefinition(form);
+  }
+
+  // ============= MODULE 11: FORM VERSIONS (PostgreSQL) =============
+
+  async getFormVersions(formId: number): Promise<FormVersion[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormVersions(formId);
+    }
+    return this.fileStorage.getFormVersions(formId);
+  }
+
+  async getFormVersion(id: number): Promise<FormVersion | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormVersion(id);
+    }
+    return this.fileStorage.getFormVersion(id);
+  }
+
+  async getLatestPublishedVersion(formId: number): Promise<FormVersion | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getLatestPublishedVersion(formId);
+    }
+    return this.fileStorage.getLatestPublishedVersion(formId);
+  }
+
+  async getLatestPublishedVersionByName(name: string): Promise<FormVersion | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getLatestPublishedVersionByName(name);
+    }
+    return this.fileStorage.getLatestPublishedVersionByName(name);
+  }
+
+  async createFormVersion(version: InsertFormVersion): Promise<FormVersion> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFormVersion(version);
+    }
+    return this.fileStorage.createFormVersion(version);
+  }
+
+  async updateFormVersion(id: number, data: Partial<FormVersion>): Promise<FormVersion> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateFormVersion(id, data);
+    }
+    return this.fileStorage.updateFormVersion(id, data);
+  }
+
+  async publishFormVersion(id: number, userId: string, changelog: string): Promise<FormVersion> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.publishFormVersion(id, userId, changelog);
+    }
+    return this.fileStorage.publishFormVersion(id, userId, changelog);
+  }
+
+  async discardFormVersion(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.discardFormVersion(id);
+    }
+    return this.fileStorage.discardFormVersion(id);
+  }
+
+  // ============= MODULE 11: FORM VERSION USAGE (PostgreSQL) =============
+
+  async createFormVersionUsage(usage: InsertFormVersionUsage): Promise<FormVersionUsage> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFormVersionUsage(usage);
+    }
+    return this.fileStorage.createFormVersionUsage(usage);
+  }
+
+  async getFormVersionUsage(formVersionId: number): Promise<FormVersionUsage[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFormVersionUsage(formVersionId);
+    }
+    return this.fileStorage.getFormVersionUsage(formVersionId);
+  }
+
+  async seedForms(): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.seedForms();
+    }
+    return this.fileStorage.seedForms();
+  }
+
+  // ============= MODULE 12: CHANGE REQUESTS (PostgreSQL) =============
+
+  async getChangeRequests(filters?: { category?: string; status?: string; q?: string; vesselId?: string }): Promise<ChangeRequest[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getChangeRequests(filters);
+    }
+    return this.fileStorage.getChangeRequests(filters);
+  }
+
+  async getChangeRequest(id: number): Promise<ChangeRequest | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getChangeRequest(id);
+    }
+    return this.fileStorage.getChangeRequest(id);
+  }
+
+  async createChangeRequest(request: InsertChangeRequest): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createChangeRequest(request);
+    }
+    return this.fileStorage.createChangeRequest(request);
+  }
+
+  async updateChangeRequest(id: number, data: Partial<ChangeRequest>): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateChangeRequest(id, data);
+    }
+    return this.fileStorage.updateChangeRequest(id, data);
+  }
+
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateChangeRequestTarget(id, targetType, targetId, snapshotBeforeJson);
+    }
+    return this.fileStorage.updateChangeRequestTarget(id, targetType, targetId, snapshotBeforeJson);
+  }
+
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateChangeRequestProposed(id, proposedChangesJson, movePreviewJson);
+    }
+    return this.fileStorage.updateChangeRequestProposed(id, proposedChangesJson, movePreviewJson);
+  }
+
+  async deleteChangeRequest(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteChangeRequest(id);
+    }
+    return this.fileStorage.deleteChangeRequest(id);
+  }
+
+  async submitChangeRequest(id: number, userId: string): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.submitChangeRequest(id, userId);
+    }
+    return this.fileStorage.submitChangeRequest(id, userId);
+  }
+
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.approveChangeRequest(id, reviewerId, comment);
+    }
+    return this.fileStorage.approveChangeRequest(id, reviewerId, comment);
+  }
+
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.rejectChangeRequest(id, reviewerId, comment);
+    }
+    return this.fileStorage.rejectChangeRequest(id, reviewerId, comment);
+  }
+
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.returnChangeRequest(id, reviewerId, comment);
+    }
+    return this.fileStorage.returnChangeRequest(id, reviewerId, comment);
+  }
+
+  // ============= MODULE 12: CHANGE REQUEST ATTACHMENTS (PostgreSQL) =============
+
+  async getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getChangeRequestAttachments(changeRequestId);
+    }
+    return this.fileStorage.getChangeRequestAttachments(changeRequestId);
+  }
+
+  async createChangeRequestAttachment(attachment: InsertChangeRequestAttachment): Promise<ChangeRequestAttachment> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createChangeRequestAttachment(attachment);
+    }
+    return this.fileStorage.createChangeRequestAttachment(attachment);
+  }
+
+  // ============= MODULE 12: CHANGE REQUEST COMMENTS (PostgreSQL) =============
+
+  async getChangeRequestComments(changeRequestId: number): Promise<ChangeRequestComment[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getChangeRequestComments(changeRequestId);
+    }
+    return this.fileStorage.getChangeRequestComments(changeRequestId);
+  }
+
+  async createChangeRequestComment(comment: InsertChangeRequestComment): Promise<ChangeRequestComment> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createChangeRequestComment(comment);
+    }
+    return this.fileStorage.createChangeRequestComment(comment);
+  }
+
+  // ============= MODULE 13: IHM ITEMS (PostgreSQL) =============
+
+  async getIhmItem(id: string, type: 'component' | 'spare'): Promise<IhmItem | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getIhmItem(id, type);
+    }
+    return this.fileStorage.getIhmItem(id, type);
+  }
+
+  async upsertIhmItem(item: InsertIhmItem): Promise<IhmItem> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.upsertIhmItem(item);
+    }
+    return this.fileStorage.upsertIhmItem(item);
+  }
+
+  // ============= MODULE 13: IHM MAINTENANCE LOG (PostgreSQL) =============
+
+  async getIhmMaintenanceLog(filters: { vesselId?: string; componentId?: string; spareId?: string; workOrderId?: string }): Promise<IhmMaintenanceLog[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getIhmMaintenanceLog(filters);
+    }
+    return this.fileStorage.getIhmMaintenanceLog(filters);
+  }
+
+  async createIhmMaintenanceLogEntry(entry: InsertIhmMaintenanceLog): Promise<IhmMaintenanceLog> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createIhmMaintenanceLogEntry(entry);
+    }
+    return this.fileStorage.createIhmMaintenanceLogEntry(entry);
+  }
+
+  async getIhmStatusReport(vesselId: string): Promise<IhmItem[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getIhmStatusReport(vesselId);
+    }
+    return this.fileStorage.getIhmStatusReport(vesselId);
+  }
+
+  // ============= MODULE 14: FLEET VESSEL MAPPING (PostgreSQL) =============
+
+  async getFleetVesselMappings(fleetEquipmentCode?: string): Promise<FleetVesselMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetVesselMappings(fleetEquipmentCode);
+    }
+    return this.fileStorage.getFleetVesselMappings(fleetEquipmentCode);
+  }
+
+  async getFleetVesselMappingsByVessel(vesselCode: string): Promise<FleetVesselMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetVesselMappingsByVessel(vesselCode);
+    }
+    return this.fileStorage.getFleetVesselMappingsByVessel(vesselCode);
+  }
+
+  async createFleetVesselMappingRecord(mapping: InsertFleetVesselMapping): Promise<FleetVesselMapping> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetVesselMappingRecord(mapping);
+    }
+    return this.fileStorage.createFleetVesselMappingRecord(mapping);
+  }
+
+  async removeFleetVesselMappingRecord(fleetEquipmentCode: string, vesselCode: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.removeFleetVesselMappingRecord(fleetEquipmentCode, vesselCode);
+    }
+    return this.fileStorage.removeFleetVesselMappingRecord(fleetEquipmentCode, vesselCode);
+  }
+
+  // ============= MODULE 14: FLEET COMPONENT MAPPING (PostgreSQL) =============
+
+  async getFleetComponentMappings(fleetEquipmentCode: string): Promise<FleetComponentMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetComponentMappings(fleetEquipmentCode);
+    }
+    return this.fileStorage.getFleetComponentMappings(fleetEquipmentCode);
+  }
+
+  async getFleetComponentMappingsByVessel(vesselCode: string): Promise<FleetComponentMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetComponentMappingsByVessel(vesselCode);
+    }
+    return this.fileStorage.getFleetComponentMappingsByVessel(vesselCode);
+  }
+
+  async createFleetComponentMappingRecord(mapping: InsertFleetComponentMapping): Promise<FleetComponentMapping> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetComponentMappingRecord(mapping);
+    }
+    return this.fileStorage.createFleetComponentMappingRecord(mapping);
+  }
+
+  async removeFleetComponentMappingRecord(fleetEquipmentCode: string, vesselCode: string, componentCode: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.removeFleetComponentMappingRecord(fleetEquipmentCode, vesselCode, componentCode);
+    }
+    return this.fileStorage.removeFleetComponentMappingRecord(fleetEquipmentCode, vesselCode, componentCode);
+  }
+
+  // ============= MODULE 14: FLEET JOB VESSEL MAPPING (PostgreSQL) =============
+
+  async getFleetJobVesselMappings(fleetEquipmentCode?: string, jobCode?: string): Promise<FleetJobVesselMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetJobVesselMappings(fleetEquipmentCode, jobCode);
+    }
+    return this.fileStorage.getFleetJobVesselMappings(fleetEquipmentCode, jobCode);
+  }
+
+  async createFleetJobVesselMappingRecord(mapping: InsertFleetJobVesselMapping): Promise<FleetJobVesselMapping> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetJobVesselMappingRecord(mapping);
+    }
+    return this.fileStorage.createFleetJobVesselMappingRecord(mapping);
+  }
+
+  async removeFleetJobVesselMappingRecord(jobCode: string, vesselCode: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.removeFleetJobVesselMappingRecord(jobCode, vesselCode);
+    }
+    return this.fileStorage.removeFleetJobVesselMappingRecord(jobCode, vesselCode);
+  }
+
+  // ============= MODULE 14: FLEET SPARE VESSEL MAPPING (PostgreSQL) =============
+
+  async getFleetSpareVesselMappings(fleetEquipmentCode?: string, partCode?: string): Promise<FleetSpareVesselMapping[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetSpareVesselMappings(fleetEquipmentCode, partCode);
+    }
+    return this.fileStorage.getFleetSpareVesselMappings(fleetEquipmentCode, partCode);
+  }
+
+  async createFleetSpareVesselMappingRecord(mapping: InsertFleetSpareVesselMapping): Promise<FleetSpareVesselMapping> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetSpareVesselMappingRecord(mapping);
+    }
+    return this.fileStorage.createFleetSpareVesselMappingRecord(mapping);
+  }
+
+  async removeFleetSpareVesselMappingRecord(partCode: string, vesselCode: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.removeFleetSpareVesselMappingRecord(partCode, vesselCode);
+    }
+    return this.fileStorage.removeFleetSpareVesselMappingRecord(partCode, vesselCode);
+  }
+
   // ============= DELEGATED METHODS (File Storage) =============
   // These are assigned in bindFileStorageMethods() and will be migrated
   // to PostgresStorage in future modules
@@ -1330,23 +2032,7 @@ export class HybridStorage implements IStorage {
   // Module 7: Spares - now have explicit PostgreSQL routing above
   // archiveSparesByIds remains delegated (bound in bindFileStorageMethods)
   
-  getChangeRequests!: IStorage['getChangeRequests'];
-  getChangeRequest!: IStorage['getChangeRequest'];
-  createChangeRequest!: IStorage['createChangeRequest'];
-  updateChangeRequest!: IStorage['updateChangeRequest'];
-  updateChangeRequestTarget!: IStorage['updateChangeRequestTarget'];
-  updateChangeRequestProposed!: IStorage['updateChangeRequestProposed'];
-  deleteChangeRequest!: IStorage['deleteChangeRequest'];
-  submitChangeRequest!: IStorage['submitChangeRequest'];
-  approveChangeRequest!: IStorage['approveChangeRequest'];
-  rejectChangeRequest!: IStorage['rejectChangeRequest'];
-  returnChangeRequest!: IStorage['returnChangeRequest'];
-  
-  getChangeRequestAttachments!: IStorage['getChangeRequestAttachments'];
-  createChangeRequestAttachment!: IStorage['createChangeRequestAttachment'];
-  
-  getChangeRequestComments!: IStorage['getChangeRequestComments'];
-  createChangeRequestComment!: IStorage['createChangeRequestComment'];
+  // Module 12 Change Requests - now have explicit PostgreSQL routing above
   
   bulkCreateComponents!: IStorage['bulkCreateComponents'];
   bulkUpdateComponents!: IStorage['bulkUpdateComponents'];
@@ -1363,48 +2049,10 @@ export class HybridStorage implements IStorage {
   archiveJob!: IStorage['archiveJob'];
   archiveWorkOrder!: IStorage['archiveWorkOrder'];
   
-  getAlertPolicies!: IStorage['getAlertPolicies'];
-  getAlertPolicy!: IStorage['getAlertPolicy'];
-  createAlertPolicy!: IStorage['createAlertPolicy'];
-  updateAlertPolicy!: IStorage['updateAlertPolicy'];
-  deleteAlertPolicy!: IStorage['deleteAlertPolicy'];
+  // Module 10 Alerts - now have explicit PostgreSQL routing above
+  // Module 11 Forms - now have explicit PostgreSQL routing above
   
-  getAlertEvents!: IStorage['getAlertEvents'];
-  getAlertEvent!: IStorage['getAlertEvent'];
-  createAlertEvent!: IStorage['createAlertEvent'];
-  acknowledgeAlertEvent!: IStorage['acknowledgeAlertEvent'];
-  
-  getAlertDeliveries!: IStorage['getAlertDeliveries'];
-  createAlertDelivery!: IStorage['createAlertDelivery'];
-  updateAlertDeliveryStatus!: IStorage['updateAlertDeliveryStatus'];
-  
-  getAlertConfig!: IStorage['getAlertConfig'];
-  createOrUpdateAlertConfig!: IStorage['createOrUpdateAlertConfig'];
-  
-  getFormDefinitions!: IStorage['getFormDefinitions'];
-  getFormDefinition!: IStorage['getFormDefinition'];
-  getFormDefinitionByName!: IStorage['getFormDefinitionByName'];
-  createFormDefinition!: IStorage['createFormDefinition'];
-  
-  getFormVersions!: IStorage['getFormVersions'];
-  getFormVersion!: IStorage['getFormVersion'];
-  getLatestPublishedVersion!: IStorage['getLatestPublishedVersion'];
-  getLatestPublishedVersionByName!: IStorage['getLatestPublishedVersionByName'];
-  createFormVersion!: IStorage['createFormVersion'];
-  updateFormVersion!: IStorage['updateFormVersion'];
-  publishFormVersion!: IStorage['publishFormVersion'];
-  discardFormVersion!: IStorage['discardFormVersion'];
-  
-  createFormVersionUsage!: IStorage['createFormVersionUsage'];
-  getFormVersionUsage!: IStorage['getFormVersionUsage'];
-  
-  seedForms!: IStorage['seedForms'];
-  
-  getIhmItem!: IStorage['getIhmItem'];
-  upsertIhmItem!: IStorage['upsertIhmItem'];
-  getIhmMaintenanceLog!: IStorage['getIhmMaintenanceLog'];
-  createIhmMaintenanceLogEntry!: IStorage['createIhmMaintenanceLogEntry'];
-  getIhmStatusReport!: IStorage['getIhmStatusReport'];
+  // Module 13 IHM - now have explicit PostgreSQL routing above
   
   // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
   // are now explicitly routed to PostgresStorage above
@@ -1417,34 +2065,10 @@ export class HybridStorage implements IStorage {
   createWorkOrderExecution!: IStorage['createWorkOrderExecution'];
   updateWorkOrderExecution!: IStorage['updateWorkOrderExecution'];
   
-  getDefects!: IStorage['getDefects'];
-  getDefectsCount!: IStorage['getDefectsCount'];
-  getDefect!: IStorage['getDefect'];
-  createDefect!: IStorage['createDefect'];
-  updateDefect!: IStorage['updateDefect'];
-  deleteDefect!: IStorage['deleteDefect'];
-  
-  getDefectActions!: IStorage['getDefectActions'];
-  createDefectAction!: IStorage['createDefectAction'];
-  updateDefectAction!: IStorage['updateDefectAction'];
-  deleteDefectAction!: IStorage['deleteDefectAction'];
-  
-  getDefectAttachments!: IStorage['getDefectAttachments'];
-  createDefectAttachment!: IStorage['createDefectAttachment'];
-  deleteDefectAttachment!: IStorage['deleteDefectAttachment'];
-  
-  addDefectNote!: IStorage['addDefectNote'];
-  linkDefects!: IStorage['linkDefects'];
-  closeDefect!: IStorage['closeDefect'];
-  
-  getRecurringDefects!: IStorage['getRecurringDefects'];
-  getRecurringDefect!: IStorage['getRecurringDefect'];
+  // Module 9: Defects - now have explicit PostgreSQL routing above
+  // Remaining delegated methods for recurring defect recalculation (complex logic in file storage)
   calculateAndUpdateRecurringDefects!: IStorage['calculateAndUpdateRecurringDefects'];
-  getRecurringDefectLinks!: IStorage['getRecurringDefectLinks'];
-  getDefectsForRecurring!: IStorage['getDefectsForRecurring'];
   recalculateAllRecurringDefects!: IStorage['recalculateAllRecurringDefects'];
-  
-  getDefectBySeedId!: IStorage['getDefectBySeedId'];
   
   createImportHistory!: IStorage['createImportHistory'];
   getImportHistory!: IStorage['getImportHistory'];
@@ -1458,44 +2082,21 @@ export class HybridStorage implements IStorage {
   
   purgeJobsAndLinkedData!: IStorage['purgeJobsAndLinkedData'];
   
-  getStoresItems!: IStorage['getStoresItems'];
-  getStoresItem!: IStorage['getStoresItem'];
-  createStoresItem!: IStorage['createStoresItem'];
-  updateStoresItem!: IStorage['updateStoresItem'];
-  deleteStoresItem!: IStorage['deleteStoresItem'];
-  consumeStoresItem!: IStorage['consumeStoresItem'];
-  receiveStoresItem!: IStorage['receiveStoresItem'];
-  getStoresTransactionHistory!: IStorage['getStoresTransactionHistory'];
-  getStoresItemHistory!: IStorage['getStoresItemHistory'];
+  // Module 8 Stores methods - now have explicit PostgreSQL routing above
   
-  getFleetVesselMappings!: IStorage['getFleetVesselMappings'];
+  // Legacy fleet vessel mappings (kept delegated for compatibility)
   createFleetVesselMappings!: IStorage['createFleetVesselMappings'];
   deleteFleetVesselMapping!: IStorage['deleteFleetVesselMapping'];
   
   generateOnDemandWorkOrder!: IStorage['generateOnDemandWorkOrder'];
   checkAndRevertPostponedWorkOrders!: IStorage['checkAndRevertPostponedWorkOrders'];
   
+  // Module 14 Fleet Mappings - now have explicit PostgreSQL routing above
   
-  getFleetVesselMappingsByVessel!: IStorage['getFleetVesselMappingsByVessel'];
-  createFleetVesselMappingRecord!: IStorage['createFleetVesselMappingRecord'];
-  removeFleetVesselMappingRecord!: IStorage['removeFleetVesselMappingRecord'];
-  
+  // Legacy component vessel mappings (kept delegated for compatibility)
   getComponentVesselMappings!: IStorage['getComponentVesselMappings'];
   createComponentVesselMapping!: IStorage['createComponentVesselMapping'];
   deleteComponentVesselMapping!: IStorage['deleteComponentVesselMapping'];
-  
-  getFleetComponentMappings!: IStorage['getFleetComponentMappings'];
-  getFleetComponentMappingsByVessel!: IStorage['getFleetComponentMappingsByVessel'];
-  createFleetComponentMappingRecord!: IStorage['createFleetComponentMappingRecord'];
-  removeFleetComponentMappingRecord!: IStorage['removeFleetComponentMappingRecord'];
-  
-  getFleetJobVesselMappings!: IStorage['getFleetJobVesselMappings'];
-  createFleetJobVesselMappingRecord!: IStorage['createFleetJobVesselMappingRecord'];
-  removeFleetJobVesselMappingRecord!: IStorage['removeFleetJobVesselMappingRecord'];
-  
-  getFleetSpareVesselMappings!: IStorage['getFleetSpareVesselMappings'];
-  createFleetSpareVesselMappingRecord!: IStorage['createFleetSpareVesselMappingRecord'];
-  removeFleetSpareVesselMappingRecord!: IStorage['removeFleetSpareVesselMappingRecord'];
   
   getBulkImportHistory!: IStorage['getBulkImportHistory'];
   getBulkImportHistoryItem!: IStorage['getBulkImportHistoryItem'];
