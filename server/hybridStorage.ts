@@ -33,10 +33,12 @@ import type {
   InsertComponentRequisition,
   RunningHoursAudit,
   InsertRunningHoursAudit,
+  Job,
+  InsertJob,
 } from '@shared/schema';
 
 /**
- * HybridStorage - Routes Module 1, 2 & 3 operations to PostgreSQL, everything else to File Storage
+ * HybridStorage - Routes Module 1, 2, 3 & 4 operations to PostgreSQL, everything else to File Storage
  * 
  * Module 1 entities (routed to PostgresStorage):
  * - users
@@ -58,6 +60,9 @@ import type {
  * - component_maintenance_history (IMMUTABLE - INSERT ONLY)
  * - component_requisitions
  * - running_hours_audit
+ * 
+ * Module 4 entities (routed to PostgresStorage):
+ * - jobs (vessel & fleet)
  * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
@@ -131,7 +136,7 @@ export class HybridStorage implements IStorage {
     this.archiveSparesByIds = fs.archiveSparesByIds.bind(fs);
     
     this.getComponentsByCodes = fs.getComponentsByCodes.bind(fs);
-    this.getJobsByJobNos = fs.getJobsByJobNos.bind(fs);
+    // getJobsByJobNos now has explicit PostgreSQL routing below
     this.getWorkOrdersByTemplateIds = fs.getWorkOrdersByTemplateIds.bind(fs);
     
     this.archiveComponent = fs.archiveComponent.bind(fs);
@@ -184,14 +189,7 @@ export class HybridStorage implements IStorage {
     // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
     // now have explicit PostgreSQL routing below
     
-    this.getJobs = fs.getJobs.bind(fs);
-    this.getJob = fs.getJob.bind(fs);
-    this.createJob = fs.createJob.bind(fs);
-    this.updateJob = fs.updateJob.bind(fs);
-    this.deleteJob = fs.deleteJob.bind(fs);
-    this.bulkCreateJobs = fs.bulkCreateJobs.bind(fs);
-    this.bulkUpdateJobs = fs.bulkUpdateJobs.bind(fs);
-    this.bulkUpsertJobs = fs.bulkUpsertJobs.bind(fs);
+    // Module 4 Jobs methods - now have explicit PostgreSQL routing below
     
     this.getWorkOrders = fs.getWorkOrders.bind(fs);
     this.getWorkOrder = fs.getWorkOrder.bind(fs);
@@ -202,12 +200,6 @@ export class HybridStorage implements IStorage {
     this.bulkCreateWorkOrders = fs.bulkCreateWorkOrders.bind(fs);
     this.bulkUpdateWorkOrders = fs.bulkUpdateWorkOrders.bind(fs);
     this.bulkUpsertWorkOrders = fs.bulkUpsertWorkOrders.bind(fs);
-    
-    this.getFleetJobs = fs.getFleetJobs.bind(fs);
-    this.getFleetJob = fs.getFleetJob.bind(fs);
-    this.createFleetJob = fs.createFleetJob.bind(fs);
-    this.updateFleetJob = fs.updateFleetJob.bind(fs);
-    this.deleteFleetJob = fs.deleteFleetJob.bind(fs);
     
     this.getWorkOrderExecutions = fs.getWorkOrderExecutions.bind(fs);
     this.getWorkOrderExecutionById = fs.getWorkOrderExecutionById.bind(fs);
@@ -972,6 +964,107 @@ export class HybridStorage implements IStorage {
       return this.postgresStorage.getRunningHoursAuditsInDateRange(componentId, startDate, endDate);
     }
     return this.fileStorage.getRunningHoursAuditsInDateRange(componentId, startDate, endDate);
+  }
+
+  // ============= MODULE 4: JOBS (PostgreSQL) =============
+
+  async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getJobs(vesselId, componentId);
+    }
+    return this.fileStorage.getJobs(vesselId, componentId);
+  }
+
+  async getJob(id: string): Promise<Job | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getJob(id);
+    }
+    return this.fileStorage.getJob(id);
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createJob(job);
+    }
+    return this.fileStorage.createJob(job);
+  }
+
+  async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateJob(id, data);
+    }
+    return this.fileStorage.updateJob(id, data);
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteJob(id);
+    }
+    return this.fileStorage.deleteJob(id);
+  }
+
+  async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkCreateJobs(jobList);
+    }
+    return this.fileStorage.bulkCreateJobs(jobList);
+  }
+
+  async bulkUpdateJobs(updates: Array<{ jobNo: string; data: Partial<Job> }>): Promise<Job[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpdateJobs(updates);
+    }
+    return this.fileStorage.bulkUpdateJobs(updates);
+  }
+
+  async bulkUpsertJobs(jobList: InsertJob[]): Promise<{ created: number; updated: number }> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpsertJobs(jobList);
+    }
+    return this.fileStorage.bulkUpsertJobs(jobList);
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getJobsByJobNos(jobNos, vesselId);
+    }
+    return this.fileStorage.getJobsByJobNos(jobNos, vesselId);
+  }
+
+  // Fleet Jobs
+  async getFleetJobs(): Promise<Job[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetJobs();
+    }
+    return this.fileStorage.getFleetJobs();
+  }
+
+  async getFleetJob(id: string): Promise<Job | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetJob(id);
+    }
+    return this.fileStorage.getFleetJob(id);
+  }
+
+  async createFleetJob(job: InsertJob): Promise<Job> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetJob(job);
+    }
+    return this.fileStorage.createFleetJob(job);
+  }
+
+  async updateFleetJob(id: string, data: Partial<InsertJob>): Promise<Job> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateFleetJob(id, data);
+    }
+    return this.fileStorage.updateFleetJob(id, data);
+  }
+
+  async deleteFleetJob(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteFleetJob(id);
+    }
+    return this.fileStorage.deleteFleetJob(id);
   }
 
   // ============= DELEGATED METHODS (File Storage) =============

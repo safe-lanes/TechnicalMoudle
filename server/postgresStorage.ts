@@ -16,6 +16,7 @@ import {
   componentMaintenanceHistory,
   componentRequisitions,
   runningHoursAudit,
+  jobs,
   type User,
   type InsertUser,
   type Fleet,
@@ -46,6 +47,8 @@ import {
   type InsertComponentRequisition,
   type RunningHoursAudit,
   type InsertRunningHoursAudit,
+  type Job,
+  type InsertJob,
 } from '@shared/schema';
 
 /**
@@ -828,6 +831,197 @@ export class PostgresStorage {
         lte(runningHoursAudit.enteredAtUTC, endDate)
       ))
       .orderBy(desc(runningHoursAudit.enteredAtUTC));
+  }
+
+  // ============= MODULE 4: JOBS =============
+
+  async getJobs(vesselId?: string, componentId?: string): Promise<Job[]> {
+    const db = await getDb();
+    
+    if (vesselId && componentId) {
+      return await db.select().from(jobs)
+        .where(and(
+          eq(jobs.vesselId, vesselId),
+          eq(jobs.componentId, componentId),
+          eq(jobs.dataScope, 'vessel')
+        ))
+        .orderBy(asc(jobs.jobNo));
+    }
+    
+    if (vesselId) {
+      return await db.select().from(jobs)
+        .where(and(
+          eq(jobs.vesselId, vesselId),
+          eq(jobs.dataScope, 'vessel')
+        ))
+        .orderBy(asc(jobs.jobNo));
+    }
+    
+    return await db.select().from(jobs)
+      .where(eq(jobs.dataScope, 'vessel'))
+      .orderBy(asc(jobs.jobNo));
+  }
+
+  async getJob(id: string): Promise<Job | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(jobs).where(eq(jobs.id, id));
+    return result[0];
+  }
+
+  async getJobByJobNo(jobNo: string): Promise<Job | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(jobs).where(eq(jobs.jobNo, jobNo));
+    return result[0];
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const db = await getDb();
+    const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(jobs).values({
+      ...job,
+      id,
+      dataScope: job.dataScope || 'vessel',
+    }).returning();
+    return result[0];
+  }
+
+  async updateJob(id: string, data: Partial<InsertJob>): Promise<Job> {
+    const db = await getDb();
+    const result = await db.update(jobs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(jobs.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Job ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(jobs).where(eq(jobs.id, id));
+  }
+
+  async bulkCreateJobs(jobList: InsertJob[]): Promise<Job[]> {
+    if (jobList.length === 0) return [];
+    const db = await getDb();
+    const results: Job[] = [];
+    
+    for (const job of jobList) {
+      const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const result = await db.insert(jobs).values({
+        ...job,
+        id,
+        dataScope: job.dataScope || 'vessel',
+      }).returning();
+      results.push(result[0]);
+    }
+    
+    return results;
+  }
+
+  async bulkUpdateJobs(updates: Array<{ jobNo: string; data: Partial<Job> }>): Promise<Job[]> {
+    const db = await getDb();
+    const results: Job[] = [];
+    
+    for (const { jobNo, data } of updates) {
+      const result = await db.update(jobs)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(jobs.jobNo, jobNo))
+        .returning();
+      if (result[0]) {
+        results.push(result[0]);
+      }
+    }
+    
+    return results;
+  }
+
+  async bulkUpsertJobs(jobList: InsertJob[]): Promise<{ created: number; updated: number }> {
+    const db = await getDb();
+    let created = 0;
+    let updated = 0;
+    
+    for (const job of jobList) {
+      const existing = job.jobNo ? await this.getJobByJobNo(job.jobNo) : null;
+      
+      if (existing) {
+        await db.update(jobs)
+          .set({ ...job, updatedAt: new Date() })
+          .where(eq(jobs.id, existing.id));
+        updated++;
+      } else {
+        const id = `JOB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        await db.insert(jobs).values({
+          ...job,
+          id,
+          dataScope: job.dataScope || 'vessel',
+        });
+        created++;
+      }
+    }
+    
+    return { created, updated };
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, Job>> {
+    if (jobNos.length === 0) return new Map();
+    const db = await getDb();
+    
+    let result: Job[];
+    if (vesselId) {
+      result = await db.select().from(jobs)
+        .where(and(
+          inArray(jobs.jobNo, jobNos),
+          eq(jobs.vesselId, vesselId)
+        ));
+    } else {
+      result = await db.select().from(jobs)
+        .where(inArray(jobs.jobNo, jobNos));
+    }
+    
+    const map = new Map<string, Job>();
+    for (const job of result) {
+      map.set(job.jobNo, job);
+    }
+    return map;
+  }
+
+  // Fleet Jobs
+  async getFleetJobs(): Promise<Job[]> {
+    const db = await getDb();
+    return await db.select().from(jobs)
+      .where(eq(jobs.dataScope, 'fleet'))
+      .orderBy(asc(jobs.jobNo));
+  }
+
+  async getFleetJob(id: string): Promise<Job | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(jobs)
+      .where(and(
+        eq(jobs.id, id),
+        eq(jobs.dataScope, 'fleet')
+      ));
+    return result[0];
+  }
+
+  async createFleetJob(job: InsertJob): Promise<Job> {
+    const db = await getDb();
+    const id = `FJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(jobs).values({
+      ...job,
+      id,
+      dataScope: 'fleet',
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetJob(id: string, data: Partial<InsertJob>): Promise<Job> {
+    return this.updateJob(id, data);
+  }
+
+  async deleteFleetJob(id: string): Promise<void> {
+    return this.deleteJob(id);
   }
 }
 
