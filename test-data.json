@@ -13247,6 +13247,83 @@
       "createdAt": "2025-12-08T07:52:27.767Z",
       "updatedAt": "2025-12-08T07:52:27.767Z",
       "woTemplateCode": "MKR-IN-00001"
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "workOrderNo": "MKR-SE-00002.WO-2025-001",
+      "templateCode": "MKR-SE-00002.WO-2025-001",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Active",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "id": "20",
+      "createdAt": "2025-12-15T03:31:48.251Z",
+      "updatedAt": "2025-12-15T03:31:48.251Z",
+      "dataScope": "vessel",
+      "executionId": null,
+      "dateCompleted": null,
+      "submittedDate": null,
+      "formData": null,
+      "approverRemarks": null,
+      "templateId": null,
+      "approver": null,
+      "approvalDate": null,
+      "rejectionDate": null,
+      "nextDueDate": null,
+      "nextDueReading": null,
+      "currentReading": null,
+      "fleetEquipmentCode": null,
+      "fleetJobCode": null,
+      "isActive": null,
+      "applicableVesselIds": null,
+      "jobGroup": null,
+      "jobCategory": null,
+      "sfiCode": null,
+      "maintenanceIntervalValue": null,
+      "maintenanceIntervalUnit": null,
+      "intervalRunningHour": null,
+      "scopeNotes": null,
+      "criticality": null,
+      "uploadedDocuments": [],
+      "consumedSpareParts": [],
+      "rejectionComments": null,
+      "approvalAction": null
     }
   ],
   "workOrderExecutions": [],
@@ -15474,8 +15551,8 @@
   "defectActions": [],
   "defectAttachments": [],
   "recurringDefects": {
-    "1101": {
-      "id": 1101,
+    "1129": {
+      "id": 1129,
       "equipmentKey": "V001_BALLAST_PUMP_NO2",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15484,10 +15561,10 @@
       "lastOccurrenceDate": "2026-01-15",
       "hasCoc": false,
       "mtbfDays": "61",
-      "updatedAt": "2025-12-11T10:15:19.870Z"
+      "updatedAt": "2025-12-15T06:36:17.425Z"
     },
-    "1102": {
-      "id": 1102,
+    "1130": {
+      "id": 1130,
       "equipmentKey": "V001_STEERING_GEAR",
       "windowMonths": 12,
       "occurrenceCount": 2,
@@ -15496,24 +15573,24 @@
       "lastOccurrenceDate": "2026-01-20",
       "hasCoc": false,
       "mtbfDays": "56",
-      "updatedAt": "2025-12-11T10:15:19.905Z"
+      "updatedAt": "2025-12-15T06:36:17.486Z"
     }
   },
   "recurringDefectLinks": [
     {
-      "recurringId": 1101,
+      "recurringId": 1129,
       "defectId": "DEF-V001-2025-005"
     },
     {
-      "recurringId": 1101,
+      "recurringId": 1129,
       "defectId": "DEF-V001-2025-013"
     },
     {
-      "recurringId": 1102,
+      "recurringId": 1130,
       "defectId": "DEF-V001-2025-009"
     },
     {
-      "recurringId": 1102,
+      "recurringId": 1130,
       "defectId": "DEF-V001-2025-014"
     }
   ],
@@ -49899,6 +49976,24 @@
       "finishedAt": "2025-12-04T18:12:16.402Z",
       "status": "complete",
       "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1764871936402_OTHERS.xlsx"
+    },
+    {
+      "id": "40b0d71a-8e12-459c-ac3b-ae247c194db8",
+      "type": "components",
+      "mode": "upsert",
+      "archiveMissing": false,
+      "userId": 1,
+      "vesselId": "V007",
+      "originalName": "components_template (11).xlsx",
+      "fileSize": 20207,
+      "created": 0,
+      "updated": 0,
+      "skipped": 0,
+      "archived": 0,
+      "startedAt": "2025-12-15T05:18:27.635Z",
+      "finishedAt": "2025-12-15T05:18:27.743Z",
+      "status": "failed",
+      "errorMessage": "Cannot read properties of undefined (reading 'match')"
     }
   ],
   "makers": [
@@ -57855,12 +57950,12 @@
     "alertConfigId": 1,
     "formDefinitionId": 1,
     "formVersionId": 1,
-    "workOrderId": 20,
+    "workOrderId": 21,
     "executionId": 1,
     "defectId": 5,
     "defectActionId": 1,
     "defectAttachmentId": 1,
-    "recurringDefectId": 1103,
+    "recurringDefectId": 1131,
     "auditLogId": 6,
     "pmsVesselSettingsId": 2,
     "storesItemId": 51,

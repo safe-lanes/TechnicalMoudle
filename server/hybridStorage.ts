@@ -11,16 +11,33 @@ import type {
   InsertVessel,
   PmsVesselSettings,
   InsertPmsVesselSettings,
+  Maker,
+  InsertMaker,
+  MasterList,
+  InsertMasterList,
+  MakerList,
+  InsertMakerList,
+  SfiDetails,
+  InsertSfiDetails,
+  MasterData,
+  InsertMasterData,
 } from '@shared/schema';
 
 /**
- * HybridStorage - Routes Module 1 operations to PostgreSQL, everything else to File Storage
+ * HybridStorage - Routes Module 1 & 2 operations to PostgreSQL, everything else to File Storage
  * 
  * Module 1 entities (routed to PostgresStorage):
  * - users
  * - fleets  
  * - vessels
  * - pms_vessel_settings
+ * 
+ * Module 2 entities (routed to PostgresStorage):
+ * - makers
+ * - master_lists
+ * - maker_list
+ * - sfi_details
+ * - master_data
  * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
@@ -250,18 +267,7 @@ export class HybridStorage implements IStorage {
     this.getImportChangeLogs = fs.getImportChangeLogs.bind(fs);
     this.deleteImportChangeLogs = fs.deleteImportChangeLogs.bind(fs);
     
-    this.getMakers = fs.getMakers.bind(fs);
-    this.getMakerById = fs.getMakerById.bind(fs);
-    this.createMaker = fs.createMaker.bind(fs);
-    this.updateMaker = fs.updateMaker.bind(fs);
-    this.deleteMaker = fs.deleteMaker.bind(fs);
-    
-    this.getMasterLists = fs.getMasterLists.bind(fs);
-    this.getMasterListById = fs.getMasterListById.bind(fs);
-    this.getMasterListsByType = fs.getMasterListsByType.bind(fs);
-    this.createMasterList = fs.createMasterList.bind(fs);
-    this.updateMasterList = fs.updateMasterList.bind(fs);
-    this.deleteMasterList = fs.deleteMasterList.bind(fs);
+    // Module 2 methods (Makers, MasterLists) now have explicit PostgreSQL routing below
     
     this.purgeJobsAndLinkedData = fs.purgeJobsAndLinkedData.bind(fs);
     
@@ -282,28 +288,7 @@ export class HybridStorage implements IStorage {
     this.generateOnDemandWorkOrder = fs.generateOnDemandWorkOrder.bind(fs);
     this.checkAndRevertPostponedWorkOrders = fs.checkAndRevertPostponedWorkOrders.bind(fs);
     
-    this.getMakerList = fs.getMakerList.bind(fs);
-    this.getMakerListItem = fs.getMakerListItem.bind(fs);
-    this.getMakerListByCode = fs.getMakerListByCode.bind(fs);
-    this.createMakerListItem = fs.createMakerListItem.bind(fs);
-    this.updateMakerListItem = fs.updateMakerListItem.bind(fs);
-    this.deleteMakerListItem = fs.deleteMakerListItem.bind(fs);
-    
-    this.getSfiDetails = fs.getSfiDetails.bind(fs);
-    this.getSfiDetail = fs.getSfiDetail.bind(fs);
-    this.getSfiByCode = fs.getSfiByCode.bind(fs);
-    this.createSfiDetail = fs.createSfiDetail.bind(fs);
-    this.updateSfiDetail = fs.updateSfiDetail.bind(fs);
-    this.deleteSfiDetail = fs.deleteSfiDetail.bind(fs);
-    
-    this.getMasterDataList = fs.getMasterDataList.bind(fs);
-    this.getMasterDataItem = fs.getMasterDataItem.bind(fs);
-    this.getMasterDataByFleetCode = fs.getMasterDataByFleetCode.bind(fs);
-    this.getMasterDataByMakerModel = fs.getMasterDataByMakerModel.bind(fs);
-    this.createMasterData = fs.createMasterData.bind(fs);
-    this.updateMasterData = fs.updateMasterData.bind(fs);
-    this.deleteMasterData = fs.deleteMasterData.bind(fs);
-    this.generateFleetEquipmentCode = fs.generateFleetEquipmentCode.bind(fs);
+    // Module 2 methods (MakerList, SfiDetails, MasterData) have explicit PostgreSQL routing below
     
     this.getFleetVesselMappingsByVessel = fs.getFleetVesselMappingsByVessel.bind(fs);
     this.createFleetVesselMappingRecord = fs.createFleetVesselMappingRecord.bind(fs);
@@ -516,6 +501,233 @@ export class HybridStorage implements IStorage {
       return;
     }
     return this.fileStorage.deletePmsVesselSettings(vesselId);
+  }
+
+  // ============= MODULE 2: MAKERS (PostgreSQL) =============
+
+  async getMakers(search?: string): Promise<Maker[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMakers(search);
+    }
+    return this.fileStorage.getMakers(search);
+  }
+
+  async getMakerById(id: number): Promise<Maker | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMakerById(id);
+    }
+    return this.fileStorage.getMakerById(id);
+  }
+
+  async createMaker(maker: InsertMaker): Promise<Maker> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createMaker(maker);
+    }
+    return this.fileStorage.createMaker(maker);
+  }
+
+  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateMaker(id, data);
+    }
+    return this.fileStorage.updateMaker(id, data);
+  }
+
+  async deleteMaker(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteMaker(id);
+    }
+    return this.fileStorage.deleteMaker(id);
+  }
+
+  // ============= MODULE 2: MASTER LISTS (PostgreSQL) =============
+
+  async getMasterLists(listType?: string): Promise<MasterList[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterLists(listType);
+    }
+    return this.fileStorage.getMasterLists(listType);
+  }
+
+  async getMasterListById(id: number): Promise<MasterList | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterListById(id);
+    }
+    return this.fileStorage.getMasterListById(id);
+  }
+
+  async getMasterListsByType(listType: string): Promise<MasterList[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterListsByType(listType);
+    }
+    return this.fileStorage.getMasterListsByType(listType);
+  }
+
+  async createMasterList(list: InsertMasterList): Promise<MasterList> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createMasterList(list);
+    }
+    return this.fileStorage.createMasterList(list);
+  }
+
+  async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateMasterList(id, data);
+    }
+    return this.fileStorage.updateMasterList(id, data);
+  }
+
+  async deleteMasterList(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteMasterList(id);
+    }
+    return this.fileStorage.deleteMasterList(id);
+  }
+
+  // ============= MODULE 2: MAKER LIST (PostgreSQL) =============
+
+  async getMakerList(): Promise<MakerList[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMakerList();
+    }
+    return this.fileStorage.getMakerList();
+  }
+
+  async getMakerListItem(id: number): Promise<MakerList | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMakerListItem(id);
+    }
+    return this.fileStorage.getMakerListItem(id);
+  }
+
+  async getMakerListByCode(makerCode: string): Promise<MakerList | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMakerListByCode(makerCode);
+    }
+    return this.fileStorage.getMakerListByCode(makerCode);
+  }
+
+  async createMakerListItem(maker: InsertMakerList): Promise<MakerList> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createMakerListItem(maker);
+    }
+    return this.fileStorage.createMakerListItem(maker);
+  }
+
+  async updateMakerListItem(id: number, data: Partial<MakerList>): Promise<MakerList> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateMakerListItem(id, data);
+    }
+    return this.fileStorage.updateMakerListItem(id, data);
+  }
+
+  async deleteMakerListItem(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteMakerListItem(id);
+    }
+    return this.fileStorage.deleteMakerListItem(id);
+  }
+
+  // ============= MODULE 2: SFI DETAILS (PostgreSQL) =============
+
+  async getSfiDetails(): Promise<SfiDetails[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSfiDetails();
+    }
+    return this.fileStorage.getSfiDetails();
+  }
+
+  async getSfiDetail(id: number): Promise<SfiDetails | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSfiDetail(id);
+    }
+    return this.fileStorage.getSfiDetail(id);
+  }
+
+  async getSfiByCode(componentCode: string): Promise<SfiDetails | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSfiByCode(componentCode);
+    }
+    return this.fileStorage.getSfiByCode(componentCode);
+  }
+
+  async createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createSfiDetail(sfi);
+    }
+    return this.fileStorage.createSfiDetail(sfi);
+  }
+
+  async updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateSfiDetail(id, data);
+    }
+    return this.fileStorage.updateSfiDetail(id, data);
+  }
+
+  async deleteSfiDetail(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteSfiDetail(id);
+    }
+    return this.fileStorage.deleteSfiDetail(id);
+  }
+
+  // ============= MODULE 2: MASTER DATA (PostgreSQL) =============
+
+  async getMasterDataList(): Promise<MasterData[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterDataList();
+    }
+    return this.fileStorage.getMasterDataList();
+  }
+
+  async getMasterDataItem(id: number): Promise<MasterData | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterDataItem(id);
+    }
+    return this.fileStorage.getMasterDataItem(id);
+  }
+
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterDataByFleetCode(fleetEquipmentCode);
+    }
+    return this.fileStorage.getMasterDataByFleetCode(fleetEquipmentCode);
+  }
+
+  async getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getMasterDataByMakerModel(makerCode, model);
+    }
+    return this.fileStorage.getMasterDataByMakerModel(makerCode, model);
+  }
+
+  async createMasterData(data: InsertMasterData): Promise<MasterData> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createMasterData(data);
+    }
+    return this.fileStorage.createMasterData(data);
+  }
+
+  async updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateMasterData(id, data);
+    }
+    return this.fileStorage.updateMasterData(id, data);
+  }
+
+  async deleteMasterData(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteMasterData(id);
+    }
+    return this.fileStorage.deleteMasterData(id);
+  }
+
+  async generateFleetEquipmentCode(sfiCode: string): Promise<string> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.generateFleetEquipmentCode(sfiCode);
+    }
+    return this.fileStorage.generateFleetEquipmentCode(sfiCode);
   }
 
   // ============= DELEGATED METHODS (File Storage) =============
@@ -733,18 +945,6 @@ export class HybridStorage implements IStorage {
   getImportChangeLogs!: IStorage['getImportChangeLogs'];
   deleteImportChangeLogs!: IStorage['deleteImportChangeLogs'];
   
-  getMakers!: IStorage['getMakers'];
-  getMakerById!: IStorage['getMakerById'];
-  createMaker!: IStorage['createMaker'];
-  updateMaker!: IStorage['updateMaker'];
-  deleteMaker!: IStorage['deleteMaker'];
-  
-  getMasterLists!: IStorage['getMasterLists'];
-  getMasterListById!: IStorage['getMasterListById'];
-  getMasterListsByType!: IStorage['getMasterListsByType'];
-  createMasterList!: IStorage['createMasterList'];
-  updateMasterList!: IStorage['updateMasterList'];
-  deleteMasterList!: IStorage['deleteMasterList'];
   
   purgeJobsAndLinkedData!: IStorage['purgeJobsAndLinkedData'];
   
@@ -765,28 +965,6 @@ export class HybridStorage implements IStorage {
   generateOnDemandWorkOrder!: IStorage['generateOnDemandWorkOrder'];
   checkAndRevertPostponedWorkOrders!: IStorage['checkAndRevertPostponedWorkOrders'];
   
-  getMakerList!: IStorage['getMakerList'];
-  getMakerListItem!: IStorage['getMakerListItem'];
-  getMakerListByCode!: IStorage['getMakerListByCode'];
-  createMakerListItem!: IStorage['createMakerListItem'];
-  updateMakerListItem!: IStorage['updateMakerListItem'];
-  deleteMakerListItem!: IStorage['deleteMakerListItem'];
-  
-  getSfiDetails!: IStorage['getSfiDetails'];
-  getSfiDetail!: IStorage['getSfiDetail'];
-  getSfiByCode!: IStorage['getSfiByCode'];
-  createSfiDetail!: IStorage['createSfiDetail'];
-  updateSfiDetail!: IStorage['updateSfiDetail'];
-  deleteSfiDetail!: IStorage['deleteSfiDetail'];
-  
-  getMasterDataList!: IStorage['getMasterDataList'];
-  getMasterDataItem!: IStorage['getMasterDataItem'];
-  getMasterDataByFleetCode!: IStorage['getMasterDataByFleetCode'];
-  getMasterDataByMakerModel!: IStorage['getMasterDataByMakerModel'];
-  createMasterData!: IStorage['createMasterData'];
-  updateMasterData!: IStorage['updateMasterData'];
-  deleteMasterData!: IStorage['deleteMasterData'];
-  generateFleetEquipmentCode!: IStorage['generateFleetEquipmentCode'];
   
   getFleetVesselMappingsByVessel!: IStorage['getFleetVesselMappingsByVessel'];
   createFleetVesselMappingRecord!: IStorage['createFleetVesselMappingRecord'];

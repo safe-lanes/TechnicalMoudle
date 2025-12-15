@@ -1,10 +1,15 @@
-import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
   fleets,
   vessels,
   pmsVesselSettings,
+  makers,
+  masterLists,
+  makerList,
+  sfiDetails,
+  masterData,
   type User,
   type InsertUser,
   type Fleet,
@@ -13,6 +18,16 @@ import {
   type InsertVessel,
   type PmsVesselSettings,
   type InsertPmsVesselSettings,
+  type Maker,
+  type InsertMaker,
+  type MasterList,
+  type InsertMasterList,
+  type MakerList,
+  type InsertMakerList,
+  type SfiDetails,
+  type InsertSfiDetails,
+  type MasterData,
+  type InsertMasterData,
 } from '@shared/schema';
 
 /**
@@ -206,6 +221,305 @@ export class PostgresStorage {
   async deletePmsVesselSettings(id: number): Promise<void> {
     const db = await getDb();
     await db.delete(pmsVesselSettings).where(eq(pmsVesselSettings.id, id));
+  }
+
+  // ============= MODULE 2: MAKERS =============
+
+  async getMakers(search?: string): Promise<Maker[]> {
+    const db = await getDb();
+    if (search) {
+      const searchPattern = `%${search}%`;
+      const result = await db.select().from(makers)
+        .where(or(
+          ilike(makers.makerName, searchPattern),
+          ilike(makers.makerCode, searchPattern)
+        ))
+        .orderBy(asc(makers.makerName));
+      return result;
+    }
+    return await db.select().from(makers).orderBy(asc(makers.makerName));
+  }
+
+  async getMakerById(id: number): Promise<Maker | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(makers).where(eq(makers.id, id));
+    return result[0];
+  }
+
+  async createMaker(maker: InsertMaker): Promise<Maker> {
+    const db = await getDb();
+    // Generate makerCode if not provided
+    let makerCode = maker.makerCode;
+    if (!makerCode) {
+      const allMakers = await db.select({ id: makers.id }).from(makers);
+      const nextId = allMakers.length > 0 ? Math.max(...allMakers.map(m => m.id)) + 1 : 1;
+      makerCode = `MKR-${String(nextId).padStart(6, '0')}`;
+    }
+    const result = await db.insert(makers).values({
+      ...maker,
+      makerCode,
+    }).returning();
+    return result[0];
+  }
+
+  async updateMaker(id: number, data: Partial<InsertMaker>): Promise<Maker> {
+    const db = await getDb();
+    const result = await db.update(makers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(makers.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Maker with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteMaker(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(makers).where(eq(makers.id, id));
+  }
+
+  // ============= MODULE 2: MASTER LISTS =============
+
+  async getMasterLists(listType?: string): Promise<MasterList[]> {
+    const db = await getDb();
+    if (listType) {
+      return await db.select().from(masterLists)
+        .where(and(eq(masterLists.listType, listType), eq(masterLists.isActive, true)))
+        .orderBy(asc(masterLists.listType), asc(masterLists.displayOrder));
+    }
+    return await db.select().from(masterLists)
+      .where(eq(masterLists.isActive, true))
+      .orderBy(asc(masterLists.listType), asc(masterLists.displayOrder));
+  }
+
+  async getMasterListById(id: number): Promise<MasterList | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterLists).where(eq(masterLists.id, id));
+    return result[0];
+  }
+
+  async getMasterListsByType(listType: string): Promise<MasterList[]> {
+    return this.getMasterLists(listType);
+  }
+
+  async createMasterList(list: InsertMasterList): Promise<MasterList> {
+    const db = await getDb();
+    const result = await db.insert(masterLists).values(list).returning();
+    return result[0];
+  }
+
+  async updateMasterList(id: number, data: Partial<InsertMasterList>): Promise<MasterList> {
+    const db = await getDb();
+    const result = await db.update(masterLists)
+      .set(data)
+      .where(eq(masterLists.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Master list with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteMasterList(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(masterLists).where(eq(masterLists.id, id));
+  }
+
+  // ============= MODULE 2: MAKER LIST =============
+
+  async getMakerList(): Promise<MakerList[]> {
+    const db = await getDb();
+    return await db.select().from(makerList).where(eq(makerList.isActive, true));
+  }
+
+  async getMakerListItem(id: number): Promise<MakerList | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(makerList).where(eq(makerList.id, id));
+    return result[0];
+  }
+
+  async getMakerListByCode(makerCode: string): Promise<MakerList | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(makerList).where(eq(makerList.makerCode, makerCode));
+    return result[0];
+  }
+
+  async createMakerListItem(maker: InsertMakerList): Promise<MakerList> {
+    const db = await getDb();
+    const result = await db.insert(makerList).values({
+      makerCode: maker.makerCode,
+      makerName: maker.makerName,
+      address: maker.address || null,
+      addressId: maker.addressId || null,
+      isActive: maker.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async updateMakerListItem(id: number, data: Partial<MakerList>): Promise<MakerList> {
+    const db = await getDb();
+    const result = await db.update(makerList)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(makerList.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Maker list item with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteMakerListItem(id: number): Promise<void> {
+    const db = await getDb();
+    // Soft delete by setting isActive to false
+    await db.update(makerList)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(makerList.id, id));
+  }
+
+  // ============= MODULE 2: SFI DETAILS =============
+
+  async getSfiDetails(): Promise<SfiDetails[]> {
+    const db = await getDb();
+    return await db.select().from(sfiDetails).where(eq(sfiDetails.isActive, true));
+  }
+
+  async getSfiDetail(id: number): Promise<SfiDetails | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(sfiDetails).where(eq(sfiDetails.id, id));
+    return result[0];
+  }
+
+  async getSfiByCode(componentCode: string): Promise<SfiDetails | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(sfiDetails)
+      .where(eq(sfiDetails.componentCode, componentCode));
+    return result[0];
+  }
+
+  async createSfiDetail(sfi: InsertSfiDetails): Promise<SfiDetails> {
+    const db = await getDb();
+    const result = await db.insert(sfiDetails).values({
+      componentCode: sfi.componentCode,
+      componentName: sfi.componentName,
+      description: sfi.description || null,
+      isActive: sfi.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async updateSfiDetail(id: number, data: Partial<SfiDetails>): Promise<SfiDetails> {
+    const db = await getDb();
+    const result = await db.update(sfiDetails)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(sfiDetails.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`SFI Detail with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteSfiDetail(id: number): Promise<void> {
+    const db = await getDb();
+    // Soft delete by setting isActive to false
+    await db.update(sfiDetails)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(sfiDetails.id, id));
+  }
+
+  // ============= MODULE 2: MASTER DATA =============
+
+  async getMasterDataList(): Promise<MasterData[]> {
+    const db = await getDb();
+    return await db.select().from(masterData).where(eq(masterData.isActive, true));
+  }
+
+  async getMasterDataItem(id: number): Promise<MasterData | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterData).where(eq(masterData.id, id));
+    return result[0];
+  }
+
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<MasterData | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterData)
+      .where(eq(masterData.fleetEquipmentCode, fleetEquipmentCode));
+    return result[0];
+  }
+
+  async getMasterDataByMakerModel(makerCode: string, model: string): Promise<MasterData | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(masterData)
+      .where(and(eq(masterData.makerCode, makerCode), eq(masterData.model, model)));
+    return result[0];
+  }
+
+  async createMasterData(data: InsertMasterData): Promise<MasterData> {
+    const db = await getDb();
+    const result = await db.insert(masterData).values({
+      slNo: data.slNo ?? null,
+      makerName: data.makerName,
+      makerCode: data.makerCode,
+      countMaker: data.countMaker ?? null,
+      model: data.model,
+      modelCode: data.modelCode,
+      countSfiCode: data.countSfiCode ?? null,
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      sfiCode: data.sfiCode,
+      assignedSubCode: data.assignedSubCode ?? null,
+      vesselName: data.vesselName ?? null,
+      vesselCode: data.vesselCode ?? null,
+      equipmentName: data.equipmentName,
+      isActive: data.isActive ?? true,
+    }).returning();
+    return result[0];
+  }
+
+  async updateMasterData(id: number, data: Partial<MasterData>): Promise<MasterData> {
+    const db = await getDb();
+    const result = await db.update(masterData)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(masterData.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Master Data with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteMasterData(id: number): Promise<void> {
+    const db = await getDb();
+    // Soft delete by setting isActive to false
+    await db.update(masterData)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(masterData.id, id));
+  }
+
+  async generateFleetEquipmentCode(sfiCode: string): Promise<string> {
+    const db = await getDb();
+    const existingCodes = await db.select({ fleetEquipmentCode: masterData.fleetEquipmentCode })
+      .from(masterData)
+      .where(eq(masterData.sfiCode, sfiCode));
+    
+    const codes = existingCodes.map(r => r.fleetEquipmentCode);
+    const seqNumbers = codes.map(code => {
+      const parts = code.split('.');
+      if (parts.length >= 2) {
+        const seqPart = parts[1];
+        return parseInt(seqPart, 10) || 0;
+      }
+      return 0;
+    });
+    
+    const nextSeq = Math.max(0, ...seqNumbers) + 1;
+    const seqStr = nextSeq.toString().padStart(3, '0');
+    
+    const subCodeIndex = codes.filter(c => c.startsWith(`${sfiCode}.${seqStr}`)).length;
+    const subCode = String.fromCharCode(65 + Math.floor(subCodeIndex / 26)) + 
+                    String.fromCharCode(65 + (subCodeIndex % 26));
+    
+    return `${sfiCode}.${seqStr}.${subCode}`;
   }
 }
 
