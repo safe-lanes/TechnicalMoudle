@@ -21,10 +21,22 @@ import type {
   InsertSfiDetails,
   MasterData,
   InsertMasterData,
+  Component,
+  InsertComponent,
+  ComponentDocument,
+  InsertComponentDocument,
+  ComponentClassRegulatory,
+  InsertComponentClassRegulatory,
+  ComponentMaintenanceHistory,
+  InsertComponentMaintenanceHistory,
+  ComponentRequisition,
+  InsertComponentRequisition,
+  RunningHoursAudit,
+  InsertRunningHoursAudit,
 } from '@shared/schema';
 
 /**
- * HybridStorage - Routes Module 1 & 2 operations to PostgreSQL, everything else to File Storage
+ * HybridStorage - Routes Module 1, 2 & 3 operations to PostgreSQL, everything else to File Storage
  * 
  * Module 1 entities (routed to PostgresStorage):
  * - users
@@ -38,6 +50,14 @@ import type {
  * - maker_list
  * - sfi_details
  * - master_data
+ * 
+ * Module 3 entities (routed to PostgresStorage):
+ * - components (vessel & fleet)
+ * - component_documents
+ * - component_class_regulatory
+ * - component_maintenance_history (IMMUTABLE - INSERT ONLY)
+ * - component_requisitions
+ * - running_hours_audit
  * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
@@ -56,24 +76,10 @@ export class HybridStorage implements IStorage {
   private bindFileStorageMethods(): void {
     const fs = this.fileStorage;
     
-    this.getComponents = fs.getComponents.bind(fs);
-    this.getComponent = fs.getComponent.bind(fs);
-    this.getComponentByCode = fs.getComponentByCode.bind(fs);
-    this.createComponent = fs.createComponent.bind(fs);
-    this.updateComponent = fs.updateComponent.bind(fs);
-    this.deleteComponent = fs.deleteComponent.bind(fs);
-    this.inactivateComponent = fs.inactivateComponent.bind(fs);
-    this.createRunningHoursAudit = fs.createRunningHoursAudit.bind(fs);
-    this.getRunningHoursAudits = fs.getRunningHoursAudits.bind(fs);
-    this.getRunningHoursAuditsInDateRange = fs.getRunningHoursAuditsInDateRange.bind(fs);
+    // Module 3 methods (Components, Running Hours Audit) now have explicit PostgreSQL routing below
+    // Keep only methods NOT migrated to PostgresStorage
     this.getRunningHourParents = fs.getRunningHourParents.bind(fs);
     this.cascadeRunningHoursUpdate = fs.cascadeRunningHoursUpdate.bind(fs);
-    
-    this.getFleetComponents = fs.getFleetComponents.bind(fs);
-    this.getFleetComponent = fs.getFleetComponent.bind(fs);
-    this.createFleetComponent = fs.createFleetComponent.bind(fs);
-    this.updateFleetComponent = fs.updateFleetComponent.bind(fs);
-    this.deleteFleetComponent = fs.deleteFleetComponent.bind(fs);
     
     this.getAllSpares = fs.getAllSpares.bind(fs);
     this.getSpares = fs.getSpares.bind(fs);
@@ -175,29 +181,8 @@ export class HybridStorage implements IStorage {
     this.createIhmMaintenanceLogEntry = fs.createIhmMaintenanceLogEntry.bind(fs);
     this.getIhmStatusReport = fs.getIhmStatusReport.bind(fs);
     
-    this.getComponentDocuments = fs.getComponentDocuments.bind(fs);
-    this.getComponentDocument = fs.getComponentDocument.bind(fs);
-    this.createComponentDocument = fs.createComponentDocument.bind(fs);
-    this.updateComponentDocument = fs.updateComponentDocument.bind(fs);
-    this.deleteComponentDocument = fs.deleteComponentDocument.bind(fs);
-    
-    this.getComponentClassRegulatory = fs.getComponentClassRegulatory.bind(fs);
-    this.getComponentClassRegulatoryItem = fs.getComponentClassRegulatoryItem.bind(fs);
-    this.createComponentClassRegulatory = fs.createComponentClassRegulatory.bind(fs);
-    this.updateComponentClassRegulatory = fs.updateComponentClassRegulatory.bind(fs);
-    this.deleteComponentClassRegulatory = fs.deleteComponentClassRegulatory.bind(fs);
-    
-    this.getAllComponentMaintenanceHistory = fs.getAllComponentMaintenanceHistory.bind(fs);
-    this.getComponentMaintenanceHistory = fs.getComponentMaintenanceHistory.bind(fs);
-    this.getComponentMaintenanceHistoryItem = fs.getComponentMaintenanceHistoryItem.bind(fs);
-    this.createComponentMaintenanceHistory = fs.createComponentMaintenanceHistory.bind(fs);
-    
-    this.getComponentRequisitions = fs.getComponentRequisitions.bind(fs);
-    this.getAllComponentRequisitions = fs.getAllComponentRequisitions.bind(fs);
-    this.getComponentRequisitionItem = fs.getComponentRequisitionItem.bind(fs);
-    this.createComponentRequisition = fs.createComponentRequisition.bind(fs);
-    this.updateComponentRequisition = fs.updateComponentRequisition.bind(fs);
-    this.deleteComponentRequisition = fs.deleteComponentRequisition.bind(fs);
+    // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
+    // now have explicit PostgreSQL routing below
     
     this.getJobs = fs.getJobs.bind(fs);
     this.getJob = fs.getJob.bind(fs);
@@ -730,28 +715,272 @@ export class HybridStorage implements IStorage {
     return this.fileStorage.generateFleetEquipmentCode(sfiCode);
   }
 
+  // ============= MODULE 3: COMPONENTS (PostgreSQL) =============
+
+  async getComponents(vesselId: string): Promise<Component[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponents(vesselId);
+    }
+    return this.fileStorage.getComponents(vesselId);
+  }
+
+  async getComponent(id: string): Promise<Component | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponent(id);
+    }
+    return this.fileStorage.getComponent(id);
+  }
+
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentByCode(componentCode, vesselId);
+    }
+    return this.fileStorage.getComponentByCode(componentCode, vesselId);
+  }
+
+  async createComponent(component: InsertComponent): Promise<Component> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createComponent(component);
+    }
+    return this.fileStorage.createComponent(component);
+  }
+
+  async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateComponent(id, data);
+    }
+    return this.fileStorage.updateComponent(id, data);
+  }
+
+  async deleteComponent(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteComponent(id);
+    }
+    return this.fileStorage.deleteComponent(id);
+  }
+
+  async inactivateComponent(id: string): Promise<Component> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.inactivateComponent(id);
+    }
+    return this.fileStorage.inactivateComponent(id);
+  }
+
+  // ============= MODULE 3: FLEET COMPONENTS (PostgreSQL) =============
+
+  async getFleetComponents(): Promise<Component[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetComponents();
+    }
+    return this.fileStorage.getFleetComponents();
+  }
+
+  async getFleetComponent(id: string): Promise<Component | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetComponent(id);
+    }
+    return this.fileStorage.getFleetComponent(id);
+  }
+
+  async createFleetComponent(component: InsertComponent): Promise<Component> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetComponent(component);
+    }
+    return this.fileStorage.createFleetComponent(component);
+  }
+
+  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateFleetComponent(id, data);
+    }
+    return this.fileStorage.updateFleetComponent(id, data);
+  }
+
+  async deleteFleetComponent(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteFleetComponent(id);
+    }
+    return this.fileStorage.deleteFleetComponent(id);
+  }
+
+  // ============= MODULE 3: COMPONENT DOCUMENTS (PostgreSQL) =============
+
+  async getComponentDocuments(componentId: string): Promise<ComponentDocument[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentDocuments(componentId);
+    }
+    return this.fileStorage.getComponentDocuments(componentId);
+  }
+
+  async getComponentDocument(id: number): Promise<ComponentDocument | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentDocument(id);
+    }
+    return this.fileStorage.getComponentDocument(id);
+  }
+
+  async createComponentDocument(doc: InsertComponentDocument): Promise<ComponentDocument> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createComponentDocument(doc);
+    }
+    return this.fileStorage.createComponentDocument(doc);
+  }
+
+  async updateComponentDocument(id: number, data: Partial<ComponentDocument>): Promise<ComponentDocument> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateComponentDocument(id, data);
+    }
+    return this.fileStorage.updateComponentDocument(id, data);
+  }
+
+  async deleteComponentDocument(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteComponentDocument(id);
+    }
+    return this.fileStorage.deleteComponentDocument(id);
+  }
+
+  // ============= MODULE 3: COMPONENT CLASS REGULATORY (PostgreSQL) =============
+
+  async getComponentClassRegulatory(componentId: string): Promise<ComponentClassRegulatory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentClassRegulatory(componentId);
+    }
+    return this.fileStorage.getComponentClassRegulatory(componentId);
+  }
+
+  async getComponentClassRegulatoryItem(id: number): Promise<ComponentClassRegulatory | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentClassRegulatoryItem(id);
+    }
+    return this.fileStorage.getComponentClassRegulatoryItem(id);
+  }
+
+  async createComponentClassRegulatory(item: InsertComponentClassRegulatory): Promise<ComponentClassRegulatory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createComponentClassRegulatory(item);
+    }
+    return this.fileStorage.createComponentClassRegulatory(item);
+  }
+
+  async updateComponentClassRegulatory(id: number, data: Partial<ComponentClassRegulatory>): Promise<ComponentClassRegulatory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateComponentClassRegulatory(id, data);
+    }
+    return this.fileStorage.updateComponentClassRegulatory(id, data);
+  }
+
+  async deleteComponentClassRegulatory(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteComponentClassRegulatory(id);
+    }
+    return this.fileStorage.deleteComponentClassRegulatory(id);
+  }
+
+  // ============= MODULE 3: COMPONENT MAINTENANCE HISTORY (PostgreSQL - IMMUTABLE) =============
+
+  async getAllComponentMaintenanceHistory(vesselCode?: string): Promise<ComponentMaintenanceHistory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAllComponentMaintenanceHistory(vesselCode);
+    }
+    return this.fileStorage.getAllComponentMaintenanceHistory(vesselCode);
+  }
+
+  async getComponentMaintenanceHistory(componentId: string): Promise<ComponentMaintenanceHistory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentMaintenanceHistory(componentId);
+    }
+    return this.fileStorage.getComponentMaintenanceHistory(componentId);
+  }
+
+  async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentMaintenanceHistoryItem(id);
+    }
+    return this.fileStorage.getComponentMaintenanceHistoryItem(id);
+  }
+
+  async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createComponentMaintenanceHistory(history);
+    }
+    return this.fileStorage.createComponentMaintenanceHistory(history);
+  }
+
+  // ============= MODULE 3: COMPONENT REQUISITIONS (PostgreSQL) =============
+
+  async getComponentRequisitions(componentId: string): Promise<ComponentRequisition[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentRequisitions(componentId);
+    }
+    return this.fileStorage.getComponentRequisitions(componentId);
+  }
+
+  async getAllComponentRequisitions(vesselCode?: string): Promise<ComponentRequisition[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAllComponentRequisitions(vesselCode);
+    }
+    return this.fileStorage.getAllComponentRequisitions(vesselCode);
+  }
+
+  async getComponentRequisitionItem(id: number): Promise<ComponentRequisition | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getComponentRequisitionItem(id);
+    }
+    return this.fileStorage.getComponentRequisitionItem(id);
+  }
+
+  async createComponentRequisition(item: InsertComponentRequisition): Promise<ComponentRequisition> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createComponentRequisition(item);
+    }
+    return this.fileStorage.createComponentRequisition(item);
+  }
+
+  async updateComponentRequisition(id: number, data: Partial<ComponentRequisition>): Promise<ComponentRequisition> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateComponentRequisition(id, data);
+    }
+    return this.fileStorage.updateComponentRequisition(id, data);
+  }
+
+  async deleteComponentRequisition(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteComponentRequisition(id);
+    }
+    return this.fileStorage.deleteComponentRequisition(id);
+  }
+
+  // ============= MODULE 3: RUNNING HOURS AUDIT (PostgreSQL) =============
+
+  async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createRunningHoursAudit(audit);
+    }
+    return this.fileStorage.createRunningHoursAudit(audit);
+  }
+
+  async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getRunningHoursAudits(componentId, limit);
+    }
+    return this.fileStorage.getRunningHoursAudits(componentId, limit);
+  }
+
+  async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<RunningHoursAudit[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getRunningHoursAuditsInDateRange(componentId, startDate, endDate);
+    }
+    return this.fileStorage.getRunningHoursAuditsInDateRange(componentId, startDate, endDate);
+  }
+
   // ============= DELEGATED METHODS (File Storage) =============
   // These are assigned in bindFileStorageMethods() and will be migrated
   // to PostgresStorage in future modules
   
-  getComponents!: IStorage['getComponents'];
-  getComponent!: IStorage['getComponent'];
-  getComponentByCode!: IStorage['getComponentByCode'];
-  createComponent!: IStorage['createComponent'];
-  updateComponent!: IStorage['updateComponent'];
-  deleteComponent!: IStorage['deleteComponent'];
-  inactivateComponent!: IStorage['inactivateComponent'];
-  createRunningHoursAudit!: IStorage['createRunningHoursAudit'];
-  getRunningHoursAudits!: IStorage['getRunningHoursAudits'];
-  getRunningHoursAuditsInDateRange!: IStorage['getRunningHoursAuditsInDateRange'];
+  // Module 3: Methods NOT in PostgresStorage (remain delegated)
   getRunningHourParents!: IStorage['getRunningHourParents'];
   cascadeRunningHoursUpdate!: IStorage['cascadeRunningHoursUpdate'];
-  
-  getFleetComponents!: IStorage['getFleetComponents'];
-  getFleetComponent!: IStorage['getFleetComponent'];
-  createFleetComponent!: IStorage['createFleetComponent'];
-  updateFleetComponent!: IStorage['updateFleetComponent'];
-  deleteFleetComponent!: IStorage['deleteFleetComponent'];
   
   getAllSpares!: IStorage['getAllSpares'];
   getSpares!: IStorage['getSpares'];
@@ -853,29 +1082,8 @@ export class HybridStorage implements IStorage {
   createIhmMaintenanceLogEntry!: IStorage['createIhmMaintenanceLogEntry'];
   getIhmStatusReport!: IStorage['getIhmStatusReport'];
   
-  getComponentDocuments!: IStorage['getComponentDocuments'];
-  getComponentDocument!: IStorage['getComponentDocument'];
-  createComponentDocument!: IStorage['createComponentDocument'];
-  updateComponentDocument!: IStorage['updateComponentDocument'];
-  deleteComponentDocument!: IStorage['deleteComponentDocument'];
-  
-  getComponentClassRegulatory!: IStorage['getComponentClassRegulatory'];
-  getComponentClassRegulatoryItem!: IStorage['getComponentClassRegulatoryItem'];
-  createComponentClassRegulatory!: IStorage['createComponentClassRegulatory'];
-  updateComponentClassRegulatory!: IStorage['updateComponentClassRegulatory'];
-  deleteComponentClassRegulatory!: IStorage['deleteComponentClassRegulatory'];
-  
-  getAllComponentMaintenanceHistory!: IStorage['getAllComponentMaintenanceHistory'];
-  getComponentMaintenanceHistory!: IStorage['getComponentMaintenanceHistory'];
-  getComponentMaintenanceHistoryItem!: IStorage['getComponentMaintenanceHistoryItem'];
-  createComponentMaintenanceHistory!: IStorage['createComponentMaintenanceHistory'];
-  
-  getComponentRequisitions!: IStorage['getComponentRequisitions'];
-  getAllComponentRequisitions!: IStorage['getAllComponentRequisitions'];
-  getComponentRequisitionItem!: IStorage['getComponentRequisitionItem'];
-  createComponentRequisition!: IStorage['createComponentRequisition'];
-  updateComponentRequisition!: IStorage['updateComponentRequisition'];
-  deleteComponentRequisition!: IStorage['deleteComponentRequisition'];
+  // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
+  // are now explicitly routed to PostgresStorage above
   
   getJobs!: IStorage['getJobs'];
   getJob!: IStorage['getJob'];

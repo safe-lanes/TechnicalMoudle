@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, or, ilike, asc } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, ilike, asc, gte, lte } from 'drizzle-orm';
 import { getDb } from './db';
 import {
   users,
@@ -10,6 +10,12 @@ import {
   makerList,
   sfiDetails,
   masterData,
+  components,
+  componentDocuments,
+  componentClassRegulatory,
+  componentMaintenanceHistory,
+  componentRequisitions,
+  runningHoursAudit,
   type User,
   type InsertUser,
   type Fleet,
@@ -28,6 +34,18 @@ import {
   type InsertSfiDetails,
   type MasterData,
   type InsertMasterData,
+  type Component,
+  type InsertComponent,
+  type ComponentDocument,
+  type InsertComponentDocument,
+  type ComponentClassRegulatory,
+  type InsertComponentClassRegulatory,
+  type ComponentMaintenanceHistory,
+  type InsertComponentMaintenanceHistory,
+  type ComponentRequisition,
+  type InsertComponentRequisition,
+  type RunningHoursAudit,
+  type InsertRunningHoursAudit,
 } from '@shared/schema';
 
 /**
@@ -520,6 +538,296 @@ export class PostgresStorage {
                     String.fromCharCode(65 + (subCodeIndex % 26));
     
     return `${sfiCode}.${seqStr}.${subCode}`;
+  }
+
+  // ============= MODULE 3: COMPONENTS =============
+
+  async getComponents(vesselId: string): Promise<Component[]> {
+    const db = await getDb();
+    return await db.select().from(components)
+      .where(and(
+        eq(components.vesselId, vesselId),
+        eq(components.dataScope, 'vessel')
+      ));
+  }
+
+  async getComponent(id: string): Promise<Component | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(components).where(eq(components.id, id));
+    return result[0];
+  }
+
+  async getComponentByCode(componentCode: string, vesselId: string): Promise<Component | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(components)
+      .where(and(
+        eq(components.componentCode, componentCode),
+        eq(components.vesselId, vesselId)
+      ));
+    return result[0];
+  }
+
+  async createComponent(component: InsertComponent): Promise<Component> {
+    const db = await getDb();
+    const id = component.id || `COMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(components).values({
+      ...component,
+      id,
+      dataScope: component.dataScope || 'vessel',
+    }).returning();
+    return result[0];
+  }
+
+  async updateComponent(id: string, data: Partial<Component>): Promise<Component> {
+    const db = await getDb();
+    const result = await db.update(components)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(components.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Component ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteComponent(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(components).where(eq(components.id, id));
+  }
+
+  async inactivateComponent(id: string): Promise<Component> {
+    return this.updateComponent(id, { isActive: false });
+  }
+
+  // Fleet Components
+  async getFleetComponents(): Promise<Component[]> {
+    const db = await getDb();
+    return await db.select().from(components)
+      .where(eq(components.dataScope, 'fleet'));
+  }
+
+  async getFleetComponent(id: string): Promise<Component | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(components)
+      .where(and(
+        eq(components.id, id),
+        eq(components.dataScope, 'fleet')
+      ));
+    return result[0];
+  }
+
+  async createFleetComponent(component: InsertComponent): Promise<Component> {
+    const db = await getDb();
+    const id = component.id || `FC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(components).values({
+      ...component,
+      id,
+      dataScope: 'fleet',
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetComponent(id: string, data: Partial<Component>): Promise<Component> {
+    return this.updateComponent(id, data);
+  }
+
+  async deleteFleetComponent(id: string): Promise<void> {
+    return this.deleteComponent(id);
+  }
+
+  // ============= MODULE 3: COMPONENT DOCUMENTS =============
+
+  async getComponentDocuments(componentId: string): Promise<ComponentDocument[]> {
+    const db = await getDb();
+    return await db.select().from(componentDocuments)
+      .where(eq(componentDocuments.componentId, componentId));
+  }
+
+  async getComponentDocument(id: number): Promise<ComponentDocument | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(componentDocuments)
+      .where(eq(componentDocuments.id, id));
+    return result[0];
+  }
+
+  async createComponentDocument(doc: InsertComponentDocument): Promise<ComponentDocument> {
+    const db = await getDb();
+    const result = await db.insert(componentDocuments).values(doc).returning();
+    return result[0];
+  }
+
+  async updateComponentDocument(id: number, data: Partial<ComponentDocument>): Promise<ComponentDocument> {
+    const db = await getDb();
+    const result = await db.update(componentDocuments)
+      .set(data)
+      .where(eq(componentDocuments.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Component document ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteComponentDocument(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(componentDocuments).where(eq(componentDocuments.id, id));
+  }
+
+  // ============= MODULE 3: COMPONENT CLASS REGULATORY =============
+
+  async getComponentClassRegulatory(componentId: string): Promise<ComponentClassRegulatory[]> {
+    const db = await getDb();
+    return await db.select().from(componentClassRegulatory)
+      .where(eq(componentClassRegulatory.componentId, componentId));
+  }
+
+  async getComponentClassRegulatoryItem(id: number): Promise<ComponentClassRegulatory | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(componentClassRegulatory)
+      .where(eq(componentClassRegulatory.id, id));
+    return result[0];
+  }
+
+  async createComponentClassRegulatory(item: InsertComponentClassRegulatory): Promise<ComponentClassRegulatory> {
+    const db = await getDb();
+    const result = await db.insert(componentClassRegulatory).values(item).returning();
+    return result[0];
+  }
+
+  async updateComponentClassRegulatory(id: number, data: Partial<ComponentClassRegulatory>): Promise<ComponentClassRegulatory> {
+    const db = await getDb();
+    const result = await db.update(componentClassRegulatory)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(componentClassRegulatory.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Component class regulatory ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteComponentClassRegulatory(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(componentClassRegulatory).where(eq(componentClassRegulatory.id, id));
+  }
+
+  // ============= MODULE 3: COMPONENT MAINTENANCE HISTORY (IMMUTABLE) =============
+
+  async getAllComponentMaintenanceHistory(vesselCode?: string): Promise<ComponentMaintenanceHistory[]> {
+    const db = await getDb();
+    if (vesselCode) {
+      return await db.select().from(componentMaintenanceHistory)
+        .where(eq(componentMaintenanceHistory.vesselCode, vesselCode))
+        .orderBy(desc(componentMaintenanceHistory.createdAt));
+    }
+    return await db.select().from(componentMaintenanceHistory)
+      .orderBy(desc(componentMaintenanceHistory.createdAt));
+  }
+
+  async getComponentMaintenanceHistory(componentId: string): Promise<ComponentMaintenanceHistory[]> {
+    const db = await getDb();
+    return await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.componentId, componentId))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+  }
+
+  async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.id, id));
+    return result[0];
+  }
+
+  // INSERT ONLY - No update or delete methods per immutability requirement
+  async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
+    const db = await getDb();
+    const result = await db.insert(componentMaintenanceHistory).values(history).returning();
+    return result[0];
+  }
+
+  // ============= MODULE 3: COMPONENT REQUISITIONS =============
+
+  async getComponentRequisitions(componentId: string): Promise<ComponentRequisition[]> {
+    const db = await getDb();
+    return await db.select().from(componentRequisitions)
+      .where(eq(componentRequisitions.componentId, componentId))
+      .orderBy(desc(componentRequisitions.createdAt));
+  }
+
+  async getAllComponentRequisitions(vesselCode?: string): Promise<ComponentRequisition[]> {
+    const db = await getDb();
+    if (vesselCode) {
+      return await db.select().from(componentRequisitions)
+        .where(eq(componentRequisitions.vesselCode, vesselCode))
+        .orderBy(desc(componentRequisitions.createdAt));
+    }
+    return await db.select().from(componentRequisitions)
+      .orderBy(desc(componentRequisitions.createdAt));
+  }
+
+  async getComponentRequisitionItem(id: number): Promise<ComponentRequisition | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(componentRequisitions)
+      .where(eq(componentRequisitions.id, id));
+    return result[0];
+  }
+
+  async createComponentRequisition(item: InsertComponentRequisition): Promise<ComponentRequisition> {
+    const db = await getDb();
+    const result = await db.insert(componentRequisitions).values(item).returning();
+    return result[0];
+  }
+
+  async updateComponentRequisition(id: number, data: Partial<ComponentRequisition>): Promise<ComponentRequisition> {
+    const db = await getDb();
+    const result = await db.update(componentRequisitions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(componentRequisitions.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Component requisition ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteComponentRequisition(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(componentRequisitions).where(eq(componentRequisitions.id, id));
+  }
+
+  // ============= MODULE 3: RUNNING HOURS AUDIT =============
+
+  async createRunningHoursAudit(audit: InsertRunningHoursAudit): Promise<RunningHoursAudit> {
+    const db = await getDb();
+    const result = await db.insert(runningHoursAudit).values(audit).returning();
+    return result[0];
+  }
+
+  async getRunningHoursAudits(componentId: string, limit?: number): Promise<RunningHoursAudit[]> {
+    const db = await getDb();
+    let query = db.select().from(runningHoursAudit)
+      .where(eq(runningHoursAudit.componentId, componentId))
+      .orderBy(desc(runningHoursAudit.enteredAtUTC));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+
+  async getRunningHoursAuditsInDateRange(
+    componentId: string, 
+    startDate: Date, 
+    endDate: Date
+  ): Promise<RunningHoursAudit[]> {
+    const db = await getDb();
+    return await db.select().from(runningHoursAudit)
+      .where(and(
+        eq(runningHoursAudit.componentId, componentId),
+        gte(runningHoursAudit.enteredAtUTC, startDate),
+        lte(runningHoursAudit.enteredAtUTC, endDate)
+      ))
+      .orderBy(desc(runningHoursAudit.enteredAtUTC));
   }
 }
 
