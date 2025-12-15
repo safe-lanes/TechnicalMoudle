@@ -37,6 +37,10 @@ import type {
   InsertJob,
   WorkOrder,
   InsertWorkOrder,
+  Spare,
+  InsertSpare,
+  SpareHistory,
+  InsertSpareHistory,
 } from '@shared/schema';
 
 /**
@@ -69,6 +73,10 @@ import type {
  * Module 5 entities (routed to PostgresStorage):
  * - work_orders (vessel & fleet)
  * 
+ * Module 7 entities (routed to PostgresStorage):
+ * - spares (vessel & fleet)
+ * - spares_history
+ * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
 export class HybridStorage implements IStorage {
@@ -91,27 +99,9 @@ export class HybridStorage implements IStorage {
     this.getRunningHourParents = fs.getRunningHourParents.bind(fs);
     this.cascadeRunningHoursUpdate = fs.cascadeRunningHoursUpdate.bind(fs);
     
-    this.getAllSpares = fs.getAllSpares.bind(fs);
-    this.getSpares = fs.getSpares.bind(fs);
-    this.getSpare = fs.getSpare.bind(fs);
-    this.createSpare = fs.createSpare.bind(fs);
-    this.updateSpare = fs.updateSpare.bind(fs);
-    this.deleteSpare = fs.deleteSpare.bind(fs);
-    this.consumeSpare = fs.consumeSpare.bind(fs);
-    this.consumeSpareFromLocation = fs.consumeSpareFromLocation.bind(fs);
-    this.receiveSpare = fs.receiveSpare.bind(fs);
-    this.bulkUpdateSpares = fs.bulkUpdateSpares.bind(fs);
-    this.adjustSpareQuantity = fs.adjustSpareQuantity.bind(fs);
-    
-    this.getFleetSpares = fs.getFleetSpares.bind(fs);
-    this.getFleetSpare = fs.getFleetSpare.bind(fs);
-    this.createFleetSpare = fs.createFleetSpare.bind(fs);
-    this.updateFleetSpare = fs.updateFleetSpare.bind(fs);
-    this.deleteFleetSpare = fs.deleteFleetSpare.bind(fs);
-    
-    this.getSpareHistory = fs.getSpareHistory.bind(fs);
-    this.getSpareHistoryBySpareId = fs.getSpareHistoryBySpareId.bind(fs);
-    this.createSpareHistory = fs.createSpareHistory.bind(fs);
+    // Module 7 Spares methods - now have explicit PostgreSQL routing below
+    // archiveSparesByIds remains in file storage for now (complex bulk operation)
+    this.archiveSparesByIds = fs.archiveSparesByIds.bind(fs);
     
     this.getChangeRequests = fs.getChangeRequests.bind(fs);
     this.getChangeRequest = fs.getChangeRequest.bind(fs);
@@ -134,11 +124,9 @@ export class HybridStorage implements IStorage {
     this.bulkCreateComponents = fs.bulkCreateComponents.bind(fs);
     this.bulkUpdateComponents = fs.bulkUpdateComponents.bind(fs);
     this.bulkUpsertComponents = fs.bulkUpsertComponents.bind(fs);
-    this.bulkCreateSpares = fs.bulkCreateSpares.bind(fs);
-    this.bulkUpdateSparesByROB = fs.bulkUpdateSparesByROB.bind(fs);
-    this.bulkUpsertSpares = fs.bulkUpsertSpares.bind(fs);
+    // bulkCreateSpares, bulkUpdateSparesByROB, bulkUpsertSpares now have explicit PostgreSQL routing below
     this.archiveComponentsByIds = fs.archiveComponentsByIds.bind(fs);
-    this.archiveSparesByIds = fs.archiveSparesByIds.bind(fs);
+    // archiveSparesByIds bound above with other spares methods
     
     this.getComponentsByCodes = fs.getComponentsByCodes.bind(fs);
     // getJobsByJobNos now has explicit PostgreSQL routing below
@@ -1170,6 +1158,165 @@ export class HybridStorage implements IStorage {
       return this.postgresStorage.deleteFleetWorkOrder(id);
     }
     return this.fileStorage.deleteFleetWorkOrder(id);
+  }
+
+  // ============= MODULE 7: SPARES (PostgreSQL) =============
+
+  async getAllSpares(): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAllSpares();
+    }
+    return this.fileStorage.getAllSpares();
+  }
+
+  async getSpares(vesselId: string): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSpares(vesselId);
+    }
+    return this.fileStorage.getSpares(vesselId);
+  }
+
+  async getSpare(id: number): Promise<Spare | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSpare(id);
+    }
+    return this.fileStorage.getSpare(id);
+  }
+
+  async createSpare(spare: InsertSpare): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createSpare(spare);
+    }
+    return this.fileStorage.createSpare(spare);
+  }
+
+  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateSpare(id, data);
+    }
+    return this.fileStorage.updateSpare(id, data);
+  }
+
+  async deleteSpare(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteSpare(id);
+    }
+    return this.fileStorage.deleteSpare(id);
+  }
+
+  async consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz);
+    }
+    return this.fileStorage.consumeSpare(id, quantity, userId, remarks, place, dateLocal, tz);
+  }
+
+  async consumeSpareFromLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.consumeSpareFromLocation(id, quantity, location, userId, remarks, place, dateLocal, tz);
+    }
+    return this.fileStorage.consumeSpareFromLocation(id, quantity, location, userId, remarks, place, dateLocal, tz);
+  }
+
+  async receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.receiveSpare(id, quantity, userId, remarks, supplierPO, place, dateLocal, tz);
+    }
+    return this.fileStorage.receiveSpare(id, quantity, userId, remarks, supplierPO, place, dateLocal, tz);
+  }
+
+  async bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpdateSpares(updates, userId, remarks);
+    }
+    return this.fileStorage.bulkUpdateSpares(updates, userId, remarks);
+  }
+
+  async adjustSpareQuantity(id: number, newRob: number, newRobA: number, newRobB: number, userId: string, remarks?: string): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.adjustSpareQuantity(id, newRob, newRobA, newRobB, userId, remarks);
+    }
+    return this.fileStorage.adjustSpareQuantity(id, newRob, newRobA, newRobB, userId, remarks);
+  }
+
+  // Fleet Spares
+  async getFleetSpares(): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetSpares();
+    }
+    return this.fileStorage.getFleetSpares();
+  }
+
+  async getFleetSpare(id: number): Promise<Spare | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetSpare(id);
+    }
+    return this.fileStorage.getFleetSpare(id);
+  }
+
+  async createFleetSpare(spare: InsertSpare): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetSpare(spare);
+    }
+    return this.fileStorage.createFleetSpare(spare);
+  }
+
+  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateFleetSpare(id, data);
+    }
+    return this.fileStorage.updateFleetSpare(id, data);
+  }
+
+  async deleteFleetSpare(id: number): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteFleetSpare(id);
+    }
+    return this.fileStorage.deleteFleetSpare(id);
+  }
+
+  // Bulk Spares Operations
+  async bulkCreateSpares(sparesList: InsertSpare[]): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkCreateSpares(sparesList);
+    }
+    return this.fileStorage.bulkCreateSpares(sparesList);
+  }
+
+  async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpdateSparesByROB(updates);
+    }
+    return this.fileStorage.bulkUpdateSparesByROB(updates);
+  }
+
+  async bulkUpsertSpares(sparesList: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpsertSpares(sparesList);
+    }
+    return this.fileStorage.bulkUpsertSpares(sparesList);
+  }
+
+  // Spares History
+  async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSpareHistory(vesselId);
+    }
+    return this.fileStorage.getSpareHistory(vesselId);
+  }
+
+  async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getSpareHistoryBySpareId(spareId);
+    }
+    return this.fileStorage.getSpareHistoryBySpareId(spareId);
+  }
+
+  async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createSpareHistory(history);
+    }
+    return this.fileStorage.createSpareHistory(history);
   }
 
   // ============= DELEGATED METHODS (File Storage) =============

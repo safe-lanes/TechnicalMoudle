@@ -18,6 +18,8 @@ import {
   runningHoursAudit,
   jobs,
   workOrders,
+  spares,
+  sparesHistory,
   type User,
   type InsertUser,
   type Fleet,
@@ -52,6 +54,10 @@ import {
   type InsertJob,
   type WorkOrder,
   type InsertWorkOrder,
+  type Spare,
+  type InsertSpare,
+  type SpareHistory,
+  type InsertSpareHistory,
 } from '@shared/schema';
 
 /**
@@ -1197,6 +1203,457 @@ export class PostgresStorage {
 
   async deleteFleetWorkOrder(id: string): Promise<void> {
     return this.deleteWorkOrder(id);
+  }
+
+  // ============= MODULE 7: SPARES =============
+
+  async getAllSpares(): Promise<Spare[]> {
+    const db = await getDb();
+    return await db.select().from(spares)
+      .where(eq(spares.deleted, false));
+  }
+
+  async getSpares(vesselId: string): Promise<Spare[]> {
+    const db = await getDb();
+    return await db.select().from(spares)
+      .where(and(
+        eq(spares.vesselId, vesselId),
+        eq(spares.dataScope, 'vessel'),
+        eq(spares.deleted, false)
+      ));
+  }
+
+  async getSpare(id: number): Promise<Spare | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(spares).where(eq(spares.id, id));
+    return result[0];
+  }
+
+  async createSpare(spare: InsertSpare): Promise<Spare> {
+    const db = await getDb();
+    const result = await db.insert(spares).values({
+      ...spare,
+      dataScope: spare.dataScope || 'vessel',
+      rob: spare.rob ?? 0,
+      robLocationA: spare.robLocationA ?? 0,
+      robLocationB: spare.robLocationB ?? 0,
+      min: spare.min ?? 0,
+    }).returning();
+    return result[0];
+  }
+
+  async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    const db = await getDb();
+    const result = await db.update(spares)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(spares.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteSpare(id: number): Promise<void> {
+    const db = await getDb();
+    await db.update(spares)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(eq(spares.id, id));
+  }
+
+  async consumeSpare(
+    id: number, 
+    quantity: number, 
+    userId: string, 
+    remarks?: string, 
+    place?: string, 
+    dateLocal?: string, 
+    tz?: string
+  ): Promise<Spare> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const newRob = (spare.rob ?? 0) - quantity;
+    const newRobA = (spare.robLocationA ?? 0) - quantity;
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newRob,
+        robLocationA: newRobA < 0 ? 0 : newRobA,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'CONSUME',
+      qtyChange: -quantity,
+      robAfter: newRob,
+      userId,
+      remarks: remarks ?? null,
+      reference: null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null,
+    });
+    
+    return updated[0];
+  }
+
+  async consumeSpareFromLocation(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<Spare> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const currentRobA = spare.robLocationA ?? 0;
+    const currentRobB = spare.robLocationB ?? 0;
+    const currentRob = spare.rob ?? 0;
+    
+    let newRobA = currentRobA;
+    let newRobB = currentRobB;
+    
+    if (location === 'A') {
+      newRobA = Math.max(0, currentRobA - quantity);
+    } else {
+      newRobB = Math.max(0, currentRobB - quantity);
+    }
+    
+    const newRob = Math.max(0, currentRob - quantity);
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newRob,
+        robLocationA: newRobA,
+        robLocationB: newRobB,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'CONSUME',
+      qtyChange: -quantity,
+      robAfter: newRob,
+      userId,
+      remarks: remarks ? `${remarks} (Location ${location})` : `Location ${location}`,
+      reference: null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null,
+    });
+    
+    return updated[0];
+  }
+
+  async receiveSpare(
+    id: number, 
+    quantity: number, 
+    userId: string, 
+    remarks?: string, 
+    supplierPO?: string, 
+    place?: string, 
+    dateLocal?: string, 
+    tz?: string
+  ): Promise<Spare> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const newRob = (spare.rob ?? 0) + quantity;
+    const newRobA = (spare.robLocationA ?? 0) + quantity;
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newRob,
+        robLocationA: newRobA,
+        lastOrderDate: dateLocal ?? null,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'RECEIVE',
+      qtyChange: quantity,
+      robAfter: newRob,
+      userId,
+      remarks: remarks ?? null,
+      reference: supplierPO ?? null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null,
+    });
+    
+    return updated[0];
+  }
+
+  async adjustSpareQuantity(
+    id: number,
+    newRob: number,
+    newRobA: number,
+    newRobB: number,
+    userId: string,
+    remarks?: string
+  ): Promise<Spare> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const qtyChange = newRob - (spare.rob ?? 0);
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newRob,
+        robLocationA: newRobA,
+        robLocationB: newRobB,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'ADJUST',
+      qtyChange,
+      robAfter: newRob,
+      userId,
+      remarks: remarks ?? null,
+      reference: null,
+      dateLocal: null,
+      tz: null,
+      place: null,
+    });
+    
+    return updated[0];
+  }
+
+  async bulkUpdateSpares(
+    updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>,
+    userId: string,
+    remarks?: string
+  ): Promise<Spare[]> {
+    const results: Spare[] = [];
+    
+    for (const update of updates) {
+      const spare = await this.getSpare(update.id);
+      if (!spare) continue;
+      
+      if (update.consumed && update.consumed > 0) {
+        const result = await this.consumeSpare(
+          update.id, 
+          update.consumed, 
+          userId, 
+          remarks
+        );
+        results.push(result);
+      } else if (update.received && update.received > 0) {
+        const result = await this.receiveSpare(
+          update.id, 
+          update.received, 
+          userId, 
+          remarks, 
+          undefined,
+          update.receivedPlace,
+          update.receivedDate
+        );
+        results.push(result);
+      }
+    }
+    
+    return results;
+  }
+
+  // Fleet Spares
+  async getFleetSpares(): Promise<Spare[]> {
+    const db = await getDb();
+    return await db.select().from(spares)
+      .where(and(
+        eq(spares.dataScope, 'fleet'),
+        eq(spares.deleted, false)
+      ));
+  }
+
+  async getFleetSpare(id: number): Promise<Spare | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(spares)
+      .where(and(
+        eq(spares.id, id),
+        eq(spares.dataScope, 'fleet')
+      ));
+    return result[0];
+  }
+
+  async createFleetSpare(spare: InsertSpare): Promise<Spare> {
+    const db = await getDb();
+    const result = await db.insert(spares).values({
+      ...spare,
+      dataScope: 'fleet',
+      rob: spare.rob ?? 0,
+      robLocationA: spare.robLocationA ?? 0,
+      robLocationB: spare.robLocationB ?? 0,
+      min: spare.min ?? 0,
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetSpare(id: number, data: Partial<Spare>): Promise<Spare> {
+    return this.updateSpare(id, data);
+  }
+
+  async deleteFleetSpare(id: number): Promise<void> {
+    return this.deleteSpare(id);
+  }
+
+  async bulkCreateSpares(sparesList: InsertSpare[]): Promise<Spare[]> {
+    if (sparesList.length === 0) return [];
+    const db = await getDb();
+    const results: Spare[] = [];
+    
+    for (const spare of sparesList) {
+      const result = await db.insert(spares).values({
+        ...spare,
+        dataScope: spare.dataScope || 'vessel',
+        rob: spare.rob ?? 0,
+        robLocationA: spare.robLocationA ?? 0,
+        robLocationB: spare.robLocationB ?? 0,
+        min: spare.min ?? 0,
+      }).returning();
+      results.push(result[0]);
+    }
+    
+    return results;
+  }
+
+  async bulkUpdateSparesByROB(updates: Array<{ robId: string; data: Partial<Spare> }>): Promise<Spare[]> {
+    const db = await getDb();
+    const results: Spare[] = [];
+    
+    for (const { robId, data } of updates) {
+      const id = parseInt(robId, 10);
+      if (isNaN(id)) continue;
+      
+      const result = await db.update(spares)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(spares.id, id))
+        .returning();
+      if (result[0]) {
+        results.push(result[0]);
+      }
+    }
+    
+    return results;
+  }
+
+  async bulkUpsertSpares(sparesList: InsertSpare[]): Promise<{ created: number; updated: number }> {
+    const db = await getDb();
+    let created = 0;
+    let updated = 0;
+    
+    for (const spare of sparesList) {
+      const existing = spare.partCode && spare.vesselId
+        ? await db.select().from(spares)
+            .where(and(
+              eq(spares.partCode, spare.partCode),
+              eq(spares.vesselId, spare.vesselId),
+              eq(spares.deleted, false)
+            ))
+            .then(r => r[0])
+        : null;
+      
+      if (existing) {
+        await db.update(spares)
+          .set({ ...spare, updatedAt: new Date() })
+          .where(eq(spares.id, existing.id));
+        updated++;
+      } else {
+        await db.insert(spares).values({
+          ...spare,
+          dataScope: spare.dataScope || 'vessel',
+          rob: spare.rob ?? 0,
+          robLocationA: spare.robLocationA ?? 0,
+          robLocationB: spare.robLocationB ?? 0,
+          min: spare.min ?? 0,
+        });
+        created++;
+      }
+    }
+    
+    return { created, updated };
+  }
+
+  // ============= MODULE 7: SPARES HISTORY =============
+
+  async getSpareHistory(vesselId: string): Promise<SpareHistory[]> {
+    const db = await getDb();
+    return await db.select().from(sparesHistory)
+      .where(eq(sparesHistory.vesselId, vesselId))
+      .orderBy(desc(sparesHistory.timestampUTC));
+  }
+
+  async getSpareHistoryBySpareId(spareId: number): Promise<SpareHistory[]> {
+    const db = await getDb();
+    return await db.select().from(sparesHistory)
+      .where(eq(sparesHistory.spareId, spareId))
+      .orderBy(desc(sparesHistory.timestampUTC));
+  }
+
+  async createSpareHistory(history: InsertSpareHistory): Promise<SpareHistory> {
+    const db = await getDb();
+    const result = await db.insert(sparesHistory).values(history).returning();
+    return result[0];
   }
 }
 
