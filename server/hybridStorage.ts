@@ -305,7 +305,7 @@ export class HybridStorage implements IStorage {
       const postgres = await resolvePostgres();
       if (postgres) {
         this.postgresAvailable = true;
-        console.log('✅ HybridStorage: PostgreSQL connection verified - Module 1 will use database');
+        console.log('✅ HybridStorage: PostgreSQL connection verified - Modules 1-7 will use database');
         return true;
       }
       console.warn('⚠️ HybridStorage: PostgreSQL not available - falling back to file storage for all operations');
