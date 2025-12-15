@@ -35,10 +35,12 @@ import type {
   InsertRunningHoursAudit,
   Job,
   InsertJob,
+  WorkOrder,
+  InsertWorkOrder,
 } from '@shared/schema';
 
 /**
- * HybridStorage - Routes Module 1, 2, 3 & 4 operations to PostgreSQL, everything else to File Storage
+ * HybridStorage - Routes Module 1, 2, 3, 4 & 5 operations to PostgreSQL, everything else to File Storage
  * 
  * Module 1 entities (routed to PostgresStorage):
  * - users
@@ -63,6 +65,9 @@ import type {
  * 
  * Module 4 entities (routed to PostgresStorage):
  * - jobs (vessel & fleet)
+ * 
+ * Module 5 entities (routed to PostgresStorage):
+ * - work_orders (vessel & fleet)
  * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
@@ -137,7 +142,7 @@ export class HybridStorage implements IStorage {
     
     this.getComponentsByCodes = fs.getComponentsByCodes.bind(fs);
     // getJobsByJobNos now has explicit PostgreSQL routing below
-    this.getWorkOrdersByTemplateIds = fs.getWorkOrdersByTemplateIds.bind(fs);
+    // getWorkOrdersByTemplateIds now has explicit PostgreSQL routing below
     
     this.archiveComponent = fs.archiveComponent.bind(fs);
     this.archiveJob = fs.archiveJob.bind(fs);
@@ -191,15 +196,7 @@ export class HybridStorage implements IStorage {
     
     // Module 4 Jobs methods - now have explicit PostgreSQL routing below
     
-    this.getWorkOrders = fs.getWorkOrders.bind(fs);
-    this.getWorkOrder = fs.getWorkOrder.bind(fs);
-    this.getWorkOrdersByJobId = fs.getWorkOrdersByJobId.bind(fs);
-    this.createWorkOrder = fs.createWorkOrder.bind(fs);
-    this.updateWorkOrder = fs.updateWorkOrder.bind(fs);
-    this.deleteWorkOrder = fs.deleteWorkOrder.bind(fs);
-    this.bulkCreateWorkOrders = fs.bulkCreateWorkOrders.bind(fs);
-    this.bulkUpdateWorkOrders = fs.bulkUpdateWorkOrders.bind(fs);
-    this.bulkUpsertWorkOrders = fs.bulkUpsertWorkOrders.bind(fs);
+    // Module 5 Work Orders methods - now have explicit PostgreSQL routing below
     
     this.getWorkOrderExecutions = fs.getWorkOrderExecutions.bind(fs);
     this.getWorkOrderExecutionById = fs.getWorkOrderExecutionById.bind(fs);
@@ -1067,6 +1064,114 @@ export class HybridStorage implements IStorage {
     return this.fileStorage.deleteFleetJob(id);
   }
 
+  // ============= MODULE 5: WORK ORDERS (PostgreSQL) =============
+
+  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getWorkOrders(vesselId);
+    }
+    return this.fileStorage.getWorkOrders(vesselId);
+  }
+
+  async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getWorkOrder(id);
+    }
+    return this.fileStorage.getWorkOrder(id);
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getWorkOrdersByJobId(jobId);
+    }
+    return this.fileStorage.getWorkOrdersByJobId(jobId);
+  }
+
+  async createWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createWorkOrder(wo);
+    }
+    return this.fileStorage.createWorkOrder(wo);
+  }
+
+  async updateWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateWorkOrder(id, data);
+    }
+    return this.fileStorage.updateWorkOrder(id, data);
+  }
+
+  async deleteWorkOrder(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteWorkOrder(id);
+    }
+    return this.fileStorage.deleteWorkOrder(id);
+  }
+
+  async bulkCreateWorkOrders(woList: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkCreateWorkOrders(woList);
+    }
+    return this.fileStorage.bulkCreateWorkOrders(woList);
+  }
+
+  async bulkUpdateWorkOrders(updates: Array<{ workOrderNo: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpdateWorkOrders(updates);
+    }
+    return this.fileStorage.bulkUpdateWorkOrders(updates);
+  }
+
+  async bulkUpsertWorkOrders(woList: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.bulkUpsertWorkOrders(woList);
+    }
+    return this.fileStorage.bulkUpsertWorkOrders(woList);
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[]): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getWorkOrdersByTemplateIds(templateIds);
+    }
+    return this.fileStorage.getWorkOrdersByTemplateIds(templateIds);
+  }
+
+  // Fleet Work Orders
+  async getFleetWorkOrders(): Promise<WorkOrder[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetWorkOrders();
+    }
+    return this.fileStorage.getFleetWorkOrders();
+  }
+
+  async getFleetWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getFleetWorkOrder(id);
+    }
+    return this.fileStorage.getFleetWorkOrder(id);
+  }
+
+  async createFleetWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createFleetWorkOrder(wo);
+    }
+    return this.fileStorage.createFleetWorkOrder(wo);
+  }
+
+  async updateFleetWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateFleetWorkOrder(id, data);
+    }
+    return this.fileStorage.updateFleetWorkOrder(id, data);
+  }
+
+  async deleteFleetWorkOrder(id: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteFleetWorkOrder(id);
+    }
+    return this.fileStorage.deleteFleetWorkOrder(id);
+  }
+
   // ============= DELEGATED METHODS (File Storage) =============
   // These are assigned in bindFileStorageMethods() and will be migrated
   // to PostgresStorage in future modules
@@ -1126,7 +1231,7 @@ export class HybridStorage implements IStorage {
   
   getComponentsByCodes!: IStorage['getComponentsByCodes'];
   getJobsByJobNos!: IStorage['getJobsByJobNos'];
-  getWorkOrdersByTemplateIds!: IStorage['getWorkOrdersByTemplateIds'];
+  // getWorkOrdersByTemplateIds - now has explicit PostgreSQL routing above
   
   archiveComponent!: IStorage['archiveComponent'];
   archiveJob!: IStorage['archiveJob'];
@@ -1178,30 +1283,8 @@ export class HybridStorage implements IStorage {
   // Module 3 methods (ComponentDocuments, ClassRegulatory, MaintenanceHistory, Requisitions)
   // are now explicitly routed to PostgresStorage above
   
-  getJobs!: IStorage['getJobs'];
-  getJob!: IStorage['getJob'];
-  createJob!: IStorage['createJob'];
-  updateJob!: IStorage['updateJob'];
-  deleteJob!: IStorage['deleteJob'];
-  bulkCreateJobs!: IStorage['bulkCreateJobs'];
-  bulkUpdateJobs!: IStorage['bulkUpdateJobs'];
-  bulkUpsertJobs!: IStorage['bulkUpsertJobs'];
-  
-  getWorkOrders!: IStorage['getWorkOrders'];
-  getWorkOrder!: IStorage['getWorkOrder'];
-  getWorkOrdersByJobId!: IStorage['getWorkOrdersByJobId'];
-  createWorkOrder!: IStorage['createWorkOrder'];
-  updateWorkOrder!: IStorage['updateWorkOrder'];
-  deleteWorkOrder!: IStorage['deleteWorkOrder'];
-  bulkCreateWorkOrders!: IStorage['bulkCreateWorkOrders'];
-  bulkUpdateWorkOrders!: IStorage['bulkUpdateWorkOrders'];
-  bulkUpsertWorkOrders!: IStorage['bulkUpsertWorkOrders'];
-  
-  getFleetJobs!: IStorage['getFleetJobs'];
-  getFleetJob!: IStorage['getFleetJob'];
-  createFleetJob!: IStorage['createFleetJob'];
-  updateFleetJob!: IStorage['updateFleetJob'];
-  deleteFleetJob!: IStorage['deleteFleetJob'];
+  // Module 4: Jobs - now have explicit PostgreSQL routing above
+  // Module 5: Work Orders - now have explicit PostgreSQL routing above
   
   getWorkOrderExecutions!: IStorage['getWorkOrderExecutions'];
   getWorkOrderExecutionById!: IStorage['getWorkOrderExecutionById'];

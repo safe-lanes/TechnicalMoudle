@@ -17,6 +17,7 @@ import {
   componentRequisitions,
   runningHoursAudit,
   jobs,
+  workOrders,
   type User,
   type InsertUser,
   type Fleet,
@@ -49,6 +50,8 @@ import {
   type InsertRunningHoursAudit,
   type Job,
   type InsertJob,
+  type WorkOrder,
+  type InsertWorkOrder,
 } from '@shared/schema';
 
 /**
@@ -1022,6 +1025,178 @@ export class PostgresStorage {
 
   async deleteFleetJob(id: string): Promise<void> {
     return this.deleteJob(id);
+  }
+
+  // ============= MODULE 5: WORK ORDERS =============
+
+  async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
+    const db = await getDb();
+    
+    if (vesselId) {
+      return await db.select().from(workOrders)
+        .where(and(
+          eq(workOrders.vesselId, vesselId),
+          eq(workOrders.dataScope, 'vessel')
+        ))
+        .orderBy(desc(workOrders.createdAt));
+    }
+    
+    return await db.select().from(workOrders)
+      .where(eq(workOrders.dataScope, 'vessel'))
+      .orderBy(desc(workOrders.createdAt));
+  }
+
+  async getWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrders).where(eq(workOrders.id, id));
+    return result[0];
+  }
+
+  async getWorkOrderByWorkOrderNo(workOrderNo: string): Promise<WorkOrder | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrders).where(eq(workOrders.workOrderNo, workOrderNo));
+    return result[0];
+  }
+
+  async getWorkOrdersByJobId(jobId: string): Promise<WorkOrder[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(eq(workOrders.jobId, jobId))
+      .orderBy(desc(workOrders.createdAt));
+  }
+
+  async createWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+    const db = await getDb();
+    const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(workOrders).values({
+      ...wo,
+      id,
+      dataScope: wo.dataScope || 'vessel',
+    }).returning();
+    return result[0];
+  }
+
+  async updateWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    const db = await getDb();
+    const result = await db.update(workOrders)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workOrders.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Work order ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async deleteWorkOrder(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(workOrders).where(eq(workOrders.id, id));
+  }
+
+  async bulkCreateWorkOrders(woList: InsertWorkOrder[]): Promise<WorkOrder[]> {
+    if (woList.length === 0) return [];
+    const db = await getDb();
+    const results: WorkOrder[] = [];
+    
+    for (const wo of woList) {
+      const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const result = await db.insert(workOrders).values({
+        ...wo,
+        id,
+        dataScope: wo.dataScope || 'vessel',
+      }).returning();
+      results.push(result[0]);
+    }
+    
+    return results;
+  }
+
+  async bulkUpdateWorkOrders(updates: Array<{ workOrderNo: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+    const db = await getDb();
+    const results: WorkOrder[] = [];
+    
+    for (const { workOrderNo, data } of updates) {
+      const result = await db.update(workOrders)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(workOrders.workOrderNo, workOrderNo))
+        .returning();
+      if (result[0]) {
+        results.push(result[0]);
+      }
+    }
+    
+    return results;
+  }
+
+  async bulkUpsertWorkOrders(woList: InsertWorkOrder[]): Promise<{ created: number; updated: number }> {
+    const db = await getDb();
+    let created = 0;
+    let updated = 0;
+    
+    for (const wo of woList) {
+      const existing = wo.workOrderNo ? await this.getWorkOrderByWorkOrderNo(wo.workOrderNo) : null;
+      
+      if (existing) {
+        await db.update(workOrders)
+          .set({ ...wo, updatedAt: new Date() })
+          .where(eq(workOrders.id, existing.id));
+        updated++;
+      } else {
+        const id = wo.id || `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        await db.insert(workOrders).values({
+          ...wo,
+          id,
+          dataScope: wo.dataScope || 'vessel',
+        });
+        created++;
+      }
+    }
+    
+    return { created, updated };
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[]): Promise<WorkOrder[]> {
+    if (templateIds.length === 0) return [];
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(inArray(workOrders.templateId, templateIds));
+  }
+
+  // Fleet Work Orders
+  async getFleetWorkOrders(): Promise<WorkOrder[]> {
+    const db = await getDb();
+    return await db.select().from(workOrders)
+      .where(eq(workOrders.dataScope, 'fleet'))
+      .orderBy(desc(workOrders.createdAt));
+  }
+
+  async getFleetWorkOrder(id: string): Promise<WorkOrder | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrders)
+      .where(and(
+        eq(workOrders.id, id),
+        eq(workOrders.dataScope, 'fleet')
+      ));
+    return result[0];
+  }
+
+  async createFleetWorkOrder(wo: InsertWorkOrder): Promise<WorkOrder> {
+    const db = await getDb();
+    const id = wo.id || `FWO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const result = await db.insert(workOrders).values({
+      ...wo,
+      id,
+      dataScope: 'fleet',
+    }).returning();
+    return result[0];
+  }
+
+  async updateFleetWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
+    return this.updateWorkOrder(id, data);
+  }
+
+  async deleteFleetWorkOrder(id: string): Promise<void> {
+    return this.deleteWorkOrder(id);
   }
 }
 
