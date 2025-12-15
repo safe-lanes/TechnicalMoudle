@@ -1327,27 +1327,8 @@ export class HybridStorage implements IStorage {
   getRunningHourParents!: IStorage['getRunningHourParents'];
   cascadeRunningHoursUpdate!: IStorage['cascadeRunningHoursUpdate'];
   
-  getAllSpares!: IStorage['getAllSpares'];
-  getSpares!: IStorage['getSpares'];
-  getSpare!: IStorage['getSpare'];
-  createSpare!: IStorage['createSpare'];
-  updateSpare!: IStorage['updateSpare'];
-  deleteSpare!: IStorage['deleteSpare'];
-  consumeSpare!: IStorage['consumeSpare'];
-  consumeSpareFromLocation!: IStorage['consumeSpareFromLocation'];
-  receiveSpare!: IStorage['receiveSpare'];
-  bulkUpdateSpares!: IStorage['bulkUpdateSpares'];
-  adjustSpareQuantity!: IStorage['adjustSpareQuantity'];
-  
-  getFleetSpares!: IStorage['getFleetSpares'];
-  getFleetSpare!: IStorage['getFleetSpare'];
-  createFleetSpare!: IStorage['createFleetSpare'];
-  updateFleetSpare!: IStorage['updateFleetSpare'];
-  deleteFleetSpare!: IStorage['deleteFleetSpare'];
-  
-  getSpareHistory!: IStorage['getSpareHistory'];
-  getSpareHistoryBySpareId!: IStorage['getSpareHistoryBySpareId'];
-  createSpareHistory!: IStorage['createSpareHistory'];
+  // Module 7: Spares - now have explicit PostgreSQL routing above
+  // archiveSparesByIds remains delegated (bound in bindFileStorageMethods)
   
   getChangeRequests!: IStorage['getChangeRequests'];
   getChangeRequest!: IStorage['getChangeRequest'];
@@ -1370,9 +1351,7 @@ export class HybridStorage implements IStorage {
   bulkCreateComponents!: IStorage['bulkCreateComponents'];
   bulkUpdateComponents!: IStorage['bulkUpdateComponents'];
   bulkUpsertComponents!: IStorage['bulkUpsertComponents'];
-  bulkCreateSpares!: IStorage['bulkCreateSpares'];
-  bulkUpdateSparesByROB!: IStorage['bulkUpdateSparesByROB'];
-  bulkUpsertSpares!: IStorage['bulkUpsertSpares'];
+  // bulkCreateSpares, bulkUpdateSparesByROB, bulkUpsertSpares - now have explicit PostgreSQL routing above
   archiveComponentsByIds!: IStorage['archiveComponentsByIds'];
   archiveSparesByIds!: IStorage['archiveSparesByIds'];
   
