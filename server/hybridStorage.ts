@@ -85,6 +85,16 @@ import type {
   InsertFleetJobVesselMapping,
   FleetSpareVesselMapping,
   InsertFleetSpareVesselMapping,
+  ImportHistory,
+  InsertImportHistory,
+  ImportChangeLog,
+  InsertImportChangeLog,
+  AuditLog,
+  InsertAuditLog,
+  BulkImportHistory,
+  InsertBulkImportHistory,
+  BulkImportError,
+  InsertBulkImportError,
 } from '@shared/schema';
 
 /**
@@ -158,6 +168,17 @@ import type {
  * - fleet_job_vessel_mapping
  * - fleet_spare_vessel_mapping
  * 
+ * Module 15 entities (routed to PostgresStorage):
+ * - import_history
+ * - import_change_log
+ * 
+ * Module 16 entities (routed to PostgresStorage):
+ * - bulk_import_history
+ * - bulk_import_errors
+ * 
+ * Module 17 entities (routed to PostgresStorage):
+ * - audit_log
+ * 
  * All other entities continue to use PersistentFileStorage until their modules are migrated.
  */
 export class HybridStorage implements IStorage {
@@ -224,14 +245,9 @@ export class HybridStorage implements IStorage {
     this.calculateAndUpdateRecurringDefects = fs.calculateAndUpdateRecurringDefects.bind(fs);
     this.recalculateAllRecurringDefects = fs.recalculateAllRecurringDefects.bind(fs);
     
-    this.createImportHistory = fs.createImportHistory.bind(fs);
-    this.getImportHistory = fs.getImportHistory.bind(fs);
-    this.getImportHistoryById = fs.getImportHistoryById.bind(fs);
-    this.updateImportHistory = fs.updateImportHistory.bind(fs);
+    // Module 15 Import Engine methods - now have explicit PostgreSQL routing below
     
-    this.createImportChangeLog = fs.createImportChangeLog.bind(fs);
-    this.getImportChangeLogs = fs.getImportChangeLogs.bind(fs);
-    this.deleteImportChangeLogs = fs.deleteImportChangeLogs.bind(fs);
+    // Module 16 Bulk Import methods - now have explicit PostgreSQL routing below
     
     // Module 2 methods (Makers, MasterLists) now have explicit PostgreSQL routing below
     
@@ -255,14 +271,9 @@ export class HybridStorage implements IStorage {
     this.createComponentVesselMapping = fs.createComponentVesselMapping.bind(fs);
     this.deleteComponentVesselMapping = fs.deleteComponentVesselMapping.bind(fs);
     
-    this.getBulkImportHistory = fs.getBulkImportHistory.bind(fs);
-    this.getBulkImportHistoryItem = fs.getBulkImportHistoryItem.bind(fs);
-    this.createBulkImportHistory = fs.createBulkImportHistory.bind(fs);
-    this.updateBulkImportHistory = fs.updateBulkImportHistory.bind(fs);
+    // Module 16 Bulk Import methods - now have explicit PostgreSQL routing below
     
-    this.getBulkImportErrors = fs.getBulkImportErrors.bind(fs);
-    this.createBulkImportError = fs.createBulkImportError.bind(fs);
-    this.createBulkImportErrors = fs.createBulkImportErrors.bind(fs);
+    // Module 17 Audit Log methods - now have explicit PostgreSQL routing below
     
     this.getFleetAdminMetrics = fs.getFleetAdminMetrics.bind(fs);
     
@@ -2021,6 +2032,148 @@ export class HybridStorage implements IStorage {
     return this.fileStorage.removeFleetSpareVesselMappingRecord(partCode, vesselCode);
   }
 
+  // ============= MODULE 15: IMPORT ENGINE (PostgreSQL) =============
+
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createImportHistory(history);
+    }
+    return this.fileStorage.createImportHistory(history);
+  }
+
+  async getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: ImportHistory[]; total: number }> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getImportHistory(type, limit, offset);
+    }
+    return this.fileStorage.getImportHistory(type, limit, offset);
+  }
+
+  async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getImportHistoryById(id);
+    }
+    return this.fileStorage.getImportHistoryById(id);
+  }
+
+  async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateImportHistory(id, data);
+    }
+    return this.fileStorage.updateImportHistory(id, data);
+  }
+
+  async createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createImportChangeLog(log);
+    }
+    return this.fileStorage.createImportChangeLog(log);
+  }
+
+  async getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getImportChangeLogs(importHistoryId);
+    }
+    return this.fileStorage.getImportChangeLogs(importHistoryId);
+  }
+
+  async deleteImportChangeLogs(importHistoryId: string): Promise<void> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.deleteImportChangeLogs(importHistoryId);
+    }
+    return this.fileStorage.deleteImportChangeLogs(importHistoryId);
+  }
+
+  // ============= MODULE 16: BULK IMPORT (PostgreSQL) =============
+
+  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getBulkImportHistory(vesselCode, moduleType);
+    }
+    return this.fileStorage.getBulkImportHistory(vesselCode, moduleType);
+  }
+
+  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getBulkImportHistoryItem(id);
+    }
+    return this.fileStorage.getBulkImportHistoryItem(id);
+  }
+
+  async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createBulkImportHistory(history);
+    }
+    return this.fileStorage.createBulkImportHistory(history);
+  }
+
+  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.updateBulkImportHistory(id, data);
+    }
+    return this.fileStorage.updateBulkImportHistory(id, data);
+  }
+
+  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getBulkImportErrors(importId);
+    }
+    return this.fileStorage.getBulkImportErrors(importId);
+  }
+
+  async createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createBulkImportError(error);
+    }
+    return this.fileStorage.createBulkImportError(error);
+  }
+
+  async createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createBulkImportErrors(errors);
+    }
+    return this.fileStorage.createBulkImportErrors(errors);
+  }
+
+  // ============= MODULE 17: AUDIT LOG (PostgreSQL) =============
+
+  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.createAuditLog(data);
+    }
+    return this.fileStorage.createAuditLog(data);
+  }
+
+  async getAuditLogs(filters?: {
+    vesselCode?: string;
+    componentCode?: string;
+    entityType?: string;
+    entityId?: string;
+    actionType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAuditLogs(filters);
+    }
+    return this.fileStorage.getAuditLogs(filters);
+  }
+
+  async getAuditLogsByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAuditLogsByEntity(entityType, entityId);
+    }
+    return this.fileStorage.getAuditLogsByEntity(entityType, entityId);
+  }
+
+  async getAuditLogsByUser(userId: string, limit?: number): Promise<AuditLog[]> {
+    if (this.postgresAvailable) {
+      return this.postgresStorage.getAuditLogsByUser(userId, limit);
+    }
+    return this.fileStorage.getAuditLogsByUser(userId, limit);
+  }
+
   // ============= DELEGATED METHODS (File Storage) =============
   // These are assigned in bindFileStorageMethods() and will be migrated
   // to PostgresStorage in future modules
@@ -2070,15 +2223,9 @@ export class HybridStorage implements IStorage {
   calculateAndUpdateRecurringDefects!: IStorage['calculateAndUpdateRecurringDefects'];
   recalculateAllRecurringDefects!: IStorage['recalculateAllRecurringDefects'];
   
-  createImportHistory!: IStorage['createImportHistory'];
-  getImportHistory!: IStorage['getImportHistory'];
-  getImportHistoryById!: IStorage['getImportHistoryById'];
-  updateImportHistory!: IStorage['updateImportHistory'];
-  
-  createImportChangeLog!: IStorage['createImportChangeLog'];
-  getImportChangeLogs!: IStorage['getImportChangeLogs'];
-  deleteImportChangeLogs!: IStorage['deleteImportChangeLogs'];
-  
+  // Module 15: Import Engine - now have explicit PostgreSQL routing above
+  // Module 16: Bulk Import - now have explicit PostgreSQL routing above
+  // Module 17: Audit Log - now have explicit PostgreSQL routing above
   
   purgeJobsAndLinkedData!: IStorage['purgeJobsAndLinkedData'];
   
@@ -2097,15 +2244,6 @@ export class HybridStorage implements IStorage {
   getComponentVesselMappings!: IStorage['getComponentVesselMappings'];
   createComponentVesselMapping!: IStorage['createComponentVesselMapping'];
   deleteComponentVesselMapping!: IStorage['deleteComponentVesselMapping'];
-  
-  getBulkImportHistory!: IStorage['getBulkImportHistory'];
-  getBulkImportHistoryItem!: IStorage['getBulkImportHistoryItem'];
-  createBulkImportHistory!: IStorage['createBulkImportHistory'];
-  updateBulkImportHistory!: IStorage['updateBulkImportHistory'];
-  
-  getBulkImportErrors!: IStorage['getBulkImportErrors'];
-  createBulkImportError!: IStorage['createBulkImportError'];
-  createBulkImportErrors!: IStorage['createBulkImportErrors'];
   
   getFleetAdminMetrics!: IStorage['getFleetAdminMetrics'];
   

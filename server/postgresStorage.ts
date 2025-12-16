@@ -127,6 +127,21 @@ import {
   type InsertFleetJobVesselMapping,
   type FleetSpareVesselMapping,
   type InsertFleetSpareVesselMapping,
+  importHistory,
+  importChangeLog,
+  auditLog,
+  bulkImportHistory,
+  bulkImportErrors,
+  type ImportHistory,
+  type InsertImportHistory,
+  type ImportChangeLog,
+  type InsertImportChangeLog,
+  type AuditLog,
+  type InsertAuditLog,
+  type BulkImportHistory,
+  type InsertBulkImportHistory,
+  type BulkImportError,
+  type InsertBulkImportError,
 } from '@shared/schema';
 
 /**
@@ -2990,6 +3005,296 @@ export class PostgresStorage {
         eq(fleetSpareVesselMapping.partCode, partCode),
         eq(fleetSpareVesselMapping.vesselCode, vesselCode)
       ));
+  }
+
+  // ============= MODULE 15: IMPORT ENGINE =============
+
+  async createImportHistory(history: InsertImportHistory): Promise<ImportHistory> {
+    const db = await getDb();
+    const result = await db.insert(importHistory).values({
+      id: history.id,
+      type: history.type,
+      mode: history.mode,
+      archiveMissing: history.archiveMissing ?? false,
+      userId: history.userId,
+      vesselId: history.vesselId ?? null,
+      created: history.created ?? 0,
+      updated: history.updated ?? 0,
+      skipped: history.skipped ?? 0,
+      archived: history.archived ?? 0,
+      status: history.status,
+      originalName: history.originalName ?? null,
+      fileSize: history.fileSize ?? null,
+      storedFilePath: history.storedFilePath ?? null,
+      undoneAt: history.undoneAt ?? null,
+      errorMessage: history.errorMessage ?? null,
+    }).returning();
+    return result[0];
+  }
+
+  async getImportHistory(type?: string, limit: number = 20, offset: number = 0): Promise<{ items: ImportHistory[]; total: number }> {
+    const db = await getDb();
+    
+    let query = db.select().from(importHistory);
+    let countQuery = db.select({ count: sql<number>`count(*)` }).from(importHistory);
+    
+    if (type) {
+      query = query.where(eq(importHistory.type, type)) as typeof query;
+      countQuery = countQuery.where(eq(importHistory.type, type)) as typeof countQuery;
+    }
+    
+    const items = await query
+      .orderBy(desc(importHistory.startedAt))
+      .limit(limit)
+      .offset(offset);
+    
+    const countResult = await countQuery;
+    const total = Number(countResult[0]?.count ?? 0);
+    
+    return { items, total };
+  }
+
+  async getImportHistoryById(id: string): Promise<ImportHistory | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(importHistory)
+      .where(eq(importHistory.id, id));
+    return result[0];
+  }
+
+  async updateImportHistory(id: string, data: Partial<ImportHistory>): Promise<ImportHistory> {
+    const db = await getDb();
+    const result = await db.update(importHistory)
+      .set(data)
+      .where(eq(importHistory.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Import history with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async createImportChangeLog(log: InsertImportChangeLog): Promise<ImportChangeLog> {
+    const db = await getDb();
+    const result = await db.insert(importChangeLog).values({
+      id: log.id,
+      importHistoryId: log.importHistoryId,
+      entityType: log.entityType,
+      entityId: log.entityId,
+      operation: log.operation,
+      previousData: log.previousData ?? null,
+      newData: log.newData ?? null,
+      checksum: log.checksum,
+    }).returning();
+    return result[0];
+  }
+
+  async getImportChangeLogs(importHistoryId: string): Promise<ImportChangeLog[]> {
+    const db = await getDb();
+    return await db.select().from(importChangeLog)
+      .where(eq(importChangeLog.importHistoryId, importHistoryId))
+      .orderBy(desc(importChangeLog.createdAt));
+  }
+
+  async deleteImportChangeLogs(importHistoryId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(importChangeLog)
+      .where(eq(importChangeLog.importHistoryId, importHistoryId));
+  }
+
+  // ============= MODULE 16: BULK IMPORT =============
+
+  async getBulkImportHistory(vesselCode?: string, moduleType?: string): Promise<BulkImportHistory[]> {
+    const db = await getDb();
+    let conditions: any[] = [];
+    
+    if (vesselCode) {
+      conditions.push(eq(bulkImportHistory.vesselCode, vesselCode));
+    }
+    if (moduleType) {
+      conditions.push(eq(bulkImportHistory.moduleType, moduleType));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(bulkImportHistory)
+        .where(and(...conditions))
+        .orderBy(desc(bulkImportHistory.uploadedAt));
+    }
+    
+    return await db.select().from(bulkImportHistory)
+      .orderBy(desc(bulkImportHistory.uploadedAt));
+  }
+
+  async getBulkImportHistoryItem(id: number): Promise<BulkImportHistory | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(bulkImportHistory)
+      .where(eq(bulkImportHistory.id, id));
+    return result[0];
+  }
+
+  async createBulkImportHistory(history: InsertBulkImportHistory): Promise<BulkImportHistory> {
+    const db = await getDb();
+    const result = await db.insert(bulkImportHistory).values({
+      vesselCode: history.vesselCode ?? null,
+      vesselName: history.vesselName ?? null,
+      moduleType: history.moduleType,
+      sheetName: history.sheetName ?? null,
+      fileName: history.fileName,
+      fileSize: history.fileSize ?? null,
+      uploadedBy: history.uploadedBy,
+      uploadedByName: history.uploadedByName ?? null,
+      totalRows: history.totalRows ?? 0,
+      successCount: history.successCount ?? 0,
+      failedCount: history.failedCount ?? 0,
+      skippedCount: history.skippedCount ?? 0,
+      status: history.status ?? 'Processing',
+      errorSummary: history.errorSummary ?? null,
+      isFleetImport: history.isFleetImport ?? false,
+      templateVersion: history.templateVersion ?? null,
+      processingTimeMs: history.processingTimeMs ?? null,
+    }).returning();
+    return result[0];
+  }
+
+  async updateBulkImportHistory(id: number, data: Partial<BulkImportHistory>): Promise<BulkImportHistory> {
+    const db = await getDb();
+    const result = await db.update(bulkImportHistory)
+      .set(data)
+      .where(eq(bulkImportHistory.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Bulk Import History with id ${id} not found`);
+    }
+    return result[0];
+  }
+
+  async getBulkImportErrors(importId: number): Promise<BulkImportError[]> {
+    const db = await getDb();
+    return await db.select().from(bulkImportErrors)
+      .where(eq(bulkImportErrors.importId, importId))
+      .orderBy(asc(bulkImportErrors.rowNumber));
+  }
+
+  async createBulkImportError(error: InsertBulkImportError): Promise<BulkImportError> {
+    const db = await getDb();
+    const result = await db.insert(bulkImportErrors).values({
+      importId: error.importId,
+      rowNumber: error.rowNumber,
+      fieldName: error.fieldName ?? null,
+      fieldValue: error.fieldValue ?? null,
+      errorType: error.errorType,
+      errorDescription: error.errorDescription,
+      recommendedFix: error.recommendedFix ?? null,
+      severity: error.severity ?? 'Error',
+      rawRowData: error.rawRowData ?? null,
+    }).returning();
+    return result[0];
+  }
+
+  async createBulkImportErrors(errors: InsertBulkImportError[]): Promise<BulkImportError[]> {
+    if (errors.length === 0) return [];
+    const db = await getDb();
+    const results: BulkImportError[] = [];
+    
+    for (const error of errors) {
+      const result = await this.createBulkImportError(error);
+      results.push(result);
+    }
+    
+    return results;
+  }
+
+  // ============= MODULE 17: AUDIT LOG =============
+
+  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+    const db = await getDb();
+    const result = await db.insert(auditLog).values({
+      userId: data.userId,
+      vesselCode: data.vesselCode ?? null,
+      componentCode: data.componentCode ?? null,
+      entityType: data.entityType,
+      entityId: data.entityId,
+      actionType: data.actionType,
+      fieldName: data.fieldName ?? null,
+      oldValue: data.oldValue ?? null,
+      newValue: data.newValue ?? null,
+      source: data.source,
+      payload: data.payload ?? null,
+    }).returning();
+    return result[0];
+  }
+
+  async getAuditLogs(filters?: {
+    vesselCode?: string;
+    componentCode?: string;
+    entityType?: string;
+    entityId?: string;
+    actionType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<AuditLog[]> {
+    const db = await getDb();
+    let conditions: any[] = [];
+    
+    if (filters) {
+      if (filters.vesselCode) {
+        conditions.push(eq(auditLog.vesselCode, filters.vesselCode));
+      }
+      if (filters.componentCode) {
+        conditions.push(eq(auditLog.componentCode, filters.componentCode));
+      }
+      if (filters.entityType) {
+        conditions.push(eq(auditLog.entityType, filters.entityType));
+      }
+      if (filters.entityId) {
+        conditions.push(eq(auditLog.entityId, filters.entityId));
+      }
+      if (filters.actionType) {
+        conditions.push(eq(auditLog.actionType, filters.actionType));
+      }
+      if (filters.startDate) {
+        conditions.push(gte(auditLog.timestamp, filters.startDate));
+      }
+      if (filters.endDate) {
+        conditions.push(lte(auditLog.timestamp, filters.endDate));
+      }
+    }
+    
+    let query = db.select().from(auditLog);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
+    }
+    
+    query = query.orderBy(desc(auditLog.timestamp)) as typeof query;
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as typeof query;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as typeof query;
+    }
+    
+    return await query;
+  }
+
+  async getAuditLogsByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    const db = await getDb();
+    return await db.select().from(auditLog)
+      .where(and(
+        eq(auditLog.entityType, entityType),
+        eq(auditLog.entityId, entityId)
+      ))
+      .orderBy(desc(auditLog.timestamp));
+  }
+
+  async getAuditLogsByUser(userId: string, limit: number = 100): Promise<AuditLog[]> {
+    const db = await getDb();
+    return await db.select().from(auditLog)
+      .where(eq(auditLog.userId, userId))
+      .orderBy(desc(auditLog.timestamp))
+      .limit(limit);
   }
 }
 
