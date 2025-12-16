@@ -1810,3 +1810,110 @@ export const insertBulkImportErrorSchema = createInsertSchema(bulkImportErrors).
 
 export type InsertBulkImportError = z.infer<typeof insertBulkImportErrorSchema>;
 export type BulkImportError = typeof bulkImportErrors.$inferSelect;
+
+// =====================================================
+// CERTIFICATES - Vessel statutory and class certificates
+// =====================================================
+export const certificates = pgTable("certificates", {
+  id: text("id").primaryKey(), // Certificate ID like C1, C2, etc.
+  certificateName: text("certificate_name").notNull(),
+  type: text("type").notNull(), // 'Flag' | 'Class' | 'Statutory'
+  vessel: text("vessel").notNull(), // Vessel name
+  vesselId: text("vessel_id"), // Optional vessel ID reference
+  issueDate: text("issue_date"), // DD MMM YYYY format
+  expiryDate: text("expiry_date"), // DD MMM YYYY format
+  lastAnnual: text("last_annual"), // DD MMM YYYY format
+  lastInterm: text("last_interm"), // DD MMM YYYY format (Interim)
+  endorsementDate: text("endorsement_date"), // DD MMM YYYY format
+  lastEditUpload: text("last_edit_upload"), // DD MMM YYYY format
+  applicable: boolean("applicable").notNull().default(true),
+  attachments: json("attachments").$type<any[]>().default([]), // Array of file attachments
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdx: index("idx_certificates_vessel").on(table.vessel),
+  typeIdx: index("idx_certificates_type").on(table.type),
+  expiryIdx: index("idx_certificates_expiry").on(table.expiryDate),
+}));
+
+export const insertCertificateSchema = createInsertSchema(certificates).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type Certificate = typeof certificates.$inferSelect;
+
+// =====================================================
+// SURVEYS - Vessel survey schedules and records
+// =====================================================
+export const surveys = pgTable("surveys", {
+  id: text("id").primaryKey(), // Survey ID like S1, S2, etc.
+  surveyName: text("survey_name").notNull(),
+  type: text("type").notNull(), // 'Annual' | 'Int' (Intermediate) | 'Special' | 'Renewal'
+  vessel: text("vessel").notNull(), // Vessel name
+  vesselId: text("vessel_id"), // Optional vessel ID reference
+  surveyDate: text("survey_date"), // DD MMM YYYY format - Last survey date
+  dueDate: text("due_date"), // DD MMM YYYY format - Next due date
+  firstRangeDate: text("first_range_date"), // DD MMM YYYY format - Window start
+  secondRangeDate: text("second_range_date"), // DD MMM YYYY format - Window end
+  postponed: text("postponed"), // DD MMM YYYY format - Postponed date if any
+  lastEdit: text("last_edit"), // DD MMM YYYY format - Last modification date
+  applicable: boolean("applicable").notNull().default(true),
+  attachments: json("attachments").$type<any[]>().default([]), // Array of file attachments
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselIdx: index("idx_surveys_vessel").on(table.vessel),
+  typeIdx: index("idx_surveys_type").on(table.type),
+  dueDateIdx: index("idx_surveys_due").on(table.dueDate),
+}));
+
+export const insertSurveySchema = createInsertSchema(surveys).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSurvey = z.infer<typeof insertSurveySchema>;
+export type Survey = typeof surveys.$inferSelect;
+
+// =====================================================
+// WORK ORDER EXECUTIONS - Detailed execution records
+// =====================================================
+export const workOrderExecutionDetails = pgTable("work_order_execution_details", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  workOrderId: text("work_order_id").notNull(), // Reference to work_orders
+  vesselId: text("vessel_id").notNull(),
+  executedBy: text("executed_by"), // User who performed the work
+  executedDate: text("executed_date"), // DD-MMM-YYYY format
+  completionNotes: text("completion_notes"),
+  partsUsed: json("parts_used").$type<any[]>().default([]), // Array of parts consumed
+  toolsUsed: json("tools_used").$type<any[]>().default([]), // Array of tools used
+  laborHours: decimal("labor_hours", { precision: 6, scale: 2 }),
+  findings: text("findings"), // Observations during execution
+  recommendations: text("recommendations"),
+  nextActionRequired: text("next_action_required"),
+  qualityCheckBy: text("quality_check_by"),
+  qualityCheckDate: text("quality_check_date"),
+  qualityCheckNotes: text("quality_check_notes"),
+  attachments: json("attachments").$type<any[]>().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  workOrderIdx: index("idx_exec_details_wo").on(table.workOrderId),
+  vesselIdx: index("idx_exec_details_vessel").on(table.vesselId),
+  executedDateIdx: index("idx_exec_details_date").on(table.executedDate),
+}));
+
+export const insertWorkOrderExecutionDetailsSchema = createInsertSchema(workOrderExecutionDetails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorkOrderExecutionDetails = z.infer<typeof insertWorkOrderExecutionDetailsSchema>;
+export type WorkOrderExecutionDetails = typeof workOrderExecutionDetails.$inferSelect;

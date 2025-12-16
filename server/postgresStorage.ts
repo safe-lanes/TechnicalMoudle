@@ -43,6 +43,9 @@ import {
   fleetComponentMapping,
   fleetJobVesselMapping,
   fleetSpareVesselMapping,
+  certificates,
+  surveys,
+  workOrderExecutionDetails,
   type User,
   type InsertUser,
   type Fleet,
@@ -122,6 +125,12 @@ import {
   type FleetVesselMapping,
   type InsertFleetVesselMapping,
   type FleetComponentMapping,
+  type Certificate,
+  type InsertCertificate,
+  type Survey,
+  type InsertSurvey,
+  type WorkOrderExecutionDetails,
+  type InsertWorkOrderExecutionDetails,
   type InsertFleetComponentMapping,
   type FleetJobVesselMapping,
   type InsertFleetJobVesselMapping,
@@ -3295,6 +3304,432 @@ export class PostgresStorage {
       .where(eq(auditLog.userId, userId))
       .orderBy(desc(auditLog.timestamp))
       .limit(limit);
+  }
+
+  // ============= CERTIFICATES =============
+  
+  async getCertificates(): Promise<Certificate[]> {
+    const db = await getDb();
+    return await db.select().from(certificates)
+      .where(eq(certificates.isActive, true))
+      .orderBy(asc(certificates.certificateName));
+  }
+
+  async getCertificate(id: string): Promise<Certificate | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(certificates)
+      .where(eq(certificates.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCertificate(certificate: InsertCertificate): Promise<Certificate> {
+    const db = await getDb();
+    const result = await db.insert(certificates).values({
+      ...certificate,
+      attachments: certificate.attachments || [],
+    }).returning();
+    return result[0];
+  }
+
+  async updateCertificate(id: string, data: Partial<Certificate>): Promise<Certificate> {
+    const db = await getDb();
+    const { id: _, createdAt: __, ...updateData } = data as any;
+    const result = await db.update(certificates)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(certificates.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`Certificate not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  async deleteCertificate(id: string): Promise<void> {
+    const db = await getDb();
+    await db.update(certificates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(certificates.id, id));
+  }
+
+  // ============= SURVEYS =============
+  
+  async getSurveys(): Promise<Survey[]> {
+    const db = await getDb();
+    return await db.select().from(surveys)
+      .where(eq(surveys.isActive, true))
+      .orderBy(asc(surveys.surveyName));
+  }
+
+  async getSurvey(id: string): Promise<Survey | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(surveys)
+      .where(eq(surveys.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createSurvey(survey: InsertSurvey): Promise<Survey> {
+    const db = await getDb();
+    const result = await db.insert(surveys).values({
+      ...survey,
+      attachments: survey.attachments || [],
+    }).returning();
+    return result[0];
+  }
+
+  async updateSurvey(id: string, data: Partial<Survey>): Promise<Survey> {
+    const db = await getDb();
+    const { id: _, createdAt: __, ...updateData } = data as any;
+    const result = await db.update(surveys)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(surveys.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`Survey not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  async deleteSurvey(id: string): Promise<void> {
+    const db = await getDb();
+    await db.update(surveys)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(surveys.id, id));
+  }
+
+  // ============= WORK ORDER EXECUTION DETAILS =============
+  
+  async getWorkOrderExecutionDetails(workOrderId: string): Promise<WorkOrderExecutionDetails[]> {
+    const db = await getDb();
+    return await db.select().from(workOrderExecutionDetails)
+      .where(eq(workOrderExecutionDetails.workOrderId, workOrderId))
+      .orderBy(desc(workOrderExecutionDetails.createdAt));
+  }
+
+  async getWorkOrderExecutionDetailById(id: number): Promise<WorkOrderExecutionDetails | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(workOrderExecutionDetails)
+      .where(eq(workOrderExecutionDetails.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createWorkOrderExecutionDetail(detail: InsertWorkOrderExecutionDetails): Promise<WorkOrderExecutionDetails> {
+    const db = await getDb();
+    const result = await db.insert(workOrderExecutionDetails).values(detail).returning();
+    return result[0];
+  }
+
+  async updateWorkOrderExecutionDetail(id: number, data: Partial<WorkOrderExecutionDetails>): Promise<WorkOrderExecutionDetails> {
+    const db = await getDb();
+    const { id: _, createdAt: __, ...updateData } = data as any;
+    const result = await db.update(workOrderExecutionDetails)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(workOrderExecutionDetails.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`WorkOrderExecutionDetail not found: ${id}`);
+    }
+    return result[0];
+  }
+
+  // ============= REMAINING FILE-BOUND METHODS =============
+  
+  async getRunningHourParents(vesselId: string): Promise<Component[]> {
+    const db = await getDb();
+    return await db.select().from(components)
+      .where(and(
+        eq(components.vesselId, vesselId),
+        eq(components.isParent, true),
+        eq(components.isActive, true)
+      ))
+      .orderBy(asc(components.name));
+  }
+
+  async cascadeRunningHoursUpdate(parentComponentId: string, delta: number, dateUpdated: string, userId: string): Promise<void> {
+    const db = await getDb();
+    
+    // Get all child components
+    const children = await db.select().from(components)
+      .where(eq(components.parentId, parentComponentId));
+    
+    // Update parent component
+    const parentResult = await db.select().from(components)
+      .where(eq(components.id, parentComponentId))
+      .limit(1);
+    
+    if (parentResult.length > 0) {
+      const parent = parentResult[0];
+      const currentRH = parseFloat(parent.currentCumulativeRH || '0');
+      const newRH = currentRH + delta;
+      
+      await db.update(components)
+        .set({ 
+          currentCumulativeRH: newRH.toString(),
+          lastUpdated: dateUpdated
+        })
+        .where(eq(components.id, parentComponentId));
+      
+      // Log audit for parent
+      await db.insert(runningHoursAudit).values({
+        vesselId: parent.vesselId || 'unknown',
+        componentId: parentComponentId,
+        previousRH: currentRH.toString(),
+        newRH: newRH.toString(),
+        cumulativeRH: newRH.toString(),
+        dateUpdatedLocal: dateUpdated,
+        dateUpdatedTZ: 'UTC',
+        enteredAtUTC: new Date(),
+        userId: userId,
+        source: 'cascade',
+      });
+    }
+    
+    // Update all children with delta
+    for (const child of children) {
+      const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+      const childNewRH = childCurrentRH + delta;
+      
+      await db.update(components)
+        .set({ 
+          currentCumulativeRH: childNewRH.toString(),
+          lastUpdated: dateUpdated
+        })
+        .where(eq(components.id, child.id));
+      
+      // Log audit for child
+      await db.insert(runningHoursAudit).values({
+        vesselId: child.vesselId || 'unknown',
+        componentId: child.id,
+        previousRH: childCurrentRH.toString(),
+        newRH: childNewRH.toString(),
+        cumulativeRH: childNewRH.toString(),
+        dateUpdatedLocal: dateUpdated,
+        dateUpdatedTZ: 'UTC',
+        enteredAtUTC: new Date(),
+        userId: userId,
+        source: 'cascade',
+      });
+    }
+  }
+
+  async bulkCreateComponents(componentsData: InsertComponent[]): Promise<Component[]> {
+    if (componentsData.length === 0) return [];
+    const db = await getDb();
+    const result = await db.insert(components).values(componentsData).returning();
+    return result;
+  }
+
+  async bulkUpdateComponents(updates: { id: string; data: Partial<Component> }[]): Promise<Component[]> {
+    const db = await getDb();
+    const results: Component[] = [];
+    
+    for (const update of updates) {
+      const { id: _, ...updateData } = update.data as any;
+      const result = await db.update(components)
+        .set(updateData)
+        .where(eq(components.id, update.id))
+        .returning();
+      if (result.length > 0) {
+        results.push(result[0]);
+      }
+    }
+    
+    return results;
+  }
+
+  async bulkUpsertComponents(componentsData: InsertComponent[]): Promise<{ created: number; updated: number }> {
+    const db = await getDb();
+    let created = 0;
+    let updated = 0;
+    
+    for (const comp of componentsData) {
+      const existing = await db.select().from(components)
+        .where(eq(components.id, comp.id))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        await db.update(components)
+          .set(comp)
+          .where(eq(components.id, comp.id));
+        updated++;
+      } else {
+        await db.insert(components).values(comp);
+        created++;
+      }
+    }
+    
+    return { created, updated };
+  }
+
+  async archiveComponentsByIds(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const db = await getDb();
+    await db.update(components)
+      .set({ isActive: false })
+      .where(inArray(components.id, ids));
+  }
+
+  async archiveSparesByIds(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const db = await getDb();
+    await db.update(spares)
+      .set({ isActive: false })
+      .where(inArray(spares.id, ids));
+  }
+
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Component[]> {
+    if (codes.length === 0) return [];
+    const db = await getDb();
+    
+    let query = db.select().from(components)
+      .where(inArray(components.componentCode, codes));
+    
+    if (vesselId) {
+      query = db.select().from(components)
+        .where(and(
+          inArray(components.componentCode, codes),
+          eq(components.vesselId, vesselId)
+        )) as typeof query;
+    }
+    
+    return await query;
+  }
+
+  async archiveComponent(id: string): Promise<void> {
+    const db = await getDb();
+    await db.update(components)
+      .set({ isActive: false })
+      .where(eq(components.id, id));
+  }
+
+  async archiveJob(id: string): Promise<void> {
+    const db = await getDb();
+    await db.update(jobs)
+      .set({ isActive: false })
+      .where(eq(jobs.id, id));
+  }
+
+  async archiveWorkOrder(id: string): Promise<void> {
+    const db = await getDb();
+    await db.update(workOrders)
+      .set({ isActive: false })
+      .where(eq(workOrders.id, id));
+  }
+
+  async calculateAndUpdateRecurringDefects(vesselId: string): Promise<void> {
+    // Recalculate recurring defects for a vessel
+    const db = await getDb();
+    const vesselDefects = await db.select().from(defects)
+      .where(eq(defects.vesselId, vesselId));
+    
+    // Group defects by defect type/category to find recurrences
+    const defectGroups = new Map<string, typeof vesselDefects>();
+    
+    for (const defect of vesselDefects) {
+      const key = `${defect.vesselId}-${defect.defectCategory || 'uncategorized'}`;
+      if (!defectGroups.has(key)) {
+        defectGroups.set(key, []);
+      }
+      defectGroups.get(key)!.push(defect);
+    }
+    
+    // Mark groups with 2+ defects as recurring
+    for (const [key, group] of defectGroups) {
+      if (group.length >= 2) {
+        for (const defect of group) {
+          await db.update(defects)
+            .set({ isRecurring: true })
+            .where(eq(defects.id, defect.id));
+        }
+      }
+    }
+  }
+
+  async recalculateAllRecurringDefects(): Promise<void> {
+    const db = await getDb();
+    const allVessels = await db.select().from(vessels);
+    
+    for (const vessel of allVessels) {
+      await this.calculateAndUpdateRecurringDefects(vessel.id);
+    }
+  }
+
+  async purgeJobsAndLinkedData(vesselId: string): Promise<{ jobsDeleted: number; workOrdersDeleted: number }> {
+    const db = await getDb();
+    
+    // Get all jobs for this vessel
+    const vesselJobs = await db.select().from(jobs)
+      .where(eq(jobs.vesselId, vesselId));
+    
+    const jobIds = vesselJobs.map(j => j.id);
+    let workOrdersDeleted = 0;
+    
+    // Delete work orders linked to these jobs
+    if (jobIds.length > 0) {
+      const woResult = await db.delete(workOrders)
+        .where(inArray(workOrders.jobId, jobIds))
+        .returning();
+      workOrdersDeleted = woResult.length;
+    }
+    
+    // Delete the jobs
+    const jobResult = await db.delete(jobs)
+      .where(eq(jobs.vesselId, vesselId))
+      .returning();
+    
+    return { jobsDeleted: jobResult.length, workOrdersDeleted };
+  }
+
+  async getVesselsByFleet(fleetId: string): Promise<Vessel[]> {
+    const db = await getDb();
+    return await db.select().from(vessels)
+      .where(eq(vessels.fleetId, fleetId));
+  }
+
+  async getVesselsWithFleets(): Promise<Array<Vessel & { fleetName?: string; fleetCode?: string }>> {
+    const db = await getDb();
+    const allVessels = await db.select().from(vessels);
+    const allFleets = await db.select().from(fleets);
+    
+    const fleetMap = new Map(allFleets.map(f => [f.id, f]));
+    
+    return allVessels.map(vessel => {
+      const fleet = vessel.fleetId ? fleetMap.get(vessel.fleetId) : undefined;
+      return {
+        ...vessel,
+        fleetName: fleet?.name,
+        fleetCode: fleet?.code,
+      };
+    });
+  }
+
+  async getFleetAdminMetrics(): Promise<{
+    totalMakers: number;
+    totalModels: number;
+    totalFleetComponents: number;
+    totalMasterLists: number;
+  }> {
+    const db = await getDb();
+    
+    const makersResult = await db.select({ count: sql<number>`count(*)` }).from(makers);
+    const masterListsResult = await db.select({ count: sql<number>`count(*)` }).from(masterLists);
+    const fleetComponentsResult = await db.select({ count: sql<number>`count(*)` })
+      .from(components)
+      .where(eq(components.dataScope, 'fleet'));
+    
+    // Count unique models from components
+    const modelsResult = await db.select({ count: sql<number>`count(distinct model)` })
+      .from(components)
+      .where(sql`model is not null`);
+    
+    return {
+      totalMakers: Number(makersResult[0]?.count || 0),
+      totalModels: Number(modelsResult[0]?.count || 0),
+      totalFleetComponents: Number(fleetComponentsResult[0]?.count || 0),
+      totalMasterLists: Number(masterListsResult[0]?.count || 0),
+    };
   }
 }
 

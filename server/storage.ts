@@ -103,6 +103,15 @@ import {
   storesLedger,
   type StoresLedger,
   type InsertStoresLedger,
+  certificates,
+  type Certificate,
+  type InsertCertificate,
+  surveys,
+  type Survey,
+  type InsertSurvey,
+  workOrderExecutionDetails,
+  type WorkOrderExecutionDetails,
+  type InsertWorkOrderExecutionDetails,
   ihmItems,
   type IhmItem,
   ihmMaintenanceLog,
@@ -659,18 +668,24 @@ export interface IStorage {
   updateVessel(id: string, data: Partial<Vessel>): Promise<Vessel>;
   
   // Certificate methods for Cert & Surveys module
-  getCertificates(): Promise<any[]>;
-  getCertificate(id: string): Promise<any | undefined>;
-  createCertificate(certificate: any): Promise<any>;
-  updateCertificate(id: string, data: any): Promise<any>;
+  getCertificates(): Promise<Certificate[]>;
+  getCertificate(id: string): Promise<Certificate | undefined>;
+  createCertificate(certificate: InsertCertificate): Promise<Certificate>;
+  updateCertificate(id: string, data: Partial<Certificate>): Promise<Certificate>;
   deleteCertificate(id: string): Promise<void>;
   
   // Survey methods for Cert & Surveys module
-  getSurveys(): Promise<any[]>;
-  getSurvey(id: string): Promise<any | undefined>;
-  createSurvey(survey: any): Promise<any>;
-  updateSurvey(id: string, data: any): Promise<any>;
+  getSurveys(): Promise<Survey[]>;
+  getSurvey(id: string): Promise<Survey | undefined>;
+  createSurvey(survey: InsertSurvey): Promise<Survey>;
+  updateSurvey(id: string, data: Partial<Survey>): Promise<Survey>;
   deleteSurvey(id: string): Promise<void>;
+  
+  // Work Order Execution Details
+  getWorkOrderExecutionDetails(workOrderId: string): Promise<WorkOrderExecutionDetails[]>;
+  getWorkOrderExecutionDetailById(id: number): Promise<WorkOrderExecutionDetails | undefined>;
+  createWorkOrderExecutionDetail(detail: InsertWorkOrderExecutionDetails): Promise<WorkOrderExecutionDetails>;
+  updateWorkOrderExecutionDetail(id: number, data: Partial<WorkOrderExecutionDetails>): Promise<WorkOrderExecutionDetails>;
 }
 
 // Helper function to normalize and validate immediateCause structure
