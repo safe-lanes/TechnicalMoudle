@@ -700,8 +700,95 @@ export class PostgresStorage {
     await db.delete(components).where(eq(components.id, id));
   }
 
-  async inactivateComponent(id: string): Promise<Component> {
-    return this.updateComponent(id, { isActive: false });
+  async inactivateComponent(id: string, userId?: string, options?: { cascadeInactivate?: boolean }): Promise<{
+    success: boolean;
+    message: string;
+    componentsInactivated: number;
+    jobsInactivated: number;
+    activeChildrenCount?: number;
+  }> {
+    const db = await getDb();
+    
+    // Get the component
+    const componentResult = await db.select().from(components)
+      .where(eq(components.id, id))
+      .limit(1);
+    
+    if (componentResult.length === 0) {
+      return {
+        success: false,
+        message: `Component not found: ${id}`,
+        componentsInactivated: 0,
+        jobsInactivated: 0,
+      };
+    }
+    
+    const component = componentResult[0];
+    
+    // Check for active children
+    const activeChildren = await db.select().from(components)
+      .where(and(
+        eq(components.parentId, id),
+        eq(components.isActive, true)
+      ));
+    
+    // If cascade is not requested and there are active children, return warning
+    if (!options?.cascadeInactivate && activeChildren.length > 0) {
+      return {
+        success: false,
+        message: `Component has ${activeChildren.length} active children. Set cascadeInactivate to true to inactivate them all.`,
+        componentsInactivated: 0,
+        jobsInactivated: 0,
+        activeChildrenCount: activeChildren.length,
+      };
+    }
+    
+    let componentsInactivated = 0;
+    let jobsInactivated = 0;
+    
+    // Cascade inactivate children if requested
+    if (options?.cascadeInactivate && activeChildren.length > 0) {
+      const childIds = activeChildren.map(c => c.id);
+      await db.update(components)
+        .set({ isActive: false })
+        .where(inArray(components.id, childIds));
+      componentsInactivated += childIds.length;
+      
+      // Inactivate jobs linked to children
+      for (const childId of childIds) {
+        const linkedJobs = await db.select().from(jobs)
+          .where(eq(jobs.componentId, childId));
+        if (linkedJobs.length > 0) {
+          await db.update(jobs)
+            .set({ isActive: false })
+            .where(eq(jobs.componentId, childId));
+          jobsInactivated += linkedJobs.length;
+        }
+      }
+    }
+    
+    // Inactivate the main component
+    await db.update(components)
+      .set({ isActive: false })
+      .where(eq(components.id, id));
+    componentsInactivated++;
+    
+    // Inactivate jobs linked to main component
+    const linkedJobs = await db.select().from(jobs)
+      .where(eq(jobs.componentId, id));
+    if (linkedJobs.length > 0) {
+      await db.update(jobs)
+        .set({ isActive: false })
+        .where(eq(jobs.componentId, id));
+      jobsInactivated += linkedJobs.length;
+    }
+    
+    return {
+      success: true,
+      message: `Component and ${componentsInactivated - 1} children inactivated, along with ${jobsInactivated} linked jobs.`,
+      componentsInactivated,
+      jobsInactivated,
+    };
   }
 
   // Fleet Components
@@ -1210,14 +1297,14 @@ export class PostgresStorage {
     return results;
   }
 
-  async bulkUpdateWorkOrders(updates: Array<{ workOrderNo: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
+  async bulkUpdateWorkOrders(updates: Array<{ templateCode: string; data: Partial<WorkOrder> }>): Promise<WorkOrder[]> {
     const db = await getDb();
     const results: WorkOrder[] = [];
     
-    for (const { workOrderNo, data } of updates) {
+    for (const { templateCode, data } of updates) {
       const result = await db.update(workOrders)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(workOrders.workOrderNo, workOrderNo))
+        .where(eq(workOrders.templateId, templateCode))
         .returning();
       if (result[0]) {
         results.push(result[0]);
@@ -1254,11 +1341,29 @@ export class PostgresStorage {
     return { created, updated };
   }
 
-  async getWorkOrdersByTemplateIds(templateIds: string[]): Promise<WorkOrder[]> {
-    if (templateIds.length === 0) return [];
+  async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, WorkOrder>> {
+    if (templateIds.length === 0) return new Map();
     const db = await getDb();
-    return await db.select().from(workOrders)
-      .where(inArray(workOrders.templateId, templateIds));
+    
+    let results: WorkOrder[];
+    if (vesselId) {
+      results = await db.select().from(workOrders)
+        .where(and(
+          inArray(workOrders.templateId, templateIds),
+          eq(workOrders.vesselId, vesselId)
+        ));
+    } else {
+      results = await db.select().from(workOrders)
+        .where(inArray(workOrders.templateId, templateIds));
+    }
+    
+    const resultMap = new Map<string, WorkOrder>();
+    for (const wo of results) {
+      if (wo.templateId) {
+        resultMap.set(wo.templateId, wo);
+      }
+    }
+    return resultMap;
   }
 
   // Fleet Work Orders
@@ -1411,10 +1516,8 @@ export class PostgresStorage {
     location: 'A' | 'B',
     userId: string,
     remarks?: string,
-    place?: string,
-    dateLocal?: string,
-    tz?: string
-  ): Promise<Spare> {
+    workOrderRef?: string
+  ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
     const db = await getDb();
     const spare = await this.getSpare(id);
     if (!spare) {
@@ -1425,16 +1528,21 @@ export class PostgresStorage {
     const currentRobB = spare.robLocationB ?? 0;
     const currentRob = spare.rob ?? 0;
     
+    // Calculate available quantity in the specified location
+    const availableInLocation = location === 'A' ? currentRobA : currentRobB;
+    const deducted = Math.min(quantity, availableInLocation);
+    const shortageQty = Math.max(0, quantity - availableInLocation);
+    
     let newRobA = currentRobA;
     let newRobB = currentRobB;
     
     if (location === 'A') {
-      newRobA = Math.max(0, currentRobA - quantity);
+      newRobA = Math.max(0, currentRobA - deducted);
     } else {
-      newRobB = Math.max(0, currentRobB - quantity);
+      newRobB = Math.max(0, currentRobB - deducted);
     }
     
-    const newRob = Math.max(0, currentRob - quantity);
+    const newRob = Math.max(0, currentRob - deducted);
     
     const updated = await db.update(spares)
       .set({
@@ -1457,17 +1565,22 @@ export class PostgresStorage {
       componentName: spare.componentName,
       componentSpareCode: spare.componentSpareCode ?? null,
       eventType: 'CONSUME',
-      qtyChange: -quantity,
+      qtyChange: -deducted,
       robAfter: newRob,
       userId,
-      remarks: remarks ? `${remarks} (Location ${location})` : `Location ${location}`,
-      reference: null,
-      dateLocal: dateLocal ?? null,
-      tz: tz ?? null,
-      place: place ?? null,
+      remarks: remarks ? `${remarks} (Location ${location})${workOrderRef ? ` WO: ${workOrderRef}` : ''}` : `Location ${location}`,
+      reference: workOrderRef ?? null,
+      dateLocal: null,
+      tz: null,
+      place: null,
     });
     
-    return updated[0];
+    return {
+      spare: updated[0],
+      deducted,
+      requested: quantity,
+      shortageQty,
+    };
   }
 
   async receiveSpare(
@@ -1524,29 +1637,32 @@ export class PostgresStorage {
   }
 
   async adjustSpareQuantity(
-    id: number,
-    newRob: number,
-    newRobA: number,
-    newRobB: number,
-    userId: string,
-    remarks?: string
+    spareId: number,
+    qtyChange: number,
+    eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST',
+    reference?: string,
+    notes?: string
   ): Promise<Spare> {
     const db = await getDb();
-    const spare = await this.getSpare(id);
+    const spare = await this.getSpare(spareId);
     if (!spare) {
-      throw new Error(`Spare ${id} not found`);
+      throw new Error(`Spare ${spareId} not found`);
     }
     
-    const qtyChange = newRob - (spare.rob ?? 0);
+    const currentRob = spare.rob ?? 0;
+    const currentRobA = spare.robLocationA ?? 0;
+    
+    // Calculate new values based on quantity change
+    const newRob = Math.max(0, currentRob + qtyChange);
+    const newRobA = Math.max(0, currentRobA + qtyChange); // Apply to location A by default
     
     const updated = await db.update(spares)
       .set({
         rob: newRob,
         robLocationA: newRobA,
-        robLocationB: newRobB,
         updatedAt: new Date()
       })
-      .where(eq(spares.id, id))
+      .where(eq(spares.id, spareId))
       .returning();
     
     await this.createSpareHistory({
@@ -1559,12 +1675,12 @@ export class PostgresStorage {
       componentCode: spare.componentCode ?? null,
       componentName: spare.componentName,
       componentSpareCode: spare.componentSpareCode ?? null,
-      eventType: 'ADJUST',
+      eventType,
       qtyChange,
       robAfter: newRob,
-      userId,
-      remarks: remarks ?? null,
-      reference: null,
+      userId: 'system',
+      remarks: notes ?? null,
+      reference: reference ?? null,
       dateLocal: null,
       tz: null,
       place: null,
@@ -3306,6 +3422,41 @@ export class PostgresStorage {
       .limit(limit);
   }
 
+  // ============= WORK ORDER EXECUTIONS (Original) =============
+  
+  async getWorkOrderExecutions(componentId: string): Promise<WorkOrderExecution[]> {
+    const db = await getDb();
+    return await db.select().from(workOrderExecutions)
+      .where(eq(workOrderExecutions.componentId, componentId))
+      .orderBy(desc(workOrderExecutions.createdAt));
+  }
+
+  async getWorkOrderExecutionById(id: string): Promise<WorkOrderExecution | null> {
+    const db = await getDb();
+    const result = await db.select().from(workOrderExecutions)
+      .where(eq(workOrderExecutions.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async createWorkOrderExecution(data: InsertWorkOrderExecution): Promise<WorkOrderExecution> {
+    const db = await getDb();
+    const result = await db.insert(workOrderExecutions).values(data).returning();
+    return result[0];
+  }
+
+  async updateWorkOrderExecution(id: string, data: Partial<InsertWorkOrderExecution>): Promise<WorkOrderExecution> {
+    const db = await getDb();
+    const result = await db.update(workOrderExecutions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workOrderExecutions.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`WorkOrderExecution not found: ${id}`);
+    }
+    return result[0];
+  }
+
   // ============= CERTIFICATES =============
   
   async getCertificates(): Promise<Certificate[]> {
@@ -3436,19 +3587,47 @@ export class PostgresStorage {
 
   // ============= REMAINING FILE-BOUND METHODS =============
   
-  async getRunningHourParents(vesselId: string): Promise<Component[]> {
+  async getRunningHourParents(vesselId: string): Promise<Array<Component & { childCount: number; latestUpdate?: string }>> {
     const db = await getDb();
-    return await db.select().from(components)
+    
+    // Get parent components
+    const parents = await db.select().from(components)
       .where(and(
         eq(components.vesselId, vesselId),
         eq(components.isParent, true),
         eq(components.isActive, true)
       ))
       .orderBy(asc(components.name));
+    
+    // Enhance with child counts
+    const result: Array<Component & { childCount: number; latestUpdate?: string }> = [];
+    
+    for (const parent of parents) {
+      const children = await db.select().from(components)
+        .where(eq(components.parentId, parent.id));
+      
+      result.push({
+        ...parent,
+        childCount: children.length,
+        latestUpdate: parent.lastUpdated || undefined,
+      });
+    }
+    
+    return result;
   }
 
-  async cascadeRunningHoursUpdate(parentComponentId: string, delta: number, dateUpdated: string, userId: string): Promise<void> {
+  async cascadeRunningHoursUpdate(params: {
+    parentComponentId: string;
+    mode: 'setTotal' | 'addDelta';
+    value: number;
+    dateUpdated: string;
+    comments?: string;
+    meterReplaced?: boolean;
+    oldMeterFinal?: string;
+    newMeterStart?: string;
+  }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
+    const { parentComponentId, mode, value, dateUpdated, comments } = params;
     
     // Get all child components
     const children = await db.select().from(components)
@@ -3459,10 +3638,13 @@ export class PostgresStorage {
       .where(eq(components.id, parentComponentId))
       .limit(1);
     
+    let updatedComponents = 0;
+    let auditsCreated = 0;
+    
     if (parentResult.length > 0) {
       const parent = parentResult[0];
       const currentRH = parseFloat(parent.currentCumulativeRH || '0');
-      const newRH = currentRH + delta;
+      const newRH = mode === 'addDelta' ? currentRH + value : value;
       
       await db.update(components)
         .set({ 
@@ -3481,14 +3663,19 @@ export class PostgresStorage {
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: new Date(),
-        userId: userId,
+        userId: 'system',
         source: 'cascade',
+        comments: comments,
       });
+      
+      updatedComponents++;
+      auditsCreated++;
     }
     
-    // Update all children with delta
+    // Update all children
     for (const child of children) {
       const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
+      const delta = mode === 'addDelta' ? value : (value - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
       const childNewRH = childCurrentRH + delta;
       
       await db.update(components)
@@ -3508,10 +3695,21 @@ export class PostgresStorage {
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
         enteredAtUTC: new Date(),
-        userId: userId,
+        userId: 'system',
         source: 'cascade',
+        comments: comments,
       });
+      
+      updatedComponents++;
+      auditsCreated++;
     }
+    
+    return { 
+      updatedComponents, 
+      auditsCreated,
+      workOrdersGenerated: 0, 
+      workOrders: [] 
+    };
   }
 
   async bulkCreateComponents(componentsData: InsertComponent[]): Promise<Component[]> {
@@ -3563,59 +3761,85 @@ export class PostgresStorage {
     return { created, updated };
   }
 
-  async archiveComponentsByIds(ids: string[]): Promise<void> {
-    if (ids.length === 0) return;
+  async archiveComponentsByIds(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
     const db = await getDb();
-    await db.update(components)
+    const result = await db.update(components)
       .set({ isActive: false })
-      .where(inArray(components.id, ids));
+      .where(inArray(components.id, ids))
+      .returning();
+    return result.length;
   }
 
-  async archiveSparesByIds(ids: string[]): Promise<void> {
-    if (ids.length === 0) return;
+  async archiveSparesByIds(ids: number[]): Promise<number> {
+    if (ids.length === 0) return 0;
     const db = await getDb();
-    await db.update(spares)
+    const result = await db.update(spares)
       .set({ isActive: false })
-      .where(inArray(spares.id, ids));
+      .where(inArray(spares.id, ids))
+      .returning();
+    return result.length;
   }
 
-  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Component[]> {
-    if (codes.length === 0) return [];
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, Component>> {
+    if (codes.length === 0) return new Map();
     const db = await getDb();
     
-    let query = db.select().from(components)
-      .where(inArray(components.componentCode, codes));
-    
+    let results: Component[];
     if (vesselId) {
-      query = db.select().from(components)
+      results = await db.select().from(components)
         .where(and(
           inArray(components.componentCode, codes),
           eq(components.vesselId, vesselId)
-        )) as typeof query;
+        ));
+    } else {
+      results = await db.select().from(components)
+        .where(inArray(components.componentCode, codes));
     }
     
-    return await query;
+    const resultMap = new Map<string, Component>();
+    for (const comp of results) {
+      if (comp.componentCode) {
+        resultMap.set(comp.componentCode, comp);
+      }
+    }
+    return resultMap;
   }
 
-  async archiveComponent(id: string): Promise<void> {
+  async archiveComponent(id: string): Promise<Component> {
     const db = await getDb();
-    await db.update(components)
+    const result = await db.update(components)
       .set({ isActive: false })
-      .where(eq(components.id, id));
+      .where(eq(components.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`Component not found: ${id}`);
+    }
+    return result[0];
   }
 
-  async archiveJob(id: string): Promise<void> {
+  async archiveJob(id: string): Promise<Job> {
     const db = await getDb();
-    await db.update(jobs)
+    const result = await db.update(jobs)
       .set({ isActive: false })
-      .where(eq(jobs.id, id));
+      .where(eq(jobs.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`Job not found: ${id}`);
+    }
+    return result[0];
   }
 
-  async archiveWorkOrder(id: string): Promise<void> {
+  async archiveWorkOrder(id: string): Promise<WorkOrder> {
     const db = await getDb();
-    await db.update(workOrders)
+    const result = await db.update(workOrders)
       .set({ isActive: false })
-      .where(eq(workOrders.id, id));
+      .where(eq(workOrders.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error(`WorkOrder not found: ${id}`);
+    }
+    return result[0];
   }
 
   async calculateAndUpdateRecurringDefects(vesselId: string): Promise<void> {
@@ -3730,6 +3954,223 @@ export class PostgresStorage {
       totalFleetComponents: Number(fleetComponentsResult[0]?.count || 0),
       totalMasterLists: Number(masterListsResult[0]?.count || 0),
     };
+  }
+
+  // ============= FLEET VESSEL MAPPING (Rule #16) =============
+  
+  async createFleetVesselMappings(data: {
+    fleetEntityType: 'component' | 'job' | 'spare';
+    fleetEntityIds: string[];
+    vesselId: string;
+    vesselEntityId?: string;
+    vesselEntityCode?: string;
+    mappedBy: string;
+  }): Promise<any[]> {
+    const db = await getDb();
+    const results: any[] = [];
+    
+    for (const fleetEntityId of data.fleetEntityIds) {
+      const result = await db.insert(fleetVesselMapping).values({
+        fleetEquipmentCode: fleetEntityId,
+        vesselCode: data.vesselId,
+        vesselComponentCode: data.vesselEntityCode,
+        createdBy: data.mappedBy,
+      }).returning();
+      if (result.length > 0) results.push(result[0]);
+    }
+    
+    return results;
+  }
+
+  async deleteFleetVesselMapping(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(fleetVesselMapping)
+      .where(eq(fleetVesselMapping.id, parseInt(id)));
+  }
+
+  async getVessels(): Promise<Array<{id: string, name: string, code: string}>> {
+    const db = await getDb();
+    const result = await db.select({
+      id: vessels.id,
+      name: vessels.name,
+      code: vessels.code,
+    }).from(vessels);
+    return result;
+  }
+
+  // ============= ON-DEMAND WORK ORDER GENERATION (Rule #4) =============
+  
+  async generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other'): Promise<WorkOrder> {
+    const db = await getDb();
+    
+    // Get the job
+    const jobResult = await db.select().from(jobs)
+      .where(eq(jobs.id, jobId))
+      .limit(1);
+    
+    if (jobResult.length === 0) {
+      throw new Error(`Job not found: ${jobId}`);
+    }
+    
+    const job = jobResult[0];
+    const today = new Date();
+    const year = today.getFullYear();
+    
+    // Generate work order number
+    const existingWOs = await db.select().from(workOrders)
+      .where(eq(workOrders.jobId, jobId));
+    const woCount = existingWOs.length + 1;
+    const workOrderNumber = `${job.jobCode}.WO-${year}-${String(woCount).padStart(3, '0')}`;
+    
+    // Create the work order
+    const newWorkOrder: InsertWorkOrder = {
+      id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      vesselId: job.vesselId,
+      vesselName: job.vesselName || '',
+      workOrderNumber,
+      jobId: job.id,
+      jobCode: job.jobCode,
+      jobTitle: job.title,
+      componentId: job.componentId,
+      component: job.componentName || '',
+      status: 'Pending',
+      dueDate: new Date().toISOString().split('T')[0],
+      createdDate: new Date().toISOString().split('T')[0],
+      remarks: `On-demand work order generated. Reason: ${reason}`,
+      isActive: true,
+    };
+    
+    const result = await db.insert(workOrders).values(newWorkOrder).returning();
+    return result[0];
+  }
+
+  // ============= POSTPONED WO REAPPEARANCE (Rule #5) =============
+  
+  async checkAndRevertPostponedWorkOrders(vesselId?: string): Promise<{
+    revertedCount: number;
+    revertedWorkOrders: WorkOrder[];
+  }> {
+    const db = await getDb();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Find postponed work orders past their postponed date
+    let query = db.select().from(workOrders)
+      .where(and(
+        eq(workOrders.status, 'Postponed'),
+        eq(workOrders.isActive, true)
+      ));
+    
+    const postponedWOs = await query;
+    const revertedWorkOrders: WorkOrder[] = [];
+    
+    for (const wo of postponedWOs) {
+      // Check if vessel filter applies
+      if (vesselId && wo.vesselId !== vesselId) continue;
+      
+      // Check if postponed date has passed
+      if (wo.postponedDate && wo.postponedDate <= todayStr) {
+        const result = await db.update(workOrders)
+          .set({ 
+            status: 'Pending',
+            postponedDate: null,
+            updatedAt: new Date()
+          })
+          .where(eq(workOrders.id, wo.id))
+          .returning();
+        
+        if (result.length > 0) {
+          revertedWorkOrders.push(result[0]);
+        }
+      }
+    }
+    
+    return {
+      revertedCount: revertedWorkOrders.length,
+      revertedWorkOrders,
+    };
+  }
+
+  // ============= COMPONENT VESSEL MAPPING =============
+  
+  async getComponentVesselMappings(): Promise<any[]> {
+    const db = await getDb();
+    return await db.select().from(fleetComponentMapping);
+  }
+
+  async createComponentVesselMapping(data: { 
+    fleetEquipmentCode: string; 
+    vesselCode: string; 
+    vesselName: string; 
+    componentCode?: string; 
+    componentName?: string;
+  }): Promise<any> {
+    const db = await getDb();
+    const result = await db.insert(fleetComponentMapping).values({
+      fleetEquipmentCode: data.fleetEquipmentCode,
+      vesselCode: data.vesselCode,
+      vesselComponentCode: data.componentCode,
+    }).returning();
+    return result[0];
+  }
+
+  async deleteComponentVesselMapping(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(fleetComponentMapping)
+      .where(eq(fleetComponentMapping.id, id));
+  }
+
+  // ============= PMS VESSEL SETTINGS =============
+  
+  async createOrUpdatePmsVesselSettings(settings: InsertPmsVesselSettings): Promise<PmsVesselSettings> {
+    const db = await getDb();
+    
+    // Check if settings exist for this vessel
+    const existing = await db.select().from(pmsVesselSettings)
+      .where(eq(pmsVesselSettings.vesselId, settings.vesselId))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing
+      const result = await db.update(pmsVesselSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(pmsVesselSettings.vesselId, settings.vesselId))
+        .returning();
+      return result[0];
+    } else {
+      // Create new
+      const result = await db.insert(pmsVesselSettings).values(settings).returning();
+      return result[0];
+    }
+  }
+
+  // ============= FLEET MANAGEMENT =============
+  
+  async getAllFleets(): Promise<Fleet[]> {
+    const db = await getDb();
+    return await db.select().from(fleets)
+      .orderBy(asc(fleets.name));
+  }
+
+  async getFleetById(id: string): Promise<Fleet | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(fleets)
+      .where(eq(fleets.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async assignVesselToFleet(vesselId: string, fleetId: string | null): Promise<Vessel> {
+    const db = await getDb();
+    const result = await db.update(vessels)
+      .set({ fleetId: fleetId, updatedAt: new Date() })
+      .where(eq(vessels.id, vesselId))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error(`Vessel not found: ${vesselId}`);
+    }
+    return result[0];
   }
 }
 

@@ -428,10 +428,10 @@ export interface IStorage {
   bulkUpsertWorkOrders(workOrders: InsertWorkOrder[]): Promise<{ created: number; updated: number }>;
   
   // Fleet Jobs methods
-  getFleetJobs(): Promise<WorkOrder[]>;
-  getFleetJob(id: string): Promise<WorkOrder | undefined>;
-  createFleetJob(job: InsertWorkOrder): Promise<WorkOrder>;
-  updateFleetJob(id: string, data: Partial<WorkOrder>): Promise<WorkOrder>;
+  getFleetJobs(): Promise<Job[]>;
+  getFleetJob(id: string): Promise<Job | undefined>;
+  createFleetJob(job: InsertJob): Promise<Job>;
+  updateFleetJob(id: string, data: Partial<Job>): Promise<Job>;
   deleteFleetJob(id: string): Promise<void>;
   
   // Work Order Execution methods
@@ -727,31 +727,40 @@ function normalizeRootCause(data: any): { individualFactor: string[], systemFact
 // Dynamic storage selection using StorageFactory
 import { getStorage, initializeStorage } from "./storageFactory";
 
-let storage: IStorage;
-let storageInitialized = false;
+let _storage: IStorage | null = null;
+
+// Getter for storage with validation
+function getStorageInstance(): IStorage {
+  if (!_storage) {
+    throw new Error(
+      'Storage not initialized. Call initStorage() before accessing storage. ' +
+      'This error typically occurs when storage is accessed before server startup completes.'
+    );
+  }
+  return _storage;
+}
 
 // Initialize storage using the factory
-// This supports HybridStorage when DATABASE_URL is available
+// PostgreSQL-only mode - fails if DATABASE_URL is not set
 async function initStorage(): Promise<void> {
-  if (storageInitialized) return;
+  if (_storage !== null) return;
   
   console.log('🔧 Initializing storage...');
   console.log(`🔍 DATABASE_URL check: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
   
-  try {
-    storage = await initializeStorage();
-    storageInitialized = true;
-    console.log('✅ Storage initialization complete');
-  } catch (error: any) {
-    console.error('❌ Storage initialization failed:', error.message);
-    storage = getStorage();
-    storageInitialized = true;
-  }
+  _storage = await initializeStorage();
+  console.log('✅ Storage initialization complete');
 }
 
-// For synchronous access (backward compatibility)
-// Uses sync fallback if async init hasn't completed
-storage = getStorage();
+// Create a proxy that lazily accesses the storage
+// This allows importing the module without immediate initialization
+const storage = new Proxy({} as IStorage, {
+  get(_target, prop) {
+    const instance = getStorageInstance();
+    const value = (instance as any)[prop];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  }
+});
 
 // Export initialization function for server startup
 export { storage, initStorage };
