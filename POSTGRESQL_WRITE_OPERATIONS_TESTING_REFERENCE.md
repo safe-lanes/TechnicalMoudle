@@ -2,7 +2,7 @@
 
 ## Overview
 
-The system uses **HybridStorage** which routes modules 1-14 to PostgreSQL when `DATABASE_URL` is configured. All PostgreSQL operations are implemented via Drizzle ORM in `server/postgresStorage.ts`.
+The system uses **HybridStorage** which routes modules 1-17 to PostgreSQL when `DATABASE_URL` is configured, with file storage fallback when PostgreSQL is unavailable. Some legacy operations (certificates, surveys, work order executions, complex recalculations) remain on file storage. All PostgreSQL operations are implemented via Drizzle ORM in `server/postgresStorage.ts`.
 
 ---
 
@@ -764,22 +764,174 @@ SELECT * FROM fleet_component_mapping WHERE fleet_equipment_code = '<code>' AND 
 
 ---
 
+## Module 15: Import Engine
+
+### Tables Used
+| Table | Purpose |
+|-------|---------|
+| `import_history` | Tracks import operations with undo support |
+| `import_change_log` | Individual record changes for rollback |
+
+### Write Operations Summary
+
+| Operation | Table | Type |
+|-----------|-------|------|
+| Start Import | `import_history` | INSERT |
+| Complete Import | `import_history` | UPDATE (status, counts) |
+| Undo Import | `import_history` | UPDATE (undoneAt timestamp) |
+| Log Entity Create | `import_change_log` | INSERT |
+| Log Entity Update | `import_change_log` | INSERT |
+| Log Entity Archive | `import_change_log` | INSERT |
+| Delete Import Logs | `import_change_log` | DELETE |
+
+### Trigger Points
+
+| Action | UI Location | Button/Action |
+|--------|-------------|---------------|
+| Start Import | Import → Master Data Import | "Import" button |
+| View Import History | Import → Import History | List of past imports |
+| Undo Import | Import → Import History | "Undo" button on import row |
+
+### Test Verification Steps
+
+**Create Import Record:**
+```sql
+-- After: Import → Upload file → Start import
+SELECT * FROM import_history ORDER BY started_at DESC LIMIT 1;
+-- Expected: New row with type, mode, status='Processing', created/updated/skipped=0
+```
+
+**Complete Import:**
+```sql
+-- After: Import completes
+SELECT id, type, status, created, updated, skipped, archived FROM import_history WHERE id = '<import_id>';
+-- Expected: status='Completed', counts populated
+```
+
+**Log Change Record:**
+```sql
+-- After: Import creates/updates entities
+SELECT * FROM import_change_log WHERE import_history_id = '<import_id>';
+-- Expected: Rows with entity_type, entity_id, operation, previous_data, new_data, checksum
+```
+
+### Storage Behavior
+**Uses PostgreSQL** - Routes to PostgresStorage when DATABASE_URL configured.
+
+---
+
+## Module 16: Bulk Import
+
+### Tables Used
+| Table | Purpose |
+|-------|---------|
+| `bulk_import_history` | Excel/CSV import audit trail |
+| `bulk_import_errors` | Row-level error tracking |
+
+### Write Operations Summary
+
+| Operation | Table | Type |
+|-----------|-------|------|
+| Create Import Record | `bulk_import_history` | INSERT |
+| Update Import Progress | `bulk_import_history` | UPDATE (counts, status) |
+| Log Row Error | `bulk_import_errors` | INSERT |
+| Bulk Log Errors | `bulk_import_errors` | BULK INSERT |
+
+### Trigger Points
+
+| Action | UI Location | Button/Action |
+|--------|-------------|---------------|
+| Upload Excel/CSV | PMS → Bulk Import | "Upload" button |
+| View Import History | PMS → Bulk Import History | View past imports |
+| View Import Errors | PMS → Bulk Import History | "View Errors" on import row |
+
+### Test Verification Steps
+
+**Create Bulk Import:**
+```sql
+-- After: Upload Excel file for bulk import
+SELECT * FROM bulk_import_history ORDER BY uploaded_at DESC LIMIT 1;
+-- Expected: New row with file_name, module_type, status='Processing', total_rows
+```
+
+**Update Import Completion:**
+```sql
+-- After: Import completes
+SELECT id, module_type, status, total_rows, success_count, failed_count, skipped_count
+FROM bulk_import_history WHERE id = <import_id>;
+-- Expected: status='Completed' or 'Completed with Errors', counts populated
+```
+
+**Log Import Errors:**
+```sql
+-- After: Import with validation errors
+SELECT * FROM bulk_import_errors WHERE import_id = <import_id> ORDER BY row_number;
+-- Expected: Rows with row_number, field_name, error_type, error_description, severity
+```
+
+### Storage Behavior
+**Uses PostgreSQL** - Routes to PostgresStorage when DATABASE_URL configured.
+
+---
+
+## Module 17: Audit Log
+
+### Tables Used
+| Table | Purpose |
+|-------|---------|
+| `audit_log` | System-wide audit trail for all data changes |
+
+### Write Operations Summary
+
+| Operation | Table | Type |
+|-----------|-------|------|
+| Log Create Action | `audit_log` | INSERT |
+| Log Update Action | `audit_log` | INSERT |
+| Log Delete Action | `audit_log` | INSERT |
+| Log Import Action | `audit_log` | INSERT |
+
+### Trigger Points
+
+| Action | UI Location | Button/Action |
+|--------|-------------|---------------|
+| Any data modification | Throughout system | Create/Update/Delete operations |
+| View Audit Trail | Admin → Audit Log | Filter by entity, user, date |
+| View Entity History | Entity Details → Audit Tab | Entity-specific audit trail |
+
+### Test Verification Steps
+
+**Create Audit Entry:**
+```sql
+-- After: Create/Update/Delete any entity
+SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 5;
+-- Expected: Rows with user_id, entity_type, entity_id, action_type, old_value, new_value
+```
+
+**Query by Entity:**
+```sql
+-- After: View audit trail for specific entity
+SELECT * FROM audit_log WHERE entity_type = '<type>' AND entity_id = '<id>' ORDER BY timestamp DESC;
+-- Expected: Complete history of changes for that entity
+```
+
+**Query by User:**
+```sql
+-- After: View user activity
+SELECT * FROM audit_log WHERE user_id = '<user_id>' ORDER BY timestamp DESC LIMIT 100;
+-- Expected: All actions performed by user
+```
+
+### Storage Behavior
+**Uses PostgreSQL** - Routes to PostgresStorage when DATABASE_URL configured.
+
+---
+
 ## Areas Still Using File Storage
 
 ### Certificates & Surveys
 - **Tables:** Uses file storage (`getCertificates`, `createCertificate`, etc.)
 - **PostgreSQL Writes:** None
 - **Test Location:** Vessel → Certificates & Surveys
-
-### Import History & Change Logs
-- **Tables:** `import_history`, `import_change_log` (defined in schema but delegated to file storage)
-- **PostgreSQL Writes:** None - all operations via `fileStorage`
-- **Test Location:** Import → Import History
-
-### Bulk Import History & Errors
-- **Tables:** `bulk_import_history`, `bulk_import_errors`
-- **PostgreSQL Writes:** None - delegated to file storage
-- **Test Location:** Import functionality
 
 ### Work Order Executions
 - **Table:** `work_order_executions`
@@ -819,7 +971,10 @@ SELECT * FROM fleet_component_mapping WHERE fleet_equipment_code = '<code>' AND 
 | 12 | change_request, change_request_attachment, change_request_comment | 3 |
 | 13 | ihm_items, ihm_maintenance_log | 2 |
 | 14 | fleet_vessel_mapping, fleet_component_mapping, fleet_job_vessel_mapping, fleet_spare_vessel_mapping | 4 |
-| **Total** | | **42 tables** |
+| 15 | import_history, import_change_log | 2 |
+| 16 | bulk_import_history, bulk_import_errors | 2 |
+| 17 | audit_log | 1 |
+| **Total** | | **47 tables** |
 
 ---
 
