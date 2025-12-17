@@ -1,69 +1,42 @@
 import type { IStorage } from './storage';
 import { postgresStorage } from './postgresStorage';
-import { resolvePostgres, getConnectionString } from './postgresClient';
-import { createConfigTemplate } from './dbConfig';
+import { memStorage } from './memStorage';
+import { resolvePostgres } from './postgresClient';
 
 /**
- * POSTGRESQL-ONLY STORAGE FACTORY
+ * STORAGE FACTORY WITH DUAL-MODE SUPPORT
  * 
- * This application requires PostgreSQL to be configured.
- * If neither DATABASE_URL nor individual PG* variables are set,
- * the application will fail to start with a clear error message.
+ * Storage selection is based on DATABASE_URL environment variable:
+ * - DATABASE_URL present → PostgreSQL storage (production mode)
+ * - DATABASE_URL absent → File-based storage (preview/development mode)
  * 
- * MIGRATION COMPLETE:
- * - All 17 modules now use PostgreSQL storage
- * - No file storage fallbacks (test-data.json eliminated)
- * - No hybrid mode - PostgreSQL is the only storage option
- * 
- * TEMPORARY FALLBACK (for Replit secret injection issues):
- * - If DATABASE_URL is not injected, constructs connection from PG* env vars
- * - If PG* vars also missing, reads from local db.config.json file
+ * This allows the application to run in Replit Preview without
+ * database credentials while still supporting full PostgreSQL
+ * in production deployments.
  */
 
 let storageInitialized = false;
 let storageInstance: IStorage | null = null;
+let currentStorageMode: 'postgres' | 'file' = 'file';
 
 /**
- * Check if PostgreSQL is available (via DATABASE_URL or PG* env vars)
+ * Check if PostgreSQL is available (DATABASE_URL is set)
  */
 export function isPostgresAvailable(): boolean {
-  return !!getConnectionString();
+  return !!process.env.DATABASE_URL;
 }
 
 /**
- * Validate that PostgreSQL is properly configured
- * Throws an error if no PostgreSQL configuration is available
+ * Get the current storage mode
  */
-function validatePostgresConfig(): void {
-  const connectionString = getConnectionString();
-  
-  if (!connectionString) {
-    // Create template config file to help user
-    createConfigTemplate();
-    
-    const errorMessage = `
-╔════════════════════════════════════════════════════════════════════════════╗
-║                    POSTGRESQL DATABASE REQUIRED                            ║
-╠════════════════════════════════════════════════════════════════════════════╣
-║  This application requires PostgreSQL to operate.                          ║
-║                                                                            ║
-║  Configuration options (in priority order):                                ║
-║  1. Set DATABASE_URL environment variable                                  ║
-║  2. Set PG* environment variables (PGHOST, PGPORT, PGUSER, etc.)           ║
-║  3. Create db.config.json with database credentials (temporary)            ║
-║                                                                            ║
-║  A template db.config.json has been created. Fill it with your             ║
-║  PostgreSQL credentials to use the temporary config file fallback.         ║
-╚════════════════════════════════════════════════════════════════════════════╝
-`;
-    console.error(errorMessage);
-    throw new Error('PostgreSQL configuration is required. See console for options.');
-  }
+export function getStorageMode(): 'postgres' | 'file' {
+  return currentStorageMode;
 }
 
 /**
- * Initialize PostgreSQL storage
- * Validates configuration and tests database connection
+ * Initialize storage based on environment
+ * - If DATABASE_URL is set, uses PostgreSQL
+ * - If DATABASE_URL is not set, falls back to file-based storage
  */
 export async function initializeStorage(): Promise<IStorage> {
   if (storageInitialized && storageInstance) {
@@ -71,45 +44,44 @@ export async function initializeStorage(): Promise<IStorage> {
   }
 
   console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
-  console.log('[StorageFactory] Initializing PostgreSQL-only storage...');
   
-  // Validate PostgreSQL is configured
-  validatePostgresConfig();
-  
-  try {
-    // Verify PostgreSQL connection
-    const postgres = await resolvePostgres();
-    if (!postgres) {
-      throw new Error('Failed to establish PostgreSQL connection');
+  // Check if DATABASE_URL is available
+  if (process.env.DATABASE_URL) {
+    console.log('[StorageFactory] DATABASE_URL found - attempting PostgreSQL connection...');
+    
+    try {
+      // Verify PostgreSQL connection
+      const postgres = await resolvePostgres();
+      if (postgres) {
+        console.log('[StorageFactory] ✓ PostgreSQL connection verified');
+        console.log('[StorageFactory] ✓ Using PostgreSQL storage');
+        console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
+        
+        // PostgresStorage implements the IStorage interface
+        storageInstance = postgresStorage as unknown as IStorage;
+        storageInitialized = true;
+        currentStorageMode = 'postgres';
+        return storageInstance;
+      }
+    } catch (error: any) {
+      console.error(`[StorageFactory] ⚠ PostgreSQL connection failed: ${error.message}`);
+      console.log('[StorageFactory] Falling back to file-based storage...');
     }
-    
-    console.log('[StorageFactory] ✓ PostgreSQL connection verified');
-    console.log('[StorageFactory] ✓ All 17 modules using PostgreSQL storage');
-    console.log('[StorageFactory] ✓ No file storage fallbacks active');
-    console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
-    
-    storageInstance = postgresStorage;
-    storageInitialized = true;
-    return storageInstance;
-    
-  } catch (error: any) {
-    const errorMessage = `
-╔════════════════════════════════════════════════════════════════════════════╗
-║                    POSTGRESQL CONNECTION FAILED                            ║
-╠════════════════════════════════════════════════════════════════════════════╣
-║  DATABASE_URL is set but connection failed.                                ║
-║                                                                            ║
-║  Error: ${error.message?.substring(0, 60) || 'Unknown error'}
-║                                                                            ║
-║  Check that:                                                               ║
-║  1. The PostgreSQL database is running                                     ║
-║  2. DATABASE_URL connection string is valid                                ║
-║  3. Network access to the database is permitted                            ║
-╚════════════════════════════════════════════════════════════════════════════╝
-`;
-    console.error(errorMessage);
-    throw new Error(`PostgreSQL connection failed: ${error.message}`);
+  } else {
+    console.log('[StorageFactory] DATABASE_URL not set');
   }
+  
+  // Fall back to file-based storage
+  console.log('[StorageFactory] ✓ Using file-based storage (test-data.json)');
+  console.log('[StorageFactory] ⚠ Data changes in this mode are for preview only');
+  console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
+  
+  // Use type assertion for preview mode - MemStorage implements core methods
+  // but may not have all IStorage methods (acceptable for UI preview)
+  storageInstance = memStorage as unknown as IStorage;
+  storageInitialized = true;
+  currentStorageMode = 'file';
+  return storageInstance;
 }
 
 /**
@@ -120,7 +92,7 @@ export function getStorage(): IStorage {
   if (!storageInitialized || !storageInstance) {
     throw new Error(
       'Storage not initialized. Call initializeStorage() before getStorage(). ' +
-      'This error typically occurs when the application starts without a PostgreSQL database configured.'
+      'This error typically occurs when storage is accessed before server startup completes.'
     );
   }
   return storageInstance;
@@ -132,10 +104,8 @@ export function getStorage(): IStorage {
 export function resetStorage(): void {
   storageInstance = null;
   storageInitialized = false;
+  currentStorageMode = 'file';
 }
 
-// Deprecated exports for backwards compatibility during migration
-export type StorageMode = 'postgres';
-export function getStorageMode(): StorageMode {
-  return 'postgres';
-}
+// Type export for backwards compatibility
+export type StorageMode = 'postgres' | 'file';

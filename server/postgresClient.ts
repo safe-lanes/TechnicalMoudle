@@ -2,28 +2,24 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import * as schema from "@shared/schema";
-import { getDatabaseUrl } from './dbConfig';
 
 // Cached PostgreSQL client to avoid connection pool leaks
 let cachedPostgres: { db: ReturnType<typeof drizzle>, pool: Pool } | null = null;
 let cacheInitialized = false;
 
 /**
- * Get the PostgreSQL connection string
- * Uses the centralized dbConfig module which handles:
- * 1. DATABASE_URL environment variable
- * 2. Individual PG* environment variables
- * 3. Local config file fallback (temporary workaround)
+ * Get the PostgreSQL connection string from DATABASE_URL only
+ * No fallback to config files - environment variable is the only source
  */
 export function getConnectionString(): string | undefined {
-  return getDatabaseUrl();
+  return process.env.DATABASE_URL;
 }
 
 /**
  * Runtime PostgreSQL database resolver with caching
  * Returns database client if DATABASE_URL is available and connection works
- * Returns undefined if no PostgreSQL configuration is available
- * Throws if connection string exists but connection fails
+ * Returns undefined if DATABASE_URL is not set (file-storage mode)
+ * Throws if DATABASE_URL exists but connection fails
  * 
  * IMPORTANT: This function caches the connection pool to prevent socket leaks
  */
@@ -33,18 +29,16 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
     return cachedPostgres || undefined;
   }
 
-  // Get connection string (tries DATABASE_URL first, then constructs from PG* vars)
-  const connectionString = getConnectionString();
-  
-  if (!connectionString) {
+  // Check if DATABASE_URL is set
+  if (!process.env.DATABASE_URL) {
     cacheInitialized = true;
     cachedPostgres = null;
-    return undefined; // No PostgreSQL configuration available
+    return undefined; // File-storage mode
   }
 
   try {
     // Create connection pool (only once) using native pg driver
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const db = drizzle(pool, { schema });
 
     // Lightweight connection test - verify database is accessible
@@ -60,7 +54,7 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
     cachedPostgres = null;
     
     throw new Error(
-      `PostgreSQL connection failed: ${error.message}. ` +
+      `PostgreSQL connection failed despite DATABASE_URL being set: ${error.message}. ` +
       `Check database credentials and network connectivity.`
     );
   }
@@ -78,4 +72,12 @@ export function getPostgresClient() {
     throw new Error('PostgreSQL is not available (DATABASE_URL not configured)');
   }
   return cachedPostgres;
+}
+
+/**
+ * Reset cached state (for testing only)
+ */
+export function resetPostgresCache(): void {
+  cachedPostgres = null;
+  cacheInitialized = false;
 }
