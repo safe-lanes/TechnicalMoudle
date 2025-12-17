@@ -64,8 +64,24 @@ export async function initializeStorage(): Promise<IStorage> {
         return storageInstance;
       }
     } catch (error: any) {
-      console.error(`[StorageFactory] ⚠ PostgreSQL connection failed: ${error.message}`);
-      console.log('[StorageFactory] Falling back to file-based storage...');
+      // DATABASE_URL is set but connection failed - this is a hard error
+      // Do NOT fall back to file storage when the user explicitly configured a database
+      const errorMessage = `
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    POSTGRESQL CONNECTION FAILED                            ║
+╠════════════════════════════════════════════════════════════════════════════╣
+║  DATABASE_URL is set but connection failed.                                ║
+║                                                                            ║
+║  Error: ${error.message?.substring(0, 60) || 'Unknown error'}
+║                                                                            ║
+║  Check that:                                                               ║
+║  1. The PostgreSQL database is running                                     ║
+║  2. DATABASE_URL connection string is valid                                ║
+║  3. Network access to the database is permitted                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+`;
+      console.error(errorMessage);
+      throw new Error(`PostgreSQL connection failed: ${error.message}`);
     }
   } else {
     console.log('[StorageFactory] DATABASE_URL not set');

@@ -3,30 +3,27 @@
  * 
  * This storage is used when DATABASE_URL is not configured.
  * It provides basic functionality for UI preview and flow validation.
- * Data is not persisted - this is intentional for preview mode.
  * 
  * For full functionality, configure DATABASE_URL to use PostgreSQL.
  */
 
-import { type IStorage } from './storage';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const DATA_FILE = path.join(process.cwd(), 'test-data.json');
 
 interface TestData {
-  users?: any[];
-  fleets?: any[];
-  vessels?: any[];
-  components?: any[];
-  jobs?: any[];
-  workOrders?: any[];
-  spares?: any[];
-  defects?: any[];
   [key: string]: any;
 }
 
-class MemStorage implements IStorage {
+// Helper function to convert object map to array
+function toArray(obj: any): any[] {
+  if (!obj) return [];
+  if (Array.isArray(obj)) return obj;
+  return Object.values(obj);
+}
+
+class MemStorage {
   private data: TestData = {};
   private idCounters: Map<string, number> = new Map();
 
@@ -67,68 +64,65 @@ class MemStorage implements IStorage {
 
   // User methods
   async getUser(id: number): Promise<any> {
-    return this.data.users?.find((u: any) => u.id === id);
+    const users = toArray(this.data.users);
+    return users.find((u: any) => u.id === id);
   }
 
   async getUserByUsername(username: string): Promise<any> {
-    return this.data.users?.find((u: any) => u.username === username);
+    const users = toArray(this.data.users);
+    return users.find((u: any) => u.username === username);
   }
 
   async createUser(user: any): Promise<any> {
-    if (!this.data.users) this.data.users = [];
+    if (!this.data.users) this.data.users = {};
     const newUser = { ...user, id: this.getNextId('users') };
-    this.data.users.push(newUser);
+    this.data.users[newUser.id] = newUser;
     this.saveData();
     return newUser;
   }
 
   async getUsers(): Promise<any[]> {
-    return this.data.users || [];
+    return toArray(this.data.users);
   }
 
   // Component methods
   async getComponents(vesselId: string): Promise<any[]> {
-    return (this.data.components || []).filter((c: any) => c.vesselId === vesselId);
+    return toArray(this.data.components).filter((c: any) => c.vesselId === vesselId);
   }
 
   async getComponent(id: string): Promise<any> {
-    return (this.data.components || []).find((c: any) => c.id === id);
+    const components = toArray(this.data.components);
+    return components.find((c: any) => c.id === id);
   }
 
   async getComponentByCode(componentCode: string, vesselId: string): Promise<any> {
-    return (this.data.components || []).find((c: any) => 
+    return toArray(this.data.components).find((c: any) => 
       c.componentCode === componentCode && c.vesselId === vesselId
     );
   }
 
   async createComponent(component: any): Promise<any> {
-    if (!this.data.components) this.data.components = [];
-    const newComponent = { ...component };
-    this.data.components.push(newComponent);
+    if (!this.data.components) this.data.components = {};
+    this.data.components[component.id] = component;
     this.saveData();
-    return newComponent;
+    return component;
   }
 
   async updateComponent(id: string, data: any): Promise<any> {
-    const components = this.data.components || [];
-    const index = components.findIndex((c: any) => c.id === id);
-    if (index >= 0) {
-      components[index] = { ...components[index], ...data };
+    if (this.data.components && this.data.components[id]) {
+      this.data.components[id] = { ...this.data.components[id], ...data };
       this.saveData();
-      return components[index];
+      return this.data.components[id];
     }
-    return undefined as any;
+    return undefined;
   }
 
   async deleteComponent(id: string): Promise<void> {
-    if (this.data.components) {
-      this.data.components = this.data.components.filter((c: any) => c.id !== id);
+    if (this.data.components && this.data.components[id]) {
+      delete this.data.components[id];
       this.saveData();
     }
   }
-
-  // Generic stub methods - return empty arrays/objects for unimplemented methods
-  // These allow the app to start and show UI without full database functionality
 
   async inactivateComponent(id: string, userId?: string, options?: any): Promise<any> {
     return { success: true, message: 'Preview mode - operation simulated', componentsInactivated: 0, jobsInactivated: 0 };
@@ -141,171 +135,179 @@ class MemStorage implements IStorage {
   async cascadeRunningHoursUpdate(params: any): Promise<any> { return { success: true, updatedComponents: [] }; }
 
   // Fleet methods
-  async getFleets(): Promise<any[]> { return this.data.fleets || []; }
-  async getFleet(id: string): Promise<any> { return (this.data.fleets || []).find((f: any) => f.id === id); }
+  async getFleets(): Promise<any[]> { return toArray(this.data.fleets); }
+  async getFleet(id: string): Promise<any> { 
+    if (this.data.fleets && this.data.fleets[id]) return this.data.fleets[id];
+    return toArray(this.data.fleets).find((f: any) => f.id === id); 
+  }
   async createFleet(fleet: any): Promise<any> {
-    if (!this.data.fleets) this.data.fleets = [];
-    const newFleet = { ...fleet, id: fleet.id || `fleet-${this.getNextId('fleets')}` };
-    this.data.fleets.push(newFleet);
+    if (!this.data.fleets) this.data.fleets = {};
+    const id = fleet.id || `fleet-${this.getNextId('fleets')}`;
+    const newFleet = { ...fleet, id };
+    this.data.fleets[id] = newFleet;
     this.saveData();
     return newFleet;
   }
   async updateFleet(id: string, data: any): Promise<any> {
-    const fleets = this.data.fleets || [];
-    const index = fleets.findIndex((f: any) => f.id === id);
-    if (index >= 0) {
-      fleets[index] = { ...fleets[index], ...data };
+    if (this.data.fleets && this.data.fleets[id]) {
+      this.data.fleets[id] = { ...this.data.fleets[id], ...data };
       this.saveData();
-      return fleets[index];
+      return this.data.fleets[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteFleet(id: string): Promise<void> {
-    if (this.data.fleets) {
-      this.data.fleets = this.data.fleets.filter((f: any) => f.id !== id);
+    if (this.data.fleets && this.data.fleets[id]) {
+      delete this.data.fleets[id];
       this.saveData();
     }
   }
 
   // Vessel methods
-  async getVessels(): Promise<any[]> { return this.data.vessels || []; }
-  async getVessel(id: string): Promise<any> { return (this.data.vessels || []).find((v: any) => v.id === id); }
+  async getVessels(): Promise<any[]> { return toArray(this.data.vessels); }
+  async getVessel(id: string): Promise<any> { 
+    if (this.data.vessels && this.data.vessels[id]) return this.data.vessels[id];
+    return toArray(this.data.vessels).find((v: any) => v.id === id); 
+  }
   async createVessel(vessel: any): Promise<any> {
-    if (!this.data.vessels) this.data.vessels = [];
-    const newVessel = { ...vessel };
-    this.data.vessels.push(newVessel);
+    if (!this.data.vessels) this.data.vessels = {};
+    this.data.vessels[vessel.id] = vessel;
     this.saveData();
-    return newVessel;
+    return vessel;
   }
   async updateVessel(id: string, data: any): Promise<any> {
-    const vessels = this.data.vessels || [];
-    const index = vessels.findIndex((v: any) => v.id === id);
-    if (index >= 0) {
-      vessels[index] = { ...vessels[index], ...data };
+    if (this.data.vessels && this.data.vessels[id]) {
+      this.data.vessels[id] = { ...this.data.vessels[id], ...data };
       this.saveData();
-      return vessels[index];
+      return this.data.vessels[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteVessel(id: string): Promise<void> {
-    if (this.data.vessels) {
-      this.data.vessels = this.data.vessels.filter((v: any) => v.id !== id);
+    if (this.data.vessels && this.data.vessels[id]) {
+      delete this.data.vessels[id];
       this.saveData();
     }
   }
 
   // Job methods
-  async getJobs(vesselId: string): Promise<any[]> { return (this.data.jobs || []).filter((j: any) => j.vesselId === vesselId); }
-  async getJob(id: string): Promise<any> { return (this.data.jobs || []).find((j: any) => j.id === id); }
+  async getJobs(vesselId: string): Promise<any[]> { 
+    return toArray(this.data.jobs).filter((j: any) => j.vesselId === vesselId); 
+  }
+  async getJob(id: string): Promise<any> { 
+    if (this.data.jobs && this.data.jobs[id]) return this.data.jobs[id];
+    return toArray(this.data.jobs).find((j: any) => j.id === id); 
+  }
   async createJob(job: any): Promise<any> {
-    if (!this.data.jobs) this.data.jobs = [];
-    const newJob = { ...job };
-    this.data.jobs.push(newJob);
+    if (!this.data.jobs) this.data.jobs = {};
+    this.data.jobs[job.id] = job;
     this.saveData();
-    return newJob;
+    return job;
   }
   async updateJob(id: string, data: any): Promise<any> {
-    const jobs = this.data.jobs || [];
-    const index = jobs.findIndex((j: any) => j.id === id);
-    if (index >= 0) {
-      jobs[index] = { ...jobs[index], ...data };
+    if (this.data.jobs && this.data.jobs[id]) {
+      this.data.jobs[id] = { ...this.data.jobs[id], ...data };
       this.saveData();
-      return jobs[index];
+      return this.data.jobs[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteJob(id: string): Promise<void> {
-    if (this.data.jobs) {
-      this.data.jobs = this.data.jobs.filter((j: any) => j.id !== id);
+    if (this.data.jobs && this.data.jobs[id]) {
+      delete this.data.jobs[id];
       this.saveData();
     }
   }
 
   // Work Order methods
-  async getWorkOrders(vesselId: string): Promise<any[]> { return (this.data.workOrders || []).filter((w: any) => w.vesselId === vesselId); }
-  async getWorkOrder(id: string): Promise<any> { return (this.data.workOrders || []).find((w: any) => w.id === id); }
+  async getWorkOrders(vesselId: string): Promise<any[]> { 
+    return toArray(this.data.workOrders).filter((w: any) => w.vesselId === vesselId); 
+  }
+  async getWorkOrder(id: string): Promise<any> { 
+    if (this.data.workOrders && this.data.workOrders[id]) return this.data.workOrders[id];
+    return toArray(this.data.workOrders).find((w: any) => w.id === id); 
+  }
   async createWorkOrder(workOrder: any): Promise<any> {
-    if (!this.data.workOrders) this.data.workOrders = [];
-    const newWorkOrder = { ...workOrder };
-    this.data.workOrders.push(newWorkOrder);
+    if (!this.data.workOrders) this.data.workOrders = {};
+    this.data.workOrders[workOrder.id] = workOrder;
     this.saveData();
-    return newWorkOrder;
+    return workOrder;
   }
   async updateWorkOrder(id: string, data: any): Promise<any> {
-    const workOrders = this.data.workOrders || [];
-    const index = workOrders.findIndex((w: any) => w.id === id);
-    if (index >= 0) {
-      workOrders[index] = { ...workOrders[index], ...data };
+    if (this.data.workOrders && this.data.workOrders[id]) {
+      this.data.workOrders[id] = { ...this.data.workOrders[id], ...data };
       this.saveData();
-      return workOrders[index];
+      return this.data.workOrders[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteWorkOrder(id: string): Promise<void> {
-    if (this.data.workOrders) {
-      this.data.workOrders = this.data.workOrders.filter((w: any) => w.id !== id);
+    if (this.data.workOrders && this.data.workOrders[id]) {
+      delete this.data.workOrders[id];
       this.saveData();
     }
   }
 
   // Spares methods
-  async getSpares(vesselId: string): Promise<any[]> { return (this.data.spares || []).filter((s: any) => s.vesselId === vesselId); }
-  async getSpare(id: string): Promise<any> { return (this.data.spares || []).find((s: any) => s.id === id); }
+  async getSpares(vesselId: string): Promise<any[]> { 
+    return toArray(this.data.spares).filter((s: any) => s.vesselId === vesselId); 
+  }
+  async getSpare(id: string): Promise<any> { 
+    if (this.data.spares && this.data.spares[id]) return this.data.spares[id];
+    return toArray(this.data.spares).find((s: any) => s.id === id); 
+  }
   async createSpare(spare: any): Promise<any> {
-    if (!this.data.spares) this.data.spares = [];
-    const newSpare = { ...spare };
-    this.data.spares.push(newSpare);
+    if (!this.data.spares) this.data.spares = {};
+    this.data.spares[spare.id] = spare;
     this.saveData();
-    return newSpare;
+    return spare;
   }
   async updateSpare(id: string, data: any): Promise<any> {
-    const spares = this.data.spares || [];
-    const index = spares.findIndex((s: any) => s.id === id);
-    if (index >= 0) {
-      spares[index] = { ...spares[index], ...data };
+    if (this.data.spares && this.data.spares[id]) {
+      this.data.spares[id] = { ...this.data.spares[id], ...data };
       this.saveData();
-      return spares[index];
+      return this.data.spares[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteSpare(id: string): Promise<void> {
-    if (this.data.spares) {
-      this.data.spares = this.data.spares.filter((s: any) => s.id !== id);
+    if (this.data.spares && this.data.spares[id]) {
+      delete this.data.spares[id];
       this.saveData();
     }
   }
 
   // Defect methods
-  async getDefects(vesselId: string): Promise<any[]> { return (this.data.defects || []).filter((d: any) => d.vesselId === vesselId); }
-  async getDefect(id: string): Promise<any> { return (this.data.defects || []).find((d: any) => d.id === id); }
+  async getDefects(vesselId: string): Promise<any[]> { 
+    return toArray(this.data.defects).filter((d: any) => d.vesselId === vesselId); 
+  }
+  async getDefect(id: string): Promise<any> { 
+    if (this.data.defects && this.data.defects[id]) return this.data.defects[id];
+    return toArray(this.data.defects).find((d: any) => d.id === id); 
+  }
   async createDefect(defect: any): Promise<any> {
-    if (!this.data.defects) this.data.defects = [];
-    const newDefect = { ...defect };
-    this.data.defects.push(newDefect);
+    if (!this.data.defects) this.data.defects = {};
+    this.data.defects[defect.id] = defect;
     this.saveData();
-    return newDefect;
+    return defect;
   }
   async updateDefect(id: string, data: any): Promise<any> {
-    const defects = this.data.defects || [];
-    const index = defects.findIndex((d: any) => d.id === id);
-    if (index >= 0) {
-      defects[index] = { ...defects[index], ...data };
+    if (this.data.defects && this.data.defects[id]) {
+      this.data.defects[id] = { ...this.data.defects[id], ...data };
       this.saveData();
-      return defects[index];
+      return this.data.defects[id];
     }
-    return undefined as any;
+    return undefined;
   }
   async deleteDefect(id: string): Promise<void> {
-    if (this.data.defects) {
-      this.data.defects = this.data.defects.filter((d: any) => d.id !== id);
+    if (this.data.defects && this.data.defects[id]) {
+      delete this.data.defects[id];
       this.saveData();
     }
   }
 
-  // Stub implementations for remaining IStorage methods
-  // These return empty results to allow the app to function in preview mode
-
-  async getAllDefects(): Promise<any[]> { return this.data.defects || []; }
+  // Stub implementations for remaining methods
+  async getAllDefects(): Promise<any[]> { return toArray(this.data.defects); }
   async getDefectActions(defectId: string): Promise<any[]> { return []; }
   async createDefectAction(action: any): Promise<any> { return { ...action, id: this.getNextId('defectActions') }; }
   async updateDefectAction(id: string, data: any): Promise<any> { return data; }
@@ -321,6 +323,10 @@ class MemStorage implements IStorage {
   async getRecurringDefectLinks(recurringDefectId: string): Promise<any[]> { return []; }
   async createRecurringDefectLink(link: any): Promise<any> { return { ...link, id: this.getNextId('links') }; }
   async deleteRecurringDefectLink(id: string): Promise<void> {}
+  async calculateAndUpdateRecurringDefects(equipmentKey: string): Promise<any> { return null; }
+  async recalculateAllRecurringDefects(): Promise<void> { 
+    console.log('[MemStorage] recalculateAllRecurringDefects called - no-op in file mode');
+  }
 
   // Alert methods
   async getAlertPolicies(vesselId: string): Promise<any[]> { return []; }
@@ -388,12 +394,15 @@ class MemStorage implements IStorage {
   async deleteFleetSpareVesselMapping(id: number): Promise<void> {}
 
   // Master data methods
-  async getMakers(): Promise<any[]> { return this.data.makers || []; }
-  async getMaker(id: number): Promise<any> { return (this.data.makers || []).find((m: any) => m.id === id); }
+  async getMakers(): Promise<any[]> { return toArray(this.data.makers); }
+  async getMaker(id: number): Promise<any> { 
+    if (this.data.makers && this.data.makers[id]) return this.data.makers[id];
+    return toArray(this.data.makers).find((m: any) => m.id === id); 
+  }
   async createMaker(maker: any): Promise<any> { return { ...maker, id: this.getNextId('makers') }; }
   async updateMaker(id: number, data: any): Promise<any> { return data; }
   async deleteMaker(id: number): Promise<void> {}
-  async getMasterLists(): Promise<any[]> { return this.data.masterLists || []; }
+  async getMasterLists(): Promise<any[]> { return toArray(this.data.masterLists); }
   async getMasterList(id: number): Promise<any> { return undefined; }
   async createMasterList(list: any): Promise<any> { return { ...list, id: this.getNextId('masterLists') }; }
   async updateMasterList(id: number, data: any): Promise<any> { return data; }
@@ -403,20 +412,25 @@ class MemStorage implements IStorage {
   async createMakerList(list: any): Promise<any> { return { ...list, id: this.getNextId('makerLists') }; }
   async updateMakerList(id: number, data: any): Promise<any> { return data; }
   async deleteMakerList(id: number): Promise<void> {}
-  async getSfiDetails(): Promise<any[]> { return this.data.sfiDetails || []; }
+  async getSfiDetails(): Promise<any[]> { return toArray(this.data.sfiDetails); }
   async getSfiDetail(id: number): Promise<any> { return undefined; }
   async createSfiDetail(detail: any): Promise<any> { return { ...detail, id: this.getNextId('sfiDetails') }; }
   async updateSfiDetail(id: number, data: any): Promise<any> { return data; }
   async deleteSfiDetail(id: number): Promise<void> {}
-  async getMasterDataItems(): Promise<any[]> { return this.data.masterData || []; }
+  async getMasterDataItems(): Promise<any[]> { return toArray(this.data.masterData); }
   async getMasterDataItem(id: number): Promise<any> { return undefined; }
   async createMasterDataItem(item: any): Promise<any> { return { ...item, id: this.getNextId('masterData') }; }
   async updateMasterDataItem(id: number, data: any): Promise<any> { return data; }
   async deleteMasterDataItem(id: number): Promise<void> {}
 
   // Stores methods
-  async getStoresItems(vesselId: string): Promise<any[]> { return (this.data.storesItems || []).filter((s: any) => s.vesselId === vesselId); }
-  async getStoresItem(id: string): Promise<any> { return (this.data.storesItems || []).find((s: any) => s.id === id); }
+  async getStoresItems(vesselId: string): Promise<any[]> { 
+    return toArray(this.data.storesItems).filter((s: any) => s.vesselId === vesselId); 
+  }
+  async getStoresItem(id: string): Promise<any> { 
+    if (this.data.storesItems && this.data.storesItems[id]) return this.data.storesItems[id];
+    return toArray(this.data.storesItems).find((s: any) => s.id === id); 
+  }
   async createStoresItem(item: any): Promise<any> { return { ...item }; }
   async updateStoresItem(id: string, data: any): Promise<any> { return data; }
   async deleteStoresItem(id: string): Promise<void> {}
@@ -486,23 +500,50 @@ class MemStorage implements IStorage {
   async updateWorkOrderExecution(id: string, data: any): Promise<any> { return data; }
   async deleteWorkOrderExecution(id: string): Promise<void> {}
 
-  // Additional methods that might be needed
+  // Additional methods
   async getJobByCode(jobCode: string, vesselId: string): Promise<any> {
-    return (this.data.jobs || []).find((j: any) => j.jobCode === jobCode && j.vesselId === vesselId);
+    return toArray(this.data.jobs).find((j: any) => j.jobCode === jobCode && j.vesselId === vesselId);
   }
 
   async getSpareByCode(spareCode: string, vesselId: string): Promise<any> {
-    return (this.data.spares || []).find((s: any) => s.spareCode === spareCode && s.vesselId === vesselId);
+    return toArray(this.data.spares).find((s: any) => s.spareCode === spareCode && s.vesselId === vesselId);
   }
 
   async getWorkOrdersByJob(jobId: string): Promise<any[]> {
-    return (this.data.workOrders || []).filter((w: any) => w.jobId === jobId);
+    return toArray(this.data.workOrders).filter((w: any) => w.jobId === jobId);
   }
 
-  async getAllJobs(): Promise<any[]> { return this.data.jobs || []; }
-  async getAllWorkOrders(): Promise<any[]> { return this.data.workOrders || []; }
-  async getAllSpares(): Promise<any[]> { return this.data.spares || []; }
-  async getAllComponents(): Promise<any[]> { return this.data.components || []; }
+  async getAllJobs(): Promise<any[]> { return toArray(this.data.jobs); }
+  async getAllWorkOrders(): Promise<any[]> { return toArray(this.data.workOrders); }
+  async getAllSpares(): Promise<any[]> { return toArray(this.data.spares); }
+  async getAllComponents(): Promise<any[]> { return toArray(this.data.components); }
+
+  // Fleet component methods
+  async getFleetComponents(fleetId: string): Promise<any[]> { return []; }
+  async getFleetComponent(id: number): Promise<any> { return undefined; }
+  async createFleetComponent(component: any): Promise<any> { return { ...component, id: this.getNextId('fleetComponents') }; }
+  async updateFleetComponent(id: number, data: any): Promise<any> { return data; }
+  async deleteFleetComponent(id: number): Promise<void> {}
+
+  // Fleet job methods
+  async getFleetJobs(fleetId: string): Promise<any[]> { return []; }
+  async getFleetJob(id: number): Promise<any> { return undefined; }
+  async createFleetJob(job: any): Promise<any> { return { ...job, id: this.getNextId('fleetJobs') }; }
+  async updateFleetJob(id: number, data: any): Promise<any> { return data; }
+  async deleteFleetJob(id: number): Promise<void> {}
+
+  // Fleet spare methods
+  async getFleetSpares(fleetId: string): Promise<any[]> { return []; }
+  async getFleetSpare(id: number): Promise<any> { return undefined; }
+  async createFleetSpare(spare: any): Promise<any> { return { ...spare, id: this.getNextId('fleetSpares') }; }
+  async updateFleetSpare(id: number, data: any): Promise<any> { return data; }
+  async deleteFleetSpare(id: number): Promise<void> {}
+
+  // Postponed work orders check
+  async checkAndRevertPostponedWorkOrders(): Promise<{ checked: number; reverted: number }> {
+    console.log('[MemStorage] checkAndRevertPostponedWorkOrders called - no-op in file mode');
+    return { checked: 0, reverted: 0 };
+  }
 }
 
 export const memStorage = new MemStorage();
