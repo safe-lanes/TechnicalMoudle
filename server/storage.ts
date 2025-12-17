@@ -741,12 +741,13 @@ function getStorageInstance(): IStorage {
 }
 
 // Initialize storage using the factory
-// PostgreSQL-only mode - fails if DATABASE_URL is not set
+// PostgreSQL-only mode - uses config file fallback if env vars not available
 async function initStorage(): Promise<void> {
   if (_storage !== null) return;
   
   console.log('🔧 Initializing storage...');
-  console.log(`🔍 DATABASE_URL check: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
+  console.log(`🔍 DATABASE_URL: ${process.env.DATABASE_URL ? 'FOUND' : 'NOT FOUND'}`);
+  console.log(`🔍 PGHOST: ${process.env.PGHOST ? 'FOUND' : 'NOT FOUND'}`);
   
   _storage = await initializeStorage();
   console.log('✅ Storage initialization complete');

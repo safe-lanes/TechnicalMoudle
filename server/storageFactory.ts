@@ -1,52 +1,63 @@
 import type { IStorage } from './storage';
 import { postgresStorage } from './postgresStorage';
-import { resolvePostgres } from './postgresClient';
+import { resolvePostgres, getConnectionString } from './postgresClient';
+import { createConfigTemplate } from './dbConfig';
 
 /**
  * POSTGRESQL-ONLY STORAGE FACTORY
  * 
  * This application requires PostgreSQL to be configured.
- * If DATABASE_URL is not set or PostgreSQL connection fails,
+ * If neither DATABASE_URL nor individual PG* variables are set,
  * the application will fail to start with a clear error message.
  * 
  * MIGRATION COMPLETE:
  * - All 17 modules now use PostgreSQL storage
  * - No file storage fallbacks (test-data.json eliminated)
  * - No hybrid mode - PostgreSQL is the only storage option
+ * 
+ * TEMPORARY FALLBACK (for Replit secret injection issues):
+ * - If DATABASE_URL is not injected, constructs connection from PG* env vars
+ * - If PG* vars also missing, reads from local db.config.json file
  */
 
 let storageInitialized = false;
 let storageInstance: IStorage | null = null;
 
 /**
- * Check if PostgreSQL is available (DATABASE_URL is set)
+ * Check if PostgreSQL is available (via DATABASE_URL or PG* env vars)
  */
 export function isPostgresAvailable(): boolean {
-  return !!process.env.DATABASE_URL;
+  return !!getConnectionString();
 }
 
 /**
  * Validate that PostgreSQL is properly configured
- * Throws an error if DATABASE_URL is not set
+ * Throws an error if no PostgreSQL configuration is available
  */
 function validatePostgresConfig(): void {
-  if (!process.env.DATABASE_URL) {
+  const connectionString = getConnectionString();
+  
+  if (!connectionString) {
+    // Create template config file to help user
+    createConfigTemplate();
+    
     const errorMessage = `
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                    POSTGRESQL DATABASE REQUIRED                            ║
 ╠════════════════════════════════════════════════════════════════════════════╣
 ║  This application requires PostgreSQL to operate.                          ║
 ║                                                                            ║
-║  To fix this:                                                              ║
-║  1. Provision a PostgreSQL database in the Replit Database panel           ║
-║  2. Ensure DATABASE_URL environment variable is set                        ║
+║  Configuration options (in priority order):                                ║
+║  1. Set DATABASE_URL environment variable                                  ║
+║  2. Set PG* environment variables (PGHOST, PGPORT, PGUSER, etc.)           ║
+║  3. Create db.config.json with database credentials (temporary)            ║
 ║                                                                            ║
-║  File-based storage (test-data.json) has been removed.                     ║
-║  PostgreSQL is now the ONLY supported storage option.                      ║
+║  A template db.config.json has been created. Fill it with your             ║
+║  PostgreSQL credentials to use the temporary config file fallback.         ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 `;
     console.error(errorMessage);
-    throw new Error('DATABASE_URL is required. PostgreSQL database must be configured.');
+    throw new Error('PostgreSQL configuration is required. See console for options.');
   }
 }
 

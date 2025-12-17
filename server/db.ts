@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
-import { resolvePostgres, getPostgresClient } from './postgresClient';
+import { resolvePostgres, getPostgresClient, getConnectionString } from './postgresClient';
 
 /**
  * DEPRECATED: Use getDb() or getPool() instead
@@ -11,10 +11,10 @@ import { resolvePostgres, getPostgresClient } from './postgresClient';
 let pool: Pool | undefined;
 let db: ReturnType<typeof drizzle> | undefined;
 
-if (process.env.DATABASE_URL) {
-  // Only initialize if DATABASE_URL is available
-  // This allows the module to be imported without crashing in file-storage mode
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Initialize if connection string is available (via DATABASE_URL or PG* env vars)
+const connectionString = getConnectionString();
+if (connectionString) {
+  pool = new Pool({ connectionString });
   db = drizzle(pool, { schema });
 }
 
