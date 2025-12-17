@@ -38,7 +38,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize storage (uses HybridStorage when DATABASE_URL is available)
+  // Initialize PostgreSQL-only storage (file-based storage has been removed)
   await initStorage();
   
   const server = await registerRoutes(app);
