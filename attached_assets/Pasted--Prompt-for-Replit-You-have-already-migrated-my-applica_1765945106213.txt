@@ -1,0 +1,74 @@
+🟦 Prompt for Replit
+You have already migrated my application module-by-module from file-based persistent storage (test-data.json, persistentStorage.ts, etc.) to PostgreSQL using Drizzle ORM.
+Before I proceed further, I need absolute confirmation that file-based storage is fully removed as a fallback — for reads, writes, staging, transformations, background logic, or implicit merges.
+🔍 Your Task (Mandatory)
+1️⃣ Full Codebase Audit — Storage Usage
+Scan the entire codebase, including but not limited to:
+persistentStorage.ts
+localFileStorage.ts
+storage.ts (IStorage abstraction)
+Any JSON read/write logic
+Any fallback logic triggered by:
+missing env vars
+try/catch storage switching
+hybrid logic left from earlier modules
+Any scripts, background jobs, bulk processors, or services
+Any code paths still touching:
+test-data.json
+in-memory maps populated from files
+merge logic that assumes file-based state
+This includes read paths, write paths, transform paths, and indirect dependencies.
+2️⃣ Explicitly Answer This (YES / NO)
+You must clearly answer:
+Is there ANY remaining file-based storage usage or fallback logic in the codebase?
+This includes:
+primary storage
+secondary fallback
+transitional hybrid logic
+legacy helpers still being invoked
+3️⃣ If the Answer is NO
+If PostgreSQL is now the only storage mechanism:
+Explicitly confirm:
+All reads → PostgreSQL (Drizzle)
+All writes → PostgreSQL (Drizzle)
+All transformations → DB-backed flows
+Confirm that:
+persistentStorage.ts is unused or fully removed
+No JSON file is read or written at runtime
+Provide a Markdown report (POSTGRES_ONLY_STORAGE_VERIFICATION.md) containing:
+Confirmation summary
+List of storage-related files and their current role (or removal)
+Statement that the system is safe to test locally with PostgreSQL only
+After that, STOP so I can download the zip and test locally.
+4️⃣ If the Answer is YES
+If any file-based logic still exists:
+Remove it completely
+Refactor the code so that:
+PostgreSQL (via Drizzle ORM) is the only source of truth
+No fallback, no hybrid, no silent file reads
+Ensure:
+Bulk uploads
+Imports
+Transform pipelines
+Module-to-module flows
+all rely exclusively on PostgreSQL-backed data
+Do not use raw SQL — Drizzle ORM only
+After removal, produce a Markdown report explaining:
+What was removed
+From which files
+Why it existed
+How PostgreSQL replaces it
+Then STOP and wait for my confirmation before proceeding further.
+⛔ Hard Rules
+❌ No raw SQL
+❌ No file-based storage (read/write/merge)
+❌ No auto-fixing beyond removal/refactor
+✅ PostgreSQL + Drizzle ORM only
+✅ Output must include a Markdown verification report
+✅ End State I Expect
+Application runs entirely on PostgreSQL
+No hidden fallback logic
+Safe for me to:
+Download the zip
+Configure env locally
+Test end-to-end flows with confidence
