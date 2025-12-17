@@ -109,6 +109,26 @@
       "isActive": true,
       "createdAt": "2025-12-11T04:34:33.480Z",
       "updatedAt": "2025-12-11T04:34:33.480Z"
+    },
+    "V005": {
+      "id": "V005",
+      "name": "test05",
+      "code": "V005",
+      "fleetId": null,
+      "imoNumber": null,
+      "vesselType": null,
+      "flag": null,
+      "isActive": true
+    },
+    "V008": {
+      "id": "V008",
+      "name": "test8",
+      "code": "V008",
+      "fleetId": null,
+      "imoNumber": null,
+      "vesselType": null,
+      "flag": null,
+      "isActive": true
     }
   },
   "components": {

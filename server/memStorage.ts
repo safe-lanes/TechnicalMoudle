@@ -408,7 +408,9 @@ class MemStorage {
   async updateMasterList(id: number, data: any): Promise<any> { return data; }
   async deleteMasterList(id: number): Promise<void> {}
   async getMakerLists(): Promise<any[]> { return []; }
-  async getMakerList(id: number): Promise<any> { return undefined; }
+  async getMakerList(): Promise<any[]> { return toArray(this.data.makerLists || []); }
+  async getMakerListItem(id: number): Promise<any> { return undefined; }
+  async getMakerListByCode(makerCode: string): Promise<any> { return undefined; }
   async createMakerList(list: any): Promise<any> { return { ...list, id: this.getNextId('makerLists') }; }
   async updateMakerList(id: number, data: any): Promise<any> { return data; }
   async deleteMakerList(id: number): Promise<void> {}
@@ -486,7 +488,10 @@ class MemStorage {
   async updateWorkOrderExecutionDetails(id: number, data: any): Promise<any> { return data; }
 
   // Import History
-  async getImportHistory(vesselId?: string): Promise<any[]> { return []; }
+  async getImportHistory(type?: string, limit?: number, offset?: number): Promise<{ items: any[]; total: number }> { 
+    return { items: [], total: 0 }; 
+  }
+  async getImportHistoryById(id: string): Promise<any> { return undefined; }
   async getImportHistoryItem(id: number): Promise<any> { return undefined; }
   async createImportHistory(item: any): Promise<any> { return { ...item, id: this.getNextId('importHistory') }; }
   async updateImportHistory(id: number, data: any): Promise<any> { return data; }
