@@ -16,7 +16,7 @@ The application features a modern full-stack architecture. The frontend is devel
 
 **Technical Implementations & Key Features**:
 - **Core PMS Business Logic**: Jobs are immutable templates; Work Orders are execution records with a defined lifecycle.
-- **PersistentFileStorage**: All data is saved to `test-data.json` and persists across application restarts.
+- **PostgreSQL-Only Storage**: All data is stored in PostgreSQL. File-based storage (test-data.json) has been completely removed. The system fails fast if DATABASE_URL is not configured.
 - **Vessel Context**: Dynamic fetching and auto-selection of vessels. Supports "All Vessels" special value (`vesselId === 'all'`) for fleet-wide aggregated views on the PMS Dashboard.
 - **Service Layer Architecture**: Business logic is organized by domain.
 - **Component Hierarchy**: Components are structured using a `parentId` field.
@@ -38,16 +38,16 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values.
 - **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must maintain exact parity for fields, labels, and order.
 - **Part A Immutability Rule**: Work Order Part A is READ-ONLY for all existing work orders, capturing a frozen snapshot of the job template.
-- **Component Document Storage (Section F)**: Handles file uploads with an object storage fallback to the local filesystem.
+- **Component Document Storage (Section F)**: Handles file uploads using Replit Object Storage exclusively (no local filesystem fallback).
 - **Work Order Naming Rules**: All work orders must follow naming conventions: Planned = `<JOB CODE>.WO-<YEAR>-<NNN>` (e.g., `MKR-SE-00005.WO-2025-001`), Unplanned = `UWO-<VESSEL>-<YEAR>-<NNN>`. Use `generatePlannedWorkOrderNumber()` and `generateUnplannedWorkOrderNumber()` from `server/utils/workOrderNumbering.ts`. Storage layer logs warnings for non-compliant names but preserves data to maintain historical integrity.
 - **Defect ID Naming Convention**: All defects must follow the pattern `DEF-<VESSEL>-<YEAR>-<NNN>` (e.g., `DEF-V001-2025-001`). IDs are auto-generated in the backend POST route using `generateDefectNumber()` from `server/utils/defectNumbering.ts`. The storage layer validates provided IDs match this pattern before accepting them.
 - **Error Prevention Strategies**: Emphasizes verification-first, systematic data persistence checking, appropriate confidence levels, and honest acknowledgment of errors.
-- **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to `test-data.json` after page reloads.
-- **Certificates & Surveys AG Grid Tables**: Both pages use AG Grid Enterprise with blue headers (#52baf3), Inter font at 13px, compact rows. Features include clickable "Applicable" checkboxes that persist to JSON storage, column filters on all 11 columns. New "Due in" filter dropdown filters by expiry/due date with options: All, Due in 3 months, Due in 2 months, Due in 1 month, Overdue. Overdue items are always included when any time-window filter is selected.
+- **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to PostgreSQL after page reloads.
+- **Certificates & Surveys AG Grid Tables**: Both pages use AG Grid Enterprise with blue headers (#52baf3), Inter font at 13px, compact rows. Features include clickable "Applicable" checkboxes that persist to PostgreSQL, column filters on all 11 columns. New "Due in" filter dropdown filters by expiry/due date with options: All, Due in 3 months, Due in 2 months, Due in 1 month, Overdue. Overdue items are always included when any time-window filter is selected.
 - **Date Cell Inline Editing (FIXED)**: Functional `DateCellEditor` component with `forwardRef` and `useImperativeHandle` for inline date editing on 5 date columns (Issue Date, Expiry Date, Last Annual, Last Interim, Endorsement Date). Uses a direct context-based save approach that bypasses AG Grid's `getValue()` mechanism - the editor calls `props.context.onDateChange()` directly on blur/Enter to trigger the API save, and `props.node.setDataValue()` to update the grid immediately. This approach works around AG Grid's React integration issue where `getValue()` wasn't being called reliably.
 - **PMS Dashboard - Outstanding Tasks Pie Chart**: New pie chart showing "Outstanding Tasks as % of Monthly Planned Maintenance". Displays completed vs outstanding work orders for the current month. Uses flexible date parsing (`parseFlexibleDate`) to handle both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) date formats. Spares Stock Status chart moved below.
 - **Running Hours Display in Work Orders Table**: RH-based work orders (without calendar due dates) now show remaining hours in the Due Date column instead of "—". Displays "X hrs remaining" (blue), "Due now" (amber), or "Overdue by X hrs" (red) based on `nextDueReading - currentReading` calculation.
-- **File Attachments for Certificates & Surveys**: Uses `FileAttachmentDialog` component for managing file attachments. Files are stored as base64 data in `test-data.json`. PDF previews open in a new browser tab (to avoid Chrome security restrictions), while images display in a modal dialog. Server configured for 10MB body size limit to handle file uploads.
+- **File Attachments for Certificates & Surveys**: Uses `FileAttachmentDialog` component for managing file attachments. Files are stored in Replit Object Storage. PDF previews open in a new browser tab (to avoid Chrome security restrictions), while images display in a modal dialog. Server configured for 10MB body size limit to handle file uploads.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
