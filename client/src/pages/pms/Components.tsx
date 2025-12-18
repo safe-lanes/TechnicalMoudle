@@ -986,8 +986,8 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   };
 
   const handleAddWorkOrder = () => {
-    // Navigate to new work order page for this component
-    setLocation(`/pms/work-order/new/${componentCode}`);
+    // Navigate to new job template page for this component (template mode shows only Part A)
+    setLocation(`/pms/work-order/new/${componentCode}?mode=template`);
   };
 
   const handleRowClick = (job: any) => {
