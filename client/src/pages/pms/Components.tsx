@@ -747,11 +747,11 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
       <div className="overflow-x-auto">
         <table className="w-full border-collapse" data-testid="table-running-hours">
           <thead>
-            <tr className="bg-teal-500 text-white">
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Type</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Source</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Running Hours</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Last Updated</th>
+            <tr className="bg-[#52baf3] text-white">
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">RH Counter Type</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">RH Counter Source</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">Running Hours</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">Last Updated</th>
             </tr>
           </thead>
           <tbody>
