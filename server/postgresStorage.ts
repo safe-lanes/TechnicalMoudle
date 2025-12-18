@@ -4009,28 +4009,32 @@ export class PostgresStorage {
     const today = new Date();
     const year = today.getFullYear();
     
-    // Generate work order number
+    // Generate work order number using the correct field name (workOrderNo matches schema)
     const existingWOs = await db.select().from(workOrders)
       .where(eq(workOrders.jobId, jobId));
     const woCount = existingWOs.length + 1;
-    const workOrderNumber = `${job.jobCode}.WO-${year}-${String(woCount).padStart(3, '0')}`;
+    const workOrderNo = `${job.jobNo}.WO-${year}-${String(woCount).padStart(3, '0')}`;
     
     // Create the work order
     const newWorkOrder: InsertWorkOrder = {
       id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       vesselId: job.vesselId,
       vesselName: job.vesselName || '',
-      workOrderNumber,
+      workOrderNo,
+      templateCode: workOrderNo,
       jobId: job.id,
-      jobCode: job.jobCode,
-      jobTitle: job.title,
+      jobTitle: job.jobTitle,
       componentId: job.componentId,
       component: job.componentName || '',
-      status: 'Pending',
-      dueDate: new Date().toISOString().split('T')[0],
-      createdDate: new Date().toISOString().split('T')[0],
+      componentCode: job.componentCode,
+      status: 'Active',
+      dueDate: job.nextDueDate || new Date().toISOString().split('T')[0],
       remarks: `On-demand work order generated. Reason: ${reason}`,
       isActive: true,
+      workOrderType: 'Planned',
+      maintenanceBasis: job.maintenanceBasis,
+      taskType: job.maintenanceType,
+      assignedTo: job.assignedTo || 'Unassigned',
     };
     
     const result = await db.insert(workOrders).values(newWorkOrder).returning();
