@@ -14,10 +14,11 @@ export const getComponentCategory = (componentIdOrCode: string): string => {
     '8': 'Ship Common Systems'
   };
   
-  // Handle dotted IDs like "3.0.1" - extract first segment
+  // Handle dotted IDs like "40.001" - extract first character of first segment
   if (componentIdOrCode.includes('.')) {
-    const topLevelId = componentIdOrCode.split('.')[0];
-    return categoryMap[topLevelId] || '';
+    const firstSegment = componentIdOrCode.split('.')[0];
+    const firstChar = firstSegment.charAt(0);
+    return categoryMap[firstChar] || '';
   }
   
   // Handle plain codes like "301" - extract first character

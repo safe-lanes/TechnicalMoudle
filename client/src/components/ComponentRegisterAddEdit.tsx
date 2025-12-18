@@ -54,6 +54,13 @@ export default function ComponentRegisterAddEdit({
   
   const isEditMode = isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId));
 
+  // Initialize selectedTreeNode from parentComponent prop if provided
+  useEffect(() => {
+    if (parentComponent?.code && !componentId) {
+      setSelectedTreeNode(parentComponent.code);
+    }
+  }, [parentComponent?.code, componentId]);
+
   const [componentData, setComponentData] = useState({
     // Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code
     fleetEquipmentCode: "",
@@ -121,6 +128,68 @@ export default function ComponentRegisterAddEdit({
   const { data: components = [], isLoading: isLoadingComponents } = useQuery<any[]>({
     queryKey: [`/api/components/${vesselId}`],
   });
+
+  // Auto-generate component code when form opens with a parent and components are loaded
+  useEffect(() => {
+    if (parentComponent?.code && !componentId && components.length > 0 && !componentData.componentCode) {
+      const isCategory = isMainCategoryCheck(parentComponent.code);
+      
+      // We need to generate the code here since components are now loaded
+      let nextCode = "";
+      if (isCategory) {
+        const categoryPrefix = parentComponent.code;
+        const categoryComponents = components.filter(c => {
+          const belongsToVessel = c.vesselId === vesselId;
+          const isTopLevel = !c.parentId || c.parentId === categoryPrefix;
+          const startsWithCategory = c.componentCode?.startsWith(categoryPrefix);
+          return belongsToVessel && isTopLevel && startsWithCategory;
+        });
+        
+        if (categoryComponents.length === 0) {
+          nextCode = `${categoryPrefix}01`;
+        } else {
+          const codes = categoryComponents
+            .map(c => c.componentCode || "")
+            .map(code => {
+              const numPart = code.substring(categoryPrefix.length);
+              const num = parseInt(numPart, 10);
+              return isNaN(num) ? 0 : num;
+            });
+          const maxNum = Math.max(0, ...codes);
+          nextCode = `${categoryPrefix}${(maxNum + 1).toString().padStart(2, '0')}`;
+        }
+      } else {
+        const parentComp = components.find(c => c.componentCode === parentComponent.code);
+        if (parentComp) {
+          const parentCode = parentComp.componentCode || "";
+          const children = components.filter(c => c.parentId === parentCode && c.vesselId === vesselId);
+          
+          if (children.length === 0) {
+            nextCode = `${parentCode}.001`;
+          } else {
+            const childCodes = children
+              .map(c => c.componentCode || "")
+              .filter(code => code.startsWith(parentCode + "."))
+              .map(code => {
+                const suffix = code.substring(parentCode.length + 1);
+                const num = parseInt(suffix, 10);
+                return isNaN(num) ? 0 : num;
+              });
+            const maxNum = Math.max(0, ...childCodes);
+            nextCode = `${parentCode}.${(maxNum + 1).toString().padStart(3, '0')}`;
+          }
+        }
+      }
+      
+      if (nextCode) {
+        setComponentData(prev => ({
+          ...prev,
+          componentCode: nextCode,
+          eqptSystemCategory: getComponentCategory(nextCode),
+        }));
+      }
+    }
+  }, [parentComponent?.code, componentId, components, vesselId, componentData.componentCode]);
 
   const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
     queryKey: [`/api/components/details/${componentId}`],
@@ -513,11 +582,14 @@ export default function ComponentRegisterAddEdit({
     
     if (isCategory) {
       const categoryPrefix = selectedId;
-      const categoryComponents = components.filter(c => 
-        c.vesselId === vesselId && 
-        !c.parentId && 
-        c.componentCode?.startsWith(categoryPrefix)
-      );
+      // For categories, find top-level components (parentId equals category code or is null/empty)
+      // that belong to this category (code starts with category prefix)
+      const categoryComponents = components.filter(c => {
+        const belongsToVessel = c.vesselId === vesselId;
+        const isTopLevel = !c.parentId || c.parentId === categoryPrefix;
+        const startsWithCategory = c.componentCode?.startsWith(categoryPrefix);
+        return belongsToVessel && isTopLevel && startsWithCategory;
+      });
       
       if (categoryComponents.length === 0) {
         return `${categoryPrefix}01`;
@@ -802,7 +874,8 @@ export default function ComponentRegisterAddEdit({
             className="bg-white text-sky-600 hover:bg-sky-50 border-white"
             onClick={() => {
               const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
-              const parentId = selectedTreeNode && !isCategory ? selectedTreeNode : "";
+              // Parent is always the selected node (whether category or component)
+              const parentId = selectedTreeNode || "";
               const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
               // Derive category from the parent or next code
               const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
