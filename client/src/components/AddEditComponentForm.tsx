@@ -721,19 +721,10 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 6: Running Hours, IS Active, Vessel Code, IS Parent */}
+                          {/* Row 6: IS Active, Vessel Code, IS Parent */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <label className="text-xs font-medium text-gray-600 block mb-1">Running Hours</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={componentData.runningHours}
-                                onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
-                                data-testid="input-running-hours"
-                              />
+                              {/* Empty spacer field */}
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">IS Active</label>

@@ -1065,19 +1065,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                       {/* Empty spacer */}
                     </div>
                     
-                    {/* Row 6: Running Hours, IS Active, Vessel Code, IS Parent */}
-                    <div className="space-y-2">
-                      <Label className="text-sm text-[#8798ad]">Running Hours</Label>
-                      <Input 
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={componentData.runningHours || ''}
-                        onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                        className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        data-testid="input-running-hours"
-                      />
-                    </div>
+                    {/* Row 6: IS Active, Vessel Code, IS Parent */}
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">IS Active</Label>
                       <Select 
