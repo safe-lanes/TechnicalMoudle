@@ -1580,7 +1580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let requisitions = await storage.getComponentRequisitions(req.params.componentId);
       
       // Add dummy data for demo component 401.005 (check component code, not ID)
-      if ((component.componentCode === "401.005" || component.code === "401.005") && requisitions.length === 0) {
+      if (component.componentCode === "401.005" && requisitions.length === 0) {
         requisitions = [
           {
             id: 1001,
@@ -2006,7 +2006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fallback: Search by component name if still not found
       if (!component) {
-        const allComponents = await storage.getComponents(workOrder.vesselId || undefined);
+        const allComponents = await storage.getComponents(workOrder.vesselId ?? undefined);
         component = allComponents.find(c => 
           c.name === workOrder.component || 
           c.componentCode === workOrder.component ||
@@ -2150,7 +2150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Add dummy data for demo work orders MKR-IN-00001.WO-2025-003 and MKR-SE-00001.WO-2025-001
-      let finalTemplateData = { ...templateData };
+      let finalTemplateData: any = { ...templateData };
       if (workOrder.workOrderNo === 'MKR-IN-00001.WO-2025-003' || workOrder.workOrderNo === 'MKR-SE-00001.WO-2025-001') {
         // A2: Required Spare Parts (2 rows)
         finalTemplateData.requiredSpareParts = [
@@ -4670,7 +4670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new fleet job
   app.post("/api/fleet/jobs", async (req, res) => {
     try {
-      const validatedData = insertWorkOrderSchema.parse(req.body);
+      const validatedData = insertJobSchema.parse(req.body);
       const job = await storage.createFleetJob(validatedData);
       res.status(201).json(job);
     } catch (error: any) {
@@ -4688,7 +4688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update fleet job
   app.patch("/api/fleet/jobs/:id", async (req, res) => {
     try {
-      const partialJobSchema = insertWorkOrderSchema.partial();
+      const partialJobSchema = insertJobSchema.partial();
       const validatedData = partialJobSchema.parse(req.body);
       const job = await storage.updateFleetJob(req.params.id, validatedData);
       res.json(job);
@@ -6137,6 +6137,28 @@ function generateCSVContent(reportId: string, data: any, template?: any): Buffer
 }
 
 // Helper function to get seed defects data (returns empty array - no test data)
-function getSeedDefectsData() {
+interface SeedDefect {
+  seedId: string;
+  vesselName: string;
+  issuedDate: string;
+  targetDate: string;
+  status: string;
+  isCoC: boolean;
+  source?: string;
+  defectCategory: string;
+  defectType: string;
+  responsibleRole: string;
+  equipment: {
+    category: string;
+    type: string;
+    make: string;
+    model: string;
+  };
+  description: string;
+  actionRequested: string;
+  dateCompleted?: string;
+}
+
+function getSeedDefectsData(): SeedDefect[] {
   return [];
 }

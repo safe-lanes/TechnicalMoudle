@@ -2933,10 +2933,10 @@ export class PostgresStorage {
       conditions.push(eq(ihmMaintenanceLog.vesselId, filters.vesselId));
     }
     if (filters.componentId) {
-      conditions.push(eq(ihmMaintenanceLog.componentId, filters.componentId));
+      conditions.push(eq(ihmMaintenanceLog.targetComponent, filters.componentId));
     }
     if (filters.spareId) {
-      conditions.push(eq(ihmMaintenanceLog.spareId, filters.spareId));
+      conditions.push(eq(ihmMaintenanceLog.targetSpare, filters.spareId));
     }
     if (filters.workOrderId) {
       conditions.push(eq(ihmMaintenanceLog.workOrderId, filters.workOrderId));
@@ -3989,16 +3989,6 @@ export class PostgresStorage {
     const db = await getDb();
     await db.delete(fleetVesselMapping)
       .where(eq(fleetVesselMapping.id, parseInt(id)));
-  }
-
-  async getVessels(): Promise<Array<{id: string, name: string, code: string}>> {
-    const db = await getDb();
-    const result = await db.select({
-      id: vessels.id,
-      name: vessels.name,
-      code: vessels.code,
-    }).from(vessels);
-    return result;
   }
 
   // ============= ON-DEMAND WORK ORDER GENERATION (Rule #4) =============

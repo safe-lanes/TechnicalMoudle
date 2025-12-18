@@ -954,7 +954,7 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   // Filter to include only leaf nodes (actual equipment, not parent categories)
   // Strategy: Build a Set of all codes that appear as prefixes of other codes
   // A component is a parent if its code (without suffix) is a prefix of another component's code
-  const allCodes = validComponents.map(c => c.componentCode);
+  const allCodes = validComponents.map(c => c.componentCode as string);
   const parentCodes = new Set<string>();
   
   allCodes.forEach(code1 => {
@@ -987,12 +987,12 @@ async function generateWorkOrdersTemplate(vesselId: string): Promise<Buffer> {
   });
   
   // Only include components that are NOT in the parent set (i.e., leaf nodes)
-  const leafComponents = validComponents.filter(c => !parentCodes.has(c.componentCode));
+  const leafComponents = validComponents.filter(c => !parentCodes.has(c.componentCode as string));
   console.log(`🌿 Filtered to ${leafComponents.length} leaf node components (actual equipment)`);
   console.log(`🚫 Excluded ${validComponents.length - leafComponents.length} parent components from template`);
   
   if (parentCodes.size > 0) {
-    console.log(`   Parent codes excluded: ${[...parentCodes].sort().join(', ')}`);
+    console.log(`   Parent codes excluded: ${Array.from(parentCodes).sort().join(', ')}`);
   }
   
   // Create main "wo" sheet
@@ -2289,7 +2289,7 @@ router.get('/history/:id/download-original', async (req, res) => {
         if (!result.ok) {
           return res.status(404).json({ error: 'File not found in storage' });
         }
-        res.send(Buffer.from(result.value));
+        res.send(Buffer.from(result.value as unknown as ArrayBuffer));
       } catch {
         return res.status(404).json({ error: 'File not found in storage' });
       }
@@ -3259,7 +3259,7 @@ async function performImport(
     
     // Create missing makers with sequential codes
     const newMakerCodes = new Map<string, string>();
-    for (const [key, makerInfo] of makersToCreate) {
+    for (const [key, makerInfo] of Array.from(makersToCreate)) {
       maxMakerNum++;
       const newMakerCode = `MKR-${String(maxMakerNum).padStart(6, '0')}`;
       
@@ -4343,7 +4343,7 @@ async function createComponentFromRow(row: any, vesselId?: string) {
   let makerName = row['Maker'] || row['Maker Name'] || null;
   const makerCode = row['Maker Code'] || null;
   if (!makerName && makerCode) {
-    const maker = await storage.getMakerByCode(String(makerCode).trim());
+    const maker = await storage.getMakerListByCode(String(makerCode).trim());
     if (maker) {
       makerName = maker.makerName;
     }
@@ -4438,7 +4438,7 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
     updateData.maker = makerFromExcel;
   } else if (row['Maker Code']) {
     // Try to resolve maker name from maker code
-    const maker = await storage.getMakerByCode(String(row['Maker Code']).trim());
+    const maker = await storage.getMakerListByCode(String(row['Maker Code']).trim());
     if (maker) {
       updateData.maker = maker.makerName;
     }
