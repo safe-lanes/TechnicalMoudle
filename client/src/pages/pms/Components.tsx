@@ -2595,7 +2595,7 @@ const Components: React.FC = () => {
               }}
               data-testid="button-add-component"
             >
-              + Add / Edit Component
+              + Add Component
             </Button>
           )}
         </div>

@@ -861,7 +861,7 @@ export default function ComponentRegisterAddEdit({
             data-testid="button-add-edit-component"
           >
             <Plus className="h-4 w-4 mr-1" />
-            Add/ Edit Component
+            Add Component
           </Button>
           <Button
             variant="outline"
