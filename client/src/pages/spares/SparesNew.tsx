@@ -95,6 +95,10 @@ const Spares: React.FC = () => {
     return "";
   });
   const { vesselId, setVesselId } = useVessel();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const { data: vessels = [] } = useVessels();
   
   // Modify mode state - use proper hook for reactivity
@@ -884,6 +888,27 @@ const Spares: React.FC = () => {
     return filtered;
   }, [sparesData, selectedComponentId, searchTerm, criticalityFilter, stockFilter]);
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredSpares.length / itemsPerPage);
+  const paginatedSpares = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredSpares.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredSpares, currentPage, itemsPerPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, criticalityFilter, stockFilter, selectedComponentId]);
+
+  // Clamp currentPage when totalPages shrinks (e.g., after deletion)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0 && filteredSpares.length === 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage, filteredSpares.length]);
+
   // Toggle node expansion
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -1324,7 +1349,7 @@ const Spares: React.FC = () => {
             <>
               {/* Inventory Table Header */}
               <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
-                <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm font-semibold text-[#ffffff]`}>
+                <div className="grid gap-2 text-sm font-semibold text-[#ffffff]" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
                   <div className="text-[#ffffff]">Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
@@ -1340,7 +1365,7 @@ const Spares: React.FC = () => {
               </div>
 
               {/* Inventory Table Body */}
-              <div className="overflow-y-auto h-[calc(100%-48px)]">
+              <div className="flex flex-col">
                 {isLoading ? (
                   <div className="p-8 text-center text-gray-500">Loading...</div>
                 ) : filteredSpares.length === 0 ? (
@@ -1348,7 +1373,7 @@ const Spares: React.FC = () => {
                     No spares found. Try adjusting your filters.
                   </div>
                 ) : (
-                  filteredSpares.map((spare: Spare) => {
+                  paginatedSpares.map((spare: Spare) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
                     const isDropdownOpen = openLocationDropdown === spare.id;
                     const robA = spare.robLocationA ?? 0;
@@ -1356,7 +1381,7 @@ const Spares: React.FC = () => {
                     const locationDisplay = `${robA} / ${robB}`;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                      <div className={`grid ${FEATURES.IHM ? 'grid-cols-11' : 'grid-cols-10'} gap-4 text-sm items-center`}>
+                      <div className="grid gap-2 text-sm items-center" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
                         <div className="text-gray-900">{spare.partCode}</div>
                         <div className="text-gray-700">{spare.partName}</div>
                         <div className="text-gray-700">{spare.componentName}</div>
@@ -1521,6 +1546,56 @@ const Spares: React.FC = () => {
                   })
                 )}
               </div>
+              
+              {/* Pagination Controls */}
+              {filteredSpares.length > 0 && (
+                <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSpares.length)} of {filteredSpares.length} entries
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      data-testid="pagination-first"
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      data-testid="pagination-prev"
+                    >
+                      Previous
+                    </Button>
+                    <span className="px-3 py-1 text-sm text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      data-testid="pagination-next"
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      data-testid="pagination-last"
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
