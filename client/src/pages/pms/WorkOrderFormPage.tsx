@@ -33,6 +33,8 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import WorkInstructionsDialog from "@/components/WorkInstructionsDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useVessel } from "@/contexts/VesselContext";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { ModifyFieldWrapper } from "@/components/modify/ModifyFieldWrapper";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
@@ -57,9 +59,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   mode = 'execution'
 }) => {
   const { toast } = useToast();
+  const { vesselId: contextVesselId } = useVessel();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
+  const [, newParams] = useRoute("/pms/work-order/new/:componentId");
   const workOrderId = params?.id;
+  const componentIdFromUrl = newParams?.componentId;
+  
+  // Determine if this is a "new job" creation flow (Add Job button)
+  const isNewJobCreation = !!componentIdFromUrl;
   
   // Check for mode query parameter (e.g., ?mode=template)
   const urlParams = new URLSearchParams(window.location.search);
@@ -242,11 +250,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Determine if Part A should be read-only (immutable)
   // Per PMS business rules: Part A is a "frozen snapshot" of the job template
   // Part A is read-only when:
-  // 1. Viewing a job template (mode=template)
+  // 1. VIEWING an existing job template (mode=template AND has workOrderId)
   // 2. Editing ANY existing work order (has workOrderId) - Part A was frozen at creation
-  // Part A is ONLY editable when creating a NEW work order (no workOrderId)
+  // Part A is EDITABLE when:
+  // 1. Creating a NEW job template via Add Job button (mode=template AND isNewJobCreation)
+  // 2. Creating a new work order from scratch (no workOrderId)
   const context = workOrderContext as any;
-  const isPartAReadOnly = resolvedMode === 'template' || !!workOrderId;
+  const isPartAReadOnly = isNewJobCreation ? false : (resolvedMode === 'template' || !!workOrderId);
   
   const isReadOnly = false; // General read-only flag (not currently used)
 
@@ -476,6 +486,24 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       contextLoadedOnce.current = true;
     }
   }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
+
+  // Initialize form for new job creation (Add Job flow)
+  useEffect(() => {
+    if (isNewJobCreation && componentIdFromUrl) {
+      // Pre-populate componentCode from URL
+      setTemplateData(prev => ({
+        ...prev,
+        componentCode: componentIdFromUrl,
+        // Set sensible defaults for new job
+        maintenanceBasis: prev.maintenanceBasis || 'Calendar',
+        frequencyUnit: prev.frequencyUnit || 'Months',
+        taskType: prev.taskType || 'Inspection',
+        jobPriority: prev.jobPriority || 'Medium',
+        classRelated: prev.classRelated || 'No',
+        isActive: prev.isActive || 'Yes'
+      }));
+    }
+  }, [isNewJobCreation, componentIdFromUrl]);
 
   const handleTemplateChange = (field: string, value: string) => {
     // Mark form as touched by user to prevent late async data from overwriting
@@ -1072,6 +1100,100 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }
   };
 
+  // Save handler for creating a new job template (Add Job flow)
+  const handleSaveNewJob = async () => {
+    try {
+      // Validate required fields for new job
+      if (!templateData.woTitle?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Job Title is required",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!templateData.componentCode?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Component Code is required",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate frequency value
+      const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
+      if (!normalizedFrequency) {
+        toast({
+          title: "Validation Error",
+          description: "Frequency value is required. Please enter a positive whole number.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Use componentCode as componentId (they are often the same in this system)
+      // componentName defaults to componentCode if not provided
+      const componentId = templateData.componentCode;
+      const componentName = templateData.componentName || templateData.componentCode;
+      
+      // Generate a unique job number (format: JOB-XXXXXXX)
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+      const jobNo = `JOB-${timestamp}${random}`;
+      
+      // Build job payload matching the jobs schema
+      // Note: All fields are strings as per the schema (frequencyValue is text type)
+      const jobPayload = {
+        vesselId: contextVesselId,
+        componentId: componentId,
+        componentCode: templateData.componentCode,
+        componentName: componentName,
+        jobNo: jobNo,
+        jobTitle: templateData.woTitle,
+        maintenanceBasis: templateData.maintenanceBasis,
+        frequencyValue: normalizedFrequency, // Keep as string
+        frequencyUnit: templateData.frequencyUnit,
+        maintenanceType: templateData.taskType,
+        assignedTo: templateData.assignedTo || null,
+        approver: templateData.approver || null,
+        jobPriority: templateData.jobPriority,
+        classRelated: templateData.classRelated,
+        department: templateData.department || null,
+        briefWorkDescription: templateData.briefWorkDescription || null,
+        jobDescription: templateData.briefWorkDescription || null,
+        nextDueDate: templateData.nextDueDate || null,
+        nextDueRH: templateData.nextDueReading || null,
+        requiredSpareParts: templateData.requiredSpareParts || [],
+        requiredTools: templateData.requiredTools || [],
+        safetyRequirements: templateData.safetyRequirements || {ppeRequirements: [], permitRequirements: [], otherRequirements: []},
+        isActive: templateData.isActive === 'Yes',
+        dataScope: 'vessel', // Jobs created from UI are vessel-specific
+      };
+      
+      const response = await apiRequest('POST', '/api/jobs', jobPayload);
+      const result = await response.json();
+      
+      // Invalidate jobs cache so the new job appears in the list
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      
+      toast({
+        title: "Success",
+        description: "New job created successfully",
+      });
+      
+      // Navigate back to components page
+      navigate("/pms/components");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create job",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Approver actions
   const handleApprove = async () => {
     if (!workOrderId) return;
@@ -1230,7 +1352,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </nav>
                 </SheetContent>
               </Sheet>
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">Work Order Form</h1>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">
+                {isNewJobCreation ? 'Job Form' : 'Work Order Form'}
+              </h1>
             </div>
             <div className="flex items-center">
               <Button
@@ -2756,19 +2880,20 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           )}
 
-          {/* Save Button at Bottom - Hide when in Pending Approval mode (approver view) */}
+            </>
+          )}
+
+          {/* Save Button at Bottom - Always visible except in Pending Approval mode */}
           {currentWorkOrderStatus !== 'Pending Approval' && (
             <div className="flex justify-end mt-6 pb-6">
               <Button
-                onClick={handleSave}
+                onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
                 className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
                 data-testid="button-save-bottom"
               >
-                Save
+                {isNewJobCreation ? 'Create Job' : 'Save'}
               </Button>
             </div>
-          )}
-            </>
           )}
           </div>
         </div>

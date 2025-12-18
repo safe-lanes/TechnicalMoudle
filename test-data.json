@@ -11810,6 +11810,36 @@
       "vesselId": null,
       "createdAt": "2025-12-08T00:00:00.000Z",
       "updatedAt": "2025-12-08T00:00:00.000Z"
+    },
+    "undefined": {
+      "vesselId": "V001",
+      "componentId": "1764654579885_ztuu36gj8",
+      "componentCode": "40",
+      "componentName": "40",
+      "jobNo": "JOB-MJBEWLD08S0",
+      "jobTitle": "Engine Check uCz8fm",
+      "assignedTo": null,
+      "maintenanceType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "6",
+      "frequencyUnit": "Months",
+      "nextDueDate": null,
+      "nextDueRH": null,
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": null,
+      "jobDescription": null,
+      "approver": null,
+      "department": null,
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": {
+        "ppeRequirements": [],
+        "permitRequirements": [],
+        "otherRequirements": []
+      },
+      "dataScope": "vessel",
+      "isActive": true
     }
   },
   "workOrders": [

@@ -602,7 +602,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate that the component is a sub-component (has a parent)
       let component: any = null;
       if (jobData.componentId) {
+        // First try to look up by ID
         component = await storage.getComponent(jobData.componentId);
+        
+        // If not found by ID, try looking up by component code (for Add Job flow)
+        if (!component && jobData.componentCode && jobData.vesselId) {
+          component = await storage.getComponentByCode(jobData.componentCode, jobData.vesselId);
+          // Update componentId to the actual component ID if found
+          if (component) {
+            jobData = { ...jobData, componentId: component.id };
+          }
+        }
+        
         if (!component) {
           return res.status(400).json({ 
             error: "Component not found" 
