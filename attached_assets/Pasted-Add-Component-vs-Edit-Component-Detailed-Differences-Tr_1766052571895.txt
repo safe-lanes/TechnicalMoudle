@@ -1,0 +1,55 @@
+Add Component vs Edit Component - Detailed Differences
+Trigger Points
+Add Component	Edit Component
+"+" button on a tree node (adds child)	"Edit" button on selected component
+"Add Component" button in toolbar	Pencil icon on component row
+Opens form with componentId = null	Opens form with componentId = existing ID
+Modal Behavior
+Aspect	Add Component	Edit Component
+isEditMode flag	false	true
+Form title	"Add New Component"	"Edit Component"
+Data loading	No fetch needed	Fetches existing component from /api/components/{id}
+Shows loading state	No	Yes, while fetching data
+Field Behavior
+Field	Add Component	Edit Component
+Component Code	Editable text input	Read-only display (cannot change after creation)
+Parent Component Code	Pre-filled if adding under a parent, editable otherwise	Editable
+Component Category	Auto-derived from component code	Shows stored value from database
+All other fields	Empty/default values	Pre-populated from database
+Sections Displayed
+Section	Add Component	Edit Component
+A. Component Information	Full form, all fields editable	Full form, all fields editable
+B. Running Hours	Basic display only	Full display with RH type, last updated, counter source
+C. Jobs	Empty/not shown	Lists all jobs for this component + children
+D. Maintenance History	Empty/not shown	Shows historical records
+E. Spares	Empty/not shown	Lists linked spares
+F. Drawings & Manuals	Empty/not shown	Shows uploaded documents
+G. Class & Regulatory	Empty/not shown	Shows classification data
+H. Requisitions	Empty/not shown	Shows purchase requisitions
+Data Queries
+Add Component	Edit Component
+No data queries needed	Fetches component details
+Fetches jobs for component
+Fetches maintenance history
+Fetches spares linked to component
+Fetches documents
+Fetches class/regulatory data
+Fetches requisitions
+Fetches running hours audit data
+Save Action
+Add Component	Edit Component
+POST /api/components	PATCH /api/components/{id}
+Creates new record in database	Updates existing record
+Generates new component ID	Uses existing component ID
+Toast: "Component Created"	Toast: "Component Updated"
+After Save
+Both invalidate the same cache keys:
+
+/api/components
+/api/components/{vesselId}
+This refreshes the component tree to show the new/updated component.
+
+Key Difference Summary
+Add Component = Fresh form, minimal sections, creates new database record
+
+Edit Component = Pre-loaded form with all 8 sections populated with related data, updates existing record
