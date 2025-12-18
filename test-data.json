@@ -2414,7 +2414,7 @@
       "rating": "9600l/h",
       "parentComponent": "702.005",
       "notes": null,
-      "runningHours": "2701.00",
+      "runningHours": 2701,
       "currentCumulativeRH": "2701.00",
       "id": "1764654581788_1ksee6pne",
       "dataScope": "vessel",
