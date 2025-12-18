@@ -356,7 +356,7 @@ const Spares: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<"inventory" | "history">("inventory");
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");

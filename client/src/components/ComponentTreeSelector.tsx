@@ -36,7 +36,7 @@ export function ComponentTreeSelector({
   searchQuery,
   onSearchChange
 }: ComponentTreeSelectorProps) {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6", "6.1", "6.1.1"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
