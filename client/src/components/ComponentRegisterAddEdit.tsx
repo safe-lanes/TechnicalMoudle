@@ -434,11 +434,11 @@ export default function ComponentRegisterAddEdit({
         return;
       }
       const node: ComponentNode = {
-        id: comp.id,
-        code: code,
+        ...comp,  // Include all component data FIRST
+        id: code,  // Use componentCode as id for tree selection
+        code: code,  // componentCode
         name: comp.name,
-        ...comp,
-        componentId: comp.id,
+        componentId: comp.id,  // Keep original database ID as componentId
         critical: comp.critical === "Yes" || comp.critical === true,
         children: []
       };
@@ -802,6 +802,8 @@ export default function ComponentRegisterAddEdit({
               const isCategory = selectedTreeNode ? isMainCategory(selectedTreeNode) : false;
               const parentId = selectedTreeNode && !isCategory ? selectedTreeNode : "";
               const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
+              // Derive category from the parent or next code
+              const derivedCategory = nextCode ? getComponentCategory(nextCode) : (selectedTreeNode ? getComponentCategory(selectedTreeNode) : "");
               
               setComponentData({
                 // Row 1
@@ -811,7 +813,7 @@ export default function ComponentRegisterAddEdit({
                 componentCode: nextCode,
                 // Row 2
                 componentName: "",
-                eqptSystemCategory: "",
+                eqptSystemCategory: derivedCategory,
                 maker: "",
                 makerCode: "",
                 // Row 3

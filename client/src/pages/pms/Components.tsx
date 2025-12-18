@@ -1994,10 +1994,10 @@ const Components: React.FC = () => {
         return;
       }
       const node: ComponentNode = {
-        id: code,
-        code: code,
+        ...comp,  // Include all component data FIRST
+        id: code,  // Override with componentCode
+        code: code,  // Override with componentCode
         name: comp.name,
-        ...comp,  // Include all component data
         critical: comp.critical === "Yes" || comp.critical === true,  // Normalize to boolean
         children: []
       };
