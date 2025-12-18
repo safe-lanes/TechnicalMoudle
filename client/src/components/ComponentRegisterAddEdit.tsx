@@ -950,7 +950,67 @@ export default function ComponentRegisterAddEdit({
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">A. Component Information</h3>
+                {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
                 <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fleet Equipment Code</label>
+                    <Input
+                      value={componentData.fleetEquipmentCode}
+                      onChange={(e) => handleFieldChange('fleetEquipmentCode', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-fleet-equipment-code"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fleet Equipment Name</label>
+                    <Input
+                      value={componentData.fleetEquipmentName}
+                      onChange={(e) => handleFieldChange('fleetEquipmentName', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-fleet-equipment-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code</label>
+                    <Input
+                      value={componentData.parentComponent}
+                      onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-parent-component"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Code</label>
+                    <Input
+                      value={componentData.componentCode}
+                      onChange={(e) => handleFieldChange('componentCode', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-component-code"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Name</label>
+                    <Input
+                      value={componentData.componentName}
+                      onChange={(e) => handleFieldChange('componentName', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-component-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Component Category</label>
+                    <Input
+                      value={componentData.eqptSystemCategory}
+                      readOnly
+                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
+                      data-testid="input-component-category"
+                      title="Auto-populated based on component group (1-8)"
+                    />
+                  </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Maker</label>
                     <Input
@@ -961,12 +1021,34 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Maker Code</label>
+                    <Input
+                      value={componentData.makerCode}
+                      onChange={(e) => handleFieldChange('makerCode', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-maker-code"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3: Model, Model Code, Serial No, Drawing No */}
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
                     <label className="text-xs text-gray-500 mb-1 block">Model</label>
                     <Input
                       value={componentData.model}
                       onChange={(e) => handleFieldChange('model', e.target.value)}
                       className="h-8 text-sm"
                       data-testid="input-model"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Model Code</label>
+                    <Input
+                      value={componentData.modelCode}
+                      onChange={(e) => handleFieldChange('modelCode', e.target.value)}
+                      className="h-8 text-sm"
+                      data-testid="input-model-code"
                     />
                   </div>
                   <div>
@@ -989,35 +1071,8 @@ export default function ComponentRegisterAddEdit({
                   </div>
                 </div>
 
+                {/* Row 4: Location, Criticality, Condition Based, Installation Date */}
                 <div className="grid grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Code</label>
-                    <Input
-                      value={componentData.componentCode}
-                      onChange={(e) => handleFieldChange('componentCode', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-component-code"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Name</label>
-                    <Input
-                      value={componentData.componentName}
-                      onChange={(e) => handleFieldChange('componentName', e.target.value)}
-                      className="h-8 text-sm"
-                      data-testid="input-component-name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Component Category</label>
-                    <Input
-                      value={componentData.eqptSystemCategory}
-                      readOnly
-                      className="h-8 text-sm bg-gray-50 text-gray-700 cursor-not-allowed"
-                      data-testid="input-component-category"
-                      title="Auto-populated based on component group (1-8)"
-                    />
-                  </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Location</label>
                     <Input
@@ -1033,16 +1088,26 @@ export default function ComponentRegisterAddEdit({
                       value={componentData.critical}
                       onChange={(e) => handleFieldChange('critical', e.target.value)}
                       className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                      data-testid="select-criticality"
+                      data-testid="select-criticality-field"
                     >
                       <option value="">Select</option>
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Condition Based</label>
+                    <select
+                      value={componentData.conditionBased}
+                      onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-condition-based"
+                    >
+                      <option value="">Select</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Installation Date</label>
                     <Input
@@ -1053,6 +1118,10 @@ export default function ComponentRegisterAddEdit({
                       data-testid="input-installation-date"
                     />
                   </div>
+                </div>
+
+                {/* Row 5: Commissioned Date, Rating, Equipment/System Department */}
+                <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Commissioned Date</label>
                     <Input
@@ -1073,59 +1142,35 @@ export default function ComponentRegisterAddEdit({
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Condition Based</label>
-                    <select
-                      value={componentData.conditionBased}
-                      onChange={(e) => handleFieldChange('conditionBased', e.target.value)}
-                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                      data-testid="select-condition-based"
-                    >
-                      <option value="">Select</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
                     <label className="text-xs text-gray-500 mb-1 block">Equipment / System Department</label>
                     <select
                       value={componentData.eqptSystemDept}
                       onChange={(e) => handleFieldChange('eqptSystemDept', e.target.value)}
                       className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                      data-testid="select-eqpt-dept"
+                      data-testid="select-eqpt-system-dept"
                     >
-                      <option value="">Select Department</option>
-                      <option value="Deck">Deck</option>
+                      <option value="">Select</option>
                       <option value="Engine">Engine</option>
+                      <option value="Deck">Deck</option>
                       <option value="Electrical">Electrical</option>
+                      <option value="Hotel">Hotel</option>
                     </select>
                   </div>
+                  <div></div>
+                </div>
+
+                {/* Row 6: Running Hours, Is Active, Vessel Code, Is Parent */}
+                <div className="grid grid-cols-4 gap-4 mb-4">
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Parent Component Code</label>
+                    <label className="text-xs text-gray-500 mb-1 block">Running Hours</label>
                     <Input
-                      value={componentData.parentComponent}
-                      onChange={(e) => handleFieldChange('parentComponent', e.target.value)}
+                      value={componentData.runningHours}
+                      onChange={(e) => handleFieldChange('runningHours', e.target.value)}
                       className="h-8 text-sm"
-                      data-testid="input-parent-component"
+                      placeholder="20000"
+                      data-testid="input-running-hours"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Notes</label>
-                  <Textarea
-                    value={componentData.notes}
-                    onChange={(e) => handleFieldChange('notes', e.target.value)}
-                    className="min-h-[60px] bg-yellow-50 border-yellow-200 text-sm"
-                    placeholder="Notes"
-                    data-testid="textarea-notes"
-                  />
-                </div>
-
-                {/* Row: Is Active, Vessel Code, Is Parent */}
-                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Is Active</label>
                     <select
@@ -1137,7 +1182,6 @@ export default function ComponentRegisterAddEdit({
                       <option value="Yes">Yes (Active)</option>
                       <option value="No">No (Inactive)</option>
                     </select>
-                    <p className="text-xs text-gray-400 mt-1">Inactive components are hidden from active views</p>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Vessel Code</label>
@@ -1162,22 +1206,75 @@ export default function ComponentRegisterAddEdit({
                     </select>
                   </div>
                 </div>
+
+                {/* Row 7: Notes (full width) */}
+                <div className="mb-4">
+                  <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+                  <Textarea
+                    value={componentData.notes}
+                    onChange={(e) => handleFieldChange('notes', e.target.value)}
+                    className="min-h-[60px] bg-yellow-50 border-yellow-200 text-sm"
+                    placeholder="Notes"
+                    data-testid="textarea-notes"
+                  />
+                </div>
               </div>
 
+              {/* Section B: Running Hours & Condition Monitoring - Enhanced with Counter Type Logic */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours</h3>
-                <div className="mb-4">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Running Hours</label>
-                    <Input
-                      value={componentData.runningHours}
-                      onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-                      className="h-8 text-sm max-w-xs"
-                      placeholder="20000"
-                      data-testid="input-running-hours"
-                    />
-                  </div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours & Condition Monitoring</h3>
+                <div className="border rounded overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Counter Type</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Source</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Running Hours</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">
+                          <span 
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              componentData.rhCounterType === 'MASTER' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : componentData.rhCounterType === 'INHERITED'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-600'
+                            }`}
+                            data-testid="badge-counter-type"
+                          >
+                            {componentData.rhCounterType === 'MASTER' ? 'Master (RH Owner)' :
+                             componentData.rhCounterType === 'INHERITED' ? 'Inherited (Uses Master Counter)' :
+                             'Not RH Driven'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-700" data-testid="text-counter-source">
+                          {componentData.rhCounterType === 'MASTER' ? 'Self' :
+                           componentData.rhCounterType === 'INHERITED' ? (componentData.rhCounterSource || 'Parent Component') :
+                           '—'}
+                        </td>
+                        <td className="px-3 py-2" data-testid="text-running-hours-value">
+                          <span className={componentData.rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>
+                            {componentData.runningHours || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2" data-testid="text-last-updated">
+                          <span className={componentData.rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>
+                            {componentData.lastUpdated || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
+                {componentData.rhCounterType === 'INHERITED' && (
+                  <p className="text-xs text-purple-600 mt-2 italic">
+                    Running hours inherited from master component. Value updates automatically.
+                  </p>
+                )}
               </div>
 
               <div>
