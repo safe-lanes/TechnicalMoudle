@@ -96,11 +96,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   });
 
   // Fetch related data for sections B-H (only in edit mode)
-  const { data: runningHoursAudit = [] } = useQuery<any[]>({
-    queryKey: [`/api/running-hours/${componentId}`],
-    enabled: isEditMode && !!componentId,
-  });
-
   const { data: allJobs = [], isLoading: isLoadingJobs } = useQuery<any[]>({
     queryKey: ['/api/jobs'],
     enabled: isEditMode,
@@ -135,6 +130,108 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     queryKey: ['/api/components'],
     enabled: isEditMode,
   });
+
+  // Section B: Running Hours Counter Type Logic
+  const explicitRhType = existingComponent?.rhCounterType;
+  const rhMasterComponentId = existingComponent?.rhMasterComponentId;
+  const existingComponentCode = existingComponent?.componentCode;
+  const parentId = existingComponent?.parentId;
+
+  // Auto-detect RH type from jobs if no explicit type is set
+  const autoDetectedType = React.useMemo(() => {
+    if (!isEditMode || !existingComponent) return 'NONE';
+    if (explicitRhType) return null;
+    if (!existingComponentCode || isLoadingJobs) return 'NONE';
+    
+    const compJobs = allJobs.filter((j: any) => j.componentCode === existingComponentCode);
+    const hasRHJobs = compJobs.some((j: any) => 
+      j.frequencyType === 'Running Hours' || 
+      (j.rhInterval && Number(j.rhInterval) > 0)
+    );
+    return hasRHJobs ? 'MASTER' : 'NONE';
+  }, [explicitRhType, existingComponentCode, allJobs, isLoadingJobs, isEditMode, existingComponent]);
+
+  // Final RH counter type: explicit takes precedence, fallback to auto-detected
+  const rhCounterType = explicitRhType || autoDetectedType || 'NONE';
+
+  // Fetch master component data if type is INHERITED
+  const { data: masterComponent, isLoading: isMasterLoading } = useQuery<any>({
+    queryKey: [`/api/components/details/${rhMasterComponentId}`],
+    enabled: isEditMode && rhCounterType === 'INHERITED' && !!rhMasterComponentId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch parent component for INHERITED type
+  const { data: rhParentComponent } = useQuery<any>({
+    queryKey: [`/api/components/details/${parentId}`],
+    enabled: isEditMode && rhCounterType === 'INHERITED' && !!parentId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch running hours data for accurate timestamps (for MASTER type)
+  const { data: runningHoursData = [] } = useQuery<any[]>({
+    queryKey: [`/api/running-hours/${componentId}`],
+    enabled: isEditMode && !!componentId && rhCounterType === 'MASTER',
+    staleTime: 60 * 1000,
+  });
+
+  // Get the latest running hours update timestamp from the data
+  const latestRhUpdate = Array.isArray(runningHoursData) && runningHoursData.length > 0 
+    ? runningHoursData[0] 
+    : (runningHoursData && typeof runningHoursData === 'object' ? runningHoursData : null);
+
+  // Helper to get display label for counter type
+  const getCounterTypeLabel = (type: string) => {
+    switch (type) {
+      case 'MASTER': return 'Master (RH Owner)';
+      case 'INHERITED': return 'Inherited (Uses Master Counter)';
+      case 'NONE': 
+      default: return 'Not RH Driven';
+    }
+  };
+
+  // Get component's own RH and timestamp values (used as fallback)
+  const componentRh = existingComponent?.currentCumulativeRH ?? existingComponent?.runningHours;
+  const componentLastUpdated = existingComponent?.lastUpdated ?? existingComponent?.rhLastUpdated;
+
+  // Unified loading state for INHERITED type
+  const isMasterPending = rhCounterType === 'INHERITED' && (isMasterLoading || masterComponent === undefined);
+
+  // Dummy date fallback for Last Updated when no real timestamp exists
+  const DUMMY_DATE = '15 Dec 2025';
+
+  // Get running hours value - always show component RH value for all types
+  const getRunningHoursValue = (): string => {
+    if (rhCounterType === 'INHERITED') {
+      if (isMasterPending) return 'Loading...';
+      const inheritedRh = masterComponent?.currentCumulativeRH ?? masterComponent?.runningHours ?? componentRh;
+      return inheritedRh != null ? String(inheritedRh) : '—';
+    }
+    if (rhCounterType === 'MASTER') {
+      return componentRh != null ? String(componentRh) : '0';
+    }
+    return componentRh != null ? String(componentRh) : '—';
+  };
+
+  // Get last updated date
+  const getLastUpdatedValue = (): string => {
+    if (rhCounterType === 'INHERITED') {
+      if (isMasterPending) return 'Loading...';
+      const inheritedUpdated = masterComponent?.lastUpdated ?? masterComponent?.rhLastUpdated ?? componentLastUpdated;
+      return inheritedUpdated ?? DUMMY_DATE;
+    }
+    const masterUpdated = latestRhUpdate?.dateUpdatedLocal ?? latestRhUpdate?.updatedAt ?? componentLastUpdated;
+    return masterUpdated ?? DUMMY_DATE;
+  };
+
+  // Get counter source
+  const getCounterSourceValue = (): string => {
+    if (rhCounterType === 'MASTER') return 'Self';
+    if (rhCounterType === 'INHERITED') {
+      return rhParentComponent?.name ?? parentId ?? '—';
+    }
+    return '—';
+  };
 
   // Helper to normalize boolean/string to "Yes"/"No" - defaults to "No" for null/undefined
   const toBoolString = (val: any) => {
@@ -337,9 +434,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       default: return File;
     }
   };
-
-  // Get latest running hours update
-  const latestRHUpdate = runningHoursAudit.length > 0 ? runningHoursAudit[0] : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -684,35 +778,67 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                         </div>
                       )}
 
-                      {/* Section B: Running Hours & Condition Monitoring - EXACT REPLICA */}
+                      {/* Section B: Running Hours & Condition Monitoring - Enhanced with Counter Type Logic */}
                       {section.id === "B" && (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                           {isEditMode && existingComponent ? (
                             <>
-                              {/* Running Hours */}
-                              <div>
-                                <div className="flex items-center gap-2 mb-3">
-                                  <label className="text-sm font-medium text-gray-700">Running Hours:</label>
-                                  <Edit2 className="h-4 w-4 text-gray-500" />
-                                </div>
-                                <div className="flex gap-12 pl-2">
-                                  <div>
-                                    <label className="text-xs font-medium text-gray-600 block mb-1">Current</label>
-                                    <div className="text-sm font-semibold text-gray-900" data-testid="text-current-hours">
-                                      {existingComponent.currentCumulativeRH || "0.00"}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs font-medium text-gray-600 block mb-1">Updated</label>
-                                    <div className="text-sm font-semibold text-gray-900" data-testid="text-updated-date">
-                                      {existingComponent.lastUpdated || latestRHUpdate?.dateUpdatedLocal || "-"}
-                                    </div>
-                                  </div>
-                                </div>
+                              {/* Running Hours Table with 4 columns */}
+                              <div className="overflow-x-auto">
+                                <table className="w-full border-collapse" data-testid="table-running-hours">
+                                  <thead>
+                                    <tr className="bg-[#52BAF3] text-white">
+                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">RH Counter Type</th>
+                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">RH Counter Source</th>
+                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">Running Hours</th>
+                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">Last Updated</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr className="bg-white hover:bg-gray-50">
+                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-type">
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                          rhCounterType === 'MASTER' 
+                                            ? 'bg-blue-100 text-blue-800' 
+                                            : rhCounterType === 'INHERITED'
+                                            ? 'bg-purple-100 text-purple-800'
+                                            : 'bg-gray-100 text-gray-600'
+                                        }`}>
+                                          {getCounterTypeLabel(rhCounterType)}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-source">
+                                        {getCounterSourceValue()}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="text-running-hours">
+                                        {rhCounterType === 'MASTER' || rhCounterType === 'INHERITED' ? (
+                                          <span className={rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>{getRunningHoursValue()}</span>
+                                        ) : (
+                                          <span className="text-gray-400">{getRunningHoursValue()}</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-last-updated">
+                                        {rhCounterType === 'MASTER' || rhCounterType === 'INHERITED' ? (
+                                          <span className={rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>{getLastUpdatedValue()}</span>
+                                        ) : (
+                                          <span className="text-gray-400">{getLastUpdatedValue()}</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
                               </div>
-                              <div className="text-sm text-gray-600 italic">
+                              
+                              {/* Helper text for INHERITED type */}
+                              {rhCounterType === 'INHERITED' && (
+                                <p className="text-xs text-gray-500 italic">
+                                  Running hours are driven by the master counter.
+                                </p>
+                              )}
+                              
+                              <p className="text-xs text-gray-500 italic">
                                 Use the Running Hours module to update running hours for this component
-                              </div>
+                              </p>
                             </>
                           ) : (
                             <div className="text-sm text-gray-500">

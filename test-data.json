@@ -12254,57 +12254,168 @@
       "templateCode": "MKR-SE-00001.WO-2025-001",
       "executionId": null,
       "jobTitle": "Impressed current systems check test",
-      "assignedTo": "Unassigned",
+      "assignedTo": "2nd Engineer",
       "dueDate": "02-Dec-2025",
       "status": "Overdue",
-      "dateCompleted": null,
+      "dateCompleted": "",
       "submittedDate": null,
       "formData": null,
-      "taskType": null,
+      "taskType": "Testing",
       "maintenanceBasis": "Running Hours",
-      "frequencyValue": 500,
+      "frequencyValue": "500",
       "frequencyUnit": "Hours",
       "approverRemarks": null,
       "isExecution": false,
       "templateId": null,
-      "approver": null,
+      "approver": "Chief Engineer",
       "approvalDate": null,
       "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": "1024",
+      "nextDueDate": "",
+      "nextDueReading": "500",
+      "currentReading": "8750",
       "classRelated": "No",
       "jobPriority": "Critical",
-      "briefWorkDescription": null,
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
       "dataScope": "vessel",
       "fleetEquipmentCode": null,
       "fleetJobCode": null,
       "jobGroup": null,
       "jobCategory": null,
-      "sfiCode": null,
+      "sfiCode": "278.010.02",
       "maintenanceIntervalValue": null,
       "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "department": null,
-      "criticality": null,
-      "isActive": true,
+      "intervalRunningHour": "500",
+      "department": "Deck",
+      "criticality": "No",
+      "isActive": "Yes",
       "applicableVesselIds": null,
       "scopeNotes": null,
       "postponementEndDate": null,
       "postponementReason": null,
       "postponementAuthorizedBy": null,
       "onDemandReason": "Planning",
-      "requiredSpareParts": [],
-      "requiredTools": [],
+      "requiredSpareParts": [
+        {
+          "partNo": "SP-00004",
+          "description": "Impressed Current Anode",
+          "quantityRequired": "2",
+          "remarks": "Annual replacement"
+        },
+        {
+          "partNo": "SP-00005",
+          "description": "Reference Cell Electrode",
+          "quantityRequired": "1",
+          "remarks": "Check and replace if corroded"
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "Digital Multimeter",
+          "quantity": "1",
+          "remarks": "For voltage measurement"
+        },
+        {
+          "toolName": "Insulation Tester (Megger)",
+          "quantity": "1",
+          "remarks": "For insulation resistance check"
+        }
+      ],
       "safetyRequirements": {
-        "ppeRequirements": [],
-        "permitRequirements": [],
-        "otherRequirements": []
+        "ppeRequirements": [
+          "Safety Gloves (Electrical)",
+          "Safety Goggles"
+        ],
+        "permitRequirements": [
+          "Electrical Work Permit",
+          "Diving Operations Permit"
+        ],
+        "otherRequirements": [
+          "System isolated before work",
+          "Vessel grounded properly"
+        ]
       },
       "uploadedDocuments": [],
-      "consumedSpareParts": [],
+      "consumedSpareParts": [
+        {
+          "partNo": "SP-00004",
+          "description": "Impressed Current Anode",
+          "quantityConsumed": "2",
+          "comments": ""
+        },
+        {
+          "partNo": "SP-00005",
+          "description": "Reference Cell Electrode",
+          "quantityConsumed": "1",
+          "comments": "Corroded electrode replaced"
+        }
+      ],
       "createdAt": "2025-12-02T07:09:01.324Z",
-      "updatedAt": "2025-12-03T11:37:16.855Z"
+      "updatedAt": "2025-12-03T11:37:16.855Z",
+      "woTitle": "Impressed current systems check test",
+      "woTemplateCode": "MKR-SE-00001",
+      "workHistory": [
+        {
+          "woNo": "MKR-IN-00001.WO-2024-002",
+          "assignedTo": "2nd Engineer",
+          "performedBy": "2nd Engineer",
+          "workDate": "2024-11-15",
+          "runDate": "",
+          "completionDate": "2024-11-15",
+          "status": "Completed",
+          "description": "Impressed current system inspection",
+          "remarks": "All anodes functional"
+        },
+        {
+          "woNo": "MKR-IN-00001.WO-2024-001",
+          "assignedTo": "3rd Engineer",
+          "performedBy": "3rd Engineer",
+          "workDate": "2024-05-20",
+          "runDate": "",
+          "completionDate": "2024-05-22",
+          "status": "Completed",
+          "description": "Annual anode replacement",
+          "remarks": "2 anodes replaced"
+        }
+      ],
+      "jobNo": "MKR-SE-00001",
+      "maintenanceType": "Testing",
+      "lastDoneDate": "2025-11-18",
+      "lastDoneRH": "0",
+      "nextDueRH": "500",
+      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
+      "woExecutionId": "WO-EXE-6287942",
+      "riskAssessment": "No",
+      "safetyChecklists": "No",
+      "operationalForms": "No",
+      "startDateTime": "",
+      "completionDateTime": "",
+      "dateOfCompletion": "",
+      "runningHours": "8750",
+      "performedBy": "",
+      "noOfPersons": "",
+      "totalTimeHours": "",
+      "manhours": "",
+      "workCarriedOut": "",
+      "jobExperienceNotes": "",
+      "previousReading": "8500",
+      "ihmUpdate": {
+        "enabled": false,
+        "action": "",
+        "targetComponent": "",
+        "targetSpare": "",
+        "quantity": "",
+        "location": "",
+        "materials": [],
+        "remarks": ""
+      },
+      "riskAssessmentStatus": "",
+      "safetyChecklistsStatus": "",
+      "operationalFormsStatus": "",
+      "executionAssignedTo": "",
+      "runningHoursDifference": "",
+      "readingDate": "",
+      "remarks": "",
+      "completionRemarks": ""
     },
     {
       "vesselId": "V001",

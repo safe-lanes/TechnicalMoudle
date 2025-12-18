@@ -43,7 +43,7 @@ export default function ComponentRegisterAddEdit({
   const { data: vessels = [] } = useVessels();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTreeNode, setSelectedTreeNode] = useState<string | null>(null);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["6"]));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [criticalityFilter, setCriticalityFilter] = useState("all");
 
@@ -55,26 +55,41 @@ export default function ComponentRegisterAddEdit({
   const isEditMode = isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId));
 
   const [componentData, setComponentData] = useState({
-    maker: "",
-    model: "",
-    serialNo: "",
-    drawingNo: "",
+    // Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code
+    fleetEquipmentCode: "",
+    fleetEquipmentName: "",
+    parentComponent: parentComponent?.id || "",
     componentCode: "",
+    // Row 2: Component Name, Component Category, Maker, Maker Code
     componentName: "",
     eqptSystemCategory: "",
+    maker: "",
+    makerCode: "",
+    // Row 3: Model, Model Code, Serial No, Drawing No
+    model: "",
+    modelCode: "",
+    serialNo: "",
+    drawingNo: "",
+    // Row 4: Location, Criticality, Condition Based, Installation Date
     location: "",
     critical: "",
+    conditionBased: "",
     installationDate: "",
+    // Row 5: Commissioned Date, Rating, Equipment/System Department, (spacer)
     commissionedDate: "",
     rating: "",
-    conditionBased: "",
     eqptSystemDept: "",
-    parentComponent: parentComponent?.id || "",
-    notes: "",
+    // Row 6: Running Hours, IS Active, Vessel Code, IS Parent
     runningHours: "",
     isActive: "Yes",
     vesselCode: "",
     isParent: "No",
+    // Row 7: Notes (full width)
+    notes: "",
+    // Section B: Running Hours & Condition Monitoring
+    rhCounterType: "NONE",
+    rhCounterSource: "",
+    lastUpdated: "",
   });
 
 
@@ -287,26 +302,41 @@ export default function ComponentRegisterAddEdit({
     if (isEditMode && existingComponent && !isLoadingComponent) {
       const comp = existingComponent;
       setComponentData({
-        maker: comp.maker || "",
-        model: comp.model || "",
-        serialNo: comp.serialNo || "",
-        drawingNo: comp.drawingNo || "",
+        // Row 1
+        fleetEquipmentCode: comp.fleetEquipmentCode || "",
+        fleetEquipmentName: comp.fleetEquipmentName || "",
+        parentComponent: comp.parentId || "",
         componentCode: comp.componentCode || "",
+        // Row 2
         componentName: comp.name || "",
         eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
+        maker: comp.maker || "",
+        makerCode: comp.makerCode || "",
+        // Row 3
+        model: comp.model || "",
+        modelCode: comp.modelCode || "",
+        serialNo: comp.serialNo || "",
+        drawingNo: comp.drawingNo || "",
+        // Row 4
         location: comp.location || "",
         critical: comp.critical ? "Yes" : "No",
+        conditionBased: comp.conditionBased ? "Yes" : "No",
         installationDate: comp.installationDate || "",
+        // Row 5
         commissionedDate: comp.commissionedDate || "",
         rating: comp.rating || "",
-        conditionBased: comp.conditionBased ? "Yes" : "No",
         eqptSystemDept: comp.eqptSystemDept || "",
-        parentComponent: comp.parentId || "",
-        notes: comp.notes || "",
+        // Row 6
         runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
         isActive: comp.isActive === false ? "No" : "Yes",
         vesselCode: comp.vesselCode || "",
         isParent: comp.isParent ? "Yes" : "No",
+        // Row 7
+        notes: comp.notes || "",
+        // Section B: Running Hours & Condition Monitoring
+        rhCounterType: comp.rhCounterType || "NONE",
+        rhCounterSource: comp.rhCounterSource || "",
+        lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
       });
       setSelectedTreeNode(comp.id);
 
@@ -629,26 +659,41 @@ export default function ComponentRegisterAddEdit({
     setSelectedComponentId(comp.id);
     
     setComponentData({
-      maker: comp.maker || "",
-      model: comp.model || "",
-      serialNo: comp.serialNo || "",
-      drawingNo: comp.drawingNo || "",
+      // Row 1
+      fleetEquipmentCode: comp.fleetEquipmentCode || "",
+      fleetEquipmentName: comp.fleetEquipmentName || "",
+      parentComponent: comp.parentId || "",
       componentCode: comp.componentCode || comp.code || "",
+      // Row 2
       componentName: comp.name || "",
       eqptSystemCategory: comp.componentCategory || getComponentCategory(comp.id),
+      maker: comp.maker || "",
+      makerCode: comp.makerCode || "",
+      // Row 3
+      model: comp.model || "",
+      modelCode: comp.modelCode || "",
+      serialNo: comp.serialNo || "",
+      drawingNo: comp.drawingNo || "",
+      // Row 4
       location: comp.location || "",
       critical: comp.critical ? "Yes" : "No",
+      conditionBased: comp.conditionBased ? "Yes" : "No",
       installationDate: comp.installationDate || "",
+      // Row 5
       commissionedDate: comp.commissionedDate || "",
       rating: comp.rating || "",
-      conditionBased: comp.conditionBased ? "Yes" : "No",
       eqptSystemDept: comp.eqptSystemDept || "",
-      parentComponent: comp.parentId || "",
-      notes: comp.notes || "",
+      // Row 6
       runningHours: comp.runningHours?.toString() || comp.currentCumulativeRH?.toString() || "",
       isActive: comp.isActive === false ? "No" : "Yes",
       vesselCode: comp.vesselCode || "",
       isParent: comp.isParent ? "Yes" : "No",
+      // Row 7
+      notes: comp.notes || "",
+      // Section B: Running Hours & Condition Monitoring
+      rhCounterType: comp.rhCounterType || "NONE",
+      rhCounterSource: comp.rhCounterSource || "",
+      lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
     });
     
     const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
@@ -758,26 +803,41 @@ export default function ComponentRegisterAddEdit({
               const nextCode = selectedTreeNode ? generateNextComponentCode(selectedTreeNode, isCategory) : "";
               
               setComponentData({
-                maker: "",
-                model: "",
-                serialNo: "",
-                drawingNo: "",
+                // Row 1
+                fleetEquipmentCode: "",
+                fleetEquipmentName: "",
+                parentComponent: parentId,
                 componentCode: nextCode,
+                // Row 2
                 componentName: "",
                 eqptSystemCategory: "",
+                maker: "",
+                makerCode: "",
+                // Row 3
+                model: "",
+                modelCode: "",
+                serialNo: "",
+                drawingNo: "",
+                // Row 4
                 location: "",
                 critical: "",
+                conditionBased: "",
                 installationDate: "",
+                // Row 5
                 commissionedDate: "",
                 rating: "",
-                conditionBased: "",
                 eqptSystemDept: "",
-                parentComponent: parentId,
-                notes: "",
+                // Row 6
                 runningHours: "",
                 isActive: "Yes",
                 vesselCode: "",
                 isParent: "No",
+                // Row 7
+                notes: "",
+                // Section B: Running Hours & Condition Monitoring
+                rhCounterType: "NONE",
+                rhCounterSource: "",
+                lastUpdated: "",
               });
               setWorkOrders([]);
               setMaintenanceHistory([]);
