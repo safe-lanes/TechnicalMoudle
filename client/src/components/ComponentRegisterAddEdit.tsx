@@ -536,12 +536,14 @@ export default function ComponentRegisterAddEdit({
       return `${categoryPrefix}${nextNum.toString().padStart(2, '0')}`;
     }
     
-    const parentComp = components.find(c => c.id === selectedId);
+    // selectedId is now a componentCode (e.g., "27"), not a database ID
+    const parentComp = components.find(c => c.componentCode === selectedId);
     if (!parentComp) return "";
     
     const parentCode = parentComp.componentCode || "";
     
-    const children = components.filter(c => c.parentId === selectedId && c.vesselId === vesselId);
+    // parentId in database stores the componentCode of the parent
+    const children = components.filter(c => c.parentId === parentCode && c.vesselId === vesselId);
     
     if (children.length === 0) {
       return `${parentCode}.001`;
