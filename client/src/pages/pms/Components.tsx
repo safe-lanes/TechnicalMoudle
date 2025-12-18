@@ -2367,9 +2367,23 @@ const Components: React.FC = () => {
                 <ChevronRight className="h-4 w-4 text-gray-400" />
               )}
             </button>
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-gray-700 flex-1">
               {node.name.startsWith(node.code + " ") ? node.name : `${node.code} ${node.name}`}
             </span>
+            {!isChangeRequestMode && !isChangeMode && (
+              <button
+                className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingComponentId(node.id);
+                  setShowAddEditFullPage(true);
+                }}
+                title="Edit Component"
+                data-testid={`button-edit-tree-node-${node.id}`}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           {hasChildren && isExpanded && (
             <div>{renderComponentTree(node.children!, level + 1)}</div>
