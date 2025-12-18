@@ -2342,6 +2342,10 @@ const Components: React.FC = () => {
             style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
               setSelectedComponent(node);
+              // Toggle expand/collapse when clicking the row
+              if (hasChildren) {
+                toggleNode(node.id);
+              }
               // Automatically open CR form when in change request mode
               if (isChangeRequestMode) {
                 setIsComponentFormOpen(true);

@@ -1161,7 +1161,12 @@ const Spares: React.FC = () => {
               isSelected ? "bg-[#52baf3] text-white" : ""
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
-            onClick={() => selectComponent(node.id)}
+            onClick={() => {
+              selectComponent(node.id);
+              if (hasChildren) {
+                toggleNode(node.id);
+              }
+            }}
           >
             <button
               className="mr-2 flex-shrink-0"

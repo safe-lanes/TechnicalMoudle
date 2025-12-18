@@ -853,7 +853,12 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
               isSelected ? "bg-white/20" : ""
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
-            onClick={() => handleNodeSelect(node)}
+            onClick={() => {
+              handleNodeSelect(node);
+              if (hasChildren) {
+                toggleNode(node.id);
+              }
+            }}
           >
             <button
               className="mr-2 flex-shrink-0"

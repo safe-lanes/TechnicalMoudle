@@ -85,7 +85,12 @@ export function ComponentTreeSelector({
               isSelected ? "bg-blue-50" : ""
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
-            onClick={() => onSelect(node)}
+            onClick={() => {
+              onSelect(node);
+              if (hasChildren) {
+                toggleNode(node.id);
+              }
+            }}
           >
             <button
               className="mr-2 flex-shrink-0"
