@@ -13,6 +13,7 @@ import { getSFIName } from '../utils/sfiLookup';
 import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dateUtils';
 import { ObjectStorageService, ObjectNotFoundError } from '../objectStorage';
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from '../utils/workOrderNumbering';
+import { getSparesExcelColumns } from '../../shared/sparesTemplateFields';
 
 const router = Router();
 
@@ -624,37 +625,10 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   
   // =====================================================
   // SHEET 9: Vessel_Spare (27 columns - EXACT HEADERS per specification)
+  // Uses shared definition from sparesTemplateFields.ts to ensure consistency
   // =====================================================
   const vesselSpareSheet = workbook.addWorksheet('Vessel_Spare');
-  vesselSpareSheet.columns = [
-    { header: 'Part Code', key: 'partCode', width: 18 },
-    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },
-    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28 },
-    { header: 'Component Code', key: 'componentCode', width: 18 },
-    { header: 'Component Name', key: 'componentName', width: 28 },
-    { header: 'Part Name', key: 'partName', width: 32 },
-    { header: 'Part Number', key: 'partNumber', width: 18 },
-    { header: 'UOM', key: 'uom', width: 12 },
-    { header: 'Drawing Number', key: 'drawingNumber', width: 18 },
-    { header: 'Position Number', key: 'positionNumber', width: 16 },
-    { header: 'Note', key: 'note', width: 35 },
-    { header: 'Specification', key: 'specification', width: 35 },
-    { header: 'Maker', key: 'maker', width: 22 },
-    { header: 'Maker Code', key: 'makerCode', width: 15 },
-    { header: 'Manual Name', key: 'manualName', width: 20 },
-    { header: 'Page Number', key: 'pageNumber', width: 14 },
-    { header: 'Criticality', key: 'criticality', width: 14 },
-    { header: 'Total ROB', key: 'totalRob', width: 12 },
-    { header: 'Location A', key: 'locationA', width: 15 },
-    { header: 'Location A - ROB', key: 'locationARob', width: 16 },
-    { header: 'Location B', key: 'locationB', width: 15 },
-    { header: 'Location B - ROB', key: 'locationBRob', width: 16 },
-    { header: 'Minimum Stock', key: 'minimumStock', width: 14 },
-    { header: 'Is Active', key: 'isActive', width: 12 },
-    { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35 },
-    { header: 'Evidence Type', key: 'evidenceType', width: 16 },
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 }
-  ];
+  vesselSpareSheet.columns = getSparesExcelColumns();
   
   // Headers only - no sample data
   vesselSpareSheet.getRow(1).font = { bold: true };
@@ -1361,35 +1335,8 @@ async function generateSparesTemplate(vesselId: string): Promise<Buffer> {
   const sparesSheet = workbook.addWorksheet('Spares');
   
   // Add headers - 27 columns matching Vessel_Spare specification exactly
-  sparesSheet.columns = [
-    { header: 'Part Code', key: 'partCode', width: 18 },                          // A - Column 1
-    { header: 'Fleet Equipment Code', key: 'fleetEquipmentCode', width: 20 },     // B - Column 2
-    { header: 'Fleet Equipment Name', key: 'fleetEquipmentName', width: 28 },     // C - Column 3
-    { header: 'Component Code', key: 'componentCode', width: 18 },                // D - Column 4
-    { header: 'Component Name', key: 'componentName', width: 28 },                // E - Column 5
-    { header: 'Part Name', key: 'partName', width: 32 },                          // F - Column 6
-    { header: 'Part Number', key: 'partNumber', width: 18 },                      // G - Column 7
-    { header: 'UOM', key: 'uom', width: 12 },                                     // H - Column 8
-    { header: 'Drawing Number', key: 'drawingNumber', width: 18 },                // I - Column 9
-    { header: 'Position Number', key: 'positionNumber', width: 16 },              // J - Column 10
-    { header: 'Note', key: 'note', width: 35 },                                   // K - Column 11
-    { header: 'Specification', key: 'specification', width: 35 },                 // L - Column 12
-    { header: 'Maker', key: 'maker', width: 22 },                                 // M - Column 13
-    { header: 'Maker Code', key: 'makerCode', width: 15 },                        // N - Column 14
-    { header: 'Manual Name', key: 'manualName', width: 20 },                      // O - Column 15
-    { header: 'Page Number', key: 'pageNumber', width: 14 },                      // P - Column 16
-    { header: 'Criticality', key: 'criticality', width: 14 },                     // Q - Column 17
-    { header: 'Total ROB', key: 'totalRob', width: 12 },                          // R - Column 18
-    { header: 'Location A', key: 'locationA', width: 15 },                        // S - Column 19
-    { header: 'Location A - ROB', key: 'locationARob', width: 16 },               // T - Column 20
-    { header: 'Location B', key: 'locationB', width: 15 },                        // U - Column 21
-    { header: 'Location B - ROB', key: 'locationBRob', width: 16 },               // V - Column 22
-    { header: 'Minimum Stock', key: 'minimumStock', width: 14 },                  // W - Column 23
-    { header: 'Is Active', key: 'isActive', width: 12 },                          // X - Column 24
-    { header: 'IHM (Inventory of Hazardous Materials)', key: 'ihm', width: 35 },  // Y - Column 25
-    { header: 'Evidence Type', key: 'evidenceType', width: 16 },                  // Z - Column 26
-    { header: 'Vessel Code', key: 'vesselCode', width: 12 }                       // AA - Column 27
-  ];
+  // Uses shared definition from sparesTemplateFields.ts to ensure consistency
+  sparesSheet.columns = getSparesExcelColumns();
   
   // Style header row
   sparesSheet.getRow(1).font = { bold: true };
