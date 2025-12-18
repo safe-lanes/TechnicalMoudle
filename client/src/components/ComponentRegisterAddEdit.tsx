@@ -1220,61 +1220,63 @@ export default function ComponentRegisterAddEdit({
                 </div>
               </div>
 
-              {/* Section B: Running Hours & Condition Monitoring - Enhanced with Counter Type Logic */}
+              {/* Section B: Running Hours & Condition Monitoring - Teal Header with Editable Controls */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours & Condition Monitoring</h3>
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
+                  <table className="w-full text-sm">
+                    <thead className="bg-teal-500">
                       <tr>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Counter Type</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Source</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Running Hours</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Last Updated</th>
+                        <th className="text-left px-3 py-2 font-medium text-white">RH Counter Type</th>
+                        <th className="text-left px-3 py-2 font-medium text-white">RH Counter Source</th>
+                        <th className="text-left px-3 py-2 font-medium text-white">Running Hours</th>
+                        <th className="text-left px-3 py-2 font-medium text-white">Last Updated</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-t">
+                      <tr className="bg-white">
                         <td className="px-3 py-2">
-                          <span 
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              componentData.rhCounterType === 'MASTER' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : componentData.rhCounterType === 'INHERITED'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-gray-100 text-gray-600'
-                            }`}
-                            data-testid="badge-counter-type"
+                          <select
+                            value={componentData.rhCounterType}
+                            onChange={(e) => handleFieldChange('rhCounterType', e.target.value)}
+                            className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                            data-testid="select-rh-counter-type"
                           >
-                            {componentData.rhCounterType === 'MASTER' ? 'Master (RH Owner)' :
-                             componentData.rhCounterType === 'INHERITED' ? 'Inherited (Uses Master Counter)' :
-                             'Not RH Driven'}
-                          </span>
+                            <option value="NONE">None</option>
+                            <option value="MASTER">Master</option>
+                            <option value="INHERITED">Inherited</option>
+                          </select>
                         </td>
-                        <td className="px-3 py-2 text-gray-700" data-testid="text-counter-source">
-                          {componentData.rhCounterType === 'MASTER' ? 'Self' :
-                           componentData.rhCounterType === 'INHERITED' ? (componentData.rhCounterSource || 'Parent Component') :
-                           '—'}
+                        <td className="px-3 py-2">
+                          <Input
+                            value={componentData.rhCounterSource || '—'}
+                            readOnly
+                            className="h-8 text-sm bg-gray-50"
+                            data-testid="input-rh-counter-source"
+                          />
                         </td>
-                        <td className="px-3 py-2" data-testid="text-running-hours-value">
-                          <span className={componentData.rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>
-                            {componentData.runningHours || '—'}
-                          </span>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={componentData.runningHours}
+                            onChange={(e) => handleFieldChange('runningHours', e.target.value)}
+                            className="h-8 text-sm"
+                            placeholder=""
+                            data-testid="input-running-hours-b"
+                          />
                         </td>
-                        <td className="px-3 py-2" data-testid="text-last-updated">
-                          <span className={componentData.rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>
-                            {componentData.lastUpdated || '—'}
-                          </span>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="date"
+                            value={componentData.lastUpdated}
+                            onChange={(e) => handleFieldChange('lastUpdated', e.target.value)}
+                            className="h-8 text-sm"
+                            data-testid="input-last-updated"
+                          />
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                {componentData.rhCounterType === 'INHERITED' && (
-                  <p className="text-xs text-purple-600 mt-2 italic">
-                    Running hours inherited from master component. Value updates automatically.
-                  </p>
-                )}
               </div>
 
               <div>

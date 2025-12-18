@@ -84,6 +84,10 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     isActive: "Yes",
     vesselCode: "",
     isParent: "No",
+    // Section B: Running Hours & Condition Monitoring
+    rhCounterType: "NONE",
+    rhCounterSource: "",
+    lastUpdated: "",
   });
 
   // Show loading state while fetching data in edit mode
@@ -285,6 +289,10 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         isActive: toBoolString(existingComponent.isActive),
         vesselCode: existingComponent.vesselCode || vesselId || "",
         isParent: toBoolString(existingComponent.isParent),
+        // Section B: Running Hours & Condition Monitoring
+        rhCounterType: existingComponent.rhCounterType || "NONE",
+        rhCounterSource: existingComponent.rhCounterSource || "",
+        lastUpdated: existingComponent.lastUpdated || existingComponent.rhLastUpdated || "",
       });
       setIsDataLoaded(true);
     } else if (!isEditMode && parentComponent) {
@@ -778,73 +786,66 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                         </div>
                       )}
 
-                      {/* Section B: Running Hours & Condition Monitoring - Enhanced with Counter Type Logic */}
+                      {/* Section B: Running Hours & Condition Monitoring - Teal Header with Editable Controls */}
                       {section.id === "B" && (
                         <div className="space-y-4">
-                          {isEditMode && existingComponent ? (
-                            <>
-                              {/* Running Hours Table with 4 columns */}
-                              <div className="overflow-x-auto">
-                                <table className="w-full border-collapse" data-testid="table-running-hours">
-                                  <thead>
-                                    <tr className="bg-[#52BAF3] text-white">
-                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">RH Counter Type</th>
-                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">RH Counter Source</th>
-                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">Running Hours</th>
-                                      <th className="px-4 py-2 text-left text-xs font-semibold border border-gray-300">Last Updated</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr className="bg-white hover:bg-gray-50">
-                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-type">
-                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                          rhCounterType === 'MASTER' 
-                                            ? 'bg-blue-100 text-blue-800' 
-                                            : rhCounterType === 'INHERITED'
-                                            ? 'bg-purple-100 text-purple-800'
-                                            : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                          {getCounterTypeLabel(rhCounterType)}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-source">
-                                        {getCounterSourceValue()}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="text-running-hours">
-                                        {rhCounterType === 'MASTER' || rhCounterType === 'INHERITED' ? (
-                                          <span className={rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>{getRunningHoursValue()}</span>
-                                        ) : (
-                                          <span className="text-gray-400">{getRunningHoursValue()}</span>
-                                        )}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-last-updated">
-                                        {rhCounterType === 'MASTER' || rhCounterType === 'INHERITED' ? (
-                                          <span className={rhCounterType === 'INHERITED' ? 'text-purple-700' : 'text-gray-900'}>{getLastUpdatedValue()}</span>
-                                        ) : (
-                                          <span className="text-gray-400">{getLastUpdatedValue()}</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                              
-                              {/* Helper text for INHERITED type */}
-                              {rhCounterType === 'INHERITED' && (
-                                <p className="text-xs text-gray-500 italic">
-                                  Running hours are driven by the master counter.
-                                </p>
-                              )}
-                              
-                              <p className="text-xs text-gray-500 italic">
-                                Use the Running Hours module to update running hours for this component
-                              </p>
-                            </>
-                          ) : (
-                            <div className="text-sm text-gray-500">
-                              Running hours data will be available after component is created
-                            </div>
-                          )}
+                          {/* Running Hours Table with 4 columns - Editable Controls */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse" data-testid="table-running-hours">
+                              <thead>
+                                <tr className="bg-teal-500 text-white">
+                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Type</th>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Source</th>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Running Hours</th>
+                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Last Updated</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="bg-white">
+                                  <td className="px-4 py-3 border border-gray-200">
+                                    <select
+                                      value={componentData.rhCounterType || 'NONE'}
+                                      onChange={(e) => handleFieldChange('rhCounterType', e.target.value)}
+                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                                      data-testid="select-rh-counter-type"
+                                    >
+                                      <option value="NONE">None</option>
+                                      <option value="MASTER">Master</option>
+                                      <option value="INHERITED">Inherited</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-4 py-3 border border-gray-200">
+                                    <input
+                                      type="text"
+                                      value={componentData.rhCounterSource || '—'}
+                                      readOnly
+                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200 bg-gray-50"
+                                      data-testid="input-rh-counter-source"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 border border-gray-200">
+                                    <input
+                                      type="text"
+                                      value={componentData.runningHours || ''}
+                                      onChange={(e) => handleFieldChange('runningHours', e.target.value)}
+                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                                      placeholder=""
+                                      data-testid="input-running-hours-b"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 border border-gray-200">
+                                    <input
+                                      type="date"
+                                      value={componentData.lastUpdated || ''}
+                                      onChange={(e) => handleFieldChange('lastUpdated', e.target.value)}
+                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                                      data-testid="input-last-updated"
+                                    />
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )}
 

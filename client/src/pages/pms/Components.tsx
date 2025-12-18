@@ -701,108 +701,78 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   const { isChangeRequestMode } = useChangeRequest();
   const { isModifyMode } = useModifyMode();
   
-  // Fetch running hours audit data for the selected component
-  const { data: runningHoursAudit = [] } = useQuery<any[]>({
-    queryKey: ['/api/running-hours-audit', selectedComponent?.id],
+  // Fetch running hours data for the selected component
+  const { data: runningHoursData } = useQuery<any>({
+    queryKey: [`/api/running-hours/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
   // Get the latest running hours update
-  const latestUpdate = runningHoursAudit.length > 0 ? runningHoursAudit[0] : null;
+  const latestUpdate = Array.isArray(runningHoursData) && runningHoursData.length > 0 
+    ? runningHoursData[0] 
+    : (runningHoursData && typeof runningHoursData === 'object' ? runningHoursData : null);
   
-  // State for running hours data - initialized from selectedComponent
   // Components show their OWN RH value (maintained independently)
-  // Delta propagation from parent happens via Running Hours module, not UI display
   const getDisplayRH = (comp: any) => {
-    return comp?.currentCumulativeRH || "0.00";
+    return comp?.currentCumulativeRH || comp?.runningHours || "0";
   };
   
-  const [runningHoursData, setRunningHoursData] = useState({
-    currentHours: getDisplayRH(selectedComponent),
-    updatedDate: selectedComponent?.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
-  });
+  // Get RH counter type display
+  const getRHCounterType = (comp: any) => {
+    return comp?.rhCounterType || 'NONE';
+  };
   
-  // Update data when selectedComponent changes
-  React.useEffect(() => {
-    if (selectedComponent) {
-      setRunningHoursData({
-        currentHours: getDisplayRH(selectedComponent),
-        updatedDate: selectedComponent.lastUpdated || latestUpdate?.dateUpdatedLocal || "-"
-      });
-    }
-  }, [selectedComponent, latestUpdate]);
+  // Get RH counter source
+  const getRHCounterSource = (comp: any) => {
+    const type = getRHCounterType(comp);
+    if (type === 'MASTER') return 'Self';
+    if (type === 'INHERITED') return comp?.rhCounterSource || 'Parent Component';
+    return '—';
+  };
   
-  const [originalData] = useState(runningHoursData);
-  
-  const handleFieldChange = (field: string, value: any) => {
-    setRunningHoursData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  // Get last updated date
+  const getLastUpdated = (comp: any) => {
+    return comp?.lastUpdated || latestUpdate?.dateUpdatedLocal || latestUpdate?.updatedAt || '—';
   };
   
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view running hours</div>;
   };
   
+  const rhCounterType = getRHCounterType(selectedComponent);
+  
   return (
-    <div className="space-y-6">
-      {/* Running Hours */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <label className="text-sm font-medium text-gray-700">Running Hours:</label>
-          <Edit2 className="h-4 w-4 text-gray-500" />
-        </div>
-        <div className="flex gap-12 pl-2">
-          <div>
-            <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Current</label>
-            {isModifyMode ? (
-              <ModifyFieldWrapper
-                originalValue={originalData.currentHours}
-                currentValue={runningHoursData.currentHours}
-                fieldName="currentHours"
-                isModifyMode={isModifyMode}
-                onFieldChange={(field, value) => handleFieldChange('currentHours', value)}
-              >
-                <input
-                  type="text"
-                  value={runningHoursData.currentHours}
-                  onChange={(e) => handleFieldChange('currentHours', e.target.value)}
-                  className="text-sm w-full px-2 py-1 border rounded"
-                  data-testid="input-current-hours"
-                />
-              </ModifyFieldWrapper>
-            ) : (
-              <div className="text-sm font-semibold text-gray-900" data-testid="text-current-hours">
-                {runningHoursData.currentHours}
-              </div>
-            )}
-          </div>
-          <div>
-            <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Updated</label>
-            {isModifyMode ? (
-              <ModifyFieldWrapper
-                originalValue={originalData.updatedDate}
-                currentValue={runningHoursData.updatedDate}
-                fieldName="updatedDate"
-                isModifyMode={isModifyMode}
-                onFieldChange={(field, value) => handleFieldChange('updatedDate', value)}
-              >
-                <input
-                  type="text"
-                  value={runningHoursData.updatedDate}
-                  onChange={(e) => handleFieldChange('updatedDate', e.target.value)}
-                  className="text-sm w-full px-2 py-1 border rounded"
-                  data-testid="input-updated-date"
-                />
-              </ModifyFieldWrapper>
-            ) : (
-              <div className="text-sm font-semibold text-gray-900" data-testid="text-updated-date">
-                {runningHoursData.updatedDate}
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Running Hours Table with Teal Header */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse" data-testid="table-running-hours">
+          <thead>
+            <tr className="bg-teal-500 text-white">
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Type</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Source</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Running Hours</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="bg-white">
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-type">
+                {rhCounterType === 'MASTER' ? 'Master' :
+                 rhCounterType === 'INHERITED' ? 'Inherited' :
+                 'Not RH Driven'}
+              </td>
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-source">
+                {getRHCounterSource(selectedComponent)}
+              </td>
+              <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="text-running-hours">
+                {getDisplayRH(selectedComponent)}
+              </td>
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-last-updated">
+                {getLastUpdated(selectedComponent)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
