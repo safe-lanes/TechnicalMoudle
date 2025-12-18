@@ -271,7 +271,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         parentComponent: existingComponent.parentId || "",
         componentCode: existingComponent.componentCode || "",
         componentName: existingComponent.name || "",
-        componentCategory: existingComponent.componentCategory || getComponentCategory(existingComponent.id),
+        componentCategory: existingComponent.componentCategory || getComponentCategory(existingComponent.componentCode || existingComponent.id),
         maker: existingComponent.maker || "",
         makerCode: existingComponent.makerCode || "",
         model: existingComponent.model || "",
@@ -300,7 +300,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       setComponentData(prev => ({
         ...prev,
         parentComponent: parentComponent.code,
-        componentCategory: getComponentCategory(parentComponent.id),
+        componentCategory: getComponentCategory(parentComponent.code),
         vesselCode: vesselId || "",
       }));
       setIsDataLoaded(true);

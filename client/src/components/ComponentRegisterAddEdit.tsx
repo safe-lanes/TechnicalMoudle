@@ -58,11 +58,11 @@ export default function ComponentRegisterAddEdit({
     // Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code
     fleetEquipmentCode: "",
     fleetEquipmentName: "",
-    parentComponent: parentComponent?.id || "",
+    parentComponent: parentComponent?.code || "",
     componentCode: "",
     // Row 2: Component Name, Component Category, Maker, Maker Code
     componentName: "",
-    eqptSystemCategory: "",
+    eqptSystemCategory: parentComponent?.code ? getComponentCategory(parentComponent.code) : "",
     maker: "",
     makerCode: "",
     // Row 3: Model, Model Code, Serial No, Drawing No
