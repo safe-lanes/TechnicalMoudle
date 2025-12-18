@@ -100,9 +100,10 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
   });
 
   // Fetch related data for sections B-H (only in edit mode)
+  // Filter jobs by vesselId at the database level
   const { data: allJobs = [], isLoading: isLoadingJobs } = useQuery<any[]>({
-    queryKey: ['/api/jobs'],
-    enabled: isEditMode,
+    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    enabled: isEditMode && !!vesselId,
   });
 
   const { data: maintenanceHistory = [], isLoading: isLoadingHistory } = useQuery<any[]>({

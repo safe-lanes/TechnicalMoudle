@@ -127,9 +127,10 @@ export default function ComponentRegisterAddEdit({
     enabled: isEditMode && !!componentId,
   });
 
+  // Filter jobs by vesselId at the database level
   const { data: allJobs = [] } = useQuery<any[]>({
-    queryKey: ['/api/jobs'],
-    enabled: isEditMode,
+    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    enabled: isEditMode && !!vesselId,
   });
 
   const { data: allSpares = [] } = useQuery<any[]>({

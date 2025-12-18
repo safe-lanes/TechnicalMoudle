@@ -5,6 +5,7 @@ import { ArrowLeft, Search, Wrench, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useVessel } from "@/contexts/VesselContext";
 
 interface Job {
   id: string;
@@ -23,12 +24,15 @@ interface Job {
 
 const JobsSelector: React.FC = () => {
   const [, setLocation] = useLocation();
+  const { vesselId } = useVessel();
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  // Filter jobs by vesselId at the database level
   const { data: jobs = [], isLoading } = useQuery<Job[]>({
-    queryKey: ['/api/jobs'],
+    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    enabled: !!vesselId,
   });
 
   const filteredJobs = jobs.filter(job => {

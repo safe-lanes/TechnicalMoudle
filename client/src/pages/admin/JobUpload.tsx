@@ -34,8 +34,10 @@ interface JobUploadProps {
 
 export default function JobUpload({ vesselId }: JobUploadProps) {
   const handleRefreshData = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/jobs', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+    // Invalidate all jobs queries (matching any vesselId parameter)
+    queryClient.invalidateQueries({ predicate: (query) => 
+      typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/jobs')
+    });
   };
 
   return (

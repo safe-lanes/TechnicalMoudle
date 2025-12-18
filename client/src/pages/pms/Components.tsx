@@ -806,7 +806,10 @@ const JobRow: React.FC<{
         description: `Work order ${data.workOrderNo} has been created successfully.`
       });
       queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      // Invalidate all jobs queries (matching any vesselId parameter)
+      queryClient.invalidateQueries({ predicate: (query) => 
+        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/jobs')
+      });
       setShowReasonDialog(false);
     },
     onError: (error: any) => {
@@ -910,14 +913,18 @@ const JobRow: React.FC<{
 const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string }> = ({ componentCode, componentName }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { vesselId } = useVessel();
   
+  // Fetch jobs filtered by vesselId at the database level
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/jobs'],
+    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    enabled: !!vesselId,
   });
   
-  // Get all components to find children
+  // Get all components to find children (also filtered by vessel)
   const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: ['/api/components'],
+    queryKey: [`/api/components?vesselId=${vesselId}`],
+    enabled: !!vesselId,
   });
   
   // Find all child component codes recursively
