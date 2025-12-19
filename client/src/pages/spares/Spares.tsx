@@ -450,9 +450,12 @@ const Spares: React.FC = () => {
   const filteredSpares = useMemo(() => {
     let filtered = sparesData;
 
-    // Filter by selected component
+    // Filter by selected component - use componentCode since tree uses component codes as node IDs
     if (selectedComponentId) {
-      filtered = filtered.filter(spare => spare.componentId === selectedComponentId);
+      filtered = filtered.filter(spare => {
+        const spareCode = spare.componentCode || spare.componentId;
+        return spareCode === selectedComponentId || spareCode?.startsWith(selectedComponentId + '.');
+      });
     }
 
     // Filter by search term

@@ -842,9 +842,11 @@ const Spares: React.FC = () => {
 
   // Helper function to check if a component matches selection (including children)
   const isComponentMatch = (spare: Spare, selectedId: string): boolean => {
-    if (spare.componentId === selectedId) return true;
-    // Check if spare's componentId starts with selected (hierarchical match)
-    return spare.componentId.startsWith(selectedId + '.');
+    // Use componentCode for matching since tree node IDs are component codes, not database IDs
+    const spareCode = spare.componentCode || spare.componentId;
+    if (spareCode === selectedId) return true;
+    // Check if spare's componentCode starts with selected (hierarchical match)
+    return spareCode.startsWith(selectedId + '.');
   };
 
   // Filter spares based on all criteria
