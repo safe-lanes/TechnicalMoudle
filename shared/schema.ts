@@ -129,54 +129,54 @@ export type RunningHourParent = Component & {
 };
 
 // Components Table (for storing current cumulative RH)
+// Column order matches UI form field order (Section A: Component Information)
 export const components = pgTable("components", {
   id: text("id").primaryKey(),
-  name: text("name"), // Nullable - only required when dataScope='vessel'
-  componentCode: text("component_code"),
-  parentId: text("parent_id"),
-  category: text("category"), // Nullable - only required when dataScope='vessel'
-  currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
-  lastUpdated: text("last_updated"),
-  vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
-  vesselCode: text("vessel_code"), // Vessel identification code
-  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel' - discriminator for fleet vs vessel data
-  // Fleet Equipment fields (from Fleet_Component Sheet)
+  // === UI Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code ===
   fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment (XXX.XXX.XX format)
   fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet
-  parentFleetEquipmentCode: text("parent_fleet_equipment_code"), // For fleet hierarchy
-  // Maker and Model fields
+  parentId: text("parent_id"),
+  componentCode: text("component_code"),
+  // === UI Row 2: Component Name, Component Category, Maker, Maker Code ===
+  name: text("name"), // Nullable - only required when dataScope='vessel'
+  componentCategory: text("component_category"),
   maker: text("maker"), // Manufacturer name from manual
   makerCode: text("maker_code"), // Unique code for maker
+  // === UI Row 3: Model, Model Code, Serial No, Drawing No ===
   model: text("model"), // Equipment model from manual
-  modelNumber: text("model_number"), // Model number (stored separately from model)
   modelCode: text("model_code"), // Combination of Maker Code + Model
-  // Component specific fields
   serialNo: text("serial_no"), // Serial number from manual
   drawingNo: text("drawing_no"), // Drawing/diagram number
-  // Department and categorization
+  // === UI Row 4: Location, Critical, Condition Based, Installation Date ===
+  location: text("location"),
+  critical: boolean("critical").default(false), // Critical equipment (Yes/No)
+  conditionBased: boolean("condition_based").default(false), // Condition Based maintenance (Yes/No)
+  installationDate: text("installation_date"), // DD-MM-YYYY format
+  // === UI Row 5: Commissioned Date, Rating, Equipment/System Department ===
+  commissionedDate: text("commissioned_date"), // DD-MM-YYYY format
+  rating: text("rating"), // Capacity or rating from manual
+  eqptSystemDept: text("eqpt_system_dept"), // Equipment/System Department
+  // === UI Row 6: IS Active, Vessel Code, IS Parent ===
+  isActive: boolean("is_active").default(true), // IS Active (Yes/No)
+  vesselCode: text("vessel_code"), // Vessel identification code
+  isParent: boolean("is_parent").default(false), // IS Parent (Yes/No) - indicates if component has children
+  // === UI Row 7: Notes ===
+  notes: text("notes"), // Specifications or additional information
+  // === Non-UI Fields (Internal/System Fields) ===
+  vesselId: text("vessel_id"), // Nullable - only required when dataScope='vessel'
+  dataScope: text("data_scope").notNull().default("vessel"), // 'fleet' | 'vessel' - discriminator for fleet vs vessel data
+  parentFleetEquipmentCode: text("parent_fleet_equipment_code"), // For fleet hierarchy
+  modelNumber: text("model_number"), // Model number (stored separately from model)
   department: text("department"),
   deptCategory: text("dept_category"),
-  componentCategory: text("component_category"),
-  location: text("location"),
-  eqptSystemDept: text("eqpt_system_dept"), // Equipment/System Department
-  // Dates
-  commissionedDate: text("commissioned_date"), // DD-MM-YYYY format
-  installationDate: text("installation_date"), // DD-MM-YYYY format
-  // Status and classification
-  critical: boolean("critical").default(false), // Critical equipment (Yes/No)
+  category: text("category"), // Nullable - only required when dataScope='vessel'
   classItem: boolean("class_item").default(false),
-  conditionBased: boolean("condition_based").default(false), // Condition Based maintenance (Yes/No)
-  isActive: boolean("is_active").default(true), // IS Active (Yes/No)
-  isParent: boolean("is_parent").default(false), // IS Parent (Yes/No) - indicates if component has children
-  // Technical specifications
-  rating: text("rating"), // Capacity or rating from manual
   noOfUnits: text("no_of_units"),
   parentComponent: text("parent_component"),
   dimensionsSize: text("dimensions_size"),
-  notes: text("notes"), // Specifications or additional information
-  // Running Hours (already has currentCumulativeRH)
   runningHours: decimal("running_hours", { precision: 10, scale: 2 }), // For storing template running hours value
-  // Fleet-specific fields (when dataScope='fleet')
+  currentCumulativeRH: decimal("current_cumulative_rh", { precision: 10, scale: 2 }).notNull().default("0"),
+  lastUpdated: text("last_updated"),
   applicableVesselIds: text("applicable_vessel_ids").array(), // Array of vessel codes that can use this fleet equipment
   scopeNotes: text("scope_notes"), // Notes about scope applicability
   createdAt: timestamp("created_at").notNull().defaultNow(),
