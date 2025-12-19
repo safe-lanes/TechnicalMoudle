@@ -4311,6 +4311,10 @@ async function createComponentFromRow(row: any, vesselId?: string) {
   const isParentValue = row['IS Parent'] ?? row['IS Parent Yes/No'];
   const isParent = isParentValue === true || isParentValue === 'Yes';
   
+  // Support Class Item field
+  const classItemValue = row['Class Item'];
+  const isClassItem = classItemValue === true || classItemValue === 'Yes';
+  
   const componentData = {
     componentCode: componentCode,
     name: row['Component Name'] || '',
@@ -4343,7 +4347,7 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     // Status and classification - Support both template format and legacy format
     critical: isCritical,
     criticality: isCritical ? 'Yes' : 'No',
-    classItem: false, // Not in template, defaulting to false
+    classItem: isClassItem,
     conditionBased: isConditionBased,
     isActive: row['IS Active'] !== false && row['IS Active'] !== 'No', // Default to true
     isParent: isParent,
@@ -4430,6 +4434,11 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   const isParentValue = row['IS Parent'] ?? row['IS Parent Yes/No'];
   if (isParentValue !== undefined) {
     updateData.isParent = isParentValue === true || isParentValue === 'Yes';
+  }
+  // Support Class Item field
+  const classItemValue = row['Class Item'];
+  if (classItemValue !== undefined) {
+    updateData.classItem = classItemValue === true || classItemValue === 'Yes';
   }
   // Technical specifications
   if (row['Rating']) updateData.rating = row['Rating'];

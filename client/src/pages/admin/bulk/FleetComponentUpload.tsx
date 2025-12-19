@@ -28,6 +28,7 @@ const FIELD_MAPPINGS = [
   { field: "IS Active", required: false, description: "Yes/No - defaults to Yes" },
   { field: "Vessel Code", required: true, description: "Vessel identifier (e.g., V001)" },
   { field: "IS Parent", required: false, description: "Yes/No - is parent component" },
+  { field: "Class Item", required: false, description: "Yes/No - is class item" },
 ];
 
 export default function FleetComponentUpload() {

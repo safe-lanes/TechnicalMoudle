@@ -85,6 +85,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
     isActive: "Yes",
     vesselCode: "",
     isParent: "No",
+    classItem: "No",
     // Section B: Running Hours & Condition Monitoring
     rhCounterType: "NONE",
     rhCounterSource: "",
@@ -291,6 +292,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         isActive: toBoolString(existingComponent.isActive),
         vesselCode: existingComponent.vesselCode || vesselId || "",
         isParent: toBoolString(existingComponent.isParent),
+        classItem: toBoolString(existingComponent.classItem),
         // Section B: Running Hours & Condition Monitoring
         rhCounterType: existingComponent.rhCounterType || "NONE",
         rhCounterSource: existingComponent.rhCounterSource || "",
@@ -356,6 +358,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
         isActive: toBool(componentData.isActive),
         vesselCode: componentData.vesselCode || vesselId || null,
         isParent: toBool(componentData.isParent),
+        classItem: toBool(componentData.classItem),
         vesselId: vesselId || "V001",
       };
 
@@ -722,10 +725,20 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             </div>
                           </div>
 
-                          {/* Row 6: IS Active, Vessel Code, IS Parent */}
+                          {/* Row 6: Class Item, IS Active, Vessel Code, IS Parent */}
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              {/* Empty spacer field */}
+                              <label className="text-xs font-medium text-gray-600 block mb-1">Class Item</label>
+                              <select
+                                value={componentData.classItem}
+                                onChange={(e) => handleFieldChange('classItem', e.target.value)}
+                                className="text-sm w-full px-2 py-1 border rounded text-[#52BAF3] border-[#52BAF3]"
+                                data-testid="select-class-item"
+                              >
+                                <option value="">Select</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                              </select>
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-600 block mb-1">IS Active</label>
