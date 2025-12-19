@@ -3624,7 +3624,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Components routes...
   app.post("/api/components", async (req, res) => {
     try {
-      const component = await storage.createComponent(req.body);
+      const data = req.body;
+      
+      // RH field validation (B7.B rules)
+      // Validate when rhCounterType OR rhMasterComponentId is provided
+      const effectiveRhType = data.rhCounterType || 'NOT_RH_DRIVEN';
+      
+      if (data.rhCounterType || data.rhMasterComponentId) {
+        if (effectiveRhType === 'MASTER') {
+          // MASTER: rh_inherit_from must be NULL
+          if (data.rhMasterComponentId) {
+            return res.status(400).json({ 
+              error: "MASTER counter type cannot have a master component reference" 
+            });
+          }
+        } else if (effectiveRhType === 'INHERITED') {
+          // INHERITED: rh_inherit_from must be set
+          if (!data.rhMasterComponentId) {
+            return res.status(400).json({ 
+              error: "INHERITED counter type requires rhMasterComponentId" 
+            });
+          }
+          // Validate master exists, same vessel, and is MASTER type
+          const masterComponent = await storage.getComponent(data.rhMasterComponentId);
+          if (!masterComponent) {
+            return res.status(400).json({ error: "Master component not found" });
+          }
+          if (masterComponent.vesselId !== data.vesselId) {
+            return res.status(400).json({ 
+              error: "Master component must be from the same vessel" 
+            });
+          }
+          if (masterComponent.rhCounterType !== 'MASTER') {
+            return res.status(400).json({ 
+              error: "Referenced component is not a MASTER counter type" 
+            });
+          }
+        } else if (effectiveRhType === 'NOT_RH_DRIVEN') {
+          // NOT_RH_DRIVEN: rh_inherit_from must be NULL
+          if (data.rhMasterComponentId) {
+            return res.status(400).json({ 
+              error: "NOT_RH_DRIVEN counter type cannot have a master component reference" 
+            });
+          }
+        }
+      }
+      
+      const component = await storage.createComponent(data);
       console.log('[API_CREATE] New component:', { 
         id: component.id, 
         code: component.componentCode, 
@@ -3663,7 +3709,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/components/:id", async (req, res) => {
     try {
       console.log(`🔧 PATCH /api/components/${req.params.id} with:`, JSON.stringify(req.body, null, 2).substring(0, 500));
-      const component = await storage.updateComponent(req.params.id, req.body);
+      const data = req.body;
+      
+      // Get existing component for validation
+      const existingComponent = await storage.getComponent(req.params.id);
+      if (!existingComponent) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // RH field validation (B7.B rules)
+      // Use effective counter type from request or existing component
+      const effectiveRhType = data.rhCounterType || existingComponent.rhCounterType || 'NOT_RH_DRIVEN';
+      // Use effective master ID from request or existing component
+      const effectiveMasterId = data.rhMasterComponentId !== undefined 
+        ? data.rhMasterComponentId 
+        : existingComponent.rhMasterComponentId;
+      
+      if (data.rhCounterType || data.rhMasterComponentId !== undefined) {
+        if (effectiveRhType === 'MASTER') {
+          // MASTER: rh_inherit_from must be NULL
+          if (effectiveMasterId) {
+            return res.status(400).json({ 
+              error: "MASTER counter type cannot have a master component reference" 
+            });
+          }
+        } else if (effectiveRhType === 'INHERITED') {
+          // INHERITED: rh_inherit_from must be set
+          if (!effectiveMasterId) {
+            return res.status(400).json({ 
+              error: "INHERITED counter type requires rhMasterComponentId" 
+            });
+          }
+          // Prevent self-reference
+          if (effectiveMasterId === req.params.id) {
+            return res.status(400).json({ 
+              error: "A component cannot inherit running hours from itself" 
+            });
+          }
+          // Validate master exists, same vessel, and is MASTER type
+          const masterComponent = await storage.getComponent(effectiveMasterId);
+          if (!masterComponent) {
+            return res.status(400).json({ error: "Master component not found" });
+          }
+          if (masterComponent.vesselId !== existingComponent.vesselId) {
+            return res.status(400).json({ 
+              error: "Master component must be from the same vessel" 
+            });
+          }
+          if (masterComponent.rhCounterType !== 'MASTER') {
+            return res.status(400).json({ 
+              error: "Referenced component is not a MASTER counter type" 
+            });
+          }
+        } else if (effectiveRhType === 'NOT_RH_DRIVEN') {
+          // NOT_RH_DRIVEN: rh_inherit_from must be NULL
+          if (effectiveMasterId) {
+            return res.status(400).json({ 
+              error: "NOT_RH_DRIVEN counter type cannot have a master component reference" 
+            });
+          }
+        }
+        
+        // Downgrade protection: Prevent MASTER → NONE/INHERITED if component has dependents
+        if (existingComponent.rhCounterType === 'MASTER' && effectiveRhType !== 'MASTER') {
+          const dependents = await storage.getInheritedComponents(req.params.id);
+          if (dependents.length > 0) {
+            const dependentNames = dependents.slice(0, 3).map((d: any) => d.name).join(', ');
+            const moreCount = dependents.length > 3 ? ` and ${dependents.length - 3} more` : '';
+            return res.status(400).json({ 
+              error: `Cannot change from MASTER: ${dependents.length} component(s) inherit from this counter (${dependentNames}${moreCount}). Reassign them first.`
+            });
+          }
+        }
+      }
+      
+      const component = await storage.updateComponent(req.params.id, data);
       console.log(`✅ Updated component:`, component.componentCode, '| vesselId:', component.vesselId, '| parentId:', component.parentId);
       res.json(component);
     } catch (error: any) {

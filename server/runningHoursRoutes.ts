@@ -302,6 +302,18 @@ export function registerRunningHoursRoutes(app: Express) {
         }
       }
 
+      // Downgrade protection: Prevent MASTER → NONE/INHERITED if component has dependents
+      if (component.rhCounterType === 'MASTER' && rhCounterType !== 'MASTER') {
+        const dependents = await storage.getInheritedComponents(componentId);
+        if (dependents.length > 0) {
+          const dependentNames = dependents.slice(0, 3).map(d => d.name).join(', ');
+          const moreCount = dependents.length > 3 ? ` and ${dependents.length - 3} more` : '';
+          return res.status(400).json({ 
+            error: `Cannot change from MASTER: ${dependents.length} component(s) inherit from this counter (${dependentNames}${moreCount}). Reassign them first.`
+          });
+        }
+      }
+
       const updatedComponent = await storage.updateRHConfig({
         componentId,
         rhCounterType,
