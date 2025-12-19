@@ -91,6 +91,8 @@ export default function ComponentRegisterAddEdit({
     isActive: "Yes",
     vesselCode: "",
     isParent: "No",
+    // Row 7: Class Item
+    classItem: "No",
     // Row 7: Notes (full width)
     notes: "",
     // Section B: Running Hours & Condition Monitoring
@@ -401,6 +403,7 @@ export default function ComponentRegisterAddEdit({
         isActive: comp.isActive === false ? "No" : "Yes",
         vesselCode: comp.vesselCode || "",
         isParent: comp.isParent ? "Yes" : "No",
+        classItem: comp.classItem ? "Yes" : "No",
         // Row 7
         notes: comp.notes || "",
         // Section B: Running Hours & Condition Monitoring
@@ -678,6 +681,7 @@ export default function ComponentRegisterAddEdit({
         isActive: componentData.isActive === "Yes",
         vesselCode: componentData.vesselCode || null,
         isParent: componentData.isParent === "Yes",
+        classItem: componentData.classItem === "Yes",
       };
 
       if (isEditMode && componentId) {
@@ -763,6 +767,7 @@ export default function ComponentRegisterAddEdit({
       isActive: comp.isActive === false ? "No" : "Yes",
       vesselCode: comp.vesselCode || "",
       isParent: comp.isParent ? "Yes" : "No",
+      classItem: comp.classItem ? "Yes" : "No",
       // Row 7
       notes: comp.notes || "",
       // Section B: Running Hours & Condition Monitoring
@@ -910,6 +915,7 @@ export default function ComponentRegisterAddEdit({
                 isActive: "Yes",
                 vesselCode: "",
                 isParent: "No",
+                classItem: "No",
                 // Row 7
                 notes: "",
                 // Section B: Running Hours & Condition Monitoring
@@ -1234,7 +1240,18 @@ export default function ComponentRegisterAddEdit({
                       <option value="Hotel">Hotel</option>
                     </select>
                   </div>
-                  <div></div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Class Item</label>
+                    <select
+                      value={componentData.classItem}
+                      onChange={(e) => handleFieldChange('classItem', e.target.value)}
+                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
+                      data-testid="select-class-item"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Row 6: Running Hours, Is Active, Vessel Code, Is Parent */}

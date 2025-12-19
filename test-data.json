@@ -6013,10 +6013,10 @@
       "runningHours": 0
     },
     "undefined": {
-      "name": "Hydr. oil pumps",
-      "componentCode": "403.006",
-      "parentId": "403",
-      "componentCategory": "Ship General",
+      "name": "Test Class Item Component",
+      "componentCode": "TC-5_1zVM",
+      "parentId": null,
+      "componentCategory": null,
       "maker": null,
       "model": null,
       "serialNo": null,
@@ -6029,11 +6029,12 @@
       "rating": null,
       "eqptSystemDept": null,
       "notes": null,
-      "runningHours": 1000,
+      "runningHours": null,
       "vesselId": "V001",
       "isActive": true,
-      "vesselCode": "V001",
-      "isParent": false
+      "vesselCode": null,
+      "isParent": false,
+      "classItem": true
     }
   },
   "runningHoursAudits": [
