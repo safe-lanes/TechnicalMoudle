@@ -1,5 +1,20 @@
 import type { Express } from "express";
 import { storage } from "./storage";
+import { z } from "zod";
+
+// Zod schemas for RH configuration API validation
+const updateRHConfigSchema = z.object({
+  rhCounterType: z.enum(['MASTER', 'INHERITED', 'NOT_RH_DRIVEN']),
+  rhMasterComponentId: z.string().nullable().optional(),
+  userId: z.string().optional()
+});
+
+const updateMasterRHSchema = z.object({
+  newRHValue: z.number().nonnegative("Running hours must be non-negative"),
+  updateSource: z.enum(['MANUAL', 'IMPORT', 'AUTOMATION']).optional().default('MANUAL'),
+  userId: z.string().optional().default('system'),
+  comments: z.string().optional()
+});
 
 export function registerRunningHoursRoutes(app: Express) {
   // Get parent components whose children have running-hour based jobs
@@ -160,6 +175,215 @@ export function registerRunningHoursRoutes(app: Express) {
     } catch (error: any) {
       console.error("Error resetting child RH:", error);
       res.status(500).json({ error: "Failed to reset child running hours" });
+    }
+  });
+
+  // ============= B7.B RH COUNTER TYPE CONFIGURATION ROUTES =============
+
+  // Get all MASTER components for a vessel (for RH source selection dropdown)
+  app.get("/api/rh-config/master-components/:vesselId", async (req, res) => {
+    try {
+      const { vesselId } = req.params;
+      const masterComponents = await storage.getMasterComponents(vesselId);
+      
+      res.json(masterComponents.map(c => ({
+        id: c.id,
+        componentCode: c.componentCode,
+        name: c.name,
+        rhCurrentMaster: c.rhCurrentMaster || '0',
+        rhMasterUpdatedAt: c.rhMasterUpdatedAt
+      })));
+    } catch (error: any) {
+      console.error("Error fetching master components:", error);
+      res.status(500).json({ error: "Failed to fetch master components" });
+    }
+  });
+
+  // Get RH configuration for a specific component
+  app.get("/api/rh-config/:componentId", async (req, res) => {
+    try {
+      const { componentId } = req.params;
+      const component = await storage.getComponent(componentId);
+      
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+
+      // Get master component name if INHERITED
+      let rhMasterComponentName: string | null = null;
+      if (component.rhCounterType === 'INHERITED' && component.rhMasterComponentId) {
+        const masterComponent = await storage.getComponent(component.rhMasterComponentId);
+        rhMasterComponentName = masterComponent?.name || null;
+      }
+
+      // Determine current RH value based on counter type
+      let rhCurrentValue: string | null = null;
+      let rhLastUpdated: Date | null = null;
+      
+      if (component.rhCounterType === 'MASTER') {
+        rhCurrentValue = component.rhCurrentMaster;
+        rhLastUpdated = component.rhMasterUpdatedAt;
+      } else if (component.rhCounterType === 'INHERITED') {
+        rhCurrentValue = component.rhCurrentInheritedCached;
+        rhLastUpdated = component.rhInheritedUpdatedAt;
+      }
+
+      res.json({
+        componentId: component.id,
+        componentName: component.name,
+        rhCounterType: component.rhCounterType,
+        rhMasterComponentId: component.rhMasterComponentId,
+        rhMasterComponentName,
+        rhCurrentValue,
+        rhLastUpdated,
+        rhUpdateSource: component.rhMasterUpdateSource
+      });
+    } catch (error: any) {
+      console.error("Error fetching RH config:", error);
+      res.status(500).json({ error: "Failed to fetch RH configuration" });
+    }
+  });
+
+  // Update RH counter type configuration for a component
+  app.put("/api/rh-config/:componentId", async (req, res) => {
+    try {
+      const { componentId } = req.params;
+      
+      // Validate request body with Zod
+      const parseResult = updateRHConfigSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body",
+          details: parseResult.error.format()
+        });
+      }
+      
+      const { rhCounterType, rhMasterComponentId, userId } = parseResult.data;
+
+      // Get the current component to validate
+      const component = await storage.getComponent(componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+
+      // Safety check: Prevent self-referential master link
+      if (rhCounterType === 'INHERITED' && rhMasterComponentId === componentId) {
+        return res.status(400).json({ 
+          error: "A component cannot inherit running hours from itself" 
+        });
+      }
+
+      // Validate rhMasterComponentId for INHERITED type
+      if (rhCounterType === 'INHERITED') {
+        if (!rhMasterComponentId) {
+          return res.status(400).json({ 
+            error: "rhMasterComponentId is required for INHERITED counter type" 
+          });
+        }
+        
+        // Safety check: Verify master component exists and is in same vessel
+        const masterComponent = await storage.getComponent(rhMasterComponentId);
+        if (!masterComponent) {
+          return res.status(400).json({ 
+            error: "Master component not found" 
+          });
+        }
+        
+        if (masterComponent.vesselId !== component.vesselId) {
+          return res.status(400).json({ 
+            error: "Master component must be from the same vessel" 
+          });
+        }
+        
+        if (masterComponent.rhCounterType !== 'MASTER') {
+          return res.status(400).json({ 
+            error: "Selected component is not configured as a MASTER counter type" 
+          });
+        }
+      }
+
+      const updatedComponent = await storage.updateRHConfig({
+        componentId,
+        rhCounterType,
+        rhMasterComponentId: rhCounterType === 'INHERITED' ? rhMasterComponentId : null,
+        userId
+      });
+
+      res.json({
+        success: true,
+        message: `RH counter type updated to ${rhCounterType}`,
+        component: updatedComponent
+      });
+    } catch (error: any) {
+      console.error("Error updating RH config:", error);
+      res.status(500).json({ error: error.message || "Failed to update RH configuration" });
+    }
+  });
+
+  // Update MASTER running hours with cascade to INHERITED components
+  app.put("/api/rh-config/master/:componentId", async (req, res) => {
+    try {
+      const { componentId } = req.params;
+      
+      // Validate request body with Zod
+      const parseResult = updateMasterRHSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body",
+          details: parseResult.error.format()
+        });
+      }
+      
+      const { newRHValue, updateSource, userId, comments } = parseResult.data;
+
+      // Verify component exists and is a MASTER type
+      const component = await storage.getComponent(componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      if (component.rhCounterType !== 'MASTER') {
+        return res.status(400).json({ 
+          error: "Running hours can only be updated for MASTER counter type components" 
+        });
+      }
+
+      const result = await storage.updateMasterRunningHours({
+        componentId,
+        newRHValue,
+        updateSource,
+        userId,
+        comments
+      });
+
+      res.json({
+        success: true,
+        message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
+        masterUpdated: result.masterUpdated,
+        inheritedUpdated: result.inheritedUpdated
+      });
+    } catch (error: any) {
+      console.error("Error updating master RH:", error);
+      res.status(500).json({ error: error.message || "Failed to update master running hours" });
+    }
+  });
+
+  // Get all INHERITED components linked to a MASTER
+  app.get("/api/rh-config/inherited/:masterComponentId", async (req, res) => {
+    try {
+      const { masterComponentId } = req.params;
+      const inheritedComponents = await storage.getInheritedComponents(masterComponentId);
+      
+      res.json(inheritedComponents.map(c => ({
+        id: c.id,
+        componentCode: c.componentCode,
+        name: c.name,
+        rhCurrentInheritedCached: c.rhCurrentInheritedCached || '0',
+        rhInheritedUpdatedAt: c.rhInheritedUpdatedAt
+      })));
+    } catch (error: any) {
+      console.error("Error fetching inherited components:", error);
+      res.status(500).json({ error: "Failed to fetch inherited components" });
     }
   });
 }

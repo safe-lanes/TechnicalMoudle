@@ -830,6 +830,152 @@ export class PostgresStorage {
     return this.deleteComponent(id);
   }
 
+  // ============= RH COUNTER TYPE METHODS (B7.B) =============
+  
+  // Get all MASTER components for a vessel (for RH source selection dropdown)
+  async getMasterComponents(vesselId: string): Promise<Component[]> {
+    const db = await getDb();
+    return await db.select().from(components)
+      .where(and(
+        eq(components.vesselId, vesselId),
+        eq(components.rhCounterType, 'MASTER'),
+        eq(components.dataScope, 'vessel')
+      ));
+  }
+
+  // Get all INHERITED components linked to a specific MASTER
+  async getInheritedComponents(masterComponentId: string): Promise<Component[]> {
+    const db = await getDb();
+    return await db.select().from(components)
+      .where(and(
+        eq(components.rhMasterComponentId, masterComponentId),
+        eq(components.rhCounterType, 'INHERITED')
+      ));
+  }
+
+  // Update RH counter type configuration for a component
+  async updateRHConfig(params: {
+    componentId: string;
+    rhCounterType: 'MASTER' | 'INHERITED' | 'NOT_RH_DRIVEN';
+    rhMasterComponentId?: string | null;
+    userId?: string;
+  }): Promise<Component> {
+    const db = await getDb();
+    const now = new Date();
+    
+    // Build update data based on RH counter type
+    const updateData: Partial<Component> = {
+      rhCounterType: params.rhCounterType,
+      updatedAt: now,
+    };
+
+    if (params.rhCounterType === 'MASTER') {
+      // For MASTER: clear inherited fields, initialize master fields if not set
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentInheritedCached = null;
+      updateData.rhInheritedUpdatedAt = null;
+      // Initialize rhCurrentMaster to 0 if not already set
+      const existing = await this.getComponent(params.componentId);
+      if (!existing?.rhCurrentMaster) {
+        updateData.rhCurrentMaster = '0';
+        updateData.rhMasterUpdatedAt = now;
+        updateData.rhMasterUpdatedBy = params.userId || 'system';
+        updateData.rhMasterUpdateSource = 'MANUAL';
+      }
+    } else if (params.rhCounterType === 'INHERITED') {
+      // For INHERITED: set master reference, clear master fields
+      if (!params.rhMasterComponentId) {
+        throw new Error('rhMasterComponentId is required for INHERITED counter type');
+      }
+      updateData.rhMasterComponentId = params.rhMasterComponentId;
+      updateData.rhCurrentMaster = null;
+      updateData.rhMasterUpdatedAt = null;
+      updateData.rhMasterUpdatedBy = null;
+      updateData.rhMasterUpdateSource = null;
+      
+      // Initialize cached value from master
+      const masterComponent = await this.getComponent(params.rhMasterComponentId);
+      if (masterComponent) {
+        updateData.rhCurrentInheritedCached = masterComponent.rhCurrentMaster || '0';
+        updateData.rhInheritedUpdatedAt = now;
+      }
+    } else {
+      // For NOT_RH_DRIVEN: clear all RH fields
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentMaster = null;
+      updateData.rhMasterUpdatedAt = null;
+      updateData.rhMasterUpdatedBy = null;
+      updateData.rhMasterUpdateSource = null;
+      updateData.rhCurrentInheritedCached = null;
+      updateData.rhInheritedUpdatedAt = null;
+    }
+
+    const result = await db.update(components)
+      .set(updateData)
+      .where(eq(components.id, params.componentId))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error(`Component ${params.componentId} not found`);
+    }
+    return result[0];
+  }
+
+  // Update MASTER running hours with automatic cascade to INHERITED components
+  async updateMasterRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    userId: string;
+    comments?: string;
+  }): Promise<{ masterUpdated: Component; inheritedUpdated: number }> {
+    const db = await getDb();
+    const now = new Date();
+    
+    // Verify component exists and is a MASTER
+    const component = await this.getComponent(params.componentId);
+    if (!component) {
+      throw new Error(`Component ${params.componentId} not found`);
+    }
+    if (component.rhCounterType !== 'MASTER') {
+      throw new Error(`Component ${params.componentId} is not a MASTER counter type. Cannot update RH directly.`);
+    }
+
+    // Update the MASTER component
+    const masterResult = await db.update(components)
+      .set({
+        rhCurrentMaster: params.newRHValue.toString(),
+        rhMasterUpdatedAt: now,
+        rhMasterUpdatedBy: params.userId,
+        rhMasterUpdateSource: params.updateSource,
+        updatedAt: now,
+      })
+      .where(eq(components.id, params.componentId))
+      .returning();
+
+    if (!masterResult[0]) {
+      throw new Error(`Failed to update MASTER component ${params.componentId}`);
+    }
+
+    // Cascade update to all INHERITED components
+    const inheritedResult = await db.update(components)
+      .set({
+        rhCurrentInheritedCached: params.newRHValue.toString(),
+        rhInheritedUpdatedAt: now,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(components.rhMasterComponentId, params.componentId),
+        eq(components.rhCounterType, 'INHERITED')
+      ))
+      .returning();
+
+    return {
+      masterUpdated: masterResult[0],
+      inheritedUpdated: inheritedResult.length,
+    };
+  }
+
   // ============= MODULE 3: COMPONENT DOCUMENTS =============
 
   async getComponentDocuments(componentId: string): Promise<ComponentDocument[]> {

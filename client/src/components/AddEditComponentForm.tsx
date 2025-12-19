@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { FEATURES } from '@/config/features';
 import { formatProfessionalDate } from "@/lib/dateUtils";
+import RunningHoursConditionPanel from "@/components/RunningHoursConditionPanel";
 
 interface AddEditComponentFormProps {
   isOpen: boolean;
@@ -778,55 +779,20 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                         </div>
                       )}
 
-                      {/* Section B: Running Hours & Condition Monitoring - Teal Header with Editable Controls */}
-                      {section.id === "B" && (
-                        <div className="space-y-4">
-                          {/* Running Hours Table - Running Hours column removed, managed in Running Hours module */}
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse" data-testid="table-running-hours">
-                              <thead>
-                                <tr className="bg-teal-500 text-white">
-                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Type</th>
-                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Source</th>
-                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Last Updated</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="bg-white">
-                                  <td className="px-4 py-3 border border-gray-200">
-                                    <select
-                                      value={componentData.rhCounterType || 'NONE'}
-                                      onChange={(e) => handleFieldChange('rhCounterType', e.target.value)}
-                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                                      data-testid="select-rh-counter-type"
-                                    >
-                                      <option value="NONE">None</option>
-                                      <option value="MASTER">Master</option>
-                                      <option value="INHERITED">Inherited</option>
-                                    </select>
-                                  </td>
-                                  <td className="px-4 py-3 border border-gray-200">
-                                    <input
-                                      type="text"
-                                      value={componentData.rhCounterSource || '—'}
-                                      readOnly
-                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200 bg-gray-50"
-                                      data-testid="input-rh-counter-source"
-                                    />
-                                  </td>
-                                  <td className="px-4 py-3 border border-gray-200">
-                                    <input
-                                      type="date"
-                                      value={componentData.lastUpdated || ''}
-                                      onChange={(e) => handleFieldChange('lastUpdated', e.target.value)}
-                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                                      data-testid="input-last-updated"
-                                    />
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                      {/* Section B: Running Hours & Condition Monitoring - B7.B Panel */}
+                      {section.id === "B" && isEditMode && componentId && (
+                        <div className="space-y-4" data-testid="section-b-rh-panel">
+                          <RunningHoursConditionPanel
+                            componentId={componentId}
+                            vesselId={vesselId}
+                            isExpanded={true}
+                            readOnly={false}
+                          />
+                        </div>
+                      )}
+                      {section.id === "B" && !isEditMode && (
+                        <div className="text-sm text-gray-500 py-4" data-testid="section-b-placeholder">
+                          Running Hours configuration will be available after the component is created.
                         </div>
                       )}
 

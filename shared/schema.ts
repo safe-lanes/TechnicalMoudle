@@ -128,6 +128,45 @@ export type RunningHourParent = Component & {
   latestUpdate?: string;
 };
 
+// === RH Counter Type Enums and Schemas (B7.B) ===
+export const RH_COUNTER_TYPES = ['MASTER', 'INHERITED', 'NOT_RH_DRIVEN'] as const;
+export const RH_UPDATE_SOURCES = ['MANUAL', 'IMPORT', 'AUTOMATION'] as const;
+
+export type RHCounterType = typeof RH_COUNTER_TYPES[number];
+export type RHUpdateSource = typeof RH_UPDATE_SOURCES[number];
+
+// Schema for updating RH counter configuration
+export const updateRHConfigSchema = z.object({
+  componentId: z.string(),
+  rhCounterType: z.enum(RH_COUNTER_TYPES),
+  rhMasterComponentId: z.string().nullable().optional(), // Required for INHERITED type
+});
+
+export type UpdateRHConfigRequest = z.infer<typeof updateRHConfigSchema>;
+
+// Schema for updating MASTER running hours (with cascade to INHERITED)
+export const updateMasterRHSchema = z.object({
+  componentId: z.string(),
+  newRHValue: z.number().nonnegative(),
+  updateSource: z.enum(RH_UPDATE_SOURCES).default('MANUAL'),
+  userId: z.string(),
+  comments: z.string().optional(),
+});
+
+export type UpdateMasterRHRequest = z.infer<typeof updateMasterRHSchema>;
+
+// Response type for RH configuration with source info
+export type RHConfigResponse = {
+  componentId: string;
+  componentName: string;
+  rhCounterType: RHCounterType;
+  rhMasterComponentId: string | null;
+  rhMasterComponentName: string | null; // Name of the master component (for display)
+  rhCurrentValue: string | null; // Current RH value (master or inherited cached)
+  rhLastUpdated: Date | null;
+  rhUpdateSource: RHUpdateSource | null;
+};
+
 // Components Table (for storing current cumulative RH)
 // Column order matches UI form field order (Section A: Component Information)
 export const components = pgTable("components", {
@@ -179,6 +218,21 @@ export const components = pgTable("components", {
   lastUpdated: text("last_updated"),
   applicableVesselIds: text("applicable_vessel_ids").array(), // Array of vessel codes that can use this fleet equipment
   scopeNotes: text("scope_notes"), // Notes about scope applicability
+  
+  // === Section B7.B: Running Hours & Condition Monitoring ===
+  // RH Counter Type: MASTER | INHERITED | NOT_RH_DRIVEN
+  rhCounterType: text("rh_counter_type").notNull().default("NOT_RH_DRIVEN"),
+  // For INHERITED components: references the MASTER component
+  rhMasterComponentId: text("rh_master_component_id"),
+  // For MASTER components: the actual running hours value
+  rhCurrentMaster: decimal("rh_current_master", { precision: 10, scale: 2 }),
+  rhMasterUpdatedAt: timestamp("rh_master_updated_at"),
+  rhMasterUpdatedBy: text("rh_master_updated_by"),
+  rhMasterUpdateSource: text("rh_master_update_source"), // MANUAL | IMPORT | AUTOMATION
+  // For INHERITED components: cached copy of MASTER RH (system-maintained, read-only)
+  rhCurrentInheritedCached: decimal("rh_current_inherited_cached", { precision: 10, scale: 2 }),
+  rhInheritedUpdatedAt: timestamp("rh_inherited_updated_at"),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -186,6 +240,8 @@ export const components = pgTable("components", {
   fleetTreeIdx: index("idx_comp_fleet_tree").on(table.dataScope, table.parentFleetEquipmentCode),
   vesselTreeIdx: index("idx_comp_vessel_tree").on(table.dataScope, table.vesselId, table.parentId),
   fleetEquipmentCodeUniqueIdx: unique("unique_fleet_equipment_code").on(table.fleetEquipmentCode, table.dataScope),
+  rhMasterIdx: index("idx_comp_rh_master").on(table.rhCounterType, table.vesselId),
+  rhInheritedIdx: index("idx_comp_rh_inherited").on(table.rhMasterComponentId),
 }));
 
 export const insertComponentSchema = createInsertSchema(components).omit({

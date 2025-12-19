@@ -134,6 +134,92 @@ class MemStorage {
   async getRunningHourParents(vesselId: string): Promise<any[]> { return []; }
   async cascadeRunningHoursUpdate(params: any): Promise<any> { return { success: true, updatedComponents: [] }; }
 
+  // RH Counter Type Methods (B7.B)
+  async getMasterComponents(vesselId: string): Promise<any[]> {
+    const components = toArray(this.data.components).filter(
+      (c: any) => c.vesselId === vesselId && c.rhCounterType === 'MASTER'
+    );
+    return components;
+  }
+
+  async getInheritedComponents(masterComponentId: string): Promise<any[]> {
+    return toArray(this.data.components).filter(
+      (c: any) => c.rhMasterComponentId === masterComponentId && c.rhCounterType === 'INHERITED'
+    );
+  }
+
+  async updateRHConfig(params: {
+    componentId: string;
+    rhCounterType: 'MASTER' | 'INHERITED' | 'NOT_RH_DRIVEN';
+    rhMasterComponentId?: string | null;
+    userId?: string;
+  }): Promise<any> {
+    const component = await this.getComponent(params.componentId);
+    if (!component) throw new Error(`Component ${params.componentId} not found`);
+    
+    const updateData: any = {
+      rhCounterType: params.rhCounterType,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (params.rhCounterType === 'MASTER') {
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentInheritedCached = null;
+      if (!component.rhCurrentMaster) {
+        updateData.rhCurrentMaster = '0';
+        updateData.rhMasterUpdatedAt = new Date().toISOString();
+      }
+    } else if (params.rhCounterType === 'INHERITED') {
+      updateData.rhMasterComponentId = params.rhMasterComponentId;
+      updateData.rhCurrentMaster = null;
+      const master = await this.getComponent(params.rhMasterComponentId!);
+      if (master) {
+        updateData.rhCurrentInheritedCached = master.rhCurrentMaster || '0';
+        updateData.rhInheritedUpdatedAt = new Date().toISOString();
+      }
+    } else {
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentMaster = null;
+      updateData.rhCurrentInheritedCached = null;
+    }
+
+    return this.updateComponent(params.componentId, updateData);
+  }
+
+  async updateMasterRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    userId: string;
+  }): Promise<{ masterUpdated: any; inheritedUpdated: number }> {
+    const component = await this.getComponent(params.componentId);
+    if (!component) throw new Error(`Component ${params.componentId} not found`);
+    if (component.rhCounterType !== 'MASTER') {
+      throw new Error(`Component ${params.componentId} is not a MASTER counter type`);
+    }
+
+    const now = new Date().toISOString();
+    const masterUpdated = await this.updateComponent(params.componentId, {
+      rhCurrentMaster: params.newRHValue.toString(),
+      rhMasterUpdatedAt: now,
+      rhMasterUpdatedBy: params.userId,
+      rhMasterUpdateSource: params.updateSource,
+    });
+
+    // Cascade to inherited components
+    const inheritedComponents = await this.getInheritedComponents(params.componentId);
+    let inheritedUpdated = 0;
+    for (const inherited of inheritedComponents) {
+      await this.updateComponent(inherited.id, {
+        rhCurrentInheritedCached: params.newRHValue.toString(),
+        rhInheritedUpdatedAt: now,
+      });
+      inheritedUpdated++;
+    }
+
+    return { masterUpdated, inheritedUpdated };
+  }
+
   // Fleet methods
   async getFleets(): Promise<any[]> { return toArray(this.data.fleets); }
   async getFleet(id: string): Promise<any> { 

@@ -25,6 +25,7 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Per-Vessel PMS Settings**: Configurable lead times and grace periods per vessel.
 - **Running Hours Module (Delta Propagation)**: Updates to parent RH propagate delta to children's independent RH values.
+- **Running Hours Counter Types (B7.B)**: Components support three RH counter types: MASTER (component maintains its own running hours), INHERITED (automatically inherits RH from a linked MASTER component with cascade updates), and NOT_RH_DRIVEN (RH not applicable). The RunningHoursConditionPanel in Section B of the component edit form allows configuration of these types. Safety validations prevent self-referential links, cross-vessel master selections, and cycles (INHERITED can only point to MASTER components).
 - **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7.
 - **Spares Module**: Inventory management with dual locations, ROB/Min/Max, bulk upload, and transaction history.
 - **Auto-Generation Scheduler**: Automatically generates work orders for calendar and RH-based jobs.

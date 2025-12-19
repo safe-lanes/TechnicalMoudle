@@ -245,6 +245,33 @@ export interface IStorage {
     workOrders: any[];
   }>;
   
+  // === RH Counter Type Methods (B7.B) ===
+  // Get all MASTER components for a vessel (for RH source selection)
+  getMasterComponents(vesselId: string): Promise<Component[]>;
+  
+  // Get all INHERITED components linked to a specific MASTER
+  getInheritedComponents(masterComponentId: string): Promise<Component[]>;
+  
+  // Update RH counter type configuration for a component
+  updateRHConfig(params: {
+    componentId: string;
+    rhCounterType: 'MASTER' | 'INHERITED' | 'NOT_RH_DRIVEN';
+    rhMasterComponentId?: string | null;
+    userId?: string;
+  }): Promise<Component>;
+  
+  // Update MASTER running hours with automatic cascade to INHERITED components
+  updateMasterRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION';
+    userId: string;
+    comments?: string;
+  }): Promise<{ 
+    masterUpdated: Component;
+    inheritedUpdated: number;
+  }>;
+  
   // Fleet Components methods
   getFleetComponents(): Promise<Component[]>;
   getFleetComponent(id: string): Promise<Component | undefined>;
