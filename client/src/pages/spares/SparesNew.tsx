@@ -115,6 +115,28 @@ const Spares: React.FC = () => {
     }
   }, [isModifyMode]);
   
+  // Read componentCode from URL parameters when navigating from component context
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const componentCodeFromUrl = urlParams.get('componentCode');
+    
+    if (componentCodeFromUrl) {
+      // Set the selected component from URL parameter
+      setSelectedComponentId(componentCodeFromUrl);
+      
+      // Auto-expand tree path to show the selected component
+      // Expand all parent nodes in the hierarchy
+      const parts = componentCodeFromUrl.split('.');
+      const nodesToExpand = new Set<string>();
+      let currentPath = '';
+      for (let i = 0; i < parts.length; i++) {
+        currentPath = i === 0 ? parts[i] : `${currentPath}.${parts[i]}`;
+        nodesToExpand.add(currentPath);
+      }
+      setExpandedNodes(nodesToExpand);
+    }
+  }, []); // Run only on mount
+  
   // Dialog states
   const [isAddSpareModalOpen, setIsAddSpareModalOpen] = useState(false);
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
