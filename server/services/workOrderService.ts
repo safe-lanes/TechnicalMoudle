@@ -108,10 +108,11 @@ export class WorkOrderService {
 
   /**
    * Get work order execution data
+   * Note: This fetches executions by looking up via templateId (reference to work_orders.id)
    */
-  async getWorkOrderExecution(workOrderId: string): Promise<WorkOrderExecution | undefined> {
-    const executions = await storage.getWorkOrderExecutions();
-    return executions.find(exec => exec.workOrderId === workOrderId);
+  async getWorkOrderExecution(workOrderId: string, componentId: string): Promise<WorkOrderExecution | undefined> {
+    const executions = await storage.getWorkOrderExecutions(componentId);
+    return executions.find(exec => exec.templateId === workOrderId);
   }
 
   /**
@@ -130,23 +131,37 @@ export class WorkOrderService {
 
   /**
    * Auto-generate work orders from due jobs (Calendar-based)
-   * Now properly applies configured vessel lead times for proactive WO generation
-   * Returns statistics about how many work orders were generated
+   * TRIGGER 2: Calendar-based auto-generation per new WO generation rules
+   * 
+   * Applicability:
+   * - job.maintenanceBasis = 'Calendar'
+   * - job.isActive = true
+   * 
+   * Calculations:
+   * - last_done_date = date of last completed WO (job.lastDoneDate)
+   * - F_days = frequency_days (frequencyValue in days)
+   * - LT_days = lead_time_days
+   * - DUE_DATE = last_done_date + F_days
+   * - GENERATE_DATE = DUE_DATE - LT_days
+   * 
+   * Auto-generation condition:
+   * - Today >= GENERATE_DATE
+   * - AND no DUE/OVERDUE/PENDING APPROVAL/POSTPONED WO exists for same job + same DUE_DATE cycle
    */
   async autoGenerateWorkOrdersFromJobs(vesselId?: string): Promise<{
     checked: number;
     generated: number;
     workOrders: WorkOrder[];
   }> {
-    // Get ALL Calendar-based jobs (not just due ones - we apply lead time in the loop)
+    // Get only active Calendar-based jobs
     const allJobs = await jobService.getJobs(vesselId);
     const calendarJobs = allJobs.filter(job => 
       job.maintenanceBasis === 'Calendar' && 
-      job.nextDueDate
+      job.isActive !== false && // Job must be active
+      job.nextDueDate // Must have valid due date
     );
     
     // Fetch vessel PMS settings for lead time configuration
-    // Cache settings by vesselId to avoid repeated fetches
     const settingsCache = new Map<string, PmsVesselSettings | null>();
     const getSettingsForVessel = async (vId: string | null): Promise<PmsVesselSettings | null> => {
       if (!vId) return null;
@@ -156,14 +171,20 @@ export class WorkOrderService {
       return settings || null;
     };
     
-    // Get all active work orders to prevent duplicates
-    // Key includes vesselId to prevent cross-vessel collision
+    // Get all work orders with active statuses to check for cycle duplicates
+    // Statuses that block new WO generation for same cycle: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
+    const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
     const allWorkOrders = await this.getWorkOrders(vesselId);
-    const activeWorkOrderKeys = new Set(
-      allWorkOrders
-        .filter(wo => ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval'].includes(wo.status))
-        .map(wo => `${wo.vesselId}|${wo.componentCode}|${wo.jobTitle}`)
-    );
+    
+    // Build a map of (jobId + cycleDueDate) → existing WO for cycle uniqueness check
+    // This is the ONLY duplicate protection - we check by cycle, not by job
+    const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
+    allWorkOrders
+      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.jobId && wo.cycleDueDateSnapshot)
+      .forEach(wo => {
+        const cycleKey = `${wo.jobId}|${wo.cycleDueDateSnapshot}`;
+        existingCycleWOs.set(cycleKey, wo);
+      });
     
     const results = {
       checked: calendarJobs.length,
@@ -171,63 +192,90 @@ export class WorkOrderService {
       workOrders: [] as WorkOrder[]
     };
     
-    // Check each job to see if it should generate a work order based on lead time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    
     for (const job of calendarJobs) {
-      // Get vessel settings for this job's vessel
+      // Get vessel settings for lead time
       const settings = await getSettingsForVessel(job.vesselId);
-      
-      // Get appropriate lead time based on job priority
       const leadTimeDays = getCalendarLeadDays(job, settings);
       
-      // Apply lead time when checking if work order should be generated
-      const shouldGenerate = shouldGenerateWorkOrder(job.nextDueDate, new Date(), leadTimeDays);
+      // Calculate DUE_DATE and GENERATE_DATE
+      // DUE_DATE is stored in job.nextDueDate
+      const dueDate = new Date(job.nextDueDate!);
+      dueDate.setHours(0, 0, 0, 0);
       
-      if (shouldGenerate) {
-        // O(1) duplicate check using Set (key includes vesselId)
-        const workOrderKey = `${job.vesselId}|${job.componentCode}|${job.jobTitle}`;
-        
-        if (!activeWorkOrderKeys.has(workOrderKey)) {
-          // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
-          const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
-          
-          const workOrderData: InsertWorkOrder = {
-            vesselId: job.vesselId,
-            component: job.componentName, // Use component name, not ID
-            componentCode: job.componentCode,
-            workOrderNo: workOrderNo,
-            templateCode: workOrderNo,
-            jobTitle: job.jobTitle,
-            assignedTo: job.assignedTo || 'Unassigned',
-            dueDate: job.nextDueDate,
-            status: 'Active',
-            taskType: job.maintenanceType,
-            maintenanceBasis: job.maintenanceBasis,
-            frequencyValue: job.frequencyValue?.toString(),
-            frequencyUnit: job.frequencyUnit,
-            jobPriority: job.jobPriority,
-            classRelated: job.classRelated,
-            briefWorkDescription: job.briefWorkDescription,
-            department: job.department,
-            requiredSpareParts: job.requiredSpareParts || [],
-            requiredTools: job.requiredTools || [],
-            safetyRequirements: job.safetyRequirements || {
-              ppeRequirements: [],
-              permitRequirements: [],
-              otherRequirements: []
-            }
-          };
-          
-          const createdWO = await this.createWorkOrder(workOrderData);
-          results.generated++;
-          results.workOrders.push(createdWO);
-          
-          // Add to Set to prevent duplicate generation in same run (key includes vesselId)
-          activeWorkOrderKeys.add(workOrderKey);
-          
-          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
-          console.log(`✅ Auto-generated work order ${workOrderNo} for ${priorityLabel} job ${job.jobNo} (lead time: ${leadTimeDays} days)`);
-        }
+      // GENERATE_DATE = DUE_DATE - LT_days
+      const generateDate = new Date(dueDate);
+      generateDate.setDate(generateDate.getDate() - leadTimeDays);
+      
+      // Check auto-generation condition: Today >= GENERATE_DATE
+      if (today < generateDate) {
+        continue; // Not yet time to generate
       }
+      
+      // Normalize due date for cycle key (ISO date string YYYY-MM-DD)
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+      
+      // CYCLE UNIQUENESS CHECK (only protection - allows multiple cycles per job over time)
+      // Each calendar cycle is uniquely identified by: (job.id + DUE_DATE)
+      const cycleKey = `${job.id}|${dueDateStr}`;
+      if (existingCycleWOs.has(cycleKey)) {
+        // WO already exists for this cycle - skip
+        continue;
+      }
+      
+      // All checks passed - generate the WO
+      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
+      
+      // Calculate generate date string for snapshot
+      const generateDateStr = generateDate.toISOString().split('T')[0];
+      
+      const workOrderData: InsertWorkOrder = {
+        vesselId: job.vesselId,
+        component: job.componentName,
+        componentCode: job.componentCode,
+        jobId: job.id, // Link to job for cycle tracking
+        workOrderNo: workOrderNo,
+        templateCode: workOrderNo,
+        jobTitle: job.jobTitle,
+        assignedTo: job.assignedTo || 'Unassigned',
+        dueDate: job.nextDueDate,
+        status: 'Due', // Start as Due since trigger condition is met
+        taskType: job.maintenanceType,
+        maintenanceBasis: job.maintenanceBasis,
+        frequencyValue: job.frequencyValue?.toString(),
+        frequencyUnit: job.frequencyUnit,
+        jobPriority: job.jobPriority,
+        classRelated: job.classRelated,
+        briefWorkDescription: job.briefWorkDescription,
+        department: job.department,
+        requiredSpareParts: job.requiredSpareParts || [],
+        requiredTools: job.requiredTools || [],
+        safetyRequirements: job.safetyRequirements || {
+          ppeRequirements: [],
+          permitRequirements: [],
+          otherRequirements: []
+        },
+        // === CALENDAR CYCLE SNAPSHOTS (TRIGGER 2) ===
+        driverType: 'CALENDAR',
+        cycleDueDateSnapshot: dueDateStr,
+        generateDateSnapshot: generateDateStr,
+        dueDateSnapshot: dueDateStr,
+        lastDoneDateSnapshot: job.lastDoneDate || null,
+      };
+      
+      const createdWO = await this.createWorkOrder(workOrderData);
+      results.generated++;
+      results.workOrders.push(createdWO);
+      
+      // Add to map to prevent duplicate generation in same run
+      existingCycleWOs.set(cycleKey, workOrderData as any);
+      
+      const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+      console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
+      console.log(`   last_done=${job.lastDoneDate || 'N/A'}, LT=${leadTimeDays} days`);
+      console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
     }
     
     // Log settings used for transparency

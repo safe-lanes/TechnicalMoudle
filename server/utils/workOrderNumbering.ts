@@ -3,18 +3,22 @@ import type { IStorage } from '../storage';
 /**
  * Spec-compliant Work Order Numbering System
  * 
- * Planned WO Format: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
- * Example: JOB-ABC1234.WO-2025-001
+ * Planned WO Format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
+ * Example: MK-000041-2025-001
  * 
  * Unplanned WO Format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
  * Example: UWO-VESSEL01-2025-001
  * 
- * Running numbers are sequential per job/vessel per year
+ * Running numbers are:
+ * - Per vessel
+ * - Per year
+ * - Generated atomically
+ * - No duplicates allowed
  */
 
 /**
  * Generate next work order number for a planned WO
- * Format: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+ * Format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
  */
 export async function generatePlannedWorkOrderNumber(
   storage: IStorage,
@@ -30,8 +34,8 @@ export async function generatePlannedWorkOrderNumber(
   const allWorkOrders = await storage.getWorkOrders(vesselId);
   
   const existingWOsForJob = allWorkOrders.filter(wo => {
-    // Match planned WO format: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
-    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}\\.WO-${currentYear}-(\\d+)$`);
+    // Match planned WO format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
+    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${currentYear}-(\\d+)$`);
     return plannedPattern.test(wo.workOrderNo);
   });
   
@@ -50,7 +54,7 @@ export async function generatePlannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${safeJobCode}.WO-${currentYear}-${paddedNumber}`;
+  return `${safeJobCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**

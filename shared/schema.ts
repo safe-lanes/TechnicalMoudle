@@ -883,6 +883,24 @@ export const workOrders = pgTable("work_orders", {
   // Approval workflow fields
   rejectionComments: text("rejection_comments"), // Comments when work order is rejected by approver
   approvalAction: text("approval_action"), // 'approved' | 'rejected' - action taken by approver
+  
+  // === WO Generation Cycle Snapshots (for duplicate protection and audit) ===
+  // Driver type determines which cycle fields apply
+  driverType: text("driver_type"), // 'RH' | 'CALENDAR' - from job's maintenanceBasis
+  
+  // RH-based WO cycle snapshots (Trigger 1)
+  cycleDueRhSnapshot: decimal("cycle_due_rh_snapshot", { precision: 10, scale: 2 }), // RH_due = RH_last_done + F
+  generateRhSnapshot: decimal("generate_rh_snapshot", { precision: 10, scale: 2 }), // RH_generate = RH_due - LT
+  dueRhSnapshot: decimal("due_rh_snapshot", { precision: 10, scale: 2 }), // RH_due (duplicated for clarity)
+  effectiveRhAtGeneration: decimal("effective_rh_at_generation", { precision: 10, scale: 2 }), // RH_effective_current at WO creation
+  rhLastDoneSnapshot: decimal("rh_last_done_snapshot", { precision: 10, scale: 2 }), // RH_last_done stored at WO creation
+  
+  // Calendar-based WO cycle snapshots (Trigger 2)
+  cycleDueDateSnapshot: text("cycle_due_date_snapshot"), // DUE_DATE = last_done_date + F_days (ISO date)
+  generateDateSnapshot: text("generate_date_snapshot"), // GENERATE_DATE = DUE_DATE - LT_days (ISO date)
+  dueDateSnapshot: text("due_date_snapshot"), // DUE_DATE (duplicated for clarity)
+  lastDoneDateSnapshot: text("last_done_date_snapshot"), // last_done_date stored at WO creation
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -894,6 +912,9 @@ export const workOrders = pgTable("work_orders", {
   dataScopeIdx: index("idx_wo_data_scope").on(table.dataScope),
   fleetEquipmentCodeIdx: index("idx_wo_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
   fleetJobCodeUniqueIdx: unique("unique_fleet_job_code").on(table.fleetJobCode, table.dataScope),
+  // Index for cycle-based duplicate protection (job_id + cycle_due)
+  jobIdCycleRhIdx: index("idx_wo_job_cycle_rh").on(table.jobId, table.cycleDueRhSnapshot),
+  jobIdCycleDateIdx: index("idx_wo_job_cycle_date").on(table.jobId, table.cycleDueDateSnapshot),
 }));
 
 export const insertWorkOrderSchema = createInsertSchema(workOrders).omit({

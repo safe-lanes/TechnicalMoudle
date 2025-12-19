@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { storage } from "./storage";
 import { z } from "zod";
+import { jobDueScanner } from "./services/jobDueScanner";
 
 // Zod schemas for RH configuration API validation
 const updateRHConfigSchema = z.object({
@@ -368,11 +369,34 @@ export function registerRunningHoursRoutes(app: Express) {
         comments
       });
 
+      // TRIGGER 1 HOOK: After MASTER RH is updated, scan for RH-based WO generation
+      // This ensures WOs are generated in real-time when RH thresholds are reached
+      let woGenerationResult = { rhJobsChecked: 0, rhWOsGenerated: 0 };
+      try {
+        // Get the component's vesselId to scope the scan
+        if (component.vesselId) {
+          // Run a scan for RH-based jobs (this will check all jobs for the vessel)
+          const scanResult = await jobDueScanner.runScan();
+          woGenerationResult = {
+            rhJobsChecked: scanResult.rhJobsChecked,
+            rhWOsGenerated: scanResult.rhWOsGenerated
+          };
+          
+          if (scanResult.rhWOsGenerated > 0) {
+            console.log(`✅ [RH Update Trigger] Generated ${scanResult.rhWOsGenerated} WO(s) after MASTER RH update on ${component.name}`);
+          }
+        }
+      } catch (scanError) {
+        // Don't fail the RH update if WO generation fails - just log the error
+        console.error('[RH Update Trigger] WO generation scan failed:', scanError);
+      }
+
       res.json({
         success: true,
         message: `Master RH updated to ${newRHValue}. Cascaded to ${result.inheritedUpdated} inherited components.`,
         masterUpdated: result.masterUpdated,
-        inheritedUpdated: result.inheritedUpdated
+        inheritedUpdated: result.inheritedUpdated,
+        woGeneration: woGenerationResult
       });
     } catch (error: any) {
       console.error("Error updating master RH:", error);
