@@ -1187,17 +1187,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     
                     {/* Full content when expanded */}
                     <CollapsibleContent>
-                      <div className="max-w-xs mb-4">
-                        <DeletableField fieldKey="runningHours">
-                          <EditableLabel fieldKey="runningHours" />
-                          <Input 
-                            value={componentData.runningHours}
-                            onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                            placeholder="20000"
-                            className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                          />
-                        </DeletableField>
-                      </div>
+                      {/* Running Hours field removed - managed in Running Hours module */}
                       
                       {/* Custom Fields for Section B */}
                       {customFields['B'] && customFields['B'].length > 0 && (
@@ -1208,20 +1198,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                     </CollapsibleContent>
                   </Collapsible>
                   
-                  {/* Preview when collapsed - OUTSIDE Collapsible */}
-                  {collapsedSections.B && (
-                    <div className="max-w-xs mb-4">
-                      <DeletableField fieldKey="runningHours">
-                        <EditableLabel fieldKey="runningHours" />
-                        <Input 
-                          value={componentData.runningHours}
-                          onChange={(e) => handleInputChange('runningHours', e.target.value)}
-                          placeholder="20000"
-                          className="border-[#52baf3] border-2 focus:border-[#52baf3]"
-                        />
-                      </DeletableField>
-                    </div>
-                  )}
+                  {/* Preview when collapsed - Running Hours removed */}
                 </div>
 
                 {/* C. Jobs */}

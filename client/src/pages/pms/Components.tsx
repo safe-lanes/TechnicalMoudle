@@ -578,27 +578,10 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         </div>
       </div>
 
-      {/* Row 6: Running Hours, IS Active, Vessel Code, IS Parent */}
+      {/* Row 6: IS Active, Vessel Code, IS Parent */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Running Hours</label>
-          {isChangeMode ? (
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={componentData.runningHours}
-              onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-              className={`text-sm w-full px-2 py-1 border rounded ${
-                changedFields.has('runningHours') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
-              }`}
-              data-testid="input-running-hours"
-            />
-          ) : (
-            <div className="text-sm text-gray-900" data-testid="text-running-hours">
-              {componentData.runningHours}
-            </div>
-          )}
+          {/* Empty spacer - Running Hours removed, moved to Section B */}
         </div>
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active</label>

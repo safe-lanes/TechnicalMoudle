@@ -781,14 +781,13 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                       {/* Section B: Running Hours & Condition Monitoring - Teal Header with Editable Controls */}
                       {section.id === "B" && (
                         <div className="space-y-4">
-                          {/* Running Hours Table with 4 columns - Editable Controls */}
+                          {/* Running Hours Table - Running Hours column removed, managed in Running Hours module */}
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse" data-testid="table-running-hours">
                               <thead>
                                 <tr className="bg-teal-500 text-white">
                                   <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Type</th>
                                   <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">RH Counter Source</th>
-                                  <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Running Hours</th>
                                   <th className="px-4 py-2 text-left text-xs font-semibold border border-teal-600">Last Updated</th>
                                 </tr>
                               </thead>
@@ -813,16 +812,6 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                                       readOnly
                                       className="h-8 w-full text-sm px-2 border rounded border-gray-200 bg-gray-50"
                                       data-testid="input-rh-counter-source"
-                                    />
-                                  </td>
-                                  <td className="px-4 py-3 border border-gray-200">
-                                    <input
-                                      type="text"
-                                      value={componentData.runningHours || ''}
-                                      onChange={(e) => handleFieldChange('runningHours', e.target.value)}
-                                      className="h-8 w-full text-sm px-2 border rounded border-gray-200"
-                                      placeholder=""
-                                      data-testid="input-running-hours-b"
                                     />
                                   </td>
                                   <td className="px-4 py-3 border border-gray-200">

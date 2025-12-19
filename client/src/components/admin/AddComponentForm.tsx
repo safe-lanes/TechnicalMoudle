@@ -534,8 +534,7 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
               <div className="p-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="running-hours" className="text-xs">Running Hours</Label>
-                    <Input id="running-hours" className="h-8 text-sm" />
+                    {/* Running Hours field removed - managed in Running Hours module */}
                   </div>
                   <div className="col-span-2">
                     <Label htmlFor="condition-metrics" className="text-xs">Condition Monitoring Metrics</Label>
