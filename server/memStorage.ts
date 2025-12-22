@@ -38,6 +38,8 @@ class MemStorage {
         const content = fs.readFileSync(DATA_FILE, 'utf-8');
         this.data = JSON.parse(content);
         console.log('[MemStorage] Loaded data from test-data.json');
+        // Initialize ID counters from existing data to ensure unique IDs
+        this.initializeIdCounters();
       } else {
         console.log('[MemStorage] No test-data.json found, starting with empty data');
         this.data = {};
@@ -45,6 +47,26 @@ class MemStorage {
     } catch (error) {
       console.error('[MemStorage] Error loading test-data.json:', error);
       this.data = {};
+    }
+  }
+  
+  private initializeIdCounters(): void {
+    // Scan existing collections to find max IDs
+    const collections = ['users', 'runningHoursAudits', 'audits'];
+    for (const collection of collections) {
+      const items = this.data[collection];
+      if (items) {
+        const itemsArray = Array.isArray(items) ? items : Object.values(items);
+        let maxId = 0;
+        for (const item of itemsArray as any[]) {
+          if (typeof item.id === 'number' && item.id > maxId) {
+            maxId = item.id;
+          }
+        }
+        if (maxId > 0) {
+          this.idCounters.set(collection, maxId);
+        }
+      }
     }
   }
 
@@ -136,7 +158,135 @@ class MemStorage {
   async getRunningHoursAudits(componentId: string, limit?: number): Promise<any[]> { return []; }
   async getRunningHoursAuditsInDateRange(componentId: string, startDate: Date, endDate: Date): Promise<any[]> { return []; }
   async getRunningHourParents(vesselId: string): Promise<any[]> { return []; }
-  async cascadeRunningHoursUpdate(params: any): Promise<any> { return { success: true, updatedComponents: [] }; }
+  
+  /**
+   * Cascade running hours update - updates the MASTER component and cascades to INHERITED children
+   */
+  async cascadeRunningHoursUpdate(params: {
+    parentComponentId: string;
+    mode: 'setTotal' | 'addDelta';
+    value: number;
+    dateUpdated: string;
+    dateUpdatedTZ?: string;
+    comments?: string;
+    meterReplaced?: boolean;
+    oldMeterFinal?: string;
+    newMeterStart?: string;
+    userId?: string;
+  }): Promise<any> {
+    console.log('[MemStorage] cascadeRunningHoursUpdate called:', params);
+    
+    // Find the component by ID or component code
+    let component = await this.getComponent(params.parentComponentId);
+    
+    // If not found by ID, try to find by component code across all vessels
+    if (!component) {
+      const allComponents = toArray(this.data.components);
+      component = allComponents.find((c: any) => c.componentCode === params.parentComponentId);
+    }
+    
+    if (!component) {
+      console.error('[MemStorage] Component not found:', params.parentComponentId);
+      throw new Error(`Component ${params.parentComponentId} not found`);
+    }
+    
+    console.log('[MemStorage] Found component:', component.componentCode, 'current RH:', component.rhCurrentMaster || component.currentCumulativeRH);
+    
+    // Calculate the new RH value
+    const currentRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+    let newRHValue: number;
+    
+    if (params.mode === 'setTotal') {
+      newRHValue = params.value;
+    } else {
+      // addDelta mode
+      newRHValue = currentRH + params.value;
+    }
+    
+    console.log('[MemStorage] Updating RH from', currentRH, 'to', newRHValue);
+    
+    const now = new Date().toISOString();
+    const updatedComponents: string[] = [];
+    
+    // Update the master component
+    const updateData: any = {
+      rhCurrentMaster: newRHValue.toString(),
+      currentCumulativeRH: newRHValue.toString(),
+      rhMasterUpdatedAt: now,
+      rhMasterUpdatedBy: params.userId || 'admin',
+      rhMasterUpdateSource: 'MANUAL',
+      lastUpdated: params.dateUpdated || now,
+      updatedAt: now,
+    };
+    
+    // Handle meter replacement
+    if (params.meterReplaced) {
+      updateData.meterReplaced = true;
+      updateData.oldMeterFinal = params.oldMeterFinal;
+      updateData.newMeterStart = params.newMeterStart;
+    }
+    
+    // Use the component's actual ID for update
+    const componentId = component.id || component.componentCode;
+    await this.updateComponent(componentId, updateData);
+    updatedComponents.push(componentId);
+    
+    console.log('[MemStorage] Master component updated:', componentId);
+    
+    // Cascade delta to inherited components
+    // INHERITED components maintain their own running hours and receive delta updates
+    const inheritedComponents = await this.getInheritedComponents(componentId);
+    console.log('[MemStorage] Found', inheritedComponents.length, 'inherited components to cascade');
+    
+    const delta = newRHValue - currentRH;
+    
+    for (const inherited of inheritedComponents) {
+      // Get the inherited component's current RH value
+      const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+      // Apply the delta to their individual running hours
+      const newInheritedRH = inheritedCurrentRH + delta;
+      
+      await this.updateComponent(inherited.id, {
+        rhCurrentInheritedCached: newRHValue.toString(), // Cache the master's value for reference
+        currentCumulativeRH: newInheritedRH.toString(), // Their individual RH + delta
+        rhInheritedUpdatedAt: now,
+        lastUpdated: now,
+        updatedAt: now,
+      });
+      updatedComponents.push(inherited.id);
+      console.log('[MemStorage] Inherited component updated:', inherited.id, 'from', inheritedCurrentRH, 'to', newInheritedRH, '(delta:', delta, ')');
+    }
+    
+    // Create audit trail record
+    if (!this.data.runningHoursAudits) this.data.runningHoursAudits = [];
+    const auditRecord = {
+      id: this.getNextId('runningHoursAudits'),
+      componentId: componentId,
+      previousValue: currentRH.toString(),
+      newValue: newRHValue.toString(),
+      delta: (newRHValue - currentRH).toString(),
+      mode: params.mode,
+      dateUpdated: params.dateUpdated,
+      comments: params.comments,
+      meterReplaced: params.meterReplaced || false,
+      userId: params.userId || 'admin',
+      createdAt: now,
+    };
+    this.data.runningHoursAudits.push(auditRecord);
+    
+    // Save all changes to disk
+    this.saveData();
+    
+    console.log('[MemStorage] cascadeRunningHoursUpdate complete. Updated', updatedComponents.length, 'components');
+    
+    return { 
+      success: true, 
+      updatedComponents,
+      newValue: newRHValue,
+      previousValue: currentRH,
+      auditId: auditRecord.id
+    };
+  }
 
   // RH Counter Type Methods (B7.B)
   async getMasterComponents(vesselId: string): Promise<any[]> {
