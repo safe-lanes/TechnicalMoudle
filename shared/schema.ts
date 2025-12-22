@@ -172,7 +172,7 @@ export type RHConfigResponse = {
 export const components = pgTable("components", {
   id: text("id").primaryKey(),
   // === UI Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code ===
-  fleetEquipmentCode: text("fleet_equipment_code"), // Unique identifier for fleet equipment (XXX.XXX.XX format)
+  fleetEquipmentCode: text("fleet_equipment_code"), // Fleet equipment code (XXX.XXX.XX format) - NOT unique, multiple components can share same code
   fleetEquipmentName: text("fleet_equipment_name"), // General name from SFI booklet
   parentId: text("parent_id"),
   componentCode: text("component_code"),
@@ -241,7 +241,8 @@ export const components = pgTable("components", {
   dataScopeIdx: index("idx_comp_data_scope").on(table.dataScope),
   fleetTreeIdx: index("idx_comp_fleet_tree").on(table.dataScope, table.parentFleetEquipmentCode),
   vesselTreeIdx: index("idx_comp_vessel_tree").on(table.dataScope, table.vesselId, table.parentId),
-  fleetEquipmentCodeUniqueIdx: unique("unique_fleet_equipment_code").on(table.fleetEquipmentCode, table.dataScope),
+  // NOTE: fleetEquipmentCode is NOT unique - multiple components can share the same fleet equipment code/name
+  fleetEquipmentCodeIdx: index("idx_comp_fleet_equipment_code").on(table.fleetEquipmentCode),
   rhMasterIdx: index("idx_comp_rh_master").on(table.rhCounterType, table.vesselId),
   rhInheritedIdx: index("idx_comp_rh_inherited").on(table.rhMasterComponentId),
 }));

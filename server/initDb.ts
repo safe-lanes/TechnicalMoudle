@@ -181,7 +181,8 @@ export async function initializeDatabase() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_comp_data_scope ON components(data_scope)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_comp_fleet_tree ON components(data_scope, parent_fleet_equipment_code)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_comp_vessel_tree ON components(data_scope, vessel_id, parent_id)`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_equipment_code ON components(fleet_equipment_code, data_scope)`);
+    // NOTE: fleetEquipmentCode is NOT unique - multiple components can share the same fleet equipment code/name
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_comp_fleet_equipment_code ON components(fleet_equipment_code)`);
     
     // 3. Work Orders table
     await db.execute(sql`
