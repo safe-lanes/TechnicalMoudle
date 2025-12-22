@@ -4209,6 +4209,311 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // ============= INVENTORY MANAGEMENT: LOCATIONS =============
+  
+  app.get("/api/inventory/locations/:vesselId", async (req, res) => {
+    try {
+      const locations = await storage.getLocations(req.params.vesselId);
+      res.json({ success: true, data: locations });
+    } catch (error: any) {
+      console.error("Error fetching locations:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/locations/:vesselId/:id", async (req, res) => {
+    try {
+      const location = await storage.getLocationById(parseInt(req.params.id));
+      if (!location) {
+        return res.status(404).json({ success: false, error: "Location not found" });
+      }
+      res.json({ success: true, data: location });
+    } catch (error: any) {
+      console.error("Error fetching location:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/locations/:vesselId", async (req, res) => {
+    try {
+      const { locationName, createdBy } = req.body;
+      if (!locationName) {
+        return res.status(400).json({ success: false, error: "locationName is required" });
+      }
+      
+      const location = await storage.findOrCreateLocation(
+        req.params.vesselId,
+        locationName,
+        createdBy || 'system'
+      );
+      res.json({ success: true, data: location });
+    } catch (error: any) {
+      console.error("Error creating location:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
+  
+  app.get("/api/inventory/spare-links/:vesselId", async (req, res) => {
+    try {
+      const links = await storage.getSpareComponentLinks(req.params.vesselId);
+      res.json({ success: true, data: links });
+    } catch (error: any) {
+      console.error("Error fetching spare-component links:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/spare-links/by-spare/:spareId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      const links = await storage.getSpareComponentLinksBySpare(spareId);
+      const linkedComponents = await storage.getLinkedComponentsForSpare(spareId);
+      res.json({ success: true, data: { links, linkedComponents } });
+    } catch (error: any) {
+      console.error("Error fetching links for spare:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/spare-links/by-component/:componentId", async (req, res) => {
+    try {
+      const links = await storage.getSpareComponentLinksByComponent(req.params.componentId);
+      res.json({ success: true, data: links });
+    } catch (error: any) {
+      console.error("Error fetching links for component:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/spare-links", async (req, res) => {
+    try {
+      const { vesselId, spareId, componentId, createdBy } = req.body;
+      if (!vesselId || !spareId || !componentId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "vesselId, spareId, and componentId are required" 
+        });
+      }
+      
+      const link = await storage.createSpareComponentLink({
+        vesselId,
+        spareId: parseInt(spareId),
+        componentId,
+        linkedBy: createdBy || 'system',
+      });
+      res.json({ success: true, data: link });
+    } catch (error: any) {
+      console.error("Error creating spare-component link:", error);
+      if (error.message?.includes('duplicate')) {
+        return res.status(409).json({ success: false, error: "Link already exists" });
+      }
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/inventory/spare-links/:spareId/:componentId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      await storage.deleteSpareComponentLink(spareId, req.params.componentId);
+      res.json({ success: true, message: "Link deleted" });
+    } catch (error: any) {
+      console.error("Error deleting spare-component link:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
+  
+  app.get("/api/inventory/stock/:spareId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      const stockRecords = await storage.getSpareLocationStock(spareId);
+      const locationsWithQty = await storage.getSpareLocationsWithQty(spareId);
+      const robTotal = await storage.getSpareRobTotal(spareId);
+      
+      res.json({ 
+        success: true, 
+        data: { 
+          spareId,
+          robTotal,
+          locations: locationsWithQty,
+          stockRecords 
+        } 
+      });
+    } catch (error: any) {
+      console.error("Error fetching spare stock:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/stock/by-location/:locationId", async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      const spares = await storage.getSparesAtLocation(locationId);
+      res.json({ success: true, data: spares });
+    } catch (error: any) {
+      console.error("Error fetching spares at location:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/stock/:spareId/:locationId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      const locationId = parseInt(req.params.locationId);
+      const { qty, vesselId } = req.body;
+      
+      if (qty === undefined || qty < 0) {
+        return res.status(400).json({ success: false, error: "qty must be >= 0" });
+      }
+      if (!vesselId) {
+        return res.status(400).json({ success: false, error: "vesselId is required" });
+      }
+      
+      const stock = await storage.upsertSpareLocationStock({
+        vesselId,
+        spareId,
+        locationId,
+        qty,
+      });
+      
+      res.json({ success: true, data: stock });
+    } catch (error: any) {
+      console.error("Error setting spare stock:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
+  
+  const inventoryTransactionSchema = z.object({
+    vesselId: z.string(),
+    spareId: z.coerce.number().int().positive(),
+    locationId: z.coerce.number().int().positive(),
+    eventType: z.enum(['RECEIVE', 'CONSUME', 'ADJUST_OPENING_BALANCE', 'ADJUST_CORRECTION']),
+    qtyChange: z.coerce.number().int(),
+    referenceType: z.enum(['WORK_ORDER', 'MANUAL', 'EXCEL_IMPORT']),
+    referenceId: z.string().optional(),
+    referenceNote: z.string().optional(),
+    userId: z.string(),
+  });
+
+  app.post("/api/inventory/transactions", async (req, res) => {
+    try {
+      const parsed = inventoryTransactionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { code: 'VALIDATION_ERROR', message: 'Invalid request data' },
+          errors: parsed.error.errors 
+        });
+      }
+      
+      const result = await storage.performInventoryTransaction(parsed.data);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("Error performing inventory transaction:", error);
+      
+      // Map domain errors to appropriate HTTP status codes
+      if (error.message?.includes('INSUFFICIENT_STOCK')) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { 
+            code: 'INSUFFICIENT_STOCK', 
+            message: error.message.replace('INSUFFICIENT_STOCK: ', '')
+          } 
+        });
+      }
+      if (error.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { 
+            code: 'NEGATIVE_STOCK_PREVENTED', 
+            message: error.message.replace('NEGATIVE_STOCK_PREVENTED: ', '')
+          } 
+        });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ 
+          success: false, 
+          error: { 
+            code: 'NOT_FOUND', 
+            message: error.message 
+          } 
+        });
+      }
+      if (error.message?.includes('requires')) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { 
+            code: 'VALIDATION_ERROR', 
+            message: error.message 
+          } 
+        });
+      }
+      
+      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+    }
+  });
+
+  app.get("/api/inventory/transactions/:vesselId", async (req, res) => {
+    try {
+      const { spareId, locationId, eventType, limit } = req.query;
+      
+      const transactions = await storage.getInventoryTransactions(req.params.vesselId, {
+        spareId: spareId ? parseInt(spareId as string) : undefined,
+        locationId: locationId ? parseInt(locationId as string) : undefined,
+        eventType: eventType as any,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      
+      res.json({ success: true, data: transactions });
+    } catch (error: any) {
+      console.error("Error fetching inventory transactions:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============= INVENTORY MANAGEMENT: ENHANCED SPARE DATA =============
+  
+  app.get("/api/inventory/spares-with-inventory/:vesselId", async (req, res) => {
+    try {
+      const spares = await storage.getSparesWithInventoryByVessel(req.params.vesselId);
+      res.json({ success: true, data: spares });
+    } catch (error: any) {
+      console.error("Error fetching spares with inventory:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/spare-with-inventory/:spareId", async (req, res) => {
+    try {
+      const spareId = parseInt(req.params.spareId);
+      const spareWithInventory = await storage.getSpareWithInventory(spareId);
+      
+      if (!spareWithInventory) {
+        return res.status(404).json({ success: false, error: "Spare not found" });
+      }
+      
+      res.json({ success: true, data: spareWithInventory });
+    } catch (error: any) {
+      console.error("Error fetching spare with inventory:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/spares-by-component/:componentId", async (req, res) => {
+    try {
+      const spares = await storage.getSparesWithInventoryByComponent(req.params.componentId);
+      res.json({ success: true, data: spares });
+    } catch (error: any) {
+      console.error("Error fetching spares by component:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   // Note: Auth removed to match spares endpoint pattern for development

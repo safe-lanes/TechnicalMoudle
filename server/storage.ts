@@ -145,7 +145,18 @@ import {
   type InsertBulkImportHistory,
   bulkImportErrors,
   type BulkImportError,
-  type InsertBulkImportError
+  type InsertBulkImportError,
+  type Location,
+  type InsertLocation,
+  type SpareComponentLink,
+  type InsertSpareComponentLink,
+  type SpareLocationStock,
+  type InsertSpareLocationStock,
+  type InventoryTransaction,
+  type InsertInventoryTransaction,
+  type InventoryEventType,
+  type InventoryReferenceType,
+  type SpareWithInventory,
 } from "@shared/schema";
 
 export function sortObjectKeys(obj: any): any {
@@ -713,6 +724,59 @@ export interface IStorage {
   getWorkOrderExecutionDetailById(id: number): Promise<WorkOrderExecutionDetails | undefined>;
   createWorkOrderExecutionDetail(detail: InsertWorkOrderExecutionDetails): Promise<WorkOrderExecutionDetails>;
   updateWorkOrderExecutionDetail(id: number, data: Partial<WorkOrderExecutionDetails>): Promise<WorkOrderExecutionDetails>;
+  
+  // ============= INVENTORY MANAGEMENT =============
+  
+  // Location Methods
+  getLocations(vesselId: string): Promise<Location[]>;
+  getLocationById(id: number): Promise<Location | undefined>;
+  getLocationByName(vesselId: string, locationName: string): Promise<Location | undefined>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  findOrCreateLocation(vesselId: string, locationName: string, createdBy: string): Promise<Location>;
+  updateLocation(id: number, data: Partial<Location>): Promise<Location>;
+  
+  // Spare-Component Link Methods
+  getSpareComponentLinks(vesselId: string): Promise<SpareComponentLink[]>;
+  getSpareComponentLinksBySpare(spareId: number): Promise<SpareComponentLink[]>;
+  getSpareComponentLinksByComponent(componentId: string): Promise<SpareComponentLink[]>;
+  createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink>;
+  deleteSpareComponentLink(spareId: number, componentId: string): Promise<void>;
+  getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  
+  // Spare Location Stock Methods
+  getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;
+  getSpareLocationStockByLocation(locationId: number): Promise<SpareLocationStock[]>;
+  getSpareLocationStockItem(spareId: number, locationId: number): Promise<SpareLocationStock | undefined>;
+  upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock>;
+  updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<SpareLocationStock>;
+  getSpareRobTotal(spareId: number): Promise<number>;
+  getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>>;
+  getSparesAtLocation(locationId: number): Promise<Array<{ spareId: number; partCode: string; partName: string; qty: number }>>;
+  
+  // Inventory Transaction Methods
+  createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction>;
+  getInventoryTransactions(vesselId: string, options?: {
+    spareId?: number;
+    locationId?: number;
+    eventType?: InventoryEventType;
+    limit?: number;
+  }): Promise<InventoryTransaction[]>;
+  performInventoryTransaction(input: {
+    vesselId: string;
+    spareId: number;
+    locationId: number;
+    eventType: InventoryEventType;
+    qtyChange: number;
+    referenceType: InventoryReferenceType;
+    referenceId?: string;
+    referenceNote?: string;
+    userId: string;
+  }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }>;
+  
+  // Enhanced Spare Data Methods
+  getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null>;
+  getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]>;
+  getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure

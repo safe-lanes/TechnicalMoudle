@@ -154,6 +154,21 @@ import {
   type InsertBulkImportHistory,
   type BulkImportError,
   type InsertBulkImportError,
+  locations,
+  spareComponentLinks,
+  spareLocationStock,
+  inventoryTransactions,
+  type Location,
+  type InsertLocation,
+  type SpareComponentLink,
+  type InsertSpareComponentLink,
+  type SpareLocationStock,
+  type InsertSpareLocationStock,
+  type InventoryTransaction,
+  type InsertInventoryTransaction,
+  type InventoryEventType,
+  type InventoryReferenceType,
+  type SpareWithInventory,
 } from '@shared/schema';
 
 /**
@@ -4314,6 +4329,398 @@ export class PostgresStorage {
       throw new Error(`Vessel not found: ${vesselId}`);
     }
     return result[0];
+  }
+
+  // ============= INVENTORY MANAGEMENT: LOCATIONS =============
+
+  async getLocations(vesselId: string): Promise<Location[]> {
+    const db = await getDb();
+    return await db.select().from(locations)
+      .where(eq(locations.vesselId, vesselId))
+      .orderBy(asc(locations.locationName));
+  }
+
+  async getLocationById(id: number): Promise<Location | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(locations).where(eq(locations.id, id));
+    return result[0];
+  }
+
+  async getLocationByName(vesselId: string, locationName: string): Promise<Location | undefined> {
+    const db = await getDb();
+    const normalizedName = locationName.trim().toUpperCase();
+    const result = await db.select().from(locations)
+      .where(and(
+        eq(locations.vesselId, vesselId),
+        sql`UPPER(TRIM(${locations.locationName})) = ${normalizedName}`
+      ));
+    return result[0];
+  }
+
+  async createLocation(location: InsertLocation): Promise<Location> {
+    const db = await getDb();
+    const normalizedName = location.locationName.trim();
+    const result = await db.insert(locations).values({
+      ...location,
+      locationName: normalizedName,
+    }).returning();
+    return result[0];
+  }
+
+  async findOrCreateLocation(vesselId: string, locationName: string, createdBy: string): Promise<Location> {
+    const existing = await this.getLocationByName(vesselId, locationName);
+    if (existing) {
+      return existing;
+    }
+    return await this.createLocation({
+      vesselId,
+      locationName: locationName.trim(),
+      createdBy,
+    });
+  }
+
+  async updateLocation(id: number, data: Partial<Location>): Promise<Location> {
+    const db = await getDb();
+    const result = await db.update(locations)
+      .set(data)
+      .where(eq(locations.id, id))
+      .returning();
+    if (!result[0]) {
+      throw new Error(`Location ${id} not found`);
+    }
+    return result[0];
+  }
+
+  // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
+
+  async getSpareComponentLinks(vesselId: string): Promise<SpareComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(spareComponentLinks)
+      .where(eq(spareComponentLinks.vesselId, vesselId));
+  }
+
+  async getSpareComponentLinksBySpare(spareId: number): Promise<SpareComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(spareComponentLinks)
+      .where(eq(spareComponentLinks.spareId, spareId));
+  }
+
+  async getSpareComponentLinksByComponent(componentId: string): Promise<SpareComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(spareComponentLinks)
+      .where(eq(spareComponentLinks.componentId, componentId));
+  }
+
+  async createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink> {
+    const db = await getDb();
+    const result = await db.insert(spareComponentLinks).values(link).returning();
+    return result[0];
+  }
+
+  async deleteSpareComponentLink(spareId: number, componentId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(spareComponentLinks)
+      .where(and(
+        eq(spareComponentLinks.spareId, spareId),
+        eq(spareComponentLinks.componentId, componentId)
+      ));
+  }
+
+  async getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+    const db = await getDb();
+    const links = await db.select({
+      componentId: spareComponentLinks.componentId,
+      componentCode: components.componentCode,
+      componentName: components.name,
+    })
+    .from(spareComponentLinks)
+    .innerJoin(components, eq(spareComponentLinks.componentId, components.id))
+    .where(eq(spareComponentLinks.spareId, spareId));
+    
+    return links.map(l => ({
+      componentId: l.componentId,
+      componentCode: l.componentCode || '',
+      componentName: l.componentName || '',
+    }));
+  }
+
+  // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
+
+  async getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]> {
+    const db = await getDb();
+    return await db.select().from(spareLocationStock)
+      .where(eq(spareLocationStock.spareId, spareId));
+  }
+
+  async getSpareLocationStockByLocation(locationId: number): Promise<SpareLocationStock[]> {
+    const db = await getDb();
+    return await db.select().from(spareLocationStock)
+      .where(eq(spareLocationStock.locationId, locationId));
+  }
+
+  async getSpareLocationStockItem(spareId: number, locationId: number): Promise<SpareLocationStock | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(spareLocationStock)
+      .where(and(
+        eq(spareLocationStock.spareId, spareId),
+        eq(spareLocationStock.locationId, locationId)
+      ));
+    return result[0];
+  }
+
+  async upsertSpareLocationStock(data: InsertSpareLocationStock): Promise<SpareLocationStock> {
+    const db = await getDb();
+    const existing = await this.getSpareLocationStockItem(data.spareId, data.locationId);
+    
+    if (existing) {
+      const result = await db.update(spareLocationStock)
+        .set({ qty: data.qty })
+        .where(eq(spareLocationStock.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(spareLocationStock).values(data).returning();
+      return result[0];
+    }
+  }
+
+  async updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<SpareLocationStock> {
+    const db = await getDb();
+    const existing = await this.getSpareLocationStockItem(spareId, locationId);
+    
+    if (!existing) {
+      throw new Error(`No stock record found for spare ${spareId} at location ${locationId}`);
+    }
+    
+    const newQty = existing.qty + qtyChange;
+    if (newQty < 0) {
+      throw new Error(`Cannot reduce stock below zero. Current: ${existing.qty}, Requested change: ${qtyChange}`);
+    }
+    
+    const result = await db.update(spareLocationStock)
+      .set({ qty: newQty })
+      .where(eq(spareLocationStock.id, existing.id))
+      .returning();
+    return result[0];
+  }
+
+  async getSpareRobTotal(spareId: number): Promise<number> {
+    const stockRecords = await this.getSpareLocationStock(spareId);
+    return stockRecords.reduce((sum, s) => sum + s.qty, 0);
+  }
+
+  async getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
+    const db = await getDb();
+    const result = await db.select({
+      locationId: spareLocationStock.locationId,
+      locationName: locations.locationName,
+      qty: spareLocationStock.qty,
+    })
+    .from(spareLocationStock)
+    .innerJoin(locations, eq(spareLocationStock.locationId, locations.id))
+    .where(eq(spareLocationStock.spareId, spareId));
+    
+    return result;
+  }
+
+  async getSparesAtLocation(locationId: number): Promise<Array<{ spareId: number; partCode: string; partName: string; qty: number }>> {
+    const db = await getDb();
+    const result = await db.select({
+      spareId: spareLocationStock.spareId,
+      partCode: spares.partCode,
+      partName: spares.partName,
+      qty: spareLocationStock.qty,
+    })
+    .from(spareLocationStock)
+    .innerJoin(spares, eq(spareLocationStock.spareId, spares.id))
+    .where(eq(spareLocationStock.locationId, locationId));
+    
+    return result;
+  }
+
+  // ============= INVENTORY MANAGEMENT: TRANSACTIONS =============
+
+  async createInventoryTransaction(txn: InsertInventoryTransaction): Promise<InventoryTransaction> {
+    const db = await getDb();
+    const result = await db.insert(inventoryTransactions).values(txn).returning();
+    return result[0];
+  }
+
+  async getInventoryTransactions(vesselId: string, options?: {
+    spareId?: number;
+    locationId?: number;
+    eventType?: InventoryEventType;
+    limit?: number;
+  }): Promise<InventoryTransaction[]> {
+    const db = await getDb();
+    
+    const conditions = [eq(inventoryTransactions.vesselId, vesselId)];
+    
+    if (options?.spareId) {
+      conditions.push(eq(inventoryTransactions.spareId, options.spareId));
+    }
+    if (options?.locationId) {
+      conditions.push(eq(inventoryTransactions.locationId, options.locationId));
+    }
+    if (options?.eventType) {
+      conditions.push(eq(inventoryTransactions.eventType, options.eventType));
+    }
+    
+    let query = db.select().from(inventoryTransactions)
+      .where(and(...conditions))
+      .orderBy(desc(inventoryTransactions.txnDatetime));
+    
+    if (options?.limit) {
+      query = query.limit(options.limit) as typeof query;
+    }
+    
+    return await query;
+  }
+
+  async performInventoryTransaction(input: {
+    vesselId: string;
+    spareId: number;
+    locationId: number;
+    eventType: InventoryEventType;
+    qtyChange: number;
+    referenceType: InventoryReferenceType;
+    referenceId?: string;
+    referenceNote?: string;
+    userId: string;
+  }): Promise<{ transaction: InventoryTransaction; newLocationQty: number; newTotalRob: number }> {
+    const db = await getDb();
+    
+    // Validate reference requirements based on event type
+    // CONSUME events MUST have WORK_ORDER reference type for full traceability
+    if (input.eventType === 'CONSUME') {
+      if (input.referenceType !== 'WORK_ORDER') {
+        throw new Error('CONSUME events require referenceType WORK_ORDER for traceability');
+      }
+      if (!input.referenceId) {
+        throw new Error('CONSUME events require a valid work order reference ID');
+      }
+    }
+    
+    // Validate location exists
+    const location = await this.getLocationById(input.locationId);
+    if (!location) {
+      throw new Error(`Location ${input.locationId} not found`);
+    }
+    
+    // Get current stock levels
+    const currentLocationStock = await this.getSpareLocationStockItem(input.spareId, input.locationId);
+    const currentLocationQty = currentLocationStock?.qty ?? 0;
+    const currentTotalRob = await this.getSpareRobTotal(input.spareId);
+    
+    // Calculate new values
+    const newLocationQty = currentLocationQty + input.qtyChange;
+    const newTotalRob = currentTotalRob + input.qtyChange;
+    
+    // CRITICAL: Enforce no negative stock at any level
+    if (newLocationQty < 0) {
+      throw new Error(`NEGATIVE_STOCK_PREVENTED: Cannot consume ${Math.abs(input.qtyChange)} from location. Current stock: ${currentLocationQty}`);
+    }
+    
+    if (newTotalRob < 0) {
+      throw new Error(`NEGATIVE_STOCK_PREVENTED: Transaction would result in negative total ROB. Current total: ${currentTotalRob}, Change: ${input.qtyChange}`);
+    }
+    
+    // Additional validation for CONSUME: ensure consume qty doesn't exceed location stock
+    if (input.eventType === 'CONSUME') {
+      const consumeQty = Math.abs(input.qtyChange);
+      if (currentLocationQty < consumeQty) {
+        throw new Error(`INSUFFICIENT_STOCK: Available at location: ${currentLocationQty}, Requested: ${consumeQty}`);
+      }
+    }
+    
+    // Get spare info for updating legacy ROB fields
+    const spare = await this.getSpare(input.spareId);
+    if (!spare) {
+      throw new Error(`Spare ${input.spareId} not found`);
+    }
+    
+    // Upsert location stock
+    await this.upsertSpareLocationStock({
+      vesselId: input.vesselId,
+      spareId: input.spareId,
+      locationId: input.locationId,
+      qty: newLocationQty,
+    });
+    
+    // Create transaction record
+    const transaction = await this.createInventoryTransaction({
+      vesselId: input.vesselId,
+      spareId: input.spareId,
+      locationId: input.locationId,
+      eventType: input.eventType,
+      qtyChange: input.qtyChange,
+      robTotalBefore: currentTotalRob,
+      robTotalAfter: newTotalRob,
+      robLocationBefore: currentLocationQty,
+      robLocationAfter: newLocationQty,
+      referenceType: input.referenceType,
+      referenceId: input.referenceId,
+      referenceNote: input.referenceNote,
+      userId: input.userId,
+    });
+    
+    // Update legacy ROB field on spare table for backwards compatibility
+    await db.update(spares)
+      .set({ rob: newTotalRob, updatedAt: new Date(), updatedBy: input.userId })
+      .where(eq(spares.id, input.spareId));
+    
+    return {
+      transaction,
+      newLocationQty,
+      newTotalRob,
+    };
+  }
+
+  async getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null> {
+    const spare = await this.getSpare(spareId);
+    if (!spare) return null;
+    
+    const robTotal = await this.getSpareRobTotal(spareId);
+    const locationsWithQty = await this.getSpareLocationsWithQty(spareId);
+    const linkedComponents = await this.getLinkedComponentsForSpare(spareId);
+    
+    const stockStatus: "OK" | "At Min" = robTotal <= (spare.min ?? 0) ? "At Min" : "OK";
+    
+    return {
+      spare,
+      robTotal,
+      stockStatus,
+      locations: locationsWithQty,
+      linkedComponents,
+    };
+  }
+
+  async getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]> {
+    const sparesInVessel = await this.getSpares(vesselId);
+    const results: SpareWithInventory[] = [];
+    
+    for (const spare of sparesInVessel) {
+      const withInventory = await this.getSpareWithInventory(spare.id);
+      if (withInventory) {
+        results.push(withInventory);
+      }
+    }
+    
+    return results;
+  }
+
+  async getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]> {
+    const links = await this.getSpareComponentLinksByComponent(componentId);
+    const results: SpareWithInventory[] = [];
+    
+    for (const link of links) {
+      const withInventory = await this.getSpareWithInventory(link.spareId);
+      if (withInventory) {
+        results.push(withInventory);
+      }
+    }
+    
+    return results;
   }
 }
 

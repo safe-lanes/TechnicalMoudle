@@ -407,13 +407,16 @@ export const spares = pgTable("spares", {
   pageNumber: text("page_number"), // Page number in manual
   criticality: text("criticality"), // 'Yes' | 'No' for fleet spares
   isActive: boolean("is_active").default(true), // Active status for fleet spares
-  ihm: text("ihm"), // IHM related text/number
-  evidenceType: text("evidence_type"), // Supporting document reference
+  ihm: text("ihm"), // IHM related text/number (legacy)
+  ihmPresence: text("ihm_presence").default("UNKNOWN"), // YES | NO | UNKNOWN
+  evidenceType: text("evidence_type"), // NONE | DOC | CERT | MSDS | OTHER
   partCategory: text("part_category"), // Category from master data
   applicableVesselIds: text("applicable_vessel_ids").array(), // Vessels that can use this fleet spare
   scopeNotes: text("scope_notes"), // Notes about scope applicability
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: text("created_by"), // User who created the spare
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"), // User who last updated the spare
 }, (table) => ({
   componentIdIdx: index("idx_spare_component").on(table.componentId),
   vesselIdIdx: index("idx_spare_vessel").on(table.vesselId),
@@ -1996,3 +1999,170 @@ export const insertWorkOrderExecutionDetailsSchema = createInsertSchema(workOrde
 
 export type InsertWorkOrderExecutionDetails = z.infer<typeof insertWorkOrderExecutionDetailsSchema>;
 export type WorkOrderExecutionDetails = typeof workOrderExecutionDetails.$inferSelect;
+
+// =====================================================
+// INVENTORY MANAGEMENT - Locations, Stock, Transactions
+// =====================================================
+
+// Inventory Event Types Enum
+export const inventoryEventTypeEnum = pgEnum("inventory_event_type", [
+  "RECEIVE",
+  "CONSUME", 
+  "ADJUST_OPENING_BALANCE",
+  "ADJUST_CORRECTION"
+]);
+
+// Inventory Reference Types Enum
+export const inventoryReferenceTypeEnum = pgEnum("inventory_reference_type", [
+  "WORK_ORDER",
+  "MANUAL",
+  "EXCEL_IMPORT"
+]);
+
+// IHM Presence Enum
+export const ihmPresenceEnum = pgEnum("ihm_presence", ["YES", "NO", "UNKNOWN"]);
+
+// IHM Evidence Type Enum  
+export const ihmEvidenceTypeEnum = pgEnum("ihm_evidence_type", ["NONE", "DOC", "CERT", "MSDS", "OTHER"]);
+
+// B4) LOCATIONS - Location registry for SIRE mapping
+export const locations = pgTable("locations", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  locationName: text("location_name").notNull(), // Unique per vessel, trimmed + case-normalized
+  locationType: text("location_type"), // STORE/LOCKER/BOX/etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: text("created_by").notNull(),
+}, (table) => ({
+  vesselLocationIdx: index("idx_location_vessel").on(table.vesselId),
+  uniqueVesselLocation: unique("unique_vessel_location").on(table.vesselId, table.locationName),
+}));
+
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+export type Location = typeof locations.$inferSelect;
+
+// B3) SPARE_COMPONENT_LINKS - Many-to-many linking between spares and components
+export const spareComponentLinks = pgTable("spare_component_links", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  spareId: integer("spare_id").notNull(), // FK → spares.id
+  componentId: text("component_id").notNull(), // FK → components.id
+  linkedBy: text("linked_by").notNull(),
+  linkedAt: timestamp("linked_at").notNull().defaultNow(),
+}, (table) => ({
+  spareIdIdx: index("idx_spare_component_link_spare").on(table.spareId),
+  componentIdIdx: index("idx_spare_component_link_component").on(table.componentId),
+  vesselIdIdx: index("idx_spare_component_link_vessel").on(table.vesselId),
+  uniqueSpareComponent: unique("unique_spare_component_link").on(table.spareId, table.componentId),
+}));
+
+export const insertSpareComponentLinkSchema = createInsertSchema(spareComponentLinks).omit({
+  id: true,
+  linkedAt: true,
+});
+
+export type InsertSpareComponentLink = z.infer<typeof insertSpareComponentLinkSchema>;
+export type SpareComponentLink = typeof spareComponentLinks.$inferSelect;
+
+// B5) SPARE_LOCATION_STOCK - Current stock per spare per location
+export const spareLocationStock = pgTable("spare_location_stock", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  spareId: integer("spare_id").notNull(), // FK → spares.id
+  locationId: integer("location_id").notNull(), // FK → locations.id
+  qty: integer("qty").notNull().default(0), // Must never go negative
+}, (table) => ({
+  spareIdIdx: index("idx_spare_location_stock_spare").on(table.spareId),
+  locationIdIdx: index("idx_spare_location_stock_location").on(table.locationId),
+  vesselIdIdx: index("idx_spare_location_stock_vessel").on(table.vesselId),
+  uniqueSpareLocation: unique("unique_spare_location_stock").on(table.spareId, table.locationId),
+}));
+
+export const insertSpareLocationStockSchema = createInsertSchema(spareLocationStock).omit({
+  id: true,
+});
+
+export type InsertSpareLocationStock = z.infer<typeof insertSpareLocationStockSchema>;
+export type SpareLocationStock = typeof spareLocationStock.$inferSelect;
+
+// B6) INVENTORY_TRANSACTIONS - Single source of truth for history
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  txnDatetime: timestamp("txn_datetime").notNull().defaultNow(),
+  spareId: integer("spare_id").notNull(), // FK → spares.id
+  locationId: integer("location_id"), // Nullable only if non-location specific; for consume/receive MUST set
+  eventType: text("event_type").notNull(), // RECEIVE | CONSUME | ADJUST_OPENING_BALANCE | ADJUST_CORRECTION
+  qtyChange: integer("qty_change").notNull(), // Positive for receive, negative for consume
+  robTotalBefore: integer("rob_total_before").notNull(),
+  robTotalAfter: integer("rob_total_after").notNull(),
+  robLocationBefore: integer("rob_location_before"), // Nullable if non-location specific
+  robLocationAfter: integer("rob_location_after"), // Nullable if non-location specific
+  referenceType: text("reference_type").notNull(), // WORK_ORDER | MANUAL | EXCEL_IMPORT
+  referenceId: text("reference_id"), // WO number, import batch id, etc.
+  referenceNote: text("reference_note"), // Free text
+  userId: text("user_id").notNull(),
+}, (table) => ({
+  vesselIdIdx: index("idx_inventory_txn_vessel").on(table.vesselId),
+  spareIdIdx: index("idx_inventory_txn_spare").on(table.spareId),
+  locationIdIdx: index("idx_inventory_txn_location").on(table.locationId),
+  txnDatetimeIdx: index("idx_inventory_txn_datetime").on(table.txnDatetime),
+  eventTypeIdx: index("idx_inventory_txn_event").on(table.eventType),
+  referenceTypeIdx: index("idx_inventory_txn_ref_type").on(table.referenceType),
+}));
+
+export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({
+  id: true,
+  txnDatetime: true,
+});
+
+export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+
+// Event type constants for validation
+export const INVENTORY_EVENT_TYPES = ["RECEIVE", "CONSUME", "ADJUST_OPENING_BALANCE", "ADJUST_CORRECTION"] as const;
+export const INVENTORY_REFERENCE_TYPES = ["WORK_ORDER", "MANUAL", "EXCEL_IMPORT"] as const;
+export const IHM_PRESENCE_VALUES = ["YES", "NO", "UNKNOWN"] as const;
+export const IHM_EVIDENCE_TYPES = ["NONE", "DOC", "CERT", "MSDS", "OTHER"] as const;
+
+export type InventoryEventType = typeof INVENTORY_EVENT_TYPES[number];
+export type InventoryReferenceType = typeof INVENTORY_REFERENCE_TYPES[number];
+export type IhmPresence = typeof IHM_PRESENCE_VALUES[number];
+export type IhmEvidenceType = typeof IHM_EVIDENCE_TYPES[number];
+
+// Zod schemas for validation
+export const inventoryTransactionInputSchema = z.object({
+  vesselId: z.string(),
+  spareId: z.number(),
+  locationId: z.number().optional(),
+  eventType: z.enum(INVENTORY_EVENT_TYPES),
+  qtyChange: z.number(),
+  referenceType: z.enum(INVENTORY_REFERENCE_TYPES),
+  referenceId: z.string().optional(),
+  referenceNote: z.string().optional(),
+  userId: z.string(),
+});
+
+export type InventoryTransactionInput = z.infer<typeof inventoryTransactionInputSchema>;
+
+// Response type for spare with calculated ROB and stock status
+export type SpareWithInventory = {
+  spare: Spare;
+  robTotal: number;
+  stockStatus: "OK" | "At Min";
+  locations: Array<{
+    locationId: number;
+    locationName: string;
+    qty: number;
+  }>;
+  linkedComponents: Array<{
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+  }>;
+};

@@ -825,6 +825,141 @@ class MemStorage {
     console.log('[MemStorage] checkAndRevertPostponedWorkOrders called - no-op in file mode');
     return { checked: 0, reverted: 0 };
   }
+
+  // ============= INVENTORY MANAGEMENT: Stub implementations =============
+  
+  async getLocations(vesselId: string): Promise<any[]> {
+    console.log('[MemStorage] getLocations called - stub in file mode');
+    return [];
+  }
+  
+  async getLocationById(id: number): Promise<any | undefined> {
+    console.log('[MemStorage] getLocationById called - stub in file mode');
+    return undefined;
+  }
+  
+  async getLocationByName(vesselId: string, locationName: string): Promise<any | undefined> {
+    console.log('[MemStorage] getLocationByName called - stub in file mode');
+    return undefined;
+  }
+  
+  async createLocation(location: any): Promise<any> {
+    console.log('[MemStorage] createLocation called - stub in file mode');
+    return { ...location, id: Date.now() };
+  }
+  
+  async findOrCreateLocation(vesselId: string, locationName: string, createdBy: string): Promise<any> {
+    console.log('[MemStorage] findOrCreateLocation called - stub in file mode');
+    return { id: Date.now(), vesselId, locationName, createdBy, createdAt: new Date() };
+  }
+  
+  async updateLocation(id: number, data: any): Promise<any> {
+    console.log('[MemStorage] updateLocation called - stub in file mode');
+    return { ...data, id };
+  }
+  
+  async getSpareComponentLinks(vesselId: string): Promise<any[]> {
+    console.log('[MemStorage] getSpareComponentLinks called - stub in file mode');
+    return [];
+  }
+  
+  async getSpareComponentLinksBySpare(spareId: number): Promise<any[]> {
+    console.log('[MemStorage] getSpareComponentLinksBySpare called - stub in file mode');
+    return [];
+  }
+  
+  async getSpareComponentLinksByComponent(componentId: string): Promise<any[]> {
+    console.log('[MemStorage] getSpareComponentLinksByComponent called - stub in file mode');
+    return [];
+  }
+  
+  async createSpareComponentLink(link: any): Promise<any> {
+    console.log('[MemStorage] createSpareComponentLink called - stub in file mode');
+    return { ...link, id: Date.now(), createdAt: new Date() };
+  }
+  
+  async deleteSpareComponentLink(spareId: number, componentId: string): Promise<void> {
+    console.log('[MemStorage] deleteSpareComponentLink called - stub in file mode');
+  }
+  
+  async getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+    console.log('[MemStorage] getLinkedComponentsForSpare called - stub in file mode');
+    return [];
+  }
+  
+  async getSpareLocationStock(spareId: number): Promise<any[]> {
+    console.log('[MemStorage] getSpareLocationStock called - stub in file mode');
+    return [];
+  }
+  
+  async getSpareLocationStockByLocation(locationId: number): Promise<any[]> {
+    console.log('[MemStorage] getSpareLocationStockByLocation called - stub in file mode');
+    return [];
+  }
+  
+  async getSpareLocationStockItem(spareId: number, locationId: number): Promise<any | undefined> {
+    console.log('[MemStorage] getSpareLocationStockItem called - stub in file mode');
+    return undefined;
+  }
+  
+  async upsertSpareLocationStock(data: any): Promise<any> {
+    console.log('[MemStorage] upsertSpareLocationStock called - stub in file mode');
+    return { ...data, id: Date.now() };
+  }
+  
+  async updateSpareLocationStockQty(spareId: number, locationId: number, qtyChange: number): Promise<any> {
+    console.log('[MemStorage] updateSpareLocationStockQty called - stub in file mode');
+    return { spareId, locationId, qty: qtyChange, id: Date.now() };
+  }
+  
+  async getSpareRobTotal(spareId: number): Promise<number> {
+    console.log('[MemStorage] getSpareRobTotal called - stub in file mode');
+    return 0;
+  }
+  
+  async getSpareLocationsWithQty(spareId: number): Promise<Array<{ locationId: number; locationName: string; qty: number }>> {
+    console.log('[MemStorage] getSpareLocationsWithQty called - stub in file mode');
+    return [];
+  }
+  
+  async getSparesAtLocation(locationId: number): Promise<Array<{ spareId: number; partCode: string; partName: string; qty: number }>> {
+    console.log('[MemStorage] getSparesAtLocation called - stub in file mode');
+    return [];
+  }
+  
+  async createInventoryTransaction(txn: any): Promise<any> {
+    console.log('[MemStorage] createInventoryTransaction called - stub in file mode');
+    return { ...txn, id: Date.now(), txnDatetime: new Date() };
+  }
+  
+  async getInventoryTransactions(vesselId: string, options?: any): Promise<any[]> {
+    console.log('[MemStorage] getInventoryTransactions called - stub in file mode');
+    return [];
+  }
+  
+  async performInventoryTransaction(input: any): Promise<{ transaction: any; newLocationQty: number; newTotalRob: number }> {
+    console.log('[MemStorage] performInventoryTransaction called - stub in file mode');
+    return {
+      transaction: { id: Date.now(), ...input, txnDatetime: new Date() },
+      newLocationQty: 0,
+      newTotalRob: 0,
+    };
+  }
+  
+  async getSpareWithInventory(spareId: number): Promise<any | null> {
+    console.log('[MemStorage] getSpareWithInventory called - stub in file mode');
+    return null;
+  }
+  
+  async getSparesWithInventoryByVessel(vesselId: string): Promise<any[]> {
+    console.log('[MemStorage] getSparesWithInventoryByVessel called - stub in file mode');
+    return [];
+  }
+  
+  async getSparesWithInventoryByComponent(componentId: string): Promise<any[]> {
+    console.log('[MemStorage] getSparesWithInventoryByComponent called - stub in file mode');
+    return [];
+  }
 }
 
 export const memStorage = new MemStorage();
