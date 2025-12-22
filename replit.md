@@ -27,7 +27,15 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Running Hours Module (Delta Propagation)**: Updates to parent RH propagate delta to children's independent RH values.
 - **Running Hours Counter Types (B7.B)**: Components support three RH counter types: MASTER (component maintains its own running hours), INHERITED (automatically inherits RH from a linked MASTER component with cascade updates), and NOT_RH_DRIVEN (RH not applicable). The RunningHoursConditionPanel in Section B of the component edit form allows configuration of these types. Safety validations prevent self-referential links, cross-vessel master selections, and cycles (INHERITED can only point to MASTER components).
 - **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7.
-- **Spares Module**: Inventory management with dual locations, ROB/Min/Max, bulk upload, and transaction history.
+- **Spares Module (Enhanced Inventory System)**: Complete inventory management with:
+  - **Many-to-Many Linking**: Spares can be linked to multiple components via `spare_component_links` table
+  - **Location Registry**: Named locations per vessel (`locations` table) with case-insensitive uniqueness
+  - **Stock Per Location**: `spare_location_stock` tracks qty per spare-location combination (no negative stock)
+  - **Transaction History**: Full audit trail via `inventory_transactions` with before/after snapshots
+  - **Event Types**: RECEIVE (add stock), CONSUME (use stock - requires work order reference), ADJUST (corrections)
+  - **Traceability**: CONSUME events MUST have referenceType=WORK_ORDER and valid referenceId
+  - **API Endpoints**: `/api/inventory/locations/*`, `/api/inventory/spare-links/*`, `/api/inventory/stock/*`, `/api/inventory/transactions`
+  - **Error Codes**: NEGATIVE_STOCK_PREVENTED, INSUFFICIENT_STOCK, NOT_FOUND, VALIDATION_ERROR
 - **Auto-Generation Scheduler**: Automatically generates work orders for calendar and RH-based jobs.
 - **Admin Module**: Bulk data import, data purging, and a Fleet Admin Dashboard.
 - **Multi-Sheet Excel Bulk Import Templates**: 11-sheet system for Fleet and Vessel data.
