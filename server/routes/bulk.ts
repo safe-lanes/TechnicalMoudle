@@ -2544,10 +2544,13 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
       });
 
       // Copy text fields directly - support both new and legacy header formats
+      // IMPORTANT: Include RH Counter Type, RH Counter Source, and Last Updated for Running Hours tracking
       const textFields = [
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Maker', 'Maker Code',
         'Model', 'Model Code', 'Model Number', 'Serial No', 'Drawing No', 'Location',
-        'Rating', 'Equipment / System Department', 'Eqpt / System Department', 'Notes', 'Vessel Code'
+        'Rating', 'Equipment / System Department', 'Eqpt / System Department', 'Notes', 'Vessel Code',
+        'IS Parent', 'Class item', 'Class Item', 'Criticality',
+        'RH Counter Type', 'RH Counter Source', 'Last Updated'
       ];
       
       textFields.forEach(field => {

@@ -9,6 +9,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 
 const DATA_FILE = path.join(process.cwd(), 'test-data.json');
 
@@ -103,9 +104,12 @@ class MemStorage {
 
   async createComponent(component: any): Promise<any> {
     if (!this.data.components) this.data.components = {};
-    this.data.components[component.id] = component;
+    // Auto-generate ID if not provided: prefer componentCode for deterministic lookup, fallback to UUID
+    const id = component.id || component.componentCode || randomUUID();
+    const componentWithId = { ...component, id };
+    this.data.components[id] = componentWithId;
     this.saveData();
-    return component;
+    return componentWithId;
   }
 
   async updateComponent(id: string, data: any): Promise<any> {
