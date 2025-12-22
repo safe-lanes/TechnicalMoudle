@@ -7966,19 +7966,19 @@
       "parentComponent": "411",
       "notes": "Technical Information\r\n===================\r\nModel: HLD-RADAR900S",
       "runningHours": "500",
-      "currentCumulativeRH": "850",
+      "currentCumulativeRH": "950",
       "rhCounterType": "MASTER",
       "rhCounterSource": "SELF",
-      "rhCurrentMaster": "850",
-      "rhMasterUpdatedAt": "2025-12-22T09:21:08.975Z",
+      "rhCurrentMaster": "950",
+      "rhMasterUpdatedAt": "2025-12-22T09:36:14.719Z",
       "rhMasterUpdateSource": "MANUAL",
       "rhMasterComponentId": null,
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
-      "lastUpdated": "22-Dec-2025 15:35",
+      "lastUpdated": "22 Dec 2025 00:00",
       "id": "411.001",
       "rhMasterUpdatedBy": "admin",
-      "updatedAt": "2025-12-22T09:21:08.975Z"
+      "updatedAt": "2025-12-22T09:36:14.719Z"
     },
     "411.002": {
       "componentCode": "411.002",
@@ -18725,6 +18725,19 @@
       "meterReplaced": false,
       "userId": "admin",
       "createdAt": "2025-12-22T09:21:08.975Z"
+    },
+    {
+      "id": 22,
+      "componentId": "411.001",
+      "previousValue": "850",
+      "newValue": "950",
+      "delta": "100",
+      "mode": "setTotal",
+      "dateUpdated": "22 Dec 2025 00:00",
+      "comments": "",
+      "meterReplaced": false,
+      "userId": "admin",
+      "createdAt": "2025-12-22T09:36:14.719Z"
     }
   ],
   "spares": {
