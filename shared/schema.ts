@@ -738,7 +738,7 @@ export const jobs = pgTable("jobs", {
   componentId: text("component_id").notNull(), // Component this job belongs to
   componentCode: text("component_code").notNull(),
   componentName: text("component_name").notNull(),
-  jobNo: text("job_no").notNull().unique(), // Auto-generated JOB-XXXXXXX
+  jobNo: text("job_no").notNull(), // Auto-generated JOB-XXXXXXX (not globally unique - same job_no can exist across vessels/components)
   jobTitle: text("job_title").notNull(),
   assignedTo: text("assigned_to"),
   maintenanceType: text("maintenance_type"), // 'Inspection' | 'Overhaul' | 'Service' | 'Testing'
@@ -785,7 +785,6 @@ export const jobs = pgTable("jobs", {
   componentCodeIdx: index("idx_job_component_code").on(table.componentCode),
   dataScopeIdx: index("idx_job_data_scope").on(table.dataScope),
   nextDueDateIdx: index("idx_job_next_due").on(table.nextDueDate),
-  jobNoUniqueIdx: unique("unique_job_no").on(table.jobNo),
 }));
 
 export const insertJobSchema = createInsertSchema(jobs).omit({
