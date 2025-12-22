@@ -498,6 +498,7 @@ class MemStorage {
   async getMakerListItem(id: number): Promise<any> { return undefined; }
   async getMakerListByCode(makerCode: string): Promise<any> { return undefined; }
   async createMakerList(list: any): Promise<any> { return { ...list, id: this.getNextId('makerLists') }; }
+  async createMakerListItem(maker: any): Promise<any> { return { ...maker, id: this.getNextId('makerLists') }; }
   async updateMakerList(id: number, data: any): Promise<any> { return data; }
   async deleteMakerList(id: number): Promise<void> {}
   async getSfiDetails(): Promise<any[]> { return toArray(this.data.sfiDetails); }
@@ -608,6 +609,40 @@ class MemStorage {
   async getAllWorkOrders(): Promise<any[]> { return toArray(this.data.workOrders); }
   async getAllSpares(): Promise<any[]> { return toArray(this.data.spares); }
   async getAllComponents(): Promise<any[]> { return toArray(this.data.components); }
+
+  // Bulk prefetch methods for performance
+  async getComponentsByCodes(codes: string[], vesselId?: string): Promise<Map<string, any>> {
+    const result = new Map<string, any>();
+    const allComponents = toArray(this.data.components);
+    for (const comp of allComponents) {
+      if (codes.includes(comp.componentCode) && (!vesselId || comp.vesselId === vesselId)) {
+        result.set(comp.componentCode, comp);
+      }
+    }
+    return result;
+  }
+
+  async getJobsByJobNos(jobNos: string[], vesselId?: string): Promise<Map<string, any>> {
+    const result = new Map<string, any>();
+    const allJobs = toArray(this.data.jobs);
+    for (const job of allJobs) {
+      if (jobNos.includes(job.jobNo || job.jobCode) && (!vesselId || job.vesselId === vesselId)) {
+        result.set(job.jobNo || job.jobCode, job);
+      }
+    }
+    return result;
+  }
+
+  async getWorkOrdersByTemplateIds(templateIds: string[], vesselId?: string): Promise<Map<string, any>> {
+    const result = new Map<string, any>();
+    const allWorkOrders = toArray(this.data.workOrders);
+    for (const wo of allWorkOrders) {
+      if (templateIds.includes(wo.templateId || wo.jobId) && (!vesselId || wo.vesselId === vesselId)) {
+        result.set(wo.templateId || wo.jobId, wo);
+      }
+    }
+    return result;
+  }
 
   // Fleet component methods
   async getFleetComponents(fleetId: string): Promise<any[]> { return []; }
