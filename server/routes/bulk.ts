@@ -1499,14 +1499,15 @@ router.get('/template', async (req, res) => {
   switch (type) {
     case 'components':
       headers = [
-        // Vessel Component Sheet - 24 columns (matching Fleet Master Data template)
+        // Vessel Component Sheet - 28 columns (exact order per user specification)
         'Fleet Equipment Code', 'Fleet Equipment Name', 'Parent Component Code',
         'Component Code', 'Component Name', 'Component Category',
         'Maker', 'Maker Code', 'Model', 'Model Code', 'Serial No', 'Drawing No',
         'Location', 'Criticality', 'Condition Based',
         'Installation Date', 'Commissioned Date', 'Rating',
-        'Equipment / System Department', 'Notes', 'Running Hours',
-        'IS Active', 'Vessel Code', 'IS Parent'
+        'Equipment / System Department', 'Class item', 'IS Active',
+        'Vessel Code', 'IS Parent', 'Notes',
+        'RH Counter Type', 'RH Counter Source', 'Running Hours', 'Last Updated'
       ];
 
       validValues = [
@@ -1515,8 +1516,9 @@ router.get('/template', async (req, res) => {
         'Text (Manufacturer name)', 'Text (Maker ID from Maker List)', 'Text (Model name)', 'Text (Model code)', 'Text (Serial number)', 'Text (Drawing reference)',
         'Text (Physical location)', 'Yes/No', 'Yes/No',
         'DD-MMM-YYYY', 'DD-MMM-YYYY', 'Text (Capacity/specification)',
-        'Engine/Deck/Electrical', 'Text (Additional notes)', 'Number >= 0',
-        'Yes/No', 'Text (e.g., V001)', 'Yes/No'
+        'Engine/Deck/Electrical', 'Yes/No', 'Yes/No',
+        'Text (e.g., V001)', 'Yes/No', 'Text (Additional notes)',
+        'MASTER/INHERITED/NOT_RH_DRIVEN', 'Text (RH source)', 'Number >= 0', 'Text (Timestamp)'
       ];
 
       example = [];
@@ -1586,14 +1588,14 @@ router.get('/template', async (req, res) => {
   // Create main sheet - Headers only, NO sample data row
   const mainSheet = XLSX.utils.aoa_to_sheet([headers]);
 
-  // Add data validation for components (24-column format)
-  // Columns: ...N=Critical Yes/No, O=Condition Based Yes/No, ...V=IS Active...
+  // Add data validation for components (28-column format)
+  // Columns: N=Criticality, O=Condition Based, T=Class item, U=IS Active, W=IS Parent, Y=RH Counter Type
   if (type === 'components') {
     if (!mainSheet['!dataValidation']) {
       mainSheet['!dataValidation'] = [];
     }
 
-    // Column N: Critical Yes/No - row 2 onwards
+    // Column N: Criticality (Yes/No) - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1605,7 +1607,7 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Column O: Condition Based Yes/No - row 2 onwards
+    // Column O: Condition Based (Yes/No) - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
@@ -1617,16 +1619,52 @@ router.get('/template', async (req, res) => {
       error: 'Please select Yes or No'
     });
 
-    // Column V: IS Active - row 2 onwards
+    // Column T: Class item (Yes/No) - row 2 onwards
     mainSheet['!dataValidation'].push({
       type: 'list',
       operator: 'equal',
-      sqref: 'V2:V1000',
+      sqref: 'T2:T1000',
       formulas: ['"Yes,No"'],
       allowBlank: true,
       showErrorMessage: true,
       errorTitle: 'Invalid Value',
       error: 'Please select Yes or No'
+    });
+
+    // Column U: IS Active (Yes/No) - row 2 onwards
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'U2:U1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Column W: IS Parent (Yes/No) - row 2 onwards
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'W2:W1000',
+      formulas: ['"Yes,No"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select Yes or No'
+    });
+
+    // Column Y: RH Counter Type - row 2 onwards
+    mainSheet['!dataValidation'].push({
+      type: 'list',
+      operator: 'equal',
+      sqref: 'Y2:Y1000',
+      formulas: ['"MASTER,INHERITED,NOT_RH_DRIVEN"'],
+      allowBlank: true,
+      showErrorMessage: true,
+      errorTitle: 'Invalid Value',
+      error: 'Please select MASTER, INHERITED, or NOT_RH_DRIVEN'
     });
   }
 
