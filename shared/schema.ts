@@ -222,6 +222,8 @@ export const components = pgTable("components", {
   // === Section B7.B: Running Hours & Condition Monitoring ===
   // RH Counter Type: MASTER | INHERITED | NOT_RH_DRIVEN
   rhCounterType: text("rh_counter_type").notNull().default("NOT_RH_DRIVEN"),
+  // RH Counter Source: Source of running hours data (e.g., MAIN_ENGINE, GENERATOR, MANUAL)
+  rhCounterSource: text("rh_counter_source"),
   // For INHERITED components: references the MASTER component
   rhMasterComponentId: text("rh_master_component_id"),
   // For MASTER components: the actual running hours value

@@ -4311,8 +4311,8 @@ async function createComponentFromRow(row: any, vesselId?: string) {
   const isParentValue = row['IS Parent'] ?? row['IS Parent Yes/No'];
   const isParent = isParentValue === true || isParentValue === 'Yes';
   
-  // Support Class Item field
-  const classItemValue = row['Class Item'];
+  // Support Class Item field (both "Class Item" and "Class item" headers)
+  const classItemValue = row['Class Item'] ?? row['Class item'];
   const isClassItem = classItemValue === true || classItemValue === 'Yes';
   
   const componentData = {
@@ -4357,7 +4357,12 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     notes: row['Notes'] || null,
     // Running Hours
     runningHours: row['Running Hours'] ? String(row['Running Hours']) : null,
-    currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0'
+    currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0',
+    // RH Counter fields
+    rhCounterType: row['RH Counter Type'] || 'NOT_RH_DRIVEN',
+    rhCounterSource: row['RH Counter Source'] || null,
+    // Last Updated
+    lastUpdated: row['Last Updated'] || null
   };
 
   console.log(`📦 Creating component: ${componentCode} - ${componentData.name}`);
@@ -4435,8 +4440,8 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   if (isParentValue !== undefined) {
     updateData.isParent = isParentValue === true || isParentValue === 'Yes';
   }
-  // Support Class Item field
-  const classItemValue = row['Class Item'];
+  // Support Class Item field (both "Class Item" and "Class item" headers)
+  const classItemValue = row['Class Item'] ?? row['Class item'];
   if (classItemValue !== undefined) {
     updateData.classItem = classItemValue === true || classItemValue === 'Yes';
   }
@@ -4449,6 +4454,11 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
     updateData.runningHours = String(row['Running Hours']);
     updateData.currentCumulativeRH = String(row['Running Hours']);
   }
+  // RH Counter fields
+  if (row['RH Counter Type']) updateData.rhCounterType = row['RH Counter Type'];
+  if (row['RH Counter Source']) updateData.rhCounterSource = row['RH Counter Source'];
+  // Last Updated
+  if (row['Last Updated']) updateData.lastUpdated = row['Last Updated'];
   // Vessel Code - CRITICAL: Update BOTH vesselId and vesselCode for consistency
   if (row['Vessel Code']) {
     updateData.vesselId = row['Vessel Code'];  // FK/reference

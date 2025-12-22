@@ -23,12 +23,15 @@ const FIELD_MAPPINGS = [
   { field: "Commissioned Date", required: false, description: "Commissioned date (DD-MMM-YYYY)" },
   { field: "Rating", required: false, description: "Power/capacity rating" },
   { field: "Equipment / System Department", required: false, description: "Department responsible" },
-  { field: "Notes", required: false, description: "Additional notes" },
-  { field: "Running Hours", required: false, description: "Current running hours" },
+  { field: "Class item", required: false, description: "Yes/No - is class item" },
   { field: "IS Active", required: false, description: "Yes/No - defaults to Yes" },
   { field: "Vessel Code", required: true, description: "Vessel identifier (e.g., V001)" },
   { field: "IS Parent", required: false, description: "Yes/No - is parent component" },
-  { field: "Class Item", required: false, description: "Yes/No - is class item" },
+  { field: "Notes", required: false, description: "Additional notes" },
+  { field: "RH Counter Type", required: false, description: "Running hours counter type (MASTER/INHERITED/NOT_RH_DRIVEN)" },
+  { field: "RH Counter Source", required: false, description: "Source of running hours data" },
+  { field: "Running Hours", required: false, description: "Current running hours" },
+  { field: "Last Updated", required: false, description: "Last update timestamp" },
 ];
 
 export default function FleetComponentUpload() {
