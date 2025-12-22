@@ -123,9 +123,11 @@ const RunningHours = () => {
       return await apiRequest('POST', '/api/running-hours/cascade', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
+      // Invalidate all related queries with refetchType 'all' to force refetch even inactive queries
+      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config/master-components'], refetchType: 'all' });
       toast({ title: "Success", description: "Running hours updated successfully" });
       setIsUpdateDialogOpen(false);
       handleCancelUpdate();
@@ -157,9 +159,11 @@ const RunningHours = () => {
       return await Promise.all(promises);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
+      // Invalidate all related queries with refetchType 'all' to force refetch even inactive queries
+      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config/master-components'], refetchType: 'all' });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",

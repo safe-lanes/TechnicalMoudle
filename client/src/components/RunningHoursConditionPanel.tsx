@@ -73,6 +73,7 @@ export default function RunningHoursConditionPanel({
       return res.json();
     },
     enabled: !!componentId,
+    staleTime: 0, // Always refetch on mount to get latest cascade updates
   });
 
   const { data: masterComponents = [], isLoading: isLoadingMasters } = useQuery<MasterComponent[]>({
@@ -83,6 +84,7 @@ export default function RunningHoursConditionPanel({
       return res.json();
     },
     enabled: !!vesselId && (pendingCounterType === "INHERITED" || rhConfig?.rhCounterType === "INHERITED"),
+    staleTime: 0, // Always refetch on mount to get latest values
   });
 
   useEffect(() => {
