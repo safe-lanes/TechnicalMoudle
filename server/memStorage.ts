@@ -561,6 +561,7 @@ class MemStorage {
 
   // Component Maintenance History
   async getComponentMaintenanceHistory(componentId: string): Promise<any[]> { return []; }
+  async getAllComponentMaintenanceHistory(): Promise<any[]> { return []; }
   async createComponentMaintenanceHistory(item: any): Promise<any> { return { ...item, id: this.getNextId('maintHistory') }; }
 
   // Component Requisitions

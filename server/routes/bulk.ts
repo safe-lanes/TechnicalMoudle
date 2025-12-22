@@ -4357,6 +4357,37 @@ async function createComponentFromRow(row: any, vesselId?: string) {
   const classItemValue = row['Class Item'] ?? row['Class item'];
   const isClassItem = classItemValue === true || classItemValue === 'Yes';
   
+  // Parse RH Counter Type and determine appropriate field mappings
+  const rhCounterType = (row['RH Counter Type'] || 'NOT_RH_DRIVEN').toString().toUpperCase().trim();
+  const rhCounterSource = row['RH Counter Source'] || null;
+  const runningHoursValue = row['Running Hours'] ? String(row['Running Hours']) : null;
+  const lastUpdatedValue = row['Last Updated'] ? normalizeDateToDDMMMYYYY(row['Last Updated']) : null;
+  
+  // Map RH fields based on Counter Type per workflow logic:
+  // MASTER: rh_current_master stores actual RH value, rh_counter_source = 'SELF'
+  // INHERITED: rh_current_inherited_cached stores cached RH, rh_master_component_id references source component
+  // NOT_RH_DRIVEN: All RH fields remain null
+  let rhCurrentMaster = null;
+  let rhCurrentInheritedCached = null;
+  let rhMasterComponentId = null;
+  let rhMasterUpdatedAt = null;
+  let rhInheritedUpdatedAt = null;
+  let rhMasterUpdateSource = null;
+  
+  if (rhCounterType === 'MASTER') {
+    // MASTER components maintain their own RH value
+    rhCurrentMaster = runningHoursValue;
+    rhMasterUpdatedAt = new Date();
+    rhMasterUpdateSource = 'IMPORT';
+  } else if (rhCounterType === 'INHERITED') {
+    // INHERITED components cache the RH value and reference a MASTER component
+    rhCurrentInheritedCached = runningHoursValue;
+    rhInheritedUpdatedAt = new Date();
+    // RH Counter Source for INHERITED should be the MASTER component's code (not 'SELF')
+    rhMasterComponentId = rhCounterSource && rhCounterSource !== 'SELF' ? rhCounterSource : null;
+  }
+  // NOT_RH_DRIVEN: All RH fields stay null (default)
+  
   const componentData = {
     componentCode: componentCode,
     name: row['Component Name'] || '',
@@ -4397,14 +4428,22 @@ async function createComponentFromRow(row: any, vesselId?: string) {
     rating: row['Rating'] || null,
     parentComponent: row['Parent Component Code'] ? String(row['Parent Component Code']).trim() : null,
     notes: row['Notes'] || null,
-    // Running Hours
-    runningHours: row['Running Hours'] ? String(row['Running Hours']) : null,
-    currentCumulativeRH: row['Running Hours'] ? String(row['Running Hours']) : '0',
-    // RH Counter fields
-    rhCounterType: row['RH Counter Type'] || 'NOT_RH_DRIVEN',
-    rhCounterSource: row['RH Counter Source'] || null,
+    // Running Hours (legacy field - kept for backward compatibility)
+    runningHours: runningHoursValue,
+    currentCumulativeRH: runningHoursValue || '0',
+    // RH Counter fields - mapped based on Counter Type
+    rhCounterType: rhCounterType,
+    rhCounterSource: rhCounterSource,
+    // MASTER-specific fields
+    rhCurrentMaster: rhCurrentMaster,
+    rhMasterUpdatedAt: rhMasterUpdatedAt,
+    rhMasterUpdateSource: rhMasterUpdateSource,
+    // INHERITED-specific fields
+    rhMasterComponentId: rhMasterComponentId,
+    rhCurrentInheritedCached: rhCurrentInheritedCached,
+    rhInheritedUpdatedAt: rhInheritedUpdatedAt,
     // Last Updated
-    lastUpdated: row['Last Updated'] || null
+    lastUpdated: lastUpdatedValue
   };
 
   console.log(`📦 Creating component: ${componentCode} - ${componentData.name}`);
@@ -4491,16 +4530,58 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   if (row['Rating']) updateData.rating = row['Rating'];
   if (row['Parent Component Code']) updateData.parentComponent = String(row['Parent Component Code']).trim();
   if (row['Notes']) updateData.notes = row['Notes'];
-  // Running Hours
-  if (row['Running Hours']) {
-    updateData.runningHours = String(row['Running Hours']);
-    updateData.currentCumulativeRH = String(row['Running Hours']);
+  // Running Hours and RH Counter fields - Map based on Counter Type
+  const rhCounterType = row['RH Counter Type'] ? row['RH Counter Type'].toString().toUpperCase().trim() : null;
+  const rhCounterSource = row['RH Counter Source'] || null;
+  const runningHoursValue = row['Running Hours'] ? String(row['Running Hours']) : null;
+  
+  if (runningHoursValue !== null) {
+    updateData.runningHours = runningHoursValue;
+    updateData.currentCumulativeRH = runningHoursValue;
   }
-  // RH Counter fields
-  if (row['RH Counter Type']) updateData.rhCounterType = row['RH Counter Type'];
-  if (row['RH Counter Source']) updateData.rhCounterSource = row['RH Counter Source'];
+  
+  if (rhCounterType) {
+    updateData.rhCounterType = rhCounterType;
+    
+    if (rhCounterType === 'MASTER') {
+      // MASTER components maintain their own RH value
+      if (runningHoursValue !== null) {
+        updateData.rhCurrentMaster = runningHoursValue;
+        updateData.rhMasterUpdatedAt = new Date();
+        updateData.rhMasterUpdateSource = 'IMPORT';
+      }
+      // Clear INHERITED fields
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentInheritedCached = null;
+      updateData.rhInheritedUpdatedAt = null;
+    } else if (rhCounterType === 'INHERITED') {
+      // INHERITED components cache the RH value and reference a MASTER component
+      if (runningHoursValue !== null) {
+        updateData.rhCurrentInheritedCached = runningHoursValue;
+        updateData.rhInheritedUpdatedAt = new Date();
+      }
+      // RH Counter Source for INHERITED should be the MASTER component's code
+      if (rhCounterSource && rhCounterSource !== 'SELF') {
+        updateData.rhMasterComponentId = rhCounterSource;
+      }
+      // Clear MASTER fields
+      updateData.rhCurrentMaster = null;
+      updateData.rhMasterUpdatedAt = null;
+      updateData.rhMasterUpdateSource = null;
+    } else if (rhCounterType === 'NOT_RH_DRIVEN') {
+      // Clear all RH-specific fields
+      updateData.rhCurrentMaster = null;
+      updateData.rhMasterUpdatedAt = null;
+      updateData.rhMasterUpdateSource = null;
+      updateData.rhMasterComponentId = null;
+      updateData.rhCurrentInheritedCached = null;
+      updateData.rhInheritedUpdatedAt = null;
+    }
+  }
+  
+  if (rhCounterSource) updateData.rhCounterSource = rhCounterSource;
   // Last Updated
-  if (row['Last Updated']) updateData.lastUpdated = row['Last Updated'];
+  if (row['Last Updated']) updateData.lastUpdated = normalizeDateToDDMMMYYYY(row['Last Updated']);
   // Vessel Code - CRITICAL: Update BOTH vesselId and vesselCode for consistency
   if (row['Vessel Code']) {
     updateData.vesselId = row['Vessel Code'];  // FK/reference
