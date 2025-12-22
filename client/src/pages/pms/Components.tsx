@@ -2256,48 +2256,94 @@ const Components: React.FC = () => {
     };
   }, [isModifyMode]);
   
-  // Check if we should open the Add/Edit Component form OR select a specific component
+  // Check if we should open the Add/Edit Component form
   useEffect(() => {
     const shouldOpenForm = sessionStorage.getItem('openComponentForm');
-    const targetComponentCode = sessionStorage.getItem('targetComponentCode');
     
     if (shouldOpenForm === 'true') {
       setIsComponentFormOpen(true);
       sessionStorage.removeItem('openComponentForm');
     }
+  }, []);
+  
+  // Handle target component navigation - find and select a specific component, expanding its parent chain
+  useEffect(() => {
+    const targetComponentCode = sessionStorage.getItem('targetComponentCode');
     
-    // If we have a target component code from ModifyPMS, find and select it
-    if (targetComponentCode) {
-      const findComponent = (nodes: ComponentNode[]): ComponentNode | null => {
-        for (const node of nodes) {
-          if (node.code === targetComponentCode) {
-            return node;
+    // Only proceed if we have a target and data is loaded
+    if (!targetComponentCode || fetchedComponents.length === 0 || componentTreeData.length === 0) {
+      return;
+    }
+    
+    // Find the target component in the tree
+    const findComponent = (nodes: ComponentNode[]): ComponentNode | null => {
+      for (const node of nodes) {
+        if (node.code === targetComponentCode) {
+          return node;
+        }
+        if (node.children) {
+          const found = findComponent(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const targetComponent = findComponent(componentTreeData);
+    
+    // Clear the session storage flag immediately to prevent repeated attempts
+    sessionStorage.removeItem('targetComponentCode');
+    
+    if (targetComponent) {
+      setSelectedComponent(targetComponent);
+      
+      // Build the parent chain by traversing parentId relationships
+      const buildParentChain = (targetCode: string): string[] => {
+        const nodesToExpand: string[] = [];
+        
+        // Find the target component in fetched data to get its parentId
+        const targetData = fetchedComponents.find((c: any) => 
+          c.componentCode === targetCode || c.id === targetCode
+        );
+        
+        if (!targetData) {
+          // Fallback: extract root category from first character of code
+          const rootCategory = targetCode.charAt(0);
+          if (rootCategory && rootCategory.match(/^[1-8]$/)) {
+            nodesToExpand.push(rootCategory);
           }
-          if (node.children) {
-            const found = findComponent(node.children);
-            if (found) return found;
+          return nodesToExpand;
+        }
+        
+        // Walk up the parent chain
+        let currentData = targetData;
+        while (currentData) {
+          const currentCode = currentData.componentCode || currentData.id;
+          nodesToExpand.push(currentCode);
+          
+          if (currentData.parentId) {
+            // Find parent by parentId (which stores parent's componentCode)
+            const parentData = fetchedComponents.find((c: any) => 
+              c.componentCode === currentData.parentId || c.id === currentData.parentId
+            );
+            currentData = parentData;
+          } else {
+            // No more parents - add the root category (first digit 1-8)
+            const rootCategory = currentCode.charAt(0);
+            if (rootCategory && rootCategory.match(/^[1-8]$/) && !nodesToExpand.includes(rootCategory)) {
+              nodesToExpand.push(rootCategory);
+            }
+            break;
           }
         }
-        return null;
+        
+        return nodesToExpand;
       };
       
-      const targetComponent = findComponent(componentTreeData);
-      if (targetComponent) {
-        setSelectedComponent(targetComponent);
-        // Expand parent nodes to show the selected component
-        const expandParents = (code: string) => {
-          const parts = code.split('.');
-          const parentsToExpand: string[] = [];
-          for (let i = 1; i <= parts.length; i++) {
-            parentsToExpand.push(parts.slice(0, i).join('.'));
-          }
-          setExpandedNodes(new Set(parentsToExpand));
-        };
-        expandParents(targetComponentCode);
-      }
-      sessionStorage.removeItem('targetComponentCode');
+      const parentChain = buildParentChain(targetComponentCode);
+      setExpandedNodes(new Set(parentChain));
     }
-  }, []);
+  }, [fetchedComponents, componentTreeData]);
 
   const handleBackToModifyPMS = () => {
     exitChangeRequestMode();
