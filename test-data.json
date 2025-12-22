@@ -6730,17 +6730,19 @@
       "parentComponent": "612.001",
       "notes": "Main propulsion engine - MASTER RH tracker",
       "runningHours": "12500",
-      "currentCumulativeRH": "12500",
+      "currentCumulativeRH": "20000",
       "rhCounterType": "MASTER",
       "rhCounterSource": "SELF",
-      "rhCurrentMaster": "12500",
-      "rhMasterUpdatedAt": "2025-12-22T06:21:57.241Z",
-      "rhMasterUpdateSource": "IMPORT",
+      "rhCurrentMaster": "20000",
+      "rhMasterUpdatedAt": "2025-12-22T10:18:41.658Z",
+      "rhMasterUpdateSource": "MANUAL",
       "rhMasterComponentId": null,
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
-      "lastUpdated": "20-Dec-2024",
-      "id": "612.001.01"
+      "lastUpdated": "22 Dec 2025 00:00",
+      "id": "612.001.01",
+      "rhMasterUpdatedBy": "admin",
+      "updatedAt": "2025-12-22T10:18:41.658Z"
     },
     "612.002.01": {
       "componentCode": "612.002.01",
@@ -6775,17 +6777,18 @@
       "parentComponent": "612.001.01",
       "notes": "Exhaust turbocharger - INHERITED from main engine",
       "runningHours": "12500",
-      "currentCumulativeRH": "12500",
+      "currentCumulativeRH": "20000",
       "rhCounterType": "INHERITED",
       "rhCounterSource": "612.001.01",
       "rhCurrentMaster": null,
       "rhMasterUpdatedAt": null,
       "rhMasterUpdateSource": null,
       "rhMasterComponentId": "612.001.01",
-      "rhCurrentInheritedCached": "12500",
-      "rhInheritedUpdatedAt": "2025-12-22T06:21:57.261Z",
-      "lastUpdated": "20-Dec-2024",
-      "id": "612.002.01"
+      "rhCurrentInheritedCached": "20000",
+      "rhInheritedUpdatedAt": "2025-12-22T10:18:41.658Z",
+      "lastUpdated": "2025-12-22T10:18:41.658Z",
+      "id": "612.002.01",
+      "updatedAt": "2025-12-22T10:18:41.658Z"
     },
     "285.001": {
       "componentCode": "285.001",
@@ -18823,6 +18826,19 @@
       "meterReplaced": false,
       "userId": "admin",
       "createdAt": "2025-12-22T09:52:03.649Z"
+    },
+    {
+      "id": 24,
+      "componentId": "612.001.01",
+      "previousValue": "12500",
+      "newValue": "20000",
+      "delta": "7500",
+      "mode": "setTotal",
+      "dateUpdated": "22 Dec 2025 00:00",
+      "comments": "",
+      "meterReplaced": false,
+      "userId": "admin",
+      "createdAt": "2025-12-22T10:18:41.658Z"
     }
   ],
   "spares": {
