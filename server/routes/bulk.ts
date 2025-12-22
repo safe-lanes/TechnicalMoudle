@@ -499,7 +499,7 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
   fleetComponentSheet.getRow(1).font = { bold: true };
   
   // =====================================================
-  // SHEET 5: Vessel_Component (24 columns - EXACT HEADERS)
+  // SHEET 5: Vessel_Component (28 columns - EXACT HEADERS in specified order)
   // =====================================================
   const vesselComponentSheet = workbook.addWorksheet('Vessel_Component');
   vesselComponentSheet.columns = [
@@ -522,11 +522,15 @@ async function generateFleetMasterTemplate(): Promise<Buffer> {
     { header: 'Commissioned Date', key: 'commissionedDate', width: 18 },
     { header: 'Rating', key: 'rating', width: 20 },
     { header: 'Equipment / System Department', key: 'equipmentDepartment', width: 28 },
-    { header: 'Notes', key: 'notes', width: 40 },
-    { header: 'Running Hours', key: 'runningHours', width: 15 },
+    { header: 'Class item', key: 'classItem', width: 12 },
     { header: 'IS Active', key: 'isActive', width: 12 },
     { header: 'Vessel Code', key: 'vesselCode', width: 12 },
-    { header: 'IS Parent', key: 'isParent', width: 12 }
+    { header: 'IS Parent', key: 'isParent', width: 12 },
+    { header: 'Notes', key: 'notes', width: 40 },
+    { header: 'RH Counter Type', key: 'rhCounterType', width: 18 },
+    { header: 'RH Counter Source', key: 'rhCounterSource', width: 18 },
+    { header: 'Running Hours', key: 'runningHours', width: 15 },
+    { header: 'Last Updated', key: 'lastUpdated', width: 18 }
   ];
   
   // Headers only - no sample data
