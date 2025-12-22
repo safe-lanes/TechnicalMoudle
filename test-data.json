@@ -6367,6 +6367,24 @@
       "rhInheritedUpdatedAt": "2025-12-22T06:28:50.306Z",
       "lastUpdated": "12-Dec-2024",
       "id": "285.001.02"
+    },
+    "TEST.001.01": {
+      "componentCode": "TEST.001.01",
+      "name": "Test Component 1",
+      "fleetEquipmentCode": "TEST.FLEET.01",
+      "fleetEquipmentName": "Test Fleet Equipment",
+      "vesselId": "V001",
+      "dataScope": "vessel",
+      "id": "TEST.001.01"
+    },
+    "TEST.001.02": {
+      "componentCode": "TEST.001.02",
+      "name": "Test Component 2",
+      "fleetEquipmentCode": "TEST.FLEET.01",
+      "fleetEquipmentName": "Test Fleet Equipment",
+      "vesselId": "V001",
+      "dataScope": "vessel",
+      "id": "TEST.001.02"
     }
   },
   "runningHoursAudits": [
