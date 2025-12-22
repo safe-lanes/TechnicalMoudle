@@ -124,6 +124,8 @@ const RunningHours = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
       toast({ title: "Success", description: "Running hours updated successfully" });
       setIsUpdateDialogOpen(false);
       handleCancelUpdate();
@@ -156,6 +158,8 @@ const RunningHours = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",
