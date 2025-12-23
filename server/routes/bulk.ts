@@ -2524,14 +2524,32 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
 
   console.log(`📋 Total rows in file: ${data.length}, Valid data rows after filtering: ${filteredData.length}`);
 
-  // Track duplicate Component Codes (actual duplicates to warn about)
-  const componentCodeOccurrences = new Map<string, number[]>();
+  // Track duplicate Component Codes (case-insensitive, per vessel)
+  // Also fetch existing component codes from database for validation
+  const componentCodeOccurrences = new Map<string, number[]>(); // Key: uppercase code, Value: row numbers
+  const existingDbComponentCodes = new Set<string>(); // Uppercase codes from database
+  
   if (type === 'components') {
+    // Fetch existing component codes for the vessel from the database
+    if (vesselId) {
+      try {
+        const existingComponents = await storage.getComponents(vesselId);
+        existingComponents.forEach(comp => {
+          if (comp.componentCode) {
+            existingDbComponentCodes.add(comp.componentCode.toUpperCase());
+          }
+        });
+        console.log(`📋 Loaded ${existingDbComponentCodes.size} existing component codes for vessel '${vesselId}'`);
+      } catch (err) {
+        console.error(`Failed to fetch existing components for vessel ${vesselId}:`, err);
+      }
+    }
+    
+    // Track occurrences within the uploaded file (case-insensitive)
     filteredData.forEach((row, index) => {
-      // Use Component Code from the new template format
       const componentCode = row['Component Code'];
       if (componentCode) {
-        const code = String(componentCode).trim();
+        const code = String(componentCode).trim().toUpperCase(); // Case-insensitive
         if (!componentCodeOccurrences.has(code)) {
           componentCodeOccurrences.set(code, []);
         }
@@ -2575,12 +2593,24 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
           errors.push(`Row ${rowNum}: Invalid Component Code format. Expected SFI format: 6, 61, 612, 612.005, etc.`);
         } else {
           normalized['Component Code'] = codeStr;
+          const codeUpperCase = codeStr.toUpperCase();
           
-          // Check for duplicates
-          const occurrences = componentCodeOccurrences.get(codeStr);
+          // Check for duplicate Component Codes within the uploaded file (case-insensitive)
+          // Only flag rows that are NOT the first occurrence - the first occurrence is valid
+          const occurrences = componentCodeOccurrences.get(codeUpperCase);
           if (occurrences && occurrences.length > 1) {
-            const otherRows = occurrences.filter(r => r !== rowNum);
-            warnings.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' found in rows ${otherRows.join(', ')}. Only the last occurrence will be kept.`);
+            const firstOccurrence = occurrences[0];
+            if (rowNum !== firstOccurrence) {
+              // This is a duplicate occurrence (not the first one)
+              errors.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Component Code must be unique within the vessel.`);
+            }
+          }
+          
+          // Check for duplicate Component Codes against existing database records (mode-specific)
+          // 'add' mode: existing code = error (cannot create duplicate)
+          // 'update'/'upsert' mode: existing code = OK (updating existing is expected)
+          if (mode === 'add' && existingDbComponentCodes.has(codeUpperCase)) {
+            errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
           }
           
           // Auto-calculate Parent Component Code from Component Code

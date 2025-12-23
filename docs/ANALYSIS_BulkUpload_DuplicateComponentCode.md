@@ -210,35 +210,71 @@ During dry run:
 
 ---
 
-## 6. Approval Request
+## 6. Implementation Status
 
-**YES/NO Question:**
+**IMPLEMENTED: December 23, 2025**
 
-> **Do you approve proceeding with the implementation of dry-run duplicate validation that:**
-> 1. Treats duplicate Component Codes within the same vessel as ERRORS (not warnings)
-> 2. Validates against existing database records for the selected vessel
-> 3. Blocks import when duplicate errors exist
-> 4. Applies case-insensitive comparison for Component Codes
-> 5. Applies mode-specific behavior ('add' blocks existing, 'update'/'upsert' allows existing)
->
-> **Please respond with: "Proceed to implement dry-run duplicate validation"** to authorize implementation.
+The following changes were made to `server/routes/bulk.ts`:
+
+### 6.1 Changes Made
+
+1. **Database fetch before validation** (lines 2536-2549):
+   - Fetch existing component codes for the selected vessel before the validation loop
+   - Store codes in uppercase for case-insensitive comparison
+   ```javascript
+   if (vesselId) {
+     const existingComponents = await storage.getComponents(vesselId);
+     existingComponents.forEach(comp => {
+       if (comp.componentCode) {
+         existingDbComponentCodes.add(comp.componentCode.toUpperCase());
+       }
+     });
+   }
+   ```
+
+2. **Case-insensitive duplicate tracking** (lines 2551-2561):
+   - Component codes are now normalized to uppercase for comparison
+   ```javascript
+   const code = String(componentCode).trim().toUpperCase();
+   ```
+
+3. **Changed warnings to errors** (lines 2601-2606):
+   - Duplicate Component Codes within the uploaded file now generate **ERRORS**
+   ```javascript
+   errors.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' found in rows ${otherRows.join(', ')}. Each Component Code must be unique within the vessel.`);
+   ```
+
+4. **Mode-specific database validation** (lines 2608-2613):
+   - In 'add' mode: existing database codes generate **ERRORS**
+   - In 'update'/'upsert' mode: existing codes are **allowed** (updating expected)
+   ```javascript
+   if (mode === 'add' && existingDbComponentCodes.has(codeUpperCase)) {
+     errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
+   }
+   ```
+
+### 6.2 Error Message Examples
+
+**Duplicate within file:**
+```
+Row 5: Duplicate Component Code '711.001' found in rows 3, 7. Each Component Code must be unique within the vessel.
+```
+
+**Duplicate against database (add mode only):**
+```
+Row 5: Component Code '711.001' already exists in vessel 'V001'. Cannot add duplicate component.
+```
+
+### 6.3 No Breaking Changes to Existing Behavior
+
+- **update mode**: Still works as expected - existing codes are allowed and updated
+- **upsert mode**: Still works as expected - existing codes are updated, new codes are created
+- **add mode**: Now properly validates that codes don't exist before allowing import
 
 ---
 
-## 7. Technical Implementation Notes (For Reference)
+## 7. Technical Implementation Notes
 
-When approved, the following changes will be made:
+**No database schema changes were required** - validation is at the application layer.
 
-1. **Modify dry-run validation** (`server/routes/bulk.ts`, around line 2527):
-   - Fetch existing component codes for the vessel before validation loop
-   - Change duplicate detection from WARNING to ERROR
-   - Add case-insensitive comparison
-   - Add mode-specific duplicate handling
-
-2. **Error message format:**
-   ```
-   Row X: Duplicate Component Code 'ABC.001' for Vessel 'V001'. 
-   This code already exists in row(s) Y, Z [and/or in the database].
-   ```
-
-3. **No database schema changes required** - validation is at the application layer
+The existing frontend already blocks import when errors exist, so no frontend changes were needed.
