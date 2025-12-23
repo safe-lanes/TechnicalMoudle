@@ -62870,6 +62870,19 @@
       "updatedBy": "admin",
       "id": 1,
       "updatedAt": "2025-12-23T11:19:08.323Z"
+    },
+    "V002": {
+      "vesselId": "V002",
+      "calendarLeadDaysCritical": 7,
+      "calendarLeadDaysNonCritical": 14,
+      "calendarGraceMode": "COMPANY_STANDARD",
+      "calendarGraceDays": 7,
+      "rhLeadHoursCritical": 50,
+      "rhLeadHoursNonCritical": 100,
+      "rhGraceHours": 168,
+      "updatedBy": "admin",
+      "id": 2,
+      "updatedAt": "2025-12-23T11:26:23.352Z"
     }
   },
   "storesItems": {
