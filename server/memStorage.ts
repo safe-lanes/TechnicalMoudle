@@ -960,6 +960,16 @@ class MemStorage {
     console.log('[MemStorage] getSparesWithInventoryByComponent called - stub in file mode');
     return [];
   }
+
+  async getMasterDataList(): Promise<any[]> {
+    console.log('[MemStorage] getMasterDataList called - stub in file mode');
+    return [];
+  }
+
+  async getAllPmsVesselSettings(): Promise<any[]> {
+    console.log('[MemStorage] getAllPmsVesselSettings called - stub in file mode');
+    return [];
+  }
 }
 
 export const memStorage = new MemStorage();

@@ -373,6 +373,13 @@ const Spares: React.FC = () => {
     queryKey: ['/api/spares', vesselId],
   });
   
+  // Fetch inventory transactions for history tab
+  const { data: inventoryTransactionsResponse, isLoading: transactionsLoading } = useQuery<{ success: boolean; data: any[] }>({
+    queryKey: [`/api/inventory/transactions/${vesselId}`],
+    enabled: activeTab === 'history' && !!vesselId,
+  });
+  const inventoryTransactions = inventoryTransactionsResponse?.data || [];
+  
   // Adjust spare quantity mutation
   const adjustMutation = useMutation({
     mutationFn: async ({ spareId, qtyChange, eventType, notes }: {
@@ -846,7 +853,7 @@ const Spares: React.FC = () => {
           </div>
         </div>
       ) : (
-        // History View
+        // History View - Inventory Transactions
         <div className="flex gap-6 h-[calc(100vh-200px)]">
           {/* Left Panel - Component Tree */}
           <div className="w-[30%]">
@@ -866,40 +873,104 @@ const Spares: React.FC = () => {
           <div className="w-[70%]">
             {/* History Table */}
             <div className="bg-white rounded-lg shadow-sm border">
-              {/* Table Header */}
+              {/* Table Header - Extended columns per requirements */}
               <div className="bg-[#52baf3] text-white px-4 py-3 rounded-t-lg">
-                <div className="grid grid-cols-6 gap-4 text-sm font-medium">
-                  <div>Date</div>
-                  <div>Part Name</div>
+                <div className="grid grid-cols-9 gap-2 text-xs font-medium">
+                  <div>Date/Time</div>
+                  <div>Part Number</div>
                   <div>Type</div>
-                  <div>Qty</div>
+                  <div className="text-center">Qty</div>
+                  <div>Location</div>
+                  <div className="text-right">ROB Before</div>
+                  <div className="text-right">ROB After</div>
                   <div>Reference</div>
-                  <div>Comment</div>
+                  <div>User</div>
                 </div>
               </div>
 
               {/* Table Body */}
-              <div className="divide-y divide-gray-200">
-                {historyData.map((entry) => (
-                  <div key={entry.id} className="px-4 py-3">
-                    <div className="grid grid-cols-6 gap-4 text-sm items-center">
-                      <div className="text-gray-900">{entry.date}</div>
-                      <div className="text-gray-900">{entry.partName}</div>
-                      <div>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          entry.type === 'Consumed' 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {entry.type}
-                        </span>
-                      </div>
-                      <div className="text-gray-700">{entry.qty}</div>
-                      <div className="text-gray-700">{entry.reference}</div>
-                      <div className="text-gray-700">{entry.comment}</div>
-                    </div>
+              <div className="divide-y divide-gray-200 max-h-[calc(100vh-350px)] overflow-auto">
+                {transactionsLoading ? (
+                  <div className="px-4 py-8 text-center text-gray-500">
+                    <div className="animate-spin h-5 w-5 border-2 border-[#52baf3] border-t-transparent rounded-full mx-auto mb-2"></div>
+                    Loading transactions...
                   </div>
-                ))}
+                ) : inventoryTransactions.length > 0 ? (
+                  inventoryTransactions.map((txn: any) => (
+                    <div key={txn.id} className="px-4 py-3 hover:bg-gray-50" data-testid={`row-transaction-${txn.id}`}>
+                      <div className="grid grid-cols-9 gap-2 text-xs items-center">
+                        <div className="text-gray-900">
+                          {new Date(txn.txnDatetime).toLocaleString('en-GB', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                        <div className="text-gray-900 font-medium">{txn.spare?.partNumber || '-'}</div>
+                        <div>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            txn.eventType === 'CONSUME' 
+                              ? 'bg-red-100 text-red-800' 
+                              : txn.eventType === 'RECEIVE'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {txn.eventType}
+                          </span>
+                        </div>
+                        <div className={`text-center font-medium ${txn.qtyChange < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {txn.qtyChange > 0 ? '+' : ''}{txn.qtyChange}
+                        </div>
+                        <div className="text-gray-700 truncate" title={txn.location?.locationName}>
+                          {txn.location?.locationName || '-'}
+                        </div>
+                        <div className="text-right text-gray-600">{txn.robTotalBefore}</div>
+                        <div className="text-right text-gray-900 font-medium">{txn.robTotalAfter}</div>
+                        <div className="text-gray-700 truncate" title={txn.referenceNote}>
+                          {txn.referenceType === 'WORK_ORDER' ? (
+                            <span className="text-blue-600">{txn.referenceNote || `WO-${txn.referenceId}`}</span>
+                          ) : txn.referenceType === 'PO' ? (
+                            <span className="text-purple-600">{txn.referenceNote || `PO-${txn.referenceId}`}</span>
+                          ) : (
+                            txn.referenceNote || '-'
+                          )}
+                        </div>
+                        <div className="text-gray-500 truncate" title={txn.userId}>
+                          {txn.userId || '-'}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  // Show sample data when no real transactions
+                  historyData.map((entry) => (
+                    <div key={entry.id} className="px-4 py-3">
+                      <div className="grid grid-cols-9 gap-2 text-xs items-center">
+                        <div className="text-gray-900">{entry.date}</div>
+                        <div className="text-gray-900">{entry.partName}</div>
+                        <div>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            entry.type === 'Consumed' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {entry.type === 'Consumed' ? 'CONSUME' : 'RECEIVE'}
+                          </span>
+                        </div>
+                        <div className={`text-center font-medium ${entry.type === 'Consumed' ? 'text-red-600' : 'text-green-600'}`}>
+                          {entry.type === 'Consumed' ? '-' : '+'}{entry.qty}
+                        </div>
+                        <div className="text-gray-700">-</div>
+                        <div className="text-right text-gray-600">-</div>
+                        <div className="text-right text-gray-900">-</div>
+                        <div className="text-gray-700">{entry.reference}</div>
+                        <div className="text-gray-500">{entry.comment}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
