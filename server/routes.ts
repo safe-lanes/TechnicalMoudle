@@ -6002,6 +6002,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // INVENTORY MIGRATION ENDPOINT
+  // ========================================
+  
+  // Migrate existing spares data to new inventory structure
+  // This converts legacy location text fields to normalized location entities
+  app.post("/api/admin/migrate-inventory", async (req, res) => {
+    try {
+      const { vesselId, dryRun = true } = req.body;
+      
+      if (!vesselId) {
+        return res.status(400).json({ success: false, error: "vesselId is required" });
+      }
+      
+      console.log(`🔄 Starting inventory migration for vessel: ${vesselId}${dryRun ? ' (DRY RUN)' : ''}`);
+      
+      // Get all spares for the vessel
+      const sparesResult = await storage.getSpares(vesselId);
+      
+      const stats = {
+        sparesProcessed: 0,
+        locationsCreated: 0,
+        stockRecordsCreated: 0,
+        componentLinksCreated: 0,
+        transactionsCreated: 0,
+        errors: [] as string[]
+      };
+      
+      for (const spare of sparesResult) {
+        try {
+          stats.sparesProcessed++;
+          
+          // Extract location text values
+          const locationA = spare.location || 'Location A';
+          const locationB = spare.location2 || 'Location B';
+          
+          // Only process if there's stock
+          const robA = spare.robLocationA || 0;
+          const robB = spare.robLocationB || 0;
+          
+          let runningRob = 0;
+          
+          // Process Location A
+          if (robA > 0) {
+            stats.locationsCreated++;
+            stats.stockRecordsCreated++;
+            stats.transactionsCreated++;
+            
+            if (!dryRun) {
+              const locA = await storage.findOrCreateLocation(vesselId, locationA, 'System Migration');
+              
+              await storage.upsertSpareLocationStock({
+                vesselId,
+                spareId: spare.id,
+                locationId: locA.id,
+                qty: robA
+              });
+              
+              await storage.createInventoryTransaction({
+                vesselId,
+                spareId: spare.id,
+                locationId: locA.id,
+                eventType: 'RECEIVE',
+                qtyChange: robA,
+                robTotalBefore: runningRob,
+                robTotalAfter: runningRob + robA,
+                robLocationBefore: 0,
+                robLocationAfter: robA,
+                referenceType: 'MANUAL',
+                referenceId: `MIGRATE-${vesselId}-${Date.now()}`,
+                referenceNote: `Opening balance migrated from legacy data`,
+                userId: 'System Migration'
+              });
+            }
+            runningRob += robA;
+          }
+          
+          // Process Location B
+          if (robB > 0) {
+            stats.locationsCreated++;
+            stats.stockRecordsCreated++;
+            stats.transactionsCreated++;
+            
+            if (!dryRun) {
+              const locB = await storage.findOrCreateLocation(vesselId, locationB, 'System Migration');
+              
+              await storage.upsertSpareLocationStock({
+                vesselId,
+                spareId: spare.id,
+                locationId: locB.id,
+                qty: robB
+              });
+              
+              await storage.createInventoryTransaction({
+                vesselId,
+                spareId: spare.id,
+                locationId: locB.id,
+                eventType: 'RECEIVE',
+                qtyChange: robB,
+                robTotalBefore: runningRob,
+                robTotalAfter: runningRob + robB,
+                robLocationBefore: 0,
+                robLocationAfter: robB,
+                referenceType: 'MANUAL',
+                referenceId: `MIGRATE-${vesselId}-${Date.now()}`,
+                referenceNote: `Opening balance migrated from legacy data`,
+                userId: 'System Migration'
+              });
+            }
+          }
+          
+          // Create component link if componentId exists
+          if (spare.componentId) {
+            stats.componentLinksCreated++;
+            
+            if (!dryRun) {
+              try {
+                await storage.createSpareComponentLink({
+                  vesselId,
+                  spareId: spare.id,
+                  componentId: spare.componentId,
+                  linkedBy: 'System Migration'
+                });
+              } catch (linkError: any) {
+                // Ignore duplicate link errors, but decrement count
+                if (!linkError.message?.includes('duplicate')) {
+                  stats.errors.push(`Link error for spare ${spare.id}: ${linkError.message}`);
+                } else {
+                  stats.componentLinksCreated--; // Already exists
+                }
+              }
+            }
+          }
+        } catch (spareError: any) {
+          stats.errors.push(`Error processing spare ${spare.id}: ${spareError.message}`);
+        }
+      }
+      
+      console.log(`✅ Migration ${dryRun ? 'preview' : 'completed'}:`, stats);
+      
+      res.json({
+        success: true,
+        dryRun,
+        message: dryRun 
+          ? `Migration preview complete. Set dryRun=false to execute.`
+          : `Migration completed successfully`,
+        statistics: stats
+      });
+    } catch (error: any) {
+      console.error("❌ Migration failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Migration failed: " + error.message 
+      });
+    }
+  });
+
+  // ========================================
   // CERTIFICATES API ROUTES
   // ========================================
   
