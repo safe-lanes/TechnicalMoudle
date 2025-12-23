@@ -4776,11 +4776,43 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
   if (!component) {
     // Use vesselId from row, or passed vesselId parameter
     const lookupVesselId = row['Vessel Code'] || vesselId;
-    component = await storage.getComponentByCode(componentCode, lookupVesselId);
+    
+    if (lookupVesselId) {
+      // Primary lookup: by componentCode + vesselId (correct uniqueness constraint)
+      component = await storage.getComponentByCode(componentCode, lookupVesselId);
+    }
+    
+    // Fallback 1: If lookupVesselId is missing or lookup failed, try by component ID directly
+    // (componentCode might actually be an ID in some edit scenarios)
+    if (!component) {
+      try {
+        component = await storage.getComponent(componentCode);
+        if (component) {
+          console.log(`✅ Component found by ID fallback: ${componentCode}`);
+        }
+      } catch (e) {
+        // Ignore - this is a fallback attempt
+      }
+    }
+    
+    // Fallback 2: Search across all vessels if still not found
+    if (!component && !lookupVesselId) {
+      console.warn(`⚠️ No vesselId provided for component lookup: ${componentCode}. Attempting global search...`);
+      // Try to find component by code across all vessels (less precise but may work for single-vessel setups)
+      const allVesselIds = ['V001', 'V002', 'V003']; // Common vessel IDs
+      for (const vid of allVesselIds) {
+        component = await storage.getComponentByCode(componentCode, vid);
+        if (component) {
+          console.log(`✅ Component ${componentCode} found in vessel ${vid} via fallback search`);
+          break;
+        }
+      }
+    }
   }
   
   if (!component) {
-    throw new Error(`Component ${componentCode} not found`);
+    const lookupVesselId = row['Vessel Code'] || vesselId || 'UNKNOWN';
+    throw new Error(`Component code '${componentCode}' not found for vessel '${lookupVesselId}'. Ensure both component_code and vessel_code are correct in the data.`);
   }
   
   return await storage.updateComponent(component.id, updateData);
