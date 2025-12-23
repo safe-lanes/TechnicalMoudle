@@ -64,6 +64,12 @@ The application features a modern full-stack architecture. The frontend is devel
   - **Clickable Filter Badges**: Valid/Warnings/Errors badges are now clickable to filter the table by status. Visual feedback shows active filter with ring highlight.
   - **Expandable Row Details**: Rows with errors/warnings have an expand button to show full error messages. Click row or expand icon to toggle details.
   - **Accurate Counts**: "Skip Errors & Import" button correctly shows total valid rows from full dataset, not limited preview.
+- **Bulk Import Duplicate Component Code Validation**: During dry-run validation, duplicate Component Codes are now treated as ERRORS (not warnings):
+  - **Case-insensitive comparison**: Component Codes are compared in uppercase (e.g., "ABC.001" and "abc.001" are duplicates)
+  - **In-file duplicates**: Only subsequent occurrences are flagged; the first occurrence is valid
+  - **Database validation**: In 'add' mode, codes that already exist in the database for that vessel generate errors
+  - **Mode-specific behavior**: 'update' and 'upsert' modes allow existing database codes (updating is expected)
+  - **Per-vessel uniqueness**: Component Codes must be unique within a vessel but may be duplicated across different vessels
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
