@@ -2202,7 +2202,8 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       fileToken,
       columns: results.columns,
       summary: results.summary,
-      rows: results.rows.slice(0, 100), // Limit preview to 100 rows
+      rows: results.rows, // Return all rows for proper pagination and filtering
+      totalRows: results.rows.length,
       errorReportUrl: results.summary.errors > 0 ? `/api/bulk/history/tmp/${fileToken}/errors.csv` : undefined
     });
   } catch (error) {
