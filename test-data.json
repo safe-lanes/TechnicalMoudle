@@ -25502,8 +25502,8 @@
       "jobTitle": "Impressed current systems check test",
       "assignedTo": "2nd Engineer",
       "dueDate": "22-Nov-2025",
-      "status": "Pending Approval",
-      "taskType": "Inspection",
+      "status": "Active",
+      "taskType": "Overhaul",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
       "frequencyUnit": "Weeks",
@@ -25513,42 +25513,28 @@
       "department": "Engine",
       "requiredSpareParts": [
         {
-          "partNo": "SP-00004",
-          "description": "Impressed Current Anode",
-          "quantityRequired": "2",
-          "remarks": "Annual replacement"
-        },
-        {
-          "partNo": "SP-00005",
-          "description": "Reference Cell Electrode",
-          "quantityRequired": "1",
-          "remarks": "Check and replace if corroded"
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
         }
       ],
       "requiredTools": [
         {
-          "toolName": "Digital Multimeter",
-          "quantity": "1",
-          "remarks": "For voltage measurement"
-        },
-        {
-          "toolName": "Insulation Tester (Megger)",
-          "quantity": "1",
-          "remarks": "For insulation resistance check"
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
         }
       ],
       "safetyRequirements": {
         "ppeRequirements": [
-          "Safety Gloves (Electrical)",
-          "Safety Goggles"
+          "test"
         ],
         "permitRequirements": [
-          "Electrical Work Permit",
-          "Diving Operations Permit"
+          "test"
         ],
         "otherRequirements": [
-          "System isolated before work",
-          "Vessel grounded properly"
+          "test"
         ]
       },
       "id": "14",
@@ -25556,111 +25542,33 @@
       "updatedAt": "2025-12-03T11:59:56.991Z",
       "dataScope": "vessel",
       "executionId": null,
-      "dateCompleted": "",
+      "dateCompleted": null,
       "submittedDate": null,
       "formData": null,
       "approverRemarks": null,
       "templateId": null,
-      "approver": "",
+      "approver": null,
       "approvalDate": null,
       "rejectionDate": null,
-      "nextDueDate": "2025-11-22",
-      "nextDueReading": "",
-      "currentReading": "",
+      "nextDueDate": null,
+      "nextDueReading": null,
+      "currentReading": null,
       "fleetEquipmentCode": null,
       "fleetJobCode": null,
-      "isActive": "Yes",
+      "isActive": null,
       "applicableVesselIds": null,
       "jobGroup": null,
       "jobCategory": null,
-      "sfiCode": "278.010.01",
+      "sfiCode": null,
       "maintenanceIntervalValue": null,
       "maintenanceIntervalUnit": null,
-      "intervalRunningHour": "",
+      "intervalRunningHour": null,
       "scopeNotes": null,
-      "criticality": "",
+      "criticality": null,
       "uploadedDocuments": [],
-      "consumedSpareParts": [
-        {
-          "partNo": "SP-00004",
-          "description": "Impressed Current Anode",
-          "quantityConsumed": "2",
-          "comments": "Replaced worn anodes"
-        },
-        {
-          "partNo": "SP-00005",
-          "description": "Reference Cell Electrode",
-          "quantityConsumed": "1",
-          "comments": "Corroded electrode replaced"
-        }
-      ],
+      "consumedSpareParts": [],
       "rejectionComments": null,
-      "approvalAction": null,
-      "woTitle": "Impressed current systems check test",
-      "componentName": "Impressed current systems No.01",
-      "woTemplateCode": "MKR-IN-00001.WO-2025-003",
-      "workHistory": [
-        {
-          "woNo": "MKR-IN-00001.WO-2024-002",
-          "assignedTo": "2nd Engineer",
-          "performedBy": "2nd Engineer",
-          "workDate": "2024-11-15",
-          "runDate": "",
-          "completionDate": "2024-11-15",
-          "status": "Completed",
-          "description": "Impressed current system inspection",
-          "remarks": "All anodes functional"
-        },
-        {
-          "woNo": "MKR-IN-00001.WO-2024-001",
-          "assignedTo": "3rd Engineer",
-          "performedBy": "3rd Engineer",
-          "workDate": "2024-05-20",
-          "runDate": "",
-          "completionDate": "2024-05-22",
-          "status": "Completed",
-          "description": "Annual anode replacement",
-          "remarks": "2 anodes replaced"
-        }
-      ],
-      "jobNo": "MKR-IN-00001.WO-2025-003",
-      "lastDoneDate": "",
-      "lastDoneRH": "",
-      "nextDueRH": "",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
-      "woExecutionId": "WO-EXE-7755956",
-      "riskAssessment": "No",
-      "safetyChecklists": "No",
-      "operationalForms": "No",
-      "startDateTime": "2025-12-23T1000",
-      "completionDateTime": "2025-12-23T1200",
-      "dateOfCompletion": "2025-12-23",
-      "runningHours": "",
-      "performedBy": "2nd Engineer",
-      "noOfPersons": "2",
-      "totalTimeHours": "2",
-      "manhours": "4",
-      "workCarriedOut": "Work carried out, found satisfactory.",
-      "jobExperienceNotes": "",
-      "previousReading": "8500",
-      "ihmUpdate": {
-        "enabled": false,
-        "action": "",
-        "targetComponent": "",
-        "targetSpare": "",
-        "quantity": "",
-        "location": "",
-        "materials": [],
-        "remarks": ""
-      },
-      "riskAssessmentStatus": "",
-      "safetyChecklistsStatus": "",
-      "operationalFormsStatus": "",
-      "executionAssignedTo": "",
-      "runningHoursDifference": "",
-      "readingDate": "",
-      "remarks": "",
-      "completionRemarks": ""
+      "approvalAction": null
     },
     {
       "id": "WO-1764764636492-8c5kmdz",

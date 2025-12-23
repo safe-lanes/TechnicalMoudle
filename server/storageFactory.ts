@@ -1,7 +1,7 @@
 import type { IStorage } from './storage';
 import { postgresStorage } from './postgresStorage';
 import { memStorage } from './memStorage';
-import { resolvePostgres, getConnectionString } from './postgresClient';
+import { resolvePostgres } from './postgresClient';
 
 /**
  * STORAGE FACTORY WITH DUAL-MODE SUPPORT
@@ -20,10 +20,10 @@ let storageInstance: IStorage | null = null;
 let currentStorageMode: 'postgres' | 'file' = 'file';
 
 /**
- * Check if PostgreSQL is available (DATABASE_URL is set from any source)
+ * Check if PostgreSQL is available (DATABASE_URL is set)
  */
 export function isPostgresAvailable(): boolean {
-  return !!getConnectionString();
+  return !!process.env.DATABASE_URL;
 }
 
 /**
@@ -45,9 +45,8 @@ export async function initializeStorage(): Promise<IStorage> {
 
   console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
   
-  // Check if DATABASE_URL is available from any source
-  const connectionString = getConnectionString();
-  if (connectionString) {
+  // Check if DATABASE_URL is available
+  if (process.env.DATABASE_URL) {
     console.log('[StorageFactory] DATABASE_URL found - attempting PostgreSQL connection...');
     
     try {
