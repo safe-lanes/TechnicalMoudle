@@ -8,11 +8,29 @@ let cachedPostgres: { db: ReturnType<typeof drizzle>, pool: Pool } | null = null
 let cacheInitialized = false;
 
 /**
- * Get the PostgreSQL connection string from DATABASE_URL only
- * No fallback to config files - environment variable is the only source
+ * Get the PostgreSQL connection string from multiple sources
+ * Priority: 
+ *   1) process.env.DATABASE_URL
+ *   2) Construct from PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+ * 
+ * Replit provides database credentials as both DATABASE_URL and individual PG* variables
  */
 export function getConnectionString(): string | undefined {
-  return process.env.DATABASE_URL;
+  // First try DATABASE_URL directly
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  
+  // Fallback: construct from individual PG* environment variables
+  const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
+  if (PGHOST && PGUSER && PGPASSWORD && PGDATABASE) {
+    const port = PGPORT || '5432';
+    const url = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${port}/${PGDATABASE}?sslmode=require`;
+    console.log('[PostgresClient] Constructed DATABASE_URL from PG* environment variables');
+    return url;
+  }
+  
+  return undefined;
 }
 
 /**
@@ -29,8 +47,9 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
     return cachedPostgres || undefined;
   }
 
-  // Check if DATABASE_URL is set
-  if (!process.env.DATABASE_URL) {
+  // Get connection string from any available source
+  const connectionString = getConnectionString();
+  if (!connectionString) {
     cacheInitialized = true;
     cachedPostgres = null;
     return undefined; // File-storage mode
@@ -38,7 +57,7 @@ export async function resolvePostgres(): Promise<{ db: ReturnType<typeof drizzle
 
   try {
     // Create connection pool (only once) using native pg driver
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({ connectionString });
     const db = drizzle(pool, { schema });
 
     // Lightweight connection test - verify database is accessible
