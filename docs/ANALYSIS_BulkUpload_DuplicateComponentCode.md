@@ -238,10 +238,17 @@ The following changes were made to `server/routes/bulk.ts`:
    const code = String(componentCode).trim().toUpperCase();
    ```
 
-3. **Changed warnings to errors** (lines 2601-2606):
+3. **Changed warnings to errors** (lines 2601-2610):
    - Duplicate Component Codes within the uploaded file now generate **ERRORS**
+   - Only subsequent occurrences are flagged (first occurrence is valid)
    ```javascript
-   errors.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' found in rows ${otherRows.join(', ')}. Each Component Code must be unique within the vessel.`);
+   const occurrences = componentCodeOccurrences.get(codeUpperCase);
+   if (occurrences && occurrences.length > 1) {
+     const firstOccurrence = occurrences[0];
+     if (rowNum !== firstOccurrence) {
+       errors.push(`Row ${rowNum}: Duplicate Component Code '${codeStr}' - this code already appears in row ${firstOccurrence}. Each Component Code must be unique within the vessel.`);
+     }
+   }
    ```
 
 4. **Mode-specific database validation** (lines 2608-2613):
@@ -255,10 +262,11 @@ The following changes were made to `server/routes/bulk.ts`:
 
 ### 6.2 Error Message Examples
 
-**Duplicate within file:**
+**Duplicate within file (only subsequent rows get errors):**
 ```
-Row 5: Duplicate Component Code '711.001' found in rows 3, 7. Each Component Code must be unique within the vessel.
+Row 5: Duplicate Component Code '711.001' - this code already appears in row 3. Each Component Code must be unique within the vessel.
 ```
+Note: Row 3 (the first occurrence) does NOT receive an error - only rows 5 and 7 would get flagged.
 
 **Duplicate against database (add mode only):**
 ```
