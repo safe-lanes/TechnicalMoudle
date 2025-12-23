@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -299,6 +300,14 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }
   });
 
+  // Fetch spare BOM for the component (from spare_component_links)
+  const componentCode = workOrder?.componentCode || component?.code || templateData?.componentCode;
+  const { data: spareBomResponse, isLoading: spareBomLoading } = useQuery<{ success: boolean; data: any[] }>({
+    queryKey: [`/api/inventory/spares-by-component/${componentCode}`],
+    enabled: !!componentCode && isOpen,
+  });
+  const componentSpareBom = spareBomResponse?.data || [];
+
   // Ranks for dropdowns
   const ranks = [
     "Master",
@@ -355,19 +364,19 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         componentCode: template.componentCode || '',
         woTemplateCode: template.workOrderNo || '',
         maintenanceBasis: template.maintenanceBasis || 'Calendar',
-        frequencyValue: template.frequency || '',
+        frequencyValue: (template as any).frequency || template.frequencyValue || '',
         frequencyUnit: template.frequencyUnit || 'Months',
         taskType: template.taskType || 'Inspection',
         assignedTo: template.assignedTo || '',
         approver: template.approver || '',
         jobPriority: template.jobPriority || 'Medium',
         classRelated: template.classRelated || 'No',
-        briefWorkDescription: template.briefWorkDescription || template.jobDescription || '',
+        briefWorkDescription: template.briefWorkDescription || (template as any).jobDescription || '',
         nextDueDate: template.nextDueDate || '',
         nextDueReading: template.nextDueReading || '',
         requiredSpareParts: Array.isArray(template.requiredSpareParts) ? template.requiredSpareParts : [],
         requiredTools: Array.isArray(template.requiredTools) ? template.requiredTools : [],
-        safetyRequirements: template.safetyRequirements || {
+        safetyRequirements: (template.safetyRequirements as { ppeRequirements: string[]; permitRequirements: string[]; otherRequirements: string[]; }) || {
           ppeRequirements: [],
           permitRequirements: [],
           otherRequirements: []
@@ -1393,6 +1402,58 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                         </Button>
                       )}
                     </div>
+
+                    {/* Component Spare BOM (Read-only from inventory system) */}
+                    {componentSpareBom.length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-gray-500 uppercase">Component Spare BOM</span>
+                          <span className="text-xs text-gray-400">(from inventory system - read only)</span>
+                        </div>
+                        <div className="border border-blue-100 rounded bg-blue-50/50">
+                          <div className="bg-blue-100 px-4 py-2 border-b border-blue-200">
+                            <div className="grid grid-cols-[2fr_3fr_1fr_1.5fr] gap-4 text-xs font-medium text-blue-800">
+                              <div>Part No</div>
+                              <div>Description</div>
+                              <div>ROB</div>
+                              <div>Status</div>
+                            </div>
+                          </div>
+                          <div className="divide-y divide-blue-100">
+                            {componentSpareBom.map((spare: any) => {
+                              const stockStatus = spare.rob >= spare.min ? 'OK' : spare.rob > 0 ? 'Low' : 'Critical';
+                              return (
+                                <div key={spare.id} className="px-4 py-2">
+                                  <div className="grid grid-cols-[2fr_3fr_1fr_1.5fr] gap-4 items-center text-sm">
+                                    <div className="text-gray-900 font-medium">{spare.partCode || '-'}</div>
+                                    <div className="text-gray-700">{spare.partName || '-'}</div>
+                                    <div className="text-gray-900 font-semibold">{spare.rob ?? 0}</div>
+                                    <div>
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        stockStatus === 'OK' 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : stockStatus === 'Low'
+                                          ? 'bg-orange-100 text-orange-800'
+                                          : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {stockStatus}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Manually Added Spare Parts */}
+                    {(templateData.requiredSpareParts.length > 0 || !isPartAReadOnly) && (
+                      <div className="text-xs font-medium text-gray-500 uppercase mb-2">
+                        Additional Required Parts
+                      </div>
+                    )}
                     
                     <div className="border border-gray-200 rounded">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
