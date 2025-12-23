@@ -697,19 +697,38 @@ class MemStorage {
   async deleteSurvey(id: number): Promise<void> {}
 
   // PMS Vessel Settings
-  async getPmsVesselSettings(vesselId: string): Promise<any> { return undefined; }
-  async upsertPmsVesselSettings(settings: any): Promise<any> { return settings; }
+  async getPmsVesselSettings(vesselId: string): Promise<any> {
+    if (!this.data.pmsVesselSettings) return undefined;
+    const settings = toArray(this.data.pmsVesselSettings);
+    return settings.find((s: any) => s.vesselId === vesselId);
+  }
+  async upsertPmsVesselSettings(settings: any): Promise<any> { 
+    return this.createOrUpdatePmsVesselSettings(settings); 
+  }
   async createOrUpdatePmsVesselSettings(settings: any): Promise<any> {
+    if (!this.data.pmsVesselSettings) this.data.pmsVesselSettings = {};
+    
+    // Check if settings already exist for this vessel
+    const existing = await this.getPmsVesselSettings(settings.vesselId);
+    
     const updatedSettings = {
       ...settings,
-      id: settings.id || this.getNextId('pmsVesselSettings'),
+      id: existing?.id || this.getNextId('pmsVesselSettings'),
       updatedBy: settings.updatedBy || 'test',
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString()
     };
+    
+    // Store by vesselId for easy lookup
+    this.data.pmsVesselSettings[settings.vesselId] = updatedSettings;
+    this.saveData();
+    
     return updatedSettings;
   }
   async deletePmsVesselSettings(vesselId: string): Promise<void> {
-    console.log('[MemStorage] deletePmsVesselSettings called - stub in file mode');
+    if (this.data.pmsVesselSettings && this.data.pmsVesselSettings[vesselId]) {
+      delete this.data.pmsVesselSettings[vesselId];
+      this.saveData();
+    }
   }
 
   // Component Documents
@@ -979,8 +998,8 @@ class MemStorage {
   }
 
   async getAllPmsVesselSettings(): Promise<any[]> {
-    console.log('[MemStorage] getAllPmsVesselSettings called - stub in file mode');
-    return [];
+    if (!this.data.pmsVesselSettings) return [];
+    return toArray(this.data.pmsVesselSettings);
   }
 }
 

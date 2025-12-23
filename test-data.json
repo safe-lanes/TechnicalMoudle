@@ -62857,6 +62857,19 @@
       "createdAt": "2025-12-03T04:28:55.617Z",
       "updatedAt": "2025-12-03T12:11:21.728Z",
       "updatedBy": "System"
+    },
+    "V015": {
+      "vesselId": "V015",
+      "calendarLeadDaysCritical": 7,
+      "calendarLeadDaysNonCritical": 14,
+      "calendarGraceMode": "COMPANY_STANDARD",
+      "calendarGraceDays": 7,
+      "rhLeadHoursCritical": 50,
+      "rhLeadHoursNonCritical": 100,
+      "rhGraceHours": 168,
+      "updatedBy": "admin",
+      "id": 1,
+      "updatedAt": "2025-12-23T11:19:08.323Z"
     }
   },
   "storesItems": {
