@@ -365,8 +365,16 @@ const Spares: React.FC = () => {
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number}}>({});
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
-  const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  
+  // Consume/Receive dialog state
+  const [consumeDialogOpen, setConsumeDialogOpen] = useState(false);
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [selectedSpareForTransaction, setSelectedSpareForTransaction] = useState<Spare | null>(null);
+  const [transactionQty, setTransactionQty] = useState<number>(1);
+  const [transactionLocationId, setTransactionLocationId] = useState<string>("");
+  const [transactionNotes, setTransactionNotes] = useState<string>("");
+  const [workOrderRef, setWorkOrderRef] = useState<string>("");
   
   // Fetch spares from API
   const { data: sparesData = [], isLoading: sparesLoading } = useQuery<Spare[]>({
@@ -379,54 +387,128 @@ const Spares: React.FC = () => {
     enabled: activeTab === 'history' && !!vesselId,
   });
   const inventoryTransactions = inventoryTransactionsResponse?.data || [];
+
+  // Fetch vessel locations for consume/receive dialogs
+  const { data: locationsResponse } = useQuery<{ success: boolean; data: any[] }>({
+    queryKey: [`/api/inventory/locations/${vesselId}`],
+    enabled: !!vesselId,
+  });
+  const vesselLocations = locationsResponse?.data || [];
   
-  // Adjust spare quantity mutation
-  const adjustMutation = useMutation({
-    mutationFn: async ({ spareId, qtyChange, eventType, notes }: {
+  // Inventory transaction mutation (uses proper location-based tracking)
+  const inventoryTransactionMutation = useMutation({
+    mutationFn: async (data: {
       spareId: number;
+      locationId: number;
+      eventType: 'RECEIVE' | 'CONSUME' | 'ADJUST_OPENING_BALANCE' | 'ADJUST_CORRECTION';
       qtyChange: number;
-      eventType: 'CONSUME' | 'RECEIVE' | 'ADJUST';
-      notes?: string;
+      referenceType: 'WORK_ORDER' | 'MANUAL' | 'EXCEL_IMPORT';
+      referenceId?: string;
+      referenceNote?: string;
     }) => {
-      return apiRequest('POST', `/api/spares/${vesselId}/${spareId}/adjust`, {
-        qtyChange,
-        eventType,
-        notes,
+      return apiRequest('POST', '/api/inventory/transactions', {
+        vesselId,
+        ...data,
+        userId: 'system', // Will be replaced with actual user when auth is implemented
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/inventory/transactions/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/inventory/locations/${vesselId}`] });
+      setConsumeDialogOpen(false);
+      setReceiveDialogOpen(false);
+      setSelectedSpareForTransaction(null);
+      setTransactionQty(1);
+      setTransactionLocationId("");
+      setTransactionNotes("");
+      setWorkOrderRef("");
       toast({
         title: "Success",
-        description: "Spare quantity updated successfully",
+        description: "Inventory transaction completed successfully",
       });
     },
     onError: (error: any) => {
+      const errorMessage = error.message?.includes('INSUFFICIENT_STOCK')
+        ? "Not enough stock at selected location"
+        : error.message || "Failed to complete transaction";
       toast({
         title: "Error",
-        description: error.message || "Failed to update spare quantity",
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
-  
-  const handleAdjustQuantity = async (spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
-    setAdjustingSpares(prev => new Set(prev).add(spareId));
-    try {
-      await adjustMutation.mutateAsync({
-        spareId,
-        qtyChange,
-        eventType,
-        notes: 'Manual adjustment',
-      });
-    } finally {
-      setAdjustingSpares(prev => {
-        const next = new Set(prev);
-        next.delete(spareId);
-        return next;
-      });
-    }
+
+  // Open consume dialog
+  const openConsumeDialog = (spare: Spare) => {
+    setSelectedSpareForTransaction(spare);
+    setTransactionQty(1);
+    setTransactionLocationId("");
+    setTransactionNotes("");
+    setWorkOrderRef("");
+    setConsumeDialogOpen(true);
   };
+
+  // Open receive dialog
+  const openReceiveDialog = (spare: Spare) => {
+    setSelectedSpareForTransaction(spare);
+    setTransactionQty(1);
+    setTransactionLocationId("");
+    setTransactionNotes("");
+    setReceiveDialogOpen(true);
+  };
+
+  // Handle consume transaction - WORK_ORDER reference is REQUIRED per design
+  const handleConsumeSubmit = () => {
+    if (!selectedSpareForTransaction || !transactionLocationId || transactionQty <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select a location and enter a valid quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!workOrderRef.trim()) {
+      toast({
+        title: "Work Order Required",
+        description: "A work order reference is required for all consumption events to maintain audit trail",
+        variant: "destructive",
+      });
+      return;
+    }
+    inventoryTransactionMutation.mutate({
+      spareId: selectedSpareForTransaction.id,
+      locationId: parseInt(transactionLocationId),
+      eventType: 'CONSUME',
+      qtyChange: -Math.abs(transactionQty), // Consume is always negative
+      referenceType: 'WORK_ORDER', // Always WORK_ORDER for CONSUME
+      referenceId: workOrderRef.trim(),
+      referenceNote: transactionNotes || `Consumed for WO: ${workOrderRef.trim()}`,
+    });
+  };
+
+  // Handle receive transaction
+  const handleReceiveSubmit = () => {
+    if (!selectedSpareForTransaction || !transactionLocationId || transactionQty <= 0) {
+      toast({
+        title: "Error",
+        description: "Please select a location and enter a valid quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+    inventoryTransactionMutation.mutate({
+      spareId: selectedSpareForTransaction.id,
+      locationId: parseInt(transactionLocationId),
+      eventType: 'RECEIVE',
+      qtyChange: Math.abs(transactionQty), // Receive is always positive
+      referenceType: 'MANUAL',
+      referenceNote: transactionNotes || 'Manual receipt',
+    });
+  };
+  
+  // Legacy handleAdjustQuantity removed - now using location-based dialogs for proper tracking
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes(prev => {
@@ -822,22 +904,23 @@ const Spares: React.FC = () => {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleAdjustQuantity(spare.id, -1, 'CONSUME')}
-                              disabled={isAdjusting || spare.rob <= 0}
-                              data-testid={`button-decrease-${spare.id}`}
+                              className="h-8 w-8 p-0 hover:bg-red-50"
+                              onClick={() => openConsumeDialog(spare)}
+                              disabled={spare.rob <= 0}
+                              data-testid={`button-consume-${spare.id}`}
+                              title="Consume from location"
                             >
-                              <Minus className="h-4 w-4" />
+                              <Minus className="h-4 w-4 text-red-600" />
                             </Button>
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleAdjustQuantity(spare.id, 1, 'RECEIVE')}
-                              disabled={isAdjusting}
-                              data-testid={`button-increase-${spare.id}`}
+                              className="h-8 w-8 p-0 hover:bg-green-50"
+                              onClick={() => openReceiveDialog(spare)}
+                              data-testid={`button-receive-${spare.id}`}
+                              title="Receive to location"
                             >
-                              <Plus className="h-4 w-4" />
+                              <Plus className="h-4 w-4 text-green-600" />
                             </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                               <Edit className="h-4 w-4" />
@@ -1291,6 +1374,173 @@ const Spares: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Consume Dialog */}
+      <Dialog open={consumeDialogOpen} onOpenChange={setConsumeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Minus className="h-5 w-5" />
+              Consume Stock
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedSpareForTransaction && (
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+                <div className="text-sm font-medium text-gray-700">{selectedSpareForTransaction.partName}</div>
+                <div className="text-xs text-gray-500">Part #: {selectedSpareForTransaction.partCode}</div>
+                <div className="text-xs text-gray-500">Current ROB: {selectedSpareForTransaction.rob}</div>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="consume-location">Location *</Label>
+              <Select value={transactionLocationId} onValueChange={setTransactionLocationId}>
+                <SelectTrigger data-testid="select-consume-location">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vesselLocations.length > 0 ? (
+                    vesselLocations.map((loc: any) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.locationName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>No locations found</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="consume-qty">Quantity *</Label>
+              <Input
+                id="consume-qty"
+                type="number"
+                min="1"
+                value={transactionQty}
+                onChange={(e) => setTransactionQty(parseInt(e.target.value) || 0)}
+                data-testid="input-consume-qty"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="work-order-ref">Work Order Reference *</Label>
+              <Input
+                id="work-order-ref"
+                placeholder="e.g., WO-2024-001"
+                value={workOrderRef}
+                onChange={(e) => setWorkOrderRef(e.target.value)}
+                data-testid="input-work-order-ref"
+                className={!workOrderRef.trim() ? "border-red-300" : ""}
+              />
+              <p className="text-xs text-red-500 font-medium">Required for audit trail compliance</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="consume-notes">Notes</Label>
+              <Input
+                id="consume-notes"
+                placeholder="Optional notes"
+                value={transactionNotes}
+                onChange={(e) => setTransactionNotes(e.target.value)}
+                data-testid="input-consume-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsumeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleConsumeSubmit}
+              disabled={inventoryTransactionMutation.isPending || !transactionLocationId || transactionQty <= 0 || !workOrderRef.trim()}
+              data-testid="button-confirm-consume"
+            >
+              {inventoryTransactionMutation.isPending ? "Processing..." : "Consume"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receive Dialog */}
+      <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-green-600 flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Receive Stock
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedSpareForTransaction && (
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+                <div className="text-sm font-medium text-gray-700">{selectedSpareForTransaction.partName}</div>
+                <div className="text-xs text-gray-500">Part #: {selectedSpareForTransaction.partCode}</div>
+                <div className="text-xs text-gray-500">Current ROB: {selectedSpareForTransaction.rob}</div>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="receive-location">Location *</Label>
+              <Select value={transactionLocationId} onValueChange={setTransactionLocationId}>
+                <SelectTrigger data-testid="select-receive-location">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vesselLocations.length > 0 ? (
+                    vesselLocations.map((loc: any) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.locationName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>No locations found</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="receive-qty">Quantity *</Label>
+              <Input
+                id="receive-qty"
+                type="number"
+                min="1"
+                value={transactionQty}
+                onChange={(e) => setTransactionQty(parseInt(e.target.value) || 0)}
+                data-testid="input-receive-qty"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="receive-notes">Notes</Label>
+              <Input
+                id="receive-notes"
+                placeholder="e.g., PO-2024-001 shipment received"
+                value={transactionNotes}
+                onChange={(e) => setTransactionNotes(e.target.value)}
+                data-testid="input-receive-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleReceiveSubmit}
+              disabled={inventoryTransactionMutation.isPending || !transactionLocationId || transactionQty <= 0}
+              data-testid="button-confirm-receive"
+            >
+              {inventoryTransactionMutation.isPending ? "Processing..." : "Receive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
