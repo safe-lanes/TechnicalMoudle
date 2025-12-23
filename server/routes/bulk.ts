@@ -67,6 +67,134 @@ function addVersionInfoToSheet(sheet: ExcelJS.Worksheet): void {
   sheet.getCell('AA1').value = `${TEMPLATE_VERSION_CELL}${TEMPLATE_VERSION}`;
   sheet.getColumn('AA').hidden = true;
 }
+
+/**
+ * Process spare inventory after spare creation/update:
+ * 1. Get or create location entities from location text names using findOrCreateLocation
+ * 2. Create spare_component_link for spare-to-component relationship
+ * 3. Create spare_location_stock records with qty
+ * 4. For NEW spares only: Create opening balance transactions using ADJUST event
+ *    (ADJUST is used for opening balances since RECEIVE is for normal stock receipts)
+ * 
+ * NOTE: This function properly reads current stock to compute accurate before/after values.
+ * For existing spares (updates), it only updates stock levels without creating transactions
+ * since the Excel import is a "sync" operation, not a receipt event.
+ */
+async function processSpareInventory(params: {
+  spareId: number;
+  vesselId: string;
+  componentId: string;
+  locationAName: string | null;
+  locationBName: string | null;
+  robLocationA: number;
+  robLocationB: number;
+  isNewSpare: boolean;
+  userId: string;
+}): Promise<void> {
+  const { spareId, vesselId, componentId, locationAName, locationBName, robLocationA, robLocationB, isNewSpare, userId } = params;
+  
+  try {
+    // 1. Create spare-component link (if not exists)
+    const existingLinks = await storage.getSpareComponentLinksBySpare(spareId);
+    const alreadyLinked = existingLinks.some((link: any) => link.componentId === componentId);
+    if (!alreadyLinked) {
+      await storage.createSpareComponentLink({
+        spareId,
+        componentId,
+        vesselId,
+        linkedBy: userId,
+      });
+      console.log(`🔗 Linked spare ${spareId} to component ${componentId}`);
+    }
+    
+    // 2. Process Location A if provided (always sync if location name is given)
+    if (locationAName && locationAName.trim()) {
+      // Use findOrCreateLocation for proper normalization
+      const locationA = await storage.findOrCreateLocation(vesselId, locationAName.trim(), userId);
+      
+      // Get current stock to compute proper before/after values
+      const currentTotalRobA = await storage.getSpareRobTotal(spareId);
+      const currentLocStockA = await storage.getSpareLocationStockItem(spareId, locationA.id);
+      const currentLocQtyA = currentLocStockA?.qty ?? 0;
+      
+      // Always sync stock to spreadsheet value (allows setting to 0)
+      if (robLocationA >= 0) {
+        await storage.upsertSpareLocationStock({
+          vesselId,
+          spareId,
+          locationId: locationA.id,
+          qty: robLocationA,
+        });
+        
+        // Create opening balance transaction for NEW spares with non-zero qty
+        // Use ADJUST event since this is an import operation, not a normal receive
+        if (isNewSpare && robLocationA > 0) {
+          const newTotalRobA = currentTotalRobA + robLocationA;
+          await storage.createInventoryTransaction({
+            vesselId,
+            spareId,
+            locationId: locationA.id,
+            eventType: 'ADJUST',
+            qtyChange: robLocationA,
+            robTotalBefore: currentTotalRobA,
+            robTotalAfter: newTotalRobA,
+            robLocationBefore: currentLocQtyA,
+            robLocationAfter: robLocationA,
+            referenceType: 'OTHER',
+            referenceNote: 'Opening balance from Excel import',
+            userId,
+          });
+          console.log(`📊 Created opening balance for spare ${spareId} at ${locationAName}: ${robLocationA}`);
+        }
+      }
+    }
+    
+    // 3. Process Location B if provided (always sync if location name is given)
+    if (locationBName && locationBName.trim()) {
+      // Use findOrCreateLocation for proper normalization
+      const locationB = await storage.findOrCreateLocation(vesselId, locationBName.trim(), userId);
+      
+      // Get current stock AFTER location A processing to compute proper before/after
+      const currentTotalRobB = await storage.getSpareRobTotal(spareId);
+      const currentLocStockB = await storage.getSpareLocationStockItem(spareId, locationB.id);
+      const currentLocQtyB = currentLocStockB?.qty ?? 0;
+      
+      // Always sync stock to spreadsheet value (allows setting to 0)
+      if (robLocationB >= 0) {
+        await storage.upsertSpareLocationStock({
+          vesselId,
+          spareId,
+          locationId: locationB.id,
+          qty: robLocationB,
+        });
+        
+        // Create opening balance transaction for NEW spares with non-zero qty
+        if (isNewSpare && robLocationB > 0) {
+          const newTotalRobB = currentTotalRobB + robLocationB;
+          await storage.createInventoryTransaction({
+            vesselId,
+            spareId,
+            locationId: locationB.id,
+            eventType: 'ADJUST',
+            qtyChange: robLocationB,
+            robTotalBefore: currentTotalRobB,
+            robTotalAfter: newTotalRobB,
+            robLocationBefore: currentLocQtyB,
+            robLocationAfter: robLocationB,
+            referenceType: 'OTHER',
+            referenceNote: 'Opening balance from Excel import',
+            userId,
+          });
+          console.log(`📊 Created opening balance for spare ${spareId} at ${locationBName}: ${robLocationB}`);
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error(`⚠️ Error processing inventory for spare ${spareId}:`, error.message);
+    // Don't throw - inventory processing is supplementary, spare was already created
+  }
+}
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
@@ -3572,6 +3700,19 @@ async function performImport(
             await trackChange(importHistoryId, 'created', 'spare', String(newSpare.id), null, newSpare);
           }
           
+          // Process inventory: create location entities, links, and stock records
+          await processSpareInventory({
+            spareId: newSpare.id,
+            vesselId: sparesVesselId,
+            componentId: component.id,
+            locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+            locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+            robLocationA: robLocationAVal,
+            robLocationB: robLocationBVal,
+            isNewSpare: true,
+            userId: 'system-import',
+          });
+          
           console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
           
         } else if (mode === 'update') {
@@ -3634,6 +3775,19 @@ async function performImport(
             await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
           }
           
+          // Process inventory for updated spare (updates links and stock, no opening balance)
+          await processSpareInventory({
+            spareId: updatedSpare.id,
+            vesselId: sparesVesselId,
+            componentId: component.id,
+            locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+            locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+            robLocationA: robLocationAUpdate,
+            robLocationB: robLocationBUpdate,
+            isNewSpare: false,
+            userId: 'system-import',
+          });
+          
           console.log(`🔄 Updated spare: ${partCode} - ${updatedSpare.partName}`);
           
         } else if (mode === 'upsert') {
@@ -3692,6 +3846,19 @@ async function performImport(
               await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
             }
             
+            // Process inventory for upsert-updated spare
+            await processSpareInventory({
+              spareId: updatedSpare.id,
+              vesselId: sparesVesselId,
+              componentId: component.id,
+              locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+              locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+              robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
+              robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
+              isNewSpare: false,
+              userId: 'system-import',
+            });
+            
             console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
           } else {
             // Create new - use criticalValUpsert from parent scope
@@ -3732,6 +3899,19 @@ async function performImport(
             if (importHistoryId) {
               await trackChange(importHistoryId, 'created', 'spare', String(newSpare.id), null, newSpare);
             }
+            
+            // Process inventory for upsert-created spare
+            await processSpareInventory({
+              spareId: newSpare.id,
+              vesselId: sparesVesselId,
+              componentId: component.id,
+              locationAName: row['Location A'] ? String(row['Location A']).trim() : null,
+              locationBName: row['Location B'] ? String(row['Location B']).trim() : null,
+              robLocationA: robLocationAUpsert,
+              robLocationB: robLocationBUpsert,
+              isNewSpare: true,
+              userId: 'system-import',
+            });
             
             console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);
           }
