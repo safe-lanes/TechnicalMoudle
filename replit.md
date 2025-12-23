@@ -58,6 +58,12 @@ The application features a modern full-stack architecture. The frontend is devel
 - **Running Hours Display in Work Orders Table**: RH-based work orders (without calendar due dates) now show remaining hours in the Due Date column instead of "—". Displays "X hrs remaining" (blue), "Due now" (amber), or "Overdue by X hrs" (red) based on `nextDueReading - currentReading` calculation.
 - **File Attachments for Certificates & Surveys**: Uses `FileAttachmentDialog` component for managing file attachments. Files are stored in Replit Object Storage. PDF previews open in a new browser tab (to avoid Chrome security restrictions), while images display in a modal dialog. Server configured for 10MB body size limit to handle file uploads.
 - **Bulk Import RH Fields Fix**: The `validateData` function in `server/routes/bulk.ts` must include RH-related columns (`RH Counter Type`, `RH Counter Source`, `Last Updated`) in the `textFields` array. Without this, these values are stripped during normalization and never passed to `createComponentFromRow`, causing all imported components to default to `NOT_RH_DRIVEN`.
+- **Bulk Import Validation UI Enhancements**: The validation results display now includes:
+  - **Full Row Display**: Backend returns ALL validation rows (no 100-row limit), ensuring complete data visibility and accurate imports.
+  - **Pagination**: Page size selector (10/25/50/100 rows per page) with first/prev/next/last navigation controls.
+  - **Clickable Filter Badges**: Valid/Warnings/Errors badges are now clickable to filter the table by status. Visual feedback shows active filter with ring highlight.
+  - **Expandable Row Details**: Rows with errors/warnings have an expand button to show full error messages. Click row or expand icon to toggle details.
+  - **Accurate Counts**: "Skip Errors & Import" button correctly shows total valid rows from full dataset, not limited preview.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
