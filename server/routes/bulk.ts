@@ -4777,42 +4777,36 @@ async function updateComponentFromRow(componentCode: string, row: any, vesselId?
     // Use vesselId from row, or passed vesselId parameter
     const lookupVesselId = row['Vessel Code'] || vesselId;
     
-    if (lookupVesselId) {
-      // Primary lookup: by componentCode + vesselId (correct uniqueness constraint)
-      component = await storage.getComponentByCode(componentCode, lookupVesselId);
+    // Require vesselId for component lookup - vessel scoping is critical for data integrity
+    if (!lookupVesselId) {
+      throw new Error(`Cannot update component '${componentCode}': Vessel Code is required. Please ensure the 'Vessel Code' column is populated in your data.`);
     }
     
-    // Fallback 1: If lookupVesselId is missing or lookup failed, try by component ID directly
-    // (componentCode might actually be an ID in some edit scenarios)
-    if (!component) {
+    // Primary lookup: by componentCode + vesselId (correct uniqueness constraint)
+    // This ensures we always update the correct vessel-specific component
+    component = await storage.getComponentByCode(componentCode, lookupVesselId);
+    
+    // Fallback: If the componentCode looks like a database ID (typically a long alphanumeric string),
+    // try to look it up directly. This handles cases where IDs are used instead of codes.
+    if (!component && componentCode.includes('-') && componentCode.length > 15) {
       try {
-        component = await storage.getComponent(componentCode);
-        if (component) {
-          console.log(`✅ Component found by ID fallback: ${componentCode}`);
+        const compById = await storage.getComponent(componentCode);
+        // Only use this component if it belongs to the correct vessel
+        if (compById && compById.vesselId === lookupVesselId) {
+          component = compById;
+          console.log(`✅ Component found by ID fallback: ${componentCode} (vessel: ${lookupVesselId})`);
+        } else if (compById) {
+          console.warn(`⚠️ Component ID ${componentCode} found but belongs to vessel ${compById.vesselId}, not ${lookupVesselId}`);
         }
       } catch (e) {
-        // Ignore - this is a fallback attempt
-      }
-    }
-    
-    // Fallback 2: Search across all vessels if still not found
-    if (!component && !lookupVesselId) {
-      console.warn(`⚠️ No vesselId provided for component lookup: ${componentCode}. Attempting global search...`);
-      // Try to find component by code across all vessels (less precise but may work for single-vessel setups)
-      const allVesselIds = ['V001', 'V002', 'V003']; // Common vessel IDs
-      for (const vid of allVesselIds) {
-        component = await storage.getComponentByCode(componentCode, vid);
-        if (component) {
-          console.log(`✅ Component ${componentCode} found in vessel ${vid} via fallback search`);
-          break;
-        }
+        // ID lookup failed - this is fine, continue with error reporting
       }
     }
   }
   
   if (!component) {
     const lookupVesselId = row['Vessel Code'] || vesselId || 'UNKNOWN';
-    throw new Error(`Component code '${componentCode}' not found for vessel '${lookupVesselId}'. Ensure both component_code and vessel_code are correct in the data.`);
+    throw new Error(`Component code '${componentCode}' not found for vessel '${lookupVesselId}'. Verify that the component exists in this vessel and that the component_code matches exactly.`);
   }
   
   return await storage.updateComponent(component.id, updateData);
