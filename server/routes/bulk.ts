@@ -2097,15 +2097,35 @@ router.post('/sheets', upload.single('file'), async (req, res) => {
   }
 });
 
+// Map sheet names to data types - allows uploading any sheet from any page
+function getTypeFromSheetName(sheetName: string): string | null {
+  const normalizedName = sheetName.toLowerCase().trim();
+  
+  // Direct matches
+  if (normalizedName === 'spares' || normalizedName.includes('spare')) return 'spares';
+  if (normalizedName === 'components' || normalizedName.includes('component') || normalizedName.includes('machinery')) return 'components';
+  if (normalizedName === 'jobs' || normalizedName.includes('job')) return 'jobs';
+  if (normalizedName === 'stores' || normalizedName.includes('store')) return 'stores';
+  if (normalizedName === 'work-orders' || normalizedName.includes('work order') || normalizedName.includes('workorder')) return 'work-orders';
+  
+  return null; // No mapping found, use passed type
+}
+
 // Dry-run validation
 router.post('/dry-run', upload.single('file'), async (req, res) => {
   try {
-    const { type, mode, archiveMissing, vesselId, sheetName } = req.body;
+    const { type: requestedType, mode, archiveMissing, vesselId, sheetName } = req.body;
     const file = req.file;
 
     if (!file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    // Determine effective type: use sheet name mapping if available, otherwise use requested type
+    const sheetBasedType = sheetName ? getTypeFromSheetName(sheetName) : null;
+    const type = sheetBasedType || requestedType;
+    
+    console.log(`📋 Type determination: requested='${requestedType}', sheetName='${sheetName}', sheetBasedType='${sheetBasedType}', effective='${type}'`);
 
     if (!['components', 'spares', 'stores', 'work-orders', 'jobs'].includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
@@ -2246,18 +2266,22 @@ router.post('/import', async (req, res) => {
       }
     }
 
+    // Use cached type for consistency - this is the effective type determined during dry-run
+    // (may differ from request type if sheet name indicated a different data type)
+    const effectiveType = cachedData.type || type;
+    
     // Log import details for debugging Issue #11
     console.log(`📦 [BULK_IMPORT] Starting import:`);
-    console.log(`   Type: ${type}`);
+    console.log(`   RequestType: ${type}`);
+    console.log(`   EffectiveType: ${effectiveType}`);
     console.log(`   Mode: ${mode}`);
     console.log(`   VesselId: ${vesselId}`);
     console.log(`   Rows: ${dataToImport.length}`);
-    console.log(`   CachedType: ${cachedData.type}`);
     
     // Create initial ImportHistory with status='in_progress'
     await storeImportHistory({
       id: historyId,
-      type,
+      type: effectiveType,
       mode,
       archiveMissing: archiveMissing || false,
       userId: (req as any).user?.id || 'system',
@@ -2275,7 +2299,7 @@ router.post('/import', async (req, res) => {
 
     // Perform the actual import using filtered/normalized data
     const importResult = await performImport(
-      type,
+      effectiveType,
       dataToImport,
       mode,
       archiveMissing,
@@ -2293,7 +2317,7 @@ router.post('/import', async (req, res) => {
       
       const timestamp = Date.now();
       const safeFileName = cachedData.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const objectPath = `bulk-imports/${type}/${timestamp}_${safeFileName}`;
+      const objectPath = `bulk-imports/${effectiveType}/${timestamp}_${safeFileName}`;
       
       // Upload file using the Replit Object Storage SDK
       await client.uploadFromBytes(objectPath, cachedData.file);
@@ -2304,7 +2328,7 @@ router.post('/import', async (req, res) => {
       
       // Fallback: Save file locally
       try {
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', type);
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'bulk-imports', effectiveType);
         await fsPromises.mkdir(uploadsDir, { recursive: true });
         
         const timestamp = Date.now();
