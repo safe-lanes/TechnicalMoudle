@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useVessel } from "@/contexts/VesselContext";
 import {
   Dialog,
   DialogContent,
@@ -267,6 +269,13 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   
   // State for Part B4 spare parts consumed inline editing
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
+  
+  // State for B4 spare consumption dialog
+  const [showConsumeDialog, setShowConsumeDialog] = useState(false);
+  const [selectedBomSpare, setSelectedBomSpare] = useState<any>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [consumeQty, setConsumeQty] = useState<string>("1");
+  const [consumeComments, setConsumeComments] = useState<string>("");
 
   // Execution data (Part B)
   const [executionData, setExecutionData] = useState({
@@ -286,7 +295,17 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, comments: string}>,
+    consumedSpareParts: [] as Array<{
+      spareId: number | null;
+      partNo: string;
+      description: string;
+      quantityConsumed: string;
+      comments: string;
+      locationId: number | null;
+      locationName: string;
+      availableQty: number;
+      isFromBom: boolean;
+    }>,
     // IHM fields
     ihmUpdate: {
       enabled: false,
@@ -300,6 +319,9 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }
   });
 
+  // Vessel context for inventory transactions
+  const { vesselId } = useVessel();
+  
   // Fetch spare BOM for the component (from spare_component_links)
   const componentCode = workOrder?.componentCode || component?.code || templateData?.componentCode;
   const { data: spareBomResponse, isLoading: spareBomLoading } = useQuery<{ success: boolean; data: any[] }>({
@@ -307,6 +329,44 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     enabled: !!componentCode && isOpen,
   });
   const componentSpareBom = spareBomResponse?.data || [];
+  
+  // Mutation for posting consumption transactions
+  const consumptionMutation = useMutation({
+    mutationFn: async (consumedParts: typeof executionData.consumedSpareParts) => {
+      const workOrderRef = workOrder?.id || workOrder?.workOrderNo || executionData.woExecutionId;
+      
+      const results = await Promise.all(
+        consumedParts
+          .filter(part => part.isFromBom && part.spareId && part.locationId)
+          .map(part => 
+            apiRequest('POST', '/api/inventory/transactions', {
+              vesselId,
+              spareId: part.spareId,
+              locationId: part.locationId,
+              eventType: 'CONSUME',
+              qty: parseInt(part.quantityConsumed, 10),
+              referenceType: 'WORK_ORDER',
+              referenceId: workOrderRef,
+              remarks: part.comments || `Consumed for WO: ${workOrderRef}`,
+              performedBy: executionData.performedBy || 'System'
+            })
+          )
+      );
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-by-component/${componentCode}`] });
+    },
+    onError: (error: any) => {
+      console.error('Consumption transaction failed:', error);
+      toast({
+        title: "Inventory Update Failed",
+        description: error?.message || "Failed to record spare consumption. Please update inventory manually.",
+        variant: "destructive"
+      });
+    }
+  });
 
   // Ranks for dropdowns
   const ranks = [
@@ -665,17 +725,92 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
 
   // Part B4 - Consumed Spare Parts Handlers
   const handleAddConsumedSparePart = () => {
+    // Show dialog to select spare from BOM
+    if (componentSpareBom.length > 0) {
+      setShowConsumeDialog(true);
+    } else {
+      // Fallback: Add manual entry for spares not in BOM
+      const newPart = {
+        spareId: null,
+        partNo: "",
+        description: "",
+        quantityConsumed: "",
+        comments: "",
+        locationId: null,
+        locationName: "",
+        availableQty: 0,
+        isFromBom: false
+      };
+      setExecutionData(prev => ({
+        ...prev,
+        consumedSpareParts: [...prev.consumedSpareParts, newPart]
+      }));
+      setEditingConsumedSparePart(executionData.consumedSpareParts.length);
+    }
+  };
+
+  // Open consume dialog for a specific BOM spare
+  const handleOpenConsumeDialog = (spare: any) => {
+    setSelectedBomSpare(spare);
+    setSelectedLocationId("");
+    setConsumeQty("1");
+    setConsumeComments("");
+    setShowConsumeDialog(true);
+  };
+
+  // Add consumption from dialog
+  const handleConfirmConsumption = () => {
+    if (!selectedBomSpare) return;
+    
+    const selectedLocation = selectedBomSpare.locations?.find((loc: any) => loc.locationId.toString() === selectedLocationId);
+    const qty = parseInt(consumeQty, 10);
+    
+    if (!selectedLocation || isNaN(qty) || qty <= 0) {
+      toast({
+        title: "Invalid input",
+        description: "Please select a location and enter a valid quantity.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (qty > selectedLocation.qty) {
+      toast({
+        title: "Insufficient stock",
+        description: `Only ${selectedLocation.qty} available at ${selectedLocation.locationName}. Cannot consume ${qty}.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const newPart = {
-      partNo: "",
-      description: "",
-      quantityConsumed: "",
-      comments: ""
+      spareId: selectedBomSpare.id,
+      partNo: selectedBomSpare.partCode || "",
+      description: selectedBomSpare.name || "",
+      quantityConsumed: qty.toString(),
+      comments: consumeComments,
+      locationId: selectedLocation.locationId,
+      locationName: selectedLocation.locationName,
+      availableQty: selectedLocation.qty,
+      isFromBom: true
     };
+    
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: [...prev.consumedSpareParts, newPart]
     }));
-    setEditingConsumedSparePart(executionData.consumedSpareParts.length);
+    
+    // Reset dialog state
+    setShowConsumeDialog(false);
+    setSelectedBomSpare(null);
+    setSelectedLocationId("");
+    setConsumeQty("1");
+    setConsumeComments("");
+    
+    toast({
+      title: "Spare part added",
+      description: `${qty} x ${selectedBomSpare.partCode} from ${selectedLocation.locationName} will be consumed when work order is completed.`
+    });
   };
 
   const handleEditConsumedSparePart = (index: number) => {
@@ -705,7 +840,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }));
   };
 
-  const handleUpdateConsumedSparePartField = (index: number, field: keyof typeof executionData.consumedSpareParts[0], value: string) => {
+  const handleUpdateConsumedSparePartField = (index: number, field: string, value: string) => {
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: prev.consumedSpareParts.map((part, i) =>
@@ -839,7 +974,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (activeSection === 'partA') {
       // Validate template data
       if (!templateData.woTitle) {
@@ -956,11 +1091,33 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
           templateCode: templateData.woTemplateCode || workOrder?.templateCode,
           submittedDate: new Date().toISOString().split('T')[0]
         };
+        
+        // Post consumption transactions for BOM-linked spare parts FIRST (atomic requirement)
+        const bomConsumedParts = executionData.consumedSpareParts.filter(
+          part => part.isFromBom && part.spareId && part.locationId
+        );
+        if (bomConsumedParts.length > 0) {
+          try {
+            await consumptionMutation.mutateAsync(bomConsumedParts);
+          } catch (error: any) {
+            console.error('Failed to post consumption transactions:', error);
+            toast({
+              title: "Inventory Update Failed",
+              description: error?.message || "Failed to record spare consumption. Work Order not submitted. Please try again or remove consumption entries.",
+              variant: "destructive"
+            });
+            // Do NOT proceed with work order submission - keep dialog open
+            return;
+          }
+        }
+        
         onSubmit(workOrderId, { type: 'execution', data: executionRecord });
         
         toast({
           title: "Success",
-          description: "Work Order submitted for approval",
+          description: bomConsumedParts.length > 0 
+            ? `Work Order submitted. ${bomConsumedParts.length} spare consumption(s) recorded.`
+            : "Work Order submitted for approval",
         });
       }
     }
@@ -2257,34 +2414,76 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                   <div className="border border-gray-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium" style={{ color: '#16569e' }}>B4. Spare Parts Consumed</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={handleAddConsumedSparePart}
-                        data-testid="button-add-spare-part-b4"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Spare Part
-                      </Button>
+                      <div className="flex gap-2">
+                        {componentSpareBom.length > 0 && (
+                          <span className="text-xs text-gray-500 self-center">
+                            {componentSpareBom.length} spare(s) in BOM
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-800"
+                          onClick={handleAddConsumedSparePart}
+                          data-testid="button-add-spare-part-b4"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Spare Part
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {/* Quick select from BOM */}
+                    {componentSpareBom.length > 0 && (
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <p className="text-xs text-blue-700 mb-2 font-medium">Quick select from Component BOM:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {componentSpareBom.map((spare: any) => {
+                            const stockStatus = spare.rob >= (spare.min || 0) ? 'OK' : spare.rob > 0 ? 'Low' : 'Critical';
+                            const statusColor = stockStatus === 'OK' ? 'bg-green-100 text-green-700' : 
+                                                stockStatus === 'Low' ? 'bg-yellow-100 text-yellow-700' : 
+                                                'bg-red-100 text-red-700';
+                            return (
+                              <button
+                                key={spare.id}
+                                type="button"
+                                onClick={() => handleOpenConsumeDialog(spare)}
+                                disabled={spare.rob <= 0}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs border rounded-full cursor-pointer transition-colors duration-150 ${
+                                  spare.rob > 0 
+                                    ? 'bg-white border-gray-300 text-gray-700 hover:bg-blue-100 hover:border-blue-300' 
+                                    : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                                }`}
+                                data-testid={`button-consume-spare-${spare.id}`}
+                              >
+                                <span className="font-medium">{spare.partCode}</span>
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusColor}`}>
+                                  ROB: {spare.rob}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="border border-gray-200 rounded">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 text-sm font-medium text-gray-700">
+                        <div className="grid grid-cols-[1.5fr_2.5fr_1fr_1.5fr_1.5fr_auto] gap-4 text-sm font-medium text-gray-700">
                           <div>Part No</div>
                           <div>Description</div>
-                          <div>Quantity Consumed</div>
+                          <div>Qty</div>
+                          <div>Location</div>
                           <div>Comments</div>
-                          <div className="w-20">Actions</div>
+                          <div className="w-16">Actions</div>
                         </div>
                       </div>
                       <div className="divide-y divide-gray-200">
                         {executionData.consumedSpareParts.length > 0 ? (
                           executionData.consumedSpareParts.map((part, index) => (
                             <div key={index} className="px-4 py-3">
-                              {editingConsumedSparePart === index ? (
-                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
+                              {editingConsumedSparePart === index && !part.isFromBom ? (
+                                <div className="grid grid-cols-[1.5fr_2.5fr_1fr_1.5fr_1.5fr_auto] gap-4 items-center">
                                   <Input
                                     value={part.partNo}
                                     onChange={(e) => handleUpdateConsumedSparePartField(index, 'partNo', e.target.value)}
@@ -2302,6 +2501,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                     value={part.quantityConsumed}
                                     onChange={(e) => handleUpdateConsumedSparePartField(index, 'quantityConsumed', e.target.value)}
                                     placeholder="Qty"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={part.locationName || ''}
+                                    onChange={(e) => handleUpdateConsumedSparePartField(index, 'locationName', e.target.value)}
+                                    placeholder="Location"
                                     className="text-sm"
                                   />
                                   <Input
@@ -2330,20 +2535,28 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-[2fr_3fr_1.5fr_2fr_auto] gap-4 items-center">
-                                  <div className="text-sm text-gray-900">{part.partNo || '-'}</div>
+                                <div className="grid grid-cols-[1.5fr_2.5fr_1fr_1.5fr_1.5fr_auto] gap-4 items-center">
+                                  <div className="text-sm text-gray-900 font-medium">
+                                    {part.partNo || '-'}
+                                    {part.isFromBom && (
+                                      <span className="ml-1 text-[10px] text-blue-500">(BOM)</span>
+                                    )}
+                                  </div>
                                   <div className="text-sm text-gray-900">{part.description || '-'}</div>
                                   <div className="text-sm text-gray-900">{part.quantityConsumed || '-'}</div>
-                                  <div className="text-sm text-gray-900">{part.comments || '-'}</div>
+                                  <div className="text-sm text-gray-600">{part.locationName || '-'}</div>
+                                  <div className="text-sm text-gray-500 truncate" title={part.comments}>{part.comments || '-'}</div>
                                   <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditConsumedSparePart(index)}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <Pencil className="h-4 w-4 text-blue-600" />
-                                    </Button>
+                                    {!part.isFromBom && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditConsumedSparePart(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Pencil className="h-4 w-4 text-blue-600" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -2359,12 +2572,92 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
                           ))
                         ) : (
                           <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                            No spare parts consumed yet
+                            No spare parts consumed yet. {componentSpareBom.length > 0 ? 'Select from BOM above or add manually.' : 'Click "Add Spare Part" to add.'}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Consume Spare Dialog */}
+                  <Dialog open={showConsumeDialog} onOpenChange={setShowConsumeDialog}>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Consume Spare Part</DialogTitle>
+                      </DialogHeader>
+                      {selectedBomSpare && (
+                        <div className="space-y-4 py-4">
+                          <div className="p-3 bg-gray-50 rounded-lg">
+                            <div className="text-sm font-medium text-gray-900">{selectedBomSpare.partCode}</div>
+                            <div className="text-sm text-gray-600">{selectedBomSpare.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">Total ROB: {selectedBomSpare.rob}</div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm text-gray-700">Select Location *</Label>
+                            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select location to consume from" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedBomSpare.locations?.filter((loc: any) => loc.qty > 0).map((loc: any) => (
+                                  <SelectItem key={loc.locationId} value={loc.locationId.toString()}>
+                                    {loc.locationName} (Available: {loc.qty})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm text-gray-700">Quantity to Consume *</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max={selectedBomSpare.locations?.find((loc: any) => loc.locationId.toString() === selectedLocationId)?.qty || 1}
+                              value={consumeQty}
+                              onChange={(e) => setConsumeQty(e.target.value)}
+                              placeholder="Enter quantity"
+                            />
+                            {selectedLocationId && (
+                              <p className="text-xs text-gray-500">
+                                Max available: {selectedBomSpare.locations?.find((loc: any) => loc.locationId.toString() === selectedLocationId)?.qty || 0}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm text-gray-700">Comments (optional)</Label>
+                            <Input
+                              value={consumeComments}
+                              onChange={(e) => setConsumeComments(e.target.value)}
+                              placeholder="e.g., Replaced worn part"
+                            />
+                          </div>
+                          
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setShowConsumeDialog(false);
+                                setSelectedBomSpare(null);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleConfirmConsumption}
+                              disabled={!selectedLocationId || !consumeQty || parseInt(consumeQty) <= 0}
+                              className="bg-blue-600 hover:bg-blue-700"
+                              data-testid="button-confirm-consumption"
+                            >
+                              Add to Consumption
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
 
                   {/* B5. IHM Update (only show if feature is enabled) */}
                   {FEATURES.IHM && (
