@@ -997,6 +997,11 @@ class MemStorage {
     return [];
   }
 
+  async getMasterDataByFleetCode(fleetEquipmentCode: string): Promise<any | undefined> {
+    console.log('[MemStorage] getMasterDataByFleetCode called - stub in file mode');
+    return undefined;
+  }
+
   async getAllPmsVesselSettings(): Promise<any[]> {
     if (!this.data.pmsVesselSettings) return [];
     return toArray(this.data.pmsVesselSettings);
