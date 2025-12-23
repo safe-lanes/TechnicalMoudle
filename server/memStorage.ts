@@ -699,6 +699,18 @@ class MemStorage {
   // PMS Vessel Settings
   async getPmsVesselSettings(vesselId: string): Promise<any> { return undefined; }
   async upsertPmsVesselSettings(settings: any): Promise<any> { return settings; }
+  async createOrUpdatePmsVesselSettings(settings: any): Promise<any> {
+    const updatedSettings = {
+      ...settings,
+      id: settings.id || this.getNextId('pmsVesselSettings'),
+      updatedBy: settings.updatedBy || 'test',
+      updatedAt: new Date()
+    };
+    return updatedSettings;
+  }
+  async deletePmsVesselSettings(vesselId: string): Promise<void> {
+    console.log('[MemStorage] deletePmsVesselSettings called - stub in file mode');
+  }
 
   // Component Documents
   async getComponentDocuments(componentId: string): Promise<any[]> { return []; }

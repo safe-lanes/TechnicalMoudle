@@ -5677,9 +5677,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "PMS vessel settings already exist for this vessel. Use PUT to update." });
       }
       
+      const updatedBy = settingsData.updatedBy || (req as any).user?.username || 'test';
       const settings = await storage.createOrUpdatePmsVesselSettings({
         vesselId,
-        ...settingsData
+        ...settingsData,
+        updatedBy
       });
       res.status(201).json(settings);
     } catch (error) {
@@ -5706,9 +5708,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/pms-vessel-settings/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
+      const updatedBy = req.body.updatedBy || (req as any).user?.username || 'test';
       const settings = await storage.createOrUpdatePmsVesselSettings({
         vesselId,
-        ...req.body
+        ...req.body,
+        updatedBy
       });
       res.json(settings);
     } catch (error) {
@@ -5761,13 +5765,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingSettings = await storage.getPmsVesselSettings(vesselId);
       
       // Create update object with ONLY location fields changed, preserving all other settings
+      const updatedBy = req.body.updatedBy || (req as any).user?.username || 'test';
       const settingsToSave = existingSettings 
         ? {
             ...existingSettings,
             vesselId,
             locationAName: locationAName ?? existingSettings.locationAName ?? 'Location A',
             locationBName: locationBName ?? existingSettings.locationBName ?? 'Location B',
-            updatedBy: req.body.updatedBy || 'System'
+            updatedBy
           }
         : {
             // New settings - use defaults for non-location fields
@@ -5781,7 +5786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rhLeadHoursCritical: 50,
             rhLeadHoursNonCritical: 100,
             rhGraceHours: 168,
-            updatedBy: req.body.updatedBy || 'System'
+            updatedBy
           };
       
       const updatedSettings = await storage.createOrUpdatePmsVesselSettings(settingsToSave);
