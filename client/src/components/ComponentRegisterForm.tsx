@@ -229,6 +229,16 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
 
+  // Fetch linked spares with inventory for the component
+  const { data: linkedSparesResponse, isLoading: isLoadingLinkedSpares } = useQuery<{ success: boolean; data: any[] }>({
+    queryKey: ['/api/inventory/spares-by-component', componentData.componentId],
+    enabled: !!componentData.componentId,
+  });
+  const linkedSpares = linkedSparesResponse?.data || [];
+
+  // State for viewing spare detail dialog
+  const [selectedSpareDetail, setSelectedSpareDetail] = useState<any | null>(null);
+
   // Build component tree from fetched data
   const componentTreeData = React.useMemo(() => {
     // Start with the 8 main categories
@@ -1534,7 +1544,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                   )}
                 </div>
 
-                {/* E. Spares */}
+                {/* E. Spares - Linked Spares with Inventory */}
                 <div>
                   <Collapsible open={!collapsedSections.E} onOpenChange={(open) => setCollapsedSections(prev => ({ ...prev, E: !open }))}>
                     <CollapsibleTrigger className="w-full">
@@ -1542,143 +1552,147 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
                         <div className="flex items-center gap-2">
                           {collapsedSections.E ? <ChevronRight className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
                           <h4 className="text-lg font-semibold text-[#16569e]">E. Spares</h4>
+                          {linkedSpares && linkedSpares.length > 0 && (
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                              {linkedSpares.length} linked
+                            </span>
+                          )}
                         </div>
                         <Button 
                           size="sm" 
                           className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
                           onClick={(e) => e.stopPropagation()}
+                          data-testid="button-add-spare"
                         >
                           <Plus className="h-4 w-4 mr-1" />
-                          Add Spares
+                          Link Spare
                         </Button>
                       </div>
                     </CollapsibleTrigger>
                     
-                    {/* Full content when expanded */}
                     <CollapsibleContent>
-                      <div className="border border-gray-200 rounded">
+                      <div className="border border-gray-200 rounded mb-4">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                          <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                            </div>
+                          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                            <div>Part Number</div>
+                            <div>Description</div>
+                            <div className="text-center">ROB Total</div>
+                            <div>Locations</div>
+                            <div className="text-center">Status</div>
+                            <div className="text-center">Actions</div>
                           </div>
                         </div>
-                        <div className="px-4 py-3">
-                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                            <div>
-                              <Input 
-                                value={componentData.partCode}
-                                onChange={(e) => handleInputChange('partCode', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
+                        <div className="divide-y divide-gray-100">
+                          {isLoadingLinkedSpares ? (
+                            <div className="px-4 py-8 text-center text-gray-500">
+                              <div className="animate-spin h-5 w-5 border-2 border-[#52baf3] border-t-transparent rounded-full mx-auto mb-2"></div>
+                              Loading linked spares...
                             </div>
-                            <div>
-                              <Input 
-                                value={componentData.partName}
-                                onChange={(e) => handleInputChange('partName', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
+                          ) : linkedSpares && linkedSpares.length > 0 ? (
+                            linkedSpares.map((item: any) => (
+                              <div key={item.spare.id} className="px-4 py-3 hover:bg-gray-50">
+                                <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                                  <div className="font-medium text-gray-900" data-testid={`text-spare-partno-${item.spare.id}`}>
+                                    {item.spare.partNumber}
+                                  </div>
+                                  <div className="text-gray-600 truncate" title={item.spare.description}>
+                                    {item.spare.description}
+                                  </div>
+                                  <div className="text-center font-semibold" data-testid={`text-spare-rob-${item.spare.id}`}>
+                                    {item.robTotal}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {item.locations && item.locations.length > 0 ? (
+                                      item.locations.map((loc: any, idx: number) => (
+                                        <span key={loc.locationId} className="mr-2">
+                                          {loc.locationName}: {loc.qty}
+                                          {idx < item.locations.length - 1 && ", "}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="italic text-gray-400">No locations</span>
+                                    )}
+                                  </div>
+                                  <div className="text-center">
+                                    <span 
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        item.stockStatus === 'OK' 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : 'bg-red-100 text-red-800'
+                                      }`}
+                                      data-testid={`status-spare-${item.spare.id}`}
+                                    >
+                                      {item.stockStatus === 'OK' ? 'OK' : 'Low Stock'}
+                                    </span>
+                                  </div>
+                                  <div className="text-center">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setSelectedSpareDetail(item)}
+                                      data-testid={`button-view-spare-${item.spare.id}`}
+                                    >
+                                      <Eye className="h-4 w-4 text-[#52baf3]" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-4 py-8 text-center text-gray-500">
+                              No spares linked to this component
                             </div>
-                            <div>
-                              <Input 
-                                value={componentData.minQty}
-                                onChange={(e) => handleInputChange('minQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.criticalQty}
-                                onChange={(e) => handleInputChange('criticalQty', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Input 
-                                value={componentData.locationStore}
-                                onChange={(e) => handleInputChange('locationStore', e.target.value)}
-                                className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                              />
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
                   
-                  {/* Preview when collapsed - header + 2 rows - OUTSIDE Collapsible */}
-                  {collapsedSections.E && (
+                  {/* Preview when collapsed */}
+                  {collapsedSections.E && linkedSpares && linkedSpares.length > 0 && (
                     <div className="border border-gray-200 rounded mb-4">
                       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="woTitle" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="assignedTo" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="metric" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="alertsThresholds" className="text-sm font-medium text-gray-700" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <EditableLabel fieldKey="frequency" className="text-sm font-medium text-gray-700" />
-                          </div>
+                        <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                          <div>Part Number</div>
+                          <div>Description</div>
+                          <div className="text-center">ROB Total</div>
+                          <div>Locations</div>
+                          <div className="text-center">Status</div>
+                          <div className="text-center">Actions</div>
                         </div>
                       </div>
-                      <div className="px-4 py-3">
-                        <div className="grid grid-cols-5 gap-4 text-sm items-center">
-                          <div>
-                            <Input 
-                              value={componentData.partCode}
-                              onChange={(e) => handleInputChange('partCode', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
+                      <div className="divide-y divide-gray-100">
+                        {linkedSpares.slice(0, 2).map((item: any) => (
+                          <div key={item.spare.id} className="px-4 py-3">
+                            <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                              <div className="font-medium text-gray-900">{item.spare.partNumber}</div>
+                              <div className="text-gray-600 truncate">{item.spare.description}</div>
+                              <div className="text-center font-semibold">{item.robTotal}</div>
+                              <div className="text-xs text-gray-500">
+                                {item.locations && item.locations.length > 0 ? (
+                                  item.locations.slice(0, 2).map((loc: any, idx: number) => (
+                                    <span key={loc.locationId}>{loc.locationName}: {loc.qty}{idx < Math.min(item.locations.length, 2) - 1 && ", "}</span>
+                                  ))
+                                ) : "-"}
+                              </div>
+                              <div className="text-center">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.stockStatus === 'OK' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  {item.stockStatus === 'OK' ? 'OK' : 'Low'}
+                                </span>
+                              </div>
+                              <div className="text-center">
+                                <Button size="sm" variant="ghost" onClick={() => setSelectedSpareDetail(item)}>
+                                  <Eye className="h-4 w-4 text-[#52baf3]" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <Input 
-                              value={componentData.partName}
-                              onChange={(e) => handleInputChange('partName', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
+                        ))}
+                        {linkedSpares.length > 2 && (
+                          <div className="px-4 py-2 text-center text-sm text-gray-500">
+                            +{linkedSpares.length - 2} more spares...
                           </div>
-                          <div>
-                            <Input 
-                              value={componentData.minQty}
-                              onChange={(e) => handleInputChange('minQty', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Input 
-                              value={componentData.criticalQty}
-                              onChange={(e) => handleInputChange('criticalQty', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Input 
-                              value={componentData.locationStore}
-                              onChange={(e) => handleInputChange('locationStore', e.target.value)}
-                              className="border-[#52baf3] border-2 focus:border-[#52baf3] text-sm"
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2080,6 +2094,86 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
         nextSectionLetter={String.fromCharCode(72 + customSections.length + 1)} // Start from I (H=72, I=73)
       />
       
+      {/* Spare Detail Dialog */}
+      <Dialog open={!!selectedSpareDetail} onOpenChange={() => setSelectedSpareDetail(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#16569e]">Spare Part Details</DialogTitle>
+          </DialogHeader>
+          {selectedSpareDetail && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-gray-500">Part Number</Label>
+                  <p className="font-medium" data-testid="text-detail-partno">{selectedSpareDetail.spare.partNumber}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Min Quantity</Label>
+                  <p className="font-medium">{selectedSpareDetail.spare.minQty || 'Not set'}</p>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs text-gray-500">Description</Label>
+                  <p className="font-medium">{selectedSpareDetail.spare.description}</p>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-semibold">Stock Status</Label>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedSpareDetail.stockStatus === 'OK' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`} data-testid="status-detail-stock">
+                    {selectedSpareDetail.stockStatus === 'OK' ? 'Stock OK' : 'Low Stock - Below Minimum'}
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-center py-4 bg-gray-50 rounded" data-testid="text-detail-rob">
+                  ROB Total: {selectedSpareDetail.robTotal}
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-2 block">Stock by Location</Label>
+                {selectedSpareDetail.locations && selectedSpareDetail.locations.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedSpareDetail.locations.map((loc: any) => (
+                      <div key={loc.locationId} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                        <span className="font-medium">{loc.locationName}</span>
+                        <span className="text-lg font-semibold">{loc.qty}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 italic">No stock at any location</p>
+                )}
+              </div>
+              
+              {selectedSpareDetail.linkedComponents && selectedSpareDetail.linkedComponents.length > 1 && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-semibold mb-2 block">Also Linked To</Label>
+                  <div className="text-sm text-gray-600">
+                    {selectedSpareDetail.linkedComponents
+                      .filter((c: any) => c.componentId !== componentData.componentId)
+                      .map((c: any) => (
+                        <span key={c.componentId} className="inline-block bg-gray-100 px-2 py-1 rounded mr-2 mb-1">
+                          {c.componentCode} - {c.componentName}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-end pt-4">
+                <Button variant="outline" onClick={() => setSelectedSpareDetail(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* IHM Management Modal */}
       {FEATURES.IHM && (
         <IhmManagementModal
