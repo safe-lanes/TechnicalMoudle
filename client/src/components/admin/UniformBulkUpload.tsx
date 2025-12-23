@@ -43,7 +43,14 @@ import {
   FileWarning,
   Clock,
   File,
-  FileDown
+  FileDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
+  ChevronUp,
+  Info
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -71,8 +78,11 @@ interface DryRunResult {
     errors: string[];
     normalized: Record<string, any>;
   }>;
+  totalRows: number;
   errorReportUrl?: string;
 }
+
+type StatusFilter = 'all' | 'ok' | 'warning' | 'error';
 
 interface ImportHistory {
   id: string;
@@ -135,6 +145,10 @@ export default function UniformBulkUpload({
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
   const [activeTab, setActiveTab] = useState('upload');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
@@ -304,6 +318,9 @@ export default function UniformBulkUpload({
 
       const result = await response.json();
       setDryRunResult(result);
+      setCurrentPage(1);
+      setStatusFilter('all');
+      setExpandedRows(new Set());
 
       if (result.summary.errors > 0) {
         toast({
@@ -407,7 +424,47 @@ export default function UniformBulkUpload({
 
   const getValidRowsCount = () => {
     if (!dryRunResult) return 0;
-    return dryRunResult.rows.filter(row => row.status === 'ok' || row.status === 'warning').length;
+    // Use summary for accurate count from all rows, not just displayed rows
+    return dryRunResult.summary.ok + dryRunResult.summary.warnings;
+  };
+
+  const getFilteredRows = () => {
+    if (!dryRunResult) return [];
+    if (statusFilter === 'all') return dryRunResult.rows;
+    return dryRunResult.rows.filter(row => row.status === statusFilter);
+  };
+
+  const getPaginatedRows = () => {
+    const filtered = getFilteredRows();
+    const startIndex = (currentPage - 1) * pageSize;
+    return filtered.slice(startIndex, startIndex + pageSize);
+  };
+
+  const getTotalPages = () => {
+    const filtered = getFilteredRows();
+    return Math.ceil(filtered.length / pageSize);
+  };
+
+  const handleStatusFilterClick = (filter: StatusFilter) => {
+    setStatusFilter(prev => prev === filter ? 'all' : filter);
+    setCurrentPage(1);
+  };
+
+  const toggleRowExpansion = (rowNumber: number) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(rowNumber)) {
+        next.delete(rowNumber);
+      } else {
+        next.add(rowNumber);
+      }
+      return next;
+    });
+  };
+
+  const handlePageSizeChange = (newSize: string) => {
+    setPageSize(Number(newSize));
+    setCurrentPage(1);
   };
 
   const handleUndoClick = (historyId: string) => {
@@ -679,57 +736,208 @@ export default function UniformBulkUpload({
                     )}
                   </div>
                   
-                  <div className="flex gap-4 flex-wrap">
-                    <Badge variant="outline" className="px-3 py-1">
+                  <div className="flex gap-3 flex-wrap items-center">
+                    <span className="text-sm text-gray-500">Filter by:</span>
+                    <Badge 
+                      variant="outline" 
+                      className={`px-3 py-1.5 cursor-pointer transition-all hover:shadow-md ${
+                        statusFilter === 'ok' 
+                          ? 'ring-2 ring-green-500 bg-green-50' 
+                          : 'hover:bg-green-50'
+                      }`}
+                      onClick={() => handleStatusFilterClick('ok')}
+                      data-testid="filter-valid"
+                    >
                       <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
                       Valid: {dryRunResult.summary.ok}
                     </Badge>
-                    <Badge variant="outline" className="px-3 py-1">
+                    <Badge 
+                      variant="outline" 
+                      className={`px-3 py-1.5 cursor-pointer transition-all hover:shadow-md ${
+                        statusFilter === 'warning' 
+                          ? 'ring-2 ring-yellow-500 bg-yellow-50' 
+                          : 'hover:bg-yellow-50'
+                      }`}
+                      onClick={() => handleStatusFilterClick('warning')}
+                      data-testid="filter-warnings"
+                    >
                       <AlertTriangle className="h-4 w-4 mr-1 text-yellow-600" />
                       Warnings: {dryRunResult.summary.warnings}
                     </Badge>
-                    <Badge variant="outline" className="px-3 py-1">
+                    <Badge 
+                      variant="outline" 
+                      className={`px-3 py-1.5 cursor-pointer transition-all hover:shadow-md ${
+                        statusFilter === 'error' 
+                          ? 'ring-2 ring-red-500 bg-red-50' 
+                          : 'hover:bg-red-50'
+                      }`}
+                      onClick={() => handleStatusFilterClick('error')}
+                      data-testid="filter-errors"
+                    >
                       <AlertCircle className="h-4 w-4 mr-1 text-red-600" />
                       Errors: {dryRunResult.summary.errors}
                     </Badge>
-                    <Badge variant="outline" className="px-3 py-1">
-                      Total Rows: {dryRunResult.rows.length}
+                    <Badge variant="outline" className="px-3 py-1.5">
+                      Total Rows: {dryRunResult.totalRows || dryRunResult.rows.length}
                     </Badge>
+                    {statusFilter !== 'all' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStatusFilter('all')}
+                        className="text-xs"
+                        data-testid="button-clear-filter"
+                      >
+                        Clear Filter
+                      </Button>
+                    )}
                   </div>
 
-                  <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead className="w-16">Row</TableHead>
-                          <TableHead className="w-24">Status</TableHead>
-                          {(previewColumns || dryRunResult.columns.slice(0, 3)).map(col => (
-                            <TableHead key={col}>{col}</TableHead>
-                          ))}
-                          <TableHead>Issues</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dryRunResult.rows.slice(0, 20).map((row) => (
-                          <TableRow key={row.row}>
-                            <TableCell className="font-mono">{row.row}</TableCell>
-                            <TableCell>
-                              <Badge variant={row.status === 'ok' ? 'default' : row.status === 'warning' ? 'secondary' : 'destructive'}>
-                                {row.status}
-                              </Badge>
-                            </TableCell>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="max-h-96 overflow-y-auto">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-gray-50 z-10">
+                          <TableRow>
+                            <TableHead className="w-12"></TableHead>
+                            <TableHead className="w-16">Row</TableHead>
+                            <TableHead className="w-24">Status</TableHead>
                             {(previewColumns || dryRunResult.columns.slice(0, 3)).map(col => (
-                              <TableCell key={col} className="max-w-xs truncate">
-                                {row.normalized[col] || '-'}
-                              </TableCell>
+                              <TableHead key={col}>{col}</TableHead>
                             ))}
-                            <TableCell className="text-sm text-red-600">
-                              {row.errors.join('; ')}
-                            </TableCell>
+                            <TableHead>Issues</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {getPaginatedRows().map((row) => (
+                            <>
+                              <TableRow 
+                                key={row.row} 
+                                className={`${row.errors.length > 0 ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                                onClick={() => row.errors.length > 0 && toggleRowExpansion(row.row)}
+                              >
+                                <TableCell className="w-12">
+                                  {row.errors.length > 0 && (
+                                    <button className="p-1 hover:bg-gray-200 rounded" data-testid={`expand-row-${row.row}`}>
+                                      {expandedRows.has(row.row) ? (
+                                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                                      )}
+                                    </button>
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-mono">{row.row}</TableCell>
+                                <TableCell>
+                                  <Badge variant={row.status === 'ok' ? 'default' : row.status === 'warning' ? 'secondary' : 'destructive'}>
+                                    {row.status}
+                                  </Badge>
+                                </TableCell>
+                                {(previewColumns || dryRunResult.columns.slice(0, 3)).map(col => (
+                                  <TableCell key={col} className="max-w-xs truncate">
+                                    {row.normalized[col] || '-'}
+                                  </TableCell>
+                                ))}
+                                <TableCell>
+                                  {row.errors.length > 0 ? (
+                                    <div className="flex items-center gap-1 text-sm">
+                                      <Info className={`h-4 w-4 ${row.status === 'error' ? 'text-red-500' : 'text-yellow-500'}`} />
+                                      <span className={row.status === 'error' ? 'text-red-600' : 'text-yellow-600'}>
+                                        {row.errors.length} issue{row.errors.length > 1 ? 's' : ''} - click to expand
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-green-600 text-sm">No issues</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                              {expandedRows.has(row.row) && row.errors.length > 0 && (
+                                <TableRow key={`${row.row}-details`} className="bg-gray-50">
+                                  <TableCell colSpan={5 + (previewColumns || dryRunResult.columns.slice(0, 3)).length} className="py-3">
+                                    <div className="px-4">
+                                      <div className="text-sm font-medium text-gray-700 mb-2">Row {row.row} Issues:</div>
+                                      <ul className="space-y-1">
+                                        {row.errors.map((error, idx) => (
+                                          <li key={idx} className={`text-sm flex items-start gap-2 ${row.status === 'error' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                            {row.status === 'error' ? (
+                                              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                            ) : (
+                                              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                            )}
+                                            {error}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Rows per page:</span>
+                        <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                          <SelectTrigger className="w-20 h-8" data-testid="select-page-size">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="25">25</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-sm text-gray-500 ml-2">
+                          Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, getFilteredRows().length)} of {getFilteredRows().length}
+                          {statusFilter !== 'all' && ` (filtered from ${dryRunResult.rows.length})`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                          data-testid="button-first-page"
+                        >
+                          <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          data-testid="button-prev-page"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="px-3 py-1 text-sm">
+                          Page {currentPage} of {getTotalPages() || 1}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(getTotalPages(), p + 1))}
+                          disabled={currentPage >= getTotalPages()}
+                          data-testid="button-next-page"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(getTotalPages())}
+                          disabled={currentPage >= getTotalPages()}
+                          data-testid="button-last-page"
+                        >
+                          <ChevronsRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   {dryRunResult.summary.errors === 0 ? (
@@ -739,7 +947,7 @@ export default function UniformBulkUpload({
                       className="w-full bg-sky-600 hover:bg-sky-700"
                       data-testid="button-import"
                     >
-                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Records`}
+                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok + dryRunResult.summary.warnings} Records`}
                     </Button>
                   ) : (
                     <div className="flex gap-3">
