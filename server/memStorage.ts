@@ -474,9 +474,10 @@ class MemStorage {
   }
   async createJob(job: any): Promise<any> {
     if (!this.data.jobs) this.data.jobs = {};
-    this.data.jobs[job.id] = job;
+    const newJob = { ...job, id: job.id || this.getNextId('jobs') };
+    this.data.jobs[newJob.id] = newJob;
     this.saveData();
-    return job;
+    return newJob;
   }
   async updateJob(id: string, data: any): Promise<any> {
     if (this.data.jobs && this.data.jobs[id]) {
@@ -503,9 +504,10 @@ class MemStorage {
   }
   async createWorkOrder(workOrder: any): Promise<any> {
     if (!this.data.workOrders) this.data.workOrders = {};
-    this.data.workOrders[workOrder.id] = workOrder;
+    const newWO = { ...workOrder, id: workOrder.id || this.getNextId('workOrders') };
+    this.data.workOrders[newWO.id] = newWO;
     this.saveData();
-    return workOrder;
+    return newWO;
   }
   async updateWorkOrder(id: string, data: any): Promise<any> {
     if (this.data.workOrders && this.data.workOrders[id]) {
@@ -562,9 +564,10 @@ class MemStorage {
   }
   async createDefect(defect: any): Promise<any> {
     if (!this.data.defects) this.data.defects = {};
-    this.data.defects[defect.id] = defect;
+    const newDefect = { ...defect, id: defect.id || this.getNextId('defects') };
+    this.data.defects[newDefect.id] = newDefect;
     this.saveData();
-    return defect;
+    return newDefect;
   }
   async updateDefect(id: string, data: any): Promise<any> {
     if (this.data.defects && this.data.defects[id]) {

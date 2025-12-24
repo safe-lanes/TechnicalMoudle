@@ -20914,874 +20914,15 @@
       "woTemplateCode": "MKR-SE-00005"
     },
     {
-      "id": "2",
-      "vesselId": "V001",
-      "component": "Rudders w/nozzle",
-      "componentCode": "401.005",
-      "componentId": "1764654580841_zrtzncuz0",
-      "workOrderNo": "MKR-IN-00004.WO-2025-003",
-      "templateCode": "MKR-IN-00004.WO-2025-003",
-      "executionId": null,
-      "jobTitle": "RUDDER INSPECTION",
-      "jobNo": "MKR-IN-00004",
-      "jobId": "ZN3iv3guIwZEg7Ss73HE6",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "2025-12-02",
-      "status": "Overdue",
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "taskType": "Replacement",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 1000,
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": "2000",
-      "currentReading": "2000",
-      "dataScope": "vessel",
-      "fleetEquipmentCode": "401.005.YY",
-      "fleetJobCode": null,
-      "department": "Engine",
-      "isActive": true,
-      "applicableVesselIds": null,
-      "classRelated": "No",
-      "jobPriority": "Medium",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the hydraulic pump ,if worn replace or repair it.",
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": 1000,
-      "scopeNotes": null,
-      "criticality": "Yes",
-      "createdAt": "2025-12-02T05:52:18.647Z",
-      "updatedAt": "2025-12-02T05:52:18.647Z",
-      "woTemplateCode": "MKR-IN-00004"
-    },
-    {
-      "id": "3",
-      "vesselId": "V001",
-      "component": "Hydr. oil pumps No.02",
-      "componentCode": "403.006.02",
-      "componentId": "1764654581295_5qiertnkn",
-      "workOrderNo": "MKR-SE-00006.WO-2025-004",
-      "templateCode": "MKR-SE-00006.WO-2025-004",
-      "executionId": null,
-      "jobTitle": "PUMP OVERHAUL",
-      "jobNo": "MKR-SE-00006",
-      "jobId": "uUdphv0Ev9o2jAhWSy-ru",
-      "assignedTo": "3rd Engineer",
-      "dueDate": "2025-12-02",
-      "status": "Overdue",
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "taskType": "Replacement",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 500,
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": "1000",
-      "currentReading": "1000",
-      "dataScope": "vessel",
-      "fleetEquipmentCode": "403.006.AA",
-      "fleetJobCode": null,
-      "department": "Deck",
-      "isActive": true,
-      "applicableVesselIds": null,
-      "classRelated": "No",
-      "jobPriority": "Critical",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the lithium battery.",
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": 500,
-      "scopeNotes": null,
-      "criticality": "No",
-      "createdAt": "2025-12-02T05:52:18.680Z",
-      "updatedAt": "2025-12-02T05:52:18.680Z",
-      "woTemplateCode": "MKR-SE-00006"
-    },
-    {
-      "id": "4",
-      "vesselId": "V001",
-      "component": "Hydr. oil pumps No.02",
-      "componentCode": "403.006.02",
-      "componentId": "1764654581295_5qiertnkn",
-      "workOrderNo": "MKR-IN-00005.WO-2025-005",
-      "templateCode": "MKR-IN-00005.WO-2025-005",
-      "executionId": null,
-      "jobTitle": "PUMP OVERHAUL",
-      "jobNo": "MKR-IN-00005",
-      "jobId": "kwBlOOBUo-iZIgYpqXs-U",
-      "assignedTo": "3rd Engineer",
-      "dueDate": "2025-12-02",
-      "status": "Overdue",
-      "dateCompleted": "",
-      "submittedDate": null,
-      "formData": null,
-      "taskType": "Cleaning",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "500",
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": "Chief Engineer",
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": "",
-      "nextDueReading": "500",
-      "currentReading": "1000",
-      "dataScope": "vessel",
-      "fleetEquipmentCode": "403.006.AA",
-      "fleetJobCode": null,
-      "department": "Engine",
-      "isActive": "Yes",
-      "applicableVesselIds": null,
-      "classRelated": "No",
-      "jobPriority": "Low",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 264, 265\r\nChapter: 7 Maintenance\r\nSection: 7.2 Maintenance On Each Unit\r\n\r\nDESCRIPTION\r\n===========\r\n1. Lubricate the band radiator, main shaft drive gear and encoder shaft drive gear.\r\n2. Apply paint to the mounting legs and coaxial cable.",
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": "403.006.02",
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": "500",
-      "scopeNotes": null,
-      "criticality": "No",
-      "createdAt": "2025-12-02T05:52:18.680Z",
-      "updatedAt": "2025-12-02T05:52:18.680Z",
-      "woTemplateCode": "MKR-IN-00005",
-      "woTitle": "PUMP OVERHAUL",
-      "componentName": "Hydr. oil pumps No.02",
-      "requiredSpareParts": [
-        {
-          "partNo": "32SDF",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "workHistory": [],
-      "maintenanceType": "Cleaning",
-      "lastDoneDate": "2025-11-27",
-      "lastDoneRH": "0",
-      "nextDueRH": "500",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 264, 265\r\nChapter: 7 Maintenance\r\nSection: 7.2 Maintenance On Each Unit\r\n\r\nDESCRIPTION\r\n===========\r\n1. Lubricate the band radiator, main shaft drive gear and encoder shaft drive gear.\r\n2. Apply paint to the mounting legs and coaxial cable.",
-      "woExecutionId": "WO-EXE-3581911",
-      "riskAssessment": "No",
-      "safetyChecklists": "No",
-      "operationalForms": "No",
-      "startDateTime": "",
-      "completionDateTime": "",
-      "dateOfCompletion": "",
-      "runningHours": "1000",
-      "performedBy": "",
-      "noOfPersons": "",
-      "totalTimeHours": "",
-      "manhours": "",
-      "workCarriedOut": "",
-      "jobExperienceNotes": "",
-      "previousReading": "1000.00",
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "ihmUpdate": {
-        "enabled": false,
-        "action": "",
-        "targetComponent": "",
-        "targetSpare": "",
-        "quantity": "",
-        "location": "",
-        "materials": [],
-        "remarks": ""
-      },
-      "riskAssessmentStatus": "",
-      "safetyChecklistsStatus": "",
-      "operationalFormsStatus": "",
-      "executionAssignedTo": "",
-      "runningHoursDifference": "",
-      "readingDate": "",
-      "remarks": "",
-      "completionRemarks": ""
-    },
-    {
-      "id": "5",
-      "vesselId": "V001",
-      "component": "Impressed current systems No.02",
-      "componentCode": "278.010.02",
-      "componentId": "1764654581208_v1hnir18e",
-      "workOrderNo": "MKR-SE-00001.WO-2025-006",
-      "templateCode": "MKR-SE-00001.WO-2025-006",
-      "executionId": null,
-      "jobTitle": "Impressed current systems check test",
-      "jobNo": "MKR-SE-00001",
-      "jobId": "08iy1CCJGDy5EY0P90hvz",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "2025-12-02",
-      "status": "Overdue",
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "taskType": "Testing",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 500,
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": "1000",
-      "currentReading": "1000",
-      "dataScope": "vessel",
-      "fleetEquipmentCode": "278.010.YY",
-      "fleetJobCode": null,
-      "department": "Deck",
-      "isActive": true,
-      "applicableVesselIds": null,
-      "classRelated": "No",
-      "jobPriority": "Critical",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": 500,
-      "scopeNotes": null,
-      "criticality": "No",
-      "createdAt": "2025-12-02T05:52:18.704Z",
-      "updatedAt": "2025-12-02T05:52:18.704Z",
-      "woTemplateCode": "MKR-SE-00001"
-    },
-    {
       "vesselId": "V001",
       "component": "Impressed current systems No.01",
       "componentCode": "278.010.01",
-      "workOrderNo": "MKR-IN-00001.WO-2025-001",
-      "templateCode": "MKR-IN-00001.WO-2025-001",
+      "jobId": "vd3lBtYI2dVNqCrkr0JKG",
+      "workOrderNo": "MKR-IN-00001-2025-001",
+      "templateCode": "MKR-IN-00001-2025-001",
       "jobTitle": "Impressed current systems check test",
       "assignedTo": "2nd Engineer",
       "dueDate": "22-Nov-2025",
-      "status": "Completed",
-      "taskType": "Inspection",
-      "maintenanceBasis": "Calendar",
-      "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "Low",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
-      "department": "Engine",
-      "requiredSpareParts": [],
-      "requiredTools": [],
-      "safetyRequirements": {
-        "ppeRequirements": [],
-        "permitRequirements": [],
-        "otherRequirements": []
-      },
-      "id": "6",
-      "createdAt": "2025-12-02T06:02:36.022Z",
-      "updatedAt": "2025-12-02T06:02:36.022Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": "2025-12-03T11:25:23.751Z",
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": "",
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": "2025-11-22",
-      "nextDueReading": "",
-      "currentReading": "",
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": "Yes",
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": "278.010.01",
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": "",
-      "scopeNotes": null,
-      "criticality": "",
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": "approved",
-      "woTitle": "Impressed current systems check test",
-      "componentName": "Impressed current systems No.01",
-      "woTemplateCode": "MKR-IN-00001.WO-2025-001",
-      "workHistory": [],
-      "jobNo": "MKR-IN-00001.WO-2025-001",
-      "lastDoneDate": "",
-      "lastDoneRH": "",
-      "nextDueRH": "",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
-      "woExecutionId": "WO-EXE-7422164",
-      "riskAssessment": "No",
-      "safetyChecklists": "No",
-      "operationalForms": "No",
-      "startDateTime": "",
-      "completionDateTime": "",
-      "dateOfCompletion": "",
-      "runningHours": "",
-      "performedBy": "",
-      "noOfPersons": "",
-      "totalTimeHours": "",
-      "manhours": "",
-      "workCarriedOut": "",
-      "jobExperienceNotes": "",
-      "previousReading": "1000.00",
-      "ihmUpdate": {
-        "enabled": false,
-        "action": "",
-        "targetComponent": "",
-        "targetSpare": "",
-        "quantity": "",
-        "location": "",
-        "materials": [],
-        "remarks": ""
-      },
-      "riskAssessmentStatus": "",
-      "safetyChecklistsStatus": "",
-      "operationalFormsStatus": "",
-      "executionAssignedTo": "",
-      "runningHoursDifference": "",
-      "readingDate": "",
-      "remarks": "",
-      "completionRemarks": ""
-    },
-    {
-      "id": "WO-1764659341324-jbf0klx",
-      "vesselId": "V001",
-      "component": "1764654581208_v1hnir18e",
-      "componentName": "Impressed current systems No.02",
-      "componentCode": "278.010.02",
-      "jobId": "08iy1CCJGDy5EY0P90hvz",
-      "workOrderNo": "MKR-SE-00001.WO-2025-001",
-      "workOrderType": "Planned",
-      "templateCode": "MKR-SE-00001.WO-2025-001",
-      "executionId": null,
-      "jobTitle": "Impressed current systems check test",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "02-Dec-2025",
-      "status": "Overdue",
-      "dateCompleted": "",
-      "submittedDate": null,
-      "formData": null,
-      "taskType": "Testing",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "500",
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": "Chief Engineer",
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": "",
-      "nextDueReading": "500",
-      "currentReading": "8750",
-      "classRelated": "No",
-      "jobPriority": "Critical",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
-      "dataScope": "vessel",
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": "278.010.02",
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": "500",
-      "department": "Deck",
-      "criticality": "No",
-      "isActive": "Yes",
-      "applicableVesselIds": null,
-      "scopeNotes": null,
-      "postponementEndDate": null,
-      "postponementReason": null,
-      "postponementAuthorizedBy": null,
-      "onDemandReason": "Planning",
-      "requiredSpareParts": [
-        {
-          "partNo": "SP-00004",
-          "description": "Impressed Current Anode",
-          "quantityRequired": "2",
-          "remarks": "Annual replacement"
-        },
-        {
-          "partNo": "SP-00005",
-          "description": "Reference Cell Electrode",
-          "quantityRequired": "1",
-          "remarks": "Check and replace if corroded"
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "Digital Multimeter",
-          "quantity": "1",
-          "remarks": "For voltage measurement"
-        },
-        {
-          "toolName": "Insulation Tester (Megger)",
-          "quantity": "1",
-          "remarks": "For insulation resistance check"
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "Safety Gloves (Electrical)",
-          "Safety Goggles"
-        ],
-        "permitRequirements": [
-          "Electrical Work Permit",
-          "Diving Operations Permit"
-        ],
-        "otherRequirements": [
-          "System isolated before work",
-          "Vessel grounded properly"
-        ]
-      },
-      "uploadedDocuments": [],
-      "consumedSpareParts": [
-        {
-          "partNo": "SP-00004",
-          "description": "Impressed Current Anode",
-          "quantityConsumed": "2",
-          "comments": "Replaced worn anodes"
-        },
-        {
-          "partNo": "SP-00005",
-          "description": "Reference Cell Electrode",
-          "quantityConsumed": "1",
-          "comments": "Corroded electrode replaced"
-        }
-      ],
-      "createdAt": "2025-12-02T07:09:01.324Z",
-      "updatedAt": "2025-12-03T11:37:16.855Z",
-      "woTitle": "Impressed current systems check test",
-      "woTemplateCode": "MKR-SE-00001",
-      "workHistory": [
-        {
-          "woNo": "MKR-IN-00001.WO-2024-002",
-          "assignedTo": "2nd Engineer",
-          "performedBy": "2nd Engineer",
-          "workDate": "2024-11-15",
-          "runDate": "",
-          "completionDate": "2024-11-15",
-          "status": "Completed",
-          "description": "Impressed current system inspection",
-          "remarks": "All anodes functional"
-        },
-        {
-          "woNo": "MKR-IN-00001.WO-2024-001",
-          "assignedTo": "3rd Engineer",
-          "performedBy": "3rd Engineer",
-          "workDate": "2024-05-20",
-          "runDate": "",
-          "completionDate": "2024-05-22",
-          "status": "Completed",
-          "description": "Annual anode replacement",
-          "remarks": "2 anodes replaced"
-        }
-      ],
-      "jobNo": "MKR-SE-00001",
-      "maintenanceType": "Testing",
-      "lastDoneDate": "2025-11-18",
-      "lastDoneRH": "0",
-      "nextDueRH": "500",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
-      "woExecutionId": "WO-EXE-6255980",
-      "riskAssessment": "No",
-      "safetyChecklists": "No",
-      "operationalForms": "No",
-      "startDateTime": "",
-      "completionDateTime": "",
-      "dateOfCompletion": "",
-      "runningHours": "8750",
-      "performedBy": "",
-      "noOfPersons": "",
-      "totalTimeHours": "",
-      "manhours": "",
-      "workCarriedOut": "",
-      "jobExperienceNotes": "",
-      "previousReading": "8500",
-      "ihmUpdate": {
-        "enabled": false,
-        "action": "",
-        "targetComponent": "",
-        "targetSpare": "",
-        "quantity": "",
-        "location": "",
-        "materials": [],
-        "remarks": ""
-      },
-      "riskAssessmentStatus": "",
-      "safetyChecklistsStatus": "",
-      "operationalFormsStatus": "",
-      "executionAssignedTo": "",
-      "runningHoursDifference": "",
-      "readingDate": "",
-      "remarks": "",
-      "completionRemarks": ""
-    },
-    {
-      "vesselId": "V001",
-      "component": "Impressed current systems No.02",
-      "componentCode": "278.010.02",
-      "workOrderNo": "MKR-SE-00001.WO-2025-002",
-      "templateCode": "MKR-SE-00001.WO-2025-002",
-      "jobTitle": "Impressed current systems check test",
-      "assignedTo": "2nd Engineer",
-      "dueDate": null,
-      "nextDueReading": "500",
-      "currentReading": "1000",
-      "status": "Active",
-      "taskType": "Testing",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "500",
-      "frequencyUnit": "Hours",
-      "intervalRunningHour": 500,
-      "jobPriority": "Critical",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
-      "department": "Deck",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "7",
-      "createdAt": "2025-12-03T04:49:57.138Z",
-      "updatedAt": "2025-12-03T04:49:57.138Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V001",
-      "component": "Rudders w/nozzle",
-      "componentCode": "401.005",
-      "workOrderNo": "MKR-IN-00004.WO-2025-001",
-      "templateCode": "MKR-IN-00004.WO-2025-001",
-      "jobTitle": "RUDDER INSPECTION",
-      "assignedTo": "2nd Engineer",
-      "dueDate": null,
-      "nextDueReading": "1000",
-      "currentReading": "2000",
-      "status": "Active",
-      "taskType": "Replacement",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "1000",
-      "frequencyUnit": "Hours",
-      "intervalRunningHour": 1000,
-      "jobPriority": "Medium",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the hydraulic pump ,if worn replace or repair it.",
-      "department": "Engine",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "8",
-      "createdAt": "2025-12-03T04:49:57.152Z",
-      "updatedAt": "2025-12-03T04:49:57.152Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V001",
-      "component": "FO separators No.02",
-      "componentCode": "702.005.02",
-      "workOrderNo": "MKR-SE-00005.WO-2025-001",
-      "templateCode": "MKR-SE-00005.WO-2025-001",
-      "jobTitle": "Purifier Parts, Visual Check - 1Y",
-      "assignedTo": "4th Engineer",
-      "dueDate": null,
-      "nextDueReading": "460",
-      "currentReading": "2710",
-      "status": "Active",
-      "taskType": "Service",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "250",
-      "frequencyUnit": "Hours",
-      "intervalRunningHour": 250,
-      "jobPriority": "Low",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the fan motor.",
-      "department": "Engine",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "9",
-      "createdAt": "2025-12-03T04:49:57.166Z",
-      "updatedAt": "2025-12-03T04:49:57.166Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V001",
-      "component": "Hydr. oil pumps No.02",
-      "componentCode": "403.006.02",
-      "workOrderNo": "MKR-SE-00006.WO-2025-001",
-      "templateCode": "MKR-SE-00006.WO-2025-001",
-      "jobTitle": "PUMP OVERHAUL",
-      "assignedTo": "3rd Engineer",
-      "dueDate": null,
-      "nextDueReading": "500",
-      "currentReading": "1000",
-      "status": "Active",
-      "taskType": "Replacement",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": "500",
-      "frequencyUnit": "Hours",
-      "intervalRunningHour": 500,
-      "jobPriority": "Critical",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the lithium battery.",
-      "department": "Deck",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "10",
-      "createdAt": "2025-12-03T04:49:57.179Z",
-      "updatedAt": "2025-12-03T04:49:57.179Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V001",
-      "component": "Impressed current systems No.01",
-      "componentCode": "278.010.01",
-      "workOrderNo": "MKR-IN-00001.WO-2025-002",
-      "templateCode": "MKR-IN-00001.WO-2025-002",
-      "jobTitle": "Impressed current systems check test",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "",
       "status": "Due",
       "taskType": "Overhaul",
       "maintenanceBasis": "Calendar",
@@ -21817,236 +20958,31 @@
           "test"
         ]
       },
-      "id": "11",
-      "createdAt": "2025-12-03T04:50:26.241Z",
-      "updatedAt": "2025-12-08T04:07:44.096Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null,
-      "postponementEndDate": "08-Dec-2025",
-      "postponementReason": "test",
-      "postponementAuthorizedBy": "chief-engineer"
-    },
-    {
-      "vesselId": "V001",
-      "component": "Impressed current systems No.02",
-      "componentCode": "278.010.02",
-      "workOrderNo": "MKR-IN-00003.WO-2025-001",
-      "templateCode": "MKR-IN-00003.WO-2025-001",
-      "jobTitle": "Impressed current systems check test",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "24-Nov-2025",
-      "status": "Completed",
-      "taskType": "Inspection",
-      "maintenanceBasis": "Calendar",
-      "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "High",
-      "classRelated": "Yes",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
-      "department": "Electrical",
-      "requiredSpareParts": [],
-      "requiredTools": [],
-      "safetyRequirements": {
-        "ppeRequirements": [],
-        "permitRequirements": [],
-        "otherRequirements": []
-      },
-      "id": "12",
-      "createdAt": "2025-12-03T04:50:26.262Z",
-      "updatedAt": "2025-12-03T04:50:26.262Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": "2025-12-24T06:10:29.085Z",
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": "",
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": "2025-11-24",
-      "nextDueReading": "",
-      "currentReading": "",
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": "Yes",
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": "278.010.02",
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": "",
-      "scopeNotes": null,
-      "criticality": "",
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": "approved",
-      "woTitle": "Impressed current systems check test",
-      "componentName": "Impressed current systems No.02",
-      "woTemplateCode": "MKR-IN-00003.WO-2025-001",
-      "workHistory": [],
-      "jobNo": "MKR-IN-00003.WO-2025-001",
-      "lastDoneDate": "",
-      "lastDoneRH": "",
-      "nextDueRH": "",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
-      "woExecutionId": "WO-EXE-5196230",
-      "riskAssessment": "No",
-      "safetyChecklists": "No",
-      "operationalForms": "No",
-      "startDateTime": "2025-12-01T1000",
-      "completionDateTime": "2025-12-02T1222",
-      "dateOfCompletion": "2025-12-02",
-      "runningHours": "",
-      "performedBy": "2nd Engineer",
-      "noOfPersons": "",
-      "totalTimeHours": "",
-      "manhours": "",
-      "workCarriedOut": "",
-      "jobExperienceNotes": "",
-      "previousReading": "1000.00",
-      "ihmUpdate": {
-        "enabled": false,
-        "action": "",
-        "targetComponent": "",
-        "targetSpare": "",
-        "quantity": "",
-        "location": "",
-        "materials": [],
-        "remarks": ""
-      },
-      "riskAssessmentStatus": "",
-      "safetyChecklistsStatus": "",
-      "operationalFormsStatus": "",
-      "executionAssignedTo": "",
-      "runningHoursDifference": "",
-      "readingDate": "",
-      "remarks": "",
-      "completionRemarks": ""
-    },
-    {
-      "vesselId": "V001",
-      "component": "FO separators No.02",
-      "componentCode": "702.005.02",
-      "workOrderNo": "MKR-SE-00004.WO-2025-001",
-      "templateCode": "MKR-SE-00004.WO-2025-001",
-      "jobTitle": "Purifier Parts, Visual Check - 1Y",
-      "assignedTo": "3rd Engineer",
-      "dueDate": "07-Dec-2025",
-      "status": "Active",
-      "taskType": "Inspection",
-      "maintenanceBasis": "Calendar",
-      "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "Critical",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
-      "department": "Deck",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "13",
-      "createdAt": "2025-12-03T04:50:26.277Z",
-      "updatedAt": "2025-12-03T04:50:26.277Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 1
     },
     {
       "vesselId": "V001",
       "component": "Impressed current systems No.01",
       "componentCode": "278.010.01",
-      "workOrderNo": "MKR-IN-00001.WO-2025-003",
-      "templateCode": "MKR-IN-00001.WO-2025-003",
+      "jobId": "5fRPG9NxQOSu4T6Muwr0x",
+      "workOrderNo": "MKR-IN-00002-2025-001",
+      "templateCode": "MKR-IN-00002-2025-001",
       "jobTitle": "Impressed current systems check test",
       "assignedTo": "2nd Engineer",
-      "dueDate": "22-Nov-2025",
-      "status": "Active",
-      "taskType": "Overhaul",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "Low",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
       "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
       "department": "Engine",
       "requiredSpareParts": [
         {
@@ -22074,190 +21010,24 @@
           "test"
         ]
       },
-      "id": "14",
-      "createdAt": "2025-12-03T11:59:56.991Z",
-      "updatedAt": "2025-12-03T11:59:56.991Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 2
     },
     {
-      "id": "WO-1764764636492-8c5kmdz",
       "vesselId": "V001",
-      "component": "1764654581295_5qiertnkn",
-      "componentName": "Hydr. oil pumps No.02",
-      "componentCode": "403.006.02",
-      "jobId": "uUdphv0Ev9o2jAhWSy-ru",
-      "workOrderNo": "MKR-SE-00006.WO-2025-005",
-      "workOrderType": "Planned",
-      "templateCode": "MKR-SE-00006.WO-2025-005",
-      "executionId": null,
-      "jobTitle": "PUMP OVERHAUL",
-      "assignedTo": "Unassigned",
-      "dueDate": "03-Dec-2025",
-      "status": "Active",
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "taskType": null,
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 500,
-      "frequencyUnit": "Hours",
-      "approverRemarks": null,
-      "isExecution": false,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "classRelated": "No",
-      "jobPriority": "Critical",
-      "briefWorkDescription": null,
-      "dataScope": "vessel",
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "department": null,
-      "criticality": null,
-      "isActive": true,
-      "applicableVesselIds": null,
-      "scopeNotes": null,
-      "postponementEndDate": null,
-      "postponementReason": null,
-      "postponementAuthorizedBy": null,
-      "onDemandReason": "Breakdown",
-      "requiredSpareParts": [],
-      "requiredTools": [],
-      "safetyRequirements": {
-        "ppeRequirements": [],
-        "permitRequirements": [],
-        "otherRequirements": []
-      },
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "createdAt": "2025-12-03T12:23:56.492Z",
-      "updatedAt": "2025-12-03T12:23:56.492Z"
-    },
-    {
-      "vesselId": "V002",
-      "component": "Impressed current systems No.01",
-      "componentCode": "278.010.01",
-      "workOrderNo": "MKR-IN-00001.WO-2025-001",
-      "templateCode": "MKR-IN-00001.WO-2025-001",
-      "jobTitle": "Impressed current systems check test",
-      "assignedTo": "2nd Engineer",
-      "dueDate": "22-Nov-2025",
-      "status": "Active",
-      "taskType": "Overhaul",
-      "maintenanceBasis": "Calendar",
-      "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "Low",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
-      "department": "Engine",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "15",
-      "createdAt": "2025-12-04T12:43:39.481Z",
-      "updatedAt": "2025-12-04T12:43:39.481Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V002",
       "component": "Impressed current systems No.02",
       "componentCode": "278.010.02",
-      "workOrderNo": "MKR-IN-00003.WO-2025-001",
-      "templateCode": "MKR-IN-00003.WO-2025-001",
+      "jobId": "pv084OSkEOx4q39AdK1rj",
+      "workOrderNo": "MKR-IN-00003-2025-001",
+      "templateCode": "MKR-IN-00003-2025-001",
       "jobTitle": "Impressed current systems check test",
       "assignedTo": "2nd Engineer",
       "dueDate": "24-Nov-2025",
-      "status": "Active",
+      "status": "Due",
       "taskType": "Service",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
@@ -22292,174 +21062,24 @@
           "test"
         ]
       },
-      "id": "16",
-      "createdAt": "2025-12-04T12:43:39.519Z",
-      "updatedAt": "2025-12-04T12:43:39.519Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "vesselId": "V002",
-      "component": "FO separators No.02",
-      "componentCode": "702.005.02",
-      "workOrderNo": "MKR-SE-00004.WO-2025-001",
-      "templateCode": "MKR-SE-00004.WO-2025-001",
-      "jobTitle": "Purifier Parts, Visual Check - 1Y",
-      "assignedTo": "3rd Engineer",
-      "dueDate": "07-Dec-2025",
-      "status": "Active",
-      "taskType": "Inspection",
-      "maintenanceBasis": "Calendar",
-      "frequencyValue": "1",
-      "frequencyUnit": "Weeks",
-      "jobPriority": "Critical",
-      "classRelated": "No",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
-      "department": "Deck",
-      "requiredSpareParts": [
-        {
-          "partNo": "",
-          "description": "test",
-          "quantityRequired": "",
-          "remarks": ""
-        }
-      ],
-      "requiredTools": [
-        {
-          "toolName": "test",
-          "quantity": "",
-          "remarks": ""
-        }
-      ],
-      "safetyRequirements": {
-        "ppeRequirements": [
-          "test"
-        ],
-        "permitRequirements": [
-          "test"
-        ],
-        "otherRequirements": [
-          "test"
-        ]
-      },
-      "id": "17",
-      "createdAt": "2025-12-07T00:51:57.133Z",
-      "updatedAt": "2025-12-07T00:51:57.133Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
-    },
-    {
-      "id": "18",
-      "dataScope": "fleet",
-      "fleetEquipmentCode": "601.001",
-      "fleetJobCode": "MKR-OV-00001",
-      "jobNo": "MKR-OV-00001",
-      "jobTitle": "ME Cylinder Head Overhaul - 16000 RHS",
-      "taskType": "Overhaul",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 16000,
-      "frequencyUnit": "RHS",
-      "componentCode": "601.001",
-      "component": "Main Engine",
-      "department": "Engine",
-      "criticality": "Critical",
-      "jobCategory": "Maintenance",
-      "status": "Template",
-      "isExecution": false,
-      "isActive": true,
-      "vesselId": null,
-      "createdAt": "2025-12-08T07:52:27.767Z",
-      "updatedAt": "2025-12-08T07:52:27.767Z",
-      "woTemplateCode": "MKR-OV-00001"
-    },
-    {
-      "id": "19",
-      "dataScope": "fleet",
-      "fleetEquipmentCode": "601.001",
-      "fleetJobCode": "MKR-IN-00001",
-      "jobNo": "MKR-IN-00001",
-      "jobTitle": "ME Cylinder Head Routine Inspection- 4000 RHS",
-      "taskType": "Inspection",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 4000,
-      "frequencyUnit": "RHS",
-      "componentCode": "601.001",
-      "component": "Main Engine",
-      "department": "Engine",
-      "criticality": "Non-Critical",
-      "jobCategory": "Inspection",
-      "status": "Template",
-      "isExecution": false,
-      "isActive": true,
-      "vesselId": null,
-      "createdAt": "2025-12-08T07:52:27.767Z",
-      "updatedAt": "2025-12-08T07:52:27.767Z",
-      "woTemplateCode": "MKR-IN-00001"
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 3
     },
     {
       "vesselId": "V001",
       "component": "FO separators No.01",
       "componentCode": "702.005.01",
-      "workOrderNo": "MKR-SE-00002.WO-2025-001",
-      "templateCode": "MKR-SE-00002.WO-2025-001",
+      "jobId": "ZAv6QccVYf41cTgcJNFlE",
+      "workOrderNo": "MKR-SE-00002-2025-001",
+      "templateCode": "MKR-SE-00002-2025-001",
       "jobTitle": "Purifier, Visual Check - 3M",
       "assignedTo": "3rd Engineer",
       "dueDate": "28-Dec-2025",
-      "status": "Active",
+      "status": "Due",
       "taskType": "Calibration",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "1",
@@ -22494,38 +21114,1676 @@
           "test"
         ]
       },
-      "id": "20",
-      "createdAt": "2025-12-15T03:31:48.251Z",
-      "updatedAt": "2025-12-15T03:31:48.251Z",
-      "dataScope": "vessel",
-      "executionId": null,
-      "dateCompleted": null,
-      "submittedDate": null,
-      "formData": null,
-      "approverRemarks": null,
-      "templateId": null,
-      "approver": null,
-      "approvalDate": null,
-      "rejectionDate": null,
-      "nextDueDate": null,
-      "nextDueReading": null,
-      "currentReading": null,
-      "fleetEquipmentCode": null,
-      "fleetJobCode": null,
-      "isActive": null,
-      "applicableVesselIds": null,
-      "jobGroup": null,
-      "jobCategory": null,
-      "sfiCode": null,
-      "maintenanceIntervalValue": null,
-      "maintenanceIntervalUnit": null,
-      "intervalRunningHour": null,
-      "scopeNotes": null,
-      "criticality": null,
-      "uploadedDocuments": [],
-      "consumedSpareParts": [],
-      "rejectionComments": null,
-      "approvalAction": null
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 4
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "MqxEscrNSaPTqOqajGiNu",
+      "workOrderNo": "MKR-SE-00003-2025-001",
+      "templateCode": "MKR-SE-00003-2025-001",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 5
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "j47W6rOZUb5SQGPPEk94f",
+      "workOrderNo": "MKR-SE-00004-2025-001",
+      "templateCode": "MKR-SE-00004-2025-001",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 6
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "G45DCGIYTdDengdEzEkmb",
+      "workOrderNo": "MKR-IN-00001-2025-001",
+      "templateCode": "MKR-IN-00001-2025-001",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "22-Nov-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Low",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 7
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "keifbY3PcC3Ug7e52sByO",
+      "workOrderNo": "MKR-IN-00002-2025-001",
+      "templateCode": "MKR-IN-00002-2025-001",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 8
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.02",
+      "componentCode": "278.010.02",
+      "jobId": "AUgaCaKFOHfy8Sov1Kygy",
+      "workOrderNo": "MKR-IN-00003-2025-001",
+      "templateCode": "MKR-IN-00003-2025-001",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "24-Nov-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "High",
+      "classRelated": "Yes",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 9
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "uH7r0VjhO95qoOFaxgl41",
+      "workOrderNo": "MKR-SE-00002-2025-001",
+      "templateCode": "MKR-SE-00002-2025-001",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Due",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 10
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "q0tPA3OZfmEvWefrYMuKl",
+      "workOrderNo": "MKR-SE-00003-2025-001",
+      "templateCode": "MKR-SE-00003-2025-001",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 11
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "4ipeDzVc_WAeJ62UvxWjG",
+      "workOrderNo": "MKR-SE-00004-2025-001",
+      "templateCode": "MKR-SE-00004-2025-001",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 12
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "vd3lBtYI2dVNqCrkr0JKG",
+      "workOrderNo": "MKR-IN-00001-2025-002",
+      "templateCode": "MKR-IN-00001-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "22-Nov-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Low",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 13
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "5fRPG9NxQOSu4T6Muwr0x",
+      "workOrderNo": "MKR-IN-00002-2025-002",
+      "templateCode": "MKR-IN-00002-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 14
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.02",
+      "componentCode": "278.010.02",
+      "jobId": "pv084OSkEOx4q39AdK1rj",
+      "workOrderNo": "MKR-IN-00003-2025-002",
+      "templateCode": "MKR-IN-00003-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "24-Nov-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "High",
+      "classRelated": "Yes",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 15
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "ZAv6QccVYf41cTgcJNFlE",
+      "workOrderNo": "MKR-SE-00002-2025-002",
+      "templateCode": "MKR-SE-00002-2025-002",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Due",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 16
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "MqxEscrNSaPTqOqajGiNu",
+      "workOrderNo": "MKR-SE-00003-2025-002",
+      "templateCode": "MKR-SE-00003-2025-002",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 17
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "j47W6rOZUb5SQGPPEk94f",
+      "workOrderNo": "MKR-SE-00004-2025-002",
+      "templateCode": "MKR-SE-00004-2025-002",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 18
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "G45DCGIYTdDengdEzEkmb",
+      "workOrderNo": "MKR-IN-00001-2025-002",
+      "templateCode": "MKR-IN-00001-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "22-Nov-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Low",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 19
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "keifbY3PcC3Ug7e52sByO",
+      "workOrderNo": "MKR-IN-00002-2025-002",
+      "templateCode": "MKR-IN-00002-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 20
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.02",
+      "componentCode": "278.010.02",
+      "jobId": "AUgaCaKFOHfy8Sov1Kygy",
+      "workOrderNo": "MKR-IN-00003-2025-002",
+      "templateCode": "MKR-IN-00003-2025-002",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "24-Nov-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "High",
+      "classRelated": "Yes",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 21
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "uH7r0VjhO95qoOFaxgl41",
+      "workOrderNo": "MKR-SE-00002-2025-002",
+      "templateCode": "MKR-SE-00002-2025-002",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Due",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 22
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "q0tPA3OZfmEvWefrYMuKl",
+      "workOrderNo": "MKR-SE-00003-2025-002",
+      "templateCode": "MKR-SE-00003-2025-002",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 23
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "4ipeDzVc_WAeJ62UvxWjG",
+      "workOrderNo": "MKR-SE-00004-2025-002",
+      "templateCode": "MKR-SE-00004-2025-002",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 24
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "vd3lBtYI2dVNqCrkr0JKG",
+      "workOrderNo": "MKR-IN-00001-2025-003",
+      "templateCode": "MKR-IN-00001-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "22-Nov-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Low",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 25
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "5fRPG9NxQOSu4T6Muwr0x",
+      "workOrderNo": "MKR-IN-00002-2025-003",
+      "templateCode": "MKR-IN-00002-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 26
+    },
+    {
+      "vesselId": "V001",
+      "component": "Impressed current systems No.02",
+      "componentCode": "278.010.02",
+      "jobId": "pv084OSkEOx4q39AdK1rj",
+      "workOrderNo": "MKR-IN-00003-2025-003",
+      "templateCode": "MKR-IN-00003-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "24-Nov-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "High",
+      "classRelated": "Yes",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 27
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "ZAv6QccVYf41cTgcJNFlE",
+      "workOrderNo": "MKR-SE-00002-2025-003",
+      "templateCode": "MKR-SE-00002-2025-003",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Due",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 28
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "MqxEscrNSaPTqOqajGiNu",
+      "workOrderNo": "MKR-SE-00003-2025-003",
+      "templateCode": "MKR-SE-00003-2025-003",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 29
+    },
+    {
+      "vesselId": "V001",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "j47W6rOZUb5SQGPPEk94f",
+      "workOrderNo": "MKR-SE-00004-2025-003",
+      "templateCode": "MKR-SE-00004-2025-003",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 30
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "G45DCGIYTdDengdEzEkmb",
+      "workOrderNo": "MKR-IN-00001-2025-003",
+      "templateCode": "MKR-IN-00001-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "22-Nov-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Low",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: H-6 SHILLING RUDDER (MAKER PLAN);5303.pdf\r\nPdf Page No: 27\r\nChapter: 3. Check And Repair\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Disassemble the casing and seal ring carefully, following safety protocols.\r\n2. Inspect the condition of the mating faces for any signs of wear or damage, ensuring they are clean and properly aligned.\r\n3. Measure the leakage volume and, if applicable, check the water -injection volume to confirm it is within operational parameters.\r\nNote:\r\nCarry out this job when any leakage is found.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-22",
+      "generateDateSnapshot": "2025-11-08",
+      "dueDateSnapshot": "2025-11-22",
+      "lastDoneDateSnapshot": "15-Nov-2025",
+      "id": 31
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.01",
+      "componentCode": "278.010.01",
+      "jobId": "keifbY3PcC3Ug7e52sByO",
+      "workOrderNo": "MKR-IN-00002-2025-003",
+      "templateCode": "MKR-IN-00002-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "16-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 93\r\nChapter: Oil Specification\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the oil contamination regularly.\r\n2. Check the Oil level & top -up if necessary.\r\n3. Inspect the actuator external leakage, paintwork and damage etc.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-16",
+      "generateDateSnapshot": "2025-12-02",
+      "dueDateSnapshot": "2025-12-16",
+      "lastDoneDateSnapshot": "16-Nov-2025",
+      "id": 32
+    },
+    {
+      "vesselId": "V002",
+      "component": "Impressed current systems No.02",
+      "componentCode": "278.010.02",
+      "jobId": "AUgaCaKFOHfy8Sov1Kygy",
+      "workOrderNo": "MKR-IN-00003-2025-003",
+      "templateCode": "MKR-IN-00003-2025-003",
+      "jobTitle": "Impressed current systems check test",
+      "assignedTo": "2nd Engineer",
+      "dueDate": "24-Nov-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "High",
+      "classRelated": "Yes",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the stuffing glands of the actuator.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-11-24",
+      "generateDateSnapshot": "2025-11-17",
+      "dueDateSnapshot": "2025-11-24",
+      "lastDoneDateSnapshot": "17-Nov-2025",
+      "id": 33
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "uH7r0VjhO95qoOFaxgl41",
+      "workOrderNo": "MKR-SE-00002-2025-003",
+      "templateCode": "MKR-SE-00002-2025-003",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "28-Dec-2025",
+      "status": "Due",
+      "taskType": "Calibration",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the magnetron.",
+      "department": "Engine",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-28",
+      "generateDateSnapshot": "2025-12-14",
+      "dueDateSnapshot": "2025-12-28",
+      "lastDoneDateSnapshot": "28-Nov-2025",
+      "id": 34
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.01",
+      "componentCode": "702.005.01",
+      "jobId": "q0tPA3OZfmEvWefrYMuKl",
+      "workOrderNo": "MKR-SE-00003-2025-003",
+      "templateCode": "MKR-SE-00003-2025-003",
+      "jobTitle": "Purifier, Visual Check - 3M",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "29-Dec-2025",
+      "status": "Due",
+      "taskType": "Overhaul",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Months",
+      "jobPriority": "High",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the motor.",
+      "department": "Electrical",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-29",
+      "generateDateSnapshot": "2025-12-22",
+      "dueDateSnapshot": "2025-12-29",
+      "lastDoneDateSnapshot": "29-Nov-2025",
+      "id": 35
+    },
+    {
+      "vesselId": "V002",
+      "component": "FO separators No.02",
+      "componentCode": "702.005.02",
+      "jobId": "4ipeDzVc_WAeJ62UvxWjG",
+      "workOrderNo": "MKR-SE-00004-2025-003",
+      "templateCode": "MKR-SE-00004-2025-003",
+      "jobTitle": "Purifier Parts, Visual Check - 1Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "07-Dec-2025",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "1",
+      "frequencyUnit": "Weeks",
+      "jobPriority": "Critical",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 4E-6 S-BAND RADAR;5303.pdf\r\nPdf Page No: 294\r\nChapter: 8 Countermeasures For Trouble And Adjustment\r\nSection: Replacement Of Parts Periodically\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the LCD.",
+      "department": "Deck",
+      "requiredSpareParts": [
+        {
+          "partNo": "",
+          "description": "test",
+          "quantityRequired": "",
+          "remarks": ""
+        }
+      ],
+      "requiredTools": [
+        {
+          "toolName": "test",
+          "quantity": "",
+          "remarks": ""
+        }
+      ],
+      "safetyRequirements": {
+        "ppeRequirements": [
+          "test"
+        ],
+        "permitRequirements": [
+          "test"
+        ],
+        "otherRequirements": [
+          "test"
+        ]
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-07",
+      "generateDateSnapshot": "2025-11-30",
+      "dueDateSnapshot": "2025-12-07",
+      "lastDoneDateSnapshot": "30-Nov-2025",
+      "id": 36
     }
   ],
   "workOrderExecutions": [],
