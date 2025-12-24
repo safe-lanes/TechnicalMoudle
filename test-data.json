@@ -7851,7 +7851,7 @@
       "name": "Rudders w/nozzle",
       "category": "4 Ship's Equipment",
       "parentId": "401",
-      "vesselId": "V015",
+      "vesselId": "V001",
       "vesselCode": "V015",
       "fleetEquipmentCode": "401.005.YY",
       "fleetEquipmentName": "Rudders w/nozzle",
@@ -7864,7 +7864,7 @@
       "drawingNo": null,
       "department": "Deck",
       "deptCategory": "Deck",
-      "componentCategory": "4 Ship's Equipment",
+      "componentCategory": "Ship's Equipment",
       "location": "Deck",
       "equipmentDepartment": "Deck",
       "commissionedDate": "26-Dec-2015",
@@ -7878,7 +7878,7 @@
       "rating": null,
       "parentComponent": "401",
       "notes": "Technical Information\r\n===================\r\nMfg Type: Monovec Spade\r\nRudder Area: 29.4m2\r\nRudder Torque: 696KN.m",
-      "runningHours": null,
+      "runningHours": 0,
       "currentCumulativeRH": "0",
       "rhCounterType": "NOT RH DRIVEN",
       "rhCounterSource": null,
@@ -7889,7 +7889,8 @@
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
       "lastUpdated": null,
-      "id": "401.005"
+      "id": "401.005",
+      "eqptSystemDept": null
     },
     "403.001": {
       "componentCode": "403.001",
