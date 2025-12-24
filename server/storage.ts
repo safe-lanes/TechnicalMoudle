@@ -151,6 +151,8 @@ import {
   type SpareComponentLink,
   type InsertSpareComponentLink,
   type SpareLocationStock,
+  type JobComponentLink,
+  type InsertJobComponentLink,
   type InsertSpareLocationStock,
   type InventoryTransaction,
   type InsertInventoryTransaction,
@@ -742,6 +744,15 @@ export interface IStorage {
   createSpareComponentLink(link: InsertSpareComponentLink): Promise<SpareComponentLink>;
   deleteSpareComponentLink(spareId: number, componentId: string): Promise<void>;
   getLinkedComponentsForSpare(spareId: number): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  
+  // Job-Component Link Methods (many-to-many for shared jobs)
+  getJobComponentLinks(vesselId: string): Promise<JobComponentLink[]>;
+  getJobComponentLinksByJob(jobId: string): Promise<JobComponentLink[]>;
+  getJobComponentLinksByComponent(componentId: string): Promise<JobComponentLink[]>;
+  createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink>;
+  deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
+  getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
+  getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
   
   // Spare Location Stock Methods
   getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;

@@ -158,6 +158,7 @@ import {
   spareComponentLinks,
   spareLocationStock,
   inventoryTransactions,
+  jobComponentLinks,
   type Location,
   type InsertLocation,
   type SpareComponentLink,
@@ -169,6 +170,8 @@ import {
   type InventoryEventType,
   type InventoryReferenceType,
   type SpareWithInventory,
+  type JobComponentLink,
+  type InsertJobComponentLink,
 } from '@shared/schema';
 
 /**
@@ -4441,6 +4444,77 @@ export class PostgresStorage {
       componentId: l.componentId,
       componentCode: l.componentCode || '',
       componentName: l.componentName || '',
+    }));
+  }
+
+  // ============= JOB-COMPONENT LINKS (Many-to-Many for Shared Jobs) =============
+
+  async getJobComponentLinks(vesselId: string): Promise<JobComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(jobComponentLinks)
+      .where(eq(jobComponentLinks.vesselId, vesselId));
+  }
+
+  async getJobComponentLinksByJob(jobId: string): Promise<JobComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(jobComponentLinks)
+      .where(eq(jobComponentLinks.jobId, jobId));
+  }
+
+  async getJobComponentLinksByComponent(componentId: string): Promise<JobComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(jobComponentLinks)
+      .where(eq(jobComponentLinks.componentId, componentId));
+  }
+
+  async createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink> {
+    const db = await getDb();
+    const result = await db.insert(jobComponentLinks).values(link).returning();
+    return result[0];
+  }
+
+  async deleteJobComponentLink(jobId: string, componentId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(jobComponentLinks)
+      .where(and(
+        eq(jobComponentLinks.jobId, jobId),
+        eq(jobComponentLinks.componentId, componentId)
+      ));
+  }
+
+  async getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>> {
+    const db = await getDb();
+    const links = await db.select({
+      componentId: jobComponentLinks.componentId,
+      componentCode: components.componentCode,
+      componentName: components.name,
+    })
+    .from(jobComponentLinks)
+    .innerJoin(components, eq(jobComponentLinks.componentId, components.id))
+    .where(eq(jobComponentLinks.jobId, jobId));
+    
+    return links.map(l => ({
+      componentId: l.componentId,
+      componentCode: l.componentCode || '',
+      componentName: l.componentName || '',
+    }));
+  }
+
+  async getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>> {
+    const db = await getDb();
+    const links = await db.select({
+      jobId: jobComponentLinks.jobId,
+      jobNo: jobs.jobNo,
+      jobTitle: jobs.jobTitle,
+    })
+    .from(jobComponentLinks)
+    .innerJoin(jobs, eq(jobComponentLinks.jobId, jobs.id))
+    .where(eq(jobComponentLinks.componentId, componentId));
+    
+    return links.map(l => ({
+      jobId: l.jobId,
+      jobNo: l.jobNo || '',
+      jobTitle: l.jobTitle || '',
     }));
   }
 
