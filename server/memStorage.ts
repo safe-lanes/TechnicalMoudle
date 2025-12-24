@@ -431,8 +431,42 @@ class MemStorage {
   }
 
   // Job methods
-  async getJobs(vesselId: string): Promise<any[]> { 
-    return toArray(this.data.jobs).filter((j: any) => j.vesselId === vesselId); 
+  async getJobs(vesselId?: string, componentId?: string): Promise<any[]> { 
+    let result = toArray(this.data.jobs);
+    
+    if (vesselId) {
+      result = result.filter((j: any) => j.vesselId === vesselId);
+    }
+    
+    if (componentId) {
+      // MANY-TO-MANY SUPPORT: Get jobs directly assigned to component
+      // AND jobs linked via job_component_links
+      const directJobs = result.filter((j: any) => j.componentId === componentId);
+      
+      // Get jobs linked via job_component_links
+      const links = toArray(this.data.jobComponentLinks).filter(
+        (link: any) => link.componentId === componentId
+      );
+      const linkedJobIds = new Set(links.map((link: any) => link.jobId));
+      const linkedJobs = result.filter((j: any) => linkedJobIds.has(j.id));
+      
+      // Combine and deduplicate
+      const jobMap = new Map<string, any>();
+      for (const job of directJobs) {
+        jobMap.set(job.id, job);
+      }
+      for (const job of linkedJobs) {
+        if (!jobMap.has(job.id)) {
+          jobMap.set(job.id, job);
+        }
+      }
+      
+      return Array.from(jobMap.values()).sort((a, b) => 
+        (a.jobNo || '').localeCompare(b.jobNo || '')
+      );
+    }
+    
+    return result;
   }
   async getJob(id: string): Promise<any> { 
     if (this.data.jobs && this.data.jobs[id]) return this.data.jobs[id];
@@ -988,8 +1022,51 @@ class MemStorage {
   }
   
   async getSparesWithInventoryByComponent(componentId: string): Promise<any[]> {
-    console.log('[MemStorage] getSparesWithInventoryByComponent called - stub in file mode');
-    return [];
+    // MANY-TO-MANY SUPPORT: Get spares directly assigned to component
+    // AND spares linked via spare_component_links table
+    const allSpares = toArray(this.data.spares);
+    
+    // Get direct spares
+    const directSpares = allSpares.filter((s: any) => s.componentId === componentId);
+    
+    // Get spares linked via spare_component_links
+    const links = toArray(this.data.spareComponentLinks).filter(
+      (link: any) => link.componentId === componentId
+    );
+    const linkedSpareIds = new Set(links.map((link: any) => link.spareId));
+    const linkedSpares = allSpares.filter((s: any) => linkedSpareIds.has(s.id));
+    
+    // Combine and deduplicate
+    const spareIdSet = new Set<number>();
+    const results: any[] = [];
+    
+    for (const spare of directSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        results.push({
+          spare,
+          robTotal: spare.rob || 0,
+          stockStatus: (spare.rob || 0) <= (spare.min || 0) ? 'At Min' : 'OK',
+          locations: [],
+          linkedComponents: [],
+        });
+      }
+    }
+    
+    for (const spare of linkedSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        results.push({
+          spare,
+          robTotal: spare.rob || 0,
+          stockStatus: (spare.rob || 0) <= (spare.min || 0) ? 'At Min' : 'OK',
+          locations: [],
+          linkedComponents: [],
+        });
+      }
+    }
+    
+    return results;
   }
 
   async getMasterDataList(): Promise<any[]> {

@@ -1195,13 +1195,42 @@ export class PostgresStorage {
     const db = await getDb();
     
     if (vesselId && componentId) {
-      return await db.select().from(jobs)
+      // MANY-TO-MANY SUPPORT: Get jobs directly assigned to component
+      // AND jobs linked via job_component_links table
+      const directJobs = await db.select().from(jobs)
         .where(and(
           eq(jobs.vesselId, vesselId),
           eq(jobs.componentId, componentId),
           eq(jobs.dataScope, 'vessel')
         ))
         .orderBy(asc(jobs.jobNo));
+      
+      // Get jobs linked via job_component_links
+      const linkedJobIds = await this.getJobComponentLinksByComponent(componentId);
+      const linkedJobs: Job[] = [];
+      
+      for (const link of linkedJobIds) {
+        const job = await this.getJob(link.jobId);
+        if (job && job.vesselId === vesselId && job.dataScope === 'vessel') {
+          linkedJobs.push(job);
+        }
+      }
+      
+      // Combine and deduplicate by job ID
+      const jobMap = new Map<string, Job>();
+      for (const job of directJobs) {
+        jobMap.set(job.id, job);
+      }
+      for (const job of linkedJobs) {
+        if (!jobMap.has(job.id)) {
+          jobMap.set(job.id, job);
+        }
+      }
+      
+      // Sort by jobNo and return
+      return Array.from(jobMap.values()).sort((a, b) => 
+        (a.jobNo || '').localeCompare(b.jobNo || '')
+      );
     }
     
     if (vesselId) {
@@ -4784,13 +4813,39 @@ export class PostgresStorage {
   }
 
   async getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]> {
+    const db = await getDb();
+    
+    // MANY-TO-MANY SUPPORT: Get spares directly assigned to component
+    // AND spares linked via spare_component_links table
+    const directSpares = await db.select().from(spares)
+      .where(eq(spares.componentId, componentId));
+    
+    // Get spares linked via spare_component_links
     const links = await this.getSpareComponentLinksByComponent(componentId);
+    
+    // Combine and deduplicate by spare ID
+    const spareIdSet = new Set<number>();
     const results: SpareWithInventory[] = [];
     
+    // Add direct spares first
+    for (const spare of directSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        const withInventory = await this.getSpareWithInventory(spare.id);
+        if (withInventory) {
+          results.push(withInventory);
+        }
+      }
+    }
+    
+    // Add linked spares (deduplicated)
     for (const link of links) {
-      const withInventory = await this.getSpareWithInventory(link.spareId);
-      if (withInventory) {
-        results.push(withInventory);
+      if (!spareIdSet.has(link.spareId)) {
+        spareIdSet.add(link.spareId);
+        const withInventory = await this.getSpareWithInventory(link.spareId);
+        if (withInventory) {
+          results.push(withInventory);
+        }
       }
     }
     
