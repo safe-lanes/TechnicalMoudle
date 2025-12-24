@@ -2166,3 +2166,28 @@ export type SpareWithInventory = {
     componentName: string;
   }>;
 };
+
+// B7) JOB_COMPONENT_LINKS - Many-to-many linking between jobs and components
+// Allows same job to be shared across multiple components
+export const jobComponentLinks = pgTable("job_component_links", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  jobId: text("job_id").notNull(), // FK → jobs.id (UUID)
+  componentId: text("component_id").notNull(), // FK → components.id (UUID)
+  componentCode: text("component_code"), // Denormalized for faster lookups
+  linkedBy: text("linked_by").notNull(),
+  linkedAt: timestamp("linked_at").notNull().defaultNow(),
+}, (table) => ({
+  jobIdIdx: index("idx_job_component_link_job").on(table.jobId),
+  componentIdIdx: index("idx_job_component_link_component").on(table.componentId),
+  vesselIdIdx: index("idx_job_component_link_vessel").on(table.vesselId),
+  uniqueJobComponent: unique("unique_job_component_link").on(table.jobId, table.componentId),
+}));
+
+export const insertJobComponentLinkSchema = createInsertSchema(jobComponentLinks).omit({
+  id: true,
+  linkedAt: true,
+});
+
+export type InsertJobComponentLink = z.infer<typeof insertJobComponentLinkSchema>;
+export type JobComponentLink = typeof jobComponentLinks.$inferSelect;
