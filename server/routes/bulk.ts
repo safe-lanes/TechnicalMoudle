@@ -3692,8 +3692,42 @@ async function performImport(
         
         if (mode === 'add') {
           if (existingSpare) {
-            console.log(`⏭️ Part Code ${partCode} already exists, skipping`);
-            result.skipped++;
+            // MANY-TO-MANY SUPPORT: If Part Code exists but for a DIFFERENT component,
+            // create a spare_component_link to share this spare across multiple components
+            if (existingSpare.componentId !== component.id) {
+              try {
+                // Check if link already exists before creating
+                const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
+                const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+                
+                if (!linkAlreadyExists) {
+                  await storage.createSpareComponentLink({
+                    vesselId: sparesVesselId,
+                    spareId: existingSpare.id,
+                    componentId: component.id,
+                    linkedBy: 'system-bulk-import',
+                  });
+                  console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
+                  
+                  // Note: Spare-component links are not tracked in import history since
+                  // they represent relationships rather than entity changes. The spare
+                  // itself remains unchanged - only the link is created.
+                  
+                  // Count as an update since we modified the spare's relationships
+                  result.updated++;
+                } else {
+                  console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
+                  result.skipped++;
+                }
+              } catch (linkError: any) {
+                console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+                result.skipped++;
+              }
+            } else {
+              // Same Part Code with same component - true duplicate, skip
+              console.log(`⏭️ Part Code ${partCode} already exists for same component, skipping`);
+              result.skipped++;
+            }
             continue;
           }
           
@@ -3866,55 +3900,82 @@ async function performImport(
           const robLocationBUpsert = parseInt(row['Location B - ROB']) || 0;
           
           if (existingSpare) {
-            // Update existing
-            const updatedSpare = await storage.updateSpare(existingSpare.id, {
-              partName: String(row['Part Name']).trim(),
-              componentId: component.id,
-              componentCode: componentCode,
-              componentName: component.name || '',
-              critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
-              rob: totalRobUpsert || existingSpare.rob,
-              robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
-              robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
-              min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
-              location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
-              location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
-              partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
-              uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
-              maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
-              makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
-              specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
-              drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : existingSpare.drawingNumber,
-              positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : existingSpare.positionNumber,
-              note: row['Note'] ? String(row['Note']).trim() : existingSpare.note,
-              manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : existingSpare.manualName,
-              pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
-              isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : existingSpare.isActive),
-              ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
-              remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
-            });
-            
-            sparesByPartCode.set(partCode, updatedSpare);
-            result.updated++;
-            
-            if (importHistoryId) {
-              await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
+            // MANY-TO-MANY SUPPORT: If Part Code exists but for a DIFFERENT component,
+            // create a spare_component_link instead of updating the spare's component reference
+            if (existingSpare.componentId !== component.id) {
+              try {
+                // Check if link already exists before creating
+                const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
+                const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+                
+                if (!linkAlreadyExists) {
+                  await storage.createSpareComponentLink({
+                    vesselId: sparesVesselId,
+                    spareId: existingSpare.id,
+                    componentId: component.id,
+                    linkedBy: 'system-bulk-import',
+                  });
+                  console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
+                  result.updated++;
+                } else {
+                  console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
+                  result.skipped++;
+                }
+              } catch (linkError: any) {
+                console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+                result.skipped++;
+              }
+            } else {
+              // Same component - update existing spare
+              const updatedSpare = await storage.updateSpare(existingSpare.id, {
+                partName: String(row['Part Name']).trim(),
+                componentId: component.id,
+                componentCode: componentCode,
+                componentName: component.name || '',
+                critical: criticalValUpsert === 'Yes' || criticalValUpsert === true ? 'Yes' : 'No',
+                rob: totalRobUpsert || existingSpare.rob,
+                robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
+                robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
+                min: row['Minimum Stock'] ? parseInt(row['Minimum Stock']) : existingSpare.min,
+                location: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+                location2: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+                partNumber: row['Part Number'] ? String(row['Part Number']).trim() : existingSpare.partNumber,
+                uom: (row['UOM'] || row['Unit Of Measurement']) ? String(row['UOM'] || row['Unit Of Measurement']).toUpperCase() : existingSpare.uom,
+                maker: (row['Maker'] || row['Maker Name']) ? String(row['Maker'] || row['Maker Name']).trim() : existingSpare.maker,
+                makerCode: row['Maker Code'] ? String(row['Maker Code']).trim() : existingSpare.makerCode,
+                specification: row['Specification'] ? String(row['Specification']).trim() : existingSpare.specification,
+                drawingNumber: (row['Drawing Number'] || row['Drawing No']) ? String(row['Drawing Number'] || row['Drawing No']).trim() : existingSpare.drawingNumber,
+                positionNumber: row['Position Number'] ? String(row['Position Number']).trim() : existingSpare.positionNumber,
+                note: row['Note'] ? String(row['Note']).trim() : existingSpare.note,
+                manualName: row['Manual Name'] ? String(row['Manual Name']).trim() : existingSpare.manualName,
+                pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
+                isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : existingSpare.isActive),
+                ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
+                remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
+              });
+              
+              sparesByPartCode.set(partCode, updatedSpare);
+              result.updated++;
+              
+              if (importHistoryId) {
+                await trackChange(importHistoryId, 'updated', 'spare', String(updatedSpare.id), existingSpare, updatedSpare);
+              }
+              
+              // Process inventory for upsert-updated spare
+              await processSpareInventory({
+                spareId: updatedSpare.id,
+                vesselId: sparesVesselId,
+                componentId: component.id,
+                locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
+                locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
+                robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
+                robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
+                isNewSpare: false,
+                userId: 'system-import',
+              });
+              
+              console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
             }
-            
-            // Process inventory for upsert-updated spare
-            await processSpareInventory({
-              spareId: updatedSpare.id,
-              vesselId: sparesVesselId,
-              componentId: component.id,
-              locationAName: row['Location A'] ? String(row['Location A']).trim() : existingSpare.location,
-              locationBName: row['Location B'] ? String(row['Location B']).trim() : existingSpare.location2,
-              robLocationA: row['Location A - ROB'] !== undefined ? robLocationAUpsert : existingSpare.robLocationA,
-              robLocationB: row['Location B - ROB'] !== undefined ? robLocationBUpsert : existingSpare.robLocationB,
-              isNewSpare: false,
-              userId: 'system-import',
-            });
-            
-            console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
           } else {
             // Create new - use criticalValUpsert from parent scope
             const newSpare = await storage.createSpare({
@@ -4487,7 +4548,41 @@ async function performImport(
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         } else {
-          result.skipped++;
+          // MANY-TO-MANY SUPPORT: If Job Code exists but for a DIFFERENT component,
+          // create a job_component_link to share this job across multiple components
+          if (existingJob.componentId !== component.id) {
+            try {
+              // Check if link already exists before creating
+              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              
+              if (!linkAlreadyExists) {
+                await storage.createJobComponentLink({
+                  vesselId: canonicalVesselId,
+                  jobId: existingJob.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode}`);
+                
+                // Note: Job-component links are not tracked in import history since
+                // they represent relationships rather than entity changes.
+                
+                // Count as an update since we modified the job's relationships
+                result.updated++;
+              } else {
+                console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
+                result.skipped++;
+              }
+            } catch (linkError: any) {
+              console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
+              result.skipped++;
+            }
+          } else {
+            // Same Job Code with same component - true duplicate, skip
+            console.log(`⏭️ Job ${jobData.jobNo} already exists for same component, skipping`);
+            result.skipped++;
+          }
         }
       } else if (mode === 'update') {
         if (existingJob) {
@@ -4506,15 +4601,44 @@ async function performImport(
         }
       } else if (mode === 'upsert') {
         if (existingJob) {
-          const previousSnapshot = createRecordSnapshot(existingJob);
-          const updatedJob = await storage.updateJob(existingJob.id, jobData);
-          jobsByJobNo.set(updatedJob.jobNo, updatedJob);
-          result.updated++;
-          
-          // Track job update with canonical state (refetch for accuracy)
-          if (importHistoryId) {
-            const canonicalJob = await storage.getJob(updatedJob.id);
-            await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
+          // MANY-TO-MANY SUPPORT: If Job Code exists but for a DIFFERENT component,
+          // create a job_component_link to share this job across multiple components
+          // (instead of updating the existing job's component reference)
+          if (existingJob.componentId !== component.id) {
+            try {
+              // Check if link already exists before creating
+              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              
+              if (!linkAlreadyExists) {
+                await storage.createJobComponentLink({
+                  vesselId: canonicalVesselId,
+                  jobId: existingJob.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode} (upsert mode)`);
+                result.updated++;
+              } else {
+                console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
+                result.skipped++;
+              }
+            } catch (linkError: any) {
+              console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
+              result.skipped++;
+            }
+          } else {
+            // Same component - update the existing job
+            const previousSnapshot = createRecordSnapshot(existingJob);
+            const updatedJob = await storage.updateJob(existingJob.id, jobData);
+            jobsByJobNo.set(updatedJob.jobNo, updatedJob);
+            result.updated++;
+            
+            // Track job update with canonical state (refetch for accuracy)
+            if (importHistoryId) {
+              const canonicalJob = await storage.getJob(updatedJob.id);
+              await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
+            }
           }
         } else {
           const createdJob = await storage.createJob(jobData);
