@@ -14,6 +14,12 @@ import { calculateNextDueDate, normalizeDateToDDMMMYYYY } from '../../shared/dat
 import { ObjectStorageService, ObjectNotFoundError } from '../objectStorage';
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from '../utils/workOrderNumbering';
 import { getSparesExcelColumns } from '../../shared/sparesTemplateFields';
+import { 
+  saveImportHistory, 
+  getImportHistoryList, 
+  getImportHistoryById as getFileBasedHistoryById,
+  updateImportHistory as updateFileBasedHistory
+} from '../services/fileBasedImportHistory';
 
 const router = Router();
 
@@ -2344,13 +2350,13 @@ router.post('/import', async (req, res) => {
       }
     }
 
-    // Update ImportHistory with status='complete' and include file path
-    await storage.updateImportHistory(historyId, {
+    // Update ImportHistory with status='complete' and include file path (file-based storage)
+    await updateFileBasedHistory(historyId, {
       ...importResult,
-      finishedAt: new Date(),
+      completedAt: new Date().toISOString(),
       status: 'complete',
       originalName: cachedData.originalName,
-      storedFilePath: storedFilePath // Store the object storage path
+      storedFilePath: storedFilePath
     });
 
     // Clean up cache
@@ -2363,12 +2369,11 @@ router.post('/import', async (req, res) => {
   } catch (error: any) {
     console.error('Import error:', error);
     
-    // Update ImportHistory with status='failed' and error message
+    // Update ImportHistory with status='failed' and error message (file-based storage)
     try {
-      await storage.updateImportHistory(historyId, {
-        finishedAt: new Date(),
-        status: 'failed',
-        errorMessage: error?.message || 'Unknown error during import'
+      await updateFileBasedHistory(historyId, {
+        completedAt: new Date().toISOString(),
+        status: 'failed'
       });
     } catch (updateError) {
       console.error('Failed to update import history:', updateError);
@@ -2405,8 +2410,8 @@ router.get('/history/:id/download-original', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Get history record to find stored file path
-    const history = await storage.getImportHistoryById(id);
+    // Get history record from file-based storage
+    const history = await getFileBasedHistoryById(id);
     if (!history) {
       return res.status(404).json({ error: 'Import history not found' });
     }
@@ -5072,15 +5077,31 @@ async function updateWorkOrderFromRow(workOrderId: string, row: any) {
   return await storage.updateWorkOrder(workOrderId, updateData);
 }
 
-// Store import history
+// Store import history - NOW USES FILE-BASED STORAGE
 async function storeImportHistory(data: any) {
-  const result = await storage.createImportHistory(data);
+  const result = await saveImportHistory({
+    id: data.id,
+    type: data.type,
+    mode: data.mode,
+    vesselId: data.vesselId,
+    userId: data.userId,
+    startedAt: data.startedAt || new Date().toISOString(),
+    completedAt: data.finishedAt || new Date().toISOString(),
+    status: data.status,
+    created: data.created || 0,
+    updated: data.updated || 0,
+    skipped: data.skipped || 0,
+    archived: data.archived || 0,
+    originalName: data.originalName,
+    storedFilePath: data.storedFilePath || null,
+    errorReport: null
+  });
   return result;
 }
 
-// Get import history
+// Get import history - NOW USES FILE-BASED STORAGE
 async function getImportHistory(type: string | undefined, limit: number, offset: number) {
-  const result = await storage.getImportHistory(type, limit, offset);
+  const result = await getImportHistoryList(type, limit, offset);
   
   return {
     items: result.items.map((h: any) => ({
@@ -5095,26 +5116,22 @@ async function getImportHistory(type: string | undefined, limit: number, offset:
       archived: h.archived,
       status: h.status,
       originalName: h.originalName,
-      storedFilePath: h.storedFilePath // Include file path for download
+      storedFilePath: h.storedFilePath
     })),
     total: result.total
   };
 }
 
-// Get history file
+// Get history file - NOW USES FILE-BASED STORAGE
 async function getHistoryFile(id: string, fileType: string): Promise<{ mimeType: string; name: string; data: Buffer } | null> {
-  const history = await storage.getImportHistoryById(id);
+  const history = await getFileBasedHistoryById(id);
   
   if (!history) return null;
 
   if (fileType === 'file') {
-    // Note: originalFile buffer is not stored in database schema
-    // This would need to be stored in object storage or file system
-    // For now, return null as file storage is not implemented
     return null;
   }
 
-  // Generate error report or result map as needed
   return null;
 }
 
@@ -5123,8 +5140,8 @@ router.post('/undo/:historyId', async (req, res) => {
   const { historyId } = req.params;
   
   try {
-    // 1. Fetch and Validate Import History
-    const history = await storage.getImportHistoryById(historyId);
+    // 1. Fetch and Validate Import History from file-based storage
+    const history = await getFileBasedHistoryById(historyId);
     if (!history) {
       return res.status(404).json({ error: 'Import history not found' });
     }
@@ -5332,10 +5349,9 @@ router.post('/undo/:historyId', async (req, res) => {
         appliedChanges.push({ log, previousState: currentState });
       }
       
-      // All changes successful - mark as undone
-      await storage.updateImportHistory(historyId, {
-        status: 'undone',
-        undoneAt: new Date()
+      // All changes successful - mark as undone (file-based storage)
+      await updateFileBasedHistory(historyId, {
+        status: 'undone'
       });
       
       console.log(`✅ Import ${historyId} successfully undone`);
@@ -5383,13 +5399,10 @@ router.post('/undo/:historyId', async (req, res) => {
         }
       }
       
-      // Mark import as undo_failed
+      // Mark import as undo_failed (file-based storage)
       try {
-        await storage.updateImportHistory(historyId, {
-          status: 'undo_failed',
-          errorMessage: rollbackErrors.length > 0 
-            ? `Undo failed: ${undoError.message}. Rollback errors: ${rollbackErrors.join('; ')}`
-            : `Undo failed: ${undoError.message}. All changes rolled back successfully.`
+        await updateFileBasedHistory(historyId, {
+          status: 'undo_failed'
         });
       } catch (updateError) {
         console.error('Failed to update history status:', updateError);
@@ -5411,11 +5424,10 @@ router.post('/undo/:historyId', async (req, res) => {
   } catch (error: any) {
     console.error('Undo error:', error);
     
-    // Try to mark history as failed
+    // Try to mark history as failed (file-based storage)
     try {
-      await storage.updateImportHistory(historyId, {
-        status: 'undo_failed',
-        errorMessage: error.message
+      await updateFileBasedHistory(historyId, {
+        status: 'undo_failed'
       });
     } catch (updateError) {
       console.error('Failed to update history status:', updateError);
