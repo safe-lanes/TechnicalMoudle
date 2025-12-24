@@ -24497,43 +24497,6 @@
       "vesselId": null,
       "createdAt": "2025-12-08T00:00:00.000Z",
       "updatedAt": "2025-12-08T00:00:00.000Z"
-    },
-    "undefined": {
-      "vesselId": "V015",
-      "vesselCode": "V015",
-      "componentId": "601.010.01",
-      "componentCode": "601.010.01",
-      "componentName": "ME bedplates, frames No.01",
-      "fleetEquipmentCode": "601.010.AA",
-      "fleetEquipmentName": "ME bedplates, frames",
-      "jobTitle": "ME Bed Plate Set Bolts, Inspection - 15000H",
-      "maintenanceType": "Inspection",
-      "maintenanceBasis": "Running Hours",
-      "frequencyValue": 15000,
-      "frequencyUnit": "Hours",
-      "intervalRunningHour": 15000,
-      "internalRunningHourNumber": "15000",
-      "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 3M-2 DIESEL ENGINE VOL II;5303.pdf\r\nPdf Page No: 193\r\nChapter: Maintenance Schedule Of Main Parts\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Inspect whether the bed plate set bolts are tightened.",
-      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 3M-2 DIESEL ENGINE VOL II;5303.pdf\r\nPdf Page No: 193\r\nChapter: Maintenance Schedule Of Main Parts\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Inspect whether the bed plate set bolts are tightened.",
-      "assignedTo": "2nd Engineer",
-      "approver": "Chief Engineer",
-      "jobPriority": "Medium",
-      "classRelated": "No",
-      "lastDoneDate": "20-Nov-2025",
-      "nextDueDate": null,
-      "lastDoneRH": "500",
-      "nextDueRH": "15500",
-      "department": "Engine",
-      "criticality": "No",
-      "isActive": true,
-      "requiredSpareParts": [],
-      "requiredTools": [],
-      "safetyRequirements": {
-        "ppeRequirements": [],
-        "permitRequirements": [],
-        "otherRequirements": []
-      },
-      "jobNo": "MKR-IN-00035"
     }
   },
   "workOrders": [
@@ -25064,7 +25027,7 @@
           "partNo": "SP-00004",
           "description": "Impressed Current Anode",
           "quantityConsumed": "2",
-          "comments": ""
+          "comments": "Replaced worn anodes"
         },
         {
           "partNo": "SP-00005",
@@ -25107,7 +25070,7 @@
       "lastDoneRH": "0",
       "nextDueRH": "500",
       "jobDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-1 ROTARY VANE STEERING GEAR;5303.pdf\r\nPdf Page No: 118\r\nChapter: Periodical Maintenance\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the rotor seal & gland seal.",
-      "woExecutionId": "WO-EXE-6287942",
+      "woExecutionId": "WO-EXE-6255980",
       "riskAssessment": "No",
       "safetyChecklists": "No",
       "operationalForms": "No",
