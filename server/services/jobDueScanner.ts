@@ -227,12 +227,22 @@ export class JobDueScannerService {
       }
 
       // All checks passed - generate the WO
-      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
+      // Get componentCode - fallback to component record if not on job
+      let componentCode = job.componentCode;
+      if (!componentCode && job.componentId) {
+        const component = await storage.getComponent(job.componentId);
+        componentCode = component?.componentCode || '';
+      }
+      if (!componentCode) {
+        console.warn(`⚠️ No component code for RH job ${job.jobNo} - skipping WO generation`);
+        continue;
+      }
+      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
       
       const workOrderData: InsertWorkOrder = {
         vesselId: job.vesselId,
         component: job.componentName,
-        componentCode: job.componentCode,
+        componentCode: componentCode, // Use resolved componentCode
         jobId: job.id, // Link to job for cycle tracking
         workOrderNo: workOrderNo,
         templateCode: workOrderNo,
@@ -428,13 +438,26 @@ export class JobDueScannerService {
       console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}`);
     }
 
-    // Generate WO number with correct format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
-    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
+    // Get componentCode - fallback to component record if not on job
+    let componentCode = job.componentCode;
+    if (!componentCode && job.componentId) {
+      const component = await storage.getComponent(job.componentId);
+      componentCode = component?.componentCode || '';
+    }
+    if (!componentCode) {
+      return { 
+        success: false, 
+        message: `Component code is required for work order generation` 
+      };
+    }
+    
+    // Generate WO number with correct format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
+    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
     
     const workOrderData: InsertWorkOrder = {
       vesselId: job.vesselId,
       component: job.componentName,
-      componentCode: job.componentCode,
+      componentCode: componentCode, // Use resolved componentCode
       jobId: job.id, // Link to job for cycle tracking
       workOrderNo: workOrderNo,
       templateCode: workOrderNo,

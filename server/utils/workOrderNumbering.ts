@@ -3,14 +3,15 @@ import type { IStorage } from '../storage';
 /**
  * Spec-compliant Work Order Numbering System
  * 
- * Planned WO Format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
- * Example: MK-000041-2025-001
+ * Planned WO Format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
+ * Example: MK-000041-711.001-2025-001
  * 
  * Unplanned WO Format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
  * Example: UWO-VESSEL01-2025-001
  * 
  * Running numbers are:
  * - Per vessel
+ * - Per job + component combination
  * - Per year
  * - Generated atomically
  * - No duplicates allowed
@@ -18,30 +19,37 @@ import type { IStorage } from '../storage';
 
 /**
  * Generate next work order number for a planned WO
- * Format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
+ * Format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
  */
 export async function generatePlannedWorkOrderNumber(
   storage: IStorage,
   jobCode: string,
+  componentCode: string,
   vesselId?: string
 ): Promise<string> {
   const currentYear = new Date().getFullYear();
   
+  // Validate required parameters - throw if component code is empty
+  if (!componentCode || !componentCode.trim()) {
+    throw new Error('Component code is required for planned work order numbering');
+  }
+  
   // Ensure job code is never empty - fallback to UNKNOWN-JOB if needed
   const safeJobCode = jobCode && jobCode.trim() ? jobCode.trim() : 'UNKNOWN-JOB';
+  const safeComponentCode = componentCode.trim();
   
-  // Find all WOs for this job in current year with planned numbering format
+  // Find all WOs for this job+component in current year with planned numbering format
   const allWorkOrders = await storage.getWorkOrders(vesselId);
   
-  const existingWOsForJob = allWorkOrders.filter(wo => {
-    // Match planned WO format: <JOB_CODE>-<YYYY>-<RUNNING_3DIGIT>
-    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${currentYear}-(\\d+)$`);
+  const existingWOsForJobComponent = allWorkOrders.filter(wo => {
+    // Match planned WO format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
+    const plannedPattern = new RegExp(`^${escapeRegex(safeJobCode)}-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
     return plannedPattern.test(wo.workOrderNo);
   });
   
   // Extract running numbers and find max
   let maxRunningNumber = 0;
-  existingWOsForJob.forEach(wo => {
+  existingWOsForJobComponent.forEach(wo => {
     const match = wo.workOrderNo.match(/-(\d+)$/);
     if (match) {
       const num = parseInt(match[1], 10);
@@ -54,7 +62,7 @@ export async function generatePlannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `${safeJobCode}-${currentYear}-${paddedNumber}`;
+  return `${safeJobCode}-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**

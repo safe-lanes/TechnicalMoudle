@@ -5023,14 +5023,18 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
     }
   }
   
-  // Generate spec-compliant work order number: <JOB CODE>.WO-<YEAR>-<RUNNING NUMBER>
+  // Generate spec-compliant work order number: <JOB_CODE>-<COMPONENT_CODE>-<YEAR>-<RUNNING NUMBER>
   // Use job code from matched job, or from Excel row, or generate unplanned format
   let workOrderNo: string;
   const jobCode = matchingJob?.jobNo || row['Job_Code'];
   
   if (jobCode) {
-    // Planned work order: use job code to generate proper format
-    workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, effectiveVesselId);
+    // Planned work order: use job code and component code to generate proper format
+    // Validate componentCode before calling generator
+    if (!componentCode || !componentCode.trim()) {
+      throw new Error(`Component code is required for planned work order generation. Row has Job_Code "${jobCode}" but no component code.`);
+    }
+    workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, componentCode, effectiveVesselId);
   } else {
     // Unplanned work order: use UWO format
     workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId);

@@ -226,7 +226,17 @@ export class WorkOrderService {
       }
       
       // All checks passed - generate the WO
-      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, job.vesselId || undefined);
+      // Get componentCode - fallback to component record if not on job
+      let componentCode = job.componentCode;
+      if (!componentCode && job.componentId) {
+        const component = await storage.getComponent(job.componentId);
+        componentCode = component?.componentCode || '';
+      }
+      if (!componentCode) {
+        console.warn(`⚠️ No component code for calendar job ${job.jobNo} - skipping WO generation`);
+        continue;
+      }
+      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
       
       // Calculate generate date string for snapshot
       const generateDateStr = generateDate.toISOString().split('T')[0];
@@ -234,7 +244,7 @@ export class WorkOrderService {
       const workOrderData: InsertWorkOrder = {
         vesselId: job.vesselId,
         component: job.componentName,
-        componentCode: job.componentCode,
+        componentCode: componentCode, // Use resolved componentCode
         jobId: job.id, // Link to job for cycle tracking
         workOrderNo: workOrderNo,
         templateCode: workOrderNo,

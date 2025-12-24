@@ -2272,17 +2272,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderData.workOrderType = woType;
         
         if (woType === 'Planned') {
-          // Get job code for planned WO numbering
+          // Get job code and component code for planned WO numbering
           let jobCode = 'JOB-UNKNOWN';
+          let componentCode = workOrderData.componentCode || '';
           if (workOrderData.jobId) {
             const job = await storage.getJob(workOrderData.jobId);
             if (job?.jobNo) {
               jobCode = job.jobNo;
             }
+            if (job?.componentCode) {
+              componentCode = job.componentCode;
+            } else if (job?.componentId) {
+              // Fallback: fetch component code from component record
+              const component = await storage.getComponent(job.componentId);
+              if (component?.componentCode) {
+                componentCode = component.componentCode;
+              }
+            }
+          }
+          // If still no componentCode, try from workOrderData.componentCode directly
+          // or fetch via componentCode lookup if we have a vesselId
+          if (!componentCode && workOrderData.componentCode) {
+            componentCode = workOrderData.componentCode;
+          }
+          // Last resort: try to find component by code if vesselId available
+          if (!componentCode && workOrderData.vesselId) {
+            // If we have component name but not code, we can't reliably get the code
+            // This is a data integrity issue - componentCode should always be provided
+            console.warn(`No componentCode available for planned WO creation`);
+          }
+          if (!componentCode) {
+            throw new Error('Component code is required for planned work order numbering');
           }
           workOrderData.workOrderNo = await generatePlannedWorkOrderNumber(
             storage, 
             jobCode, 
+            componentCode,
             workOrderData.vesselId || undefined
           );
         } else {
@@ -2776,12 +2801,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Generate spec-compliant work order number
             const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
             const jobCode = job.jobNo || 'JOB-UNKNOWN';
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, vesselId);
+            // Get component code from job, fallback to component record
+            let componentCode = job.componentCode;
+            if (!componentCode && job.componentId) {
+              const component = componentsMap.get(job.componentId);
+              componentCode = component?.componentCode;
+            }
+            if (!componentCode) {
+              console.warn(`⚠️ No component code for calendar job ${job.jobNo} - skipping WO generation`);
+              continue;
+            }
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, componentCode, vesselId);
             
             const workOrderData = {
               vesselId: job.vesselId,
               component: job.componentId,
-              componentCode: job.componentCode,
+              componentCode: componentCode,
               jobId: job.id, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
               workOrderType: 'Planned' as const,
@@ -2842,12 +2877,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Generate spec-compliant work order number
             const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
             const jobCode = job.jobNo || 'JOB-UNKNOWN';
-            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, vesselId);
+            // Get component code from job, fallback to component record
+            const componentCode = job.componentCode || component?.componentCode;
+            if (!componentCode) {
+              console.warn(`⚠️ No component code for RH job ${job.jobNo} - skipping WO generation`);
+              continue;
+            }
+            const workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, componentCode, vesselId);
             
             const workOrderData = {
               vesselId: job.vesselId,
               component: job.componentId,
-              componentCode: job.componentCode,
+              componentCode: componentCode, // Use resolved componentCode
               jobId: job.id, // Store job ID for reliable lead time hydration
               workOrderNo: workOrderNo,
               workOrderType: 'Planned' as const,
