@@ -1083,6 +1083,58 @@ class MemStorage {
     if (!this.data.pmsVesselSettings) return [];
     return toArray(this.data.pmsVesselSettings);
   }
+
+  // =====================================================
+  // JOB-COMPONENT LINKS (Many-to-Many)
+  // =====================================================
+  
+  async getJobComponentLinks(vesselId: string): Promise<any[]> {
+    if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
+    const links = toArray(this.data.jobComponentLinks);
+    // Filter by vessel - need to check the job's vesselId
+    const jobs = toArray(this.data.jobs).filter((j: any) => j.vesselId === vesselId);
+    const jobIds = new Set(jobs.map((j: any) => j.id));
+    return links.filter((link: any) => jobIds.has(link.jobId));
+  }
+
+  async getJobComponentLinksByJob(jobId: string): Promise<any[]> {
+    if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
+    return toArray(this.data.jobComponentLinks).filter((link: any) => link.jobId === jobId);
+  }
+
+  async getJobComponentLinksByComponent(componentId: string): Promise<any[]> {
+    if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
+    return toArray(this.data.jobComponentLinks).filter((link: any) => link.componentId === componentId);
+  }
+
+  async createJobComponentLink(link: any): Promise<any> {
+    if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
+    
+    // Check if link already exists
+    const existing = this.data.jobComponentLinks.find(
+      (l: any) => l.jobId === link.jobId && l.componentId === link.componentId
+    );
+    if (existing) {
+      return existing;
+    }
+    
+    const newLink = {
+      ...link,
+      id: this.getNextId('jobComponentLinks'),
+      createdAt: new Date().toISOString()
+    };
+    this.data.jobComponentLinks.push(newLink);
+    this.saveData();
+    return newLink;
+  }
+
+  async deleteJobComponentLink(jobId: string, componentId: string): Promise<void> {
+    if (!this.data.jobComponentLinks) return;
+    this.data.jobComponentLinks = this.data.jobComponentLinks.filter(
+      (link: any) => !(link.jobId === jobId && link.componentId === componentId)
+    );
+    this.saveData();
+  }
 }
 
 export const memStorage = new MemStorage();
