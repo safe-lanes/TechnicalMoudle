@@ -1,12 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { resolvePostgres } from './postgresClient';
+import { isFileStorageForced } from './storageFactory';
 
 /**
  * Ensure immutability trigger exists for component_maintenance_history
  * This function is idempotent and can be called multiple times safely
  * 
  * Behavior:
- * - File-storage mode (no DATABASE_URL): Skips trigger creation, returns void
+ * - File-storage mode (forced or no DATABASE_URL): Skips trigger creation, returns void
  * - PostgreSQL mode: Creates/verifies triggers, throws on failure
  * 
  * IMPORTANT: This function throws if trigger creation fails in PostgreSQL mode
@@ -14,6 +15,12 @@ import { resolvePostgres } from './postgresClient';
  */
 export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
   console.log('🔒 Ensuring immutability trigger for component_maintenance_history...');
+  
+  // Check if file-based storage is forced (skip PostgreSQL operations)
+  if (isFileStorageForced()) {
+    console.log('⏭️  Skipping immutability trigger setup - file-based storage is active');
+    return;
+  }
   
   // Attempt to resolve PostgreSQL client
   const postgres = await resolvePostgres();

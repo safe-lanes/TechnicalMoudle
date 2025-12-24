@@ -21,10 +21,24 @@ let storageInstance: IStorage | null = null;
 let currentStorageMode: 'postgres' | 'file' = 'file';
 
 /**
- * Check if file-based storage is forced via environment variable
+ * Local development database URL that should trigger file-based storage fallback
+ */
+const LOCAL_DEV_DATABASE_URL = 'postgresql://postgres:password@helium/heliumdb?sslmode=disable';
+
+/**
+ * Check if file-based storage should be used
+ * - If USE_FILE_STORAGE=true is set
+ * - If DATABASE_URL matches the local development URL (for Replit fallback)
  */
 export function isFileStorageForced(): boolean {
-  return process.env.USE_FILE_STORAGE === 'true';
+  if (process.env.USE_FILE_STORAGE === 'true') {
+    return true;
+  }
+  // Fallback to file storage if DATABASE_URL matches local dev URL
+  if (process.env.DATABASE_URL === LOCAL_DEV_DATABASE_URL) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -53,9 +67,12 @@ export async function initializeStorage(): Promise<IStorage> {
 
   console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
   
-  // Check if file-based storage is forced via USE_FILE_STORAGE=true
+  // Check if file-based storage is forced
   if (isFileStorageForced()) {
-    console.log('[StorageFactory] USE_FILE_STORAGE=true - forcing file-based storage');
+    const reason = process.env.USE_FILE_STORAGE === 'true' 
+      ? 'USE_FILE_STORAGE=true' 
+      : 'DATABASE_URL matches local dev URL';
+    console.log(`[StorageFactory] ${reason} - using file-based storage`);
     console.log('[StorageFactory] ✓ Using file-based storage (test-data.json)');
     console.log('[StorageFactory] ⚠ Data changes in this mode are for preview only');
     console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
