@@ -52,7 +52,7 @@ class MemStorage {
   
   private initializeIdCounters(): void {
     // Scan existing collections to find max IDs
-    const collections = ['users', 'runningHoursAudits', 'audits'];
+    const collections = ['users', 'runningHoursAudits', 'audits', 'spares', 'defects', 'jobs', 'workOrders', 'storesItems'];
     for (const collection of collections) {
       const items = this.data[collection];
       if (items) {
@@ -532,9 +532,10 @@ class MemStorage {
   }
   async createSpare(spare: any): Promise<any> {
     if (!this.data.spares) this.data.spares = {};
-    this.data.spares[spare.id] = spare;
+    const newSpare = { ...spare, id: spare.id || this.getNextId('spares') };
+    this.data.spares[newSpare.id] = newSpare;
     this.saveData();
-    return spare;
+    return newSpare;
   }
   async updateSpare(id: string, data: any): Promise<any> {
     if (this.data.spares && this.data.spares[id]) {
