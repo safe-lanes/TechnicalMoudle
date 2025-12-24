@@ -22300,12 +22300,12 @@
       "robLocationB": 0
     },
     "undefined": {
-      "partCode": "MV0001-01283",
+      "partCode": "MV0001-01282",
       "partName": "Leistritz Pump Cartridge",
       "componentId": "403.001",
       "componentCode": "403.001",
       "componentName": "Steering gears, complete",
-      "componentSpareCode": "SP-403.001-1274",
+      "componentSpareCode": "SP-403.001-1273",
       "critical": "No",
       "rob": 5,
       "robLocationA": 2,
