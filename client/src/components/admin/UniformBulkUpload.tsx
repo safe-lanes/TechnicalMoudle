@@ -424,8 +424,9 @@ export default function UniformBulkUpload({
 
   const getValidRowsCount = () => {
     if (!dryRunResult) return 0;
-    // Use summary for accurate count from all rows, not just displayed rows
-    return dryRunResult.summary.ok + dryRunResult.summary.warnings;
+    // summary.ok already includes rows with warnings (they're importable)
+    // Don't add summary.warnings again - that would double-count
+    return dryRunResult.summary.ok;
   };
 
   const getFilteredRows = () => {
@@ -947,7 +948,7 @@ export default function UniformBulkUpload({
                       className="w-full bg-sky-600 hover:bg-sky-700"
                       data-testid="button-import"
                     >
-                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok + dryRunResult.summary.warnings} Records`}
+                      {isImporting ? 'Importing...' : `Import ${dryRunResult.summary.ok} Records`}
                     </Button>
                   ) : (
                     <div className="flex gap-3">
