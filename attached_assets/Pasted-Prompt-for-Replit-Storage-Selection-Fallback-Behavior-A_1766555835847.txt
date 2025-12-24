@@ -1,0 +1,78 @@
+Prompt for Replit — Storage Selection & Fallback Behavior Analysis (DO NOT FIX YET)
+Context
+I am facing issues while testing on Replit related to storage selection.
+Expected behavior (already agreed earlier):
+If DATABASE_URL exists → use PostgreSQL only
+If DATABASE_URL does NOT exist → use file-based storage (test-data.json)
+Local setup works correctly with PostgreSQL
+Replit environment may or may not inject DATABASE_URL, so fallback is required only on Replit
+However, the current behavior does not match this expectation.
+🔍 Observed Problem
+On Replit:
+The application automatically attempts to initialize PostgreSQL
+It tries to validate or connect to the database even when:
+DATABASE_URL is missing
+Secrets are not injected
+No DB connection is possible
+Instead of falling back to test-data.json, it:
+Errors out
+Blocks UI testing
+Does not read/write data from file storage (e.g. spares, sparesHistory)
+This makes it impossible to test flows on Replit without a working DB connection.
+🧠 What I Want You to Analyze (Questions You Must Answer)
+1️⃣ Storage Selection Logic
+Where exactly in the codebase is the decision made to:
+Use PostgreSQL
+OR use file-based storage
+Is this decision based on:
+DATABASE_URL presence?
+A hard-coded flag?
+A build-time assumption?
+A Replit-specific behavior?
+Please point to the exact file(s) and logic responsible.
+2️⃣ Why PostgreSQL Is Forced on Replit
+Explain why the app currently:
+Attempts to connect to PostgreSQL even when DATABASE_URL is missing
+Does NOT gracefully fall back to test-data.json
+Specifically:
+Is there any code that:
+Assumes DB must exist on Replit?
+Tries to auto-provision or auto-detect DB?
+Fails fast instead of falling back?
+3️⃣ File-Based Storage Availability
+Confirm clearly:
+Does test-data.json still contain valid structures for:
+spares
+sparesHistory
+other required entities
+Are there any parts of the code that:
+No longer read from file storage at all
+Or partially read but never write back
+4️⃣ Environment-Aware Behavior (Critical)
+Answer YES / NO with explanation:
+Is there a clean, runtime-safe way for the app to behave like this?
+If YES:
+Why is it not working correctly on Replit right now?
+If NO:
+What assumption in the code prevents this fallback?
+📄 Output Required
+Produce a Markdown document containing:
+Current storage-selection flow (step-by-step)
+Why Replit forces DB checks today
+Why file-based fallback is not activating
+Whether this is:
+Intentional
+Accidental
+A regression from earlier behavior
+A clear recommendation:
+Whether fallback is safe to re-enable
+Or whether something must change in logic
+⛔ Important Rules
+❌ Do NOT fix anything yet
+❌ Do NOT change storage logic
+❌ Do NOT remove PostgreSQL
+❌ Do NOT generate code
+✅ Analysis and explanation only
+After this report, STOP and wait for my instruction.
+I will explicitly say when to:
+“Enable file-based fallback when DATABASE_URL is missing.”
