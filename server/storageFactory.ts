@@ -6,9 +6,10 @@ import { resolvePostgres } from './postgresClient';
 /**
  * STORAGE FACTORY WITH DUAL-MODE SUPPORT
  * 
- * Storage selection is based on DATABASE_URL environment variable:
- * - DATABASE_URL present → PostgreSQL storage (production mode)
- * - DATABASE_URL absent → File-based storage (preview/development mode)
+ * Storage selection priority:
+ * 1. USE_FILE_STORAGE=true → Force file-based storage (override)
+ * 2. DATABASE_URL present → PostgreSQL storage (production mode)
+ * 3. DATABASE_URL absent → File-based storage (preview/development mode)
  * 
  * This allows the application to run in Replit Preview without
  * database credentials while still supporting full PostgreSQL
@@ -20,10 +21,17 @@ let storageInstance: IStorage | null = null;
 let currentStorageMode: 'postgres' | 'file' = 'file';
 
 /**
- * Check if PostgreSQL is available (DATABASE_URL is set)
+ * Check if file-based storage is forced via environment variable
+ */
+export function isFileStorageForced(): boolean {
+  return process.env.USE_FILE_STORAGE === 'true';
+}
+
+/**
+ * Check if PostgreSQL is available (DATABASE_URL is set and not forced to file storage)
  */
 export function isPostgresAvailable(): boolean {
-  return !!process.env.DATABASE_URL;
+  return !!process.env.DATABASE_URL && !isFileStorageForced();
 }
 
 /**
@@ -44,6 +52,19 @@ export async function initializeStorage(): Promise<IStorage> {
   }
 
   console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
+  
+  // Check if file-based storage is forced via USE_FILE_STORAGE=true
+  if (isFileStorageForced()) {
+    console.log('[StorageFactory] USE_FILE_STORAGE=true - forcing file-based storage');
+    console.log('[StorageFactory] ✓ Using file-based storage (test-data.json)');
+    console.log('[StorageFactory] ⚠ Data changes in this mode are for preview only');
+    console.log('[StorageFactory] ═══════════════════════════════════════════════════════');
+    
+    storageInstance = memStorage as unknown as IStorage;
+    storageInitialized = true;
+    currentStorageMode = 'file';
+    return storageInstance;
+  }
   
   // Check if DATABASE_URL is available
   if (process.env.DATABASE_URL) {
