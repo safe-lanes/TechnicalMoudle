@@ -32,7 +32,7 @@ function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined
 export class JobDueScannerService {
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
-  private scanIntervalMs = 60 * 60 * 1000; // 1 hour
+  private scanIntervalMs = 1 * 60 * 1000; // 1 minute
 
   /**
    * Start the scheduler to run periodically
