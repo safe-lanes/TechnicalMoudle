@@ -3888,14 +3888,20 @@ export class PostgresStorage {
             eq(components.rhCounterType, 'INHERITED')
           ));
         
+        // Calculate the delta from master's change
+        const delta = newRH - currentRH;
+        
         for (const inherited of inheritedComponents) {
-          const inheritedPreviousRH = parseFloat(inherited.rhCurrentInheritedCached || '0');
+          // Get inherited component's current individual RH
+          const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+          // Apply delta to their individual running hours (they maintain their own offset)
+          const newInheritedRH = inheritedCurrentRH + delta;
           
           await db.update(components)
             .set({
-              rhCurrentInheritedCached: newRH.toString(),
+              rhCurrentInheritedCached: newRH.toString(), // Cache master's absolute value for reference
               rhInheritedUpdatedAt: now,
-              currentCumulativeRH: newRH.toString(),
+              currentCumulativeRH: newInheritedRH.toString(), // Their individual RH + delta
               lastUpdated: dateUpdated,
               updatedAt: now
             })
@@ -3905,15 +3911,15 @@ export class PostgresStorage {
           await db.insert(runningHoursAudit).values({
             vesselId: inherited.vesselId || 'unknown',
             componentId: inherited.id,
-            previousRH: inheritedPreviousRH.toString(),
-            newRH: newRH.toString(),
-            cumulativeRH: newRH.toString(),
+            previousRH: inheritedCurrentRH.toString(),
+            newRH: newInheritedRH.toString(),
+            cumulativeRH: newInheritedRH.toString(),
             dateUpdatedLocal: dateUpdated,
             dateUpdatedTZ: 'UTC',
             enteredAtUTC: now,
             userId: 'system',
             source: 'inherited_cascade',
-            comments: `Inherited from MASTER ${parent.componentCode || parent.name}`,
+            comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
           });
           
           updatedComponents++;
@@ -3922,11 +3928,13 @@ export class PostgresStorage {
       }
     }
     
+    // Calculate delta for structural children 
+    const structuralDelta = mode === 'addDelta' ? value : (newRH - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
+    
     // Update all structural children (by parentId hierarchy)
     for (const child of children) {
       const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
-      const delta = mode === 'addDelta' ? value : (value - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
-      const childNewRH = childCurrentRH + delta;
+      const childNewRH = childCurrentRH + structuralDelta;
       
       const childUpdateData: any = { 
         currentCumulativeRH: childNewRH.toString(),
@@ -3940,7 +3948,7 @@ export class PostgresStorage {
         childUpdateData.rhMasterUpdatedAt = now;
       }
       
-      // If child is INHERITED and its master was updated, sync its rhCurrentInheritedCached
+      // If child is INHERITED and its master was updated, cache master's absolute value
       if (child.rhCounterType === 'INHERITED' && child.rhMasterComponentId === parentComponentId) {
         childUpdateData.rhCurrentInheritedCached = newRH.toString();
         childUpdateData.rhInheritedUpdatedAt = now;
