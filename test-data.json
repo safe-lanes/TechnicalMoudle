@@ -8116,17 +8116,19 @@
       "parentComponent": "554",
       "notes": "Technical Information\r\n===================\r\nMfg Model: URS-3.7SSSD4\r\nRating: 2.6kW\r\nCooling Capacity: 2.6kW\r\nDimesnion: 413x1410x960\r\nOil Seperator: M301404",
       "runningHours": null,
-      "currentCumulativeRH": "0",
+      "currentCumulativeRH": "2000",
       "rhCounterType": "MASTER",
       "rhCounterSource": "SELF",
-      "rhCurrentMaster": null,
-      "rhMasterUpdatedAt": "2025-12-26T05:24:15.476Z",
-      "rhMasterUpdateSource": "IMPORT",
+      "rhCurrentMaster": "2000",
+      "rhMasterUpdatedAt": "2025-12-26T11:45:29.061Z",
+      "rhMasterUpdateSource": "MANUAL",
       "rhMasterComponentId": null,
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
-      "lastUpdated": null,
-      "id": "554.001"
+      "lastUpdated": "Invalid Date Invalid Date",
+      "id": "554.001",
+      "rhMasterUpdatedBy": "admin",
+      "updatedAt": "2025-12-26T11:45:29.061Z"
     },
     "601.001": {
       "componentCode": "601.001",
@@ -21229,6 +21231,19 @@
       "meterReplaced": false,
       "userId": "admin",
       "createdAt": "2025-12-26T11:20:45.510Z"
+    },
+    {
+      "id": 67,
+      "componentId": "554.001",
+      "previousValue": "0",
+      "newValue": "2000",
+      "delta": "2000",
+      "mode": "setTotal",
+      "dateUpdated": "Invalid Date Invalid Date",
+      "comments": "",
+      "meterReplaced": false,
+      "userId": "admin",
+      "createdAt": "2025-12-26T11:45:29.061Z"
     }
   ],
   "spares": {
@@ -76203,8 +76218,8 @@
       "componentName": "Emergency generator aggregates, complete",
       "componentSpareCode": "SP-665.001-001",
       "critical": "No",
-      "rob": 5,
-      "robLocationA": 2,
+      "rob": 13,
+      "robLocationA": 10,
       "robLocationB": 3,
       "min": 4,
       "location": "AAA-BBB-CCC",
@@ -122729,7 +122744,7 @@
       "jobTitle": "Purifier Gear Pump Bush, Renewal/Replace - 2Y",
       "assignedTo": "3rd Engineer",
       "dueDate": "18-Dec-2025",
-      "status": "Pending Approval",
+      "status": "Completed",
       "taskType": "Service",
       "maintenanceBasis": "Calendar",
       "frequencyValue": "2",
@@ -122803,8 +122818,9 @@
       "runningHoursDifference": "",
       "readingDate": "",
       "remarks": "",
-      "dateCompleted": "",
-      "completionRemarks": ""
+      "dateCompleted": "2025-12-26T11:54:36.936Z",
+      "completionRemarks": "",
+      "approvalAction": "approved"
     },
     "21": {
       "vesselId": "V015",
@@ -123911,6 +123927,39 @@
       "remarks": "",
       "dateCompleted": "",
       "completionRemarks": ""
+    },
+    "46": {
+      "vesselId": "V015",
+      "component": "DO separator booster pumps No.01",
+      "componentCode": "702.010.01",
+      "jobId": 35,
+      "workOrderNo": "MKR-SE-00010-702.010.01-2025-002",
+      "templateCode": "MKR-SE-00010-702.010.01-2025-002",
+      "jobTitle": "Purifier Gear Pump Bush, Renewal/Replace - 2Y",
+      "assignedTo": "3rd Engineer",
+      "dueDate": "18-Dec-2025",
+      "status": "Due",
+      "taskType": "Service",
+      "maintenanceBasis": "Calendar",
+      "frequencyValue": "2",
+      "frequencyUnit": "Years",
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 8M-3 INSTRUCTION MANAUL FOR PURIFIER;5303.pdf\r\nPdf Page No: 61\r\nChapter: 3. Maintenance Inspection Procedures\r\nSection: 3.4 Expendable parts replacement intervals\r\n\r\nDESCRIPTION\r\n===========\r\n1. Replace the following part of Gear pump:\r\n - Bush.",
+      "department": "Engine",
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": {
+        "ppeRequirements": [],
+        "permitRequirements": [],
+        "otherRequirements": []
+      },
+      "driverType": "CALENDAR",
+      "cycleDueDateSnapshot": "2025-12-18",
+      "generateDateSnapshot": "2025-12-04",
+      "dueDateSnapshot": "2025-12-18",
+      "lastDoneDateSnapshot": "18-Dec-2023",
+      "id": 46
     }
   },
   "workOrderExecutions": [],
