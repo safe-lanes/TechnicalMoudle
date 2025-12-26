@@ -2453,9 +2453,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work order not found" });
       }
       
-      const component = await storage.getComponent(workOrder.component);
+      // Try multiple methods to find the component:
+      // 1. By ID (workOrder.component might be an ID for some work orders)
+      // 2. By component code + vessel (most reliable for auto-generated WOs)
+      // 3. By component name + vessel (fallback for legacy WOs)
+      let component = await storage.getComponent(workOrder.component);
+      
+      if (!component && workOrder.componentCode && workOrder.vesselId) {
+        // Try lookup by component code
+        component = await storage.getComponentByCode(workOrder.componentCode, workOrder.vesselId);
+        if (component) {
+          console.log(`📋 Found component by code ${workOrder.componentCode} for vessel ${workOrder.vesselId}`);
+        }
+      }
+      
+      if (!component && workOrder.vesselId) {
+        // Fallback: Search by component name
+        const vesselComponents = await storage.getComponents(workOrder.vesselId);
+        component = vesselComponents.find(c => 
+          c.name === workOrder.component || 
+          c.componentCode === workOrder.componentCode
+        );
+        if (component) {
+          console.log(`📋 Found component by name/code match: ${component.name}`);
+        }
+      }
+      
       if (!component) {
-        return res.status(404).json({ error: "Component not found" });
+        return res.status(404).json({ error: `Component not found: ${workOrder.component} (code: ${workOrder.componentCode})` });
       }
       
       // Rule #19: Multi-Department Approver Validation
@@ -2589,8 +2614,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         // Use schema validation for type safety and defaults
+        // FIX: Use component.id (actual UUID) not workOrder.component (which is the component NAME)
         const historyPayload = {
-          componentId: workOrder.component,
+          componentId: component.id,
           componentCode: workOrder.componentCode || component.componentCode,
           vesselCode: workOrder.vesselId,
           workOrderId: workOrder.id,
@@ -2610,7 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         await storage.createComponentMaintenanceHistory(historyPayload);
-        console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id}`);
+        console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id})`);
       } catch (historyError) {
         console.error('Failed to create maintenance history record:', historyError);
         // Don't fail the work order completion if history creation fails
@@ -2618,58 +2644,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Auto-update parent job's cycle fields (Calendar: lastDoneDate/nextDueDate, RH: lastDoneRH/nextDueRH)
       // Use work order's maintenanceBasis (not job's) since jobs don't have this field
-      if (workOrder.jobId) {
-        try {
-          const job = await storage.getJob(workOrder.jobId);
+      try {
+        let job = null;
+        
+        // First try direct lookup by jobId
+        if (workOrder.jobId) {
+          job = await storage.getJob(workOrder.jobId);
+        }
+        
+        // Fallback: Extract jobNo from work order number and find job by jobNo
+        // Work order formats: MKR-SE-00010-702.010.01-2025-001 or MKR-SE-00010-2025-001
+        if (!job && workOrder.workOrderNo) {
+          const woNumber = workOrder.workOrderNo;
+          // Try to extract jobNo from various WO number formats
+          // NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+          // OLD format: <JOB_NO>-<YYYY>-<RUNNING>
+          let extractedJobNo: string | null = null;
           
-          if (job) {
-            const updates: any = {};
-            
-            // Calendar-based job cycle update
-            if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
-              const { calculateNextDueDate } = await import('@shared/dateUtils');
-              updates.lastDoneDate = dateOfCompletion;
-              
-              // Recalculate nextDueDate based on lastDoneDate + interval
-              if (job.frequencyValue && job.frequencyUnit) {
-                const nextDue = calculateNextDueDate(
-                  dateOfCompletion,
-                  job.frequencyValue,
-                  job.frequencyUnit
-                );
-                
-                if (nextDue) {
-                  updates.nextDueDate = nextDue;
-                  console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
-                }
-              }
-              
-              await storage.updateJob(job.id, updates);
-              console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+          // Try NEW format first: has component code with dots before the year
+          const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+          if (newFormatMatch) {
+            extractedJobNo = newFormatMatch[1];
+          }
+          
+          // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
+          if (!extractedJobNo) {
+            const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
+            if (oldFormatMatch) {
+              extractedJobNo = oldFormatMatch[1];
             }
-            
-            // Running Hours-based job cycle update
-            if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
-              const currentRH = parseInt(runningHours);
-              if (!isNaN(currentRH)) {
-                updates.lastDoneRH = currentRH;
-                
-                // Recalculate nextDueRH based on lastDoneRH + interval
-                if (job.frequencyValue) {
-                  const nextDueRH = currentRH + parseInt(job.frequencyValue);
-                  updates.nextDueRH = nextDueRH;
-                  console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${job.frequencyValue} hours)`);
-                }
-                
-                await storage.updateJob(job.id, updates);
-                console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
+          }
+          
+          if (extractedJobNo) {
+            // Search for job by jobNo in the vessel
+            const vesselId = workOrder.vesselId || component.vesselId;
+            if (vesselId) {
+              const jobs = await storage.getJobs(vesselId);
+              job = jobs.find(j => j.jobNo === extractedJobNo);
+              if (job) {
+                console.log(`📋 Found job ${job.jobNo} via work order number extraction (jobId was not linked)`);
               }
             }
           }
-        } catch (jobUpdateError) {
-          console.error('Failed to update job cycle fields:', jobUpdateError);
-          // Don't fail the work order completion if job update fails
         }
+        
+        if (job) {
+          const updates: any = {};
+          
+          // Calendar-based job cycle update
+          if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
+            const { calculateNextDueDate } = await import('@shared/dateUtils');
+            updates.lastDoneDate = dateOfCompletion;
+            
+            // Recalculate nextDueDate based on lastDoneDate + interval
+            if (job.frequencyValue && job.frequencyUnit) {
+              const nextDue = calculateNextDueDate(
+                dateOfCompletion,
+                job.frequencyValue,
+                job.frequencyUnit
+              );
+              
+              if (nextDue) {
+                updates.nextDueDate = nextDue;
+                console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
+              }
+            }
+            
+            await storage.updateJob(job.id, updates);
+            console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
+          }
+          
+          // Running Hours-based job cycle update
+          if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
+            const currentRH = parseInt(runningHours);
+            if (!isNaN(currentRH)) {
+              updates.lastDoneRH = currentRH;
+              
+              // Recalculate nextDueRH based on lastDoneRH + interval
+              // Use intervalRunningHour first (dedicated RH field), fallback to frequencyValue
+              const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+              if (rhInterval && !isNaN(rhInterval)) {
+                const nextDueRH = currentRH + rhInterval;
+                updates.nextDueRH = nextDueRH;
+                console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${rhInterval} hours)`);
+              }
+              
+              await storage.updateJob(job.id, updates);
+              console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
+            }
+          }
+        } else {
+          console.warn(`⚠️ Could not find job to update for work order ${workOrder.workOrderNo}`);
+        }
+      } catch (jobUpdateError) {
+        console.error('Failed to update job cycle fields:', jobUpdateError);
+        // Don't fail the work order completion if job update fails
       }
       
       // Auto-deduct consumed spares from inventory and create transaction records
