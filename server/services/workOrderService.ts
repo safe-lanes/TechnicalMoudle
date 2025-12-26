@@ -1,6 +1,6 @@
 import { storage } from "../storage";
-import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings } from "@shared/schema";
-import { computeWorkOrderStatus } from "@shared/workOrders/status";
+import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings, Component } from "@shared/schema";
+import { computeWorkOrderStatus, VesselGraceSettings } from "@shared/workOrders/status";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
@@ -43,23 +43,91 @@ function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined
 export class WorkOrderService {
   /**
    * Get all work orders with optional vessel filter and computed status
+   * Fetches component running hours for RH-based work orders and vessel grace settings
    */
   async getWorkOrders(vesselId?: string): Promise<WorkOrder[]> {
     const workOrders = await storage.getWorkOrders(vesselId);
     
+    // Get unique job IDs from RH-based work orders to fetch component data
+    const rhWorkOrders = workOrders.filter(wo => wo.maintenanceBasis === 'Running Hours' && wo.jobId);
+    const jobIds = Array.from(new Set(rhWorkOrders.map(wo => wo.jobId).filter((id): id is string => id !== null)));
+    
+    // Fetch jobs to get component IDs
+    const jobsMap = new Map<string, Job>();
+    for (const jobId of jobIds) {
+      const job = await storage.getJob(jobId);
+      if (job) {
+        jobsMap.set(jobId, job);
+      }
+    }
+    
+    // Get unique component IDs from those jobs
+    const componentIds = Array.from(new Set(
+      Array.from(jobsMap.values())
+        .map(job => job.componentId)
+        .filter((id): id is string => id !== null && id !== undefined)
+    ));
+    
+    // Fetch component data to get current running hours
+    const componentsMap = new Map<string, Component>();
+    for (const componentId of componentIds) {
+      const component = await storage.getComponent(componentId);
+      if (component) {
+        componentsMap.set(componentId, component);
+      }
+    }
+    
+    // Fetch vessel grace settings for proper status calculation
+    const vesselIds = Array.from(new Set(workOrders.map(wo => wo.vesselId).filter((id): id is string => id !== null)));
+    const graceSettingsMap = new Map<string, VesselGraceSettings>();
+    for (const vId of vesselIds) {
+      const settings = await storage.getPmsVesselSettings(vId);
+      if (settings) {
+        graceSettingsMap.set(vId, {
+          calendarGraceMode: settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS' || 'COMPANY_STANDARD',
+          calendarGraceDays: settings.calendarGraceDays || 7,
+          rhGraceHours: settings.rhGraceHours || 168
+        });
+      }
+    }
+    
     // Augment each work order with computed status
-    return workOrders.map(wo => ({
-      ...wo,
-      computedStatus: computeWorkOrderStatus({
-        dueDate: wo.dueDate,
-        dueRH: (wo as any).dueRH || null,
-        currentRH: null, // Will need component data for RH status - enhance in future
-        isExecution: wo.isExecution,
-        status: wo.status,
-        completionDateTime: wo.dateCompleted,
-        maintenanceBasis: wo.maintenanceBasis || undefined
-      })
-    }));
+    return workOrders.map(wo => {
+      let currentRH: number | null = null;
+      let dueRH: number | null = null;
+      
+      // For RH-based work orders, get the current running hours from the component
+      if (wo.maintenanceBasis === 'Running Hours' && wo.jobId) {
+        const job = jobsMap.get(wo.jobId);
+        if (job?.componentId) {
+          const component = componentsMap.get(job.componentId);
+          if (component?.currentCumulativeRH) {
+            currentRH = parseFloat(String(component.currentCumulativeRH));
+          }
+        }
+        // Get the due RH from nextDueReading
+        if (wo.nextDueReading) {
+          dueRH = parseFloat(wo.nextDueReading);
+        }
+      }
+      
+      // Get vessel grace settings
+      const vesselGraceSettings = wo.vesselId ? graceSettingsMap.get(wo.vesselId) : undefined;
+      
+      return {
+        ...wo,
+        computedStatus: computeWorkOrderStatus({
+          dueDate: wo.dueDate,
+          dueRH,
+          currentRH,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.dateCompleted,
+          maintenanceBasis: wo.maintenanceBasis || undefined,
+          vesselGraceSettings
+        })
+      };
+    });
   }
 
   /**

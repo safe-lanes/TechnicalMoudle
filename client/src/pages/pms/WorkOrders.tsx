@@ -495,7 +495,7 @@ const WorkOrders: React.FC = () => {
                 className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                 onClick={() => handleWorkOrderClick(workOrder)}
               >
-                <td className="py-3 px-4 text-gray-900">{workOrder.componentName || workOrder.component}</td>
+                <td className="py-3 px-4 text-gray-900">{workOrder.component}</td>
                 <td className="py-3 px-4 text-blue-600 hover:text-blue-800">
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
