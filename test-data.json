@@ -18597,17 +18597,19 @@
       "parentComponent": "601",
       "notes": null,
       "runningHours": null,
-      "currentCumulativeRH": "0",
+      "currentCumulativeRH": "500",
       "rhCounterType": "MASTER",
       "rhCounterSource": null,
-      "rhCurrentMaster": null,
-      "rhMasterUpdatedAt": "2025-12-26T05:24:16.223Z",
-      "rhMasterUpdateSource": "IMPORT",
+      "rhCurrentMaster": "500",
+      "rhMasterUpdatedAt": "2025-12-26T08:43:30.820Z",
+      "rhMasterUpdateSource": "MANUAL",
       "rhMasterComponentId": null,
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
-      "lastUpdated": null,
-      "id": "V015-601.001"
+      "lastUpdated": "20 Dec 2025 05:30",
+      "id": "V015-601.001",
+      "rhMasterUpdatedBy": "admin",
+      "updatedAt": "2025-12-26T08:43:30.820Z"
     },
     "V015-601.016": {
       "componentCode": "601.016",
@@ -20926,6 +20928,19 @@
       "meterReplaced": false,
       "userId": "admin",
       "createdAt": "2025-12-26T07:06:19.986Z"
+    },
+    {
+      "id": 54,
+      "componentId": "V015-601.001",
+      "previousValue": "0",
+      "newValue": "500",
+      "delta": "500",
+      "mode": "setTotal",
+      "dateUpdated": "20 Dec 2025 05:30",
+      "comments": "",
+      "meterReplaced": false,
+      "userId": "admin",
+      "createdAt": "2025-12-26T08:43:30.820Z"
     }
   ],
   "spares": {
