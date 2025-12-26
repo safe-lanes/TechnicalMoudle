@@ -3824,8 +3824,9 @@ export class PostgresStorage {
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
     const { parentComponentId, mode, value, dateUpdated, comments } = params;
+    const now = new Date();
     
-    // Get all child components
+    // Get all child components (by parentId - structural hierarchy)
     const children = await db.select().from(components)
       .where(eq(components.parentId, parentComponentId));
     
@@ -3836,17 +3837,29 @@ export class PostgresStorage {
     
     let updatedComponents = 0;
     let auditsCreated = 0;
+    let newRH = 0;
     
     if (parentResult.length > 0) {
       const parent = parentResult[0];
-      const currentRH = parseFloat(parent.currentCumulativeRH || '0');
-      const newRH = mode === 'addDelta' ? currentRH + value : value;
+      const currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
+      newRH = mode === 'addDelta' ? currentRH + value : value;
+      
+      // Build update object - always update currentCumulativeRH
+      const updateData: any = { 
+        currentCumulativeRH: newRH.toString(),
+        lastUpdated: dateUpdated,
+        updatedAt: now
+      };
+      
+      // If this component is a MASTER type, also update rhCurrentMaster
+      if (parent.rhCounterType === 'MASTER') {
+        updateData.rhCurrentMaster = newRH.toString();
+        updateData.rhMasterUpdatedAt = now;
+        updateData.rhMasterUpdateSource = 'MANUAL';
+      }
       
       await db.update(components)
-        .set({ 
-          currentCumulativeRH: newRH.toString(),
-          lastUpdated: dateUpdated
-        })
+        .set(updateData)
         .where(eq(components.id, parentComponentId));
       
       // Log audit for parent
@@ -3858,7 +3871,7 @@ export class PostgresStorage {
         cumulativeRH: newRH.toString(),
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
-        enteredAtUTC: new Date(),
+        enteredAtUTC: now,
         userId: 'system',
         source: 'cascade',
         comments: comments,
@@ -3866,19 +3879,75 @@ export class PostgresStorage {
       
       updatedComponents++;
       auditsCreated++;
+      
+      // If parent is MASTER, also update all INHERITED components that reference this master
+      if (parent.rhCounterType === 'MASTER') {
+        const inheritedComponents = await db.select().from(components)
+          .where(and(
+            eq(components.rhMasterComponentId, parentComponentId),
+            eq(components.rhCounterType, 'INHERITED')
+          ));
+        
+        for (const inherited of inheritedComponents) {
+          const inheritedPreviousRH = parseFloat(inherited.rhCurrentInheritedCached || '0');
+          
+          await db.update(components)
+            .set({
+              rhCurrentInheritedCached: newRH.toString(),
+              rhInheritedUpdatedAt: now,
+              currentCumulativeRH: newRH.toString(),
+              lastUpdated: dateUpdated,
+              updatedAt: now
+            })
+            .where(eq(components.id, inherited.id));
+          
+          // Log audit for inherited component
+          await db.insert(runningHoursAudit).values({
+            vesselId: inherited.vesselId || 'unknown',
+            componentId: inherited.id,
+            previousRH: inheritedPreviousRH.toString(),
+            newRH: newRH.toString(),
+            cumulativeRH: newRH.toString(),
+            dateUpdatedLocal: dateUpdated,
+            dateUpdatedTZ: 'UTC',
+            enteredAtUTC: now,
+            userId: 'system',
+            source: 'inherited_cascade',
+            comments: `Inherited from MASTER ${parent.componentCode || parent.name}`,
+          });
+          
+          updatedComponents++;
+          auditsCreated++;
+        }
+      }
     }
     
-    // Update all children
+    // Update all structural children (by parentId hierarchy)
     for (const child of children) {
       const childCurrentRH = parseFloat(child.currentCumulativeRH || '0');
       const delta = mode === 'addDelta' ? value : (value - parseFloat(parentResult[0]?.currentCumulativeRH || '0'));
       const childNewRH = childCurrentRH + delta;
       
+      const childUpdateData: any = { 
+        currentCumulativeRH: childNewRH.toString(),
+        lastUpdated: dateUpdated,
+        updatedAt: now
+      };
+      
+      // If child is also MASTER type, update its rhCurrentMaster too
+      if (child.rhCounterType === 'MASTER') {
+        childUpdateData.rhCurrentMaster = childNewRH.toString();
+        childUpdateData.rhMasterUpdatedAt = now;
+      }
+      
+      // If child is INHERITED and its master was updated, sync its rhCurrentInheritedCached
+      if (child.rhCounterType === 'INHERITED' && child.rhMasterComponentId === parentComponentId) {
+        childUpdateData.rhCurrentInheritedCached = newRH.toString();
+        childUpdateData.rhInheritedUpdatedAt = now;
+      }
+      
       await db.update(components)
-        .set({ 
-          currentCumulativeRH: childNewRH.toString(),
-          lastUpdated: dateUpdated
-        })
+        .set(childUpdateData)
         .where(eq(components.id, child.id));
       
       // Log audit for child
@@ -3890,7 +3959,7 @@ export class PostgresStorage {
         cumulativeRH: childNewRH.toString(),
         dateUpdatedLocal: dateUpdated,
         dateUpdatedTZ: 'UTC',
-        enteredAtUTC: new Date(),
+        enteredAtUTC: now,
         userId: 'system',
         source: 'cascade',
         comments: comments,
