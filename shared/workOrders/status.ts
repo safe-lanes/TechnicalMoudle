@@ -100,10 +100,12 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   const { dueDate, dueRH, currentRH, isExecution, status, completionDateTime, maintenanceBasis, vesselGraceSettings } = input;
   
   // Execution records use their stored status
+  // IMPORTANT: Check Pending Approval BEFORE completionDateTime
+  // Workflow: User fills Part B (sets completionDateTime) → Pending Approval → Approver approves → Completed
   if (isExecution) {
-    if (status === 'Approved' || completionDateTime) return 'Completed';
     if (status === 'Pending Approval') return 'Pending Approval';
     if (status === 'Rejected') return 'Rejected';
+    if (status === 'Approved' || completionDateTime) return 'Completed';
     return 'Active';
   }
   

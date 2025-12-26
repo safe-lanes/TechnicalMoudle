@@ -2411,6 +2411,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
+      // SAFEGUARD: If completion data is provided without explicit status,
+      // automatically set status to 'Pending Approval' to enforce approval workflow
+      const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
+      const hasExplicitStatus = updateData.status !== undefined;
+      
+      if (hasCompletionData && !hasExplicitStatus) {
+        // Get current work order to check current status
+        const currentWorkOrder = await storage.getWorkOrder(req.params.id);
+        if (currentWorkOrder && currentWorkOrder.status !== 'Approved' && currentWorkOrder.status !== 'Completed') {
+          updateData.status = 'Pending Approval';
+          console.log('📝 Auto-setting status to Pending Approval (completion data provided without explicit status)');
+        }
+      }
+      
       console.log('📝 Cleaned update data keys:', Object.keys(updateData));
       
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
