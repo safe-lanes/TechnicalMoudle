@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -72,6 +72,10 @@ const WorkOrders: React.FC = () => {
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   // Modify mode integration  
   const { isModifyMode, targetId, fieldChanges } = useModifyMode();
@@ -218,6 +222,41 @@ const WorkOrders: React.FC = () => {
     
     return true;
   });
+
+  // Pagination calculations
+  const totalItems = filteredWorkOrders.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedComponent, selectedCriticality, vesselId]);
+  
+  // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+  
+  // Get paginated work orders
+  const paginatedWorkOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredWorkOrders.slice(startIndex, endIndex);
+  }, [filteredWorkOrders, currentPage, itemsPerPage]);
+  
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+  
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
+  };
 
   const handlePostponeClick = (workOrder: WorkOrder) => {
     setSelectedWorkOrder(workOrder);
@@ -450,7 +489,7 @@ const WorkOrders: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredWorkOrders.map((workOrder, index) => (
+            {paginatedWorkOrders.map((workOrder, index) => (
               <tr 
                 key={workOrder.id} 
                 className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
@@ -557,9 +596,91 @@ const WorkOrders: React.FC = () => {
           </table>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-        Page 0 of 0
+      {/* Pagination Footer */}
+      <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between" data-testid="pagination-footer">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <span>Show</span>
+          <Select value={String(itemsPerPage)} onValueChange={handleItemsPerPageChange}>
+            <SelectTrigger className="w-20 h-8" data-testid="select-items-per-page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+          <span>items per page</span>
+        </div>
+        
+        <div className="flex items-center gap-2 text-sm text-gray-600" data-testid="pagination-info">
+          <span>
+            Showing {totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} work orders
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 p-0"
+            data-testid="button-first-page"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 p-0"
+            data-testid="button-prev-page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-1 px-2">
+            <span className="text-sm text-gray-600">Page</span>
+            <Input
+              type="number"
+              min={1}
+              max={totalPages || 1}
+              value={currentPage}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value)) goToPage(value);
+              }}
+              className="w-14 h-8 text-center"
+              data-testid="input-page-number"
+            />
+            <span className="text-sm text-gray-600">of {totalPages || 1}</span>
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            data-testid="button-next-page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(totalPages)}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            data-testid="button-last-page"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Postpone Work Order Dialog */}
