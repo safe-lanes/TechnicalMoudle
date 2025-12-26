@@ -499,7 +499,7 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4 text-blue-600 hover:text-blue-800">
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
-                    : workOrder.templateCode || workOrder.workOrderNo}
+                    : workOrder.workOrderNo || workOrder.templateCode}
                 </td>
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 text-gray-900">{workOrder.templateCode}</td>
