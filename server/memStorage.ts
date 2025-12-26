@@ -312,8 +312,27 @@ class MemStorage {
   }
 
   async getInheritedComponents(masterComponentId: string): Promise<any[]> {
+    // First get the master component to find its component code
+    let masterComponent = await this.getComponent(masterComponentId);
+    
+    // If not found by ID, try finding by component code
+    if (!masterComponent) {
+      const allComponents = toArray(this.data.components);
+      masterComponent = allComponents.find((c: any) => c.componentCode === masterComponentId);
+    }
+    
+    const masterComponentCode = masterComponent?.componentCode || masterComponentId;
+    const masterComponentFullId = masterComponent?.id || masterComponentId;
+    
+    // Match inherited components that reference:
+    // 1. The exact master component ID (e.g., "V015-601.001")
+    // 2. The master's component code (e.g., "601.001") - for legacy data compatibility
+    // 3. The original masterComponentId parameter (in case it's a code, not ID)
     return toArray(this.data.components).filter(
-      (c: any) => c.rhMasterComponentId === masterComponentId && c.rhCounterType === 'INHERITED'
+      (c: any) => c.rhCounterType === 'INHERITED' && 
+        (c.rhMasterComponentId === masterComponentFullId || 
+         c.rhMasterComponentId === masterComponentCode ||
+         c.rhMasterComponentId === masterComponentId)
     );
   }
 

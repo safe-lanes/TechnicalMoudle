@@ -864,10 +864,33 @@ export class PostgresStorage {
   // Get all INHERITED components linked to a specific MASTER
   async getInheritedComponents(masterComponentId: string): Promise<Component[]> {
     const db = await getDb();
+    
+    // First try to get the master component to find its component code
+    let masterComponent = await this.getComponent(masterComponentId);
+    
+    // If not found by ID, try finding by component code
+    if (!masterComponent) {
+      const byCode = await db.select().from(components)
+        .where(eq(components.componentCode, masterComponentId))
+        .limit(1);
+      masterComponent = byCode[0] || null;
+    }
+    
+    const masterComponentCode = masterComponent?.componentCode || masterComponentId;
+    const masterComponentFullId = masterComponent?.id || masterComponentId;
+    
+    // Match inherited components that reference:
+    // 1. The exact master component ID (e.g., "V015-601.001")
+    // 2. The master's component code (e.g., "601.001") - for legacy data compatibility
+    // 3. The original masterComponentId parameter (in case it's a code, not ID)
     return await db.select().from(components)
       .where(and(
-        eq(components.rhMasterComponentId, masterComponentId),
-        eq(components.rhCounterType, 'INHERITED')
+        eq(components.rhCounterType, 'INHERITED'),
+        or(
+          eq(components.rhMasterComponentId, masterComponentFullId),
+          eq(components.rhMasterComponentId, masterComponentCode),
+          eq(components.rhMasterComponentId, masterComponentId)
+        )
       ));
   }
 
