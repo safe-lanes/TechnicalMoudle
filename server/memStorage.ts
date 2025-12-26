@@ -543,6 +543,9 @@ class MemStorage {
       this.saveData();
     }
   }
+  async getWorkOrdersByJobId(jobId: string): Promise<any[]> {
+    return toArray(this.data.workOrders).filter((w: any) => w.jobId === jobId);
+  }
 
   // Spares methods
   async getSpares(vesselId: string): Promise<any[]> { 
