@@ -4530,10 +4530,10 @@ async function performImport(
         }
       };
       
-      // Auto-generate job number if not provided (format: JOB-XXXXXXX)
+      // Auto-generate job number if not provided (format: MKR-XX-NNNNN)
       if (!row['Job Code']) {
-        const { nanoid } = await import('nanoid');
-        jobData.jobNo = `JOB-${nanoid(7).toUpperCase()}`;
+        const { generateJobNumber } = await import('../utils/workOrderNumbering');
+        jobData.jobNo = await generateJobNumber(storage, jobData.taskType);
       } else {
         jobData.jobNo = String(row['Job Code']).trim();
       }

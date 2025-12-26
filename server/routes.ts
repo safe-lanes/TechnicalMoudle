@@ -626,10 +626,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Auto-generate job number if not provided (format: JOB-XXXXXXX)
+      // Auto-generate job number if not provided (format: MKR-XX-NNNNN)
       if (!jobData.jobNo) {
-        const { nanoid } = await import('nanoid');
-        const generatedJobNo = `JOB-${nanoid(7).toUpperCase()}`;
+        const { generateJobNumber } = await import('./utils/workOrderNumbering');
+        const taskType = (jobData as any).taskType;
+        const generatedJobNo = await generateJobNumber(storage, taskType);
         jobData = {
           ...jobData,
           jobNo: generatedJobNo

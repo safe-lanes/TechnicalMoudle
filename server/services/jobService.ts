@@ -39,17 +39,11 @@ export class JobService {
       }
     }
 
-    // Auto-generate job number if not provided
-    if (!jobData.jobNo && jobData.componentId) {
-      const component = await storage.getComponent(jobData.componentId);
-      if (!component) {
-        throw new Error(`Component ${jobData.componentId} not found`);
-      }
-      
-      // Generate job number: JOB-{componentCode}-{sequence}
-      const existingJobs = await this.getJobs(jobData.vesselId || undefined, jobData.componentId);
-      const sequence = String(existingJobs.length + 1).padStart(2, '0');
-      jobData.jobNo = `JOB-${component.componentCode}-${sequence}`;
+    // Auto-generate job number if not provided (format: MKR-XX-NNNNN)
+    if (!jobData.jobNo) {
+      const { generateJobNumber } = await import('../utils/workOrderNumbering');
+      const taskType = (jobData as any).taskType;
+      jobData.jobNo = await generateJobNumber(storage, taskType);
     }
 
     // Calculate nextDueDate for Calendar-based jobs

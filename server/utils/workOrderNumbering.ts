@@ -117,3 +117,71 @@ function escapeRegex(str: string): string {
 export function determineWorkOrderType(jobId?: string | null, templateCode?: string | null): 'Planned' | 'Unplanned' {
   return (jobId || templateCode) ? 'Planned' : 'Unplanned';
 }
+
+/**
+ * Task type codes for job number generation
+ * Format: MKR-<TYPE>-<5DIGIT>
+ */
+const TASK_TYPE_CODES: Record<string, string> = {
+  'Inspection': 'IN',
+  'Service': 'SE',
+  'Overhaul': 'OV',
+  'Calibration': 'CA',
+  'Test': 'TE',
+  'Replacement': 'RE',
+  'Cleaning': 'CL',
+  'Lubrication': 'LU',
+  'General': 'GN'
+};
+
+/**
+ * Generate next job number following the MKR-XX-NNNNN convention
+ * Format: MKR-<TYPE_CODE>-<5DIGIT_SEQUENCE>
+ * Example: MKR-IN-00001, MKR-SE-00002
+ * 
+ * @param storage - Storage interface to query existing jobs
+ * @param taskType - Task type (Inspection, Service, Overhaul, etc.)
+ * @returns Generated job number in MKR format
+ */
+export async function generateJobNumber(
+  storage: IStorage,
+  taskType?: string
+): Promise<string> {
+  // Get the type code, default to 'IN' (Inspection) if not specified
+  const typeCode = taskType && TASK_TYPE_CODES[taskType] 
+    ? TASK_TYPE_CODES[taskType] 
+    : 'IN';
+  
+  // Find all existing jobs to get the max sequence number
+  const allJobs = await storage.getJobs();
+  
+  // Extract sequence numbers from existing MKR-XX-NNNNN formatted job numbers
+  let maxSequence = 0;
+  allJobs.forEach(job => {
+    if (job.jobNo) {
+      // Match MKR-XX-NNNNN format (where XX is 2 letter code, NNNNN is 5 digits)
+      const match = job.jobNo.match(/^MKR-[A-Z]{2}-(\d{5})$/);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSequence) {
+          maxSequence = seq;
+        }
+      }
+    }
+  });
+  
+  const nextSequence = maxSequence + 1;
+  const paddedSequence = nextSequence.toString().padStart(5, '0');
+  
+  return `MKR-${typeCode}-${paddedSequence}`;
+}
+
+/**
+ * Validate if a job number follows the MKR-XX-NNNNN format
+ * Returns true if valid, false otherwise
+ */
+export function isValidJobNumber(jobNo: string): boolean {
+  if (!jobNo || typeof jobNo !== 'string') return false;
+  // Match MKR-XX-NNNNN format (2 letter code, 5 digits)
+  return /^MKR-[A-Z]{2}-\d{5}$/.test(jobNo);
+}
