@@ -2428,6 +2428,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('📝 Cleaned update data keys:', Object.keys(updateData));
       
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
+      
+      // When work order is being approved/completed, create maintenance history and update job
+      if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
+        console.log('📋 Work order approved - creating maintenance history and updating job cycle dates');
+        
+        // Fetch fresh work order data to get all execution fields
+        const freshWorkOrder = await storage.getWorkOrder(req.params.id);
+        if (!freshWorkOrder) {
+          console.error('Failed to refetch work order for completion processing');
+        } else {
+          // Find the component for maintenance history
+          let component = await storage.getComponent(freshWorkOrder.component);
+          
+          if (!component && freshWorkOrder.componentCode && freshWorkOrder.vesselId) {
+            component = await storage.getComponentByCode(freshWorkOrder.componentCode, freshWorkOrder.vesselId);
+          }
+          
+          if (!component && freshWorkOrder.vesselId) {
+            const vesselComponents = await storage.getComponents(freshWorkOrder.vesselId);
+            component = vesselComponents.find(c => 
+              c.name === freshWorkOrder.component || 
+              c.componentCode === freshWorkOrder.componentCode
+            );
+          }
+          
+          if (component) {
+            // Create maintenance history record using stored execution data
+            try {
+              const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted || new Date().toISOString();
+              const normalizeToISO = (isoDate: string | undefined): string => {
+                if (!isoDate) return new Date().toISOString().split('T')[0];
+                const date = new Date(isoDate);
+                return date.toISOString().split('T')[0];
+              };
+              
+              // Use stored execution data from work order (populated during Part B save)
+              const historyPayload = {
+                componentId: component.id,
+                componentCode: freshWorkOrder.componentCode || component.componentCode,
+                vesselCode: freshWorkOrder.vesselId,
+                workOrderId: freshWorkOrder.id,
+                workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
+                jobTitle: freshWorkOrder.jobTitle,
+                maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
+                dateCompleted: normalizeToISO(dateOfCompletion),
+                runningHoursAtCompletion: freshWorkOrder.runningHours || null,
+                performedBy: freshWorkOrder.performedBy || freshWorkOrder.executionAssignedTo || 'Unknown',
+                approvedBy: freshWorkOrder.approver || null,
+                approvalDate: normalizeToISO(dateOfCompletion),
+                status: 'Approved' as const,
+                workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
+                sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
+                remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
+                isComponentReplaced: false
+              };
+              
+              await storage.createComponentMaintenanceHistory(historyPayload);
+              console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+            } catch (historyError) {
+              console.error('Failed to create maintenance history record:', historyError);
+            }
+            
+            // Update job cycle dates
+            try {
+              let job = null;
+              
+              if (freshWorkOrder.jobId) {
+                job = await storage.getJob(freshWorkOrder.jobId);
+              }
+              
+              // Fallback: Extract jobNo from work order number
+              if (!job && freshWorkOrder.workOrderNo) {
+                const woNumber = freshWorkOrder.workOrderNo;
+                let extractedJobNo: string | null = null;
+                
+                const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+                if (newFormatMatch) {
+                  extractedJobNo = newFormatMatch[1];
+                }
+                
+                if (!extractedJobNo) {
+                  const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
+                  if (oldFormatMatch) {
+                    extractedJobNo = oldFormatMatch[1];
+                  }
+                }
+                
+                if (extractedJobNo && freshWorkOrder.vesselId) {
+                  const jobs = await storage.getJobs(freshWorkOrder.vesselId);
+                  job = jobs.find(j => j.jobNo === extractedJobNo);
+                }
+              }
+              
+              if (job) {
+                const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted;
+                const runningHours = freshWorkOrder.runningHours;
+                
+                // Handle Calendar-based jobs
+                if (freshWorkOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
+                  const { calculateNextDueDate } = await import('@shared/dateUtils');
+                  const calendarUpdates: any = { lastDoneDate: dateOfCompletion };
+                  
+                  if (job.frequencyValue && job.frequencyUnit) {
+                    const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit);
+                    if (nextDue) {
+                      calendarUpdates.nextDueDate = nextDue;
+                      console.log(`✅ Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
+                    }
+                  }
+                  
+                  await storage.updateJob(job.id, calendarUpdates);
+                }
+                
+                // Handle Running Hours-based jobs (separate update to avoid key leakage)
+                if (freshWorkOrder.maintenanceBasis === 'Running Hours' && runningHours) {
+                  const currentRH = parseInt(runningHours);
+                  if (!isNaN(currentRH)) {
+                    const rhUpdates: any = { lastDoneRH: currentRH };
+                    const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
+                    if (rhInterval && !isNaN(rhInterval)) {
+                      rhUpdates.nextDueRH = currentRH + rhInterval;
+                      console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
+                    }
+                    await storage.updateJob(job.id, rhUpdates);
+                  }
+                }
+              }
+            } catch (jobError) {
+              console.error('Failed to update job cycle dates:', jobError);
+            }
+          } else {
+            console.warn(`⚠️ Could not find component for work order ${freshWorkOrder.id}`);
+          }
+        }
+      }
+      
       res.json(workOrder);
     } catch (error: any) {
       console.error('❌ Work order update error:', error);

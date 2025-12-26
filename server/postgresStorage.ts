@@ -1483,8 +1483,20 @@ export class PostgresStorage {
 
   async updateWorkOrder(id: string, data: Partial<InsertWorkOrder>): Promise<WorkOrder> {
     const db = await getDb();
+    
+    // Sanitize data: convert empty strings to null for integer fields
+    // PostgreSQL cannot cast empty strings to integers
+    const integerFields = ['maintenanceIntervalValue', 'intervalRunningHour'];
+    const sanitizedData = { ...data };
+    
+    for (const field of integerFields) {
+      if (field in sanitizedData && sanitizedData[field as keyof typeof sanitizedData] === '') {
+        (sanitizedData as any)[field] = null;
+      }
+    }
+    
     const result = await db.update(workOrders)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...sanitizedData, updatedAt: new Date() })
       .where(eq(workOrders.id, id))
       .returning();
     if (!result[0]) {

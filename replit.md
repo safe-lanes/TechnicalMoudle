@@ -70,6 +70,13 @@ The application features a modern full-stack architecture. The frontend is devel
   - **Database validation**: In 'add' mode, codes that already exist in the database for that vessel generate errors
   - **Mode-specific behavior**: 'update' and 'upsert' modes allow existing database codes (updating is expected)
   - **Per-vessel uniqueness**: Component Codes must be unique within a vessel but may be duplicated across different vessels
+- **Work Order Completion & Maintenance History**: When work orders are approved via PATCH `/api/work-orders/:id` with `approvalAction='approved'`, the system:
+  1. Re-fetches fresh work order data to access all stored execution fields
+  2. Creates maintenance history record using `componentId` (UUID), not component name
+  3. Updates job cycle dates (Calendar: `lastDoneDate`/`nextDueDate`, RH: `lastDoneRH`/`nextDueRH`)
+  4. Uses separate update objects for Calendar vs RH jobs to prevent key leakage
+  5. Component lookup fallback chain: ID → componentCode+vessel → name match
+  6. Immutable history is enforced by PostgreSQL triggers (INSERT-only)
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
