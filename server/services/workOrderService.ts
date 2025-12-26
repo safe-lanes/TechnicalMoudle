@@ -101,7 +101,8 @@ export class WorkOrderService {
         const job = jobsMap.get(wo.jobId);
         if (job?.componentId) {
           const component = componentsMap.get(job.componentId);
-          if (component?.currentCumulativeRH) {
+          // Use explicit null check to handle zero running hours correctly
+          if (component?.currentCumulativeRH != null) {
             currentRH = parseFloat(String(component.currentCumulativeRH));
           }
         }
