@@ -57,14 +57,29 @@ class MemStorage {
       const items = this.data[collection];
       if (items) {
         const itemsArray = Array.isArray(items) ? items : Object.values(items);
+        // Filter out null/undefined items
+        const validItems = itemsArray.filter((item: any) => item != null);
         let maxId = 0;
-        for (const item of itemsArray as any[]) {
+        for (const item of validItems as any[]) {
           if (typeof item.id === 'number' && item.id > maxId) {
             maxId = item.id;
           }
         }
         if (maxId > 0) {
           this.idCounters.set(collection, maxId);
+        }
+        // Clean the collection by removing null values
+        if (Array.isArray(items)) {
+          this.data[collection] = validItems;
+        } else {
+          // For object-based collections, rebuild without null values
+          const cleanedObj: any = {};
+          for (const [key, value] of Object.entries(items)) {
+            if (value != null) {
+              cleanedObj[key] = value;
+            }
+          }
+          this.data[collection] = cleanedObj;
         }
       }
     }
