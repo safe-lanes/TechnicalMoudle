@@ -6,6 +6,37 @@ import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from
 import { jobService } from "./jobService";
 
 /**
+ * Extract jobNo from a work order number
+ * Handles both formats:
+ * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
+ * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
+ * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
+ */
+function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
+  if (!workOrderNo) return null;
+  
+  // Try NEW format first: has component code with dots before the year
+  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
+  }
+  
+  // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
+  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
+  }
+  
+  // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
+  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  
+  return null;
+}
+
+/**
  * Determine if a job is "critical" based on its jobPriority
  * Critical and High priority jobs are considered critical for lead time purposes
  */
@@ -240,19 +271,33 @@ export class WorkOrderService {
       return settings || null;
     };
     
-    // Get all work orders with active statuses to check for cycle duplicates
-    // Statuses that block new WO generation for same cycle: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
+    // Get all work orders with active statuses to check for duplicates
+    // Statuses that block new WO generation: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
     const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
     const allWorkOrders = await this.getWorkOrders(vesselId);
     
-    // Build a map of (jobId + cycleDueDate) → existing WO for cycle uniqueness check
-    // This is the ONLY duplicate protection - we check by cycle, not by job
+    // JOB-LEVEL LOCK: Build a set of jobNos that already have an active WO
+    // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
+    const jobsWithActiveWO = new Set<string>();
+    allWorkOrders
+      .filter(wo => BLOCKING_STATUSES.includes(wo.status))
+      .forEach(wo => {
+        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (jobNo) {
+          jobsWithActiveWO.add(jobNo);
+        }
+      });
+    
+    // CYCLE UNIQUENESS: Also build a map by (jobNo + cycleDueDate) for cycle-level check
     const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
     allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.jobId && wo.cycleDueDateSnapshot)
+      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.cycleDueDateSnapshot)
       .forEach(wo => {
-        const cycleKey = `${wo.jobId}|${wo.cycleDueDateSnapshot}`;
-        existingCycleWOs.set(cycleKey, wo);
+        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (jobNo) {
+          const cycleKey = `${jobNo}|${wo.cycleDueDateSnapshot}`;
+          existingCycleWOs.set(cycleKey, wo);
+        }
       });
     
     const results = {
@@ -283,12 +328,16 @@ export class WorkOrderService {
         continue; // Not yet time to generate
       }
       
+      // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
+      if (jobsWithActiveWO.has(job.jobNo)) {
+        continue; // Already has an active WO - skip
+      }
+      
       // Normalize due date for cycle key (ISO date string YYYY-MM-DD)
       const dueDateStr = dueDate.toISOString().split('T')[0];
       
-      // CYCLE UNIQUENESS CHECK (only protection - allows multiple cycles per job over time)
-      // Each calendar cycle is uniquely identified by: (job.id + DUE_DATE)
-      const cycleKey = `${job.id}|${dueDateStr}`;
+      // CYCLE UNIQUENESS CHECK: Each calendar cycle is uniquely identified by (jobNo + DUE_DATE)
+      const cycleKey = `${job.jobNo}|${dueDateStr}`;
       if (existingCycleWOs.has(cycleKey)) {
         // WO already exists for this cycle - skip
         continue;
@@ -348,8 +397,9 @@ export class WorkOrderService {
       results.generated++;
       results.workOrders.push(createdWO);
       
-      // Add to map to prevent duplicate generation in same run
+      // Add to maps to prevent duplicate generation in same run
       existingCycleWOs.set(cycleKey, workOrderData as any);
+      jobsWithActiveWO.add(job.jobNo);
       
       const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
       console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);

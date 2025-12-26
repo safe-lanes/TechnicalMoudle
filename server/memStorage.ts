@@ -511,8 +511,12 @@ class MemStorage {
   }
 
   // Work Order methods
-  async getWorkOrders(vesselId: string): Promise<any[]> { 
-    return toArray(this.data.workOrders).filter((w: any) => w.vesselId === vesselId); 
+  async getWorkOrders(vesselId?: string): Promise<any[]> { 
+    const allWOs = toArray(this.data.workOrders);
+    if (vesselId === undefined) {
+      return allWOs;
+    }
+    return allWOs.filter((w: any) => w.vesselId === vesselId); 
   }
   async getWorkOrder(id: string): Promise<any> { 
     if (this.data.workOrders && this.data.workOrders[id]) return this.data.workOrders[id];

@@ -5,6 +5,38 @@ import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import type { InsertWorkOrder, Job, PmsVesselSettings } from "@shared/schema";
 
 /**
+ * Extract jobNo from a work order number
+ * Handles both formats:
+ * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
+ * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
+ * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
+ */
+function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
+  if (!workOrderNo) return null;
+  
+  // Try NEW format first: has component code with dots before the year
+  // Pattern: capture everything before -<digits>.<digits> pattern
+  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+  if (newFormatMatch) {
+    return newFormatMatch[1];
+  }
+  
+  // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
+  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
+  if (woSuffixMatch) {
+    return woSuffixMatch[1];
+  }
+  
+  // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
+  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
+  if (oldFormatMatch) {
+    return oldFormatMatch[1];
+  }
+  
+  return null;
+}
+
+/**
  * Determine if a job is "critical" based on its jobPriority
  * Critical and High priority jobs are considered critical for lead time purposes
  */
@@ -154,31 +186,54 @@ export class JobDueScannerService {
       return settings || null;
     };
 
-    // Get all work orders with active statuses to check for cycle duplicates
-    // Statuses that block new WO generation for same cycle: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
+    // Get all work orders with active statuses to check for duplicates
+    // Statuses that block new WO generation: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
     const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
     const allWorkOrders = await storage.getWorkOrders();
     
-    // Build a map of (jobId + cycleDueRh) → existing WO for cycle uniqueness check
-    // This is the ONLY duplicate protection - we check by cycle, not by job
-    const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
+    // JOB-LEVEL LOCK: Build a set of jobNos that already have an active WO
+    // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
+    const jobsWithActiveWO = new Set<string>();
     allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.jobId && wo.cycleDueRhSnapshot)
+      .filter(wo => BLOCKING_STATUSES.includes(wo.status))
       .forEach(wo => {
-        const cycleKey = `${wo.jobId}|${wo.cycleDueRhSnapshot}`;
-        existingCycleWOs.set(cycleKey, wo);
+        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (jobNo) {
+          jobsWithActiveWO.add(jobNo);
+        }
       });
     
-    // Cache component and settings data to avoid repeated fetches inside the loop
-    const componentCache = new Map<string, typeof allWorkOrders extends Promise<(infer T)[]> ? T : any>();
-    const allComponents = await storage.getComponents();
-    allComponents.forEach(c => componentCache.set(c.id, c));
+    // CYCLE UNIQUENESS: Build a map by (jobNo + cycleDueRh) for cycle-level check
+    const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
+    allWorkOrders
+      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.cycleDueRhSnapshot)
+      .forEach(wo => {
+        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (jobNo) {
+          const cycleKey = `${jobNo}|${wo.cycleDueRhSnapshot}`;
+          existingCycleWOs.set(cycleKey, wo);
+        }
+      });
+    
+    // Cache for components - will fetch lazily per vessel
+    const componentCache = new Map<string, any>();
+    const vesselComponentsFetched = new Set<string>();
+    
+    const getComponentFromCache = async (componentId: string, vesselId: string | null): Promise<any | undefined> => {
+      // Ensure we've fetched components for this vessel
+      if (vesselId && !vesselComponentsFetched.has(vesselId)) {
+        const vesselComponents = await storage.getComponents(vesselId);
+        vesselComponents.forEach(c => componentCache.set(c.id, c));
+        vesselComponentsFetched.add(vesselId);
+      }
+      return componentCache.get(componentId);
+    };
 
     let generated = 0;
 
     for (const job of rhJobs) {
       // Get the component from cache to check RH counter type and current RH
-      const component = componentCache.get(job.componentId);
+      const component = await getComponentFromCache(job.componentId, job.vesselId);
       if (!component) continue;
 
       // Check RH counter type - must be MASTER or INHERITED
@@ -218,9 +273,13 @@ export class JobDueScannerService {
         continue; // Not yet time to generate
       }
 
-      // CYCLE UNIQUENESS CHECK (only protection - allows multiple cycles per job over time)
-      // Each RH cycle is uniquely identified by: (job.id + RH_due)
-      const cycleKey = `${job.id}|${rhDue}`;
+      // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
+      if (jobsWithActiveWO.has(job.jobNo)) {
+        continue; // Already has an active WO - skip
+      }
+
+      // CYCLE UNIQUENESS CHECK: Each RH cycle is uniquely identified by (jobNo + RH_due)
+      const cycleKey = `${job.jobNo}|${rhDue}`;
       if (existingCycleWOs.has(cycleKey)) {
         // WO already exists for this cycle - skip
         continue;
@@ -280,8 +339,9 @@ export class JobDueScannerService {
       await workOrderService.createWorkOrder(workOrderData);
       generated++;
       
-      // Add to map to prevent duplicate generation in same run
+      // Add to maps to prevent duplicate generation in same run
       existingCycleWOs.set(cycleKey, workOrderData as any);
+      jobsWithActiveWO.add(job.jobNo);
       
       const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
       console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
@@ -330,8 +390,19 @@ export class JobDueScannerService {
     // Get all work orders for this vessel
     const allWorkOrders = await storage.getWorkOrders(job.vesselId || undefined);
     
-    // No job-level lock here - only cycle uniqueness check per job type below
-    // This allows multiple cycles per job over time
+    // JOB-LEVEL LOCK: Check if job already has an active WO (using jobNo from workOrderNo)
+    const existingActiveWO = allWorkOrders.find(wo => {
+      if (!BLOCKING_STATUSES.includes(wo.status)) return false;
+      const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+      return woJobNo === job.jobNo;
+    });
+    
+    if (existingActiveWO) {
+      return { 
+        success: false, 
+        message: `Work Order already exists for this job: ${existingActiveWO.workOrderNo}` 
+      };
+    }
 
     // Determine job type and compute cycle values
     const isRHJob = job.maintenanceBasis === 'Running Hours';
