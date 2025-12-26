@@ -9433,17 +9433,19 @@
       "parentComponent": "554.003",
       "notes": "Technical Information\r\n===================\r\nMfg Model: FAD-2MSYM\r\nMfg Type: Semi Hermatic Type\r\nCylinder bore: 50mm\r\nStroke: 40mm\r\nRev: 1750min-1",
       "runningHours": null,
-      "currentCumulativeRH": "0",
+      "currentCumulativeRH": "10000",
       "rhCounterType": "MASTER",
       "rhCounterSource": "SELF",
-      "rhCurrentMaster": null,
-      "rhMasterUpdatedAt": "2025-12-26T05:24:50.286Z",
-      "rhMasterUpdateSource": "IMPORT",
+      "rhCurrentMaster": "10000",
+      "rhMasterUpdatedAt": "2025-12-26T10:27:53.763Z",
+      "rhMasterUpdateSource": "MANUAL",
       "rhMasterComponentId": null,
       "rhCurrentInheritedCached": null,
       "rhInheritedUpdatedAt": null,
-      "lastUpdated": null,
-      "id": "554.003.01"
+      "lastUpdated": "Invalid Date Invalid Date",
+      "id": "554.003.01",
+      "rhMasterUpdatedBy": "admin",
+      "updatedAt": "2025-12-26T10:27:53.763Z"
     },
     "554.003.02": {
       "componentCode": "554.003.02",
@@ -21160,6 +21162,19 @@
       "meterReplaced": false,
       "userId": "admin",
       "createdAt": "2025-12-26T09:47:21.115Z"
+    },
+    {
+      "id": 65,
+      "componentId": "554.003.01",
+      "previousValue": "0",
+      "newValue": "10000",
+      "delta": "10000",
+      "mode": "setTotal",
+      "dateUpdated": "Invalid Date Invalid Date",
+      "comments": "",
+      "meterReplaced": false,
+      "userId": "admin",
+      "createdAt": "2025-12-26T10:27:53.763Z"
     }
   ],
   "spares": {
@@ -68684,6 +68699,42 @@
       "effectiveRhAtGeneration": "999",
       "rhLastDoneSnapshot": "0",
       "id": 44
+    },
+    "45": {
+      "vesselId": "V030",
+      "component": "Compressors w/drive unit No.01",
+      "componentCode": "554.003.01",
+      "jobId": 76,
+      "workOrderNo": "MKR-IN-00011-554.003.01-2025-001",
+      "templateCode": "MKR-IN-00011-554.003.01-2025-001",
+      "jobTitle": "Provision Ref. Compressors, Visual Check - 10000H",
+      "assignedTo": "2nd Engineer",
+      "nextDueReading": "10000",
+      "currentReading": "10000",
+      "status": "Due",
+      "taskType": "Inspection",
+      "maintenanceBasis": "Running Hours",
+      "frequencyValue": "10000",
+      "frequencyUnit": "Hours",
+      "intervalRunningHour": 10000,
+      "jobPriority": "Medium",
+      "classRelated": "No",
+      "briefWorkDescription": "SAFETY PROCEDURE (COMPANY)\r\n===========================\r\nEnsure compliance with safety procedures according to the company policy and requirements.\r\n\r\nJOB REFERENCE DETAILS\r\n===================\r\nManual Name: 2F-16 UNIT TYPE PROV. REF. CHAMBER;5303.pdf\r\nPdf Page No: 118\r\nChapter: Standard Working Period & Limit Of Wear For Each Part\r\n\r\n\r\nDESCRIPTION\r\n===========\r\n1. Check the Connect. Rod large and small end.\r\n2. Check the piston and piston ring and joint part.\r\n3. Check the Piston ring joint part clearance.",
+      "department": "Engine",
+      "requiredSpareParts": [],
+      "requiredTools": [],
+      "safetyRequirements": {
+        "ppeRequirements": [],
+        "permitRequirements": [],
+        "otherRequirements": []
+      },
+      "driverType": "RH",
+      "cycleDueRhSnapshot": "10000",
+      "generateRhSnapshot": "9976",
+      "dueRhSnapshot": "10000",
+      "effectiveRhAtGeneration": "10000",
+      "rhLastDoneSnapshot": "0",
+      "id": 45
     }
   },
   "workOrderExecutions": [],
