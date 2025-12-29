@@ -2367,29 +2367,8 @@ router.post('/import', async (req, res) => {
       status: 'in_progress'
     });
 
-    // Also save to database for import_change_log foreign key constraint
-    try {
-      await storage.createImportHistory({
-        id: historyId,
-        type: effectiveType,
-        mode,
-        archiveMissing: archiveMissing || false,
-        userId: (req as any).user?.id || 'system',
-        vesselId: vesselId || null,
-        originalName: cachedData.originalName,
-        fileSize: cachedData.file.length,
-        created: 0,
-        updated: 0,
-        skipped: 0,
-        archived: 0,
-        status: 'in_progress'
-      });
-      console.log(`📊 Import history saved to database: ${historyId}`);
-    } catch (dbHistoryError) {
-      console.warn(`⚠️ Failed to save import history to database (change tracking may be disabled):`, (dbHistoryError as Error).message);
-    }
-
     // Perform the actual import using filtered/normalized data
+    // Note: Change tracking is disabled (pass undefined for historyId) to use file-based storage only
     const importResult = await performImport(
       effectiveType,
       dataToImport,
@@ -2397,7 +2376,7 @@ router.post('/import', async (req, res) => {
       archiveMissing,
       vesselId,
       (req as any).user?.id || 'system',
-      historyId, // Pass history ID for change tracking
+      undefined, // Disable database change tracking - using file-based storage only
       storeType  // Pass store type for stores import (determines which tab: Stores, Lubes, Chemicals, Others)
     );
 
@@ -2436,7 +2415,7 @@ router.post('/import', async (req, res) => {
       }
     }
 
-    // Update ImportHistory with status='complete' and include file path (file-based storage)
+    // Update ImportHistory with status='complete' and include file path (file-based storage only)
     await updateFileBasedHistory(historyId, {
       ...importResult,
       completedAt: new Date().toISOString(),
@@ -2444,19 +2423,6 @@ router.post('/import', async (req, res) => {
       originalName: cachedData.originalName,
       storedFilePath: storedFilePath
     });
-
-    // Also update database import history to keep it in sync
-    try {
-      await storage.updateImportHistory(historyId, {
-        ...importResult,
-        finishedAt: new Date(),
-        status: 'complete',
-        storedFilePath: storedFilePath
-      });
-      console.log(`📊 Import history updated in database: ${historyId}`);
-    } catch (dbUpdateError) {
-      console.warn(`⚠️ Failed to update import history in database:`, (dbUpdateError as Error).message);
-    }
 
     // Clean up cache
     dryRunCache.delete(fileToken);
