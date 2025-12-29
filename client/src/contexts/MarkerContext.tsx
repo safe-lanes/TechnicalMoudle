@@ -16,8 +16,9 @@ export function MarkerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'm' || e.key === 'M')) {
         e.preventDefault();
+        console.log('[MarkerContext] Ctrl+M pressed, toggling markers');
         toggleMarkers();
       }
     };
