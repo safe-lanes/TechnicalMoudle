@@ -1,3 +1,7 @@
+// Re-export Marker from MarkerContext to avoid duplicate definitions
+// This ensures all imports resolve to the same component
+export { Marker, useMarkers } from '@/contexts/MarkerContext';
+
 import { ReactNode } from 'react';
 import { useMarkers } from '@/contexts/MarkerContext';
 
@@ -31,20 +35,5 @@ export function MarkerBadge({ id, children, className = '', position = 'top-left
         </span>
       )}
     </div>
-  );
-}
-
-export function Marker({ id, className = '' }: { id: string; className?: string }) {
-  const { showMarkers } = useMarkers();
-
-  if (!showMarkers) return null;
-
-  return (
-    <span 
-      className={`bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded z-[9998] whitespace-nowrap pointer-events-none shadow-md ${className}`}
-      title={id}
-    >
-      {id}
-    </span>
   );
 }
