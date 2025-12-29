@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X } from "lucide-react";
+import { Marker } from "@/components/ui/marker-badge";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -22,10 +23,14 @@ import { StatusPill } from "@/components/StatusPill";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-const ReadOnlyField: React.FC<{ label: string; value: string | undefined }> = ({ label, value }) => (
+const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string }> = ({ label, value, labelMarker, valueMarker }) => (
   <div className="space-y-1">
-    <Label className="text-sm text-[#8798ad]">{label}</Label>
-    <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center">
+    <Label className="text-sm text-[#8798ad]" data-testid={labelMarker}>
+      {labelMarker && <Marker id={labelMarker} />}
+      {label}
+    </Label>
+    <div className="text-sm font-medium text-gray-900 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 min-h-[38px] flex items-center" data-testid={valueMarker}>
+      {valueMarker && <Marker id={valueMarker} />}
       {value || '-'}
     </div>
   </div>
@@ -40,6 +45,8 @@ interface EditableFieldProps {
   isModifyMode: boolean;
   type?: "text" | "select" | "textarea";
   options?: string[];
+  labelMarker?: string;
+  valueMarker?: string;
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({ 
@@ -50,17 +57,20 @@ const EditableField: React.FC<EditableFieldProps> = ({
   onChange, 
   isModifyMode,
   type = "text",
-  options = []
+  options = [],
+  labelMarker,
+  valueMarker
 }) => {
   const isChanged = value !== originalValue;
   
   if (!isModifyMode) {
-    return <ReadOnlyField label={label} value={value} />;
+    return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} />;
   }
   
   return (
     <div className="space-y-1">
-      <Label className={`text-sm ${isChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`}>
+      <Label className={`text-sm ${isChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid={labelMarker}>
+        {labelMarker && <Marker id={labelMarker} />}
         {label} {isChanged && '(Modified)'}
       </Label>
       {type === "select" ? (
@@ -350,8 +360,9 @@ const JobsFormPage: React.FC = () => {
                 size="sm"
                 onClick={handleBack}
                 className="text-gray-600 hover:text-gray-900"
-                data-testid="button-back"
+                data-testid="JF3"
               >
+                <Marker id="JF3" />
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -400,7 +411,8 @@ const JobsFormPage: React.FC = () => {
                   </nav>
                 </SheetContent>
               </Sheet>
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="JF1">
+                <Marker id="JF1" />
                 {isModifyMode ? 'Modify Job' : 'Jobs Form'}
               </h1>
             </div>
@@ -422,8 +434,9 @@ const JobsFormPage: React.FC = () => {
                 size="sm"
                 onClick={() => setIsWorkInstructionsOpen(true)}
                 className="border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-blue-50 font-medium px-4 h-9"
-                data-testid="button-work-instructions"
+                data-testid="JF2"
               >
+                <Marker id="JF2" />
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Work Instructions
               </Button>
@@ -438,14 +451,15 @@ const JobsFormPage: React.FC = () => {
         <aside className="hidden lg:block w-20 flex-shrink-0">
           <div className="sticky top-6 px-4 py-6">
             <nav className="space-y-6">
-              {navSteps.map((step) => (
+              {navSteps.map((step, index) => (
                 <a
                   key={step.id}
                   href={`#${step.id}`}
                   onClick={() => setActiveStep(step.id)}
                   className="flex flex-col items-center gap-2 group"
-                  data-testid={`nav-step-${step.id}`}
+                  data-testid={index === 0 ? "JF4" : `nav-step-${step.id}`}
                 >
+                  {index === 0 && <Marker id="JF4" />}
                   <div className={`
                     w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-colors
                     ${activeStep === step.id 
@@ -474,6 +488,8 @@ const JobsFormPage: React.FC = () => {
               label="Part A"
               title="Job Details"
               description="Job template details and configuration"
+              headerMarker="JF5"
+              descriptionMarker="JF6"
             />
             
             {/* A1. Job Information */}
@@ -482,6 +498,8 @@ const JobsFormPage: React.FC = () => {
               number="A1"
               title="Job Information" 
               description="Basic details and configuration for this job"
+              headerMarker="JF.A1.1"
+              descriptionMarker="JF.A1.2"
             >
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -492,11 +510,13 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.woTitle}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    labelMarker="JF.A1.3"
+                    valueMarker="JF.A1.4"
                   />
-                  <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} />
-                  <ReadOnlyField label="Component Code" value={templateData.componentCode} />
-                  <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} />
-                  <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} />
+                  <ReadOnlyField label="Component Name" value={templateData.componentName || templateData.component} labelMarker="JF.A1.5" valueMarker="JF.A1.6" />
+                  <ReadOnlyField label="Component Code" value={templateData.componentCode} labelMarker="JF.A1.7" valueMarker="JF.A1.8" />
+                  <ReadOnlyField label="Job Code" value={templateData.woTemplateCode} labelMarker="JF.A1.9" valueMarker="JF.A1.10" />
+                  <ReadOnlyField label="Maintenance Basis" value={templateData.maintenanceBasis} labelMarker="JF.A1.11" valueMarker="JF.A1.12" />
                   <EditableField 
                     label="Frequency" 
                     field="frequencyValue"
@@ -504,6 +524,8 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.frequencyValue}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    labelMarker="JF.A1.13"
+                    valueMarker="JF.A1.14"
                   />
                   <EditableField 
                     label="Task Type" 
@@ -514,6 +536,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['Inspection', 'Overhaul', 'Service', 'Repair', 'Test', 'Calibration', 'Survey', 'Other']}
+                    labelMarker="JF.A1.15"
+                    valueMarker="JF.A1.16"
                   />
                   <EditableField 
                     label="Assigned To (Rank)" 
@@ -524,6 +548,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Electrician', 'Fitter', 'Bosun', 'Chief Officer', '2nd Officer']}
+                    labelMarker="JF.A1.17"
+                    valueMarker="JF.A1.18"
                   />
                   <EditableField 
                     label="Approver (Rank)" 
@@ -534,6 +560,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['Chief Engineer', 'Master', 'Technical Superintendent', '2nd Engineer']}
+                    labelMarker="JF.A1.19"
+                    valueMarker="JF.A1.20"
                   />
                   <EditableField 
                     label="Job Priority" 
@@ -544,6 +572,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['High', 'Medium', 'Low']}
+                    labelMarker="JF.A1.21"
+                    valueMarker="JF.A1.22"
                   />
                   <EditableField 
                     label="Class Related" 
@@ -554,17 +584,21 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['Yes', 'No']}
+                    labelMarker="JF.A1.23"
+                    valueMarker="JF.A1.24"
                   />
                   {templateData.maintenanceBasis === 'Running Hours' ? (
                     <ReadOnlyField 
                       label="Next Due RH" 
                       value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'} 
+                      labelMarker="JF.A1.25"
+                      valueMarker="JF.A1.26"
                     />
                   ) : (
-                    <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} />
+                    <ReadOnlyField label="Next Due Date" value={formatDate(templateData.nextDueDate)} labelMarker="JF.A1.25" valueMarker="JF.A1.26" />
                   )}
-                  <ReadOnlyField label="Department" value={templateData.department} />
-                  <ReadOnlyField label="Criticality" value={templateData.criticality} />
+                  <ReadOnlyField label="Department" value={templateData.department} labelMarker="JF.A1.27" valueMarker="JF.A1.28" />
+                  <ReadOnlyField label="Criticality" value={templateData.criticality} labelMarker="JF.A1.29" valueMarker="JF.A1.30" />
                   <EditableField 
                     label="Is Active" 
                     field="isActive"
@@ -574,6 +608,8 @@ const JobsFormPage: React.FC = () => {
                     isModifyMode={isModifyMode}
                     type="select"
                     options={['Yes', 'No']}
+                    labelMarker="JF.A1.31"
+                    valueMarker="JF.A1.32"
                   />
                 </div>
 
@@ -585,6 +621,8 @@ const JobsFormPage: React.FC = () => {
                   onChange={handleFieldChange}
                   isModifyMode={isModifyMode}
                   type="textarea"
+                  labelMarker="JF.A1.33"
+                  valueMarker="JF.A1.34"
                 />
               </div>
             </SectionBlock>
@@ -595,16 +633,18 @@ const JobsFormPage: React.FC = () => {
               number="A2"
               title="Required Spare Parts"
               description="Spare parts needed for this job"
+              headerMarker="JF.A2.1"
+              descriptionMarker="JF.A2.2"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="JF.A2.3"><Marker id="JF.A2.3" />PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]" data-testid="JF.A2.4"><Marker id="JF.A2.4" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A2.5"><Marker id="JF.A2.5" />QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="JF.A2.6"><Marker id="JF.A2.6" />ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A2.7"><Marker id="JF.A2.7" />STATUS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -617,14 +657,13 @@ const JobsFormPage: React.FC = () => {
                     ) : (
                       (templateData.requiredSpareParts || []).map((part, index) => (
                         <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
-                          <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
-                          <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
-                          <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>-</td>
-                          <td className="p-2">
-                            <span data-testid={`status-spare-${index}`}>
-                              <StatusPill status="available" />
-                            </span>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A2.8" : `text-spare-part-no-${index}`}>{index === 0 && <Marker id="JF.A2.8" />}{part.partNo || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A2.9" : `text-spare-description-${index}`}>{index === 0 && <Marker id="JF.A2.9" />}{part.description || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A2.10" : `text-spare-quantity-${index}`}>{index === 0 && <Marker id="JF.A2.10" />}{part.quantityRequired || '-'}</td>
+                          <td className="p-2 text-center" data-testid={index === 0 ? "JF.A2.11" : `text-spare-rob-${index}`}>{index === 0 && <Marker id="JF.A2.11" />}-</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A2.12" : `status-spare-${index}`}>
+                            {index === 0 && <Marker id="JF.A2.12" />}
+                            <StatusPill status="available" />
                           </td>
                         </tr>
                       ))
@@ -640,15 +679,17 @@ const JobsFormPage: React.FC = () => {
               number="A3"
               title="Required Tools & Equipment"
               description="Tools and equipment needed for this job"
+              headerMarker="JF.A3.1"
+              descriptionMarker="JF.A3.2"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]" data-testid="JF.A3.3"><Marker id="JF.A3.3" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A3.4"><Marker id="JF.A3.4" />QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="JF.A3.5"><Marker id="JF.A3.5" />ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="JF.A3.6"><Marker id="JF.A3.6" />STATUS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -661,13 +702,12 @@ const JobsFormPage: React.FC = () => {
                     ) : (
                       (templateData.requiredTools || []).map((tool, index) => (
                         <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={`text-tool-name-${index}`}>{tool.toolName || '-'}</td>
-                          <td className="p-2" data-testid={`text-tool-quantity-${index}`}>{tool.quantity || '-'}</td>
-                          <td className="p-2 text-center" data-testid={`text-tool-rob-${index}`}>-</td>
-                          <td className="p-2">
-                            <span data-testid={`status-tool-${index}`}>
-                              <StatusPill status="available" />
-                            </span>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A3.7" : `text-tool-name-${index}`}>{index === 0 && <Marker id="JF.A3.7" />}{tool.toolName || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A3.8" : `text-tool-quantity-${index}`}>{index === 0 && <Marker id="JF.A3.8" />}{tool.quantity || '-'}</td>
+                          <td className="p-2 text-center" data-testid={index === 0 ? "JF.A3.9" : `text-tool-rob-${index}`}>{index === 0 && <Marker id="JF.A3.9" />}-</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A3.10" : `status-tool-${index}`}>
+                            {index === 0 && <Marker id="JF.A3.10" />}
+                            <StatusPill status="available" />
                           </td>
                         </tr>
                       ))
@@ -683,44 +723,49 @@ const JobsFormPage: React.FC = () => {
               number="A4"
               title="Safety Requirements"
               description="Safety requirements and permits for this job"
+              headerMarker="JF.A4.1"
+              descriptionMarker="JF.A4.2"
             >
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">Personal Protective Equipment (PPE):</Label>
+                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.3"><Marker id="JF.A4.3" />Personal Protective Equipment (PPE):</Label>
                   {(templateData.safetyRequirements?.ppeRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.4">
+                      <Marker id="JF.A4.4" />
                       {templateData.safetyRequirements.ppeRequirements.map((item, index) => (
                         <li key={index}>{item}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1">No PPE requirements specified</p>
+                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.4"><Marker id="JF.A4.4" />No PPE requirements specified</p>
                   )}
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">Permits Required:</Label>
+                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.5"><Marker id="JF.A4.5" />Permits Required:</Label>
                   {(templateData.safetyRequirements?.permitRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.6">
+                      <Marker id="JF.A4.6" />
                       {templateData.safetyRequirements.permitRequirements.map((item, index) => (
                         <li key={index}>{item}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1">No permits required</p>
+                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.6"><Marker id="JF.A4.6" />No permits required</p>
                   )}
                 </div>
                 
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">Other Safety Requirements:</Label>
+                  <Label className="text-sm font-medium text-gray-700" data-testid="JF.A4.7"><Marker id="JF.A4.7" />Other Safety Requirements:</Label>
                   {(templateData.safetyRequirements?.otherRequirements || []).length > 0 ? (
-                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
+                    <ul className="list-disc list-inside mt-1 text-sm text-gray-600" data-testid="JF.A4.8">
+                      <Marker id="JF.A4.8" />
                       {templateData.safetyRequirements.otherRequirements.map((item, index) => (
                         <li key={index}>{item}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-500 italic mt-1">No other safety requirements specified</p>
+                    <p className="text-sm text-gray-500 italic mt-1" data-testid="JF.A4.8"><Marker id="JF.A4.8" />No other safety requirements specified</p>
                   )}
                 </div>
               </div>
@@ -732,17 +777,19 @@ const JobsFormPage: React.FC = () => {
               number="A5"
               title="Work History"
               description="Previous executions and completion history for this job"
+              headerMarker="JF.A5.1"
+              descriptionMarker="JF.A5.2"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700">DATE</th>
-                      <th className="text-left p-2 font-medium text-gray-700">WORK ORDER</th>
-                      <th className="text-left p-2 font-medium text-gray-700">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700">PERFORMED BY</th>
-                      <th className="text-left p-2 font-medium text-gray-700">STATUS</th>
-                      <th className="text-left p-2 font-medium text-gray-700">REMARKS</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.3"><Marker id="JF.A5.3" />DATE</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.4"><Marker id="JF.A5.4" />WORK ORDER</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.5"><Marker id="JF.A5.5" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.6"><Marker id="JF.A5.6" />PERFORMED BY</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.7"><Marker id="JF.A5.7" />STATUS</th>
+                      <th className="text-left p-2 font-medium text-gray-700" data-testid="JF.A5.8"><Marker id="JF.A5.8" />REMARKS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -755,16 +802,17 @@ const JobsFormPage: React.FC = () => {
                     ) : (
                       (templateData.workHistory || []).map((record, index) => (
                         <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={`text-history-date-${index}`}>{formatDate(record.completionDate || record.workDate)}</td>
-                          <td className="p-2" data-testid={`text-history-wo-${index}`}>{record.woNo || '-'}</td>
-                          <td className="p-2 max-w-[200px] truncate" data-testid={`text-history-description-${index}`} title={record.description || '-'}>{record.description || '-'}</td>
-                          <td className="p-2" data-testid={`text-history-performed-by-${index}`}>{record.performedBy || '-'}</td>
-                          <td className="p-2" data-testid={`text-history-status-${index}`}>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.9" : `text-history-date-${index}`}>{index === 0 && <Marker id="JF.A5.9" />}{formatDate(record.completionDate || record.workDate)}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.10" : `text-history-wo-${index}`}>{index === 0 && <Marker id="JF.A5.10" />}{record.woNo || '-'}</td>
+                          <td className="p-2 max-w-[200px] truncate" data-testid={index === 0 ? "JF.A5.11" : `text-history-description-${index}`} title={record.description || '-'}>{index === 0 && <Marker id="JF.A5.11" />}{record.description || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.12" : `text-history-performed-by-${index}`}>{index === 0 && <Marker id="JF.A5.12" />}{record.performedBy || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.13" : `text-history-status-${index}`}>
+                            {index === 0 && <Marker id="JF.A5.13" />}
                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
                               {record.status || 'Completed'}
                             </span>
                           </td>
-                          <td className="p-2" data-testid={`text-history-remarks-${index}`}>{record.remarks || '-'}</td>
+                          <td className="p-2" data-testid={index === 0 ? "JF.A5.14" : `text-history-remarks-${index}`}>{index === 0 && <Marker id="JF.A5.14" />}{record.remarks || '-'}</td>
                         </tr>
                       ))
                     )}
