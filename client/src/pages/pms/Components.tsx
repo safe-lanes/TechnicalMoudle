@@ -1382,19 +1382,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
   }
   
-  if (spares.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-gray-400 text-sm">
-          No spare parts linked to this component
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Navigate to the Spares module to manage spare parts inventory
-        </p>
-      </div>
-    );
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -1413,7 +1400,14 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
           </tr>
         </thead>
         <tbody>
-          {spares.map((spare, index) => (
+          {spares.length === 0 ? (
+            <tr>
+              <td colSpan={FEATURES.IHM ? 8 : 7} className="text-center py-8">
+                <div className="text-gray-400 text-sm">No spare parts linked to this component</div>
+                <p className="text-xs text-gray-500 mt-2">Navigate to the Spares module to manage spare parts inventory</p>
+              </td>
+            </tr>
+          ) : spares.map((spare, index) => (
             <tr key={index} className="border-b border-gray-100">
               <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.10" : undefined}>
                 {index === 0 && <Marker id="B7.E.10" />}
