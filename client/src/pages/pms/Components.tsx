@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil } from "lucide-react";
+import { Marker } from "@/components/ui/marker-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
@@ -224,7 +225,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Fleet Equipment Code</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -233,16 +234,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('fleetEquipmentCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-fleet-equipment-code"
+              data-testid="B7.A.2"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-fleet-equipment-code">
-              {componentData.fleetEquipmentCode}
+            <div className="text-sm text-gray-900" data-testid="B7.A.2">
+              <Marker id="B7.A.2" /> {componentData.fleetEquipmentCode}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Fleet Equipment Name</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.3"><Marker id="B7.A.3" /> Fleet Equipment Name</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -251,16 +252,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('fleetEquipmentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-fleet-equipment-name"
+              data-testid="B7.A.4"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-fleet-equipment-name">
-              {componentData.fleetEquipmentName}
+            <div className="text-sm text-gray-900" data-testid="B7.A.4">
+              <Marker id="B7.A.4" /> {componentData.fleetEquipmentName}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Parent Component Code</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.5"><Marker id="B7.A.5" /> Parent Component Code</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -269,25 +270,25 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('parentComponent') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-parent-component-code"
+              data-testid="B7.A.6"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-parent-component-code">
-              {componentData.parentComponent}
+            <div className="text-sm text-gray-900" data-testid="B7.A.6">
+              <Marker id="B7.A.6" /> {componentData.parentComponent}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Code</label>
-          <div className="text-sm text-gray-900" data-testid="text-component-code">
-            {componentData.componentCode}
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.7"><Marker id="B7.A.7" /> Component Code</label>
+          <div className="text-sm text-gray-900" data-testid="B7.A.8">
+            <Marker id="B7.A.8" /> {componentData.componentCode}
           </div>
         </div>
       </div>
       {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Name</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.9"><Marker id="B7.A.9" /> Component Name</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -296,22 +297,22 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('componentName') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-component-name"
+              data-testid="B7.A.10"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-component-name">
-              {componentData.componentName}
+            <div className="text-sm text-gray-900" data-testid="B7.A.10">
+              <Marker id="B7.A.10" /> {componentData.componentName}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Component Category</label>
-          <div className="text-sm text-gray-900" data-testid="text-component-category">
-            {componentData.componentCategory}
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.11"><Marker id="B7.A.11" /> Component Category</label>
+          <div className="text-sm text-gray-900" data-testid="B7.A.12">
+            <Marker id="B7.A.12" /> {componentData.componentCategory}
           </div>
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.13"><Marker id="B7.A.13" /> Maker</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -320,16 +321,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('maker') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-maker"
+              data-testid="B7.A.14"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-maker">
-              {componentData.maker}
+            <div className="text-sm text-gray-900" data-testid="B7.A.14">
+              <Marker id="B7.A.14" /> {componentData.maker}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Maker Code</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.15"><Marker id="B7.A.15" /> Maker Code</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -338,11 +339,11 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('makerCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-maker-code"
+              data-testid="B7.A.16"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-maker-code">
-              {componentData.makerCode}
+            <div className="text-sm text-gray-900" data-testid="B7.A.16">
+              <Marker id="B7.A.16" /> {componentData.makerCode}
             </div>
           )}
         </div>
@@ -2381,13 +2382,21 @@ const Components: React.FC = () => {
   };
 
   const renderComponentTree = (nodes: ComponentNode[], level: number = 0) => {
+    const getTreeNodeMarker = (nodeLevel: number) => {
+      if (nodeLevel === 0) return "B6.1";
+      if (nodeLevel === 1) return "B6.2";
+      if (nodeLevel === 2) return "B6.3";
+      return "B6.4";
+    };
+
     return nodes.map((node) => {
       const hasChildren = node.children && node.children.length > 0;
       const isExpanded = expandedNodes.has(node.id);
       const isSelected = selectedComponent?.id === node.id;
+      const markerLevel = getTreeNodeMarker(level);
 
       return (
-        <div key={node.id}>
+        <div key={node.id} data-testid={markerLevel}>
           <div
             className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
               isSelected ? "bg-blue-50" : ""
@@ -2395,16 +2404,15 @@ const Components: React.FC = () => {
             style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
               setSelectedComponent(node);
-              // Toggle expand/collapse when clicking the row
               if (hasChildren) {
                 toggleNode(node.id);
               }
-              // Automatically open CR form when in change request mode
               if (isChangeRequestMode) {
                 setIsComponentFormOpen(true);
               }
             }}
           >
+            <Marker id={markerLevel} />
             <button
               className="mr-2 flex-shrink-0"
               onClick={(e) => {
@@ -2437,14 +2445,14 @@ const Components: React.FC = () => {
   };
 
   const formSections = [
-    { id: "A", title: "Component Information" },
-    { id: "B", title: "Running Hours & Condition Monitoring" },
-    { id: "C", title: "Jobs" },
-    { id: "D", title: "Maintenance History" },
-    { id: "E", title: "Spares" },
-    { id: "F", title: "Drawings & Manuals" },
-    { id: "G", title: "Classification & Regulatory Data" },
-    { id: "H", title: "Requisitions" }
+    { id: "A", title: "Component Information", marker: "B7.A" },
+    { id: "B", title: "Running Hours & Condition Monitoring", marker: "B7.B" },
+    { id: "C", title: "Jobs", marker: "B7.C" },
+    { id: "D", title: "Maintenance History", marker: "B7.D" },
+    { id: "E", title: "Spares", marker: "B7.E" },
+    { id: "F", title: "Drawings & Manuals", marker: "B7.F" },
+    { id: "G", title: "Classification & Regulatory Data", marker: "B7.G" },
+    { id: "H", title: "Requisitions", marker: "B7.H" }
   ];
 
   // Build proposed changes from tracked modifications
@@ -2639,8 +2647,8 @@ const Components: React.FC = () => {
                 Back to Modify PMS
               </Button>
             )}
-            <h1 className={`text-2xl font-semibold ${isChangeRequestMode ? 'text-white' : 'text-gray-800'}`}>
-              Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
+            <h1 className={`text-2xl font-semibold ${isChangeRequestMode ? 'text-white' : 'text-gray-800'}`} data-testid="B1">
+              <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
           {!isChangeRequestMode && !isChangeMode && (
@@ -2650,16 +2658,17 @@ const Components: React.FC = () => {
                 setEditingComponentId(null);
                 setShowAddEditFullPage(true);
               }}
-              data-testid="button-add-component"
+              data-testid="B5"
             >
-              + Add Component
+              <Marker id="B5" /> + Add / Edit Component
             </Button>
           )}
         </div>
         
         {/* Filters Row */}
         <div className="flex gap-4 mb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-testid="B2">
+            <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
             <Select value={vesselId} onValueChange={setVesselId}>
               <SelectTrigger className={`w-[200px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
@@ -2675,7 +2684,8 @@ const Components: React.FC = () => {
             </Select>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-testid="B3">
+            <Marker id="B3" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Critical Item:</span>
             <Select value={criticalFilter} onValueChange={setCriticalFilter}>
               <SelectTrigger className={`w-[140px] ${isChangeRequestMode ? 'border-white bg-white/10 text-white' : ''}`}>
@@ -2689,7 +2699,8 @@ const Components: React.FC = () => {
             </Select>
           </div>
           
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 flex-1" data-testid="B4">
+            <Marker id="B4" />
             <Input
               placeholder="Search by Name, SFI Code, Fleet Equipment Code, Maker, or Serial Number..."
               value={searchTerm}
@@ -2702,11 +2713,11 @@ const Components: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex gap-6 h-[calc(100vh-200px)]">
         {/* Left Panel - Component Tree (30%) */}
-        <div className="w-[30%]">
+        <div className="w-[30%]" data-testid="B6">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
             <div className="flex-1 overflow-auto">
-              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm">
-                COMPONENTS
+              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center gap-2">
+                <Marker id="B6" /> COMPONENTS
               </div>
               <div>
                 {renderComponentTree(filteredComponentTree)}
@@ -2716,13 +2727,14 @@ const Components: React.FC = () => {
         </div>
 
         {/* Right Panel - Component Details Form (70%) */}
-        <div className="w-[70%]">
+        <div className="w-[70%]" data-testid="B7">
           {selectedComponent ? (
             <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
               <div className="p-4 border-b-2 border-[#52baf3] flex-shrink-0">
+                <Marker id="B7" />
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-[#15569e]">
-                    {selectedComponent.code} {selectedComponent.name}
+                  <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
+                    <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
                   {!isChangeRequestMode && !isChangeMode && (
                     <Button
@@ -2733,9 +2745,9 @@ const Components: React.FC = () => {
                         setEditingComponentId(selectedComponent.id);
                         setShowAddEditFullPage(true);
                       }}
-                      data-testid="button-edit-component"
+                      data-testid="B7.2"
                     >
-                      <Edit2 className="h-4 w-4 mr-1" />
+                      <Marker id="B7.2" /> <Edit2 className="h-4 w-4 mr-1" />
                       Edit Component
                     </Button>
                   )}
@@ -2771,14 +2783,14 @@ const Components: React.FC = () => {
                     const isExpanded = expandedSections.has(section.id);
                     
                     return (
-                      <Card key={section.id} className="rounded-sm border border-gray-200">
+                      <Card key={section.id} className="rounded-sm border border-gray-200" data-testid={section.marker}>
                         <CardHeader 
                           className="py-3 cursor-pointer hover:bg-gray-50"
                           onClick={() => toggleSection(section.id)}
                         >
                           <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm font-medium text-[#16569e]">
-                              {section.id}. {section.title}
+                            <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2">
+                              <Marker id={section.marker} /> {section.id}. {section.title}
                             </CardTitle>
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4" />

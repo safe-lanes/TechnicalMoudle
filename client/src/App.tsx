@@ -8,6 +8,7 @@ import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
+import { MarkerProvider } from "@/contexts/MarkerContext";
 import { TechnicalModule } from "./pages/TechnicalModule";
 import Alerts from "./pages/admin/Alerts";
 import TestE2E from "./pages/TestE2E";
@@ -20,13 +21,14 @@ import NotFound from "./pages/not-found";
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <VesselProvider>
-          <OfflineProvider>
-            <ChangeRequestProvider>
-              <ChangeModeProvider>
-                <TooltipProvider>
+    <MarkerProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <VesselProvider>
+            <OfflineProvider>
+              <ChangeRequestProvider>
+                <ChangeModeProvider>
+                  <TooltipProvider>
             <div className="min-h-screen bg-gray-50">
               <Switch>
                 <Route path="/" component={TechnicalModule} />
@@ -82,13 +84,14 @@ function App() {
               </Switch>
             </div>
             <Toaster />
-                </TooltipProvider>
-              </ChangeModeProvider>
-            </ChangeRequestProvider>
-          </OfflineProvider>
-        </VesselProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+                  </TooltipProvider>
+                </ChangeModeProvider>
+              </ChangeRequestProvider>
+            </OfflineProvider>
+          </VesselProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </MarkerProvider>
   );
 }
 
