@@ -1183,16 +1183,18 @@ const Spares: React.FC = () => {
               <div className="border border-t-0 rounded-b">
                 {/* Row 1 - First row with field markers */}
                 <div className="grid grid-cols-12 gap-3 p-3 border-b bg-white items-center">
-                  <div className="col-span-2">
-                    <Input placeholder="SP-ME-001" className="text-sm" data-testid="E10.3" />
+                  <div className="col-span-2 relative">
+                    <Marker id="E10.3" />
+                    <Input placeholder="e.g., SP-ME-001" className="text-sm" data-testid="E10.3" />
                   </div>
-                  <div className="col-span-2">
-                    <Input placeholder="Fuel Injector" className="text-sm" data-testid="E10.5" />
+                  <div className="col-span-2 relative">
+                    <Marker id="E10.5" />
+                    <Input placeholder="e.g., Fuel Injector" className="text-sm" data-testid="E10.5" />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-3 relative">
+                    <Marker id="E10.8" />
                     <Select>
                       <SelectTrigger className="text-sm" data-testid="E10.8">
-                        <Marker id="E10.8" />
                         <SelectValue placeholder="Select a component" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1201,19 +1203,28 @@ const Spares: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Input placeholder="0" className="text-sm" data-testid="E10.12" />
-                  <Input placeholder="0" className="text-sm" data-testid="E10.14" />
-                  <Select>
-                    <SelectTrigger className="text-sm" data-testid="E10.10">
-                      <Marker id="E10.10" />
-                      <SelectValue placeholder="No" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Y">Yes</SelectItem>
-                      <SelectItem value="N">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="col-span-2 flex items-center gap-2">
+                  <div className="relative">
+                    <Marker id="E10.12" />
+                    <Input placeholder="0" className="text-sm" data-testid="E10.12" />
+                  </div>
+                  <div className="relative">
+                    <Marker id="E10.14" />
+                    <Input placeholder="0" className="text-sm" data-testid="E10.14" />
+                  </div>
+                  <div className="relative">
+                    <Marker id="E10.10" />
+                    <Select>
+                      <SelectTrigger className="text-sm" data-testid="E10.10">
+                        <SelectValue placeholder="No" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Y">Yes</SelectItem>
+                        <SelectItem value="N">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2 relative">
+                    <Marker id="E10.16" />
                     <Input placeholder="e.g., Store Room A" className="text-sm flex-1" data-testid="E10.16" />
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                       <Edit className="h-3 w-3" />
