@@ -52,7 +52,15 @@ export function Marker({ id }: { id: string }) {
   if (!showMarkers) return null;
   
   return (
-    <span className="inline-flex items-center justify-center bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-middle">
+    <span 
+      className="inline-flex items-center justify-center bg-purple-600 text-white text-[10px] font-bold px-1 py-0.5 rounded mr-1 align-middle shadow-md border border-purple-400"
+      style={{ 
+        zIndex: 9998,
+        position: 'relative',
+        minWidth: 'fit-content',
+        whiteSpace: 'nowrap'
+      }}
+    >
       {id}
     </span>
   );

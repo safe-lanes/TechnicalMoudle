@@ -23,6 +23,7 @@ import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
+import { Marker } from "@/contexts/MarkerContext";
 
 // Extend WorkOrderWithLeadTime to include computed status from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -353,13 +354,17 @@ const WorkOrders: React.FC = () => {
       {/* Header with Status Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl font-semibold text-gray-900">Work Orders (W.O)</h1>
+          <h1 className="text-xl font-semibold text-gray-900" data-testid="C1">
+            <Marker id="C1" />Work Orders (W.O)
+          </h1>
           <div className="flex gap-2">
             <Button 
               size="sm" 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
               onClick={handleAddWorkOrderClick}
+              data-testid="C2"
             >
+              <Marker id="C2" />
               <Plus className="h-4 w-4 mr-1" />
               Add W.O
             </Button>
@@ -367,7 +372,9 @@ const WorkOrders: React.FC = () => {
               size="sm" 
               className="bg-green-600 hover:bg-green-700 text-white"
               onClick={() => setUnplannedWorkOrderFormOpen(true)}
+              data-testid="C3"
             >
+              <Marker id="C3" />
               <Plus className="h-4 w-4 mr-1" />
               Unplanned W.O
             </Button>
@@ -376,31 +383,37 @@ const WorkOrders: React.FC = () => {
         
         {/* Status Tabs */}
         <div className="flex items-center gap-1 px-4 pb-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "bg-[#52baf3] text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
-              }`}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-xs">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+          {tabs.map((tab, index) => {
+            const markerId = index === 0 ? "C4" : index === 1 ? "C5" : index === 2 ? "C6" : index === 3 ? "C7" : "C8";
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-[#52baf3] text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                }`}
+                data-testid={markerId}
+              >
+                <Marker id={markerId} />
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white rounded-full text-xs">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-200">
         <Select value={vesselId} onValueChange={setVesselId}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-48" data-testid="C15">
+            <Marker id="C15" />
             <SelectValue placeholder="Select Vessel" />
           </SelectTrigger>
           <SelectContent>
@@ -412,7 +425,8 @@ const WorkOrders: React.FC = () => {
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-sm" data-testid="C10">
+          <Marker id="C10" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search Work Orders..."
@@ -423,7 +437,8 @@ const WorkOrders: React.FC = () => {
         </div>
 
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-          <SelectTrigger className="w-24">
+          <SelectTrigger className="w-24" data-testid="C11">
+            <Marker id="C11" />
             <SelectValue placeholder="Period" />
           </SelectTrigger>
           <SelectContent>
@@ -434,7 +449,8 @@ const WorkOrders: React.FC = () => {
         </Select>
 
         <Select value={selectedRank} onValueChange={setSelectedRank}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" data-testid="C12">
+            <Marker id="C12" />
             <SelectValue placeholder="All Ranks" />
           </SelectTrigger>
           <SelectContent>
@@ -445,7 +461,8 @@ const WorkOrders: React.FC = () => {
         </Select>
 
         <Select value={selectedComponent} onValueChange={setSelectedComponent}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" data-testid="C13">
+            <Marker id="C13" />
             <SelectValue placeholder="Component" />
           </SelectTrigger>
           <SelectContent>
@@ -456,7 +473,8 @@ const WorkOrders: React.FC = () => {
         </Select>
 
         <Select value={selectedCriticality} onValueChange={setSelectedCriticality}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32" data-testid="C14">
+            <Marker id="C14" />
             <SelectValue placeholder="Criticality" />
           </SelectTrigger>
           <SelectContent>
@@ -471,21 +489,22 @@ const WorkOrders: React.FC = () => {
         <table className="w-full text-sm">
           <thead className="bg-[#52baf3] text-white sticky top-0">
             <tr>
-              <th className="text-left py-3 px-4 font-medium">Component</th>
-              <th className="text-left py-3 px-4 font-medium">Work Order No</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="C16"><Marker id="C16" />Component</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="C17"><Marker id="C17" />Work Order No</th>
               {activeTab === "Pending Approval" && (
                 <th className="text-left py-3 px-4 font-medium">WO Template Code</th>
               )}
-              <th className="text-left py-3 px-4 font-medium">Job Title</th>
-              <th className="text-left py-3 px-4 font-medium">Assigned to</th>
-              <th className="text-left py-3 px-4 font-medium">
+              <th className="text-left py-3 px-4 font-medium" data-testid="C18"><Marker id="C18" />Job Title</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="C19"><Marker id="C19" />Assigned to</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="C20">
+                <Marker id="C20" />
                 {activeTab === "Pending Approval" || activeTab === "Completed" ? "Submitted Date" : "Due Date"}
               </th>
-              <th className="text-left py-3 px-4 font-medium">Status</th>
+              <th className="text-left py-3 px-4 font-medium" data-testid="C21"><Marker id="C21" />Status</th>
               {activeTab !== "Pending Approval" && (
-                <th className="text-left py-3 px-4 font-medium">Date Completed</th>
+                <th className="text-left py-3 px-4 font-medium" data-testid="C22"><Marker id="C22" />Date Completed</th>
               )}
-              <th className="text-center py-3 px-4 font-medium">Actions</th>
+              <th className="text-center py-3 px-4 font-medium" data-testid="C23"><Marker id="C23" />Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -495,8 +514,12 @@ const WorkOrders: React.FC = () => {
                 className={`${index % 2 === 0 ? "bg-gray-50" : "bg-white"} cursor-pointer hover:bg-gray-100`}
                 onClick={() => handleWorkOrderClick(workOrder)}
               >
-                <td className="py-3 px-4 text-gray-900">{workOrder.component}</td>
-                <td className="py-3 px-4 text-blue-600 hover:text-blue-800">
+                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C24" : undefined}>
+                  {index === 0 && <Marker id="C24" />}
+                  {workOrder.component}
+                </td>
+                <td className="py-3 px-4 text-blue-600 hover:text-blue-800" data-testid={index === 0 ? "C25" : undefined}>
+                  {index === 0 && <Marker id="C25" />}
                   {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.executionId 
                     ? workOrder.executionId 
                     : workOrder.workOrderNo || workOrder.templateCode}
@@ -504,9 +527,16 @@ const WorkOrders: React.FC = () => {
                 {activeTab === "Pending Approval" && (
                   <td className="py-3 px-4 text-gray-900">{workOrder.templateCode}</td>
                 )}
-                <td className="py-3 px-4 text-gray-900">{workOrder.jobTitle}</td>
-                <td className="py-3 px-4 text-gray-900">{workOrder.assignedTo}</td>
-                <td className="py-3 px-4">
+                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C26" : undefined}>
+                  {index === 0 && <Marker id="C26" />}
+                  {workOrder.jobTitle}
+                </td>
+                <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C27" : undefined}>
+                  {index === 0 && <Marker id="C27" />}
+                  {workOrder.assignedTo}
+                </td>
+                <td className="py-3 px-4" data-testid={index === 0 ? "C28" : undefined}>
+                  {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900">
                       {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
@@ -558,13 +588,17 @@ const WorkOrders: React.FC = () => {
                     })()}
                   </div>
                 </td>
-                <td className="py-3 px-4">
+                <td className="py-3 px-4" data-testid={index === 0 ? "C29" : undefined}>
+                  {index === 0 && <Marker id="C29" />}
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
                     {workOrder.computedStatus || workOrder.status || 'Active'}
                   </span>
                 </td>
                 {activeTab !== "Pending Approval" && (
-                  <td className="py-3 px-4 text-gray-900">{formatProfessionalDate(workOrder.dateCompleted)}</td>
+                  <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C30" : undefined}>
+                    {index === 0 && <Marker id="C30" />}
+                    {formatProfessionalDate(workOrder.dateCompleted)}
+                  </td>
                 )}
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
@@ -575,7 +609,9 @@ const WorkOrders: React.FC = () => {
                         handlePencilClick(workOrder);
                       }}
                       title="Edit Template"
+                      data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
                     >
+                      {index === 0 && <Marker id="C31" />}
                       <Pen className="h-4 w-4 text-gray-600" />
                     </button>
                     <button 
@@ -585,7 +621,9 @@ const WorkOrders: React.FC = () => {
                         handleTimerClick(workOrder);
                       }}
                       title="Postpone Work Order"
+                      data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
                     >
+                      {index === 0 && <Marker id="C32" />}
                       <Timer className="h-4 w-4 text-gray-600" />
                     </button>
                   </div>
