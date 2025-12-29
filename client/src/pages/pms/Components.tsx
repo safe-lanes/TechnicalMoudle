@@ -1415,7 +1415,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
         <tbody>
           {spares.map((spare, index) => (
             <tr key={index} className="border-b border-gray-100">
-              <td className="py-3 px-3 text-gray-900">
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.10" : undefined}>
+                {index === 0 && <Marker id="B7.E.10" />}
                 {isModifyMode ? (
                   <ModifyFieldWrapper
                     originalValue={originalSpares?.[index]?.partCode ?? spare.partCode}
@@ -1435,7 +1436,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   spare.partCode
                 )}
               </td>
-              <td className="py-3 px-3 text-gray-900">
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.11" : undefined}>
+                {index === 0 && <Marker id="B7.E.11" />}
                 {isModifyMode ? (
                   <ModifyFieldWrapper
                     originalValue={originalSpares?.[index]?.partName ?? spare.partName}
@@ -1455,7 +1457,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   spare.partName
                 )}
               </td>
-              <td className="py-3 px-3">
+              <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.12" : undefined}>
+                {index === 0 && <Marker id="B7.E.12" />}
                 {isModifyMode ? (
                   <ModifyFieldWrapper
                     originalValue={originalSpares?.[index]?.critical ?? spare.critical}
@@ -1481,7 +1484,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   )
                 )}
               </td>
-              <td className="py-3 px-3 text-gray-900">
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.13" : undefined}>
+                {index === 0 && <Marker id="B7.E.13" />}
                 {isModifyMode ? (
                   <ModifyFieldWrapper
                     originalValue={originalSpares?.[index]?.rob ?? spare.rob}
@@ -1501,7 +1505,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   spare.rob
                 )}
               </td>
-              <td className="py-3 px-3 text-gray-900">
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.14" : undefined}>
+                {index === 0 && <Marker id="B7.E.14" />}
                 {isModifyMode ? (
                   <ModifyFieldWrapper
                     originalValue={originalSpares?.[index]?.min ?? spare.min}
@@ -1521,12 +1526,14 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                   spare.min
                 )}
               </td>
-              <td className="py-3 px-3">
+              <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.15" : undefined}>
+                {index === 0 && <Marker id="B7.E.15" />}
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   {spare.stock}
                 </span>
               </td>
-              <td className="py-3 px-3 text-gray-900">
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.16" : undefined}>
+                {index === 0 && <Marker id="B7.E.16" />}
                 <Popover>
                   <PopoverTrigger asChild>
                     <button 
@@ -1580,7 +1587,8 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                 </Popover>
               </td>
               {FEATURES.IHM && (
-                <td className="py-3 px-3 text-center">
+                <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
+                  {index === 0 && <Marker id="B7.E.17" />}
                   {/* Mock IHM status - in real implementation, fetch from API */}
                   {spare.partCode === 'SP-ME-001' ? (
                     <AlertCircle className="h-4 w-4 text-red-500 mx-auto" />
@@ -2450,7 +2458,7 @@ const Components: React.FC = () => {
     { id: "B", title: "Running Hours & Condition Monitoring", marker: "B7.B" },
     { id: "C", title: "Jobs", marker: "B7.C" },
     { id: "D", title: "Maintenance History", marker: "B7.D" },
-    { id: "E", title: "Spares", marker: "B7.E" },
+    { id: "E", title: "Spares", marker: "B7.E.1" },
     { id: "F", title: "Drawings & Manuals", marker: "B7.F" },
     { id: "G", title: "Classification & Regulatory Data", marker: "B7.G" },
     { id: "H", title: "Requisitions", marker: "B7.H" }
