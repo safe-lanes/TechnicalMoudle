@@ -2348,6 +2348,7 @@ router.post('/import', async (req, res) => {
     console.log(`   Rows: ${dataToImport.length}`);
     
     // Create initial ImportHistory with status='in_progress'
+    // Save to file-based storage for history listing
     await storeImportHistory({
       id: historyId,
       type: effectiveType,
@@ -2365,6 +2366,28 @@ router.post('/import', async (req, res) => {
       finishedAt: null,
       status: 'in_progress'
     });
+
+    // Also save to database for import_change_log foreign key constraint
+    try {
+      await storage.createImportHistory({
+        id: historyId,
+        type: effectiveType,
+        mode,
+        archiveMissing: archiveMissing || false,
+        userId: (req as any).user?.id || 'system',
+        vesselId: vesselId || null,
+        originalName: cachedData.originalName,
+        fileSize: cachedData.file.length,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        archived: 0,
+        status: 'in_progress'
+      });
+      console.log(`📊 Import history saved to database: ${historyId}`);
+    } catch (dbHistoryError) {
+      console.warn(`⚠️ Failed to save import history to database (change tracking may be disabled):`, (dbHistoryError as Error).message);
+    }
 
     // Perform the actual import using filtered/normalized data
     const importResult = await performImport(
