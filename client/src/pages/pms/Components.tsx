@@ -521,7 +521,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Commissioned Date</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.33"><Marker id="B7.A.33" /> Commissioned Date</label>
           {isChangeMode ? (
             <input
               type="date"
@@ -530,16 +530,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('commissionedDate') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-commissioned-date"
+              data-testid="B7.A.34"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-commissioned-date">
-              {componentData.commissionedDate}
+            <div className="text-sm text-gray-900" data-testid="B7.A.34">
+              <Marker id="B7.A.34" /> {componentData.commissionedDate}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Rating</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.35"><Marker id="B7.A.35" /> Rating</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -548,16 +548,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('rating') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-rating"
+              data-testid="B7.A.36"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-rating">
-              {componentData.rating}
+            <div className="text-sm text-gray-900" data-testid="B7.A.36">
+              <Marker id="B7.A.36" /> {componentData.rating}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Equipment / System Department</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.37"><Marker id="B7.A.37" /> Equipment / System Department</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -566,11 +566,11 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('eqptSystemDept') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-eqpt-system-dept"
+              data-testid="B7.A.38"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-eqpt-system-dept">
-              {componentData.eqptSystemDept}
+            <div className="text-sm text-gray-900" data-testid="B7.A.38">
+              <Marker id="B7.A.38" /> {componentData.eqptSystemDept}
             </div>
           )}
         </div>
@@ -582,7 +582,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
       {/* Row 6: Class Item, IS Active, Vessel Code, IS Parent */}
       <div className="grid grid-cols-4 gap-4">
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Class Item</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.39"><Marker id="B7.A.39" /> Class Item</label>
           {isChangeMode ? (
             <select
               value={componentData.classItem}
@@ -590,15 +590,15 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('classItem') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="select-class-item"
+              data-testid="B7.A.40"
             >
               <option value="">Select</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-class-item">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            <div className="text-sm text-gray-900" data-testid="B7.A.40">
+              <Marker id="B7.A.40" /> <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 componentData.classItem === "Yes" 
                   ? "bg-blue-100 text-blue-800" 
                   : "bg-gray-100 text-gray-800"
@@ -609,7 +609,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Active</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.41"><Marker id="B7.A.41" /> IS Active</label>
           {isChangeMode ? (
             <select
               value={componentData.isActive}
@@ -617,15 +617,15 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('isActive') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="select-is-active"
+              data-testid="B7.A.42"
             >
               <option value="">Select</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-is-active">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            <div className="text-sm text-gray-900" data-testid="B7.A.42">
+              <Marker id="B7.A.42" /> <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 componentData.isActive === "Yes" 
                   ? "bg-green-100 text-green-800" 
                   : "bg-gray-100 text-gray-800"
@@ -636,7 +636,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Vessel Code</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.43"><Marker id="B7.A.43" /> Vessel Code</label>
           {isChangeMode ? (
             <input
               type="text"
@@ -645,16 +645,16 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('vesselCode') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="input-vessel-code"
+              data-testid="B7.A.44"
             />
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-vessel-code">
-              {componentData.vesselCode}
+            <div className="text-sm text-gray-900" data-testid="B7.A.44">
+              <Marker id="B7.A.44" /> {componentData.vesselCode}
             </div>
           )}
         </div>
         <div>
-          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>IS Parent</label>
+          <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.45"><Marker id="B7.A.45" /> IS Parent</label>
           {isChangeMode ? (
             <select
               value={componentData.isParent}
@@ -662,15 +662,15 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               className={`text-sm w-full px-2 py-1 border rounded ${
                 changedFields.has('isParent') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
               }`}
-              data-testid="select-is-parent"
+              data-testid="B7.A.46"
             >
               <option value="">Select</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
           ) : (
-            <div className="text-sm text-gray-900" data-testid="text-is-parent">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            <div className="text-sm text-gray-900" data-testid="B7.A.46">
+              <Marker id="B7.A.46" /> <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 componentData.isParent === "Yes" 
                   ? "bg-purple-100 text-purple-800" 
                   : "bg-gray-100 text-gray-800"
@@ -684,7 +684,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
       {/* Row 7: Notes (full width) */}
       <div>
-        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`}>Notes</label>
+        <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.47"><Marker id="B7.A.47" /> Notes</label>
         {isChangeMode ? (
           <textarea
             value={componentData.notes}
@@ -693,11 +693,11 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
               changedFields.has('notes') ? 'text-red-600 border-red-300' : 'text-[#52BAF3] border-[#52BAF3]'
             }`}
             rows={3}
-            data-testid="input-notes"
+            data-testid="B7.A.48"
           />
         ) : (
-          <div className="text-sm text-gray-900" data-testid="text-notes">
-            {componentData.notes}
+          <div className="text-sm text-gray-900" data-testid="B7.A.48">
+            <Marker id="B7.A.48" /> {componentData.notes}
           </div>
         )}
       </div>
