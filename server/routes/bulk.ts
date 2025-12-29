@@ -2445,6 +2445,19 @@ router.post('/import', async (req, res) => {
       storedFilePath: storedFilePath
     });
 
+    // Also update database import history to keep it in sync
+    try {
+      await storage.updateImportHistory(historyId, {
+        ...importResult,
+        finishedAt: new Date(),
+        status: 'complete',
+        storedFilePath: storedFilePath
+      });
+      console.log(`📊 Import history updated in database: ${historyId}`);
+    } catch (dbUpdateError) {
+      console.warn(`⚠️ Failed to update import history in database:`, (dbUpdateError as Error).message);
+    }
+
     // Clean up cache
     dryRunCache.delete(fileToken);
 
