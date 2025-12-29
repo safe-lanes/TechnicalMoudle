@@ -1,0 +1,17 @@
+{
+  "id": "34df427f-ed0d-4ca4-843a-68d141f45b9b",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "V015",
+  "userId": 1,
+  "startedAt": "2025-12-29T04:37:45.700Z",
+  "completedAt": "2025-12-29T04:37:47.228Z",
+  "status": "complete",
+  "created": 329,
+  "updated": 94,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Vessel component _ Test Vessel_01 2.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/components/1766983067228_Vessel_component___Test_Vessel_01_2.xlsx",
+  "errorReport": null
+}
