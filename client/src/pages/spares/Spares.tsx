@@ -894,7 +894,6 @@ const Spares: React.FC = () => {
                   filteredSpares.map((spare, rowIndex) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
                     const isCritical = spare.critical === "Critical" || spare.critical === "Yes";
-                    const isAdjusting = adjustingSpares.has(spare.id);
                     const isFirstRow = rowIndex === 0;
                     
                     return (
