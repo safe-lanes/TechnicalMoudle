@@ -16,6 +16,7 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
+import { Marker } from "@/contexts/MarkerContext";
 
 interface ChildRHData {
   id: string;
@@ -418,19 +419,21 @@ const RunningHours = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Running Hours</h1>
+        <h1 className="text-2xl font-semibold text-gray-900" data-testid="D1"><Marker id="D1" />Running Hours</h1>
         <Button 
           className="bg-green-600 hover:bg-green-700 text-white ml-[228px] mr-[228px]"
           onClick={openBulkUpdate}
+          data-testid="D5"
         >
-          <span className="mr-2">+</span>
+          <Marker id="D5" /><span className="mr-2">+</span>
           Bulk Update RH
         </Button>
       </div>
 
       {/* Search and Export Row */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-md" data-testid="D2">
+          <Marker id="D2" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Search Component"
@@ -440,13 +443,13 @@ const RunningHours = () => {
           />
         </div>
 
-        <Button variant="outline" className="flex items-center gap-2" onClick={exportToCSV}>
-          <FileSpreadsheet className="h-4 w-4" />
+        <Button variant="outline" className="flex items-center gap-2" onClick={exportToCSV} data-testid="D3">
+          <Marker id="D3" /><FileSpreadsheet className="h-4 w-4" />
           Export
         </Button>
 
-        <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2">
-          Clear
+        <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2" data-testid="D4">
+          <Marker id="D4" />Clear
         </Button>
       </div>
 
@@ -455,13 +458,13 @@ const RunningHours = () => {
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
           <div className="grid grid-cols-8 gap-4 text-sm font-medium">
-            <div>Component Name</div>
-            <div>Component Code</div>
-            <div>Component Category</div>
-            <div>Running Hours</div>
-            <div>last Updated</div>
-            <div>Utilization Rate</div>
-            <div className="col-span-2">Update RH</div>
+            <div data-testid="D6"><Marker id="D6" />Component Name</div>
+            <div data-testid="D7"><Marker id="D7" />Component Code</div>
+            <div data-testid="D8"><Marker id="D8" />Component Category</div>
+            <div data-testid="D9"><Marker id="D9" />Running Hours</div>
+            <div data-testid="D10"><Marker id="D10" />Last Updated</div>
+            <div data-testid="D11"><Marker id="D11" />Utilization Rate</div>
+            <div className="col-span-2" data-testid="D12"><Marker id="D12" />Update RH</div>
           </div>
         </div>
 
@@ -492,11 +495,12 @@ const RunningHours = () => {
               );
             }
             
-            return filteredData.map((item) => (
+            return filteredData.map((item, index) => (
               <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
               <div className="grid grid-cols-8 gap-4 text-sm items-center">
-                <div className="text-gray-900">{item.component}</div>
-                <div>
+                <div className="text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</div>
+                <div data-testid={index === 0 ? "D14" : undefined}>
+                  {index === 0 && <Marker id="D14" />}
                   {item.sfiCode && item.componentCode ? (
                     <button
                       type="button"
@@ -513,11 +517,11 @@ const RunningHours = () => {
                     <span className="text-sm text-gray-400">—</span>
                   )}
                 </div>
-                <div className="text-gray-700">{item.componentCategory}</div>
-                <div className="text-gray-900 font-medium">{item.runningHours}</div>
-                <div className="text-gray-700">{item.lastUpdated}</div>
-                <div className="text-gray-700" title="Computed from last 30 days of RH entries">
-                  {item.utilizationRate !== null ? `${item.utilizationRate} hrs/day` : "—"}
+                <div className="text-gray-700" data-testid={index === 0 ? "D15" : undefined}>{index === 0 && <Marker id="D15" />}{item.componentCategory}</div>
+                <div className="text-gray-900 font-medium" data-testid={index === 0 ? "D16" : undefined}>{index === 0 && <Marker id="D16" />}{item.runningHours}</div>
+                <div className="text-gray-700" data-testid={index === 0 ? "D17" : undefined}>{index === 0 && <Marker id="D17" />}{item.lastUpdated}</div>
+                <div className="text-gray-700" title="Computed from last 30 days of RH entries" data-testid={index === 0 ? "D18" : undefined}>
+                  {index === 0 && <Marker id="D18" />}{item.utilizationRate !== null ? `${item.utilizationRate} hrs/day` : "—"}
                 </div>
                 <div className="col-span-2 flex gap-2">
                   <Button 
@@ -526,9 +530,9 @@ const RunningHours = () => {
                     className="h-8 w-8 p-0"
                     onClick={() => openUpdateDialog(item)}
                     title="Update Running Hours"
-                    data-testid={`button-update-rh-${item.id}`}
+                    data-testid={index === 0 ? "D19" : `button-update-rh-${item.id}`}
                   >
-                    <Settings className="h-4 w-4 text-gray-600" />
+                    {index === 0 && <Marker id="D19" />}<Settings className="h-4 w-4 text-gray-600" />
                   </Button>
                   <Button 
                     variant="outline" 
@@ -536,9 +540,9 @@ const RunningHours = () => {
                     className="h-8 w-8 p-0"
                     onClick={() => openChildRHPopup(item)}
                     title="View Children Running Hours"
-                    data-testid={`button-view-children-rh-${item.id}`}
+                    data-testid={index === 0 ? "D20" : `button-view-children-rh-${item.id}`}
                   >
-                    <Users className="h-4 w-4 text-blue-600" />
+                    {index === 0 && <Marker id="D20" />}<Users className="h-4 w-4 text-blue-600" />
                   </Button>
                 </div>
               </div>
@@ -549,8 +553,8 @@ const RunningHours = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-end text-sm text-gray-500">
-        Page 6 of 6
+      <div className="flex justify-end text-sm text-gray-500" data-testid="D21">
+        <Marker id="D21" />Page 6 of 6
       </div>
 
       {/* Update Running Hours Dialog */}
