@@ -756,27 +756,27 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
         <table className="w-full border-collapse" data-testid="table-running-hours">
           <thead>
             <tr className="bg-[#52baf3] text-white">
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">RH Counter Type</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">RH Counter Source</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">Running Hours</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]">Last Updated</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.1"><Marker id="B7.B.1" /> RH Counter Type</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.2"><Marker id="B7.B.2" /> RH Counter Source</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.3"><Marker id="B7.B.3" /> Running Hours</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold border border-[#3da8e0]" data-testid="B7.B.4"><Marker id="B7.B.4" /> Last Updated</th>
             </tr>
           </thead>
           <tbody>
             <tr className="bg-white">
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-type">
-                {rhCounterType === 'MASTER' ? 'Master' :
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.5">
+                <Marker id="B7.B.5" /> {rhCounterType === 'MASTER' ? 'Master' :
                  rhCounterType === 'INHERITED' ? 'Inherited' :
                  'Not RH Driven'}
               </td>
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-rh-counter-source">
-                {getRHCounterSource(selectedComponent)}
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.6">
+                <Marker id="B7.B.6" /> {getRHCounterSource(selectedComponent)}
               </td>
-              <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="text-running-hours">
-                {getDisplayRH(selectedComponent)}
+              <td className="px-4 py-3 text-sm font-semibold border border-gray-200" data-testid="B7.B.7">
+                <Marker id="B7.B.7" /> {getDisplayRH(selectedComponent)}
               </td>
-              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="text-last-updated">
-                {getLastUpdated(selectedComponent)}
+              <td className="px-4 py-3 text-sm border border-gray-200" data-testid="B7.B.8">
+                <Marker id="B7.B.8" /> {getLastUpdated(selectedComponent)}
               </td>
             </tr>
           </tbody>
@@ -1011,21 +1011,22 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
             onClick={handleAddWorkOrder}
             size="sm"
             className="bg-[#0ea5e9] hover:bg-[#0284c7] text-white"
+            data-testid="B7.C.2"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Marker id="B7.C.2" /> <Plus className="h-4 w-4 mr-1" />
             Add Job
           </Button>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Code</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Job Title</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Task Type</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Frequency</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Last Done Date</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600">Next Due Date</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600">Actions</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.3"><Marker id="B7.C.3" /> Job Code</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.4"><Marker id="B7.C.4" /> Job Title</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.5"><Marker id="B7.C.5" /> Task Type</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.6"><Marker id="B7.C.6" /> Frequency</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.7"><Marker id="B7.C.7" /> Last Done Date</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.C.8"><Marker id="B7.C.8" /> Next Due Date</th>
+              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.C.9"><Marker id="B7.C.9" /> Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1091,11 +1092,11 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600">
-          <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
+        <div className="text-sm text-gray-600" data-testid="B7.D.2">
+          <Marker id="B7.D.2" /> <span className="font-semibold">{maintenanceHistory.length}</span> maintenance record(s) found
         </div>
-        <div className="text-xs text-gray-500 italic">
-          Records are immutable and cannot be edited or deleted
+        <div className="text-xs text-gray-500 italic" data-testid="B7.D.3">
+          <Marker id="B7.D.3" /> Records are immutable and cannot be edited or deleted
         </div>
       </div>
       
@@ -1103,14 +1104,14 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">WO No</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Job Title</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Type</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Date Completed</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Running Hours</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Performed By</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Approved By</th>
-              <th className="text-left py-3 px-3 font-semibold text-gray-700">Status</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.4"><Marker id="B7.D.4" /> WO No</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.5"><Marker id="B7.D.5" /> Job Title</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.6"><Marker id="B7.D.6" /> Type</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.7"><Marker id="B7.D.7" /> Date Completed</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.8"><Marker id="B7.D.8" /> Running Hours</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.9"><Marker id="B7.D.9" /> Performed By</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.10"><Marker id="B7.D.10" /> Approved By</th>
+              <th className="text-left py-3 px-3 font-semibold text-gray-700" data-testid="B7.D.11"><Marker id="B7.D.11" /> Status</th>
             </tr>
           </thead>
           <tbody>
@@ -1146,8 +1147,8 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
       </div>
       
       {/* Instruction hint */}
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-        Click on a record to view full details including work description, spares used, and remarks
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.D.20">
+        <Marker id="B7.D.20" /> Click on a record to view full details including work description, spares used, and remarks
       </div>
 
       {/* Record Detail Modal */}
@@ -1399,15 +1400,15 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200">
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Part Code</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Part Name</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Critical</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">ROB</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Min</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Stock</th>
-            <th className="text-left py-2 px-3 font-medium text-gray-600">Location</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.2"><Marker id="B7.E.2" /> Part Code</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.3"><Marker id="B7.E.3" /> Part Name</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.4"><Marker id="B7.E.4" /> Critical</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.5"><Marker id="B7.E.5" /> ROB</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.6"><Marker id="B7.E.6" /> Min</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.7"><Marker id="B7.E.7" /> Stock</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.8"><Marker id="B7.E.8" /> Location</th>
             {FEATURES.IHM && (
-              <th className="text-center py-2 px-3 font-medium text-gray-600" title="IHM Status">IHM</th>
+              <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.E.9" title="IHM Status"><Marker id="B7.E.9" /> IHM</th>
             )}
           </tr>
         </thead>
@@ -1698,12 +1699,12 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-gray-600">
-          <span className="font-semibold">{viewableDocuments.length}</span> document(s) available
+        <div className="text-sm text-gray-600" data-testid="B7.F.2">
+          <Marker id="B7.F.2" /> <span className="font-semibold">{viewableDocuments.length}</span> document(s) available
         </div>
         <AdminOnly>
-          <Button size="sm" variant="outline" className="text-xs" data-testid="button-upload-document">
-            <Upload className="h-3 w-3 mr-1" />
+          <Button size="sm" variant="outline" className="text-xs" data-testid="B7.F.3">
+            <Marker id="B7.F.3" /> <Upload className="h-3 w-3 mr-1" />
             Upload Document
           </Button>
         </AdminOnly>
@@ -1722,7 +1723,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
                   ? 'hover:bg-blue-50 cursor-pointer border-gray-200' 
                   : 'bg-gray-50 border-gray-100 cursor-not-allowed'
               }`}
-              data-testid={`document-${doc.fileName || index}`}
+              data-testid="B7.F.4"
               onClick={() => {
                 if (hasDownloadAccess) {
                   console.log('Download document:', doc.fileName);
@@ -1753,15 +1754,15 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
                 </div>
               </div>
               {hasDownloadAccess && (
-                <Download className="h-4 w-4 text-gray-400" />
+                <span data-testid="B7.F.5"><Marker id="B7.F.5" /> <Download className="h-4 w-4 text-gray-400" /></span>
               )}
             </div>
           );
         })}
       </div>
       
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-        💡 Document access is controlled by role-based permissions
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.F.6">
+        <Marker id="B7.F.6" /> 💡 Document access is controlled by role-based permissions
       </div>
     </div>
   );
@@ -2792,11 +2793,14 @@ const Components: React.FC = () => {
                             <CardTitle className="text-sm font-medium text-[#16569e] flex items-center gap-2">
                               <Marker id={section.marker} /> {section.id}. {section.title}
                             </CardTitle>
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
+                            <span data-testid="B7.3">
+                              <Marker id="B7.3" />
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </span>
                           </div>
                         </CardHeader>
                         {isExpanded && (
