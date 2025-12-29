@@ -45,3 +45,15 @@ export function useMarkers() {
   }
   return context;
 }
+
+export function Marker({ id }: { id: string }) {
+  const { showMarkers } = useMarkers();
+  
+  if (!showMarkers) return null;
+  
+  return (
+    <span className="inline-flex items-center justify-center bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-middle">
+      {id}
+    </span>
+  );
+}
