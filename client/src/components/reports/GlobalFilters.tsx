@@ -1,8 +1,8 @@
-import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Marker } from "@/components/Marker";
 import {
   Select,
   SelectContent,
@@ -131,12 +131,12 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
   };
 
   return (
-    <Card className={cn("mb-6", className)} data-testid="global-filters">
+    <Card className={cn("mb-6", className)} data-testid="G7">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-600" />
-            <h3 className="font-semibold text-gray-800">Global Filters</h3>
+            <h3 className="font-semibold text-gray-800" data-testid="G7.1"><Marker id="G7" />Global Filters</h3>
             {getActiveFiltersCount() > 0 && (
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 {getActiveFiltersCount()} active
@@ -160,12 +160,13 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Vessel Selection */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <Label className="text-sm font-medium flex items-center gap-2" data-testid="G8">
+              <Marker id="G8" />
               <Ship className="h-4 w-4" />
               Vessel
             </Label>
             <Select value={filters.vessel} onValueChange={handleVesselChange}>
-              <SelectTrigger data-testid="select-vessel-filter">
+              <SelectTrigger data-testid="G9">
                 <SelectValue placeholder="Select vessel" />
               </SelectTrigger>
               <SelectContent>
@@ -184,12 +185,13 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
           {/* Department Selection */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <Label className="text-sm font-medium flex items-center gap-2" data-testid="G10">
+              <Marker id="G10" />
               <Building className="h-4 w-4" />
               Department
             </Label>
             <Select value={filters.department} onValueChange={handleDepartmentChange}>
-              <SelectTrigger data-testid="select-department-filter">
+              <SelectTrigger data-testid="G11">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -208,12 +210,13 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
           {/* Priority Selection */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <Label className="text-sm font-medium flex items-center gap-2" data-testid="G12">
+              <Marker id="G12" />
               <AlertTriangle className="h-4 w-4" />
               Priority
             </Label>
             <Select value={filters.priority} onValueChange={handlePriorityChange}>
-              <SelectTrigger data-testid="select-priority-filter">
+              <SelectTrigger data-testid="G13">
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
@@ -232,7 +235,8 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
 
           {/* Date Range Selection */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <Label className="text-sm font-medium flex items-center gap-2" data-testid="G14">
+              <Marker id="G14" />
               <CalendarIcon className="h-4 w-4" />
               Date Range
             </Label>
@@ -244,7 +248,7 @@ const GlobalFilters: React.FC<GlobalFiltersProps> = ({
                     "w-full justify-start text-left font-normal",
                     !filters.dateRange.from && !filters.dateRange.to && "text-muted-foreground"
                   )}
-                  data-testid="button-date-range-filter"
+                  data-testid="G15"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {formatDateRange()}

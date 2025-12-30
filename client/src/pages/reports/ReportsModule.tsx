@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Marker } from "@/components/Marker";
 import {
   ClipboardList,
   Clock,
@@ -253,15 +254,17 @@ const ReportsModule = () => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
-            <p className="text-gray-600">Generate and export comprehensive reports across all PMS modules</p>
+            <h1 className="text-2xl font-bold text-gray-800" data-testid="G1"><Marker id="G1" />Reports</h1>
+            <p className="text-gray-600" data-testid="G2"><Marker id="G2" />Generate and export comprehensive reports across all PMS modules</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="flex items-center gap-2" data-testid="button-schedule-reports">
+            <Button variant="outline" className="flex items-center gap-2" data-testid="G5">
+              <Marker id="G5" />
               <Calendar className="h-4 w-4" />
               Schedule Reports
             </Button>
-            <Button variant="outline" className="flex items-center gap-2" data-testid="button-export-queue">
+            <Button variant="outline" className="flex items-center gap-2" data-testid="G6">
+              <Marker id="G6" />
               <Download className="h-4 w-4" />
               Export Queue
             </Button>
@@ -277,10 +280,11 @@ const ReportsModule = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-reports"
+              data-testid="G3"
             />
           </div>
-          <Button variant="outline" className="flex items-center gap-2" data-testid="button-filters">
+          <Button variant="outline" className="flex items-center gap-2" data-testid="G4">
+            <Marker id="G4" />
             <Filter className="h-4 w-4" />
             Filters
           </Button>
@@ -296,12 +300,12 @@ const ReportsModule = () => {
 
       {/* Statistics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
+        <Card data-testid="G16">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-total-reports">
+                <p className="text-sm text-gray-600"><Marker id="G16" />Total Reports</p>
+                <p className="text-2xl font-bold text-gray-800">
                   {reportCategories.reduce((sum, cat) => sum + cat.reportCount, 0)}
                 </p>
               </div>
@@ -309,12 +313,12 @@ const ReportsModule = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="G17">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Generated Today</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-generated-today">
+                <p className="text-sm text-gray-600"><Marker id="G17" />Generated Today</p>
+                <p className="text-2xl font-bold text-gray-800">
                   {recentReports.filter(r => r.generatedAt.includes('hour')).length}
                 </p>
               </div>
@@ -322,12 +326,12 @@ const ReportsModule = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="G18">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Export Queue</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-export-queue">
+                <p className="text-sm text-gray-600"><Marker id="G18" />Export Queue</p>
+                <p className="text-2xl font-bold text-gray-800">
                   {recentReports.filter(r => r.status === 'processing').length}
                 </p>
               </div>
@@ -335,12 +339,12 @@ const ReportsModule = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="G19">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Scheduled</p>
-                <p className="text-2xl font-bold text-gray-800" data-testid="text-scheduled">0</p>
+                <p className="text-sm text-gray-600"><Marker id="G19" />Scheduled</p>
+                <p className="text-2xl font-bold text-gray-800">0</p>
               </div>
               <Calendar className="h-8 w-8 text-purple-500" />
             </div>
@@ -351,24 +355,26 @@ const ReportsModule = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Report Categories */}
         <div className="lg:col-span-2">
-          <Card>
+          <Card data-testid="G20">
             <CardHeader>
-              <CardTitle>Report Categories</CardTitle>
+              <CardTitle><Marker id="G20" />Report Categories</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reportCategories.map((category) => {
+                {reportCategories.map((category, index) => {
                   const Icon = category.icon;
+                  const markerId = `G${21 + index}`;
                   return (
                     <Card 
                       key={category.id}
                       className={`cursor-pointer hover:shadow-md transition-shadow border-l-4 ${category.color}`}
                       onClick={() => handleCategoryClick(category.id)}
-                      data-testid={`category-card-${category.id}`}
+                      data-testid={markerId}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className={`p-2 rounded-lg ${category.iconBg} text-white`}>
+                            <Marker id={markerId} />
                             <Icon className="h-5 w-5" />
                           </div>
                           <Badge variant="secondary">{category.reportCount} reports</Badge>
@@ -390,29 +396,33 @@ const ReportsModule = () => {
         {/* Right Sidebar */}
         <div className="space-y-6">
           {/* Quick Access Reports */}
-          <Card>
+          <Card data-testid="G30">
             <CardHeader>
-              <CardTitle className="text-lg">Quick Access</CardTitle>
+              <CardTitle className="text-lg"><Marker id="G30" />Quick Access</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {quickAccessReports.map((report, index) => (
-                <div key={index} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer" data-testid={`quick-access-${index}`}>
-                  <div>
-                    <p className="font-medium text-sm text-gray-800">{report.name}</p>
-                    <p className="text-xs text-gray-500">{report.frequency}</p>
+              {quickAccessReports.map((report, index) => {
+                const markerId = `G${31 + index}`;
+                return (
+                  <div key={index} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer" data-testid={markerId}>
+                    <div>
+                      <Marker id={markerId} />
+                      <p className="font-medium text-sm text-gray-800">{report.name}</p>
+                      <p className="text-xs text-gray-500">{report.frequency}</p>
+                    </div>
+                    <Button size="sm" variant="ghost">
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost" data-testid={`button-quick-download-${index}`}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 
           {/* Recent Reports */}
-          <Card>
+          <Card data-testid="G37">
             <CardHeader>
-              <CardTitle className="text-lg">Recent Reports</CardTitle>
+              <CardTitle className="text-lg"><Marker id="G37" />Recent Reports</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {recentReports.map((report) => (
