@@ -174,6 +174,33 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     enabled: !!vesselId
   });
 
+  // Fetch vessel locations for location selection in B4
+  const { data: locationsResponse } = useQuery<{ success: boolean; data: Array<{ id: number; locationName: string }> }>({
+    queryKey: [`/api/inventory/locations/${vesselId}`],
+    enabled: !!vesselId
+  });
+  const vesselLocations = locationsResponse?.data || [];
+
+  // Fetch spares with inventory for stock validation
+  const { data: sparesWithInventoryResponse, isLoading: isSparesInventoryLoading, isFetched: isSparesInventoryFetched, isError: isSparesInventoryError } = useQuery<{ success: boolean; data: Array<{
+    spare: { id: number; partCode: string; partName: string };
+    robTotal: number;
+    stockStatus: string;
+    locations: Array<{ locationId: number; locationName: string; qty: number }>;
+  }> }>({
+    queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`],
+    enabled: !!vesselId
+  });
+  const sparesWithInventory = sparesWithInventoryResponse?.data || [];
+
+  // Helper to get stock at a specific location for a part
+  const getStockAtLocation = (partCode: string, locationId: number): number => {
+    const spare = sparesWithInventory.find(s => s.spare.partCode === partCode);
+    if (!spare) return 0;
+    const loc = spare.locations.find(l => l.locationId === locationId);
+    return loc?.qty || 0;
+  };
+
   // Helper function to get available locations for a spare part
   const getAvailableLocationsForSpare = (partNo: string): Array<'Location A' | 'Location B'> => {
     const spare = sparesInventory.find(s => s.partCode === partNo);
@@ -312,7 +339,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', comments: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', locationId: number | null, comments: string}>,
     ihmUpdate: {
       enabled: false,
       action: "",
@@ -450,9 +477,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
       }
       if (context.executionData) {
+        // PHASE 3A: Hydrate locationId for existing consumedSpareParts by matching location names
+        const hydratedConsumedSpareParts = (context.executionData.consumedSpareParts || []).map((spare: any) => {
+          // If locationId already present, use it
+          if (spare.locationId != null && spare.locationId > 0) {
+            return spare;
+          }
+          // Try to find locationId by matching location name (legacy data)
+          if (spare.location && vesselLocations?.length > 0) {
+            const matchedLocation = vesselLocations.find(
+              (loc: any) => loc.locationName?.toLowerCase() === spare.location?.toLowerCase()
+            );
+            if (matchedLocation) {
+              return { ...spare, locationId: matchedLocation.id };
+            }
+          }
+          return spare;
+        });
+        
         setExecutionData(prev => ({
           ...prev,
           ...context.executionData,
+          consumedSpareParts: hydratedConsumedSpareParts,
           woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
         }));
       }
@@ -486,7 +532,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Mark context as loaded once to prevent re-hydration
       contextLoadedOnce.current = true;
     }
-  }, [workOrderContext, isModifyMode, setOriginalSnapshot]);
+  }, [workOrderContext, isModifyMode, setOriginalSnapshot, vesselLocations]);
 
   // Initialize form for new job creation (Add Job flow)
   useEffect(() => {
@@ -888,7 +934,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddConsumedSparePart = () => {
-    const newPart = { partNo: "", description: "", quantityConsumed: "", location: "" as const, comments: "" };
+    const newPart = { partNo: "", description: "", quantityConsumed: "", location: "" as const, locationId: null, comments: "" };
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: [...prev.consumedSpareParts, newPart]
@@ -967,19 +1013,74 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         return;
       }
 
-      // Validate spare parts consumed - location must be selected for items with quantity
+      // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
+      const hasConsumedSpares = executionData.consumedSpareParts.some(
+        spare => spare.partNo && spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0
+      );
+      if (hasConsumedSpares && vesselId) {
+        if (!isSparesInventoryFetched) {
+          toast({
+            title: "Loading Inventory Data",
+            description: "Please wait for inventory data to load before submitting.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (isSparesInventoryError) {
+          toast({
+            title: "Inventory Data Error",
+            description: "Failed to load inventory data. Stock validation cannot be performed. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // PHASE 3A: Validate spare parts consumed - locationId must be selected for inventory-tracked items
+      // Only require locationId for items that exist in inventory (have partNo matching a spare.partCode)
       const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
         const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
-        const autoLocation = getAutoSelectedLocation(spare.partNo);
-        const hasLocation = spare.location || autoLocation;
-        return hasQuantity && !hasLocation;
+        if (!hasQuantity) return false;
+        
+        // Check if this spare exists in inventory
+        const isInInventory = spare.partNo && sparesWithInventory.some(s => s.spare.partCode === spare.partNo);
+        if (!isInInventory) return false; // Skip validation for manual entries not in inventory
+        
+        const hasLocationId = spare.locationId != null && spare.locationId > 0;
+        return !hasLocationId;
       });
 
       if (sparesWithMissingLocation.length > 0) {
-        const missingParts = sparesWithMissingLocation.map(s => s.partNo).join(', ');
+        const missingParts = sparesWithMissingLocation.map(s => s.partNo || s.description).join(', ');
         toast({
-          title: "Validation Error",
-          description: `Please select a location for consumed spare parts: ${missingParts}`,
+          title: "Location Required",
+          description: `Please select a location for: ${missingParts}. Location selection is required for inventory tracking.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // PHASE 3A: Validate stock availability at selected locations (only for inventory-tracked items)
+      const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
+        const qty = parseFloat(spare.quantityConsumed);
+        if (!qty || qty <= 0 || !spare.locationId) return false;
+        
+        // Only validate stock for items in inventory
+        const isInInventory = spare.partNo && sparesWithInventory.some(s => s.spare.partCode === spare.partNo);
+        if (!isInInventory) return false;
+        
+        const stockAtLocation = getStockAtLocation(spare.partNo, spare.locationId);
+        return qty > stockAtLocation;
+      });
+
+      if (sparesWithInsufficientStock.length > 0) {
+        const insufficientParts = sparesWithInsufficientStock.map(s => {
+          const stockAtLoc = getStockAtLocation(s.partNo, s.locationId!);
+          return `${s.partNo} (need ${s.quantityConsumed}, have ${stockAtLoc})`;
+        }).join(', ');
+        toast({
+          title: "Insufficient Stock",
+          description: `Not enough stock at selected locations: ${insufficientParts}`,
           variant: "destructive",
         });
         return;
@@ -2671,7 +2772,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       ...prev,
                       consumedSpareParts: [
                         ...prev.consumedSpareParts,
-                        { partNo: '', description: '', quantityConsumed: '', location: '' as const, comments: '' }
+                        { partNo: '', description: '', quantityConsumed: '', location: '' as const, locationId: null, comments: '' }
                       ]
                     }));
                     setEditingConsumedSparePart(executionData.consumedSpareParts.length);
@@ -2688,10 +2789,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.4"><Marker id="WOF.B4.4" />Part No</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]" data-testid="WOF.B4.5"><Marker id="WOF.B4.5" />Description</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.6"><Marker id="WOF.B4.6" />Quantity Consumed</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]" data-testid="WOF.B4.7"><Marker id="WOF.B4.7" />Comments (If any)</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[18%]" data-testid="WOF.B4.4"><Marker id="WOF.B4.4" />Part No</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.B4.5"><Marker id="WOF.B4.5" />Description</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[12%]" data-testid="WOF.B4.6"><Marker id="WOF.B4.6" />Qty Used</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.11"><Marker id="WOF.B4.11" />Location *</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[25%]" data-testid="WOF.B4.7"><Marker id="WOF.B4.7" />Comments</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2700,6 +2802,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       const consumedIndex = executionData.consumedSpareParts.findIndex(c => c.partNo === spare.partNo);
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
                       const autoSelectedLocation = getAutoSelectedLocation(spare.partNo);
+                      
+                      const stockInfo = sparesWithInventory.find(s => s.spare.partCode === spare.partNo);
                       
                       return (
                         <tr key={`preloaded-${index}`} className="border-b border-gray-100">
@@ -2725,15 +2829,63 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       description: spare.description,
                                       quantityConsumed: newValue,
                                       location: autoSelectedLocation || '',
+                                      locationId: null,
                                       comments: ''
                                     });
                                   }
                                   return { ...prev, consumedSpareParts: consumed };
                                 });
                               }}
-                              className="text-sm h-8 w-24"
+                              className="text-sm h-8 w-20"
                               data-testid={`input-consumed-qty-${spare.partNo}`}
                             />
+                          </td>
+                          <td className="py-3">
+                            <Select
+                              value={consumedData?.locationId?.toString() || ''}
+                              onValueChange={(value) => {
+                                const locationId = parseInt(value);
+                                const location = vesselLocations.find(l => l.id === locationId);
+                                setExecutionData(prev => {
+                                  const consumed = [...prev.consumedSpareParts];
+                                  if (consumedIndex >= 0) {
+                                    consumed[consumedIndex] = {
+                                      ...consumed[consumedIndex],
+                                      locationId: locationId,
+                                      location: location?.locationName as any || ''
+                                    };
+                                  } else {
+                                    consumed.push({
+                                      partNo: spare.partNo,
+                                      description: spare.description,
+                                      quantityConsumed: '',
+                                      location: location?.locationName as any || '',
+                                      locationId: locationId,
+                                      comments: ''
+                                    });
+                                  }
+                                  return { ...prev, consumedSpareParts: consumed };
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs" data-testid={`select-location-${spare.partNo}`}>
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {vesselLocations.length > 0 ? (
+                                  vesselLocations.map((loc) => {
+                                    const stockAtLoc = stockInfo?.locations.find(l => l.locationId === loc.id)?.qty || 0;
+                                    return (
+                                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                                        {loc.locationName} ({stockAtLoc} avail)
+                                      </SelectItem>
+                                    );
+                                  })
+                                ) : (
+                                  <SelectItem value="none" disabled>No locations found</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="py-3">
                             <Input
@@ -2753,6 +2905,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                       description: spare.description,
                                       quantityConsumed: '',
                                       location: '' as const,
+                                      locationId: null,
                                       comments: newValue
                                     });
                                   }
@@ -2818,9 +2971,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
-                                    className="text-sm h-8 w-24"
+                                    className="text-sm h-8 w-20"
                                     onBlur={() => setEditingConsumedSparePart(null)}
                                   />
+                                </td>
+                                <td className="py-3">
+                                  <Select
+                                    value={consumed.locationId?.toString() || ''}
+                                    onValueChange={(value) => {
+                                      const locationId = parseInt(value);
+                                      const location = vesselLocations.find(l => l.id === locationId);
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { 
+                                          ...updated[actualIndex], 
+                                          locationId: locationId,
+                                          location: location?.locationName as any || ''
+                                        };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {vesselLocations.map((loc) => (
+                                        <SelectItem key={loc.id} value={loc.id.toString()}>
+                                          {loc.locationName}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </td>
                                 <td className="py-3">
                                   <Input
@@ -2851,8 +3033,37 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                         return { ...prev, consumedSpareParts: updated };
                                       });
                                     }}
-                                    className="text-sm h-8 w-24"
+                                    className="text-sm h-8 w-20"
                                   />
+                                </td>
+                                <td className="py-3">
+                                  <Select
+                                    value={consumed.locationId?.toString() || ''}
+                                    onValueChange={(value) => {
+                                      const locationId = parseInt(value);
+                                      const location = vesselLocations.find(l => l.id === locationId);
+                                      setExecutionData(prev => {
+                                        const updated = [...prev.consumedSpareParts];
+                                        updated[actualIndex] = { 
+                                          ...updated[actualIndex], 
+                                          locationId: locationId,
+                                          location: location?.locationName as any || ''
+                                        };
+                                        return { ...prev, consumedSpareParts: updated };
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {vesselLocations.map((loc) => (
+                                        <SelectItem key={loc.id} value={loc.id.toString()}>
+                                          {loc.locationName}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </td>
                                 <td className="py-3">
                                   <Input

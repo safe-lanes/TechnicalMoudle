@@ -100,6 +100,62 @@ The application features a modern full-stack architecture. The frontend is devel
   - I4.QL7.16: RH Lead Time (Non-Critical)
   - I4.QL7.5-I4.QL7.12: Grace Period configuration fields
 
+### SPARES_LOGIC: Normalized Inventory System (DO NOT MODIFY WITHOUT REVIEW)
+
+This section documents the normalized spare parts inventory system. Changes must preserve backward compatibility.
+
+**Database Tables (normalized schema):**
+1. `spares` - Master spare parts table (partCode, description, min/max qty, unit, linkedComponentCodes legacy field)
+2. `spare_component_links` - Many-to-many linking: `spareId` ↔ `componentId` with vessel context
+3. `locations` - Per-vessel storage locations (name unique per vessel, case-insensitive)
+4. `spare_location_stock` - Stock qty per spare-location combination (enforces no negative stock)
+5. `inventory_transactions` - Immutable audit trail with event type, qty change, reference info
+
+**Event Types for inventory_transactions:**
+- `RECEIVE`: Stock addition (qty_change > 0), no work order reference required
+- `CONSUME`: Stock deduction (qty_change < 0), MUST have referenceType=WORK_ORDER and referenceId
+- `ADJUST`: Inventory corrections with adjustment notes, positive or negative
+
+**API Endpoints:**
+- `GET /api/inventory/locations/:vesselId` - List all locations for vessel
+- `POST /api/inventory/locations` - Create new location
+- `GET /api/inventory/spare-links/:vesselId` - List all spare-component links
+- `POST /api/inventory/spare-links` - Create new link
+- `DELETE /api/inventory/spare-links/:linkId` - Remove link
+- `GET /api/inventory/stock/:vesselId` - Get all stock levels by location
+- `POST /api/inventory/stock` - Bulk upsert stock levels
+- `GET /api/inventory/transactions/:vesselId` - Get transaction history with spare data hydration
+- `POST /api/inventory/transaction` - Create new transaction (validates stock, prevents negative)
+- `GET /api/spares/:vesselId/with-inventory` - Composite endpoint returning spares with linkedComponents array and locationStock
+
+**Work Order Integration (Phase 3A/3B):**
+- WO Form B4 section includes Location dropdown showing available stock per location
+- Quantity entry validates against stock at selected location
+- `locationId` is REQUIRED when consuming spares with quantity > 0
+- Backend coerces locationId string to number before processing
+- On WO completion with approval, backend calls `performInventoryTransaction()` with:
+  - eventType: 'CONSUME'
+  - referenceType: 'WORK_ORDER'
+  - referenceId: work order ID
+- Falls back to legacy ROB update if locationId missing (backward compatibility only)
+
+**Stock Validation Rules:**
+- Frontend validates: locationId required, qty ≤ stock at location
+- Backend validates: atomic check-and-deduct in performInventoryTransaction()
+- Error codes: `INSUFFICIENT_STOCK`, `NEGATIVE_STOCK_PREVENTED`
+
+**Multi-Linked Indicator:**
+- Spares with multiple component links show "Multi-linked" badge
+- `linkedComponents` array populated from spare_component_links table
+- Frontend displays component codes comma-separated
+
+**Critical Implementation Notes:**
+1. NEVER bypass performInventoryTransaction() for stock changes
+2. ALWAYS include locationId when consuming from work orders
+3. Transaction history is IMMUTABLE - no updates/deletes
+4. Stock per location (spare_location_stock) is the source of truth, not legacy ROB field
+5. Backend hydrates transactions with spare.linkedComponents for history display
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`

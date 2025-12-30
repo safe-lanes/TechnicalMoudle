@@ -2911,47 +2911,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Auto-deduct consumed spares from inventory and create transaction records
+      // PHASE 3B: Use new location-based inventory transaction system
       if (workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
         const consumedSpares = workOrder.consumedSpareParts as Array<{
           partNo: string;
           description?: string;
-          quantityConsumed: number;
+          quantityConsumed: number | string;
+          locationId?: number | null;
+          location?: string;
           comments?: string;
         }>;
         
         for (const consumedSpare of consumedSpares) {
-          if (consumedSpare.quantityConsumed && consumedSpare.quantityConsumed > 0) {
+          const qtyConsumed = typeof consumedSpare.quantityConsumed === 'string' 
+            ? parseFloat(consumedSpare.quantityConsumed) 
+            : consumedSpare.quantityConsumed;
+            
+          if (qtyConsumed && qtyConsumed > 0) {
             try {
               // Get spare from inventory (match by partNo which corresponds to partCode)
               const spares = await storage.getSpares(workOrder.vesselId || 'V001');
               const spare = spares.find(s => s.partCode === consumedSpare.partNo);
               
               if (spare) {
-                // Deduct from ROB
-                const newROB = spare.rob - consumedSpare.quantityConsumed;
-                
-                // Update spare inventory
-                await storage.updateSpare(spare.id, {
-                  rob: newROB
-                });
-                
-                console.log(`✅ Deducted ${consumedSpare.quantityConsumed} units of ${consumedSpare.partNo} from inventory (${spare.rob} → ${newROB})`);
-                
-                // Check for low stock alert
-                if (spare.min && newROB < spare.min) {
-                  console.warn(`⚠️  LOW STOCK ALERT: ${consumedSpare.partNo} is below minimum (${newROB} < ${spare.min})`);
-                  // TODO: Complete spare transaction persistence and alert notification system
-                  // Requirements: 1) Create transaction record in spares_transactions table
-                  //               2) Trigger alert notification via alert service
-                  //               3) Ensure atomic ROB updates per WO completion
-                  // Current implementation: ROB deduction is working, transaction/alert stubs pending
+                // Check if locationId is provided for new location-based tracking
+                // Coerce to number in case frontend sends string
+                const locationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
+                if (locationId && !isNaN(locationId)) {
+                  // Use new inventory transaction system with location tracking
+                  try {
+                    await storage.performInventoryTransaction({
+                      vesselId: workOrder.vesselId || 'V001',
+                      spareId: spare.id,
+                      locationId: locationId,
+                      eventType: 'CONSUME',
+                      qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
+                      referenceType: 'WORK_ORDER',
+                      referenceId: workOrder.id,
+                      referenceNote: `WO: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work completion'}`
+                    });
+                    console.log(`✅ [Inventory Transaction] Consumed ${qtyConsumed} units of ${consumedSpare.partNo} from location ${locationId} (WO: ${workOrder.workOrderNo})`);
+                  } catch (txnError: any) {
+                    if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+                      console.warn(`⚠️ Insufficient stock for ${consumedSpare.partNo} at location ${locationId}: ${txnError.message}`);
+                      // PHASE 3B: Do NOT fall back to legacy ROB - reject the transaction
+                      throw new Error(`INSUFFICIENT_STOCK: Cannot consume ${qtyConsumed} units of ${consumedSpare.partNo} from location ${locationId}. Insufficient stock.`);
+                    } else {
+                      throw txnError;
+                    }
+                  }
+                } else {
+                  // PHASE 3B: locationId is REQUIRED for inventory-tracked spares
+                  // Reject work order completion without locationId - this enforces proper inventory tracking
+                  console.error(`❌ [Inventory] Missing locationId for ${consumedSpare.partNo} - rejecting work order completion.`);
+                  throw new Error(`LOCATION_REQUIRED: Spare part ${consumedSpare.partNo} requires a storage location for inventory tracking. Please select a location in the work order form.`);
                 }
               } else {
-                console.warn(`⚠️  Spare ${consumedSpare.partNo} not found in inventory - skipping deduction`);
+                console.warn(`⚠️ Spare ${consumedSpare.partNo} not found in inventory - skipping deduction`);
               }
-            } catch (spareError) {
+            } catch (spareError: any) {
+              // PHASE 3B: Propagate LOCATION_REQUIRED and INSUFFICIENT_STOCK errors to fail the request
+              if (spareError.message?.includes('LOCATION_REQUIRED') || 
+                  spareError.message?.includes('INSUFFICIENT_STOCK') ||
+                  spareError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+                console.error(`❌ [Inventory Enforcement] ${spareError.message}`);
+                throw spareError; // Rethrow to fail the work order completion
+              }
               console.error(`Failed to deduct spare ${consumedSpare.partNo}:`, spareError);
-              // Don't fail the work order completion if spare deduction fails
+              // Don't fail the work order completion for other types of spare deduction errors
             }
           }
         }
@@ -2966,6 +2993,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Work order completion error:', error);
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid completion data", details: error.errors });
+      }
+      // PHASE 3B: Return 400 for inventory enforcement errors
+      if (error.message?.includes('LOCATION_REQUIRED') || 
+          error.message?.includes('INSUFFICIENT_STOCK') ||
+          error.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+        return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to complete work order" });
     }
