@@ -1,6 +1,5 @@
-// Re-export Marker from MarkerContext to avoid duplicate definitions
-// This ensures all imports resolve to the same component
-export { Marker, useMarkers } from '@/contexts/MarkerContext';
+// NOTE: Do NOT re-export from MarkerContext here - it breaks Vite Fast Refresh
+// All components should import Marker and useMarkers directly from @/contexts/MarkerContext
 
 import { ReactNode } from 'react';
 import { useMarkers } from '@/contexts/MarkerContext';

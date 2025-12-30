@@ -1,4 +1,4 @@
-import { Marker } from "@/components/ui/marker-badge";
+import { Marker } from "@/components/Marker";
 
 interface SectionBlockProps {
   id?: string;

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useModifyMode } from "@/hooks/useModifyMode";
 import { useVessel } from "@/contexts/VesselContext";
 import { useLocation } from "wouter";
+import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1253,7 +1254,8 @@ const Spares: React.FC = () => {
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-2xl font-semibold text-gray-800">
+          <h1 className="text-2xl font-semibold text-gray-800" data-testid={activeTab === 'inventory' ? "E1" : "E3.1"}>
+            {activeTab === 'inventory' ? <Marker id="E1" /> : <Marker id="E3.1" />}
             {activeTab === 'inventory' ? 'Spares Inventory' : 'Spares - History of Transactions'}
           </h1>
           {isModifyMode && (
@@ -1269,13 +1271,17 @@ const Spares: React.FC = () => {
             <button 
               className={`px-4 py-2 rounded-l ${activeTab === 'inventory' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}
               onClick={() => setActiveTab('inventory')}
+              data-testid="E2"
             >
+              <Marker id="E2" />
               Inventory
             </button>
             <button 
               className={`px-4 py-2 rounded-r ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}
               onClick={() => setActiveTab('history')}
+              data-testid={activeTab === 'history' ? "E3.3" : "E3"}
             >
+              {activeTab === 'history' ? <Marker id="E3.3" /> : <Marker id="E3" />}
               History
             </button>
           </div>

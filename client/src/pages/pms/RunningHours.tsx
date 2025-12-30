@@ -16,7 +16,7 @@ import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
-import { Marker } from "@/contexts/MarkerContext";
+import { Marker } from "@/components/Marker";
 
 interface ChildRHData {
   id: string;

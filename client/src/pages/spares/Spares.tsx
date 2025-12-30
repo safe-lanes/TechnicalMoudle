@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useVessel } from "@/contexts/VesselContext";
 import { useVessels } from "@/hooks/useVessels";
-import { useMarkers, Marker } from "@/contexts/MarkerContext";
+import { useMarkers } from "@/contexts/MarkerContext";
+import { Marker } from "@/components/Marker";
 import type { Spare } from "@shared/schema";
 
 // Component tree is now imported from shared data

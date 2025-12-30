@@ -23,7 +23,7 @@ import { ComputedWorkOrderStatus } from "@shared/workOrders/status";
 import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
-import { Marker } from "@/contexts/MarkerContext";
+import { Marker } from "@/components/Marker";
 
 // Extend WorkOrderWithLeadTime to include computed status from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
