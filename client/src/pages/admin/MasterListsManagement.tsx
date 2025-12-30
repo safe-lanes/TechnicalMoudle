@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Marker } from "@/components/Marker";
 
 const masterListFormSchema = insertMasterListSchema;
 type MasterListFormData = z.infer<typeof masterListFormSchema>;
@@ -185,21 +186,22 @@ export default function MasterListsManagement() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Master Lists Management</h1>
-          <p className="text-gray-600 mt-2">Configure dropdown options and system classifications</p>
+          <h1 className="text-3xl font-bold text-gray-900" data-testid="I4.QL.2.7"><Marker id="I4.QL.2.7" />Master Lists Management</h1>
+          <p className="text-gray-600 mt-2" data-testid="I4.QL.2.9"><Marker id="I4.QL.2.9" />Configure dropdown options and system classifications</p>
         </div>
 
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle className="text-lg font-semibold">Master List Items</CardTitle>
+              <CardTitle className="text-lg font-semibold" data-testid="I4.QL.2.8"><Marker id="I4.QL.2.8" />Master List Items</CardTitle>
               <div className="flex flex-col sm:flex-row items-center gap-3">
                 {/* List Type Selector */}
                 <Select value={selectedListType} onValueChange={(value) => {
                   setSelectedListType(value);
                   setSelectedRowItem(null);
                 }}>
-                  <SelectTrigger className="w-full sm:w-[200px] bg-white" data-testid="select-list-type">
+                  <SelectTrigger className="w-full sm:w-[200px] bg-white" data-testid="I4.QL.2.10">
+                    <Marker id="I4.QL.2.10" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -215,16 +217,18 @@ export default function MasterListsManagement() {
                   onClick={() => selectedRowItem && handleEdit(selectedRowItem)}
                   disabled={!selectedRowItem}
                   className="whitespace-nowrap bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
-                  data-testid="button-edit-selected"
+                  data-testid="I4.QL.2.11"
                 >
+                  <Marker id="I4.QL.2.11" />
                   Edit
                 </Button>
                 {/* Add New Button */}
                 <Button
                   onClick={handleAddNew}
                   className="whitespace-nowrap bg-green-500 hover:bg-green-600 text-white"
-                  data-testid="button-add-master-list"
+                  data-testid="I4.QL.2.12"
                 >
+                  <Marker id="I4.QL.2.12" />
                   <Plus className="mr-2 h-4 w-4" />
                   Add New
                 </Button>
@@ -254,15 +258,15 @@ export default function MasterListsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Key</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Display Order</TableHead>
-                      <TableHead>Active</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead data-testid="I4.QL.2.13"><Marker id="I4.QL.2.13" />Key</TableHead>
+                      <TableHead data-testid="I4.QL.2.14"><Marker id="I4.QL.2.14" />Value</TableHead>
+                      <TableHead data-testid="I4.QL.2.15"><Marker id="I4.QL.2.15" />Display Order</TableHead>
+                      <TableHead data-testid="I4.QL.2.16"><Marker id="I4.QL.2.16" />Active</TableHead>
+                      <TableHead className="text-right" data-testid="I4.QL.2.17"><Marker id="I4.QL.2.17" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {masterLists.map((item) => (
+                    {masterLists.map((item, index) => (
                       <TableRow 
                         key={item.id} 
                         data-testid={`row-master-list-${item.id}`}
@@ -273,10 +277,20 @@ export default function MasterListsManagement() {
                             : ''
                         }`}
                       >
-                        <TableCell className="font-mono text-sm text-blue-600">{item.listKey}</TableCell>
-                        <TableCell className="font-medium">{item.listValue}</TableCell>
-                        <TableCell>{item.displayOrder}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-mono text-sm text-blue-600" data-testid={index === 0 ? "I4.QL.2.18" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.2.18" />}
+                          {item.listKey}
+                        </TableCell>
+                        <TableCell className="font-medium" data-testid={index === 0 ? "I4.QL.2.19" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.2.19" />}
+                          {item.listValue}
+                        </TableCell>
+                        <TableCell data-testid={index === 0 ? "I4.QL.2.20" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.2.20" />}
+                          {item.displayOrder}
+                        </TableCell>
+                        <TableCell data-testid={index === 0 ? "I4.QL.2.21" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.2.21" />}
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               item.isActive
@@ -297,8 +311,9 @@ export default function MasterListsManagement() {
                                 handleEdit(item);
                               }}
                               className="text-gray-500 hover:text-gray-700"
-                              data-testid={`button-edit-${item.id}`}
+                              data-testid={index === 0 ? "I4.QL.2.22" : `button-edit-${item.id}`}
                             >
+                              {index === 0 && <Marker id="I4.QL.2.22" />}
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
@@ -309,8 +324,9 @@ export default function MasterListsManagement() {
                                 handleDeleteClick(item);
                               }}
                               className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                              data-testid={`button-delete-${item.id}`}
+                              data-testid={index === 0 ? "I4.QL.2.23" : `button-delete-${item.id}`}
                             >
+                              {index === 0 && <Marker id="I4.QL.2.23" />}
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
