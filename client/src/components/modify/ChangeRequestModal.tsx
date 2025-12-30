@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Wrench, Package, Archive } from "lucide-react";
+import { Settings, Wrench, Package, Archive, X } from "lucide-react";
 import { useLocation } from "wouter";
+import { Marker } from "@/components/Marker";
 
 interface ChangeRequestModalProps {
   open: boolean;
@@ -69,25 +70,38 @@ export function ChangeRequestModal({ open, onClose }: ChangeRequestModalProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">New Change Request</DialogTitle>
-          <p className="text-sm text-gray-600 mt-2">
-            Select the module you want to modify. You'll be able to navigate to specific items and make changes.
+        <DialogHeader className="relative">
+          <DialogTitle className="text-xl font-semibold" data-testid="H3.1"><Marker id="H3.1" />New Change Request</DialogTitle>
+          <p className="text-sm text-gray-600 mt-2" data-testid="H3.2">
+            <Marker id="H3.2" />Select the module you want to modify. You'll be able to navigate to specific items and make changes.
           </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="absolute right-0 top-0 h-8 w-8 p-0"
+            data-testid="H3.3"
+          >
+            <Marker id="H3.3" />
+            <X className="h-4 w-4" />
+          </Button>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          {tiles.map((tile) => {
+          {tiles.map((tile, index) => {
             const IconComponent = tile.icon;
+            const markerId = `H3.${4 + index}`;
             return (
               <Card 
                 key={tile.id}
                 className={`cursor-pointer transition-all duration-200 ${tile.color} hover:shadow-md`}
                 onClick={() => handleTileClick(tile.id)}
+                data-testid={markerId}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg bg-white shadow-sm`}>
+                      <Marker id={markerId} />
                       <IconComponent className={`h-6 w-6 ${tile.iconColor}`} />
                     </div>
                     <div>
@@ -108,8 +122,8 @@ export function ChangeRequestModal({ open, onClose }: ChangeRequestModalProps) {
         </div>
         
         <div className="flex justify-end mt-6 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
+          <Button variant="outline" onClick={onClose} data-testid="H3.8">
+            <Marker id="H3.8" />Cancel
           </Button>
         </div>
       </DialogContent>

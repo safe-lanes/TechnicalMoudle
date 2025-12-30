@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Eye, Check, X, ArrowLeft } from "lucide-react";
+import { Marker } from "@/components/Marker";
 import { changeRequestService } from "@/services/changeRequestService";
 import { useChangeRequest } from "@/contexts/ChangeRequestContext";
 import { ChangeRequest } from "@/services/changeRequestService";
@@ -125,7 +126,7 @@ const ModifyPMS: React.FC = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">Modify PMS - Change Requests</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-4" data-testid="H1"><Marker id="H1" />Modify PMS - Change Requests</h1>
         
         {/* Search and New Request Button */}
         <div className="flex justify-between items-center mb-4">
@@ -135,12 +136,15 @@ const ModifyPMS: React.FC = () => {
               value={searchStatus}
               onChange={(e) => setSearchStatus(e.target.value)}
               className="w-full"
+              data-testid="H2"
             />
           </div>
           <Button 
             className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white ml-4"
             onClick={handleNewChangeRequest}
+            data-testid="H3"
           >
+            <Marker id="H3" />
             <Plus className="h-4 w-4 mr-2" />
             New Change Request
           </Button>
@@ -151,24 +155,29 @@ const ModifyPMS: React.FC = () => {
         {/* Left Sidebar - Categories */}
         <div className="w-64">
           <div className="bg-white rounded-lg shadow-sm">
-            <div className="bg-[#52baf3] text-white px-4 py-3 rounded-t-lg font-semibold">
-              Category
+            <div className="bg-[#52baf3] text-white px-4 py-3 rounded-t-lg font-semibold" data-testid="H4">
+              <Marker id="H4" />Category
             </div>
             <div className="p-0">
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  className={`px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 ${
-                    selectedCategory === category.name ? 'bg-blue-50 border-l-4 border-l-[#52baf3]' : ''
-                  }`}
-                  onClick={() => setSelectedCategory(selectedCategory === category.name ? null : category.name)}
-                >
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-700 mr-2">{category.id}.</span>
-                    <span className="text-sm text-gray-800">{category.name}</span>
+              {categories.map((category) => {
+                const markerId = `H${4 + category.id}`;
+                return (
+                  <div
+                    key={category.id}
+                    className={`px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 ${
+                      selectedCategory === category.name ? 'bg-blue-50 border-l-4 border-l-[#52baf3]' : ''
+                    }`}
+                    onClick={() => setSelectedCategory(selectedCategory === category.name ? null : category.name)}
+                    data-testid={markerId}
+                  >
+                    <div className="flex items-center">
+                      <Marker id={markerId} />
+                      <span className="text-sm text-gray-700 mr-2">{category.id}.</span>
+                      <span className="text-sm text-gray-800">{category.name}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -179,32 +188,37 @@ const ModifyPMS: React.FC = () => {
             {/* Table Header */}
             <div className="bg-[#52baf3] text-white px-6 py-4 rounded-t-lg">
               <div className="grid grid-cols-5 gap-4 text-sm font-medium">
-                <div>Request Title</div>
-                <div>Requested By</div>
-                <div>Date</div>
-                <div>Status</div>
+                <div data-testid="H9"><Marker id="H9" />Request Title</div>
+                <div data-testid="H10"><Marker id="H10" />Requested By</div>
+                <div data-testid="H11"><Marker id="H11" />Date</div>
+                <div data-testid="H12"><Marker id="H12" />Status</div>
                 <div></div>
               </div>
             </div>
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {filteredRequests.map((request) => (
+              {filteredRequests.map((request, index) => (
                 <div key={request.id} className="px-6 py-4 hover:bg-gray-50">
                   <div className="grid grid-cols-5 gap-4 items-center text-sm">
                     <div 
                       className="text-gray-900 font-medium cursor-pointer hover:text-[#52baf3]"
                       onClick={() => handleViewRequest(request)}
+                      data-testid={index === 0 ? "H13" : `H13-${index}`}
                     >
+                      {index === 0 && <Marker id="H13" />}
                       {request.requestTitle}
                     </div>
-                    <div className="text-gray-700">
+                    <div className="text-gray-700" data-testid={index === 0 ? "H14" : `H14-${index}`}>
+                      {index === 0 && <Marker id="H14" />}
                       {request.requestedBy}
                     </div>
-                    <div className="text-gray-700">
+                    <div className="text-gray-700" data-testid={index === 0 ? "H15" : `H15-${index}`}>
+                      {index === 0 && <Marker id="H15" />}
                       {request.requestDate}
                     </div>
-                    <div>
+                    <div data-testid={index === 0 ? "H16" : `H16-${index}`}>
+                      {index === 0 && <Marker id="H16" />}
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
                         {request.status}
                       </span>
@@ -257,9 +271,12 @@ const ModifyPMS: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-4xl max-h-[90vh] overflow-auto">
             <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Change Request Review - {selectedRequest.requestTitle}
-              </h2>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800" data-testid="H13.1">
+                  <Marker id="H13.1" />Change Request Details
+                </h2>
+                <p className="text-sm text-gray-600" data-testid="H13.2"><Marker id="H13.2" />Review and manage this change request</p>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -273,39 +290,58 @@ const ModifyPMS: React.FC = () => {
             <div className="p-6">
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Requested By</label>
-                  <p className="text-gray-900">{selectedRequest.requestedBy}</p>
+                  <label className="text-sm font-medium text-gray-600" data-testid="H13.3"><Marker id="H13.3" />Title</label>
+                  <p className="text-gray-900" data-testid="H13.4"><Marker id="H13.4" />{selectedRequest.requestTitle}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Date</label>
-                  <p className="text-gray-900">{selectedRequest.requestDate}</p>
+                  <label className="text-sm font-medium text-gray-600" data-testid="H13.5"><Marker id="H13.5" />Category</label>
+                  <p className="text-gray-900 capitalize" data-testid="H13.6"><Marker id="H13.6" />{selectedRequest.category.replace('-', ' ')}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Category</label>
-                  <p className="text-gray-900 capitalize">{selectedRequest.category.replace('-', ' ')}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Status</label>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedRequest.status)}`}>
-                    {selectedRequest.status}
+                  <label className="text-sm font-medium text-gray-600" data-testid="H13.7"><Marker id="H13.7" />Status</label>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedRequest.status)}`} data-testid="H13.8">
+                    <Marker id="H13.8" />{selectedRequest.status}
                   </span>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600" data-testid="H13.9"><Marker id="H13.9" />Requested By</label>
+                  <p className="text-gray-900" data-testid="H13.10"><Marker id="H13.10" />{selectedRequest.requestedBy}</p>
                 </div>
               </div>
 
+              {selectedRequest.comments && (
+                <div className="mb-6">
+                  <label className="text-sm font-medium text-gray-600" data-testid="H13.11"><Marker id="H13.11" />Reason</label>
+                  <p className="text-gray-900 mt-1" data-testid="H13.12"><Marker id="H13.12" />{selectedRequest.comments}</p>
+                </div>
+              )}
+
               <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Changes Requested</h3>
+                <label className="text-sm font-medium text-gray-600" data-testid="H13.13"><Marker id="H13.13" />Created</label>
+                <p className="text-gray-900" data-testid="H13.14"><Marker id="H13.14" />{selectedRequest.requestDate}</p>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2" data-testid="H13.15">
+                  <Marker id="H13.15" />
+                  <Eye className="h-5 w-5 text-red-500" />
+                  Changes Made
+                </h3>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  {selectedRequest.changedFields.map(field => (
+                  {selectedRequest.changedFields.map((field, idx) => (
                     <div key={field} className="mb-3 last:mb-0">
-                      <label className="text-sm font-medium text-gray-600 capitalize">
+                      <label className="text-sm font-medium text-gray-600 capitalize" data-testid={idx === 0 ? "H13.16" : `H13.16-${idx}`}>
+                        {idx === 0 && <Marker id="H13.16" />}
                         {field.replace(/([A-Z])/g, ' $1').trim()}
                       </label>
                       <div className="flex items-center gap-4 mt-1">
-                        <span className="text-gray-700">
-                          {selectedRequest.originalData[field] || 'N/A'}
+                        <span className="text-gray-700" data-testid={idx === 0 ? "H13.17" : `H13.17-${idx}`}>
+                          {idx === 0 && <Marker id="H13.17" />}
+                          Previous: {selectedRequest.originalData[field] || 'N/A'}
                         </span>
                         <span className="text-gray-400">→</span>
-                        <span className="text-red-600 font-medium">
+                        <span className="text-red-600 font-medium" data-testid={idx === 0 ? "H13.18" : `H13.18-${idx}`}>
+                          {idx === 0 && <Marker id="H13.18" />}
                           {selectedRequest.newData[field] || 'N/A'}
                         </span>
                       </div>
@@ -313,13 +349,6 @@ const ModifyPMS: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {selectedRequest.comments && (
-                <div className="mb-6">
-                  <label className="text-sm font-medium text-gray-600">Request Comments</label>
-                  <p className="text-gray-900 mt-1">{selectedRequest.comments}</p>
-                </div>
-              )}
 
               {currentUser.role === "approver" && selectedRequest.status === "Pending Approval" && (
                 <div className="mb-6">
@@ -347,9 +376,9 @@ const ModifyPMS: React.FC = () => {
             <div className="flex gap-3 justify-end p-6 border-t bg-gray-50">
               <Button
                 variant="outline"
-                onClick={() => setIsReviewMode(false)}
+                data-testid="H13.19"
               >
-                Close
+                <Marker id="H13.19" />View Changes
               </Button>
               {currentUser.role === "approver" && selectedRequest.status === "Pending Approval" && (
                 <>
@@ -357,17 +386,30 @@ const ModifyPMS: React.FC = () => {
                     variant="outline"
                     onClick={handleReject}
                     className="text-red-600 border-red-600 hover:bg-red-50"
+                    data-testid="H13.20"
                   >
+                    <Marker id="H13.20" />
+                    <X className="h-4 w-4 mr-1" />
                     Reject
                   </Button>
                   <Button
                     onClick={handleApprove}
                     className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="H13.21"
                   >
+                    <Marker id="H13.21" />
+                    <Check className="h-4 w-4 mr-1" />
                     Approve
                   </Button>
                 </>
               )}
+              <Button
+                variant="outline"
+                onClick={() => setIsReviewMode(false)}
+                data-testid="H13.22"
+              >
+                <Marker id="H13.22" />Close
+              </Button>
             </div>
           </div>
         </div>
