@@ -387,20 +387,26 @@ class MemStorage {
     }
 
     const now = new Date().toISOString();
+    // Update both rhCurrentMaster and currentCumulativeRH for compatibility
     const masterUpdated = await this.updateComponent(params.componentId, {
       rhCurrentMaster: params.newRHValue.toString(),
+      currentCumulativeRH: params.newRHValue.toString(),
       rhMasterUpdatedAt: now,
       rhMasterUpdatedBy: params.userId,
       rhMasterUpdateSource: params.updateSource,
+      lastUpdated: now,
     });
 
     // Cascade to inherited components
+    // Update BOTH rhCurrentInheritedCached (RH config) AND currentCumulativeRH (legacy field used by WO status)
     const inheritedComponents = await this.getInheritedComponents(params.componentId);
     let inheritedUpdated = 0;
     for (const inherited of inheritedComponents) {
       await this.updateComponent(inherited.id, {
         rhCurrentInheritedCached: params.newRHValue.toString(),
+        currentCumulativeRH: params.newRHValue.toString(),
         rhInheritedUpdatedAt: now,
+        lastUpdated: now,
       });
       inheritedUpdated++;
     }

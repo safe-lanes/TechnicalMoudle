@@ -982,13 +982,15 @@ export class PostgresStorage {
       throw new Error(`Component ${params.componentId} is not a MASTER counter type. Cannot update RH directly.`);
     }
 
-    // Update the MASTER component
+    // Update the MASTER component - update both rhCurrentMaster and currentCumulativeRH for compatibility
     const masterResult = await db.update(components)
       .set({
         rhCurrentMaster: params.newRHValue.toString(),
+        currentCumulativeRH: params.newRHValue.toString(),
         rhMasterUpdatedAt: now,
         rhMasterUpdatedBy: params.userId,
         rhMasterUpdateSource: params.updateSource,
+        lastUpdated: now.toISOString(),
         updatedAt: now,
       })
       .where(eq(components.id, params.componentId))
@@ -999,10 +1001,13 @@ export class PostgresStorage {
     }
 
     // Cascade update to all INHERITED components
+    // Update BOTH rhCurrentInheritedCached (RH config system) AND currentCumulativeRH (legacy field used by WO status calculation)
     const inheritedResult = await db.update(components)
       .set({
         rhCurrentInheritedCached: params.newRHValue.toString(),
+        currentCumulativeRH: params.newRHValue.toString(),
         rhInheritedUpdatedAt: now,
+        lastUpdated: now.toISOString(),
         updatedAt: now,
       })
       .where(and(
