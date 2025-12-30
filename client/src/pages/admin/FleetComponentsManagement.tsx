@@ -10,6 +10,7 @@ import { Plus, Search, Pencil, Trash2, ChevronRight, ChevronDown, Upload, Downlo
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetComponentForm from "./FleetComponentForm";
+import { Marker } from "@/components/Marker";
 
 export default function FleetComponentsManagement() {
   const { toast } = useToast();
@@ -154,14 +155,15 @@ export default function FleetComponentsManagement() {
     }
   };
 
-  const renderTreeNode = (node: TreeNode, level: number = 0): JSX.Element => {
+  const renderTreeNode = (node: TreeNode, level: number = 0, isFirstRoot: boolean = false): JSX.Element => {
     const isExpanded = expandedNodes.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
 
     return (
       <>
         <TableRow key={node.id} data-testid={`row-component-${node.id}`}>
-          <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }}>
+          <TableCell style={{ paddingLeft: `${level * 24 + 16}px` }} data-testid={isFirstRoot ? "I4.QL.3.20" : undefined}>
+            {isFirstRoot && <Marker id="I4.QL.3.20" />}
             <div className="flex items-center gap-2">
               {hasChildren ? (
                 <button
@@ -181,27 +183,41 @@ export default function FleetComponentsManagement() {
               <span className="font-medium">{node.fleetEquipmentName}</span>
             </div>
           </TableCell>
-          <TableCell className="font-mono text-sm">{node.fleetEquipmentCode}</TableCell>
-          <TableCell className="font-mono text-sm">{node.componentCode || "-"}</TableCell>
-          <TableCell>{node.maker || "-"}</TableCell>
-          <TableCell>{node.model || "-"}</TableCell>
+          <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.21" : undefined}>
+            {isFirstRoot && <Marker id="I4.QL.3.21" />}
+            {node.fleetEquipmentCode}
+          </TableCell>
+          <TableCell className="font-mono text-sm" data-testid={isFirstRoot ? "I4.QL.3.22" : undefined}>
+            {isFirstRoot && <Marker id="I4.QL.3.22" />}
+            {node.componentCode || "-"}
+          </TableCell>
+          <TableCell data-testid={isFirstRoot ? "I4.QL.3.23" : undefined}>
+            {isFirstRoot && <Marker id="I4.QL.3.23" />}
+            {node.maker || "-"}
+          </TableCell>
+          <TableCell data-testid={isFirstRoot ? "I4.QL.3.24" : undefined}>
+            {isFirstRoot && <Marker id="I4.QL.3.24" />}
+            {node.model || "-"}
+          </TableCell>
           <TableCell className="text-right">
             <div className="flex justify-end gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleAddNew(node.fleetEquipmentCode)}
-                data-testid={`button-add-child-${node.id}`}
+                data-testid={isFirstRoot ? "I4.QL.3.25" : `button-add-child-${node.id}`}
                 title="Add Child"
               >
+                {isFirstRoot && <Marker id="I4.QL.3.25" />}
                 <Plus className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleEdit(node)}
-                data-testid={`button-edit-${node.id}`}
+                data-testid={isFirstRoot ? "I4.QL.3.26" : `button-edit-${node.id}`}
               >
+                {isFirstRoot && <Marker id="I4.QL.3.26" />}
                 <Pencil className="h-4 w-4" />
               </Button>
               <Button
@@ -209,14 +225,15 @@ export default function FleetComponentsManagement() {
                 size="sm"
                 onClick={() => handleDeleteClick(node)}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                data-testid={`button-delete-${node.id}`}
+                data-testid={isFirstRoot ? "I4.QL.3.27" : `button-delete-${node.id}`}
               >
+                {isFirstRoot && <Marker id="I4.QL.3.27" />}
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </TableCell>
         </TableRow>
-        {isExpanded && hasChildren && node.children.map((child) => renderTreeNode(child, level + 1))}
+        {isExpanded && hasChildren && node.children.map((child) => renderTreeNode(child, level + 1, false))}
       </>
     );
   };
@@ -226,13 +243,13 @@ export default function FleetComponentsManagement() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Fleet Components Management</h1>
-          <p className="text-gray-600 mt-2">Manage fleet-level equipment hierarchy (SFI structure)</p>
+          <p className="text-gray-600 mt-2" data-testid="I4.QL.3.9"><Marker id="I4.QL.3.9" />Manage fleet-level equipment hierarchy (SFI structure)</p>
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>All Fleet Components</CardTitle>
+              <CardTitle data-testid="I4.QL.3.10"><Marker id="I4.QL.3.10" />All Fleet Components</CardTitle>
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Search Bar */}
                 <div className="relative flex-1 sm:min-w-[300px]">
@@ -243,23 +260,26 @@ export default function FleetComponentsManagement() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
-                    data-testid="input-search-components"
+                    data-testid="I4.QL.3.11"
                   />
+                  <Marker id="I4.QL.3.11" />
                 </div>
                 {/* Action Buttons */}
                 <Button
                   variant="outline"
                   onClick={handleExport}
-                  data-testid="button-export-components"
+                  data-testid="I4.QL.3.12"
                 >
+                  <Marker id="I4.QL.3.12" />
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
                 <Button
                   onClick={() => handleAddNew()}
                   className="whitespace-nowrap"
-                  data-testid="button-add-component"
+                  data-testid="I4.QL.3.13"
                 >
+                  <Marker id="I4.QL.3.13" />
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Component
                 </Button>
@@ -289,16 +309,16 @@ export default function FleetComponentsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Equipment Name</TableHead>
-                      <TableHead>Fleet Code</TableHead>
-                      <TableHead>SFI Code</TableHead>
-                      <TableHead>Maker</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead data-testid="I4.QL.3.14"><Marker id="I4.QL.3.14" />Equipment Name</TableHead>
+                      <TableHead data-testid="I4.QL.3.15"><Marker id="I4.QL.3.15" />Fleet Code</TableHead>
+                      <TableHead data-testid="I4.QL.3.16"><Marker id="I4.QL.3.16" />SFI Code</TableHead>
+                      <TableHead data-testid="I4.QL.3.17"><Marker id="I4.QL.3.17" />Maker</TableHead>
+                      <TableHead data-testid="I4.QL.3.18"><Marker id="I4.QL.3.18" />Model</TableHead>
+                      <TableHead className="text-right" data-testid="I4.QL.3.19"><Marker id="I4.QL.3.19" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {treeData.map((node) => renderTreeNode(node))}
+                    {treeData.map((node, index) => renderTreeNode(node, 0, index === 0))}
                   </TableBody>
                 </Table>
               </div>

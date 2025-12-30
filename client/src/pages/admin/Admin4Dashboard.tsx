@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, List, ArrowRight, ArrowLeft, Box, Wrench, Package, Ship, Clock, FileCode2, FolderTree, Anchor, Database, Layers } from "lucide-react";
+import { Marker } from "@/components/Marker";
 import MakerManagement from "./MakerManagement";
 import MasterListsManagement from "./MasterListsManagement";
 import MasterDataManagement from "./MasterDataManagement";
@@ -165,13 +166,14 @@ export default function Admin4Dashboard() {
             variant="ghost"
             size="sm"
             onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
+            data-testid="I4.QL.3.6"
           >
+            <Marker id="I4.QL.3.6" />
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
           <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Components Management</h1>
+          <h1 className="text-xl font-semibold text-gray-900" data-testid="I4.QL.3.7"><Marker id="I4.QL.3.7" />Fleet Components Management</h1>
         </div>
         <FleetComponentsManagement />
       </div>

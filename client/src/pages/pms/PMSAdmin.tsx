@@ -4,6 +4,7 @@ import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
 import Forms from "@/components/admin/Forms";
 import Admin4Dashboard from "../admin/Admin4Dashboard";
+import { Marker } from "@/components/Marker";
 
 export default function PMSAdmin() {
   const [activeTab, setActiveTab] = useState("bulk-data-imp");
@@ -27,7 +28,7 @@ export default function PMSAdmin() {
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
         <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h1>
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="I4.QL.3.1"><Marker id="I4.QL.3.1" />{getPageTitle()}</h1>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -35,29 +36,33 @@ export default function PMSAdmin() {
             <TabsTrigger 
               value="bulk-data-imp" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-bulk-data-imp"
+              data-testid="I4.QL.3.2"
             >
+              <Marker id="I4.QL.3.2" />
               Bulk Data Imp
             </TabsTrigger>
             <TabsTrigger 
               value="alerts" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-alerts"
+              data-testid="I4.QL.3.3"
             >
+              <Marker id="I4.QL.3.3" />
               Alerts
             </TabsTrigger>
             <TabsTrigger 
               value="forms" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-forms"
+              data-testid="I4.QL.3.4"
             >
+              <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
             <TabsTrigger 
               value="admin-4" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
-              data-testid="tab-master-data"
+              data-testid="I4.QL.3.5"
             >
+              <Marker id="I4.QL.3.5" />
               Master Data
             </TabsTrigger>
           </TabsList>
