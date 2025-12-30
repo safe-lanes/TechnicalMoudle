@@ -45,6 +45,7 @@ import { SectionBlock } from '@/components/SectionBlock';
 import { PartHeader } from '@/components/PartHeader';
 import { WorkOrderDataTable } from '@/components/WorkOrderDataTable';
 import { StatusPill } from '@/components/StatusPill';
+import { Marker } from "@/components/Marker";
 
 export interface HistoryWorkOrderPayload {
   template: WorkOrder;
@@ -1302,8 +1303,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 size="sm"
                 onClick={handleBack}
                 className="text-gray-600 hover:text-gray-900"
-                data-testid="button-back"
+                data-testid="WOF2"
               >
+                <Marker id="WOF2" />
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
@@ -1352,7 +1354,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </nav>
                 </SheetContent>
               </Sheet>
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="WOF1">
+                <Marker id="WOF1" />
                 {isNewJobCreation ? 'Job Form' : 'Work Order Form'}
               </h1>
             </div>
@@ -1362,8 +1365,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 size="sm"
                 onClick={() => setIsWorkInstructionsOpen(true)}
                 className="border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-blue-50 font-medium px-4 h-9"
-                data-testid="button-work-instructions"
+                data-testid="WOF5"
               >
+                <Marker id="WOF5" />
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Work Instructions
               </Button>
@@ -1409,14 +1413,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A - Job Details */}
+            <div data-testid="WOF3"><Marker id="WOF3" /></div>
             <PartHeader
               id="part-a"
               label="Part A"
               title="Job Details"
               description="Work details about this work order"
             />
+            <div data-testid="WOF.AA"><Marker id="WOF.AA" /></div>
+            <div data-testid="WOF.A"><Marker id="WOF.A" /></div>
             
             {/* A1. Job Information */}
+            <div data-testid="WOF.A1.1"><Marker id="WOF.A1.1" /></div>
+            <div data-testid="WOF.A1.2"><Marker id="WOF.A1.2" /></div>
             <SectionBlock 
               id="work-order-info"
               number="A1"
@@ -1426,61 +1435,61 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Job Title</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.3"><Marker id="WOF.A1.3" />Job Title</Label>
                   <Input
                     value={templateData.woTitle}
                     onChange={(e) => handleTemplateChange('woTitle', e.target.value)}
                     className="text-sm"
                     placeholder="Enter job title"
                     disabled={isPartAReadOnly}
-                    data-testid="input-wo-title"
+                    data-testid="WOF.A1.4"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Component Name</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.5"><Marker id="WOF.A1.5" />Component Name</Label>
                   <Input
                     value={templateData.componentName || templateData.component}
                     onChange={(e) => handleTemplateChange('componentName', e.target.value)}
                     className="text-sm"
                     placeholder="Enter component"
                     disabled={isPartAReadOnly}
-                    data-testid="input-component"
+                    data-testid="WOF.A1.6"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Component Code</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.7"><Marker id="WOF.A1.7" />Component Code</Label>
                   <Input
                     value={templateData.componentCode}
                     onChange={(e) => handleTemplateChange('componentCode', e.target.value)}
                     className="text-sm"
                     placeholder="Enter component code"
                     disabled={isPartAReadOnly}
-                    data-testid="input-component-code"
+                    data-testid="WOF.A1.8"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Job Code</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.9"><Marker id="WOF.A1.9" />Job Code</Label>
                   <Input
                     value={templateData.woTemplateCode}
                     onChange={(e) => handleTemplateChange('woTemplateCode', e.target.value)}
                     className="text-sm"
                     placeholder="Auto-generated"
                     disabled={isPartAReadOnly}
-                    data-testid="input-wo-template-code"
+                    data-testid="WOF.A1.10"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Maintenance Basis</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.11"><Marker id="WOF.A1.11" />Maintenance Basis</Label>
                   <Select
                     value={templateData.maintenanceBasis}
                     onValueChange={(value) => handleTemplateChange('maintenanceBasis', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-maintenance-basis">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.12">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1491,7 +1500,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Frequency</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.13"><Marker id="WOF.A1.13" />Frequency</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
@@ -1501,14 +1510,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       className="text-sm flex-1"
                       placeholder="Value"
                       disabled={isPartAReadOnly}
-                      data-testid="input-frequency-value"
+                      data-testid="WOF.A1.14"
                     />
                     <Select
                       value={templateData.maintenanceBasis === 'Running Hours' ? 'Hours' : templateData.frequencyUnit}
                       onValueChange={(value) => handleTemplateChange('frequencyUnit', value)}
                       disabled={isPartAReadOnly || templateData.maintenanceBasis === 'Running Hours'}
                     >
-                      <SelectTrigger className="text-sm w-32" data-testid="select-frequency-unit">
+                      <SelectTrigger className="text-sm w-32" data-testid="WOF.A1.15">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1528,13 +1537,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Task Type</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.16"><Marker id="WOF.A1.16" />Task Type</Label>
                   <Select
                     value={templateData.taskType}
                     onValueChange={(value) => handleTemplateChange('taskType', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-task-type">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.17">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1548,13 +1557,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Assigned To (Rank)</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.18"><Marker id="WOF.A1.18" />Assigned To (Rank)</Label>
                   <Select
                     value={templateData.assignedTo}
                     onValueChange={(value) => handleTemplateChange('assignedTo', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-assigned-to">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.19">
                       <SelectValue placeholder="Select rank" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1566,13 +1575,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Approver (Rank)</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.20"><Marker id="WOF.A1.20" />Approver (Rank)</Label>
                   <Select
                     value={templateData.approver}
                     onValueChange={(value) => handleTemplateChange('approver', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-approver">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.21">
                       <SelectValue placeholder="Select rank" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1584,13 +1593,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Job Priority</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.22"><Marker id="WOF.A1.22" />Job Priority</Label>
                   <Select
                     value={templateData.jobPriority}
                     onValueChange={(value) => handleTemplateChange('jobPriority', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-job-priority">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.23">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1603,13 +1612,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Class Related</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.24"><Marker id="WOF.A1.24" />Class Related</Label>
                   <Select
                     value={templateData.classRelated}
                     onValueChange={(value) => handleTemplateChange('classRelated', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-class-related">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.25">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1622,61 +1631,61 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 {/* Conditional Next Due field based on Maintenance Basis */}
                 {templateData.maintenanceBasis === 'Running Hours' ? (
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Next Due RH</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due RH</Label>
                     <Input
                       type="text"
                       value={templateData.nextDueReading ? `${templateData.nextDueReading} Hours` : '-'}
                       className="text-sm bg-gray-50"
                       disabled={true}
-                      data-testid="input-next-due-rh"
+                      data-testid="WOF.A1.27"
                     />
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Next Due Date</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.26"><Marker id="WOF.A1.26" />Next Due Date</Label>
                     <Input
                       type="date"
                       value={templateData.nextDueDate}
                       onChange={(e) => handleTemplateChange('nextDueDate', e.target.value)}
                       className="text-sm"
                       disabled={isPartAReadOnly}
-                      data-testid="input-next-due-date"
+                      data-testid="WOF.A1.27"
                     />
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Department</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.28"><Marker id="WOF.A1.28" />Department</Label>
                   <Input
                     value={templateData.department}
                     onChange={(e) => handleTemplateChange('department', e.target.value)}
                     className="text-sm"
                     placeholder="Enter department"
                     disabled={isPartAReadOnly}
-                    data-testid="input-department"
+                    data-testid="WOF.A1.29"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Criticality</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.30"><Marker id="WOF.A1.30" />Criticality</Label>
                   <Input
                     value={templateData.criticality}
                     onChange={(e) => handleTemplateChange('criticality', e.target.value)}
                     className="text-sm"
                     placeholder="Enter criticality"
                     disabled={isPartAReadOnly}
-                    data-testid="input-criticality"
+                    data-testid="WOF.A1.31"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm text-[#8798ad]">Is Active</Label>
+                  <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.32"><Marker id="WOF.A1.32" />Is Active</Label>
                   <Select
                     value={templateData.isActive}
                     onValueChange={(value) => handleTemplateChange('isActive', value)}
                     disabled={isPartAReadOnly}
                   >
-                    <SelectTrigger className="text-sm" data-testid="select-is-active">
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.33">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1688,20 +1697,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Brief Work Description</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.34"><Marker id="WOF.A1.34" />Brief Work Description</Label>
                 <Textarea
                   value={templateData.briefWorkDescription}
                   onChange={(e) => handleTemplateChange('briefWorkDescription', e.target.value)}
                   className="text-sm min-h-[80px]"
                   placeholder="Describe what this job is to do for the manufacturer/builder guidance (e.g. Lubricate, Clean, Change Oil, etc.)"
                   disabled={isPartAReadOnly}
-                  data-testid="textarea-brief-work-description"
+                  data-testid="WOF.A1.35"
                 />
               </div>
             </div>
           </SectionBlock>
 
           {/* A2. Required Spare Parts */}
+          <div data-testid="WOF.A2.1"><Marker id="WOF.A2.1" /></div>
+          <div data-testid="WOF.A2.2"><Marker id="WOF.A2.2" /></div>
           <SectionBlock
             id="spare-parts"
             number="A2"
@@ -1715,8 +1726,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddSparePart}
                   disabled={isPartAReadOnly}
-                  data-testid="button-add-spare"
+                  data-testid="WOF.A2.16"
                 >
+                  <Marker id="WOF.A2.16" />
                   <Plus className="h-4 w-4 mr-1" />
                   Add spares
                 </Button>
@@ -1727,12 +1739,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">PART NO.</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]">ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
-                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]">ACTIONS</th>}
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A2.3"><Marker id="WOF.A2.3" />PART NO.</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[40%]" data-testid="WOF.A2.4"><Marker id="WOF.A2.4" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.5"><Marker id="WOF.A2.5" />QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[10%]" data-testid="WOF.A2.6"><Marker id="WOF.A2.6" />ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A2.7"><Marker id="WOF.A2.7" />STATUS</th>
+                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A2.8"><Marker id="WOF.A2.8" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1848,6 +1860,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </SectionBlock>
 
           {/* A3. Required Tools & Equipment */}
+          <div data-testid="WOF.A3.1"><Marker id="WOF.A3.1" /></div>
+          <div data-testid="WOF.A3.2"><Marker id="WOF.A3.2" /></div>
           <SectionBlock
             id="tools"
             number="A3"
@@ -1861,8 +1875,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   onClick={handleAddTool}
                   disabled={isPartAReadOnly}
-                  data-testid="button-add-tool"
+                  data-testid="WOF.A3.14"
                 >
+                  <Marker id="WOF.A3.14" />
                   <Plus className="h-4 w-4 mr-1" />
                   Add tools
                 </Button>
@@ -1873,11 +1888,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <table className="w-full text-sm border border-gray-200">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]">DESCRIPTION</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]">QTY REQUIRED</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">ROB</th>
-                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]">STATUS</th>
-                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]">ACTIONS</th>}
+                      <th className="text-left p-2 font-medium text-gray-700 w-[50%]" data-testid="WOF.A3.3"><Marker id="WOF.A3.3" />DESCRIPTION</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.A3.4"><Marker id="WOF.A3.4" />QTY REQUIRED</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.5"><Marker id="WOF.A3.5" />ROB</th>
+                      <th className="text-left p-2 font-medium text-gray-700 w-[15%]" data-testid="WOF.A3.6"><Marker id="WOF.A3.6" />STATUS</th>
+                      {!isReadOnly && <th className="text-center p-2 font-medium text-gray-700 w-[100px]" data-testid="WOF.A3.7"><Marker id="WOF.A3.7" />ACTIONS</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1983,13 +1998,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </SectionBlock>
 
           {/* A4. Safety Requirements */}
+          <div data-testid="WOF.A4.1"><Marker id="WOF.A4.1" /></div>
+          <div data-testid="WOF.A4.2"><Marker id="WOF.A4.2" /></div>
           <SectionBlock
             id="safety"
             number="A4"
             title="Safety Requirements"
             description="Safety requirements and permits for this work order"
           >
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="WOF.A4.3"><Marker id="WOF.A4.3" />
               {/* PPE Requirements */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Personal Protective Equipment (PPE):</h3>
@@ -2042,12 +2059,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </SectionBlock>
 
           {/* A5. Work History */}
+          <div data-testid="WOF.A5.1"><Marker id="WOF.A5.1" /></div>
+          <div data-testid="WOF.A5.2"><Marker id="WOF.A5.2" /></div>
           <SectionBlock
             id="history"
             number="A5"
             title="Work History"
             description="Previous executions and completion history for this work order"
           >
+            <div className="flex flex-wrap gap-1 mb-2">
+              <span data-testid="WOF.A5.3"><Marker id="WOF.A5.3" /></span>
+              <span data-testid="WOF.A5.4"><Marker id="WOF.A5.4" /></span>
+              <span data-testid="WOF.A5.5"><Marker id="WOF.A5.5" /></span>
+              <span data-testid="WOF.A5.6"><Marker id="WOF.A5.6" /></span>
+              <span data-testid="WOF.A5.7"><Marker id="WOF.A5.7" /></span>
+              <span data-testid="WOF.A5.8"><Marker id="WOF.A5.8" /></span>
+            </div>
             <WorkOrderDataTable
               columns={[
                 { key: 'date', label: 'Date', width: '12%' },
@@ -2077,6 +2104,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           {/* Part B - Work Completion Record (hidden for template mode) */}
           {resolvedMode !== 'template' && (
             <>
+              <div data-testid="WOF.B"><Marker id="WOF.B" /></div>
               <PartHeader
                 id="part-b"
                 label="Part B"
@@ -2085,6 +2113,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               />
           
           {/* B1. Risk Assessment, Checklists & Records */}
+          <div data-testid="WOF.B1.1"><Marker id="WOF.B1.1" /></div>
+          <div data-testid="WOF.B1.2"><Marker id="WOF.B1.2" /></div>
           <SectionBlock
             id="completion"
             number="B1"
@@ -2092,8 +2122,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             <div className="space-y-4">
               {/* B1.1 Risk Assessment */}
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <Label className="text-sm text-gray-700">B1.1 Risk Assessment Completed / Reviewed:</Label>
+              <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.3"><Marker id="WOF.B1.3" />
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.4"><Marker id="WOF.B1.4" />B1.1 Risk Assessment Completed / Reviewed:</Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -2104,7 +2134,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.riskAssessment === "Yes"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-risk-assessment-yes"
+                        data-testid="WOF.B1.5"
                       />
                       <span className="text-sm">Yes</span>
                     </label>
@@ -2116,7 +2146,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.riskAssessment === "No"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-risk-assessment-no"
+                        data-testid="WOF.B1.6"
                       />
                       <span className="text-sm">No</span>
                     </label>
@@ -2128,7 +2158,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.riskAssessment === "NA"}
                         onChange={(e) => handleExecutionChange('riskAssessment', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-risk-assessment-na"
+                        data-testid="WOF.B1.7"
                       />
                       <span className="text-sm">NA</span>
                     </label>
@@ -2140,7 +2170,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument('riskAssessment')}
-                          data-testid="button-view-risk-assessment"
+                          data-testid="WOF.B1.8"
                         >
                           View
                         </Button>
@@ -2150,7 +2180,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleUploadDocument('riskAssessment', riskAssessmentFileRef)}
-                        data-testid="button-upload-risk-assessment"
+                        data-testid="WOF.B1.9"
                       >
                         Upload
                       </Button>
@@ -2173,8 +2203,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               {/* B1.2 Safety Checklists */}
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <Label className="text-sm text-gray-700">B1.2 Safety Checklists Completed (As applicable):</Label>
+              <div className="flex items-center justify-between py-3 border-b border-gray-100" data-testid="WOF.B1.10"><Marker id="WOF.B1.10" />
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.11"><Marker id="WOF.B1.11" />B1.2 Safety Checklists Completed (As applicable):</Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -2185,7 +2215,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.safetyChecklists === "Yes"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-safety-checklists-yes"
+                        data-testid="WOF.B1.12"
                       />
                       <span className="text-sm">Yes</span>
                     </label>
@@ -2197,7 +2227,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.safetyChecklists === "No"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-safety-checklists-no"
+                        data-testid="WOF.B1.13"
                       />
                       <span className="text-sm">No</span>
                     </label>
@@ -2209,7 +2239,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.safetyChecklists === "NA"}
                         onChange={(e) => handleExecutionChange('safetyChecklists', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-safety-checklists-na"
+                        data-testid="WOF.B1.14"
                       />
                       <span className="text-sm">NA</span>
                     </label>
@@ -2221,7 +2251,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewDocument('safetyChecklists')}
-                          data-testid="button-view-safety-checklists"
+                          data-testid="WOF.B1.15"
                         >
                           View
                         </Button>
@@ -2231,7 +2261,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => handleUploadDocument('safetyChecklists', safetyChecklistFileRef)}
-                        data-testid="button-upload-safety-checklists"
+                        data-testid="WOF.B1.16"
                       >
                         Upload
                       </Button>
@@ -2254,8 +2284,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               {/* B1.3 Operational Forms */}
-              <div className="flex items-center justify-between py-3">
-                <Label className="text-sm text-gray-700">B1.3 Operational Forms Completed (As applicable):</Label>
+              <div className="flex items-center justify-between py-3" data-testid="WOF.B1.17"><Marker id="WOF.B1.17" />
+                <Label className="text-sm text-gray-700" data-testid="WOF.B1.18"><Marker id="WOF.B1.18" />B1.3 Operational Forms Completed (As applicable):</Label>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2">
@@ -2266,7 +2296,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.operationalForms === "Yes"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-operational-forms-yes"
+                        data-testid="WOF.B1.19"
                       />
                       <span className="text-sm">Yes</span>
                     </label>
@@ -2278,7 +2308,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.operationalForms === "No"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-operational-forms-no"
+                        data-testid="WOF.B1.20"
                       />
                       <span className="text-sm">No</span>
                     </label>
@@ -2290,7 +2320,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         checked={executionData.operationalForms === "NA"}
                         onChange={(e) => handleExecutionChange('operationalForms', e.target.value)}
                         className="text-blue-600" 
-                        data-testid="radio-operational-forms-na"
+                        data-testid="WOF.B1.21"
                       />
                       <span className="text-sm">NA</span>
                     </label>
@@ -2337,6 +2367,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </SectionBlock>
 
           {/* B2. Details of Work Carried Out */}
+          <div data-testid="WOF.B2.1"><Marker id="WOF.B2.1" /></div>
+          <div data-testid="WOF.B2.2"><Marker id="WOF.B2.2" /></div>
           <SectionBlock
             id="work-details"
             number="B2"
@@ -2344,11 +2376,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             <div className="space-y-6">
               {/* B2.1 Work Duration */}
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-4">B2.1 Work Duration:</h4>
+              <div data-testid="WOF.B2.3"><Marker id="WOF.B2.3" />
+                <h4 className="text-sm font-medium text-gray-700 mb-4" data-testid="WOF.B2.4"><Marker id="WOF.B2.4" />B2.1 Work Duration:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Start Date</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.5"><Marker id="WOF.B2.5" />Start Date</Label>
                     <Input
                       type="date"
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[0] : ''}
@@ -2358,12 +2390,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       }}
                       className="text-sm"
                       placeholder="dd-mm-yyyy"
-                      data-testid="input-start-date"
+                      data-testid="WOF.B2.6"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Start Time</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.7"><Marker id="WOF.B2.7" />Start Time</Label>
                     <Input
                       type="text"
                       value={executionData.startDateTime ? executionData.startDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
@@ -2373,12 +2405,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       }}
                       className="text-sm"
                       placeholder="1045"
-                      data-testid="input-start-time"
+                      data-testid="WOF.B2.8"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Completion Date</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date</Label>
                     <Input
                       type="date"
                       value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
@@ -2389,12 +2421,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       }}
                       className="text-sm"
                       placeholder="dd-mm-yyyy"
-                      data-testid="input-completion-date"
+                      data-testid="WOF.B2.10"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Completion Time</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.11"><Marker id="WOF.B2.11" />Completion Time</Label>
                     <Input
                       type="text"
                       value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[1]?.substring(0, 5) || '' : ''}
@@ -2404,17 +2436,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       }}
                       className="text-sm"
                       placeholder="1200"
-                      data-testid="input-completion-time"
+                      data-testid="WOF.B2.12"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Performed by</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.13"><Marker id="WOF.B2.13" />Performed by</Label>
                     <Select
                       value={executionData.performedBy}
                       onValueChange={(value) => handleExecutionChange('performedBy', value)}
                     >
-                      <SelectTrigger className="text-sm" data-testid="select-performed-by">
+                      <SelectTrigger className="text-sm" data-testid="WOF.B2.14">
                         <SelectValue placeholder="Select rank" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2426,38 +2458,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">No of Persons in the team</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.15"><Marker id="WOF.B2.15" />No of Persons in the team</Label>
                     <Input
                       type="number"
                       value={executionData.noOfPersons}
                       onChange={(e) => handleExecutionChange('noOfPersons', e.target.value)}
                       className="text-sm"
                       placeholder="3"
-                      data-testid="input-no-of-persons"
+                      data-testid="WOF.B2.16"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Total Time Taken (Hours)</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.17"><Marker id="WOF.B2.17" />Total Time Taken (Hours)</Label>
                     <Input
                       type="number"
                       value={executionData.totalTimeHours}
                       onChange={(e) => handleExecutionChange('totalTimeHours', e.target.value)}
                       className="text-sm"
                       placeholder="3"
-                      data-testid="input-total-time-hours"
+                      data-testid="WOF.B2.18"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm text-[#8798ad]">Manhours</Label>
+                    <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.19"><Marker id="WOF.B2.19" />Manhours</Label>
                     <Input
                       type="number"
                       value={executionData.manhours}
                       onChange={(e) => handleExecutionChange('manhours', e.target.value)}
                       className="text-sm"
                       placeholder="3.3"
-                      data-testid="input-manhours"
+                      data-testid="WOF.B2.20"
                     />
                   </div>
                 </div>
@@ -2576,20 +2608,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
               </div>
 
               {/* Job Experience / Notes */}
-              <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Job Experience / Notes</Label>
+              <div className="space-y-2" data-testid="WOF.B2.21"><Marker id="WOF.B2.21" />
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.22"><Marker id="WOF.B2.22" />Job Experience / Notes</Label>
                 <Textarea
                   value={executionData.jobExperienceNotes}
                   onChange={(e) => handleExecutionChange('jobExperienceNotes', e.target.value)}
                   className="text-sm min-h-[80px]"
                   placeholder="Job Experience / Notes"
-                  data-testid="textarea-job-experience-notes"
+                  data-testid="WOF.B2.23"
                 />
               </div>
             </div>
           </SectionBlock>
 
           {/* B3. Running Hours */}
+          <div data-testid="WOF.B3.1"><Marker id="WOF.B3.1" /></div>
+          <div data-testid="WOF.B3.2"><Marker id="WOF.B3.2" /></div>
           <SectionBlock
             id="running-hours"
             number="B3"
@@ -2597,29 +2631,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Previous reading</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.3"><Marker id="WOF.B3.3" />Previous reading</Label>
                 <Input
                   value={executionData.previousReading}
                   className="text-sm bg-gray-50"
                   disabled
-                  data-testid="input-previous-reading"
+                  data-testid="WOF.B3.4"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-[#8798ad]">Current Reading</Label>
+                <Label className="text-sm text-[#8798ad]" data-testid="WOF.B3.5"><Marker id="WOF.B3.5" />Current Reading</Label>
                 <Input
                   type="number"
                   value={executionData.currentReading}
                   onChange={(e) => handleExecutionChange('currentReading', e.target.value)}
                   className="text-sm"
-                  data-testid="input-current-reading"
+                  data-testid="WOF.B3.6"
                 />
               </div>
             </div>
           </SectionBlock>
 
           {/* B4. Spare Parts Consumed */}
+          <div data-testid="WOF.B4.1"><Marker id="WOF.B4.1" /></div>
+          <div data-testid="WOF.B4.2"><Marker id="WOF.B4.2" /></div>
           <SectionBlock
             id="spare-parts-consumed"
             number="B4"
@@ -2640,21 +2676,22 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                     }));
                     setEditingConsumedSparePart(executionData.consumedSpareParts.length);
                   }}
-                  data-testid="button-add-consumed-spare"
+                  data-testid="WOF.B4.10"
                 >
+                  <Marker id="WOF.B4.10" />
                   + Add Spare Part
                 </Button>
               </div>
 
               {/* Spare Parts Consumed Table */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" data-testid="WOF.B4.3"><Marker id="WOF.B4.3" />
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]">Part No</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]">Description</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]">Quantity Consumed</th>
-                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]">Comments (If any)</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.4"><Marker id="WOF.B4.4" />Part No</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]" data-testid="WOF.B4.5"><Marker id="WOF.B4.5" />Description</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[20%]" data-testid="WOF.B4.6"><Marker id="WOF.B4.6" />Quantity Consumed</th>
+                      <th className="text-left py-2 font-medium text-gray-700 w-[30%]" data-testid="WOF.B4.7"><Marker id="WOF.B4.7" />Comments (If any)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2843,36 +2880,38 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
           {/* Approval Section - Only visible for Pending Approval work orders */}
           {currentWorkOrderStatus === 'Pending Approval' && (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
                 {/* Rejection Comments */}
-                <div className="space-y-2">
+                <div className="space-y-2" data-testid="WOF.B5.2"><Marker id="WOF.B5.2" />
                   <Label className="text-base font-semibold text-[#17a2b8]">Rejection Comments</Label>
                   <Textarea
                     value={rejectionComments}
                     onChange={(e) => setRejectionComments(e.target.value)}
                     placeholder="Enter rejection comments..."
                     className="text-sm min-h-[100px] border-gray-200"
-                    data-testid="textarea-rejection-comments"
+                    data-testid="WOF.B5.2.1"
                   />
                 </div>
                 
                 {/* Approve / Reject Buttons */}
-                <div className="flex justify-center gap-4 pt-2">
+                <div className="flex justify-center gap-4 pt-2" data-testid="WOF.B5.3"><Marker id="WOF.B5.3" />
                   <Button
                     onClick={handleApprove}
                     disabled={isProcessingApproval}
                     className="bg-[#28a745] hover:bg-[#218838] text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
-                    data-testid="button-approve"
+                    data-testid="WOF.B5.4"
                   >
+                    <Marker id="WOF.B5.4" />
                     {isProcessingApproval ? 'Processing...' : 'Approve'}
                   </Button>
                   <Button
                     onClick={handleReject}
                     disabled={isProcessingApproval}
                     className="bg-[#dc3545] hover:bg-[#c82333] text-white font-semibold px-8 py-2.5 h-auto text-sm rounded-full shadow-md min-w-[120px]"
-                    data-testid="button-reject"
+                    data-testid="WOF.B5.5"
                   >
+                    <Marker id="WOF.B5.5" />
                     {isProcessingApproval ? 'Processing...' : 'Reject'}
                   </Button>
                 </div>
@@ -2885,12 +2924,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
           {/* Save Button at Bottom - Always visible except in Pending Approval mode */}
           {currentWorkOrderStatus !== 'Pending Approval' && (
-            <div className="flex justify-end mt-6 pb-6">
+            <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
               <Button
                 onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
                 className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 text-white font-bold px-12 py-2.5 h-auto text-sm shadow-md"
-                data-testid="button-save-bottom"
+                data-testid="WOF6.1"
               >
+                <Marker id="WOF6.1" />
                 {isNewJobCreation ? 'Create Job' : 'Save'}
               </Button>
             </div>
