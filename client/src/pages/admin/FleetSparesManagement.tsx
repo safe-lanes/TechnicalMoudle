@@ -11,6 +11,7 @@ import { Plus, Search, Pencil, Trash2, Upload, Download } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetSpareForm from "./FleetSpareForm";
+import { Marker } from "@/components/Marker";
 
 export default function FleetSparesManagement() {
   const { toast } = useToast();
@@ -125,18 +126,19 @@ export default function FleetSparesManagement() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Fleet Spares Management</h1>
-          <p className="text-gray-600 mt-2">Manage fleet-level spare parts inventory</p>
+          <h1 className="text-3xl font-bold text-gray-900" data-testid="I4.QL5.5.8"><Marker id="I4.QL5.5.8" />Fleet Spares Management</h1>
+          <p className="text-gray-600 mt-2" data-testid="I4.QL5.5.9"><Marker id="I4.QL5.5.9" />Manage fleet-level spare parts inventory</p>
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>All Fleet Spares</CardTitle>
+              <CardTitle data-testid="I4.QL5.5.10"><Marker id="I4.QL5.5.10" />All Fleet Spares</CardTitle>
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Equipment Filter */}
                 <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-equipment-filter">
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="I4.QL5.5.11">
+                    <Marker id="I4.QL5.5.11" />
                     <SelectValue placeholder="All Equipment" />
                   </SelectTrigger>
                   <SelectContent>
@@ -158,24 +160,27 @@ export default function FleetSparesManagement() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
-                    data-testid="input-search-spares"
+                    data-testid="I4.QL5.5.12"
                   />
+                  <Marker id="I4.QL5.5.12" />
                 </div>
 
                 {/* Action Buttons */}
                 <Button
                   variant="outline"
                   onClick={handleExport}
-                  data-testid="button-export-spares"
+                  data-testid="I4.QL5.5.13"
                 >
+                  <Marker id="I4.QL5.5.13" />
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
                 <Button
                   onClick={handleAddNew}
                   className="whitespace-nowrap"
-                  data-testid="button-add-spare"
+                  data-testid="I4.QL5.5.14"
                 >
+                  <Marker id="I4.QL5.5.14" />
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Spare
                 </Button>
@@ -207,36 +212,54 @@ export default function FleetSparesManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Part Code</TableHead>
-                      <TableHead>Part Name</TableHead>
-                      <TableHead>Equipment</TableHead>
-                      <TableHead>Maker Reference</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead data-testid="I4.QL5.5.15"><Marker id="I4.QL5.5.15" />Part Code</TableHead>
+                      <TableHead data-testid="I4.QL5.5.16"><Marker id="I4.QL5.5.16" />Part Name</TableHead>
+                      <TableHead data-testid="I4.QL5.5.17"><Marker id="I4.QL5.5.17" />Equipment</TableHead>
+                      <TableHead data-testid="I4.QL5.5.18"><Marker id="I4.QL5.5.18" />Maker Reference</TableHead>
+                      <TableHead data-testid="I4.QL5.5.19"><Marker id="I4.QL5.5.19" />Unit</TableHead>
+                      <TableHead data-testid="I4.QL5.5.20"><Marker id="I4.QL5.5.20" />Location</TableHead>
+                      <TableHead className="text-right" data-testid="I4.QL5.5.21"><Marker id="I4.QL5.5.21" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredSpares.map((spare) => {
+                    {filteredSpares.map((spare, index) => {
                       const equipment = components?.find(c => c.fleetEquipmentCode === spare.fleetEquipmentCode);
+                      const isFirstRow = index === 0;
                       return (
                         <TableRow key={spare.id} data-testid={`row-spare-${spare.id}`}>
-                          <TableCell className="font-mono text-sm">{spare.fleetPartCode}</TableCell>
-                          <TableCell className="font-medium">{spare.partName}</TableCell>
-                          <TableCell className="text-sm">
+                          <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL5.5.22" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.22" />}
+                            {spare.fleetPartCode}
+                          </TableCell>
+                          <TableCell className="font-medium" data-testid={isFirstRow ? "I4.QL5.5.23" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.23" />}
+                            {spare.partName}
+                          </TableCell>
+                          <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.24" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.24" />}
                             {equipment ? `${equipment.fleetEquipmentCode} - ${equipment.fleetEquipmentName}` : spare.fleetEquipmentCode || "-"}
                           </TableCell>
-                          <TableCell className="text-sm">{spare.maker || "-"}</TableCell>
-                          <TableCell>{spare.uom || "-"}</TableCell>
-                          <TableCell>{spare.location || "-"}</TableCell>
+                          <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL5.5.25" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.25" />}
+                            {spare.maker || "-"}
+                          </TableCell>
+                          <TableCell data-testid={isFirstRow ? "I4.QL5.5.26" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.26" />}
+                            {spare.uom || "-"}
+                          </TableCell>
+                          <TableCell data-testid={isFirstRow ? "I4.QL5.5.27" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL5.5.27" />}
+                            {spare.location || "-"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(spare)}
-                                data-testid={`button-edit-${spare.id}`}
+                                data-testid={isFirstRow ? "I4.QL5.5.28" : `button-edit-${spare.id}`}
                               >
+                                {isFirstRow && <Marker id="I4.QL5.5.28" />}
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
@@ -244,8 +267,9 @@ export default function FleetSparesManagement() {
                                 size="sm"
                                 onClick={() => handleDeleteClick(spare)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={`button-delete-${spare.id}`}
+                                data-testid={isFirstRow ? "I4.QL5.5.29" : `button-delete-${spare.id}`}
                               >
+                                {isFirstRow && <Marker id="I4.QL5.5.29" />}
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
