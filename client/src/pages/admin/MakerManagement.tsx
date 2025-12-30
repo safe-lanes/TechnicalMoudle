@@ -10,6 +10,7 @@ import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import MakerForm from "./MakerForm";
+import { Marker } from "@/components/Marker";
 
 export default function MakerManagement() {
   const { toast } = useToast();
@@ -83,14 +84,14 @@ export default function MakerManagement() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Makers Management</h1>
-          <p className="text-gray-600 mt-2">Manage equipment manufacturers and suppliers</p>
+          <h1 className="text-3xl font-bold text-gray-900" data-testid="I4.QL.1.7"><Marker id="I4.QL.1.7" />Makers Management</h1>
+          <p className="text-gray-600 mt-2" data-testid="I4.QL.1.9"><Marker id="I4.QL.1.9" />Manage equipment manufacturers and suppliers</p>
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>All Makers</CardTitle>
+              <CardTitle data-testid="I4.QL.1.10"><Marker id="I4.QL.1.10" />All Makers</CardTitle>
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Search Bar */}
                 <div className="relative flex-1 sm:min-w-[300px]">
@@ -101,15 +102,17 @@ export default function MakerManagement() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
-                    data-testid="input-search-makers"
+                    data-testid="I4.QL.1.11"
                   />
+                  <Marker id="I4.QL.1.11" />
                 </div>
                 {/* Add New Button */}
                 <Button
                   onClick={handleAddNew}
                   className="whitespace-nowrap"
-                  data-testid="button-add-maker"
+                  data-testid="I4.QL.1.12"
                 >
+                  <Marker id="I4.QL.1.12" />
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Maker
                 </Button>
@@ -139,30 +142,46 @@ export default function MakerManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#52BAF3] hover:bg-[#52BAF3]">
-                      <TableHead className="text-white font-medium">S.No</TableHead>
-                      <TableHead className="text-white font-medium">Maker Code</TableHead>
-                      <TableHead className="text-white font-medium">Maker Name</TableHead>
-                      <TableHead className="text-white font-medium">Address</TableHead>
-                      <TableHead className="text-white font-medium">Address ID</TableHead>
-                      <TableHead className="text-white font-medium text-right">Actions</TableHead>
+                      <TableHead className="text-white font-medium" data-testid="I4.QL.1.13"><Marker id="I4.QL.1.13" />S.No</TableHead>
+                      <TableHead className="text-white font-medium" data-testid="I4.QL.1.14"><Marker id="I4.QL.1.14" />Maker Code</TableHead>
+                      <TableHead className="text-white font-medium" data-testid="I4.QL.1.15"><Marker id="I4.QL.1.15" />Maker Name</TableHead>
+                      <TableHead className="text-white font-medium" data-testid="I4.QL.1.16"><Marker id="I4.QL.1.16" />Address</TableHead>
+                      <TableHead className="text-white font-medium" data-testid="I4.QL.1.17"><Marker id="I4.QL.1.17" />Address ID</TableHead>
+                      <TableHead className="text-white font-medium text-right" data-testid="I4.QL.1.18"><Marker id="I4.QL.1.18" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredMakers.map((maker, index) => (
                       <TableRow key={maker.id} data-testid={`row-maker-${maker.id}`}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-mono text-sm">{maker.makerCode}</TableCell>
-                        <TableCell className="font-medium">{maker.makerName}</TableCell>
-                        <TableCell className="max-w-xs truncate">{maker.address || "-"}</TableCell>
-                        <TableCell>{maker.addressId || "-"}</TableCell>
+                        <TableCell className="font-medium" data-testid={index === 0 ? "I4.QL.1.19" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.1.19" />}
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm" data-testid={index === 0 ? "I4.QL.1.20" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.1.20" />}
+                          {maker.makerCode}
+                        </TableCell>
+                        <TableCell className="font-medium" data-testid={index === 0 ? "I4.QL.1.21" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.1.21" />}
+                          {maker.makerName}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate" data-testid={index === 0 ? "I4.QL.1.22" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.1.22" />}
+                          {maker.address || "-"}
+                        </TableCell>
+                        <TableCell data-testid={index === 0 ? "I4.QL.1.23" : undefined}>
+                          {index === 0 && <Marker id="I4.QL.1.23" />}
+                          {maker.addressId || "-"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEdit(maker)}
-                              data-testid={`button-edit-${maker.id}`}
+                              data-testid={index === 0 ? "I4.QL.1.24" : `button-edit-${maker.id}`}
                             >
+                              {index === 0 && <Marker id="I4.QL.1.24" />}
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
@@ -170,8 +189,9 @@ export default function MakerManagement() {
                               size="sm"
                               onClick={() => handleDeleteClick(maker)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              data-testid={`button-delete-${maker.id}`}
+                              data-testid={index === 0 ? "I4.QL.1.25" : `button-delete-${maker.id}`}
                             >
+                              {index === 0 && <Marker id="I4.QL.1.25" />}
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
