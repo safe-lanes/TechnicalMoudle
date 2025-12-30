@@ -4795,7 +4795,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: limit ? parseInt(limit as string) : undefined,
       });
       
-      res.json({ success: true, data: transactions });
+      // Hydrate transactions with spare data including linkedComponents
+      const hydratedTransactions = await Promise.all(transactions.map(async (txn) => {
+        const spare = await storage.getSpare(txn.spareId);
+        const linkedComponents = spare ? await storage.getLinkedComponentsForSpare(spare.id) : [];
+        const location = txn.locationId ? await storage.getLocationById(txn.locationId) : null;
+        return {
+          ...txn,
+          spare: spare ? {
+            ...spare,
+            linkedComponents,
+          } : null,
+          locationName: location?.locationName || null,
+        };
+      }));
+      
+      res.json({ success: true, data: hydratedTransactions });
     } catch (error: any) {
       console.error("Error fetching inventory transactions:", error);
       res.status(500).json({ success: false, error: error.message });

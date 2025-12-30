@@ -379,10 +379,21 @@ const Spares: React.FC = () => {
   const [transactionNotes, setTransactionNotes] = useState<string>("");
   const [workOrderRef, setWorkOrderRef] = useState<string>("");
   
-  // Fetch spares from API
-  const { data: sparesData = [], isLoading: sparesLoading } = useQuery<Spare[]>({
-    queryKey: ['/api/spares', vesselId],
+  // Fetch spares from API with inventory data (uses spareComponentLinks for many-to-many support)
+  const { data: sparesWithInventoryResponse, isLoading: sparesLoading } = useQuery<{success: boolean; data: any[]}>({
+    queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`],
+    enabled: !!vesselId,
   });
+  const sparesData = useMemo(() => {
+    const inventoryData = sparesWithInventoryResponse?.data || [];
+    return inventoryData.map((item: any) => ({
+      ...item.spare,
+      robTotal: item.robTotal,
+      stockStatus: item.stockStatus,
+      locations: item.locations || [],
+      linkedComponents: item.linkedComponents || [],
+    }));
+  }, [sparesWithInventoryResponse]);
   
   // Fetch inventory transactions for history tab
   const { data: inventoryTransactionsResponse, isLoading: transactionsLoading } = useQuery<{ success: boolean; data: any[] }>({
@@ -416,7 +427,7 @@ const Spares: React.FC = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/inventory/transactions/${vesselId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/inventory/locations/${vesselId}`] });
       setConsumeDialogOpen(false);
@@ -542,11 +553,21 @@ const Spares: React.FC = () => {
   const filteredSpares = useMemo(() => {
     let filtered = sparesData;
 
-    // Filter by selected component - use componentCode since tree uses component codes as node IDs
+    // Filter by selected component - uses linkedComponents for many-to-many support
     if (selectedComponentId) {
       filtered = filtered.filter(spare => {
-        const spareCode = spare.componentCode || spare.componentId;
-        return spareCode === selectedComponentId || spareCode?.startsWith(selectedComponentId + '.');
+        // Check linked components (many-to-many via spareComponentLinks)
+        const linkedComponents = spare.linkedComponents || [];
+        const isLinked = linkedComponents.some((lc: any) => 
+          lc.componentCode === selectedComponentId || 
+          lc.componentCode?.startsWith(selectedComponentId + '.')
+        );
+        // Fallback to legacy componentCode/componentId if no links
+        if (!isLinked && linkedComponents.length === 0) {
+          const spareCode = spare.componentCode || spare.componentId;
+          return spareCode === selectedComponentId || spareCode?.startsWith(selectedComponentId + '.');
+        }
+        return isLinked;
       });
     }
 
@@ -656,7 +677,7 @@ const Spares: React.FC = () => {
       }
       
       // Invalidate cache to refresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`] });
       
       toast({
         title: "Success",
@@ -910,7 +931,15 @@ const Spares: React.FC = () => {
                           </div>
                           <div className="text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>
                             {isFirstRow && <Marker id="E26" />}
-                            {spare.componentName || '-'}
+                            {spare.linkedComponents && spare.linkedComponents.length > 1 ? (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                                Multi-linked ({spare.linkedComponents.length})
+                              </span>
+                            ) : spare.linkedComponents && spare.linkedComponents.length === 1 ? (
+                              spare.linkedComponents[0].componentName || spare.linkedComponents[0].componentCode
+                            ) : (
+                              spare.componentName || '-'
+                            )}
                           </div>
                           <div data-testid={isFirstRow ? "E28" : undefined}>
                             {isFirstRow && <Marker id="E28" />}
@@ -920,9 +949,9 @@ const Spares: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="text-gray-700" data-testid={isFirstRow ? "E29" : undefined}>
+                          <div className="text-gray-700 font-medium" data-testid={isFirstRow ? "E29" : undefined}>
                             {isFirstRow && <Marker id="E29" />}
-                            {spare.rob}
+                            {spare.robTotal !== undefined ? spare.robTotal : spare.rob}
                           </div>
                           <div className="text-gray-700" data-testid={isFirstRow ? "E30" : undefined}>
                             {isFirstRow && <Marker id="E30" />}
@@ -930,17 +959,15 @@ const Spares: React.FC = () => {
                           </div>
                           <div data-testid={isFirstRow ? "E31" : undefined}>
                             {isFirstRow && <Marker id="E31" />}
-                            {stockStatus === "Low" && (
-                              <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
-                                Low
+                            {spare.stockStatus === "At Min" || stockStatus === "Low" ? (
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
+                                {spare.stockStatus === "At Min" ? "At Min" : "Low"}
                               </span>
-                            )}
-                            {stockStatus === "Minimum" && (
+                            ) : stockStatus === "Minimum" ? (
                               <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
                                 Min
                               </span>
-                            )}
-                            {stockStatus === "OK" && (
+                            ) : (
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
                                 OK
                               </span>
@@ -948,11 +975,23 @@ const Spares: React.FC = () => {
                           </div>
                           <div className="text-gray-700" data-testid={isFirstRow ? "E32" : undefined}>
                             {isFirstRow && <Marker id="E32" />}
-                            {spare.location || '-'}
+                            {spare.locations && spare.locations.length > 0 ? (
+                              <span title={spare.locations[0]?.locationName}>
+                                {spare.locations[0]?.locationName?.substring(0, 6) || 'Loc A'}: {spare.locations[0]?.qty || 0}
+                              </span>
+                            ) : (
+                              spare.location ? `${spare.location}: ${spare.robLocationA || 0}` : '-'
+                            )}
                           </div>
                           <div className="text-gray-700" data-testid={isFirstRow ? "E33" : undefined}>
                             {isFirstRow && <Marker id="E33" />}
-                            {spare.location2 || '-'}
+                            {spare.locations && spare.locations.length > 1 ? (
+                              <span title={spare.locations[1]?.locationName}>
+                                {spare.locations[1]?.locationName?.substring(0, 6) || 'Loc B'}: {spare.locations[1]?.qty || 0}
+                              </span>
+                            ) : spare.location2 ? (
+                              `${spare.location2}: ${spare.robLocationB || 0}`
+                            ) : '-'}
                           </div>
                           <div className="flex gap-1" data-testid={isFirstRow ? "E35" : undefined}>
                             {isFirstRow && <Marker id="E35" />}
@@ -1062,7 +1101,15 @@ const Spares: React.FC = () => {
                           </div>
                           <div className="text-gray-700 truncate" data-testid={isFirstTxn ? "E3.23" : undefined}>
                             {isFirstTxn && <Marker id="E3.23" />}
-                            {txn.spare?.componentName || '-'}
+                            {txn.spare?.linkedComponents && txn.spare.linkedComponents.length > 1 ? (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-medium">
+                                Multi-linked
+                              </span>
+                            ) : txn.spare?.linkedComponents && txn.spare.linkedComponents.length === 1 ? (
+                              txn.spare.linkedComponents[0].componentName || txn.spare.linkedComponents[0].componentCode
+                            ) : (
+                              txn.spare?.componentName || txn.locationName || '-'
+                            )}
                           </div>
                           <div className="text-gray-700" data-testid={isFirstTxn ? "E3.24" : undefined}>
                             {isFirstTxn && <Marker id="E3.24" />}

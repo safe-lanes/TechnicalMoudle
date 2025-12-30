@@ -1283,23 +1283,55 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   );
 };
 
+interface SpareWithInventoryData {
+  spare: any;
+  robTotal: number;
+  stockStatus: "OK" | "At Min";
+  locations: Array<{
+    locationId: number;
+    locationName: string;
+    qty: number;
+  }>;
+  linkedComponents: Array<{
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+  }>;
+}
+
 const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { isModifyMode } = useModifyMode();
   const [editLocationDialogOpen, setEditLocationDialogOpen] = useState(false);
   const [editingLocationA, setEditingLocationA] = useState('');
   const [editingLocationB, setEditingLocationB] = useState('');
+  const [spareDetailsOpen, setSpareDetailsOpen] = useState(false);
+  const [selectedSpareDetails, setSelectedSpareDetails] = useState<SpareWithInventoryData | null>(null);
   
-  // Get vesselId from selectedComponent or default to V001
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
   
-  // Fetch spares scoped to the current vessel to avoid cross-vessel data leakage
-  // Note: queryKey[0] is used as the URL by default fetcher, so include vesselId in the URL path
-  const { data: allSpares = [] } = useQuery<any[]>({
-    queryKey: [`/api/spares/${vesselId}`],
-    enabled: !!vesselId,
+  const { data: allComponents = [] } = useQuery<any[]>({
+    queryKey: ['/api/components'],
   });
   
-  // Fetch vessel location names - URL must include vesselId since default fetcher uses queryKey[0]
+  const getActualComponentId = (code: string): string | undefined => {
+    const comp = allComponents.find((c: any) => (c.componentCode || c.code) === code);
+    return comp?.id;
+  };
+  
+  const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
+  
+  const { data: sparesWithInventory = [], isLoading: sparesLoading } = useQuery<SpareWithInventoryData[]>({
+    queryKey: ['/api/inventory/spares-by-component', selectedActualId],
+    queryFn: async () => {
+      if (!selectedActualId) return [];
+      const res = await fetch(`/api/inventory/spares-by-component/${selectedActualId}`);
+      if (!res.ok) throw new Error('Failed to fetch spares');
+      const json = await res.json();
+      return json.data || [];
+    },
+    enabled: !!selectedActualId,
+  });
+  
   const { data: locationNames = { locationAName: 'Location A', locationBName: 'Location B' } } = useQuery<{
     vesselId: string;
     locationAName: string;
@@ -1309,12 +1341,6 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     enabled: !!vesselId,
   });
   
-  // Get all components to find children
-  const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: ['/api/components'],
-  });
-  
-  // Mutation to update location names
   const updateLocationNamesMutation = useMutation({
     mutationFn: async (data: { locationAName: string; locationBName: string }) => {
       const response = await fetch(`/api/vessel-location-names/${vesselId}`, {
@@ -1344,38 +1370,41 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     });
   };
   
-  // Find the actual database ID for a component by its code
-  const getActualComponentId = (code: string): string | undefined => {
-    const comp = allComponents.find((c: any) => (c.componentCode || c.code) === code);
-    return comp?.id;
+  const handleViewSpareDetails = (spareData: SpareWithInventoryData) => {
+    setSelectedSpareDetails(spareData);
+    setSpareDetailsOpen(true);
   };
   
-  // Find all child component IDs recursively
-  // Note: parentId stores parent's componentCode (not id), so we match by code
-  const getAllChildIds = (parentCode: string): string[] => {
-    const children = allComponents.filter((c: any) => c.parentId === parentCode);
-    const childIds = children.map((c: any) => c.id);
-    // Recurse using each child's componentCode (or code) as the next parentCode
-    const descendantIds = children.flatMap((c: any) => getAllChildIds(c.componentCode || c.code));
-    return [...childIds, ...descendantIds];
+  const getStockStatusBadge = (status: string) => {
+    if (status === "At Min") {
+      return <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">At Min</span>;
+    }
+    return <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>;
   };
   
-  // Get component IDs to include (parent + all children)
-  // Use selectedComponent.code to find the actual database ID and children
-  const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
-  const relevantComponentIds = selectedComponent 
-    ? [selectedActualId, ...getAllChildIds(selectedComponent.code)].filter(Boolean) as string[]
-    : [];
+  const getLocationQty = (locations: SpareWithInventoryData['locations'], locationName: string): number => {
+    const loc = locations.find(l => l.locationName.toLowerCase().includes(locationName.toLowerCase()) || 
+      l.locationName === locationNames.locationAName || l.locationName === locationNames.locationBName);
+    return loc?.qty || 0;
+  };
   
-  // Filter spares for this component AND all its children
-  const spares = selectedComponent 
-    ? allSpares.filter(s => relevantComponentIds.includes(s.componentId))
-    : [];
+  const getLocationAQty = (locations: SpareWithInventoryData['locations']): number => {
+    return locations[0]?.qty || 0;
+  };
   
-  const [originalSpares] = useState(JSON.parse(JSON.stringify(spares)));
+  const getLocationBQty = (locations: SpareWithInventoryData['locations']): number => {
+    return locations[1]?.qty || 0;
+  };
+  
+  const getComponentDisplay = (linkedComponents: SpareWithInventoryData['linkedComponents']): string => {
+    if (linkedComponents.length === 0) return '-';
+    if (linkedComponents.length === 1) return linkedComponents[0].componentName || linkedComponents[0].componentCode;
+    return 'Multi-linked';
+  };
+  
+  const [originalSpares] = useState<any[]>([]);
   
   const handleFieldChange = (index: number, field: string, value: string) => {
-    // ModifyFieldWrapper handles change tracking
   };
   
   if (!selectedComponent) {
@@ -1384,11 +1413,16 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   
   return (
     <div className="overflow-x-auto">
+      {sparesLoading ? (
+        <div className="py-8 text-center text-gray-500">Loading spares...</div>
+      ) : (
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200">
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.2"><Marker id="B7.E.2" /> Part Code</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.3"><Marker id="B7.E.3" /> Part Name</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600">Component</th>
+            <th className="text-left py-2 px-3 font-medium text-gray-600">Part Number</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.4"><Marker id="B7.E.4" /> Critical</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.5"><Marker id="B7.E.5" /> ROB</th>
             <th className="text-left py-2 px-3 font-medium text-gray-600" data-testid="B7.E.6"><Marker id="B7.E.6" /> Min</th>
@@ -1397,136 +1431,59 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
             {FEATURES.IHM && (
               <th className="text-center py-2 px-3 font-medium text-gray-600" data-testid="B7.E.9" title="IHM Status"><Marker id="B7.E.9" /> IHM</th>
             )}
+            <th className="text-left py-2 px-3 font-medium text-gray-600">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {spares.length === 0 ? (
+          {sparesWithInventory.length === 0 ? (
             <tr>
-              <td colSpan={FEATURES.IHM ? 8 : 7} className="text-center py-8">
+              <td colSpan={FEATURES.IHM ? 11 : 10} className="text-center py-8">
                 <div className="text-gray-400 text-sm">No spare parts linked to this component</div>
                 <p className="text-xs text-gray-500 mt-2">Navigate to the Spares module to manage spare parts inventory</p>
               </td>
             </tr>
-          ) : spares.map((spare, index) => (
-            <tr key={index} className="border-b border-gray-100">
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.10" : undefined}>
+          ) : sparesWithInventory.map((spareData, index) => {
+            const spare = spareData.spare;
+            const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes' || spare.criticality === 'Yes';
+            return (
+            <tr key={spare.id || index} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleViewSpareDetails(spareData)}>
+              <td className="py-3 px-3 text-gray-900 text-blue-600 hover:underline" data-testid={index === 0 ? "B7.E.10" : undefined}>
                 {index === 0 && <Marker id="B7.E.10" />}
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares?.[index]?.partCode ?? spare.partCode}
-                    currentValue={spare.partCode}
-                    fieldName={`partCode-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'partCode', value)}
-                  >
-                    <input
-                      type="text"
-                      value={spare.partCode}
-                      onChange={(e) => handleFieldChange(index, 'partCode', e.target.value)}
-                      className="text-sm w-full px-2 py-1 border rounded"
-                    />
-                  </ModifyFieldWrapper>
-                ) : (
-                  spare.partCode
-                )}
+                {spare.partCode}
               </td>
               <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.11" : undefined}>
                 {index === 0 && <Marker id="B7.E.11" />}
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares?.[index]?.partName ?? spare.partName}
-                    currentValue={spare.partName}
-                    fieldName={`partName-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'partName', value)}
-                  >
-                    <input
-                      type="text"
-                      value={spare.partName}
-                      onChange={(e) => handleFieldChange(index, 'partName', e.target.value)}
-                      className="text-sm w-full px-2 py-1 border rounded"
-                    />
-                  </ModifyFieldWrapper>
+                {spare.partName}
+              </td>
+              <td className="py-3 px-3 text-gray-700">
+                {spareData.linkedComponents.length > 1 ? (
+                  <span className="px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">Multi-linked</span>
                 ) : (
-                  spare.partName
+                  getComponentDisplay(spareData.linkedComponents)
                 )}
               </td>
+              <td className="py-3 px-3 text-gray-700">{spare.partNumber || '-'}</td>
               <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.12" : undefined}>
                 {index === 0 && <Marker id="B7.E.12" />}
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares?.[index]?.critical ?? spare.critical}
-                    currentValue={spare.critical}
-                    fieldName={`critical-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'critical', value)}
-                  >
-                    <select
-                      value={spare.critical}
-                      onChange={(e) => handleFieldChange(index, 'critical', e.target.value)}
-                      className="text-sm w-full px-2 py-1 border rounded"
-                    >
-                      <option value="">Non-Critical</option>
-                      <option value="Critical">Critical</option>
-                    </select>
-                  </ModifyFieldWrapper>
-                ) : (
-                  spare.critical && (
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                      {spare.critical}
-                    </span>
-                  )
+                {isCritical && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                    Critical
+                  </span>
                 )}
               </td>
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.13" : undefined}>
+              <td className="py-3 px-3 text-gray-900 font-medium" data-testid={index === 0 ? "B7.E.13" : undefined}>
                 {index === 0 && <Marker id="B7.E.13" />}
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares?.[index]?.rob ?? spare.rob}
-                    currentValue={spare.rob}
-                    fieldName={`rob-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'rob', value)}
-                  >
-                    <input
-                      type="text"
-                      value={spare.rob}
-                      onChange={(e) => handleFieldChange(index, 'rob', e.target.value)}
-                      className="text-sm w-[60px] px-2 py-1 border rounded"
-                    />
-                  </ModifyFieldWrapper>
-                ) : (
-                  spare.rob
-                )}
+                {spareData.robTotal}
               </td>
               <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.14" : undefined}>
                 {index === 0 && <Marker id="B7.E.14" />}
-                {isModifyMode ? (
-                  <ModifyFieldWrapper
-                    originalValue={originalSpares?.[index]?.min ?? spare.min}
-                    currentValue={spare.min}
-                    fieldName={`min-${index}`}
-                    isModifyMode={isModifyMode}
-                    onFieldChange={(field, value) => handleFieldChange(index, 'min', value)}
-                  >
-                    <input
-                      type="text"
-                      value={spare.min}
-                      onChange={(e) => handleFieldChange(index, 'min', e.target.value)}
-                      className="text-sm w-[60px] px-2 py-1 border rounded"
-                    />
-                  </ModifyFieldWrapper>
-                ) : (
-                  spare.min
-                )}
+                {spare.min || 0}
               </td>
               <td className="py-3 px-3" data-testid={index === 0 ? "B7.E.15" : undefined}>
                 {index === 0 && <Marker id="B7.E.15" />}
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {spare.stock}
-                </span>
+                {getStockStatusBadge(spareData.stockStatus)}
               </td>
-              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.16" : undefined}>
+              <td className="py-3 px-3 text-gray-900" data-testid={index === 0 ? "B7.E.16" : undefined} onClick={(e) => e.stopPropagation()}>
                 {index === 0 && <Marker id="B7.E.16" />}
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1535,7 +1492,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                       data-testid={`location-popup-trigger-${index}`}
                     >
                       <MapPin className="h-3.5 w-3.5" />
-                      <span>View Locations</span>
+                      <span>View ({spareData.locations.length})</span>
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-72 p-0" align="start">
@@ -1553,28 +1510,22 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                       </div>
                     </div>
                     <div className="p-3 space-y-3">
-                      <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          <span className="text-sm font-medium text-gray-700">{locationNames.locationAName}</span>
+                      {spareData.locations.length === 0 ? (
+                        <div className="text-sm text-gray-500 text-center py-2">No locations assigned</div>
+                      ) : spareData.locations.map((loc, locIdx) => (
+                        <div key={loc.locationId} className={`flex items-center justify-between p-2 rounded-lg border ${locIdx === 0 ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'}`}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${locIdx === 0 ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                            <span className="text-sm font-medium text-gray-700">{loc.locationName}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-gray-900">{loc.qty}</span>
+                            <span className="text-xs text-gray-500 ml-1">units</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-sm font-bold text-gray-900">{spare.robLocationA ?? 0}</span>
-                          <span className="text-xs text-gray-500 ml-1">units</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-100">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                          <span className="text-sm font-medium text-gray-700">{locationNames.locationBName}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-sm font-bold text-gray-900">{spare.robLocationB ?? 0}</span>
-                          <span className="text-xs text-gray-500 ml-1">units</span>
-                        </div>
-                      </div>
+                      ))}
                       <div className="pt-2 border-t text-xs text-gray-500">
-                        Total ROB: <span className="font-semibold text-gray-700">{spare.rob}</span> units
+                        Total ROB: <span className="font-semibold text-gray-700">{spareData.robTotal}</span> units
                       </div>
                     </div>
                   </PopoverContent>
@@ -1583,20 +1534,25 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               {FEATURES.IHM && (
                 <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
                   {index === 0 && <Marker id="B7.E.17" />}
-                  {/* Mock IHM status - in real implementation, fetch from API */}
-                  {spare.partCode === 'SP-ME-001' ? (
-                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" />
-                  ) : spare.partCode === 'SP-ME-002' ? (
-                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                  {spare.ihmPresence === 'YES' ? (
+                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" title="IHM Present" />
+                  ) : spare.ihmPresence === 'NO' ? (
+                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" title="No IHM" />
                   ) : (
-                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" />
+                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" title="IHM Unknown" />
                   )}
                 </td>
               )}
+              <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="sm" onClick={() => handleViewSpareDetails(spareData)} data-testid={`view-spare-details-${spare.id}`}>
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
+      )}
       
       {/* Edit Location Names Dialog */}
       <Dialog open={editLocationDialogOpen} onOpenChange={setEditLocationDialogOpen}>
@@ -1648,6 +1604,161 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Spare Details Dialog (E1) */}
+      <Dialog open={spareDetailsOpen} onOpenChange={setSpareDetailsOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Spare Part Details
+              {selectedSpareDetails && selectedSpareDetails.linkedComponents.length > 1 && (
+                <span className="ml-2 px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">Multi-linked</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSpareDetails && (
+            <div className="space-y-6 pt-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Basic Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-gray-500">Part Code</Label>
+                    <p className="text-sm font-medium" data-testid="spare-details-part-code">{selectedSpareDetails.spare.partCode}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Part Name</Label>
+                    <p className="text-sm font-medium" data-testid="spare-details-part-name">{selectedSpareDetails.spare.partName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Part Number</Label>
+                    <p className="text-sm font-medium" data-testid="spare-details-part-number">{selectedSpareDetails.spare.partNumber || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Unit</Label>
+                    <p className="text-sm font-medium">{selectedSpareDetails.spare.unit || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Maker</Label>
+                    <p className="text-sm font-medium">{selectedSpareDetails.spare.maker || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Maker Reference</Label>
+                    <p className="text-sm font-medium">{selectedSpareDetails.spare.makerReference || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Drawing Number</Label>
+                    <p className="text-sm font-medium">{selectedSpareDetails.spare.drawingNo || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Critical</Label>
+                    <p className="text-sm font-medium">
+                      {(selectedSpareDetails.spare.critical === 'Critical' || selectedSpareDetails.spare.critical === 'Yes' || selectedSpareDetails.spare.criticality === 'Yes') ? (
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">Critical</span>
+                      ) : (
+                        'No'
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Linked Components */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Linked Components ({selectedSpareDetails.linkedComponents.length})</h4>
+                {selectedSpareDetails.linkedComponents.length === 0 ? (
+                  <p className="text-sm text-gray-500">No components linked</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedSpareDetails.linkedComponents.map((comp, idx) => (
+                      <div key={comp.componentId} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                        <div>
+                          <span className="text-sm font-medium">{comp.componentName || comp.componentCode}</span>
+                          <span className="ml-2 text-xs text-gray-500">{comp.componentCode}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Stock & Inventory */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Stock & Inventory</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 bg-blue-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-blue-800">{selectedSpareDetails.robTotal}</p>
+                    <p className="text-xs text-blue-600">Total ROB</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-gray-800">{selectedSpareDetails.spare.min || 0}</p>
+                    <p className="text-xs text-gray-600">Minimum Level</p>
+                  </div>
+                  <div className="p-3 rounded-lg text-center" style={{ backgroundColor: selectedSpareDetails.stockStatus === 'OK' ? '#dcfce7' : '#fef9c3' }}>
+                    <p className="text-lg font-bold" style={{ color: selectedSpareDetails.stockStatus === 'OK' ? '#166534' : '#854d0e' }}>{selectedSpareDetails.stockStatus}</p>
+                    <p className="text-xs" style={{ color: selectedSpareDetails.stockStatus === 'OK' ? '#15803d' : '#a16207' }}>Stock Status</p>
+                  </div>
+                </div>
+
+                {/* Location Breakdown */}
+                <div className="mt-4">
+                  <h5 className="text-xs font-medium text-gray-600 mb-2">Stock by Location</h5>
+                  {selectedSpareDetails.locations.length === 0 ? (
+                    <p className="text-sm text-gray-500">No location stock data available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedSpareDetails.locations.map((loc, idx) => (
+                        <div key={loc.locationId} className={`flex items-center justify-between p-2 rounded border ${idx === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm font-medium">{loc.locationName}</span>
+                          </div>
+                          <span className="text-sm font-bold">{loc.qty} units</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              {FEATURES.IHM && selectedSpareDetails.spare.ihmPresence && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">IHM Information</h4>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50">
+                    {selectedSpareDetails.spare.ihmPresence === 'YES' ? (
+                      <>
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                        <span className="text-sm text-red-700">This spare contains hazardous materials (IHM)</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        <span className="text-sm text-green-700">No hazardous materials (IHM compliant)</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Remarks */}
+              {selectedSpareDetails.spare.remarks && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Remarks</h4>
+                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded">{selectedSpareDetails.spare.remarks}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button variant="outline" onClick={() => setSpareDetailsOpen(false)} data-testid="close-spare-details">
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
