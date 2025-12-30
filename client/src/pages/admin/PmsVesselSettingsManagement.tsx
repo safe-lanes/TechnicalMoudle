@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2 } from "lucide-react";
 import type { PmsVesselSettings } from "@shared/schema";
+import { Marker } from "@/components/Marker";
 
 interface Vessel {
   id: string;
@@ -124,9 +125,9 @@ export default function PmsVesselSettingsManagement() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Lead Time & Grace Period Settings</h2>
-        <p className="text-gray-600 mt-1">
-          Configure vessel-specific lead times for work order generation and grace periods for status calculation.
+        <h2 className="text-xl font-semibold text-gray-900" data-testid="I4.QL7.1"><Marker id="I4.QL7.1" />Lead Time & Grace Period Settings</h2>
+        <p className="text-gray-600 mt-1" data-testid="I4.QL7.2">
+          <Marker id="I4.QL7.2" />Configure vessel-specific lead times for work order generation and grace periods for status calculation.
         </p>
       </div>
 
@@ -223,15 +224,16 @@ export default function PmsVesselSettingsManagement() {
 
           <div className="space-y-6 py-4">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2">
+              <div className="flex items-center gap-2 border-b pb-2" data-testid="I4.QL7.3">
+                <Marker id="I4.QL7.3" />
                 <Calendar className="h-5 w-5 text-blue-600" />
                 <h3 className="font-semibold text-gray-900">Calendar-Based Jobs</h3>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="calendarLeadDaysCritical" className="text-sm font-medium">
-                    Lead Time (Critical Jobs)
+                  <Label htmlFor="calendarLeadDaysCritical" className="text-sm font-medium" data-testid="I4.QL7.4">
+                    <Marker id="I4.QL7.4" />Lead Time (Critical Jobs)
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -241,15 +243,15 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.calendarLeadDaysCritical}
                       onChange={(e) => setFormData({...formData, calendarLeadDaysCritical: parseInt(e.target.value) || 0})}
                       className="w-24"
-                      data-testid="input-calendar-lead-critical"
+                      data-testid="I4.QL7.5"
                     />
                     <span className="text-sm text-gray-500">days before due</span>
                   </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="calendarLeadDaysNonCritical" className="text-sm font-medium">
-                    Lead Time (Non-Critical Jobs)
+                  <Label htmlFor="calendarLeadDaysNonCritical" className="text-sm font-medium" data-testid="I4.QL7.6">
+                    <Marker id="I4.QL7.6" />Lead Time (Non-Critical Jobs)
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -259,7 +261,7 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.calendarLeadDaysNonCritical}
                       onChange={(e) => setFormData({...formData, calendarLeadDaysNonCritical: parseInt(e.target.value) || 0})}
                       className="w-24"
-                      data-testid="input-calendar-lead-non-critical"
+                      data-testid="I4.QL7.7"
                     />
                     <span className="text-sm text-gray-500">days before due</span>
                   </div>
@@ -268,14 +270,14 @@ export default function PmsVesselSettingsManagement() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="calendarGraceMode" className="text-sm font-medium">
-                    Grace Period Mode
+                  <Label htmlFor="calendarGraceMode" className="text-sm font-medium" data-testid="I4.QL7.8">
+                    <Marker id="I4.QL7.8" />Grace Period Mode
                   </Label>
                   <Select
                     value={formData.calendarGraceMode}
                     onValueChange={(value) => setFormData({...formData, calendarGraceMode: value})}
                   >
-                    <SelectTrigger className="mt-1" data-testid="select-grace-mode">
+                    <SelectTrigger className="mt-1" data-testid="I4.QL7.9">
                       <SelectValue placeholder="Select mode" />
                     </SelectTrigger>
                     <SelectContent>
@@ -291,8 +293,8 @@ export default function PmsVesselSettingsManagement() {
                 </div>
 
                 <div>
-                  <Label htmlFor="calendarGraceDays" className="text-sm font-medium">
-                    {formData.calendarGraceMode === 'FIXED_DAYS' ? 'Fixed Grace Days' : 'Default Grace Days'}
+                  <Label htmlFor="calendarGraceDays" className="text-sm font-medium" data-testid="I4.QL7.10">
+                    <Marker id="I4.QL7.10" />{formData.calendarGraceMode === 'FIXED_DAYS' ? 'Fixed Grace Days' : 'Default Grace Days'}
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -302,7 +304,7 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.calendarGraceDays}
                       onChange={(e) => setFormData({...formData, calendarGraceDays: parseInt(e.target.value) || 0})}
                       className="w-24"
-                      data-testid="input-calendar-grace-days"
+                      data-testid="I4.QL7.11"
                     />
                     <span className="text-sm text-gray-500">days</span>
                   </div>
@@ -311,15 +313,16 @@ export default function PmsVesselSettingsManagement() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-2">
+              <div className="flex items-center gap-2 border-b pb-2" data-testid="I4.QL7.12">
+                <Marker id="I4.QL7.12" />
                 <Gauge className="h-5 w-5 text-orange-600" />
                 <h3 className="font-semibold text-gray-900">Running Hours Jobs</h3>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="rhLeadHoursCritical" className="text-sm font-medium">
-                    Lead Time (Critical Jobs)
+                  <Label htmlFor="rhLeadHoursCritical" className="text-sm font-medium" data-testid="I4.QL7.13">
+                    <Marker id="I4.QL7.13" />Lead Time (Critical Jobs)
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -329,15 +332,15 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.rhLeadHoursCritical}
                       onChange={(e) => setFormData({...formData, rhLeadHoursCritical: parseInt(e.target.value) || 0})}
                       className="w-24"
-                      data-testid="input-rh-lead-critical"
+                      data-testid="I4.QL7.14"
                     />
                     <span className="text-sm text-gray-500">hours before due</span>
                   </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="rhLeadHoursNonCritical" className="text-sm font-medium">
-                    Lead Time (Non-Critical Jobs)
+                  <Label htmlFor="rhLeadHoursNonCritical" className="text-sm font-medium" data-testid="I4.QL7.15">
+                    <Marker id="I4.QL7.15" />Lead Time (Non-Critical Jobs)
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -347,7 +350,7 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.rhLeadHoursNonCritical}
                       onChange={(e) => setFormData({...formData, rhLeadHoursNonCritical: parseInt(e.target.value) || 0})}
                       className="w-24"
-                      data-testid="input-rh-lead-non-critical"
+                      data-testid="I4.QL7.16"
                     />
                     <span className="text-sm text-gray-500">hours before due</span>
                   </div>
@@ -355,8 +358,8 @@ export default function PmsVesselSettingsManagement() {
               </div>
 
               <div>
-                <Label htmlFor="rhGraceHours" className="text-sm font-medium">
-                  Grace Period
+                <Label htmlFor="rhGraceHours" className="text-sm font-medium" data-testid="I4.QL7.17">
+                  <Marker id="I4.QL7.17" />Grace Period
                 </Label>
                 <div className="mt-1 flex items-center gap-2">
                   <Input
@@ -366,9 +369,9 @@ export default function PmsVesselSettingsManagement() {
                     value={formData.rhGraceHours}
                     onChange={(e) => setFormData({...formData, rhGraceHours: parseInt(e.target.value) || 0})}
                     className="w-24"
-                    data-testid="input-rh-grace-hours"
+                    data-testid="I4.QL7.18"
                   />
-                  <span className="text-sm text-gray-500">hours after due</span>
+                  <span className="text-sm text-gray-500" data-testid="I4.QL7.19"><Marker id="I4.QL7.19" />hours after due</span>
                   <span className="text-xs text-gray-400">(≈ {Math.round(formData.rhGraceHours / 24)} days)</span>
                 </div>
               </div>
