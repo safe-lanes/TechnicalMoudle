@@ -188,13 +188,14 @@ export default function Admin4Dashboard() {
             variant="ghost"
             size="sm"
             onClick={() => setCurrentView('dashboard')}
-            data-testid="button-back-to-dashboard"
+            data-testid="I4.QL.4.6"
           >
+            <Marker id="I4.QL.4.6" />
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
           <div className="h-6 w-px bg-gray-300" />
-          <h1 className="text-xl font-semibold text-gray-900">Fleet Jobs Management</h1>
+          <h1 className="text-xl font-semibold text-gray-900" data-testid="I4.QL.4.7"><Marker id="I4.QL.4.7" />Fleet Jobs Management</h1>
         </div>
         <FleetJobsManagement />
       </div>

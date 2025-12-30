@@ -21,6 +21,7 @@ import { Plus, Search, Pencil, Trash2, Download, PlayCircle } from "lucide-react
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FleetJobForm from "./FleetJobForm";
+import { Marker } from "@/components/Marker";
 
 export default function FleetJobsManagement() {
   const { toast } = useToast();
@@ -206,17 +207,18 @@ export default function FleetJobsManagement() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Fleet Jobs Management</h1>
-          <p className="text-gray-600 mt-2">Manage fleet-level maintenance jobs and work orders</p>
+          <p className="text-gray-600 mt-2" data-testid="I4.QL.4.9"><Marker id="I4.QL.4.9" />Manage fleet-level maintenance jobs and work orders</p>
         </div>
 
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>All Fleet Jobs</CardTitle>
+              <CardTitle data-testid="I4.QL.4.10"><Marker id="I4.QL.4.10" />All Fleet Jobs</CardTitle>
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Equipment Filter */}
                 <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-equipment-filter">
+                  <SelectTrigger className="w-full sm:w-[200px]" data-testid="I4.QL.4.11">
+                    <Marker id="I4.QL.4.11" />
                     <SelectValue placeholder="All Equipment" />
                   </SelectTrigger>
                   <SelectContent>
@@ -238,24 +240,27 @@ export default function FleetJobsManagement() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
-                    data-testid="input-search-jobs"
+                    data-testid="I4.QL.4.12"
                   />
+                  <Marker id="I4.QL.4.12" />
                 </div>
 
                 {/* Action Buttons */}
                 <Button
                   variant="outline"
                   onClick={handleExport}
-                  data-testid="button-export-jobs"
+                  data-testid="I4.QL.4.13"
                 >
+                  <Marker id="I4.QL.4.13" />
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
                 <Button
                   onClick={handleAddNew}
                   className="whitespace-nowrap"
-                  data-testid="button-add-job"
+                  data-testid="I4.QL.4.14"
                 >
+                  <Marker id="I4.QL.4.14" />
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Job
                 </Button>
@@ -287,30 +292,42 @@ export default function FleetJobsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Job Code</TableHead>
-                      <TableHead>Job Title</TableHead>
-                      <TableHead>Equipment</TableHead>
-                      <TableHead>Interval</TableHead>
-                      <TableHead>Task Type</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead data-testid="I4.QL.4.15"><Marker id="I4.QL.4.15" />Job Code</TableHead>
+                      <TableHead data-testid="I4.QL.4.16"><Marker id="I4.QL.4.16" />Job Title</TableHead>
+                      <TableHead data-testid="I4.QL.4.17"><Marker id="I4.QL.4.17" />Equipment</TableHead>
+                      <TableHead data-testid="I4.QL.4.18"><Marker id="I4.QL.4.18" />Interval</TableHead>
+                      <TableHead data-testid="I4.QL.4.19"><Marker id="I4.QL.4.19" />Task Type</TableHead>
+                      <TableHead className="text-right" data-testid="I4.QL.4.20"><Marker id="I4.QL.4.20" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredJobs.map((job) => {
+                    {filteredJobs.map((job, index) => {
                       const equipment = components?.find(c => c.fleetEquipmentCode === job.fleetEquipmentCode);
+                      const isFirstRow = index === 0;
                       return (
                         <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
-                          <TableCell className="font-mono text-sm">{job.fleetJobCode}</TableCell>
-                          <TableCell className="font-medium max-w-xs truncate">{job.jobTitle}</TableCell>
-                          <TableCell className="text-sm">
+                          <TableCell className="font-mono text-sm" data-testid={isFirstRow ? "I4.QL.4.21" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL.4.21" />}
+                            {job.fleetJobCode}
+                          </TableCell>
+                          <TableCell className="font-medium max-w-xs truncate" data-testid={isFirstRow ? "I4.QL.4.22" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL.4.22" />}
+                            {job.jobTitle}
+                          </TableCell>
+                          <TableCell className="text-sm" data-testid={isFirstRow ? "I4.QL.4.23" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL.4.23" />}
                             {equipment ? `${equipment.fleetEquipmentCode} - ${equipment.fleetEquipmentName}` : job.fleetEquipmentCode || "-"}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-testid={isFirstRow ? "I4.QL.4.24" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL.4.24" />}
                             {job.maintenanceIntervalValue && job.maintenanceIntervalUnit
                               ? `${job.maintenanceIntervalValue} ${job.maintenanceIntervalUnit}`
                               : "-"}
                           </TableCell>
-                          <TableCell>{job.taskType || "-"}</TableCell>
+                          <TableCell data-testid={isFirstRow ? "I4.QL.4.25" : undefined}>
+                            {isFirstRow && <Marker id="I4.QL.4.25" />}
+                            {job.taskType || "-"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
@@ -319,8 +336,9 @@ export default function FleetJobsManagement() {
                                 onClick={() => handleGenerateWOClick(job)}
                                 className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
                                 title="Create Work Order Now"
-                                data-testid={`button-generate-wo-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.26" : `button-generate-wo-${job.id}`}
                               >
+                                {isFirstRow && <Marker id="I4.QL.4.26" />}
                                 <PlayCircle className="h-4 w-4 mr-1" />
                                 Create WO
                               </Button>
@@ -328,8 +346,9 @@ export default function FleetJobsManagement() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEdit(job)}
-                                data-testid={`button-edit-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.27" : `button-edit-${job.id}`}
                               >
+                                {isFirstRow && <Marker id="I4.QL.4.27" />}
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
@@ -337,8 +356,9 @@ export default function FleetJobsManagement() {
                                 size="sm"
                                 onClick={() => handleDeleteClick(job)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={`button-delete-${job.id}`}
+                                data-testid={isFirstRow ? "I4.QL.4.28" : `button-delete-${job.id}`}
                               >
+                                {isFirstRow && <Marker id="I4.QL.4.28" />}
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
