@@ -110,14 +110,17 @@ export class WorkOrderService {
     
     // Fetch vessel grace settings for proper status calculation
     const vesselIds = Array.from(new Set(workOrders.map(wo => wo.vesselId).filter((id): id is string => id !== null)));
+    const vesselSettingsMap = new Map<string, PmsVesselSettings>();
     const graceSettingsMap = new Map<string, VesselGraceSettings>();
     for (const vId of vesselIds) {
       const settings = await storage.getPmsVesselSettings(vId);
       if (settings) {
+        vesselSettingsMap.set(vId, settings);
         graceSettingsMap.set(vId, {
           calendarGraceMode: settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS' || 'COMPANY_STANDARD',
           calendarGraceDays: settings.calendarGraceDays || 7,
-          rhGraceHours: settings.rhGraceHours || 168
+          rhGraceHours: settings.rhGraceHours || 168,
+          rhLeadTimeHours: settings.rhLeadHoursNonCritical || 100
         });
       }
     }
@@ -126,10 +129,11 @@ export class WorkOrderService {
     return workOrders.map(wo => {
       let currentRH: number | null = null;
       let dueRH: number | null = null;
+      let job: Job | undefined;
       
       // For RH-based work orders, get the current running hours from the component
       if (wo.maintenanceBasis === 'Running Hours' && wo.jobId) {
-        const job = jobsMap.get(wo.jobId);
+        job = jobsMap.get(wo.jobId);
         if (job?.componentId) {
           const component = componentsMap.get(job.componentId);
           // Use explicit null check to handle zero running hours correctly
@@ -145,6 +149,18 @@ export class WorkOrderService {
       
       // Get vessel grace settings
       const vesselGraceSettings = wo.vesselId ? graceSettingsMap.get(wo.vesselId) : undefined;
+      const vesselSettings = wo.vesselId ? vesselSettingsMap.get(wo.vesselId) : undefined;
+      
+      // Determine RH lead time based on job criticality (Critical vs Non-Critical)
+      // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
+      // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
+      // (null ?? 50) = 50 (fallback for unconfigured vessels)
+      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+      const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
+        ? (isJobCritical 
+            ? (vesselSettings?.rhLeadHoursCritical ?? 50)
+            : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+        : undefined;
       
       return {
         ...wo,
@@ -156,7 +172,8 @@ export class WorkOrderService {
           status: wo.status,
           completionDateTime: wo.dateCompleted,
           maintenanceBasis: wo.maintenanceBasis || undefined,
-          vesselGraceSettings
+          vesselGraceSettings,
+          rhLeadTimeHours
         })
       };
     });

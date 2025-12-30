@@ -177,10 +177,14 @@ const WorkOrders: React.FC = () => {
         return "bg-green-100 text-green-800";
       case "due":
         return "bg-yellow-100 text-yellow-800";
+      case "due soon":
+        return "bg-amber-100 text-amber-800";
       case "due (grace p)":
         return "bg-orange-100 text-orange-800";
       case "overdue":
         return "bg-red-100 text-red-800";
+      case "planned":
+        return "bg-sky-100 text-sky-800";
       case "postponed":
         return "bg-blue-100 text-blue-800";
       case "pending approval":

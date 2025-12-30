@@ -1844,7 +1844,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselGraceSettings = vesselSettings ? {
         calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
         calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
-        rhGraceHours: vesselSettings.rhGraceHours ?? 168
+        rhGraceHours: vesselSettings.rhGraceHours ?? 168,
+        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? 100
       } : undefined;
       
       // Augment each work order with computed status and lead time data
@@ -1870,6 +1871,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dueRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
         const currentRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
         
+        // Determine RH lead time based on job criticality (Critical vs Non-Critical)
+        // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
+        // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
+        // (null ?? 50) = 50 (fallback for unconfigured vessels)
+        const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+        const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
+          ? (isJobCritical 
+              ? (vesselSettings?.rhLeadHoursCritical ?? 50)
+              : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+          : undefined;
+        
         return {
           ...wo,
           // Hydrate assignedTo from job if work order has 'Unassigned' or empty value
@@ -1884,24 +1896,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: wo.status,
             completionDateTime: wo.dateCompleted,
             maintenanceBasis: wo.maintenanceBasis || job?.maintenanceBasis || undefined,
-            vesselGraceSettings
+            vesselGraceSettings,
+            rhLeadTimeHours
           }),
           leadTimeValue: job?.leadTimeValue ?? null,
           leadTimeUnit: job?.leadTimeUnit ?? null
         };
       });
       
-      // Sort by spec-compliant priority: Overdue → Grace P → Due → Postponed → Pending Approval → Completed
+      // Sort by spec-compliant priority: Overdue → Grace P → Due → Due Soon → Planned → Postponed → Pending Approval → Completed
       // Then by nearest due date within each status group
       const statusPriority: Record<string, number> = {
         'Overdue': 1,
         'Due (Grace P)': 2,
         'Due': 3,
-        'Postponed': 4,
-        'Pending Approval': 5,
-        'Active': 6,
-        'Completed': 7,
-        'Rejected': 8
+        'Due Soon': 4,
+        'Planned': 5,
+        'Postponed': 6,
+        'Pending Approval': 7,
+        'Active': 8,
+        'Completed': 9,
+        'Rejected': 10
       };
       
       const sortedWorkOrders = enrichedWorkOrders.sort((a, b) => {
@@ -1973,8 +1988,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselGraceSettings = vesselSettings ? {
         calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
         calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
-        rhGraceHours: vesselSettings.rhGraceHours ?? 168
+        rhGraceHours: vesselSettings.rhGraceHours ?? 168,
+        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? 100
       } : undefined;
+      
+      // Determine RH lead time based on job criticality (Critical vs Non-Critical)
+      // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
+      // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
+      // (null ?? 50) = 50 (fallback for unconfigured vessels)
+      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+      const rhLeadTimeHours = workOrder.maintenanceBasis === 'Running Hours' 
+        ? (isJobCritical 
+            ? (vesselSettings?.rhLeadHoursCritical ?? 50)
+            : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+        : undefined;
       
       // Augment with computed status and lead time data
       const enrichedWorkOrder = {
@@ -1987,7 +2014,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: workOrder.status,
           completionDateTime: workOrder.dateCompleted,
           maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis || undefined,
-          vesselGraceSettings
+          vesselGraceSettings,
+          rhLeadTimeHours
         }),
         leadTimeValue,
         leadTimeUnit

@@ -77,6 +77,22 @@ The application features a modern full-stack architecture. The frontend is devel
   4. Uses separate update objects for Calendar vs RH jobs to prevent key leakage
   5. Component lookup fallback chain: ID → componentCode+vessel → name match
   6. Immutable history is enforced by PostgreSQL triggers (INSERT-only)
+- **RH Status Calculation (Lead Time-Driven)**: Running Hours work orders now use lead time-driven status categories per workflow document:
+  - **OVERDUE**: RH_remaining < 0 (current RH exceeds due RH)
+  - **DUE**: RH_remaining = 0 (at due point)
+  - **DUE SOON**: 0 < RH_remaining ≤ LT (within lead time window)
+  - **PLANNED**: RH_remaining > LT (beyond lead time)
+  - Formula: RH_remaining = RH_due - RH_effective_current
+  - Lead time uses vessel PMS settings (Critical vs Non-Critical): `rhLeadHoursCritical` (default 50) and `rhLeadHoursNonCritical` (default 100)
+  - Status is computed in `shared/workOrders/status.ts` via `computeRHStatusCategory()` and mapped to display via `rhCategoryToDisplayStatus()`
+  - Frontend badge colors: Due Soon (amber), Planned (sky blue)
+  - Explicit zero lead time is respected (no fallback to default when explicitly set to 0)
+- **PMS Vessel Settings UI Markers**: PmsVesselSettingsManagement.tsx includes I4.QL7.x markers for traceability:
+  - I4.QL7.1: Calendar-Based Jobs Lead Time (Critical)
+  - I4.QL7.3: Calendar-Based Jobs Lead Time (Non-Critical)
+  - I4.QL7.14: RH Lead Time (Critical)
+  - I4.QL7.16: RH Lead Time (Non-Critical)
+  - I4.QL7.5-I4.QL7.12: Grace Period configuration fields
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
