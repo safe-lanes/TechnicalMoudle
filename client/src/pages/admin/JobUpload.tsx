@@ -1,23 +1,7 @@
 import { Wrench } from "lucide-react";
 import UniformBulkUpload from "@/components/admin/UniformBulkUpload";
 import { queryClient } from "@/lib/queryClient";
-
-const JOBS_MARKERS = {
-  header: "I1.6B.12",
-  description: "I1.6B.13",
-  downloadTemplate: "I1.6B.14",
-  tabUpload: "I1.6B.15",
-  tabMapping: "I1.6B.16",
-  tabHistory: "I1.6B.17",
-  importModeSection: "I1.6B.18",
-  importModeLabel: "I1.6B.19",
-  radioAddOnly: "I1.6B.20",
-  radioUpdateOnly: "I1.6B.21",
-  radioUpsert: "I1.6B.22",
-  uploadSection: "I1.6B.23",
-  uploadDescription: "I1.6B.24",
-  dropZone: "I1.6B.25"
-};
+import { PageMarkers } from "./BulkDataImport";
 
 const FIELD_MAPPINGS = [
   { field: "Vessel Code", required: true, description: "Vessel code (e.g., V001)" },
@@ -47,9 +31,10 @@ const FIELD_MAPPINGS = [
 
 interface JobUploadProps {
   vesselId: string;
+  markers?: PageMarkers;
 }
 
-export default function JobUpload({ vesselId }: JobUploadProps) {
+export default function JobUpload({ vesselId, markers }: JobUploadProps) {
   const handleRefreshData = () => {
     // Invalidate all jobs queries (matching any vesselId parameter)
     queryClient.invalidateQueries({ predicate: (query) => 
@@ -68,7 +53,22 @@ export default function JobUpload({ vesselId }: JobUploadProps) {
       vesselId={vesselId}
       previewColumns={["Vessel Code", "Component Code", "Maintenance Task"]}
       onRefreshData={handleRefreshData}
-      markers={JOBS_MARKERS}
+      markers={markers ? {
+        header: markers.uploadHeader,
+        description: markers.uploadDescription,
+        downloadTemplate: markers.downloadTemplate,
+        tabUpload: markers.tabUpload,
+        tabMapping: markers.tabMapping,
+        tabHistory: markers.tabHistory,
+        importModeSection: markers.importModeSection,
+        importModeLabel: markers.importModeLabel,
+        radioAddOnly: markers.radioAddOnly,
+        radioUpdateOnly: markers.radioUpdateOnly,
+        radioUpsert: markers.radioUpsert,
+        uploadSection: markers.uploadSection,
+        uploadDescription: markers.uploadDescription2,
+        dropZone: markers.dropZone,
+      } : undefined}
     />
   );
 }

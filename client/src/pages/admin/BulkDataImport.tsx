@@ -27,6 +27,170 @@ type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
 type ViewMode = 'upload' | 'history';
 
+// Complete marker configurations per template tab
+// Each tab has its own marker prefix for ALL elements on the page
+export interface PageMarkers {
+  // Sidebar (Templates section)
+  templatesHeader: string;
+  templateMachinery: string;
+  templateJobs: string;
+  templateSpares: string;
+  templateStores: string;
+  // Vessel controls (top header bar)
+  vesselLabel: string;
+  vesselDropdown: string;
+  newVesselButton: string;
+  fleetToggle: string;
+  infoText: string;
+  historyButton: string;
+  // Upload component markers
+  uploadHeader: string;
+  uploadDescription: string;
+  downloadTemplate: string;
+  tabUpload: string;
+  tabMapping: string;
+  tabHistory: string;
+  importModeSection: string;
+  importModeLabel: string;
+  radioAddOnly: string;
+  radioUpdateOnly: string;
+  radioUpsert: string;
+  uploadSection: string;
+  uploadDescription2: string;
+  dropZone: string;
+  // Stores-specific
+  storeTypeSection?: string;
+  storeTypeLabel?: string;
+  storeTypeDropdown?: string;
+}
+
+// Machinery tab markers (I1.A*)
+const MACHINERY_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6",
+  templateMachinery: "I1.6A",
+  templateJobs: "I1.6B",
+  templateSpares: "I1.6C",
+  templateStores: "I1.6D",
+  vesselLabel: "I1.A6",
+  vesselDropdown: "I1.A7",
+  newVesselButton: "I1.A8",
+  fleetToggle: "I1.A9",
+  infoText: "I1.A10",
+  historyButton: "I1.A11",
+  uploadHeader: "I1.A12",
+  uploadDescription: "I1.A13",
+  downloadTemplate: "I1.A14",
+  tabUpload: "I1.A15",
+  tabMapping: "I1.A16",
+  tabHistory: "I1.A17",
+  importModeSection: "I1.A18",
+  importModeLabel: "I1.A19",
+  radioAddOnly: "I1.A20",
+  radioUpdateOnly: "I1.A21",
+  radioUpsert: "I1.A22",
+  uploadSection: "I1.A23",
+  uploadDescription2: "I1.A24",
+  dropZone: "I1.A25",
+};
+
+// Jobs tab markers (I1.6B.*)
+const JOBS_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6B.6",
+  templateMachinery: "I1.6B.6A",
+  templateJobs: "I1.6B.6B",
+  templateSpares: "I1.6B.6C",
+  templateStores: "I1.6B.6D",
+  vesselLabel: "I1.6B.7",
+  vesselDropdown: "I1.6B.8",
+  newVesselButton: "I1.6B.9",
+  fleetToggle: "I1.6B.10",
+  infoText: "I1.6B.11",
+  historyButton: "I1.6B.12",
+  uploadHeader: "I1.6B.13",
+  uploadDescription: "I1.6B.14",
+  downloadTemplate: "I1.6B.15",
+  tabUpload: "I1.6B.16",
+  tabMapping: "I1.6B.17",
+  tabHistory: "I1.6B.18",
+  importModeSection: "I1.6B.19",
+  importModeLabel: "I1.6B.20",
+  radioAddOnly: "I1.6B.21",
+  radioUpdateOnly: "I1.6B.22",
+  radioUpsert: "I1.6B.23",
+  uploadSection: "I1.6B.24",
+  uploadDescription2: "I1.6B.25",
+  dropZone: "I1.6B.26",
+};
+
+// Spares tab markers (I1.6C.*)
+const SPARES_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6C.6",
+  templateMachinery: "I1.6C.6A",
+  templateJobs: "I1.6C.6B",
+  templateSpares: "I1.6C.6C",
+  templateStores: "I1.6C.6D",
+  vesselLabel: "I1.6C.7",
+  vesselDropdown: "I1.6C.8",
+  newVesselButton: "I1.6C.9",
+  fleetToggle: "I1.6C.10",
+  infoText: "I1.6C.11",
+  historyButton: "I1.6C.12",
+  uploadHeader: "I1.6C.13",
+  uploadDescription: "I1.6C.14",
+  downloadTemplate: "I1.6C.15",
+  tabUpload: "I1.6C.16",
+  tabMapping: "I1.6C.17",
+  tabHistory: "I1.6C.18",
+  importModeSection: "I1.6C.19",
+  importModeLabel: "I1.6C.20",
+  radioAddOnly: "I1.6C.21",
+  radioUpdateOnly: "I1.6C.22",
+  radioUpsert: "I1.6C.23",
+  uploadSection: "I1.6C.24",
+  uploadDescription2: "I1.6C.25",
+  dropZone: "I1.6C.26",
+};
+
+// Stores tab markers (I1.6D.*)
+const STORES_PAGE_MARKERS: PageMarkers = {
+  templatesHeader: "I1.6D.6",
+  templateMachinery: "I1.6D.6A",
+  templateJobs: "I1.6D.6B",
+  templateSpares: "I1.6D.6C",
+  templateStores: "I1.6D.6D",
+  vesselLabel: "I1.6D.7",
+  vesselDropdown: "I1.6D.8",
+  newVesselButton: "I1.6D.9",
+  fleetToggle: "I1.6D.10",
+  infoText: "I1.6D.11",
+  historyButton: "I1.6D.12",
+  uploadHeader: "I1.6D.13",
+  uploadDescription: "I1.6D.14",
+  downloadTemplate: "I1.6D.15",
+  tabUpload: "I1.6D.16",
+  tabMapping: "I1.6D.17",
+  tabHistory: "I1.6D.18",
+  storeTypeSection: "I1.6D.1A",
+  storeTypeLabel: "I1.6D.19",
+  storeTypeDropdown: "I1.6D.20",
+  importModeSection: "I1.6D.21",
+  importModeLabel: "I1.6D.22",
+  radioAddOnly: "I1.6D.23",
+  radioUpdateOnly: "I1.6D.24",
+  radioUpsert: "I1.6D.25",
+  uploadSection: "I1.6D.26",
+  uploadDescription2: "I1.6D.27",
+  dropZone: "I1.6D.28",
+};
+
+// Map template type to page markers
+const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
+  machinery: MACHINERY_PAGE_MARKERS,
+  jobs: JOBS_PAGE_MARKERS,
+  spares: SPARES_PAGE_MARKERS,
+  stores: STORES_PAGE_MARKERS,
+};
+
 export default function BulkDataImport() {
   const { data: vessels = [] } = useVessels();
   const { toast } = useToast();
@@ -98,6 +262,9 @@ export default function BulkDataImport() {
   ];
 
   const currentTemplates = isFleetMode ? fleetTemplates : vesselTemplates;
+  
+  // Get current page markers based on selected template
+  const currentMarkers = PAGE_MARKERS_BY_TEMPLATE[selectedVesselTemplate];
 
   return (
     <div className="flex h-[calc(100vh-140px)]">
@@ -105,17 +272,18 @@ export default function BulkDataImport() {
       <div className="w-72 bg-sky-500 p-4">
         <Card className="bg-sky-500 border-none shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-lg" data-testid="I1.6">TEMPLATES</CardTitle>
+            <CardTitle className="text-white text-lg" data-testid={currentMarkers.templatesHeader}>TEMPLATES</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {currentTemplates.map((template) => {
-              const vesselMarkerIds: Record<VesselTemplateType, string> = {
-                'machinery': 'I1.6A',
-                'jobs': 'I1.6B',
-                'spares': 'I1.6C',
-                'stores': 'I1.6D'
+              // Dynamic markers based on selected template tab
+              const templateMarkerMap: Record<VesselTemplateType, string> = {
+                'machinery': currentMarkers.templateMachinery,
+                'jobs': currentMarkers.templateJobs,
+                'spares': currentMarkers.templateSpares,
+                'stores': currentMarkers.templateStores,
               };
-              const markerId = !isFleetMode ? vesselMarkerIds[template.id as VesselTemplateType] : undefined;
+              const markerId = !isFleetMode ? templateMarkerMap[template.id as VesselTemplateType] : undefined;
               return (
                 <button
                   key={template.id}
@@ -148,11 +316,11 @@ export default function BulkDataImport() {
               <>
                 <Ship className="h-5 w-5 text-sky-600" />
                 <div className="flex items-center gap-3">
-                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700" data-testid="I1.A6">
+                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700" data-testid={currentMarkers.vesselLabel}>
                     Select Vessel:
                   </Label>
                   <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
-                    <SelectTrigger id="vessel-select" className="w-64" data-testid="I1.A7">
+                    <SelectTrigger id="vessel-select" className="w-64" data-testid={currentMarkers.vesselDropdown}>
                       <SelectValue placeholder="Choose vessel..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -171,7 +339,7 @@ export default function BulkDataImport() {
                         variant="outline" 
                         size="sm" 
                         className="gap-1"
-                        data-testid="I1.A8"
+                        data-testid={currentMarkers.newVesselButton}
                       >
                         <Plus className="h-4 w-4" />
                         New Vessel
@@ -234,7 +402,7 @@ export default function BulkDataImport() {
             )}
             
             {/* Fleet Data Import Toggle */}
-            <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid="I1.A9">
+            <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid={currentMarkers.fleetToggle}>
               <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
                 Fleet Data Import
               </Label>
@@ -246,7 +414,7 @@ export default function BulkDataImport() {
             </div>
             
             <div className="ml-auto flex items-center gap-3">
-              <p className="text-sm text-gray-500" data-testid="I1.A10">
+              <p className="text-sm text-gray-500" data-testid={currentMarkers.infoText}>
                 {viewMode === 'history' 
                   ? "View import history and error logs"
                   : isFleetMode 
@@ -257,7 +425,7 @@ export default function BulkDataImport() {
                 variant={viewMode === 'history' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode(viewMode === 'history' ? 'upload' : 'history')}
-                data-testid="I1.A11"
+                data-testid={currentMarkers.historyButton}
               >
                 <History className="h-4 w-4 mr-2" />
                 {viewMode === 'history' ? 'Back to Upload' : 'Import History'}
@@ -295,13 +463,13 @@ export default function BulkDataImport() {
             )
           ) : (
             selectedVesselTemplate === 'machinery' ? (
-              <MachineryComponentUpload vesselId={selectedVessel} />
+              <MachineryComponentUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'jobs' ? (
-              <JobUpload vesselId={selectedVessel} />
+              <JobUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'spares' ? (
-              <SparesUpload vesselId={selectedVessel} />
+              <SparesUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : selectedVesselTemplate === 'stores' ? (
-              <StoresUpload vesselId={selectedVessel} />
+              <StoresUpload vesselId={selectedVessel} markers={currentMarkers} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

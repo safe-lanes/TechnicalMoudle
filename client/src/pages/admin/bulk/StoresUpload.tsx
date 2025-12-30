@@ -1,26 +1,7 @@
 import { Store } from "lucide-react";
 import UniformBulkUpload from "@/components/admin/UniformBulkUpload";
 import { queryClient } from "@/lib/queryClient";
-
-const STORES_MARKERS = {
-  header: "I1.6D.13",
-  description: "I1.6D.14",
-  downloadTemplate: "I1.6D.15",
-  tabUpload: "I1.6D.16",
-  tabMapping: "I1.6D.17",
-  tabHistory: "I1.6D.18",
-  storeTypeSection: "I1.6D.1A",
-  storeTypeLabel: "I1.6D.19",
-  storeTypeDropdown: "I1.6D.20",
-  importModeSection: "I1.6D.21",
-  importModeLabel: "I1.6D.22",
-  radioAddOnly: "I1.6D.23",
-  radioUpdateOnly: "I1.6D.24",
-  radioUpsert: "I1.6D.25",
-  uploadSection: "I1.6D.26",
-  uploadDescription: "I1.6D.27",
-  dropZone: "I1.6D.28"
-};
+import { PageMarkers } from "../BulkDataImport";
 
 const FIELD_MAPPINGS = [
   { field: "Item Code", required: true, description: "Unique identifier for the stores item" },
@@ -45,9 +26,10 @@ const STORE_TYPES = [
 
 interface StoresUploadProps {
   vesselId: string;
+  markers?: PageMarkers;
 }
 
-export default function StoresUpload({ vesselId }: StoresUploadProps) {
+export default function StoresUpload({ vesselId, markers }: StoresUploadProps) {
   const handleRefreshData = () => {
     // Invalidate all stores queries for all tabs (stores, lubes, chemicals, others)
     ['stores', 'lubes', 'chemicals', 'others'].forEach(tab => {
@@ -67,7 +49,25 @@ export default function StoresUpload({ vesselId }: StoresUploadProps) {
       previewColumns={["Item Code", "Item Name", "Stores Category"]}
       storeTypes={STORE_TYPES}
       onRefreshData={handleRefreshData}
-      markers={STORES_MARKERS}
+      markers={markers ? {
+        header: markers.uploadHeader,
+        description: markers.uploadDescription,
+        downloadTemplate: markers.downloadTemplate,
+        tabUpload: markers.tabUpload,
+        tabMapping: markers.tabMapping,
+        tabHistory: markers.tabHistory,
+        storeTypeSection: markers.storeTypeSection,
+        storeTypeLabel: markers.storeTypeLabel,
+        storeTypeDropdown: markers.storeTypeDropdown,
+        importModeSection: markers.importModeSection,
+        importModeLabel: markers.importModeLabel,
+        radioAddOnly: markers.radioAddOnly,
+        radioUpdateOnly: markers.radioUpdateOnly,
+        radioUpsert: markers.radioUpsert,
+        uploadSection: markers.uploadSection,
+        uploadDescription: markers.uploadDescription2,
+        dropZone: markers.dropZone,
+      } : undefined}
     />
   );
 }
