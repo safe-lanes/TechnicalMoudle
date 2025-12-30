@@ -1,160 +1,47 @@
 # Seafarer Technical Management System
 
 ## Overview
-This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). It provides solutions for managing technical equipment maintenance, scheduling, and performance tracking, with a focus on Certificate & Surveys, Defect Reporting, and core PMS operations. The system aims to enhance efficiency and compliance in maritime maintenance through a data-driven approach.
+This project is a full-stack Technical Module for a maritime Planned Maintenance System (PMS). It manages technical equipment maintenance, scheduling, and performance tracking, with key capabilities in Certificate & Surveys, Defect Reporting, and core PMS operations. The system aims to enhance efficiency and compliance in maritime maintenance through a data-driven, data-driven approach.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
-The application features a modern full-stack architecture. The frontend is developed with React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter) ensuring a mobile-first and responsive user experience. The backend is built using Express.js (TypeScript).
+The application features a modern full-stack architecture with a mobile-first, responsive design. The frontend uses React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), and the backend is built with Express.js (TypeScript). All data is stored in PostgreSQL, with a strict "fail fast" policy if the database URL is not configured.
 
 **UI/UX Decisions**:
-- Emphasis on mobile-first, responsive design.
+- Mobile-first and responsive design.
 - Interactive data visualizations on the PMS Dashboard using AG Charts React.
 - Work Order forms are single scrollable pages with numbered subsections and professional maritime styling.
+- Certificates & Surveys AG Grid Tables use AG Grid Enterprise with specific styling and inline date editing capabilities.
 
 **Technical Implementations & Key Features**:
 - **Core PMS Business Logic**: Jobs are immutable templates; Work Orders are execution records with a defined lifecycle.
-- **PostgreSQL-Only Storage**: All data is stored in PostgreSQL. File-based storage (test-data.json) has been completely removed. The system fails fast if DATABASE_URL is not configured.
-- **Vessel Context**: Dynamic fetching and auto-selection of vessels. Supports "All Vessels" special value (`vesselId === 'all'`) for fleet-wide aggregated views on the PMS Dashboard.
+- **Vessel Context**: Supports dynamic fetching and auto-selection of vessels, including an "All Vessels" aggregate view.
 - **Service Layer Architecture**: Business logic is organized by domain.
-- **Component Hierarchy**: Components are structured using a `parentId` field.
-- **PMS Dashboard**: Professional analytics workspace with data visualizations.
+- **PMS Dashboard**: Professional analytics workspace with data visualizations, including an "Outstanding Tasks" pie chart.
 - **PMS Submodules**: CRUD operations for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
-- **Per-Vessel PMS Settings**: Configurable lead times and grace periods per vessel.
-- **Running Hours Module (Delta Propagation)**: Updates to parent RH propagate delta to children's independent RH values.
-- **Running Hours Counter Types (B7.B)**: Components support three RH counter types: MASTER (component maintains its own running hours), INHERITED (automatically inherits RH from a linked MASTER component with cascade updates), and NOT_RH_DRIVEN (RH not applicable). The RunningHoursConditionPanel in Section B of the component edit form allows configuration of these types. Safety validations prevent self-referential links, cross-vessel master selections, and cycles (INHERITED can only point to MASTER components).
-- **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7.
-- **Spares Module (Enhanced Inventory System)**: Complete inventory management with:
-  - **Many-to-Many Linking**: Spares can be linked to multiple components via `spare_component_links` table
-  - **Location Registry**: Named locations per vessel (`locations` table) with case-insensitive uniqueness
-  - **Stock Per Location**: `spare_location_stock` tracks qty per spare-location combination (no negative stock)
-  - **Transaction History**: Full audit trail via `inventory_transactions` with before/after snapshots
-  - **Event Types**: RECEIVE (add stock), CONSUME (use stock - requires work order reference), ADJUST (corrections)
-  - **Traceability**: CONSUME events MUST have referenceType=WORK_ORDER and valid referenceId
-  - **API Endpoints**: `/api/inventory/locations/*`, `/api/inventory/spare-links/*`, `/api/inventory/stock/*`, `/api/inventory/transactions`
-  - **Error Codes**: NEGATIVE_STOCK_PREVENTED, INSUFFICIENT_STOCK, NOT_FOUND, VALIDATION_ERROR
+- **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations. RH status is lead time-driven.
+- **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7, following specific naming conventions.
+- **Spares Module (Enhanced Inventory System)**:
+    - Complete inventory management with many-to-many linking between spares and components.
+    - Location registry and stock per location tracking with no negative stock.
+    - Full audit trail via `inventory_transactions` with RECEIVE, CONSUME, and ADJUST event types.
+    - `CONSUME` events require a work order reference.
+    - Robust stock validation rules.
 - **Auto-Generation Scheduler**: Automatically generates work orders for calendar and RH-based jobs.
-- **Admin Module**: Bulk data import, data purging, and a Fleet Admin Dashboard.
-- **Multi-Sheet Excel Bulk Import Templates**: 11-sheet system for Fleet and Vessel data.
-- **Role-Based Access Control (RBAC)**: Implemented with `AuthContext`, `RoleGuard` components, and backend middleware for authorization and data isolation across three user roles (Ship, Office, PMS Admin).
+- **Admin Module**: Bulk data import (with multi-sheet Excel templates, enhanced validation UI, and duplicate component code checks), data purging, and a Fleet Admin Dashboard.
+- **Role-Based Access Control (RBAC)**: Implemented for authorization and data isolation across Ship, Office, and PMS Admin roles.
 - **Global Business Rules Compliance**: Enforces rules for Parent vs Sub-Component RH Authority, Stores Module Isolation, Component Code Cascade Updates, Component Cascade Inactivate, RH Correction → WO Re-trigger, Grace Period → Overdue Transition, Job Frequency Change Impact, Spare Consumption Warning, and Multi-Department Approver Validation.
 - **Fleet Admin Workflow Enhancements**: Includes Fleet Vessel Mapping, On-Demand WO Generation, and Postponed WO Reappearance.
-- **Database Schema Enhancements**: New tables and enhancements to existing tables.
-- **Immutability Constraints**: PostgreSQL triggers enforce INSERT-only for `component_maintenance_history`.
-- **Backend Hydration**: Work order API endpoints automatically enrich responses with lead time values.
-- **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) must maintain exact parity for fields, labels, and order.
-- **Part A Immutability Rule**: Work Order Part A is READ-ONLY for all existing work orders, capturing a frozen snapshot of the job template.
-- **Component Document Storage (Section F)**: Handles file uploads using Replit Object Storage exclusively (no local filesystem fallback).
-- **Work Order Naming Rules**: All work orders must follow naming conventions: Planned = `<JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<NNN>` (e.g., `MK-000041-711.001-2025-001`), Unplanned = `UWO-<VESSEL>-<YEAR>-<NNN>`. Use `generatePlannedWorkOrderNumber()` and `generateUnplannedWorkOrderNumber()` from `server/utils/workOrderNumbering.ts`. The planned WO format includes component code to ensure unique numbering when multiple components share the same job code. Component code is required for planned WOs - the system throws an error if not available.
-- **Defect ID Naming Convention**: All defects must follow the pattern `DEF-<VESSEL>-<YEAR>-<NNN>` (e.g., `DEF-V001-2025-001`). IDs are auto-generated in the backend POST route using `generateDefectNumber()` from `server/utils/defectNumbering.ts`. The storage layer validates provided IDs match this pattern before accepting them.
-- **Error Prevention Strategies**: Emphasizes verification-first, systematic data persistence checking, appropriate confidence levels, and honest acknowledgment of errors.
-- **Root Cause Summary**: Focus on ensuring frontend correctly loads and displays data saved to PostgreSQL after page reloads.
-- **Certificates & Surveys AG Grid Tables**: Both pages use AG Grid Enterprise with blue headers (#52baf3), Inter font at 13px, compact rows. Features include clickable "Applicable" checkboxes that persist to PostgreSQL, column filters on all 11 columns. New "Due in" filter dropdown filters by expiry/due date with options: All, Due in 3 months, Due in 2 months, Due in 1 month, Overdue. Overdue items are always included when any time-window filter is selected.
-- **Date Cell Inline Editing (FIXED)**: Functional `DateCellEditor` component with `forwardRef` and `useImperativeHandle` for inline date editing on 5 date columns (Issue Date, Expiry Date, Last Annual, Last Interim, Endorsement Date). Uses a direct context-based save approach that bypasses AG Grid's `getValue()` mechanism - the editor calls `props.context.onDateChange()` directly on blur/Enter to trigger the API save, and `props.node.setDataValue()` to update the grid immediately. This approach works around AG Grid's React integration issue where `getValue()` wasn't being called reliably.
-- **PMS Dashboard - Outstanding Tasks Pie Chart**: New pie chart showing "Outstanding Tasks as % of Monthly Planned Maintenance". Displays completed vs outstanding work orders for the current month. Uses flexible date parsing (`parseFlexibleDate`) to handle both ISO (YYYY-MM-DD) and legacy (DD-MMM-YYYY) date formats. Spares Stock Status chart moved below.
-- **Running Hours Display in Work Orders Table**: RH-based work orders (without calendar due dates) now show remaining hours in the Due Date column instead of "—". Displays "X hrs remaining" (blue), "Due now" (amber), or "Overdue by X hrs" (red) based on `nextDueReading - currentReading` calculation.
-- **File Attachments for Certificates & Surveys**: Uses `FileAttachmentDialog` component for managing file attachments. Files are stored in Replit Object Storage. PDF previews open in a new browser tab (to avoid Chrome security restrictions), while images display in a modal dialog. Server configured for 10MB body size limit to handle file uploads.
-- **Bulk Import RH Fields Fix**: The `validateData` function in `server/routes/bulk.ts` must include RH-related columns (`RH Counter Type`, `RH Counter Source`, `Last Updated`) in the `textFields` array. Without this, these values are stripped during normalization and never passed to `createComponentFromRow`, causing all imported components to default to `NOT_RH_DRIVEN`.
-- **Bulk Import Validation UI Enhancements**: The validation results display now includes:
-  - **Full Row Display**: Backend returns ALL validation rows (no 100-row limit), ensuring complete data visibility and accurate imports.
-  - **Pagination**: Page size selector (10/25/50/100 rows per page) with first/prev/next/last navigation controls.
-  - **Clickable Filter Badges**: Valid/Warnings/Errors badges are now clickable to filter the table by status. Visual feedback shows active filter with ring highlight.
-  - **Expandable Row Details**: Rows with errors/warnings have an expand button to show full error messages. Click row or expand icon to toggle details.
-  - **Accurate Counts**: "Skip Errors & Import" button correctly shows total valid rows from full dataset, not limited preview.
-- **Bulk Import Duplicate Component Code Validation**: During dry-run validation, duplicate Component Codes are now treated as ERRORS (not warnings):
-  - **Case-insensitive comparison**: Component Codes are compared in uppercase (e.g., "ABC.001" and "abc.001" are duplicates)
-  - **In-file duplicates**: Only subsequent occurrences are flagged; the first occurrence is valid
-  - **Database validation**: In 'add' mode, codes that already exist in the database for that vessel generate errors
-  - **Mode-specific behavior**: 'update' and 'upsert' modes allow existing database codes (updating is expected)
-  - **Per-vessel uniqueness**: Component Codes must be unique within a vessel but may be duplicated across different vessels
-- **Work Order Completion & Maintenance History**: When work orders are approved via PATCH `/api/work-orders/:id` with `approvalAction='approved'`, the system:
-  1. Re-fetches fresh work order data to access all stored execution fields
-  2. Creates maintenance history record using `componentId` (UUID), not component name
-  3. Updates job cycle dates (Calendar: `lastDoneDate`/`nextDueDate`, RH: `lastDoneRH`/`nextDueRH`)
-  4. Uses separate update objects for Calendar vs RH jobs to prevent key leakage
-  5. Component lookup fallback chain: ID → componentCode+vessel → name match
-  6. Immutable history is enforced by PostgreSQL triggers (INSERT-only)
-- **Centralized RH Update Architecture (CRITICAL)**: ALL running hours updates now route through `storage.setComponentRunningHours()` - the single source of truth that:
-  1. Ensures `rhCurrentMaster`/`rhCurrentInheritedCached` and `currentCumulativeRH` stay in sync
-  2. Automatically cascades updates from MASTER components to all INHERITED dependents
-  3. Respects counter types (MASTER, INHERITED, NOT_RH_DRIVEN) for proper field updates
-  4. Entry points refactored: Work order completion, PATCH /api/components/:id, bulk imports all use this function
-  5. This architectural fix prevents recurring drift between dual RH field systems
-- **RH Status Calculation (Lead Time-Driven)**: Running Hours work orders now use lead time-driven status categories per workflow document:
-  - **OVERDUE**: RH_remaining < 0 (current RH exceeds due RH)
-  - **DUE**: RH_remaining = 0 (at due point)
-  - **DUE SOON**: 0 < RH_remaining ≤ LT (within lead time window)
-  - **PLANNED**: RH_remaining > LT (beyond lead time)
-  - Formula: RH_remaining = RH_due - RH_effective_current
-  - Lead time uses vessel PMS settings (Critical vs Non-Critical): `rhLeadHoursCritical` (default 50) and `rhLeadHoursNonCritical` (default 100)
-  - Status is computed in `shared/workOrders/status.ts` via `computeRHStatusCategory()` and mapped to display via `rhCategoryToDisplayStatus()`
-  - Frontend badge colors: Due Soon (amber), Planned (sky blue)
-  - Explicit zero lead time is respected (no fallback to default when explicitly set to 0)
-- **PMS Vessel Settings UI Markers**: PmsVesselSettingsManagement.tsx includes I4.QL7.x markers for traceability:
-  - I4.QL7.1: Calendar-Based Jobs Lead Time (Critical)
-  - I4.QL7.3: Calendar-Based Jobs Lead Time (Non-Critical)
-  - I4.QL7.14: RH Lead Time (Critical)
-  - I4.QL7.16: RH Lead Time (Non-Critical)
-  - I4.QL7.5-I4.QL7.12: Grace Period configuration fields
-
-### SPARES_LOGIC: Normalized Inventory System (DO NOT MODIFY WITHOUT REVIEW)
-
-This section documents the normalized spare parts inventory system. Changes must preserve backward compatibility.
-
-**Database Tables (normalized schema):**
-1. `spares` - Master spare parts table (partCode, description, min/max qty, unit, linkedComponentCodes legacy field)
-2. `spare_component_links` - Many-to-many linking: `spareId` ↔ `componentId` with vessel context
-3. `locations` - Per-vessel storage locations (name unique per vessel, case-insensitive)
-4. `spare_location_stock` - Stock qty per spare-location combination (enforces no negative stock)
-5. `inventory_transactions` - Immutable audit trail with event type, qty change, reference info
-
-**Event Types for inventory_transactions:**
-- `RECEIVE`: Stock addition (qty_change > 0), no work order reference required
-- `CONSUME`: Stock deduction (qty_change < 0), MUST have referenceType=WORK_ORDER and referenceId
-- `ADJUST`: Inventory corrections with adjustment notes, positive or negative
-
-**API Endpoints:**
-- `GET /api/inventory/locations/:vesselId` - List all locations for vessel
-- `POST /api/inventory/locations` - Create new location
-- `GET /api/inventory/spare-links/:vesselId` - List all spare-component links
-- `POST /api/inventory/spare-links` - Create new link
-- `DELETE /api/inventory/spare-links/:linkId` - Remove link
-- `GET /api/inventory/stock/:vesselId` - Get all stock levels by location
-- `POST /api/inventory/stock` - Bulk upsert stock levels
-- `GET /api/inventory/transactions/:vesselId` - Get transaction history with spare data hydration
-- `POST /api/inventory/transaction` - Create new transaction (validates stock, prevents negative)
-- `GET /api/spares/:vesselId/with-inventory` - Composite endpoint returning spares with linkedComponents array and locationStock
-
-**Work Order Integration (Phase 3A/3B):**
-- WO Form B4 section includes Location dropdown showing available stock per location
-- Quantity entry validates against stock at selected location
-- `locationId` is REQUIRED when consuming spares with quantity > 0
-- Backend coerces locationId string to number before processing
-- On WO completion with approval, backend calls `performInventoryTransaction()` with:
-  - eventType: 'CONSUME'
-  - referenceType: 'WORK_ORDER'
-  - referenceId: work order ID
-- Falls back to legacy ROB update if locationId missing (backward compatibility only)
-
-**Stock Validation Rules:**
-- Frontend validates: locationId required, qty ≤ stock at location
-- Backend validates: atomic check-and-deduct in performInventoryTransaction()
-- Error codes: `INSUFFICIENT_STOCK`, `NEGATIVE_STOCK_PREVENTED`
-
-**Multi-Linked Indicator:**
-- Spares with multiple component links show "Multi-linked" badge
-- `linkedComponents` array populated from spare_component_links table
-- Frontend displays component codes comma-separated
-
-**Critical Implementation Notes:**
-1. NEVER bypass performInventoryTransaction() for stock changes
-2. ALWAYS include locationId when consuming from work orders
-3. Transaction history is IMMUTABLE - no updates/deletes
-4. Stock per location (spare_location_stock) is the source of truth, not legacy ROB field
-5. Backend hydrates transactions with spare.linkedComponents for history display
+- **Database Schema Enhancements**: New tables and enhancements to existing tables, including PostgreSQL triggers for immutability constraints.
+- **Work Order Naming Rules**: Strict naming conventions for Planned and Unplanned Work Orders.
+- **Component Document Storage (Section F)**: Handles file uploads using Replit Object Storage exclusively.
+- **Centralized RH Update Architecture**: All running hours updates route through `storage.setComponentRunningHours()` for consistency and cascade updates.
+- **Work Order Completion & Maintenance History**: Automated creation of maintenance history records and updates to job cycle dates upon work order approval.
+- **Master-Slave Parity Protocol**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) maintain exact parity for fields.
+- **Part A Immutability Rule**: Work Order Part A is read-only for existing work orders.
 
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
