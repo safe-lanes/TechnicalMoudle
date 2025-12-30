@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessel } from "@/contexts/VesselContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format as formatDate } from "date-fns";
+import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -283,15 +284,16 @@ export default function MaintenancePlanner() {
               variant="ghost"
               size="sm"
               onClick={() => setLocation("/pms/reports")}
-              data-testid="button-back"
+              data-testid="G21.3"
             >
+              <Marker id="G21.3" />
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Reports
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Maintenance Planner</h1>
-              <p className="text-sm text-gray-500">
-                Planning view for {vesselId}
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="G21.1"><Marker id="G21.1" />Maintenance Planner</h1>
+              <p className="text-sm text-gray-500" data-testid="G21.2">
+                <Marker id="G21.2" />Planning view for {vesselId}
               </p>
             </div>
           </div>
@@ -301,8 +303,9 @@ export default function MaintenancePlanner() {
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              data-testid="button-refresh"
+              data-testid="G21.5"
             >
+              <Marker id="G21.5" />
               <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -311,8 +314,9 @@ export default function MaintenancePlanner() {
               size="sm"
               onClick={() => exportMutation.mutate("excel")}
               disabled={exportMutation.isPending}
-              data-testid="button-export-excel"
+              data-testid="G21.6"
             >
+              <Marker id="G21.6" />
               <FileSpreadsheet className="h-4 w-4 mr-2" />
               Export Excel
             </Button>
@@ -323,7 +327,8 @@ export default function MaintenancePlanner() {
         {data?.summary && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2" data-testid="G21.4">
+                <Marker id="G21.4" />
                 <BarChart3 className="h-5 w-5" />
                 Summary
               </h2>
@@ -339,12 +344,12 @@ export default function MaintenancePlanner() {
             {expandedSummary && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Total Jobs Card */}
-                <Card>
+                <Card data-testid="G21.7">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-500">Total Jobs</p>
-                        <p className="text-3xl font-bold text-gray-900" data-testid="text-total-jobs">
+                        <p className="text-sm text-gray-500"><Marker id="G21.7" />Total Jobs</p>
+                        <p className="text-3xl font-bold text-gray-900">
                           {data.summary.totalJobs}
                         </p>
                       </div>
@@ -354,12 +359,12 @@ export default function MaintenancePlanner() {
                 </Card>
 
                 {/* Total Man-Hours Card */}
-                <Card>
+                <Card data-testid="G21.8">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-500">Total Man-Hours</p>
-                        <p className="text-3xl font-bold text-gray-900" data-testid="text-total-hours">
+                        <p className="text-sm text-gray-500"><Marker id="G21.8" />Total Man-Hours</p>
+                        <p className="text-3xl font-bold text-gray-900">
                           {data.summary.totalManHours}
                         </p>
                       </div>
@@ -369,24 +374,24 @@ export default function MaintenancePlanner() {
                 </Card>
 
                 {/* Status Breakdown Card */}
-                <Card>
+                <Card data-testid="G21.9">
                   <CardContent className="pt-6">
-                    <p className="text-sm text-gray-500 mb-2">By Status</p>
+                    <p className="text-sm text-gray-500 mb-2"><Marker id="G21.9" />By Status</p>
                     <div className="flex gap-4">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600" data-testid="text-overdue-count">
+                        <p className="text-2xl font-bold text-red-600">
                           {data.summary.byStatus.OVERDUE}
                         </p>
                         <p className="text-xs text-gray-500">Overdue</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-orange-500" data-testid="text-due-soon-count">
+                        <p className="text-2xl font-bold text-orange-500">
                           {data.summary.byStatus.DUE_SOON}
                         </p>
                         <p className="text-xs text-gray-500">Due Soon</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-gray-600" data-testid="text-future-count">
+                        <p className="text-2xl font-bold text-gray-600">
                           {data.summary.byStatus.FUTURE}
                         </p>
                         <p className="text-xs text-gray-500">Upcoming</p>
@@ -396,9 +401,9 @@ export default function MaintenancePlanner() {
                 </Card>
 
                 {/* Workload by Rank */}
-                <Card>
+                <Card data-testid="G21.10">
                   <CardContent className="pt-6">
-                    <p className="text-sm text-gray-500 mb-2">Top Workloads</p>
+                    <p className="text-sm text-gray-500 mb-2"><Marker id="G21.10" />Top Workloads</p>
                     <div className="space-y-1">
                       {data.summary.byRank.slice(0, 3).map((r) => (
                         <div key={r.rank} className="flex justify-between text-sm">
@@ -418,13 +423,14 @@ export default function MaintenancePlanner() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2" data-testid="G21.11">
+                <Marker id="G21.11" />
                 <Filter className="h-4 w-4" />
                 Filters
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Reset
+              <div className="flex items-center gap-2" data-testid="G21.21">
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="G21.20">
+                  <Marker id="G21.20" />Reset
                 </Button>
                 <Button
                   variant="ghost"
@@ -441,9 +447,9 @@ export default function MaintenancePlanner() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Job Type */}
                 <div className="space-y-2">
-                  <Label>Job Type</Label>
+                  <Label data-testid="G21.12"><Marker id="G21.12" />Job Type</Label>
                   <Select value={jobType} onValueChange={setJobType}>
-                    <SelectTrigger data-testid="select-job-type">
+                    <SelectTrigger data-testid="G21.13">
                       <SelectValue placeholder="Select job type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -456,15 +462,15 @@ export default function MaintenancePlanner() {
 
                 {/* Date Window */}
                 <div className="space-y-2">
-                  <Label>Date Window (Calendar Jobs)</Label>
-                  <div className="flex gap-1">
+                  <Label data-testid="G21.14"><Marker id="G21.14" />Date Window (Calendar Jobs)</Label>
+                  <div className="flex gap-1" data-testid="G21.15">
+                    <Marker id="G21.15" />
                     {["7", "30", "60", "90"].map((days) => (
                       <Button
                         key={days}
                         variant={dateWindow === days ? "default" : "outline"}
                         size="sm"
                         onClick={() => setDateWindow(days)}
-                        data-testid={`button-date-${days}`}
                       >
                         {days}d
                       </Button>
@@ -474,15 +480,15 @@ export default function MaintenancePlanner() {
 
                 {/* RH Window */}
                 <div className="space-y-2">
-                  <Label>RH Window (RH Jobs)</Label>
-                  <div className="flex gap-1">
+                  <Label data-testid="G21.16"><Marker id="G21.16" />RH Window (RH Jobs)</Label>
+                  <div className="flex gap-1" data-testid="G21.17">
+                    <Marker id="G21.17" />
                     {["250", "500", "1000"].map((hrs) => (
                       <Button
                         key={hrs}
                         variant={rhWindow === hrs ? "default" : "outline"}
                         size="sm"
                         onClick={() => setRhWindow(hrs)}
-                        data-testid={`button-rh-${hrs}`}
                       >
                         ≤{hrs}h
                       </Button>
@@ -492,9 +498,9 @@ export default function MaintenancePlanner() {
 
                 {/* Department */}
                 <div className="space-y-2">
-                  <Label>Department</Label>
+                  <Label data-testid="G21.18"><Marker id="G21.18" />Department</Label>
                   <Select value={department} onValueChange={setDepartment}>
-                    <SelectTrigger data-testid="select-department">
+                    <SelectTrigger data-testid="G21.19">
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
@@ -516,10 +522,10 @@ export default function MaintenancePlanner() {
                     id="includeOverdue"
                     checked={includeOverdue}
                     onCheckedChange={(checked) => setIncludeOverdue(checked === true)}
-                    data-testid="checkbox-include-overdue"
+                    data-testid="G21.22"
                   />
                   <Label htmlFor="includeOverdue" className="text-sm cursor-pointer">
-                    Include Overdue
+                    <Marker id="G21.22" />Include Overdue
                   </Label>
                 </div>
 
@@ -529,19 +535,20 @@ export default function MaintenancePlanner() {
                     id="criticalOnly"
                     checked={criticalOnly}
                     onCheckedChange={(checked) => setCriticalOnly(checked === true)}
-                    data-testid="checkbox-critical-only"
+                    data-testid="G21.23"
                   />
                   <Label htmlFor="criticalOnly" className="text-sm cursor-pointer">
-                    Critical Only
+                    <Marker id="G21.23" />Critical Only
                   </Label>
                 </div>
 
                 {/* Rank Multi-select */}
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">Ranks:</Label>
+                  <Label className="text-sm whitespace-nowrap" data-testid="G21.24"><Marker id="G21.24" />Ranks:</Label>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" data-testid="button-select-ranks">
+                      <Button variant="outline" size="sm" data-testid="G21.25">
+                        <Marker id="G21.25" />
                         <Users className="h-4 w-4 mr-2" />
                         {selectedRanks.length === 0 ? "All Ranks" : `${selectedRanks.length} selected`}
                       </Button>
@@ -583,8 +590,8 @@ export default function MaintenancePlanner() {
         {/* Jobs Table */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              Maintenance Jobs
+            <CardTitle className="text-base" data-testid="G21.26">
+              <Marker id="G21.26" />Maintenance Jobs
               {data?.jobs && (
                 <span className="text-sm font-normal text-gray-500 ml-2">
                   ({data.jobs.length} jobs)
@@ -606,22 +613,22 @@ export default function MaintenancePlanner() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[80px]">Status</TableHead>
-                      <TableHead>Job Code</TableHead>
-                      <TableHead className="max-w-[200px]">Job Title</TableHead>
-                      <TableHead>Component</TableHead>
-                      <TableHead>Dept</TableHead>
-                      <TableHead>Assigned</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Due Date / RH</TableHead>
-                      <TableHead className="text-center">Hours</TableHead>
-                      <TableHead className="text-center">Spares</TableHead>
-                      <TableHead>WO Status</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
+                      <TableHead className="w-[80px]" data-testid="G21.27"><Marker id="G21.27" />Status</TableHead>
+                      <TableHead data-testid="G21.28"><Marker id="G21.28" />Job Code</TableHead>
+                      <TableHead className="max-w-[200px]" data-testid="G21.29"><Marker id="G21.29" />Job Title</TableHead>
+                      <TableHead data-testid="G21.30"><Marker id="G21.30" />Component</TableHead>
+                      <TableHead data-testid="G21.31"><Marker id="G21.31" />Dept</TableHead>
+                      <TableHead data-testid="G21.32"><Marker id="G21.32" />Assigned</TableHead>
+                      <TableHead data-testid="G21.33"><Marker id="G21.33" />Type</TableHead>
+                      <TableHead data-testid="G21.34"><Marker id="G21.34" />Due Date / RH</TableHead>
+                      <TableHead className="text-center" data-testid="G21.35"><Marker id="G21.35" />Hours</TableHead>
+                      <TableHead className="text-center" data-testid="G21.36"><Marker id="G21.36" />Spares</TableHead>
+                      <TableHead data-testid="G21.37"><Marker id="G21.37" />WO Status</TableHead>
+                      <TableHead className="w-[80px]" data-testid="G21.38"><Marker id="G21.38" />Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.jobs.map((job) => (
+                    {data.jobs.map((job, index) => (
                       <TableRow
                         key={job.jobId}
                         className={
@@ -633,13 +640,16 @@ export default function MaintenancePlanner() {
                         }
                         data-testid={`row-job-${job.jobId}`}
                       >
-                        <TableCell>
+                        <TableCell data-testid={index === 0 ? "G21.39" : undefined}>
+                          {index === 0 && <Marker id="G21.39" />}
                           {getStatusBadge(job.status)}
                         </TableCell>
-                        <TableCell className="font-mono text-sm">
+                        <TableCell className="font-mono text-sm" data-testid={index === 0 ? "G21.40" : undefined}>
+                          {index === 0 && <Marker id="G21.40" />}
                           {job.jobCode}
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate" title={job.jobTitle}>
+                        <TableCell className="max-w-[200px] truncate" title={job.jobTitle} data-testid={index === 0 ? "G21.41" : undefined}>
+                          {index === 0 && <Marker id="G21.41" />}
                           <div className="flex items-center gap-1">
                             {job.criticalFlag && (
                               <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />
@@ -647,7 +657,8 @@ export default function MaintenancePlanner() {
                             <span className="truncate">{job.jobTitle}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-testid={index === 0 ? "G21.42" : undefined}>
+                          {index === 0 && <Marker id="G21.42" />}
                           <div className="text-sm">
                             <div className="font-medium">{job.componentCode}</div>
                             <div className="text-gray-500 text-xs truncate max-w-[150px]" title={job.componentName}>
@@ -655,9 +666,16 @@ export default function MaintenancePlanner() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{job.department}</TableCell>
-                        <TableCell className="text-sm">{job.assignedRank}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.43" : undefined}>
+                          {index === 0 && <Marker id="G21.43" />}
+                          {job.department}
+                        </TableCell>
+                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.44" : undefined}>
+                          {index === 0 && <Marker id="G21.44" />}
+                          {job.assignedRank}
+                        </TableCell>
+                        <TableCell data-testid={index === 0 ? "G21.45" : undefined}>
+                          {index === 0 && <Marker id="G21.45" />}
                           <Badge variant="outline" className="text-xs">
                             {job.jobType === "CALENDAR" ? (
                               <><Calendar className="h-3 w-3 mr-1" /> Cal</>
@@ -666,7 +684,8 @@ export default function MaintenancePlanner() {
                             )}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.46" : undefined}>
+                          {index === 0 && <Marker id="G21.46" />}
                           {job.jobType === "CALENDAR" ? (
                             job.nextDueDate ? formatDate(new Date(job.nextDueDate), "dd MMM yyyy") : "-"
                           ) : (
@@ -680,10 +699,12 @@ export default function MaintenancePlanner() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-center text-sm">
+                        <TableCell className="text-center text-sm" data-testid={index === 0 ? "G21.47" : undefined}>
+                          {index === 0 && <Marker id="G21.47" />}
                           {job.estimatedManHours > 0 ? job.estimatedManHours : "-"}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center" data-testid={index === 0 ? "G21.48" : undefined}>
+                          {index === 0 && <Marker id="G21.48" />}
                           <Tooltip>
                             <TooltipTrigger>
                               {getSpareStatusIcon(job.spareStatus)}
@@ -693,7 +714,8 @@ export default function MaintenancePlanner() {
                             </TooltipContent>
                           </Tooltip>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm" data-testid={index === 0 ? "G21.49" : undefined}>
+                          {index === 0 && <Marker id="G21.49" />}
                           {job.woNo ? (
                             <div>
                               <div className="font-mono text-xs">{job.woNo}</div>
@@ -714,8 +736,9 @@ export default function MaintenancePlanner() {
                                   size="sm"
                                   className="h-7 w-7 p-0"
                                   onClick={() => setLocation(`/pms/components?id=${job.componentId}`)}
-                                  data-testid={`button-view-component-${job.jobId}`}
+                                  data-testid={index === 0 ? "G21.50" : `button-view-component-${job.jobId}`}
                                 >
+                                  {index === 0 && <Marker id="G21.50" />}
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
@@ -729,8 +752,9 @@ export default function MaintenancePlanner() {
                                     size="sm"
                                     className="h-7 w-7 p-0"
                                     onClick={() => setLocation(`/pms/work-order/${job.woId}`)}
-                                    data-testid={`button-view-wo-${job.jobId}`}
+                                    data-testid={index === 0 ? "G21.51" : `button-view-wo-${job.jobId}`}
                                   >
+                                    {index === 0 && <Marker id="G21.51" />}
                                     <Wrench className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
