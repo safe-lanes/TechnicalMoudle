@@ -18,6 +18,22 @@ import { FEATURES } from "@/config/features";
 import { useVessels } from "@/hooks/useVessels";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 
+// Helper function to get marker prefix based on active tab
+const getMarkerPrefix = (tab: "stores" | "lubes" | "chemicals" | "others") => {
+  switch (tab) {
+    case "stores": return "F.S";
+    case "lubes": return "F.L";
+    case "chemicals": return "F.C";
+    case "others": return "F.O";
+    default: return "F.S";
+  }
+};
+
+// Helper function to create marker ID based on tab and suffix
+const getMarkerId = (tab: "stores" | "lubes" | "chemicals" | "others", suffix: string) => {
+  return `${getMarkerPrefix(tab)}.${suffix}`;
+};
+
 // IHM constants
 const IHM_PRESENCE = ["Unknown", "Present", "Not Present"] as const;
 const IHM_EVIDENCE_TYPES = ["None", "MD", "SDoC", "Test"] as const;
@@ -881,9 +897,9 @@ const Stores: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? "F.S.33" : "F.S.2.1"}>
-            {viewMode === "inventory" && <Marker id="F.S.33" />}
-            {viewMode === "history" && <Marker id="F.S.2.1" />}
+          <h1 className="text-2xl font-bold text-gray-800" data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "33") : getMarkerId(activeTab, "2.1")}>
+            {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "33")} />}
+            {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.1")} />}
             {activeTab === "stores" ? "Stores Inventory" : 
              activeTab === "lubes" ? "Lubes Inventory" :
              activeTab === "chemicals" ? "Chemicals Inventory" : "Others Inventory"}
@@ -897,10 +913,10 @@ const Stores: React.FC = () => {
         <Button 
           className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" 
           onClick={openBulkUpdateModal}
-          data-testid={viewMode === "inventory" ? "F.S.3" : "F.S.2.6"}
+          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "3") : getMarkerId(activeTab, "2.6")}
         >
-          {viewMode === "inventory" && <Marker id="F.S.3" />}
-          {viewMode === "history" && <Marker id="F.S.2.6" />}
+          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "3")} />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.6")} />}
           + Bulk Update {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
         </Button>
       </div>
@@ -914,10 +930,10 @@ const Stores: React.FC = () => {
               ? "bg-[#52baf3] text-white"
               : "bg-gray-200 text-gray-600 hover:bg-gray-300"
           }`}
-          data-testid={viewMode === "inventory" ? "F.S" : "F.S.2.2"}
+          data-testid={viewMode === "inventory" ? "F.S" : getMarkerId(activeTab, "2.2")}
         >
           {viewMode === "inventory" && <Marker id="F.S" />}
-          {viewMode === "history" && <Marker id="F.S.2.2" />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.2")} />}
           Stores
         </button>
         <button
@@ -927,10 +943,10 @@ const Stores: React.FC = () => {
               ? "bg-[#52baf3] text-white"
               : "bg-gray-200 text-gray-600 hover:bg-gray-300"
           }`}
-          data-testid={viewMode === "inventory" ? "F.L" : "F.S.2.3"}
+          data-testid={viewMode === "inventory" ? "F.L" : getMarkerId(activeTab, "2.3")}
         >
           {viewMode === "inventory" && <Marker id="F.L" />}
-          {viewMode === "history" && <Marker id="F.S.2.3" />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.3")} />}
           Lubes
         </button>
         <button
@@ -940,10 +956,10 @@ const Stores: React.FC = () => {
               ? "bg-[#52baf3] text-white"
               : "bg-gray-200 text-gray-600 hover:bg-gray-300"
           }`}
-          data-testid={viewMode === "inventory" ? "F.C" : "F.S.2.4"}
+          data-testid={viewMode === "inventory" ? "F.C" : getMarkerId(activeTab, "2.4")}
         >
           {viewMode === "inventory" && <Marker id="F.C" />}
-          {viewMode === "history" && <Marker id="F.S.2.4" />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.4")} />}
           Chemicals
         </button>
         <button
@@ -953,10 +969,10 @@ const Stores: React.FC = () => {
               ? "bg-[#52baf3] text-white"
               : "bg-gray-200 text-gray-600 hover:bg-gray-300"
           }`}
-          data-testid={viewMode === "inventory" ? "F.O" : "F.S.2.5"}
+          data-testid={viewMode === "inventory" ? "F.O" : getMarkerId(activeTab, "2.5")}
         >
           {viewMode === "inventory" && <Marker id="F.O" />}
-          {viewMode === "history" && <Marker id="F.S.2.5" />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.5")} />}
           Others
         </button>
       </div>
@@ -967,20 +983,20 @@ const Stores: React.FC = () => {
           variant={viewMode === "inventory" ? "default" : "outline"}
           onClick={() => setViewMode("inventory")}
           className="text-sm"
-          data-testid={viewMode === "inventory" ? "F.S.1" : "F.S.2.7"}
+          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "1") : getMarkerId(activeTab, "2.7")}
         >
-          {viewMode === "inventory" && <Marker id="F.S.1" />}
-          {viewMode === "history" && <Marker id="F.S.2.7" />}
+          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "1")} />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.7")} />}
           Inventory
         </Button>
         <Button
           variant={viewMode === "history" ? "default" : "outline"}
           onClick={() => setViewMode("history")}
           className="text-sm"
-          data-testid={viewMode === "inventory" ? "F.S.2" : "F.S.2.8"}
+          data-testid={viewMode === "inventory" ? getMarkerId(activeTab, "2") : getMarkerId(activeTab, "2.8")}
         >
-          {viewMode === "inventory" && <Marker id="F.S.2" />}
-          {viewMode === "history" && <Marker id="F.S.2.8" />}
+          {viewMode === "inventory" && <Marker id={getMarkerId(activeTab, "2")} />}
+          {viewMode === "history" && <Marker id={getMarkerId(activeTab, "2.8")} />}
           History
         </Button>
       </div>
@@ -990,8 +1006,8 @@ const Stores: React.FC = () => {
       <div className="flex gap-4 mb-6">
         <div className="flex-1">
           <Select value={vesselId} onValueChange={setVesselId}>
-            <SelectTrigger className="text-sm" data-testid="F.S.4">
-              <Marker id="F.S.4" />
+            <SelectTrigger className="text-sm" data-testid={getMarkerId(activeTab, "4")}>
+              <Marker id={getMarkerId(activeTab, "4")} />
               <SelectValue placeholder="Select Vessel" />
             </SelectTrigger>
             <SelectContent>
@@ -1004,20 +1020,20 @@ const Stores: React.FC = () => {
           </Select>
         </div>
         <div className="flex-1 relative">
-          <Marker id="F.S.5" />
+          <Marker id={getMarkerId(activeTab, "5")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 text-sm"
-            data-testid="F.S.5"
+            data-testid={getMarkerId(activeTab, "5")}
           />
         </div>
         <div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-40 text-sm" data-testid="F.S.6">
-              <Marker id="F.S.6" />
+            <SelectTrigger className="w-40 text-sm" data-testid={getMarkerId(activeTab, "6")}>
+              <Marker id={getMarkerId(activeTab, "6")} />
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -1031,8 +1047,8 @@ const Stores: React.FC = () => {
         </div>
         <div>
           <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="w-32 text-sm" data-testid="F.S.7">
-              <Marker id="F.S.7" />
+            <SelectTrigger className="w-32 text-sm" data-testid={getMarkerId(activeTab, "7")}>
+              <Marker id={getMarkerId(activeTab, "7")} />
               <SelectValue placeholder="Stock" />
             </SelectTrigger>
             <SelectContent>
@@ -1047,9 +1063,9 @@ const Stores: React.FC = () => {
           size="sm" 
           className="text-blue-600"
           onClick={exportInventoryToExcel}
-          data-testid="F.S.8"
+          data-testid={getMarkerId(activeTab, "8")}
         >
-          <Marker id="F.S.8" />
+          <Marker id={getMarkerId(activeTab, "8")} />
           <FileSpreadsheet className="h-4 w-4 mr-1" />
           Export
         </Button>
@@ -1062,9 +1078,9 @@ const Stores: React.FC = () => {
             setCategoryFilter("all");
             setStockFilter("all");
           }}
-          data-testid="F.S.9"
+          data-testid={getMarkerId(activeTab, "9")}
         >
-          <Marker id="F.S.9" />
+          <Marker id={getMarkerId(activeTab, "9")} />
           Clear
         </Button>
       </div>
@@ -1072,20 +1088,20 @@ const Stores: React.FC = () => {
       /* History Filters */
       <div className="flex gap-4 mb-6">
         <div className="flex-1 relative">
-          <Marker id="F.S.2.9" />
+          <Marker id={getMarkerId(activeTab, "2.9")} />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search history..."
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
             className="pl-10 text-sm"
-            data-testid="F.S.2.9"
+            data-testid={getMarkerId(activeTab, "2.9")}
           />
         </div>
         <div>
           <Select value={historyEventFilter} onValueChange={setHistoryEventFilter}>
-            <SelectTrigger className="w-40 text-sm" data-testid="F.S.2.10">
-              <Marker id="F.S.2.10" />
+            <SelectTrigger className="w-40 text-sm" data-testid={getMarkerId(activeTab, "2.10")}>
+              <Marker id={getMarkerId(activeTab, "2.10")} />
               <SelectValue placeholder="All Events" />
             </SelectTrigger>
             <SelectContent>
@@ -1098,26 +1114,26 @@ const Stores: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Marker id="F.S.2.11" />
+            <Marker id={getMarkerId(activeTab, "2.11")} />
             <Input
               type="date"
               value={historyDateFrom}
               onChange={(e) => setHistoryDateFrom(e.target.value)}
               className="text-sm"
               placeholder="From"
-              data-testid="F.S.2.11"
+              data-testid={getMarkerId(activeTab, "2.11")}
             />
           </div>
           <span className="text-gray-500">to</span>
           <div className="relative">
-            <Marker id="F.S.2.12" />
+            <Marker id={getMarkerId(activeTab, "2.12")} />
             <Input
               type="date"
               value={historyDateTo}
               onChange={(e) => setHistoryDateTo(e.target.value)}
               className="text-sm"
               placeholder="To"
-              data-testid="F.S.2.12"
+              data-testid={getMarkerId(activeTab, "2.12")}
             />
           </div>
         </div>
@@ -1126,9 +1142,9 @@ const Stores: React.FC = () => {
           size="sm" 
           className="text-blue-600"
           onClick={exportHistoryToExcel}
-          data-testid="F.S.2.13"
+          data-testid={getMarkerId(activeTab, "2.13")}
         >
-          <Marker id="F.S.2.13" />
+          <Marker id={getMarkerId(activeTab, "2.13")} />
           <FileSpreadsheet className="h-4 w-4 mr-1" />
           Export
         </Button>
@@ -1141,31 +1157,31 @@ const Stores: React.FC = () => {
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white p-4">
           <div className="grid gap-4 items-center text-sm font-medium" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
-            <div data-testid="F.S.10">
-              <Marker id="F.S.10" />
+            <div data-testid={getMarkerId(activeTab, "10")}>
+              <Marker id={getMarkerId(activeTab, "10")} />
               {activeTab === "lubes" ? "Lube Grade" : 
                activeTab === "chemicals" ? "Chem Code" : "Item Code"}
             </div>
-            <div data-testid="F.S.11">
-              <Marker id="F.S.11" />
+            <div data-testid={getMarkerId(activeTab, "11")}>
+              <Marker id={getMarkerId(activeTab, "11")} />
               {activeTab === "lubes" ? "Lube Type" : 
                activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
             </div>
-            <div data-testid="F.S.12">
-              <Marker id="F.S.12" />
+            <div data-testid={getMarkerId(activeTab, "12")}>
+              <Marker id={getMarkerId(activeTab, "12")} />
               {activeTab === "lubes" ? "Application" : 
                activeTab === "chemicals" ? "Application Area" : "Stores Category"}
             </div>
-            <div data-testid="F.S.13"><Marker id="F.S.13" />UOM</div>
-            <div data-testid="F.S.14">
-              <Marker id="F.S.14" />
+            <div data-testid={getMarkerId(activeTab, "13")}><Marker id={getMarkerId(activeTab, "13")} />UOM</div>
+            <div data-testid={getMarkerId(activeTab, "14")}>
+              <Marker id={getMarkerId(activeTab, "14")} />
               {activeTab === "lubes" || activeTab === "chemicals" ? "ROB" : "ROB"}
             </div>
-            <div data-testid="F.S.15"><Marker id="F.S.15" />Min</div>
-            <div data-testid="F.S.16"><Marker id="F.S.16" />Stock</div>
-            <div data-testid="F.S.17"><Marker id="F.S.17" />Location</div>
-            {FEATURES.IHM && <div className="text-center" data-testid="F.S.18"><Marker id="F.S.18" />IHM</div>}
-            <div className="text-right pr-2" data-testid="F.S.19"><Marker id="F.S.19" />Actions</div>
+            <div data-testid={getMarkerId(activeTab, "15")}><Marker id={getMarkerId(activeTab, "15")} />Min</div>
+            <div data-testid={getMarkerId(activeTab, "16")}><Marker id={getMarkerId(activeTab, "16")} />Stock</div>
+            <div data-testid={getMarkerId(activeTab, "17")}><Marker id={getMarkerId(activeTab, "17")} />Location</div>
+            {FEATURES.IHM && <div className="text-center" data-testid={getMarkerId(activeTab, "18")}><Marker id={getMarkerId(activeTab, "18")} />IHM</div>}
+            <div className="text-right pr-2" data-testid={getMarkerId(activeTab, "19")}><Marker id={getMarkerId(activeTab, "19")} />Actions</div>
           </div>
         </div>
 
@@ -1174,39 +1190,39 @@ const Stores: React.FC = () => {
           {filteredItems.map((item, index) => (
             <div key={item.id} className="hover:bg-gray-50">
               <div className="grid gap-4 items-center text-sm py-3 px-4" style={{gridTemplateColumns: FEATURES.IHM ? '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr 0.6fr 1fr' : '2fr 2fr 2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.5fr 1fr'}}>
-                <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? "F.S.20" : undefined}>
-                  {index === 0 && <Marker id="F.S.20" />}
+                <div className="font-medium text-gray-900 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "20") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "20")} />}
                   {item.itemCode}
                 </div>
-                <div className="text-gray-700 truncate" data-testid={index === 0 ? "F.S.21" : undefined}>
-                  {index === 0 && <Marker id="F.S.21" />}
+                <div className="text-gray-700 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "21") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "21")} />}
                   {item.itemName}
                 </div>
-                <div className="text-gray-600 truncate" data-testid={index === 0 ? "F.S.22" : undefined}>
-                  {index === 0 && <Marker id="F.S.22" />}
+                <div className="text-gray-600 truncate" data-testid={index === 0 ? getMarkerId(activeTab, "22") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "22")} />}
                   {item.storesCategory}
                 </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? "F.S.23" : undefined}>
-                  {index === 0 && <Marker id="F.S.23" />}
+                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "23") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "23")} />}
                   {item.uom || "-"}
                 </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? "F.S.24" : undefined}>
-                  {index === 0 && <Marker id="F.S.24" />}
+                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "24") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "24")} />}
                   {item.rob}
                 </div>
-                <div className="text-gray-700 text-center" data-testid={index === 0 ? "F.S.25" : undefined}>
-                  {index === 0 && <Marker id="F.S.25" />}
+                <div className="text-gray-700 text-center" data-testid={index === 0 ? getMarkerId(activeTab, "25") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "25")} />}
                   {item.min}
                 </div>
-                <div className="text-center" data-testid={index === 0 ? "F.S.26" : undefined}>
-                  {index === 0 && <Marker id="F.S.26" />}
+                <div className="text-center" data-testid={index === 0 ? getMarkerId(activeTab, "26") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "26")} />}
                   <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block ${getStockColor(item.stock)}`}>
                     {item.stock}
                   </span>
                 </div>
                 {/* Location Dropdown */}
-                <div className="relative" data-testid={index === 0 ? "F.S.27" : undefined}>
-                  {index === 0 && <Marker id="F.S.27" />}
+                <div className="relative" data-testid={index === 0 ? getMarkerId(activeTab, "27") : undefined}>
+                  {index === 0 && <Marker id={getMarkerId(activeTab, "27")} />}
                   {(() => {
                     const robA = item.robLocationA ?? 0;
                     const robB = item.robLocationB ?? 0;
@@ -1305,8 +1321,8 @@ const Stores: React.FC = () => {
                   })()}
                 </div>
                 {FEATURES.IHM && (
-                  <div className="flex justify-center" data-testid={index === 0 ? "F.S.28" : undefined}>
-                    {index === 0 && <Marker id="F.S.28" />}
+                  <div className="flex justify-center" data-testid={index === 0 ? getMarkerId(activeTab, "28") : undefined}>
+                    {index === 0 && <Marker id={getMarkerId(activeTab, "28")} />}
                     {/* Mock IHM status - in real implementation, would come from API */}
                     {item.itemCode === 'ST-TOOL-001' ? (
                       <div title="IHM Present">
@@ -1331,9 +1347,9 @@ const Stores: React.FC = () => {
                     onClick={() => openEditModal(item)}
                     aria-label="Edit Item"
                     title="Edit"
-                    data-testid={index === 0 ? "F.S.29" : `button-edit-${item.id}`}
+                    data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
                   >
-                    {index === 0 && <Marker id="F.S.29" />}
+                    {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
                     <Edit className="h-3.5 w-3.5 text-gray-500" />
                   </Button>
                   <Button 
@@ -1343,9 +1359,9 @@ const Stores: React.FC = () => {
                     onClick={() => openConsumeModal(item)}
                     aria-label="Consume Item"
                     title="Consume"
-                    data-testid={index === 0 ? "F.S.30" : `button-consume-${item.id}`}
+                    data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-${item.id}`}
                   >
-                    {index === 0 && <Marker id="F.S.30" />}
+                    {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
                     <Minus className="h-3.5 w-3.5 text-gray-500" />
                   </Button>
                   <Button 
@@ -1355,9 +1371,9 @@ const Stores: React.FC = () => {
                     onClick={() => openReceiveModal(item)}
                     aria-label="Receive Item"
                     title="Receive"
-                    data-testid={index === 0 ? "F.S.31" : `button-receive-${item.id}`}
+                    data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-receive-${item.id}`}
                   >
-                    {index === 0 && <Marker id="F.S.31" />}
+                    {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
                     <Plus className="h-3.5 w-3.5 text-gray-500" />
                   </Button>
                   <Button 
@@ -1367,9 +1383,9 @@ const Stores: React.FC = () => {
                     onClick={() => handleArchive(item)}
                     aria-label="Archive Item"
                     title="Archive"
-                    data-testid={index === 0 ? "F.S.32" : `button-archive-${item.id}`}
+                    data-testid={index === 0 ? getMarkerId(activeTab, "32") : `button-archive-${item.id}`}
                   >
-                    {index === 0 && <Marker id="F.S.32" />}
+                    {index === 0 && <Marker id={getMarkerId(activeTab, "32")} />}
                     <Archive className="h-3.5 w-3.5 text-gray-400" />
                   </Button>
                 </div>
@@ -1383,16 +1399,16 @@ const Stores: React.FC = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="bg-[#52baf3] text-white p-4">
           <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
-            <div className="col-span-2" data-testid="F.S.2.14"><Marker id="F.S.2.14" />Date/Time</div>
-            <div className="col-span-1" data-testid="F.S.2.15"><Marker id="F.S.2.15" />Event</div>
-            <div className="col-span-2" data-testid="F.S.2.16"><Marker id="F.S.2.16" />Item Name</div>
-            <div className="col-span-1" data-testid="F.S.2.17"><Marker id="F.S.2.17" />Part Code</div>
-            <div className="col-span-1" data-testid="F.S.2.18"><Marker id="F.S.2.18" />UOM</div>
-            <div className="col-span-1" data-testid="F.S.2.19"><Marker id="F.S.2.19" />Qty Change</div>
-            <div className="col-span-1" data-testid="F.S.2.20"><Marker id="F.S.2.20" />ROB After</div>
-            <div className="col-span-1" data-testid="F.S.2.21"><Marker id="F.S.2.21" />Place</div>
-            <div className="col-span-1" data-testid="F.S.2.22"><Marker id="F.S.2.22" />User</div>
-            <div className="col-span-1" data-testid="F.S.2.23"><Marker id="F.S.2.23" />Remarks</div>
+            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.14")}><Marker id={getMarkerId(activeTab, "2.14")} />Date/Time</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.15")}><Marker id={getMarkerId(activeTab, "2.15")} />Event</div>
+            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.16")}><Marker id={getMarkerId(activeTab, "2.16")} />Item Name</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.17")}><Marker id={getMarkerId(activeTab, "2.17")} />Part Code</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.18")}><Marker id={getMarkerId(activeTab, "2.18")} />UOM</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.19")}><Marker id={getMarkerId(activeTab, "2.19")} />Qty Change</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.20")}><Marker id={getMarkerId(activeTab, "2.20")} />ROB After</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.21")}><Marker id={getMarkerId(activeTab, "2.21")} />Place</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.22")}><Marker id={getMarkerId(activeTab, "2.22")} />User</div>
+            <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.23")}><Marker id={getMarkerId(activeTab, "2.23")} />Remarks</div>
           </div>
         </div>
         
