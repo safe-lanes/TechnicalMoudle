@@ -1029,9 +1029,11 @@ export class PostgresStorage {
     newRHValue: number;
     updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
     userId: string;
+    lastUpdatedDate?: string; // Optional: use this date instead of now for lastUpdated field (e.g., WO completion date)
   }): Promise<{ component: Component; inheritedUpdated: number }> {
     const db = await getDb();
     const now = new Date();
+    const lastUpdatedValue = params.lastUpdatedDate || now.toISOString();
     
     // Get the component to determine its counter type
     const component = await this.getComponent(params.componentId);
@@ -1051,7 +1053,7 @@ export class PostgresStorage {
           rhMasterUpdatedAt: now,
           rhMasterUpdatedBy: params.userId,
           rhMasterUpdateSource: params.updateSource,
-          lastUpdated: now.toISOString(),
+          lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
         .where(eq(components.id, params.componentId))
@@ -1067,7 +1069,7 @@ export class PostgresStorage {
           rhCurrentInheritedCached: rhValueStr,
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
-          lastUpdated: now.toISOString(),
+          lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
         .where(and(
@@ -1087,7 +1089,7 @@ export class PostgresStorage {
           rhCurrentInheritedCached: rhValueStr,
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
-          lastUpdated: now.toISOString(),
+          lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
         .where(eq(components.id, params.componentId))
@@ -1103,7 +1105,7 @@ export class PostgresStorage {
       const result = await db.update(components)
         .set({
           currentCumulativeRH: rhValueStr,
-          lastUpdated: now.toISOString(),
+          lastUpdated: lastUpdatedValue,
           updatedAt: now,
         })
         .where(eq(components.id, params.componentId))

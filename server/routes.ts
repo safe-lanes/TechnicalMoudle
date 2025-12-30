@@ -2741,7 +2741,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           componentId: component.id,
           newRHValue: newRH,
           updateSource: 'WO_COMPLETION',
-          userId: executionData.performedBy || 'System'
+          userId: executionData.performedBy || 'System',
+          lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
         });
         
         // Record running hours audit entry with complete metadata
@@ -4083,16 +4084,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rhValue = parseFloat(data.currentCumulativeRH || data.runningHours || '0');
         if (!isNaN(rhValue)) {
           // Use centralized RH update for field sync and cascade
+          // Forward any supplied lastUpdated to preserve caller's date intent
           const result = await storage.setComponentRunningHours({
             componentId: req.params.id,
             newRHValue: rhValue,
             updateSource: 'MANUAL',
-            userId: 'user'
+            userId: (req as any).user?.username || 'unknown',
+            lastUpdatedDate: data.lastUpdated // Forward caller's date if provided
           });
           console.log(`🔄 RH Update: synced ${result.inheritedUpdated} inherited components`);
           
           // Remove RH fields from data to avoid double-update, then update other fields
-          const { currentCumulativeRH, runningHours, ...otherData } = data;
+          // Also remove lastUpdated since we already handled it in setComponentRunningHours
+          const { currentCumulativeRH, runningHours, lastUpdated, ...otherData } = data;
           if (Object.keys(otherData).length > 0) {
             component = await storage.updateComponent(req.params.id, otherData);
           } else {

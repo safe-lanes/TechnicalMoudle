@@ -77,6 +77,12 @@ The application features a modern full-stack architecture. The frontend is devel
   4. Uses separate update objects for Calendar vs RH jobs to prevent key leakage
   5. Component lookup fallback chain: ID → componentCode+vessel → name match
   6. Immutable history is enforced by PostgreSQL triggers (INSERT-only)
+- **Centralized RH Update Architecture (CRITICAL)**: ALL running hours updates now route through `storage.setComponentRunningHours()` - the single source of truth that:
+  1. Ensures `rhCurrentMaster`/`rhCurrentInheritedCached` and `currentCumulativeRH` stay in sync
+  2. Automatically cascades updates from MASTER components to all INHERITED dependents
+  3. Respects counter types (MASTER, INHERITED, NOT_RH_DRIVEN) for proper field updates
+  4. Entry points refactored: Work order completion, PATCH /api/components/:id, bulk imports all use this function
+  5. This architectural fix prevents recurring drift between dual RH field systems
 - **RH Status Calculation (Lead Time-Driven)**: Running Hours work orders now use lead time-driven status categories per workflow document:
   - **OVERDUE**: RH_remaining < 0 (current RH exceeds due RH)
   - **DUE**: RH_remaining = 0 (at due point)

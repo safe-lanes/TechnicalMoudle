@@ -421,6 +421,7 @@ class MemStorage {
     newRHValue: number;
     updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
     userId: string;
+    lastUpdatedDate?: string; // Optional: use this date instead of now for lastUpdated field (e.g., WO completion date)
   }): Promise<{ component: any; inheritedUpdated: number }> {
     const component = await this.getComponent(params.componentId);
     if (!component) {
@@ -429,6 +430,7 @@ class MemStorage {
 
     const rhValueStr = params.newRHValue.toString();
     const now = new Date().toISOString();
+    const lastUpdatedValue = params.lastUpdatedDate || now;
     let inheritedUpdated = 0;
 
     if (component.rhCounterType === 'MASTER') {
@@ -439,7 +441,7 @@ class MemStorage {
         rhMasterUpdatedAt: now,
         rhMasterUpdatedBy: params.userId,
         rhMasterUpdateSource: params.updateSource,
-        lastUpdated: now,
+        lastUpdated: lastUpdatedValue,
       });
 
       // Cascade to inherited components
@@ -449,7 +451,7 @@ class MemStorage {
           rhCurrentInheritedCached: rhValueStr,
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
-          lastUpdated: now,
+          lastUpdated: lastUpdatedValue,
         });
         inheritedUpdated++;
       }
@@ -461,7 +463,7 @@ class MemStorage {
         rhCurrentInheritedCached: rhValueStr,
         currentCumulativeRH: rhValueStr,
         rhInheritedUpdatedAt: now,
-        lastUpdated: now,
+        lastUpdated: lastUpdatedValue,
       });
       return { component: updated, inheritedUpdated: 0 };
 
@@ -469,7 +471,7 @@ class MemStorage {
       // For NOT_RH_DRIVEN: just update currentCumulativeRH for backward compatibility
       const updated = await this.updateComponent(params.componentId, {
         currentCumulativeRH: rhValueStr,
-        lastUpdated: now,
+        lastUpdated: lastUpdatedValue,
       });
       return { component: updated, inheritedUpdated: 0 };
     }
