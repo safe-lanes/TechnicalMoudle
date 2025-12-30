@@ -414,6 +414,67 @@ class MemStorage {
     return { masterUpdated, inheritedUpdated };
   }
 
+  // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
+  // This is the SINGLE SOURCE OF TRUTH for all running hours updates
+  async setComponentRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
+    userId: string;
+  }): Promise<{ component: any; inheritedUpdated: number }> {
+    const component = await this.getComponent(params.componentId);
+    if (!component) {
+      throw new Error(`Component ${params.componentId} not found`);
+    }
+
+    const rhValueStr = params.newRHValue.toString();
+    const now = new Date().toISOString();
+    let inheritedUpdated = 0;
+
+    if (component.rhCounterType === 'MASTER') {
+      // For MASTER: update both RH fields and cascade to inherited
+      const updated = await this.updateComponent(params.componentId, {
+        rhCurrentMaster: rhValueStr,
+        currentCumulativeRH: rhValueStr,
+        rhMasterUpdatedAt: now,
+        rhMasterUpdatedBy: params.userId,
+        rhMasterUpdateSource: params.updateSource,
+        lastUpdated: now,
+      });
+
+      // Cascade to inherited components
+      const inheritedComponents = await this.getInheritedComponents(params.componentId);
+      for (const inherited of inheritedComponents) {
+        await this.updateComponent(inherited.id, {
+          rhCurrentInheritedCached: rhValueStr,
+          currentCumulativeRH: rhValueStr,
+          rhInheritedUpdatedAt: now,
+          lastUpdated: now,
+        });
+        inheritedUpdated++;
+      }
+      return { component: updated, inheritedUpdated };
+
+    } else if (component.rhCounterType === 'INHERITED') {
+      // For INHERITED: update both RH fields
+      const updated = await this.updateComponent(params.componentId, {
+        rhCurrentInheritedCached: rhValueStr,
+        currentCumulativeRH: rhValueStr,
+        rhInheritedUpdatedAt: now,
+        lastUpdated: now,
+      });
+      return { component: updated, inheritedUpdated: 0 };
+
+    } else {
+      // For NOT_RH_DRIVEN: just update currentCumulativeRH for backward compatibility
+      const updated = await this.updateComponent(params.componentId, {
+        currentCumulativeRH: rhValueStr,
+        lastUpdated: now,
+      });
+      return { component: updated, inheritedUpdated: 0 };
+    }
+  }
+
   // Fleet methods
   async getFleets(): Promise<any[]> { return toArray(this.data.fleets); }
   async getFleet(id: string): Promise<any> { 

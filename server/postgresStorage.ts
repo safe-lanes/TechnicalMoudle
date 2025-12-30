@@ -1022,6 +1022,100 @@ export class PostgresStorage {
     };
   }
 
+  // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
+  // This is the SINGLE SOURCE OF TRUTH for all running hours updates
+  async setComponentRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
+    userId: string;
+  }): Promise<{ component: Component; inheritedUpdated: number }> {
+    const db = await getDb();
+    const now = new Date();
+    
+    // Get the component to determine its counter type
+    const component = await this.getComponent(params.componentId);
+    if (!component) {
+      throw new Error(`Component ${params.componentId} not found`);
+    }
+
+    const rhValueStr = params.newRHValue.toString();
+    let inheritedUpdated = 0;
+
+    if (component.rhCounterType === 'MASTER') {
+      // For MASTER components: update rhCurrentMaster AND currentCumulativeRH, then cascade
+      const result = await db.update(components)
+        .set({
+          rhCurrentMaster: rhValueStr,
+          currentCumulativeRH: rhValueStr,
+          rhMasterUpdatedAt: now,
+          rhMasterUpdatedBy: params.userId,
+          rhMasterUpdateSource: params.updateSource,
+          lastUpdated: now.toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(components.id, params.componentId))
+        .returning();
+
+      if (!result[0]) {
+        throw new Error(`Failed to update MASTER component ${params.componentId}`);
+      }
+
+      // Cascade to all INHERITED components
+      const inheritedResult = await db.update(components)
+        .set({
+          rhCurrentInheritedCached: rhValueStr,
+          currentCumulativeRH: rhValueStr,
+          rhInheritedUpdatedAt: now,
+          lastUpdated: now.toISOString(),
+          updatedAt: now,
+        })
+        .where(and(
+          eq(components.rhMasterComponentId, params.componentId),
+          eq(components.rhCounterType, 'INHERITED')
+        ))
+        .returning();
+
+      inheritedUpdated = inheritedResult.length;
+      return { component: result[0], inheritedUpdated };
+
+    } else if (component.rhCounterType === 'INHERITED') {
+      // For INHERITED components: update rhCurrentInheritedCached AND currentCumulativeRH
+      // Note: This is typically only used for component replacement scenarios (reset to 0)
+      const result = await db.update(components)
+        .set({
+          rhCurrentInheritedCached: rhValueStr,
+          currentCumulativeRH: rhValueStr,
+          rhInheritedUpdatedAt: now,
+          lastUpdated: now.toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(components.id, params.componentId))
+        .returning();
+
+      if (!result[0]) {
+        throw new Error(`Failed to update INHERITED component ${params.componentId}`);
+      }
+      return { component: result[0], inheritedUpdated: 0 };
+
+    } else {
+      // For NOT_RH_DRIVEN or unknown: just update currentCumulativeRH for backward compatibility
+      const result = await db.update(components)
+        .set({
+          currentCumulativeRH: rhValueStr,
+          lastUpdated: now.toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(components.id, params.componentId))
+        .returning();
+
+      if (!result[0]) {
+        throw new Error(`Failed to update component ${params.componentId}`);
+      }
+      return { component: result[0], inheritedUpdated: 0 };
+    }
+  }
+
   // ============= MODULE 3: COMPONENT DOCUMENTS =============
 
   async getComponentDocuments(componentId: string): Promise<ComponentDocument[]> {

@@ -2734,10 +2734,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Update ONLY this sub-component's running hours (NO cascade, NO parent update)
-        await storage.updateComponent(component.id, {
-          currentCumulativeRH: newRH.toString(),
-          lastUpdated: dateOfCompletion || new Date().toISOString().split('T')[0]
+        // Update running hours using the CENTRALIZED function to ensure field sync
+        // This ensures rhCurrentMaster/rhCurrentInheritedCached and currentCumulativeRH stay in sync
+        // and properly cascades to inherited components if this is a MASTER component
+        await storage.setComponentRunningHours({
+          componentId: component.id,
+          newRHValue: newRH,
+          updateSource: 'WO_COMPLETION',
+          userId: executionData.performedBy || 'System'
         });
         
         // Record running hours audit entry with complete metadata
@@ -4072,7 +4076,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const component = await storage.updateComponent(req.params.id, data);
+      // INTERCEPT RH UPDATES: If running hours are being updated, use the centralized function
+      // to ensure all RH fields stay in sync and cascade properly to inherited components
+      let component;
+      if (data.currentCumulativeRH !== undefined || data.runningHours !== undefined) {
+        const rhValue = parseFloat(data.currentCumulativeRH || data.runningHours || '0');
+        if (!isNaN(rhValue)) {
+          // Use centralized RH update for field sync and cascade
+          const result = await storage.setComponentRunningHours({
+            componentId: req.params.id,
+            newRHValue: rhValue,
+            updateSource: 'MANUAL',
+            userId: 'user'
+          });
+          console.log(`🔄 RH Update: synced ${result.inheritedUpdated} inherited components`);
+          
+          // Remove RH fields from data to avoid double-update, then update other fields
+          const { currentCumulativeRH, runningHours, ...otherData } = data;
+          if (Object.keys(otherData).length > 0) {
+            component = await storage.updateComponent(req.params.id, otherData);
+          } else {
+            component = result.component;
+          }
+        } else {
+          component = await storage.updateComponent(req.params.id, data);
+        }
+      } else {
+        component = await storage.updateComponent(req.params.id, data);
+      }
+      
       console.log(`✅ Updated component:`, component.componentCode, '| vesselId:', component.vesselId, '| parentId:', component.parentId);
       res.json(component);
     } catch (error: any) {

@@ -285,6 +285,20 @@ export interface IStorage {
     inheritedUpdated: number;
   }>;
   
+  // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
+  // This is the ONLY method that should be used to update running hours to prevent field drift
+  // It handles: syncing rhCurrentMaster/rhCurrentInheritedCached with currentCumulativeRH,
+  // and propagating changes from MASTER to all INHERITED components
+  setComponentRunningHours(params: {
+    componentId: string;
+    newRHValue: number;
+    updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
+    userId: string;
+  }): Promise<{
+    component: Component;
+    inheritedUpdated: number;
+  }>;
+  
   // Fleet Components methods
   getFleetComponents(): Promise<Component[]>;
   getFleetComponent(id: string): Promise<Component | undefined>;
