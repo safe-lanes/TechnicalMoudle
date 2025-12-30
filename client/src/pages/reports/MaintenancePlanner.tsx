@@ -450,6 +450,7 @@ export default function MaintenancePlanner() {
                   <Label data-testid="G21.12"><Marker id="G21.12" />Job Type</Label>
                   <Select value={jobType} onValueChange={setJobType}>
                     <SelectTrigger data-testid="G21.13">
+                      <Marker id="G21.13" />
                       <SelectValue placeholder="Select job type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -501,6 +502,7 @@ export default function MaintenancePlanner() {
                   <Label data-testid="G21.18"><Marker id="G21.18" />Department</Label>
                   <Select value={department} onValueChange={setDepartment}>
                     <SelectTrigger data-testid="G21.19">
+                      <Marker id="G21.19" />
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
