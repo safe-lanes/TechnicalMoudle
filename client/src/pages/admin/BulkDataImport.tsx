@@ -105,26 +105,35 @@ export default function BulkDataImport() {
       <div className="w-72 bg-sky-500 p-4">
         <Card className="bg-sky-500 border-none shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="text-white text-lg">TEMPLATES</CardTitle>
+            <CardTitle className="text-white text-lg" data-testid="I1.6">TEMPLATES</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {currentTemplates.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => isFleetMode 
-                  ? setSelectedFleetTemplate(template.id as FleetTemplateType) 
-                  : setSelectedVesselTemplate(template.id as VesselTemplateType)
-                }
-                className={`w-full text-left px-4 py-3 rounded transition-colors ${
-                  (isFleetMode ? selectedFleetTemplate : selectedVesselTemplate) === template.id
-                    ? 'bg-white text-sky-600 font-medium'
-                    : 'text-white hover:bg-sky-400'
-                }`}
-                data-testid={`template-${template.id}`}
-              >
-                {template.number}. {template.name}
-              </button>
-            ))}
+            {currentTemplates.map((template) => {
+              const vesselMarkerIds: Record<VesselTemplateType, string> = {
+                'machinery': 'I1.6A',
+                'jobs': 'I1.6B',
+                'spares': 'I1.6C',
+                'stores': 'I1.6D'
+              };
+              const markerId = !isFleetMode ? vesselMarkerIds[template.id as VesselTemplateType] : undefined;
+              return (
+                <button
+                  key={template.id}
+                  onClick={() => isFleetMode 
+                    ? setSelectedFleetTemplate(template.id as FleetTemplateType) 
+                    : setSelectedVesselTemplate(template.id as VesselTemplateType)
+                  }
+                  className={`w-full text-left px-4 py-3 rounded transition-colors ${
+                    (isFleetMode ? selectedFleetTemplate : selectedVesselTemplate) === template.id
+                      ? 'bg-white text-sky-600 font-medium'
+                      : 'text-white hover:bg-sky-400'
+                  }`}
+                  data-testid={markerId || `template-${template.id}`}
+                >
+                  {template.number}. {template.name}
+                </button>
+              );
+            })}
           </CardContent>
         </Card>
       </div>
@@ -139,11 +148,11 @@ export default function BulkDataImport() {
               <>
                 <Ship className="h-5 w-5 text-sky-600" />
                 <div className="flex items-center gap-3">
-                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="vessel-select" className="text-sm font-medium text-gray-700" data-testid="I1.A6">
                     Select Vessel:
                   </Label>
                   <Select value={selectedVessel} onValueChange={(value) => setSelectedVessel(value)}>
-                    <SelectTrigger id="vessel-select" className="w-64" data-testid="select-vessel">
+                    <SelectTrigger id="vessel-select" className="w-64" data-testid="I1.A7">
                       <SelectValue placeholder="Choose vessel..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -162,7 +171,7 @@ export default function BulkDataImport() {
                         variant="outline" 
                         size="sm" 
                         className="gap-1"
-                        data-testid="button-create-vessel"
+                        data-testid="I1.A8"
                       >
                         <Plus className="h-4 w-4" />
                         New Vessel
@@ -225,7 +234,7 @@ export default function BulkDataImport() {
             )}
             
             {/* Fleet Data Import Toggle */}
-            <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50">
+            <div className="flex items-center gap-2 px-4 py-2 border rounded-full bg-gray-50" data-testid="I1.A9">
               <Label htmlFor="fleet-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
                 Fleet Data Import
               </Label>
@@ -233,12 +242,11 @@ export default function BulkDataImport() {
                 id="fleet-toggle"
                 checked={isFleetMode}
                 onCheckedChange={setIsFleetMode}
-                data-testid="toggle-fleet-mode"
               />
             </div>
             
             <div className="ml-auto flex items-center gap-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500" data-testid="I1.A10">
                 {viewMode === 'history' 
                   ? "View import history and error logs"
                   : isFleetMode 
@@ -249,7 +257,7 @@ export default function BulkDataImport() {
                 variant={viewMode === 'history' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode(viewMode === 'history' ? 'upload' : 'history')}
-                data-testid="button-toggle-history"
+                data-testid="I1.A11"
               >
                 <History className="h-4 w-4 mr-2" />
                 {viewMode === 'history' ? 'Back to Upload' : 'Import History'}

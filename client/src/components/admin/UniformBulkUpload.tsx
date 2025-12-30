@@ -105,6 +105,26 @@ interface StoreTypeOption {
   label: string;
 }
 
+interface MarkerConfig {
+  header: string;
+  description: string;
+  downloadTemplate: string;
+  tabUpload: string;
+  tabMapping: string;
+  tabHistory: string;
+  storeTypeSection?: string;
+  storeTypeLabel?: string;
+  storeTypeDropdown?: string;
+  importModeSection: string;
+  importModeLabel: string;
+  radioAddOnly: string;
+  radioUpdateOnly: string;
+  radioUpsert: string;
+  uploadSection: string;
+  uploadDescription: string;
+  dropZone: string;
+}
+
 interface UniformBulkUploadProps {
   title: string;
   description: string;
@@ -116,6 +136,7 @@ interface UniformBulkUploadProps {
   previewColumns?: string[];
   storeTypes?: StoreTypeOption[];
   onRefreshData?: () => void;
+  markers?: MarkerConfig;
 }
 
 export default function UniformBulkUpload({
@@ -128,7 +149,8 @@ export default function UniformBulkUpload({
   vesselId,
   previewColumns,
   storeTypes,
-  onRefreshData
+  onRefreshData,
+  markers
 }: UniformBulkUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<'add' | 'update' | 'upsert'>('upsert');
@@ -575,11 +597,15 @@ export default function UniformBulkUpload({
             <Icon className="h-6 w-6 text-sky-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            <p className="text-gray-600">{description}</p>
+            <h1 className="text-2xl font-bold text-gray-900" data-testid={markers?.header || "bulk-upload-header"}>
+              {title}
+            </h1>
+            <p className="text-gray-600" data-testid={markers?.description || "bulk-upload-description"}>
+              {description}
+            </p>
           </div>
         </div>
-        <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
+        <Button variant="outline" onClick={handleDownloadTemplate} data-testid={markers?.downloadTemplate || "button-download-template"}>
           <Download className="h-4 w-4 mr-2" />
           Download Template
         </Button>
@@ -587,21 +613,29 @@ export default function UniformBulkUpload({
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="upload" data-testid="tab-upload">Upload</TabsTrigger>
-          <TabsTrigger value="mapping" data-testid="tab-mapping">Field Mapping Guide</TabsTrigger>
-          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
+          <TabsTrigger value="upload" data-testid={markers?.tabUpload || "tab-upload"}>
+            Upload
+          </TabsTrigger>
+          <TabsTrigger value="mapping" data-testid={markers?.tabMapping || "tab-mapping"}>
+            Field Mapping Guide
+          </TabsTrigger>
+          <TabsTrigger value="history" data-testid={markers?.tabHistory || "tab-history"}>
+            History
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload" className="space-y-6 pt-4">
           {storeTypes && (
-            <Card>
+            <Card data-testid={markers?.storeTypeSection || "store-type-section"}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Store Type <span className="text-red-500">*</span></CardTitle>
+                <CardTitle className="text-base" data-testid={markers?.storeTypeLabel || "store-type-label"}>
+                  Store Type <span className="text-red-500">*</span>
+                </CardTitle>
                 <CardDescription>Select which tab this data belongs to (required)</CardDescription>
               </CardHeader>
               <CardContent>
                 <Select value={selectedStoreType} onValueChange={setSelectedStoreType}>
-                  <SelectTrigger className="w-64" data-testid="select-store-type">
+                  <SelectTrigger className="w-64" data-testid={markers?.storeTypeDropdown || "select-store-type"}>
                     <SelectValue placeholder="Select store type..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -614,10 +648,12 @@ export default function UniformBulkUpload({
             </Card>
           )}
 
-          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''}>
+          <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''} data-testid={markers?.importModeSection || "import-mode-section"}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Import Mode</CardTitle>
-              <CardDescription>Choose how to handle existing records</CardDescription>
+              <CardDescription data-testid={markers?.importModeLabel || "import-mode-label"}>
+                Choose how to handle existing records
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <RadioGroup 
@@ -625,21 +661,21 @@ export default function UniformBulkUpload({
                 onValueChange={(value) => setImportMode(value as any)}
                 className="space-y-3"
               >
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3" data-testid={markers?.radioAddOnly || "radio-add-only"}>
                   <RadioGroupItem value="add" id="mode-add" className="mt-1" />
                   <Label htmlFor="mode-add" className="font-normal cursor-pointer">
                     <div className="font-medium">Add Only</div>
                     <div className="text-sm text-gray-500">Only create new records, skip existing ones</div>
                   </Label>
                 </div>
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3" data-testid={markers?.radioUpdateOnly || "radio-update-only"}>
                   <RadioGroupItem value="update" id="mode-update" className="mt-1" />
                   <Label htmlFor="mode-update" className="font-normal cursor-pointer">
                     <div className="font-medium">Update Only</div>
                     <div className="text-sm text-gray-500">Only update existing records, skip new ones</div>
                   </Label>
                 </div>
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-3" data-testid={markers?.radioUpsert || "radio-upsert"}>
                   <RadioGroupItem value="upsert" id="mode-upsert" className="mt-1" />
                   <Label htmlFor="mode-upsert" className="font-normal cursor-pointer">
                     <div className="font-medium">Add + Update (Recommended)</div>
@@ -652,8 +688,10 @@ export default function UniformBulkUpload({
 
           <Card className={isStoresAndNoType ? 'opacity-50 pointer-events-none' : ''}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Upload File</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base" data-testid={markers?.uploadSection || "upload-section"}>
+                Upload File
+              </CardTitle>
+              <CardDescription data-testid={markers?.uploadDescription || "upload-description"}>
                 Upload CSV, XLS, or XLSX files containing {templateType} data
               </CardDescription>
             </CardHeader>
@@ -663,6 +701,7 @@ export default function UniformBulkUpload({
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onClick={() => document.getElementById(`file-upload-${templateType}`)?.click()}
+                data-testid={markers?.dropZone || "drop-zone"}
               >
                 <input
                   type="file"
