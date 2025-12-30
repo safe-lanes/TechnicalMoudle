@@ -1291,15 +1291,18 @@ const Spares: React.FC = () => {
               size="sm"
               className="text-blue-600"
               onClick={exportSparesToExcel}
-              data-testid="button-export-spares"
+              data-testid="E9"
             >
+              <Marker id="E9" />
               <FileSpreadsheet className="h-4 w-4 mr-1" />
               Export
             </Button>
-            <Button size="sm" className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)}>
+            <Button size="sm" className="bg-[#52baf3] hover:bg-[#40a8e0] text-white" onClick={() => setIsAddSpareModalOpen(true)} data-testid="E10">
+              <Marker id="E10" />
               + Add Spare
             </Button>
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={openBulkUpdateModal}>
+            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={openBulkUpdateModal} data-testid="E11">
+              <Marker id="E11" />
               🔄 Bulk Update Spares
             </Button>
           </div>
@@ -1307,20 +1310,24 @@ const Spares: React.FC = () => {
       </div>
       {/* Search and Filters */}
       <div className="flex gap-3 items-center mb-4">
-        <Select value={vesselId} onValueChange={setVesselId}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select Vessel" />
-          </SelectTrigger>
-          <SelectContent>
-            {vessels.map(vessel => (
-              <SelectItem key={vessel.id} value={vessel.id}>
-                {vessel.id} - {vessel.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="relative" data-testid="E4">
+          <Marker id="E4" />
+          <Select value={vesselId} onValueChange={setVesselId}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select Vessel" />
+            </SelectTrigger>
+            <SelectContent>
+              {vessels.map(vessel => (
+                <SelectItem key={vessel.id} value={vessel.id}>
+                  {vessel.id} - {vessel.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <div className="relative w-80">
+        <div className="relative w-80" data-testid="E5">
+          <Marker id="E5" />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Search parts or components..."
@@ -1330,42 +1337,51 @@ const Spares: React.FC = () => {
           />
         </div>
 
-        <Select value={criticalityFilter} onValueChange={setCriticalityFilter}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Criticality" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            <SelectItem value="Critical">Critical</SelectItem>
-            <SelectItem value="Non-critical">Non-critical</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="relative" data-testid="E6">
+          <Marker id="E6" />
+          <Select value={criticalityFilter} onValueChange={setCriticalityFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Criticality" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="Critical">Critical</SelectItem>
+              <SelectItem value="Non-critical">Non-critical</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Select value={stockFilter} onValueChange={setStockFilter}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Stock" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            <SelectItem value="OK">OK</SelectItem>
-            <SelectItem value="At Min">At Min</SelectItem>
-            <SelectItem value="Low">Low</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="relative" data-testid="E7">
+          <Marker id="E7" />
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Stock" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="OK">OK</SelectItem>
+              <SelectItem value="At Min">At Min</SelectItem>
+              <SelectItem value="Low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <Button 
           variant="outline"
           onClick={clearFilters}
           className="text-gray-600"
+          data-testid="E8"
         >
+          <Marker id="E8" />
           Clear
         </Button>
       </div>
       {/* Main Content */}
       <div className="flex gap-4 h-[calc(100%-180px)]">
         {/* Left Panel - Component Tree */}
-        <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="w-80 bg-white border border-gray-200 rounded-lg overflow-hidden" data-testid="E12">
           <div className="text-white px-4 py-2 font-semibold bg-[#52baf3]">
+            <Marker id="E12" />
             COMPONENT SEARCH
           </div>
           <div className="overflow-y-auto h-[calc(100%-40px)]">
@@ -1380,17 +1396,17 @@ const Spares: React.FC = () => {
               {/* Inventory Table Header */}
               <div className="px-4 py-3 border-b border-gray-200 bg-[#52baf3]">
                 <div className="grid gap-2 text-sm font-semibold text-[#ffffff]" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
-                  <div className="text-[#ffffff]">Part Code</div>
-                  <div>Part Name</div>
-                  <div>Component</div>
-                  <div>Part Number</div>
-                  <div>Criticality</div>
-                  <div className="text-center">ROB</div>
-                  <div className="text-center">Min</div>
-                  <div className="text-center">Stock</div>
-                  <div>Location</div>
-                  {FEATURES.IHM && <div className="text-center">IHM</div>}
-                  <div className="text-center">Actions</div>
+                  <div className="text-[#ffffff]" data-testid="E13"><Marker id="E13" />Part Code</div>
+                  <div data-testid="E14"><Marker id="E14" />Part Name</div>
+                  <div data-testid="E15"><Marker id="E15" />Component</div>
+                  <div data-testid="E16"><Marker id="E16" />Part Number</div>
+                  <div data-testid="E17"><Marker id="E17" />Criticality</div>
+                  <div className="text-center" data-testid="E18"><Marker id="E18" />ROB</div>
+                  <div className="text-center" data-testid="E19"><Marker id="E19" />Min</div>
+                  <div className="text-center" data-testid="E20"><Marker id="E20" />Stock</div>
+                  <div data-testid="E21"><Marker id="E21" />Location</div>
+                  {FEATURES.IHM && <div className="text-center" data-testid="E22"><Marker id="E22" />IHM</div>}
+                  <div className="text-center" data-testid="E23"><Marker id="E23" />Actions</div>
                 </div>
               </div>
 
@@ -1403,20 +1419,22 @@ const Spares: React.FC = () => {
                     No spares found. Try adjusting your filters.
                   </div>
                 ) : (
-                  paginatedSpares.map((spare: Spare) => {
+                  paginatedSpares.map((spare: Spare, rowIndex: number) => {
                     const stockStatus = getStockStatus(spare.rob, spare.min);
                     const isDropdownOpen = openLocationDropdown === spare.id;
                     const robA = spare.robLocationA ?? 0;
                     const robB = spare.robLocationB ?? 0;
                     const locationDisplay = `${robA} / ${robB}`;
+                    const isFirstRow = rowIndex === 0;
                     return (
                     <div key={spare.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid gap-2 text-sm items-center" style={{ gridTemplateColumns: FEATURES.IHM ? '90px 130px 150px 100px 80px 50px 50px 60px 100px 50px 140px' : '90px 130px 150px 100px 80px 50px 50px 60px 100px 140px' }}>
-                        <div className="text-gray-900">{spare.partCode}</div>
-                        <div className="text-gray-700">{spare.partName}</div>
-                        <div className="text-gray-700">{spare.componentName}</div>
-                        <div className="text-blue-600 font-medium">{spare.componentSpareCode || '-'}</div>
-                        <div>
+                        <div className="text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
+                        <div className="text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
+                        <div className="text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
+                        <div className="text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.componentSpareCode || '-'}</div>
+                        <div data-testid={isFirstRow ? "E28" : undefined}>
+                          {isFirstRow && <Marker id="E28" />}
                           <span className={`px-2 py-1 rounded text-xs ${
                             spare.critical === 'Critical' || spare.critical === 'Yes' 
                               ? 'bg-red-100 text-red-800' 
@@ -1425,15 +1443,17 @@ const Spares: React.FC = () => {
                             {spare.critical}
                           </span>
                         </div>
-                        <div className="text-center">{spare.rob}</div>
-                        <div className="text-center">{spare.min}</div>
-                        <div className="text-center">
+                        <div className="text-center" data-testid={isFirstRow ? "E29" : undefined}>{isFirstRow && <Marker id="E29" />}{spare.rob}</div>
+                        <div className="text-center" data-testid={isFirstRow ? "E30" : undefined}>{isFirstRow && <Marker id="E30" />}{spare.min}</div>
+                        <div className="text-center" data-testid={isFirstRow ? "E31" : undefined}>
+                          {isFirstRow && <Marker id="E31" />}
                           <span className={`px-2 py-1 rounded text-xs ${stockStatus.color}`}>
                             {stockStatus.label}
                           </span>
                         </div>
                         {/* Location Dropdown */}
-                        <div className="relative">
+                        <div className="relative" data-testid={isFirstRow ? "E32" : undefined}>
+                          {isFirstRow && <Marker id="E32" />}
                           <button
                             onClick={() => handleOpenLocationDropdown(spare)}
                             className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
@@ -1521,14 +1541,15 @@ const Spares: React.FC = () => {
                           )}
                         </div>
                         {FEATURES.IHM && (
-                          <div className="flex justify-center">
+                          <div className="flex justify-center" data-testid={isFirstRow ? "E33" : undefined}>
+                            {isFirstRow && <Marker id="E33" />}
                             {/* Mock IHM status - in real implementation, would come from API */}
                             {spare.partCode === 'SP-ME-001' ? (
-                              <AlertCircle className="h-4 w-4 text-red-500" title="IHM Present" />
+                              <AlertCircle className="h-4 w-4 text-red-500" />
                             ) : spare.partCode === 'SP-ME-002' ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" title="IHM Not Present" />
+                              <CheckCircle className="h-4 w-4 text-green-500" />
                             ) : (
-                              <HelpCircle className="h-4 w-4 text-gray-400" title="IHM Unknown" />
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
                             )}
                           </div>
                         )}
@@ -1538,8 +1559,9 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => openInfoModal(spare)}
                             title="View Details"
-                            data-testid={`button-info-${spare.id}`}
+                            data-testid={isFirstRow ? "E34" : `button-info-${spare.id}`}
                           >
+                            {isFirstRow && <Marker id="E34" />}
                             <Info className="h-4 w-4 text-blue-600" />
                           </Button>
                           <Button 
@@ -1547,8 +1569,9 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => openEditModal(spare)}
                             title="Edit"
-                            data-testid={`button-edit-${spare.id}`}
+                            data-testid={isFirstRow ? "E35" : `button-edit-${spare.id}`}
                           >
+                            {isFirstRow && <Marker id="E35" />}
                             <Edit2 className="h-4 w-4" />
                           </Button>
                           <Button 
@@ -1565,8 +1588,9 @@ const Spares: React.FC = () => {
                             variant="ghost"
                             onClick={() => handleDeleteSpare(spare.id)}
                             title="Delete"
-                            data-testid={`button-delete-${spare.id}`}
+                            data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
                           >
+                            {isFirstRow && <Marker id="E36" />}
                             <Square className="h-4 w-4" />
                           </Button>
                         </div>
