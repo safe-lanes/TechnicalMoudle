@@ -6630,6 +6630,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // WORK ORDER STATUS SYNC ENDPOINT
+  // ========================================
+  
+  // Sync stale stored status values with computed status
+  // This ensures the database status field matches the runtime computed status
+  app.post("/api/admin/sync-work-order-status", async (req, res) => {
+    try {
+      const { vesselId, dryRun = true } = req.body;
+      
+      console.log(`🔄 Starting work order status sync${vesselId ? ` for vessel ${vesselId}` : ' for all vessels'}${dryRun ? ' (DRY RUN)' : ''}`);
+      
+      // Get all work orders (filtered by vessel if specified)
+      const workOrders = await storage.getWorkOrders(vesselId || undefined);
+      
+      // Get all vessels for grace settings
+      const allVessels = await storage.getVessels();
+      const vesselSettingsMap = new Map<string, any>();
+      const graceSettingsMap = new Map<string, any>();
+      
+      for (const vessel of allVessels) {
+        if (vessel.id) {
+          const settings = await storage.getPmsVesselSettings(vessel.id);
+          if (settings) {
+            vesselSettingsMap.set(vessel.id, settings);
+            graceSettingsMap.set(vessel.id, settings);
+          }
+        }
+      }
+      
+      // Get all jobs and components for status calculation
+      const allJobs = await storage.getJobs();
+      const jobMap = new Map(allJobs.map(j => [j.id, j]));
+      
+      const allComponents = await storage.getComponents();
+      const componentMap = new Map(allComponents.map(c => [c.id, c]));
+      
+      const stats = {
+        totalProcessed: 0,
+        statusUpdated: 0,
+        alreadyCorrect: 0,
+        errors: [] as string[],
+        changes: [] as { id: string; workOrderNo: string; oldStatus: string; newStatus: string }[]
+      };
+      
+      for (const wo of workOrders) {
+        try {
+          stats.totalProcessed++;
+          
+          const job = wo.jobId ? jobMap.get(wo.jobId) : undefined;
+          const component = wo.componentId ? componentMap.get(wo.componentId) : undefined;
+          const vesselSettings = wo.vesselId ? vesselSettingsMap.get(wo.vesselId) : undefined;
+          const vesselGraceSettings = wo.vesselId ? graceSettingsMap.get(wo.vesselId) : undefined;
+          
+          // Parse RH values
+          const parseRH = (val: string | number | null | undefined): number | undefined => {
+            if (val === null || val === undefined || val === '') return undefined;
+            const num = typeof val === 'number' ? val : parseFloat(String(val));
+            return isNaN(num) ? undefined : num;
+          };
+          
+          const dueRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
+          const currentRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+          
+          // Determine RH lead time based on job criticality
+          const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;
+          const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
+            ? (isJobCritical 
+                ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+                : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS))
+            : undefined;
+          
+          // Compute status
+          const computedStatus = computeWorkOrderStatus({
+            dueDate: wo.dueDate,
+            dueRH,
+            currentRH,
+            isExecution: wo.isExecution || false,
+            status: wo.status,
+            completionDateTime: wo.completionDateTime,
+            maintenanceBasis: wo.maintenanceBasis,
+            vesselGraceSettings: vesselGraceSettings ? {
+              calendarGraceMode: vesselGraceSettings.calendarGraceMode || 'COMPANY_STANDARD',
+              calendarGraceDays: vesselGraceSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+              rhGraceHours: vesselSettings?.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+              rhLeadTimeHours: vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+            } : undefined,
+            rhLeadTimeHours
+          });
+          
+          // Check if status needs updating
+          if (wo.status !== computedStatus) {
+            stats.changes.push({
+              id: wo.id,
+              workOrderNo: wo.workOrderNo,
+              oldStatus: wo.status || 'null',
+              newStatus: computedStatus
+            });
+            
+            if (!dryRun) {
+              await storage.updateWorkOrder(wo.id, { status: computedStatus });
+              stats.statusUpdated++;
+            } else {
+              stats.statusUpdated++;
+            }
+          } else {
+            stats.alreadyCorrect++;
+          }
+        } catch (woError: any) {
+          stats.errors.push(`Error processing WO ${wo.workOrderNo}: ${woError.message}`);
+        }
+      }
+      
+      console.log(`✅ Status sync ${dryRun ? 'preview' : 'completed'}:`, {
+        totalProcessed: stats.totalProcessed,
+        statusUpdated: stats.statusUpdated,
+        alreadyCorrect: stats.alreadyCorrect,
+        errors: stats.errors.length
+      });
+      
+      res.json({
+        success: true,
+        dryRun,
+        message: dryRun 
+          ? `Status sync preview complete. ${stats.statusUpdated} work orders would be updated. Set dryRun=false to execute.`
+          : `Status sync completed. ${stats.statusUpdated} work orders updated.`,
+        statistics: {
+          totalProcessed: stats.totalProcessed,
+          statusUpdated: stats.statusUpdated,
+          alreadyCorrect: stats.alreadyCorrect,
+          errorCount: stats.errors.length
+        },
+        changes: stats.changes.slice(0, 50), // Limit to first 50 for response size
+        errors: stats.errors
+      });
+    } catch (error: any) {
+      console.error("❌ Status sync failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Status sync failed: " + error.message 
+      });
+    }
+  });
+
+  // ========================================
   // CERTIFICATES API ROUTES
   // ========================================
   
