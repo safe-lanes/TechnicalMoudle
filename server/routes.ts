@@ -2482,8 +2482,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentWorkOrder = await storage.getWorkOrder(req.params.id);
         if (currentWorkOrder && currentWorkOrder.status !== 'Approved' && currentWorkOrder.status !== 'Completed') {
           updateData.status = 'Pending Approval';
+          // Capture submittedDate for audit trail when transitioning to Pending Approval
+          if (!currentWorkOrder.submittedDate) {
+            updateData.submittedDate = new Date().toISOString();
+            console.log('📝 Auto-capturing submittedDate for audit trail');
+          }
           console.log('📝 Auto-setting status to Pending Approval (completion data provided without explicit status)');
         }
+      }
+      
+      // AUDIT TRAIL: Capture submittedDate whenever status changes to 'Pending Approval'
+      // or when an approval action (submitted/approved) is taken
+      const isSubmissionAction = updateData.approvalAction === 'submitted' || 
+                                  updateData.approvalAction === 'submit' ||
+                                  updateData.status === 'Pending Approval';
+      if (isSubmissionAction && !existingWO.submittedDate) {
+        updateData.submittedDate = new Date().toISOString();
+        console.log('📝 Capturing submittedDate for audit trail on submission/Pending Approval');
       }
       
       console.log('📝 Cleaned update data keys:', Object.keys(updateData));
