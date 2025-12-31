@@ -526,7 +526,7 @@ const Dashboard = () => {
 
           <Card 
             className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400"
-            onClick={() => navigateToWorkOrders('All W.O')}
+            onClick={() => navigateToWorkOrders('Active')}
             data-testid="card-total-wo"
           >
             <CardHeader className="pb-2">
@@ -573,7 +573,7 @@ const Dashboard = () => {
                           else if (status === 'Due') navigateToWorkOrders('Due');
                           else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
                           else if (status === 'Completed') navigateToWorkOrders('Completed');
-                          else navigateToWorkOrders('All W.O');
+                          else navigateToWorkOrders('Active');
                         }
                       }
                     } as any],
@@ -618,7 +618,7 @@ const Dashboard = () => {
                         nodeClick: (event: any) => {
                           const status = event.datum.status;
                           if (status === 'Outstanding') {
-                            navigateToWorkOrders('All W.O');
+                            navigateToWorkOrders('Active');
                           } else {
                             navigateToWorkOrders('Completed');
                           }

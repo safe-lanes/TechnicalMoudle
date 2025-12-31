@@ -68,7 +68,7 @@ const WorkOrders: React.FC = () => {
       sessionStorage.removeItem('workOrdersActiveTab');
       return savedTab;
     }
-    return "All W.O";
+    return "Active";
   });
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
@@ -162,7 +162,7 @@ const WorkOrders: React.FC = () => {
   
   // Use computedStatus for tab counts (automatic status calculation)
   const tabs = [
-    { id: "All W.O", label: "All W.O", count: safeWorkOrdersList.filter(wo => !wo.isExecution).length },
+    { id: "Active", label: "Active", count: safeWorkOrdersList.filter(wo => !wo.isExecution).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.computedStatus === "Due" || wo.computedStatus === "Due (Grace P)")).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.computedStatus === "Overdue").length },
@@ -203,7 +203,7 @@ const WorkOrders: React.FC = () => {
     // Ensure computedStatus is always defined (defensive check)
     const effectiveStatus = wo.computedStatus || wo.status || 'Active';
     
-    if (activeTab === "All W.O") {
+    if (activeTab === "Active") {
       // Show templates and rejected executions
       if (wo.isExecution && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Due") {

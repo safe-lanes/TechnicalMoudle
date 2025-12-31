@@ -741,7 +741,7 @@ test.describe('Work Orders Module - Comprehensive PMS Tests', () => {
   test.describe('3. LIST PAGE FUNCTIONALITY', () => {
     test('Test all status tabs', async ({ page }) => {
       const tabs = [
-        { name: 'All W.O', testId: 'tab-all-wo' },
+        { name: 'Active', testId: 'tab-active' },
         { name: 'Due', testId: 'tab-due' },
         { name: 'Pending Approval', testId: 'tab-pending-approval' },
         { name: 'Overdue', testId: 'tab-overdue' },
@@ -1119,7 +1119,7 @@ test.describe('Work Orders Module - Comprehensive PMS Tests', () => {
   test('Generate test summary report', async ({ page }) => {
     // Navigate through all main sections and capture final state
     const sections = [
-      { tab: 'All W.O', name: 'all_work_orders' },
+      { tab: 'Active', name: 'active_work_orders' },
       { tab: 'Pending Approval', name: 'pending_approval_final' },
       { tab: 'Completed', name: 'completed_final' }
     ];
