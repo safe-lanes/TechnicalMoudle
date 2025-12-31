@@ -22,6 +22,12 @@ The application features a modern full-stack architecture with a mobile-first, r
 - **PMS Dashboard**: Professional analytics workspace with data visualizations, including an "Outstanding Tasks" pie chart.
 - **PMS Submodules**: CRUD operations for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
+- **Centralized Status Thresholds** (`shared/workOrders/constants.ts`): Single source of truth for all work order status thresholds. DO NOT modify unless explicitly requested. Values:
+    - Calendar Lead Time: 30 days (Active → Due transition)
+    - RH Lead Time: 720 hours (Active → Due transition)
+    - RH Grace Period: 168 hours (Due → Overdue after grace)
+    - Calendar Grace Period: 7 days (minimum)
+    - All services import from this file - no hardcoded fallbacks allowed.
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations. RH status is lead time-driven.
 - **Defects Module**: Tracks Condition of Class, recurring defects, and integrates with SIRE VIQ 7, following specific naming conventions.
 - **Spares Module (Enhanced Inventory System)**:
