@@ -1221,6 +1221,13 @@ export class PostgresStorage {
     return result[0];
   }
 
+  async getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<ComponentMaintenanceHistory | undefined> {
+    const db = await getDb();
+    const result = await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.workOrderId, workOrderId));
+    return result[0];
+  }
+
   // INSERT ONLY - No update or delete methods per immutability requirement
   async createComponentMaintenanceHistory(history: InsertComponentMaintenanceHistory): Promise<ComponentMaintenanceHistory> {
     const db = await getDb();

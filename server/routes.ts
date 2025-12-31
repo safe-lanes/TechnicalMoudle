@@ -2511,36 +2511,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (component) {
             // Create maintenance history record using stored execution data
             try {
-              const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted || new Date().toISOString();
-              const normalizeToISO = (isoDate: string | undefined): string => {
-                if (!isoDate) return new Date().toISOString().split('T')[0];
-                const date = new Date(isoDate);
-                return date.toISOString().split('T')[0];
-              };
-              
-              // Use stored execution data from work order (populated during Part B save)
-              const historyPayload = {
-                componentId: component.id,
-                componentCode: freshWorkOrder.componentCode || component.componentCode,
-                vesselCode: freshWorkOrder.vesselId,
-                workOrderId: freshWorkOrder.id,
-                workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
-                jobTitle: freshWorkOrder.jobTitle,
-                maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
-                dateCompleted: normalizeToISO(dateOfCompletion),
-                runningHoursAtCompletion: freshWorkOrder.runningHours || null,
-                performedBy: freshWorkOrder.performedBy || freshWorkOrder.executionAssignedTo || 'Unknown',
-                approvedBy: freshWorkOrder.approver || null,
-                approvalDate: normalizeToISO(dateOfCompletion),
-                status: 'Approved' as const,
-                workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
-                sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
-                remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
-                isComponentReplaced: false
-              };
-              
-              await storage.createComponentMaintenanceHistory(historyPayload);
-              console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+              // DUPLICATE CHECK: Only create if no record exists for this work order
+              const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(freshWorkOrder.id);
+              if (existingHistory) {
+                console.log(`⚠️ Maintenance history already exists for work order ${freshWorkOrder.id}, skipping duplicate creation`);
+              } else {
+                const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted || new Date().toISOString();
+                const normalizeToISO = (isoDate: string | undefined): string => {
+                  if (!isoDate) return new Date().toISOString().split('T')[0];
+                  const date = new Date(isoDate);
+                  return date.toISOString().split('T')[0];
+                };
+                
+                // Use stored execution data from work order (populated during Part B save)
+                const historyPayload = {
+                  componentId: component.id,
+                  componentCode: freshWorkOrder.componentCode || component.componentCode,
+                  vesselCode: freshWorkOrder.vesselId,
+                  workOrderId: freshWorkOrder.id,
+                  workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
+                  jobTitle: freshWorkOrder.jobTitle,
+                  maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
+                  dateCompleted: normalizeToISO(dateOfCompletion),
+                  runningHoursAtCompletion: freshWorkOrder.runningHours || null,
+                  performedBy: freshWorkOrder.performedBy || freshWorkOrder.executionAssignedTo || 'Unknown',
+                  approvedBy: freshWorkOrder.approver || null,
+                  approvalDate: normalizeToISO(dateOfCompletion),
+                  status: 'Approved' as const,
+                  workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
+                  sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
+                  remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
+                  isComponentReplaced: false
+                };
+                
+                await storage.createComponentMaintenanceHistory(historyPayload);
+                console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+              }
             } catch (historyError) {
               console.error('Failed to create maintenance history record:', historyError);
             }
@@ -2799,40 +2805,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Auto-populate component_maintenance_history when work order is completed
       try {
-        // Normalize date to ISO format (YYYY-MM-DD) for proper chronological sorting
-        const normalizeToISO = (isoDate: string | undefined): string => {
-          if (!isoDate) {
-            return new Date().toISOString().split('T')[0];
-          }
-          // Ensure ISO format
-          const date = new Date(isoDate);
-          return date.toISOString().split('T')[0];
-        };
+        // DUPLICATE CHECK: Only create if no record exists for this work order
+        const existingHistory = await storage.getMaintenanceHistoryByWorkOrderId(workOrder.id);
+        if (existingHistory) {
+          console.log(`⚠️ Maintenance history already exists for work order ${workOrder.id}, skipping duplicate creation`);
+        } else {
+          // Normalize date to ISO format (YYYY-MM-DD) for proper chronological sorting
+          const normalizeToISO = (isoDate: string | undefined): string => {
+            if (!isoDate) {
+              return new Date().toISOString().split('T')[0];
+            }
+            // Ensure ISO format
+            const date = new Date(isoDate);
+            return date.toISOString().split('T')[0];
+          };
 
-        // Use schema validation for type safety and defaults
-        // FIX: Use component.id (actual UUID) not workOrder.component (which is the component NAME)
-        const historyPayload = {
-          componentId: component.id,
-          componentCode: workOrder.componentCode || component.componentCode,
-          vesselCode: workOrder.vesselId,
-          workOrderId: workOrder.id,
-          workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
-          jobTitle: workOrder.jobTitle,
-          maintenanceType: workOrder.taskType || 'Servicing',
-          dateCompleted: normalizeToISO(dateOfCompletion),
-          runningHoursAtCompletion: runningHours || null,
-          performedBy: executionData.performedBy || 'Unknown',
-          approvedBy: executionData.approver || null,
-          approvalDate: executionData.approvalDate ? normalizeToISO(executionData.approvalDate) : null,
-          status: 'Approved' as const,
-          workDescription: executionData.workDone || workOrder.briefWorkDescription || null,
-          sparesUsed: executionData.sparesUsed || null,
-          remarks: executionData.remarks || null,
-          isComponentReplaced: false
-        };
+          // Use schema validation for type safety and defaults
+          // FIX: Use component.id (actual UUID) not workOrder.component (which is the component NAME)
+          const historyPayload = {
+            componentId: component.id,
+            componentCode: workOrder.componentCode || component.componentCode,
+            vesselCode: workOrder.vesselId,
+            workOrderId: workOrder.id,
+            workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
+            jobTitle: workOrder.jobTitle,
+            maintenanceType: workOrder.taskType || 'Servicing',
+            dateCompleted: normalizeToISO(dateOfCompletion),
+            runningHoursAtCompletion: runningHours || null,
+            performedBy: executionData.performedBy || 'Unknown',
+            approvedBy: executionData.approver || null,
+            approvalDate: executionData.approvalDate ? normalizeToISO(executionData.approvalDate) : null,
+            status: 'Approved' as const,
+            workDescription: executionData.workDone || workOrder.briefWorkDescription || null,
+            sparesUsed: executionData.sparesUsed || null,
+            remarks: executionData.remarks || null,
+            isComponentReplaced: false
+          };
 
-        await storage.createComponentMaintenanceHistory(historyPayload);
-        console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id})`);
+          await storage.createComponentMaintenanceHistory(historyPayload);
+          console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id})`);
+        }
       } catch (historyError) {
         console.error('Failed to create maintenance history record:', historyError);
         // Don't fail the work order completion if history creation fails

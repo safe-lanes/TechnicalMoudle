@@ -450,6 +450,7 @@ export interface IStorage {
   getAllComponentMaintenanceHistory(): Promise<any[]>;
   getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
+  getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<any | undefined>;
   createComponentMaintenanceHistory(history: any): Promise<any>;
   
   // Component Requisitions methods (Section H)
