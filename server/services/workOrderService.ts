@@ -4,37 +4,13 @@ import { computeWorkOrderStatus, VesselGraceSettings } from "@shared/workOrders/
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
-
-/**
- * Extract jobNo from a work order number
- * Handles both formats:
- * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
- * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
- * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
- */
-function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
-  if (!workOrderNo) return null;
-  
-  // Try NEW format first: has component code with dots before the year
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  
-  // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  
-  // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  
-  return null;
-}
+import { 
+  isBlockingStatus, 
+  isCompletedStatus,
+  extractJobNoFromWorkOrderNo,
+  buildJobsWithActiveWOSet,
+  buildCalendarCycleWOMap
+} from "../utils/workOrderStatus";
 
 /**
  * Determine if a job is "critical" based on its jobPriority
@@ -288,34 +264,17 @@ export class WorkOrderService {
       return settings || null;
     };
     
-    // Get all work orders with active statuses to check for duplicates
-    // Statuses that block new WO generation: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
-    const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
+    // Get all work orders to check for duplicates
     const allWorkOrders = await this.getWorkOrders(vesselId);
     
     // JOB-LEVEL LOCK: Build a set of jobNos that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
-    const jobsWithActiveWO = new Set<string>();
-    allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status))
-      .forEach(wo => {
-        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (jobNo) {
-          jobsWithActiveWO.add(jobNo);
-        }
-      });
+    // Uses case-insensitive status matching via isBlockingStatus()
+    const jobsWithActiveWO = buildJobsWithActiveWOSet(allWorkOrders);
     
     // CYCLE UNIQUENESS: Also build a map by (jobNo + cycleDueDate) for cycle-level check
-    const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
-    allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.cycleDueDateSnapshot)
-      .forEach(wo => {
-        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (jobNo) {
-          const cycleKey = `${jobNo}|${wo.cycleDueDateSnapshot}`;
-          existingCycleWOs.set(cycleKey, wo);
-        }
-      });
+    // Uses case-insensitive status matching via isBlockingStatus()
+    const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders);
     
     const results = {
       checked: calendarJobs.length,

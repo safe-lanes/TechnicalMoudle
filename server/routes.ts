@@ -2428,6 +2428,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log incoming data for debugging
       console.log('📝 PATCH work order request body keys:', Object.keys(req.body));
       
+      // RULE: Completed WOs are immutable except for specific fields
+      // Check if the WO is already completed before allowing updates
+      const existingWO = await storage.getWorkOrder(req.params.id);
+      if (!existingWO) {
+        return res.status(404).json({ error: "Work order not found" });
+      }
+      
+      // Check if WO is completed - if so, only allow limited updates
+      // Use centralized isCompletedStatus for case-insensitive matching
+      const { isCompletedStatus } = await import('./utils/workOrderStatus');
+      const woIsCompleted = isCompletedStatus(existingWO.status);
+      
+      if (woIsCompleted) {
+        // Only allow adding comments/remarks to completed WOs, not modifying core fields
+        const allowedFieldsForCompletedWO = ['remarks', 'completionRemarks', 'jobExperienceNotes'];
+        const requestedFields = Object.keys(req.body);
+        const disallowedFields = requestedFields.filter(f => !allowedFieldsForCompletedWO.includes(f));
+        
+        if (disallowedFields.length > 0) {
+          console.warn(`⚠️ Attempted to modify completed WO ${existingWO.workOrderNo}: ${disallowedFields.join(', ')}`);
+          return res.status(400).json({ 
+            error: "Cannot modify completed work order",
+            message: `Work Order ${existingWO.workOrderNo} is completed and cannot be modified. Only remarks can be added.`,
+            disallowedFields 
+          });
+        }
+      }
+      
       // Use a more permissive update approach - accept any partial data
       // The storage layer will handle what fields to actually update
       const updateData = { ...req.body };
@@ -6329,6 +6357,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin endpoint: Trigger job due scan manually (for testing/debugging WO generation)
+  // GET version for easy testing
+  app.get("/api/admin/job-due-scan", async (req, res) => {
+    try {
+      console.log('🔍 Manual job due scan triggered (GET) for ALL vessels');
+      
+      const { jobDueScanner } = await import("./services/jobDueScanner");
+      const results = await jobDueScanner.runScan();
+      
+      console.log('✅ Manual job due scan completed:', results);
+      
+      res.json({
+        success: true,
+        scanCompleted: true,
+        message: `Job due scan completed`,
+        results: {
+          calendarJobsChecked: results.calendarJobsChecked,
+          calendarWOsGenerated: results.calendarWOsGenerated,
+          rhJobsChecked: results.rhJobsChecked,
+          rhWOsGenerated: results.rhWOsGenerated,
+          totalGenerated: results.calendarWOsGenerated + results.rhWOsGenerated
+        }
+      });
+    } catch (error: any) {
+      console.error("❌ Job due scan failed:", error);
+      res.status(500).json({ 
+        success: false,
+        scanCompleted: false,
+        error: "Failed to run job due scan: " + error.message 
+      });
+    }
+  });
+  
+  // POST version for programmatic triggering
+  app.post("/api/admin/job-due-scan", async (req, res) => {
+    try {
+      const { vesselId } = req.body;
+      
+      console.log(`🔍 Manual job due scan triggered${vesselId ? ` for vessel: ${vesselId}` : ' for ALL vessels'}`);
+      
+      // Import and run the scanner
+      const { jobDueScanner } = await import("./services/jobDueScanner");
+      const results = await jobDueScanner.runScan();
+      
+      console.log('✅ Manual job due scan completed:', results);
+      
+      res.json({
+        success: true,
+        message: `Job due scan completed`,
+        results: {
+          calendarJobsChecked: results.calendarJobsChecked,
+          calendarWOsGenerated: results.calendarWOsGenerated,
+          rhJobsChecked: results.rhJobsChecked,
+          rhWOsGenerated: results.rhWOsGenerated,
+          totalGenerated: results.calendarWOsGenerated + results.rhWOsGenerated
+        }
+      });
+    } catch (error: any) {
+      console.error("❌ Job due scan failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to run job due scan: " + error.message 
+      });
+    }
+  });
+
   // Admin endpoint: Purge all jobs and linked data
   app.post("/api/admin/purge-jobs", async (req, res) => {
     try {

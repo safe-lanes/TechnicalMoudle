@@ -2,39 +2,15 @@ import { workOrderService } from "./workOrderService";
 import { jobService } from "./jobService";
 import { storage } from "../storage";
 import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
+import { 
+  isBlockingStatus, 
+  extractJobNoFromWorkOrderNo,
+  buildJobsWithActiveWOSet,
+  buildRhCycleWOMap,
+  buildCalendarCycleWOMap,
+  findBlockingWOForJob
+} from "../utils/workOrderStatus";
 import type { InsertWorkOrder, Job, PmsVesselSettings } from "@shared/schema";
-
-/**
- * Extract jobNo from a work order number
- * Handles both formats:
- * - NEW format: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING> (e.g., MKR-IN-00002-403.001-2025-439)
- * - OLD format: <JOB_NO>-<YYYY>-<RUNNING> (e.g., MKR-IN-00001-2025-001)
- * - Variant: <JOB_NO>.WO-<YYYY>-<RUNNING> (e.g., MKR-SE-00005.WO-2025-002)
- */
-function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): string | null {
-  if (!workOrderNo) return null;
-  
-  // Try NEW format first: has component code with dots before the year
-  // Pattern: capture everything before -<digits>.<digits> pattern
-  const newFormatMatch = workOrderNo.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
-  if (newFormatMatch) {
-    return newFormatMatch[1];
-  }
-  
-  // Try OLD format with .WO suffix: MKR-SE-00005.WO-2025-002
-  const woSuffixMatch = workOrderNo.match(/^(.+?)\.WO-\d{4}-\d+$/);
-  if (woSuffixMatch) {
-    return woSuffixMatch[1];
-  }
-  
-  // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
-  const oldFormatMatch = workOrderNo.match(/^(.+)-\d{4}-\d+$/);
-  if (oldFormatMatch) {
-    return oldFormatMatch[1];
-  }
-  
-  return null;
-}
 
 /**
  * Determine if a job is "critical" based on its jobPriority
@@ -186,34 +162,17 @@ export class JobDueScannerService {
       return settings || null;
     };
 
-    // Get all work orders with active statuses to check for duplicates
-    // Statuses that block new WO generation: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
-    const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
+    // Get all work orders to check for duplicates
     const allWorkOrders = await storage.getWorkOrders();
     
     // JOB-LEVEL LOCK: Build a set of jobNos that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
-    const jobsWithActiveWO = new Set<string>();
-    allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status))
-      .forEach(wo => {
-        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (jobNo) {
-          jobsWithActiveWO.add(jobNo);
-        }
-      });
+    // Uses case-insensitive status matching via isBlockingStatus()
+    const jobsWithActiveWO = buildJobsWithActiveWOSet(allWorkOrders);
     
     // CYCLE UNIQUENESS: Build a map by (jobNo + cycleDueRh) for cycle-level check
-    const existingCycleWOs = new Map<string, typeof allWorkOrders[0]>();
-    allWorkOrders
-      .filter(wo => BLOCKING_STATUSES.includes(wo.status) && wo.cycleDueRhSnapshot)
-      .forEach(wo => {
-        const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-        if (jobNo) {
-          const cycleKey = `${jobNo}|${wo.cycleDueRhSnapshot}`;
-          existingCycleWOs.set(cycleKey, wo);
-        }
-      });
+    // Uses case-insensitive status matching via isBlockingStatus()
+    const existingCycleWOs = buildRhCycleWOMap(allWorkOrders);
     
     // Cache for components - will fetch lazily per vessel
     const componentCache = new Map<string, any>();
@@ -384,18 +343,12 @@ export class JobDueScannerService {
       return { success: false, message: 'Job not found' };
     }
 
-    // Statuses that block new WO generation: DUE/OVERDUE/PENDING APPROVAL/POSTPONED
-    const BLOCKING_STATUSES = ['Active', 'Due', 'Due (Grace P)', 'Overdue', 'Pending Approval', 'Postponed'];
-    
     // Get all work orders for this vessel
     const allWorkOrders = await storage.getWorkOrders(job.vesselId || undefined);
     
-    // JOB-LEVEL LOCK: Check if job already has an active WO (using jobNo from workOrderNo)
-    const existingActiveWO = allWorkOrders.find(wo => {
-      if (!BLOCKING_STATUSES.includes(wo.status)) return false;
-      const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
-      return woJobNo === job.jobNo;
-    });
+    // JOB-LEVEL LOCK: Check if job already has an active WO
+    // Uses case-insensitive status matching via findBlockingWOForJob()
+    const existingActiveWO = findBlockingWOForJob(allWorkOrders, job.id, job.jobNo);
     
     if (existingActiveWO) {
       return { 
@@ -440,10 +393,11 @@ export class JobDueScannerService {
       const rhGenerate = Math.max(0, rhDue - leadTimeRH);
       
       // Check for existing WO with same cycle (cycle uniqueness)
+      // Uses case-insensitive status matching via isBlockingStatus()
       const existingCycleWO = allWorkOrders.find(wo => 
         wo.jobId === job.id &&
         wo.cycleDueRhSnapshot === String(rhDue) &&
-        BLOCKING_STATUSES.includes(wo.status)
+        isBlockingStatus(wo.status)
       );
       
       if (existingCycleWO) {
@@ -483,10 +437,11 @@ export class JobDueScannerService {
       const generateDateStr = generateDate.toISOString().split('T')[0];
       
       // Check for existing WO with same cycle (cycle uniqueness)
+      // Uses case-insensitive status matching via isBlockingStatus()
       const existingCycleWO = allWorkOrders.find(wo => 
         wo.jobId === job.id &&
         wo.cycleDueDateSnapshot === dueDateStr &&
-        BLOCKING_STATUSES.includes(wo.status)
+        isBlockingStatus(wo.status)
       );
       
       if (existingCycleWO) {
