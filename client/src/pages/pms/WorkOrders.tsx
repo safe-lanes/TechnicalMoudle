@@ -161,15 +161,20 @@ const WorkOrders: React.FC = () => {
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
   // Use computedStatus for tab counts (automatic status calculation)
-  // Active tab only shows work orders with Active or Postponed status (excludes Due, Overdue, Pending Approval, Completed)
+  // Active tab only shows work orders with Active status (Postponed goes to Due tab)
   const tabs = [
     { id: "Active", label: "Active", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       // Use same fallback logic as the filter to ensure count matches displayed items
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      return effectiveStatus === "Active" || effectiveStatus === "Postponed";
+      return effectiveStatus === "Active";
     }).length },
-    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => !wo.isExecution && (wo.computedStatus === "Due" || wo.computedStatus === "Due (Grace P)")).length },
+    { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
+      if (wo.isExecution) return false;
+      // Use same fallback logic as the filter to ensure count matches displayed items
+      const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+      return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)" || effectiveStatus === "Postponed";
+    }).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.computedStatus === "Overdue").length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Completed").length }
@@ -210,15 +215,16 @@ const WorkOrders: React.FC = () => {
     const effectiveStatus = wo.computedStatus || wo.status || 'Active';
     
     if (activeTab === "Active") {
-      // Show templates with Active or Postponed status, plus rejected executions
+      // Show templates with Active status only, plus rejected executions
       if (wo.isExecution && effectiveStatus !== "Rejected") return false;
-      // Exclude statuses that have their own dedicated tabs
+      // Exclude statuses that have their own dedicated tabs (Postponed goes to Due tab)
       if (effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)" || 
           effectiveStatus === "Overdue" || effectiveStatus === "Pending Approval" || 
-          effectiveStatus === "Completed") return false;
+          effectiveStatus === "Completed" || effectiveStatus === "Postponed") return false;
     } else if (activeTab === "Due") {
       if (wo.isExecution) return false;
-      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
+      // Due tab includes Due, Due (Grace P), and Postponed statuses
+      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)" && effectiveStatus !== "Postponed") return false;
     } else if (activeTab === "Overdue") {
       if (wo.isExecution) return false;
       if (effectiveStatus !== "Overdue") return false;
