@@ -246,12 +246,12 @@ const Dashboard = () => {
   }, [componentsData]);
 
   // Work Order Status chart data
+  // Note: Active status is excluded as the dashboard focuses on items needing attention
   const workOrderStatusChartData = useMemo(() => {
     return [
       { status: 'Overdue', count: workOrderKPIs.overdue, color: '#ef4444' },
       { status: 'Due', count: workOrderKPIs.due, color: '#f59e0b' },
       { status: 'Pending Approval', count: workOrderKPIs.pendingApproval, color: '#3b82f6' },
-      { status: 'Active', count: workOrderKPIs.active, color: '#8b5cf6' },
       { status: 'Completed', count: workOrderKPIs.completed, color: '#10b981' }
     ].filter(d => d.count > 0);
   }, [workOrderKPIs]);
