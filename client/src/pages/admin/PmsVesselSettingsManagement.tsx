@@ -282,7 +282,7 @@ export default function PmsVesselSettingsManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="COMPANY_STANDARD">Company Standard</SelectItem>
-                      <SelectItem value="FIXED_DAYS">Fixed Days</SelectItem>
+                      <SelectItem value="CUSTOM_DAYS">Fixed Days</SelectItem>
                     </SelectContent>
                   </Select>
                   {formData.calendarGraceMode === 'COMPANY_STANDARD' && (
@@ -294,7 +294,7 @@ export default function PmsVesselSettingsManagement() {
 
                 <div>
                   <Label htmlFor="calendarGraceDays" className="text-sm font-medium" data-testid="I4.QL7.10">
-                    <Marker id="I4.QL7.10" />{formData.calendarGraceMode === 'FIXED_DAYS' ? 'Fixed Grace Days' : 'Default Grace Days'}
+                    <Marker id="I4.QL7.10" />{formData.calendarGraceMode === 'CUSTOM_DAYS' ? 'Fixed Grace Days' : 'Default Grace Days'}
                   </Label>
                   <div className="mt-1 flex items-center gap-2">
                     <Input
@@ -304,10 +304,16 @@ export default function PmsVesselSettingsManagement() {
                       value={formData.calendarGraceDays}
                       onChange={(e) => setFormData({...formData, calendarGraceDays: parseInt(e.target.value) || 0})}
                       className="w-24"
+                      disabled={formData.calendarGraceMode === 'COMPANY_STANDARD'}
                       data-testid="I4.QL7.11"
                     />
                     <span className="text-sm text-gray-500">days</span>
                   </div>
+                  {formData.calendarGraceMode === 'COMPANY_STANDARD' && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      This field is ignored in Company Standard mode
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
