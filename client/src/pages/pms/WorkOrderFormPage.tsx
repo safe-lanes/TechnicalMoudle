@@ -3133,8 +3133,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
-          {/* Save Button at Bottom - Always visible except in Pending Approval mode */}
-          {currentWorkOrderStatus !== 'Pending Approval' && (
+          {/* Save Button at Bottom - Hidden for Pending Approval and Completed work orders (completed WOs are immutable records) */}
+          {currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (
             <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
               <Button
                 onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
