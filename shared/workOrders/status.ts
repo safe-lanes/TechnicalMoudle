@@ -1,4 +1,5 @@
 import { parseDDMMYYYY } from '@shared/utils/dateCalculations';
+import { WORK_ORDER_THRESHOLDS } from './constants';
 
 const MONTH_NAMES: { [key: string]: number } = {
   'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
@@ -37,11 +38,16 @@ function parseDate(dateStr: string | null | undefined): Date | null {
   return parseDDMMYYYY(dateStr);
 }
 
+/**
+ * GRACE_PERIOD_CONSTANTS - NOW USES CENTRALIZED THRESHOLDS
+ * All values imported from shared/workOrders/constants.ts
+ * DO NOT CHANGE THESE VALUES HERE - modify constants.ts instead
+ */
 export const GRACE_PERIOD_CONSTANTS = {
-  DUE_HORIZON_DAYS: 30,
-  GRACE_PERIOD_DAYS: 7, // Minimum grace period for calendar jobs
-  RH_GRACE_HOURS: 168, // Grace period for running hours jobs (168 hours = 7 days equivalent)
-  DEFAULT_RH_LEAD_TIME: 100, // Default lead time for RH jobs when not configured
+  DUE_HORIZON_DAYS: WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS,
+  GRACE_PERIOD_DAYS: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+  RH_GRACE_HOURS: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+  DEFAULT_RH_LEAD_TIME: WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS,
 } as const;
 
 export type GraceMode = 'COMPANY_STANDARD' | 'CUSTOM_DAYS';

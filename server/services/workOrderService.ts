@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import type { WorkOrder, InsertWorkOrder, WorkOrderExecution, InsertWorkOrderExecution, Job, PmsVesselSettings, Component } from "@shared/schema";
 import { computeWorkOrderStatus, VesselGraceSettings } from "@shared/workOrders/status";
+import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { generatePlannedWorkOrderNumber, generateUnplannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { jobService } from "./jobService";
@@ -94,9 +95,9 @@ export class WorkOrderService {
         vesselSettingsMap.set(vId, settings);
         graceSettingsMap.set(vId, {
           calendarGraceMode: settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS' || 'COMPANY_STANDARD',
-          calendarGraceDays: settings.calendarGraceDays || 7,
-          rhGraceHours: settings.rhGraceHours || 168,
-          rhLeadTimeHours: settings.rhLeadHoursNonCritical || 100
+          calendarGraceDays: settings.calendarGraceDays || WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+          rhGraceHours: settings.rhGraceHours || WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+          rhLeadTimeHours: settings.rhLeadHoursNonCritical || WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
         });
       }
     }
@@ -131,11 +132,11 @@ export class WorkOrderService {
       // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
       // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
       // (null ?? 50) = 50 (fallback for unconfigured vessels)
-      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;
       const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
         ? (isJobCritical 
-            ? (vesselSettings?.rhLeadHoursCritical ?? 50)
-            : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+            ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+            : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
         : undefined;
       
       return {

@@ -2,6 +2,7 @@ import { workOrderService } from "./workOrderService";
 import { jobService } from "./jobService";
 import { storage } from "../storage";
 import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
+import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { 
   isBlockingStatus, 
   extractJobNoFromWorkOrderNo,
@@ -23,12 +24,17 @@ function isJobCritical(job: Job): boolean {
 
 /**
  * Get the appropriate RH lead time in hours for a job based on its priority
+ * Uses centralized WORK_ORDER_THRESHOLDS as fallback when vessel settings not configured
  */
 function getRhLeadHours(job: Job, settings: PmsVesselSettings | null | undefined): number {
-  if (!settings) return 0; // No settings configured, use 0 lead time
+  if (!settings) {
+    return isJobCritical(job) 
+      ? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL 
+      : WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL;
+  }
   return isJobCritical(job)
-    ? settings.rhLeadHoursCritical
-    : settings.rhLeadHoursNonCritical;
+    ? (settings.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+    : (settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL);
 }
 
 /**

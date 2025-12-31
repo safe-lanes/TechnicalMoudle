@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from "@shared/schema";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
+import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
 import { z } from "zod";
 import multer from "multer";
@@ -1843,9 +1844,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselSettings = vesselId ? await storage.getPmsVesselSettings(vesselId) : null;
       const vesselGraceSettings = vesselSettings ? {
         calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
-        calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
-        rhGraceHours: vesselSettings.rhGraceHours ?? 168,
-        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? 100
+        calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+        rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
       } : undefined;
       
       // Augment each work order with computed status and lead time data
@@ -1878,8 +1879,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
         const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
           ? (isJobCritical 
-              ? (vesselSettings?.rhLeadHoursCritical ?? 50)
-              : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+              ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+              : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
           : undefined;
         
         return {
@@ -1987,9 +1988,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselSettings = workOrder.vesselId ? await storage.getPmsVesselSettings(workOrder.vesselId) : null;
       const vesselGraceSettings = vesselSettings ? {
         calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
-        calendarGraceDays: vesselSettings.calendarGraceDays ?? 7,
-        rhGraceHours: vesselSettings.rhGraceHours ?? 168,
-        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? 100
+        calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+        rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+        rhLeadTimeHours: vesselSettings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
       } : undefined;
       
       // Determine RH lead time based on job criticality (Critical vs Non-Critical)
@@ -1999,8 +2000,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
       const rhLeadTimeHours = workOrder.maintenanceBasis === 'Running Hours' 
         ? (isJobCritical 
-            ? (vesselSettings?.rhLeadHoursCritical ?? 50)
-            : (vesselSettings?.rhLeadHoursNonCritical ?? 100))
+            ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+            : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
         : undefined;
       
       // Augment with computed status and lead time data
@@ -3059,8 +3060,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Default lead times if vessel settings not configured
       const calendarLeadDaysCritical = vesselSettings?.calendarLeadDaysCritical ?? 7;
       const calendarLeadDaysNonCritical = vesselSettings?.calendarLeadDaysNonCritical ?? 14;
-      const rhLeadHoursCritical = vesselSettings?.rhLeadHoursCritical ?? 50;
-      const rhLeadHoursNonCritical = vesselSettings?.rhLeadHoursNonCritical ?? 100;
+      const rhLeadHoursCritical = vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL;
+      const rhLeadHoursNonCritical = vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL;
       
       console.log(`[AUTO-GEN] Using lead times for vessel ${vesselId}: Calendar (C: ${calendarLeadDaysCritical}d, NC: ${calendarLeadDaysNonCritical}d), RH (C: ${rhLeadHoursCritical}hrs, NC: ${rhLeadHoursNonCritical}hrs)`);
       
