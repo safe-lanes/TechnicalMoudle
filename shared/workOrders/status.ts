@@ -60,31 +60,33 @@ export interface VesselGraceSettings {
 }
 
 /**
- * Work order status types for display
- * - Legacy display statuses (still used for work orders with existing stored status)
- * - PLANNED/DUE SOON/DUE/OVERDUE are the spec-compliant RH status categories
+ * Work order status types for display - SPEC-COMPLIANT
+ * Per specification, only these statuses are allowed:
+ * - Active: >30 days or >720 RH before due
+ * - Due: ≤30 days or ≤720 RH before due (within lead time)
+ * - Due (Grace P): Past due but within grace period
+ * - Overdue: Past due AND past grace period
+ * - Completed/Pending Approval/Rejected/Postponed: Terminal states
  */
 export type ComputedWorkOrderStatus = 
-  | 'Active'      // Legacy: far from due
-  | 'Planned'     // RH: RH_remaining > LT (more than lead time away)
-  | 'Due Soon'    // RH: 0 < RH_remaining <= LT (within lead time but not yet due)
-  | 'Due'         // RH: RH_remaining = 0 (at due point) OR Calendar: within horizon
-  | 'Due (Grace P)' // Legacy: past due but within grace
-  | 'Overdue'     // Past due (past grace for calendar, negative remaining for RH)
+  | 'Active'        // Far from due (>30 days or >720 RH)
+  | 'Due'           // Within lead time (≤30 days or ≤720 RH)
+  | 'Due (Grace P)' // Past due but within grace period
+  | 'Overdue'       // Past due AND past grace period
   | 'Completed'
   | 'Pending Approval'
   | 'Rejected'
   | 'Postponed';
 
 /**
- * RH-specific status for maintenance planning (per workflow document)
- * Uses strict LT-driven categorization:
- * - OVERDUE: RH_remaining < 0
- * - DUE: RH_remaining = 0
- * - DUE_SOON: 0 < RH_remaining <= LT
- * - PLANNED: RH_remaining > LT (or FUTURE)
+ * RH-specific status for maintenance planning - SPEC-COMPLIANT
+ * Uses lead time and grace period driven categorization:
+ * - OVERDUE: Past due RH AND past grace period
+ * - DUE_GRACE: Past due RH but within grace period
+ * - DUE: Within lead time (0 <= remaining <= leadTime)
+ * - PLANNED/FUTURE: Beyond lead time (remaining > leadTime)
  */
-export type RHStatusCategory = 'OVERDUE' | 'DUE' | 'DUE_SOON' | 'PLANNED' | 'FUTURE';
+export type RHStatusCategory = 'OVERDUE' | 'DUE_GRACE' | 'DUE' | 'DUE_SOON' | 'PLANNED' | 'FUTURE';
 
 export interface WorkOrderStatusInput {
   dueDate?: string | null;
@@ -123,35 +125,36 @@ function calculateCompanyStandardGraceEnd(dueDate: Date): Date {
 }
 
 /**
- * Calculate RH status category based on workflow document rules
+ * Calculate RH status category based on spec-compliant rules
  * 
- * Formulas (per workflow document):
+ * Formulas:
  * - RH_remaining = RH_due - RH_effective_current
- * - RH_due = RH_last_done + Frequency (this should be pre-calculated and passed as dueRH)
  * 
- * Status categories:
- * - OVERDUE: RH_remaining < 0 (current RH exceeds due RH)
- * - DUE: RH_remaining = 0 (at exactly due RH, tolerance of ±1)
- * - DUE_SOON: 0 < RH_remaining <= LT (within lead time window)
- * - PLANNED (FUTURE): RH_remaining > LT (beyond lead time, not yet actionable)
+ * Status categories (SPEC-COMPLIANT):
+ * - OVERDUE: Past due RH AND past grace period (rhRemaining < -graceHours)
+ * - DUE_GRACE: Past due RH but within grace period (-graceHours <= rhRemaining < 0)
+ * - DUE: Within lead time (0 <= rhRemaining <= leadTimeHours)
+ * - ACTIVE: Beyond lead time (rhRemaining > leadTimeHours)
  */
 export function computeRHStatusCategory(
   dueRH: number,
   currentRH: number,
-  leadTimeHours: number
+  leadTimeHours: number,
+  graceHours: number = GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS
 ): RHStatusCategory {
   // RH_remaining = RH_due - RH_effective_current
   const rhRemaining = dueRH - currentRH;
   
-  // Status determination per workflow document
-  if (rhRemaining < 0) {
+  // Status determination per specification
+  if (rhRemaining < -graceHours) {
+    // Past due AND past grace period
     return 'OVERDUE';
-  } else if (Math.abs(rhRemaining) < 1) {
-    // At due point (with tolerance for floating point)
-    return 'DUE';
+  } else if (rhRemaining < 0) {
+    // Past due but within grace period
+    return 'DUE_GRACE' as RHStatusCategory;
   } else if (rhRemaining <= leadTimeHours) {
-    // Within lead time window: 0 < RH_remaining <= LT
-    return 'DUE_SOON';
+    // Within lead time: 0 <= RH_remaining <= LT
+    return 'DUE';
   } else {
     // Beyond lead time: RH_remaining > LT
     return 'PLANNED';
@@ -159,19 +162,21 @@ export function computeRHStatusCategory(
 }
 
 /**
- * Map RH status category to display status
+ * Map RH status category to display status - SPEC-COMPLIANT
+ * Maps to only the four allowed statuses: Active, Due, Due (Grace P), Overdue
  */
 export function rhCategoryToDisplayStatus(category: RHStatusCategory): ComputedWorkOrderStatus {
   switch (category) {
     case 'OVERDUE':
       return 'Overdue';
+    case 'DUE_GRACE':
+      return 'Due (Grace P)';
     case 'DUE':
-      return 'Due';
     case 'DUE_SOON':
-      return 'Due Soon';
+      return 'Due';
     case 'PLANNED':
     case 'FUTURE':
-      return 'Planned';
+      return 'Active';
     default:
       return 'Active';
   }
@@ -217,8 +222,8 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   
   // Branch based on maintenance basis for spec-compliant status calculation
   if (maintenanceBasis === 'Running Hours') {
-    // Running Hours-based status calculation (per workflow document)
-    if (dueRH == null || currentRH == null) return 'Planned';
+    // Running Hours-based status calculation - SPEC-COMPLIANT
+    if (dueRH == null || currentRH == null) return 'Active';
     
     // Get lead time from settings
     // Important: Respect explicit zero lead time (null-coalescing only for undefined/null)
@@ -232,8 +237,11 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
       leadTime = GRACE_PERIOD_CONSTANTS.DEFAULT_RH_LEAD_TIME;
     }
     
-    // Calculate RH status category using workflow document rules
-    const category = computeRHStatusCategory(dueRH, currentRH, leadTime);
+    // Get grace period from settings
+    const graceHours = vesselGraceSettings?.rhGraceHours ?? GRACE_PERIOD_CONSTANTS.RH_GRACE_HOURS;
+    
+    // Calculate RH status category using spec-compliant rules (includes grace period)
+    const category = computeRHStatusCategory(dueRH, currentRH, leadTime, graceHours);
     
     // Map to display status
     return rhCategoryToDisplayStatus(category);
