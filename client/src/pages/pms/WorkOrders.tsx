@@ -543,8 +543,10 @@ const WorkOrders: React.FC = () => {
                   {index === 0 && <Marker id="C28" />}
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900">
-                      {(activeTab === "Pending Approval" || activeTab === "Completed") && workOrder.submittedDate 
-                        ? formatProfessionalDate(workOrder.submittedDate)
+                      {(activeTab === "Pending Approval" || activeTab === "Completed")
+                        ? (workOrder.submittedDate 
+                            ? formatProfessionalDate(workOrder.submittedDate)
+                            : '—')
                         : workOrder.dueDate 
                           ? formatProfessionalDate(workOrder.dueDate)
                           : workOrder.nextDueReading && workOrder.currentReading
