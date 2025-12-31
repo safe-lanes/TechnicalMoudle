@@ -1,0 +1,228 @@
+import { storage } from "../storage";
+import type { WorkOrder, Job, Component, PmsVesselSettings } from "@shared/schema";
+import { computeWorkOrderStatus, VesselGraceSettings, ComputedWorkOrderStatus } from "@shared/workOrders/status";
+import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
+
+/**
+ * Work Order Status Recalculator Service
+ * 
+ * Runs every minute to recalculate and persist work order statuses.
+ * When grace period settings change, work order statuses are updated automatically.
+ * 
+ * Key business rules:
+ * - Only recalculates statuses for non-terminal work orders
+ * - Terminal statuses (Completed, Rejected) are NOT recalculated
+ * - Uses vessel-specific grace period settings
+ * - For RH-based work orders, fetches current component RH
+ */
+
+export class WorkOrderStatusRecalculatorService {
+  private isRunning = false;
+  private intervalId: NodeJS.Timeout | null = null;
+  private scanIntervalMs = 1 * 60 * 1000; // 1 minute
+
+  /**
+   * Start the scheduler to run periodically
+   */
+  start(intervalMs?: number): void {
+    if (this.isRunning) {
+      console.log('[StatusRecalculator] Already running');
+      return;
+    }
+
+    if (intervalMs) {
+      this.scanIntervalMs = intervalMs;
+    }
+
+    console.log(`[StatusRecalculator] Starting scheduler (interval: ${this.scanIntervalMs / 1000 / 60} minutes)`);
+    
+    // Run immediately on startup
+    this.runRecalculation().catch(err => {
+      console.error('[StatusRecalculator] Error during initial recalculation:', err);
+    });
+
+    // Schedule periodic runs
+    this.intervalId = setInterval(() => {
+      this.runRecalculation().catch(err => {
+        console.error('[StatusRecalculator] Error during scheduled recalculation:', err);
+      });
+    }, this.scanIntervalMs);
+
+    this.isRunning = true;
+  }
+
+  /**
+   * Stop the scheduler
+   */
+  stop(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.isRunning = false;
+    console.log('[StatusRecalculator] Stopped');
+  }
+
+  /**
+   * Terminal statuses that should NOT be recalculated
+   * These represent work orders that are finalized
+   */
+  private isTerminalStatus(status: string | null | undefined): boolean {
+    if (!status) return false;
+    const normalizedStatus = status.toLowerCase().trim();
+    return ['completed', 'rejected', 'closed', 'cancelled', 'canceled'].includes(normalizedStatus);
+  }
+
+  /**
+   * Run a full recalculation of all work order statuses
+   * Only recalculates non-terminal work orders
+   */
+  async runRecalculation(): Promise<{
+    workOrdersChecked: number;
+    statusesUpdated: number;
+  }> {
+    console.log('[StatusRecalculator] Starting status recalculation...');
+    
+    const results = {
+      workOrdersChecked: 0,
+      statusesUpdated: 0
+    };
+
+    try {
+      // Get all work orders
+      const allWorkOrders = await storage.getWorkOrders();
+      
+      // Filter to only non-terminal work orders
+      const activeWorkOrders = allWorkOrders.filter(wo => !this.isTerminalStatus(wo.status));
+      results.workOrdersChecked = activeWorkOrders.length;
+
+      if (activeWorkOrders.length === 0) {
+        console.log('[StatusRecalculator] No active work orders to recalculate');
+        return results;
+      }
+
+      // Cache vessel settings, jobs, and components
+      const vesselSettingsCache = new Map<string, PmsVesselSettings | null>();
+      const graceSettingsCache = new Map<string, VesselGraceSettings>();
+      const jobsCache = new Map<string, Job>();
+      const componentsCache = new Map<string, Component>();
+
+      // Prefetch jobs for RH-based work orders
+      const jobIds = new Set<string>();
+      activeWorkOrders.forEach(wo => {
+        if (wo.jobId) jobIds.add(wo.jobId);
+      });
+      
+      for (const jobId of Array.from(jobIds)) {
+        const job = await storage.getJob(jobId);
+        if (job) jobsCache.set(jobId, job);
+      }
+
+      // Prefetch components for RH-based jobs
+      const componentIds = new Set<string>();
+      jobsCache.forEach(job => {
+        if (job.componentId) componentIds.add(job.componentId);
+      });
+      
+      for (const componentId of Array.from(componentIds)) {
+        const component = await storage.getComponent(componentId);
+        if (component) componentsCache.set(componentId, component);
+      }
+
+      // Prefetch vessel settings
+      const vesselIds = new Set<string>();
+      activeWorkOrders.forEach(wo => {
+        if (wo.vesselId) vesselIds.add(wo.vesselId);
+      });
+      
+      for (const vesselId of Array.from(vesselIds)) {
+        const settings = await storage.getPmsVesselSettings(vesselId);
+        vesselSettingsCache.set(vesselId, settings || null);
+        
+        if (settings) {
+          graceSettingsCache.set(vesselId, {
+            calendarGraceMode: (settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS') ?? 'COMPANY_STANDARD',
+            calendarGraceDays: settings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+            rhGraceHours: settings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+            rhLeadTimeHours: settings.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+          });
+        }
+      }
+
+      // Recalculate each work order
+      for (const wo of activeWorkOrders) {
+        let currentRH: number | null = null;
+        let dueRH: number | null = null;
+        let job: Job | undefined;
+
+        // For RH-based work orders, get the current running hours from the component
+        if (wo.maintenanceBasis === 'Running Hours' && wo.jobId) {
+          job = jobsCache.get(wo.jobId);
+          if (job?.componentId) {
+            const component = componentsCache.get(job.componentId);
+            if (component?.currentCumulativeRH != null) {
+              currentRH = parseFloat(String(component.currentCumulativeRH));
+            }
+          }
+          // Get the due RH from nextDueReading
+          if (wo.nextDueReading) {
+            dueRH = parseFloat(wo.nextDueReading);
+          }
+        }
+
+        // Get vessel grace settings
+        const vesselGraceSettings = wo.vesselId ? graceSettingsCache.get(wo.vesselId) : undefined;
+        const vesselSettings = wo.vesselId ? vesselSettingsCache.get(wo.vesselId) : null;
+
+        // Determine RH lead time based on job criticality
+        const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || String(job?.classRelated) === 'true';
+        const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
+          ? (isJobCritical 
+              ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+              : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL))
+          : undefined;
+
+        // Compute new status
+        const computedStatus = computeWorkOrderStatus({
+          dueDate: wo.dueDate,
+          dueRH,
+          currentRH,
+          isExecution: wo.isExecution,
+          status: wo.status,
+          completionDateTime: wo.dateCompleted,
+          maintenanceBasis: wo.maintenanceBasis || undefined,
+          vesselGraceSettings,
+          rhLeadTimeHours
+        });
+
+        // Only update if status has changed
+        if (computedStatus !== wo.status) {
+          await storage.updateWorkOrder(wo.id, { status: computedStatus });
+          results.statusesUpdated++;
+          console.log(`📝 [StatusRecalculator] Updated WO ${wo.workOrderNo}: ${wo.status} → ${computedStatus}`);
+        }
+      }
+
+      console.log(`[StatusRecalculator] Recalculation complete: ${results.statusesUpdated}/${results.workOrdersChecked} statuses updated`);
+    } catch (error) {
+      console.error('[StatusRecalculator] Recalculation failed:', error);
+      throw error;
+    }
+
+    return results;
+  }
+
+  /**
+   * Force an immediate recalculation (for use when settings change)
+   */
+  async forceRecalculation(): Promise<{
+    workOrdersChecked: number;
+    statusesUpdated: number;
+  }> {
+    console.log('[StatusRecalculator] Force recalculation triggered (settings changed)');
+    return this.runRecalculation();
+  }
+}
+
+// Export singleton instance
+export const workOrderStatusRecalculator = new WorkOrderStatusRecalculatorService();

@@ -61,6 +61,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   jobDueScanner.start(1 * 60 * 1000); // Run every 1 minute
   console.log('[JobDueScanner] Scheduler started - will auto-generate work orders for due jobs');
   
+  // Start Work Order Status Recalculator - recalculates and persists work order statuses
+  // Runs every minute so grace period setting changes are reflected automatically
+  const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
+  workOrderStatusRecalculator.start(1 * 60 * 1000); // Run every 1 minute
+  console.log('[StatusRecalculator] Scheduler started - will recalculate work order statuses based on current settings');
+  
   // Register Running Hours routes from dedicated file
   registerRunningHoursRoutes(app);
   // Set up multer for file uploads
@@ -6126,6 +6132,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         updatedBy
       });
+      
+      // Trigger immediate status recalculation when grace period settings change
+      // This ensures work order statuses reflect the new settings right away
+      try {
+        const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
+        const recalcResult = await workOrderStatusRecalculator.forceRecalculation();
+        console.log(`[PMS Settings] Grace period settings updated for ${vesselId}, recalculated ${recalcResult.statusesUpdated} work order statuses`);
+      } catch (recalcError) {
+        console.error("[PMS Settings] Failed to trigger status recalculation:", recalcError);
+        // Don't fail the request if recalculation fails - settings were saved successfully
+      }
+      
       res.json(settings);
     } catch (error) {
       console.error("Error saving PMS vessel settings:", error);
@@ -6141,6 +6159,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting PMS vessel settings:", error);
       res.status(500).json({ error: "Failed to delete PMS vessel settings" });
+    }
+  });
+
+  // Manually trigger work order status recalculation
+  // Useful for immediate updates after settings changes or for admin operations
+  app.post("/api/work-orders/recalculate-statuses", async (req, res) => {
+    try {
+      const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
+      const result = await workOrderStatusRecalculator.forceRecalculation();
+      res.json({
+        success: true,
+        workOrdersChecked: result.workOrdersChecked,
+        statusesUpdated: result.statusesUpdated,
+        message: `Recalculated ${result.statusesUpdated} out of ${result.workOrdersChecked} work orders`
+      });
+    } catch (error) {
+      console.error("Error recalculating work order statuses:", error);
+      res.status(500).json({ error: "Failed to recalculate work order statuses" });
     }
   });
   
