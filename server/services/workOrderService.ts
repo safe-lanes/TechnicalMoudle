@@ -130,9 +130,8 @@ export class WorkOrderService {
       
       // Determine RH lead time based on job criticality (Critical vs Non-Critical)
       // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
-      // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
-      // (null ?? 50) = 50 (fallback for unconfigured vessels)
-      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;
+      // Fallback uses centralized WORK_ORDER_THRESHOLDS (720 hours per spec)
+      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || String(job?.classRelated) === 'true';
       const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
         ? (isJobCritical 
             ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)

@@ -1874,9 +1874,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Determine RH lead time based on job criticality (Critical vs Non-Critical)
         // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
-        // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
-        // (null ?? 50) = 50 (fallback for unconfigured vessels)
-        const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+        // Fallback uses centralized WORK_ORDER_THRESHOLDS (720 hours per spec)
+        const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;
         const rhLeadTimeHours = wo.maintenanceBasis === 'Running Hours' 
           ? (isJobCritical 
               ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
@@ -1995,9 +1994,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Determine RH lead time based on job criticality (Critical vs Non-Critical)
       // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
-      // (0 ?? 50) = 0 (correct - explicit zero lead time is respected)
-      // (null ?? 50) = 50 (fallback for unconfigured vessels)
-      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === true;
+      // Fallback uses centralized WORK_ORDER_THRESHOLDS (720 hours per spec)
+      const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;
       const rhLeadTimeHours = workOrder.maintenanceBasis === 'Running Hours' 
         ? (isJobCritical 
             ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
@@ -3058,8 +3056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vesselSettings = await storage.getPmsVesselSettings(vesselId);
       
       // Default lead times if vessel settings not configured
-      const calendarLeadDaysCritical = vesselSettings?.calendarLeadDaysCritical ?? 7;
-      const calendarLeadDaysNonCritical = vesselSettings?.calendarLeadDaysNonCritical ?? 14;
+      const calendarLeadDaysCritical = vesselSettings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS_CRITICAL;
+      const calendarLeadDaysNonCritical = vesselSettings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS_NON_CRITICAL;
       const rhLeadHoursCritical = vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL;
       const rhLeadHoursNonCritical = vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL;
       

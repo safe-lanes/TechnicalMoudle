@@ -58,6 +58,18 @@ export const WORK_ORDER_THRESHOLDS = {
    * Same as standard RH_LEAD_TIME_HOURS for consistency
    */
   RH_LEAD_TIME_HOURS_NON_CRITICAL: 720,
+
+  /**
+   * Calendar Lead Time for Critical/High priority jobs (in days)
+   * Work orders for critical jobs become "Due" when within this many days
+   */
+  CALENDAR_LEAD_TIME_DAYS_CRITICAL: 7,
+
+  /**
+   * Calendar Lead Time for Non-Critical jobs (in days)
+   * Work orders for non-critical jobs become "Due" when within this many days
+   */
+  CALENDAR_LEAD_TIME_DAYS_NON_CRITICAL: 14,
 } as const;
 
 /**
