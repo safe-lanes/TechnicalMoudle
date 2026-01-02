@@ -25,9 +25,11 @@ import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { Marker } from "@/components/Marker";
 
-// Extend WorkOrderWithLeadTime to include computed status from backend
+// Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
   computedStatus?: ComputedWorkOrderStatus;
+  dueRH?: number | null;
+  currentRH?: number | null;
 };
 
 // Using WorkOrder type from shared schema
@@ -62,6 +64,7 @@ const WorkOrders: React.FC = () => {
   const [selectedRank, setSelectedRank] = useState("");
   const [selectedComponent, setSelectedComponent] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
+  const [selectedRHFilter, setSelectedRHFilter] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
@@ -241,6 +244,28 @@ const WorkOrders: React.FC = () => {
       return false;
     }
     
+    // RH-based filter: "Due in next X hours" (skip if "all" or empty)
+    if (selectedRHFilter && selectedRHFilter !== "all") {
+      // When RH filter is selected, exclude non-RH work orders
+      if (wo.maintenanceBasis !== "Running Hours") {
+        return false;
+      }
+      
+      const rhThreshold = parseInt(selectedRHFilter);
+      // Exclude RH work orders with missing RH data
+      if (wo.dueRH == null || wo.currentRH == null) {
+        return false;
+      }
+      
+      if (!isNaN(rhThreshold)) {
+        const rhRemaining = wo.dueRH - wo.currentRH;
+        // Show work orders where remaining RH is positive (not yet due) and within threshold
+        if (rhRemaining < 0 || rhRemaining > rhThreshold) {
+          return false;
+        }
+      }
+    }
+    
     return true;
   });
 
@@ -251,7 +276,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedComponent, selectedCriticality, vesselId]);
+  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedComponent, selectedCriticality, selectedRHFilter, vesselId]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -500,6 +525,18 @@ const WorkOrders: React.FC = () => {
           <SelectContent>
             <SelectItem value="critical">Critical</SelectItem>
             <SelectItem value="non-critical">Non-Critical</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedRHFilter} onValueChange={setSelectedRHFilter}>
+          <SelectTrigger className="w-36" data-testid="select-rh-filter">
+            <SelectValue placeholder="RH Filter" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="250">Due in 250 hrs</SelectItem>
+            <SelectItem value="500">Due in 500 hrs</SelectItem>
+            <SelectItem value="1000">Due in 1000 hrs</SelectItem>
           </SelectContent>
         </Select>
       </div>

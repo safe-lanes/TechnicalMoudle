@@ -1914,7 +1914,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rhLeadTimeHours
           }),
           leadTimeValue: job?.leadTimeValue ?? null,
-          leadTimeUnit: job?.leadTimeUnit ?? null
+          leadTimeUnit: job?.leadTimeUnit ?? null,
+          dueRH: dueRH ?? null,
+          currentRH: currentRH ?? null
         };
       });
       
