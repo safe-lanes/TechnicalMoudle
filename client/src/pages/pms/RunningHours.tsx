@@ -267,16 +267,6 @@ const RunningHours = () => {
   const handleSaveUpdate = () => {
     if (!selectedComponent) return;
     
-    // Validate date is required
-    if (!updateForm.dateUpdated || updateForm.dateUpdated.trim() === "") {
-      toast({
-        title: "Date Required",
-        description: "Please select the date when running hours were updated",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     // Validate date not in future
     const selectedDate = new Date(updateForm.dateUpdated);
     const today = new Date();

@@ -265,30 +265,6 @@ const WorkOrders: React.FC = () => {
       }
     }
     
-    // Counter-based filter: show only counter-based jobs
-    if (selectedPeriod === "counter") {
-      if (wo.maintenanceBasis !== "Counter") {
-        return false;
-      }
-    }
-    
-    // Period-based filter for calendar jobs (weekly/monthly/annual)
-    if (selectedPeriod === "weekly" || selectedPeriod === "monthly" || selectedPeriod === "annual") {
-      if (wo.maintenanceBasis !== "Calendar") {
-        return false;
-      }
-      const frequencyUnit = wo.frequencyUnit?.toLowerCase() || "";
-      if (selectedPeriod === "weekly" && frequencyUnit !== "week" && frequencyUnit !== "weeks") {
-        return false;
-      }
-      if (selectedPeriod === "monthly" && frequencyUnit !== "month" && frequencyUnit !== "months") {
-        return false;
-      }
-      if (selectedPeriod === "annual" && frequencyUnit !== "year" && frequencyUnit !== "years") {
-        return false;
-      }
-    }
-    
     return true;
   });
 
@@ -513,7 +489,6 @@ const WorkOrders: React.FC = () => {
             <SelectItem value="weekly">Weekly</SelectItem>
             <SelectItem value="monthly">Monthly</SelectItem>
             <SelectItem value="annual">Annual</SelectItem>
-            <SelectItem value="counter">Counter Based</SelectItem>
             <SelectItem value="rh-250">Due in 250 hrs</SelectItem>
             <SelectItem value="rh-500">Due in 500 hrs</SelectItem>
             <SelectItem value="rh-1000">Due in 1000 hrs</SelectItem>
