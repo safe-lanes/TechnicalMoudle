@@ -1204,6 +1204,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         throw new Error(result.error || 'Failed to save work order');
       }
       
+      // Invalidate all work orders-related caches so the updated status is reflected
+      // This includes the list (with any vesselId variants) and the specific work order context
+      await queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/work-orders/${workOrderId}/context`] });
+      
       toast({
         title: "Success",
         description: hasCompletionData 
