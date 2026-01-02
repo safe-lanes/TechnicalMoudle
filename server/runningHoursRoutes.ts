@@ -180,10 +180,11 @@ export function registerRunningHoursRoutes(app: Express) {
         return res.status(404).json({ error: "Component not found" });
       }
 
-      // Get master component name if INHERITED
+      // Get master component details if INHERITED
       let rhMasterComponentName: string | null = null;
+      let masterComponent: Awaited<ReturnType<typeof storage.getComponent>> = undefined;
       if (component.rhCounterType === 'INHERITED' && component.rhMasterComponentId) {
-        const masterComponent = await storage.getComponent(component.rhMasterComponentId);
+        masterComponent = await storage.getComponent(component.rhMasterComponentId);
         rhMasterComponentName = masterComponent?.name || null;
       }
 
@@ -192,11 +193,20 @@ export function registerRunningHoursRoutes(app: Express) {
       let rhLastUpdated: Date | null = null;
       
       if (component.rhCounterType === 'MASTER') {
+        // MASTER: Bind Running Hours from the component's own rhCurrentMaster
         rhCurrentValue = component.rhCurrentMaster;
         rhLastUpdated = component.rhMasterUpdatedAt;
       } else if (component.rhCounterType === 'INHERITED') {
-        rhCurrentValue = component.rhCurrentInheritedCached;
-        rhLastUpdated = component.rhInheritedUpdatedAt;
+        // INHERITED: Bind Running Hours LIVE from the master component referenced by rhMasterComponentId
+        // This ensures inherited components always show the current value from their master source
+        if (masterComponent) {
+          rhCurrentValue = masterComponent.rhCurrentMaster;
+          rhLastUpdated = masterComponent.rhMasterUpdatedAt;
+        } else {
+          // Fallback to cached value if master component not found (shouldn't happen in normal operation)
+          rhCurrentValue = component.rhCurrentInheritedCached;
+          rhLastUpdated = component.rhInheritedUpdatedAt;
+        }
       }
 
       res.json({
