@@ -156,15 +156,22 @@ export class WorkOrderStatusRecalculatorService {
         let job: Job | undefined;
 
         // For RH-based work orders, get the current running hours from the component
-        if (wo.maintenanceBasis === 'Running Hours' && wo.jobId) {
-          job = jobsCache.get(wo.jobId);
-          if (job?.componentId) {
-            const component = componentsCache.get(job.componentId);
-            if (component?.currentCumulativeRH != null) {
-              currentRH = parseFloat(String(component.currentCumulativeRH));
+        // FALLBACK: If component data is missing, use work order's own currentReading
+        if (wo.maintenanceBasis === 'Running Hours') {
+          if (wo.jobId) {
+            job = jobsCache.get(wo.jobId);
+            if (job?.componentId) {
+              const component = componentsCache.get(job.componentId);
+              if (component?.currentCumulativeRH != null) {
+                currentRH = parseFloat(String(component.currentCumulativeRH));
+              }
             }
           }
-          // Get the due RH from nextDueReading
+          // Fallback to work order's currentReading if component data is missing
+          if (currentRH === null && wo.currentReading) {
+            currentRH = parseFloat(wo.currentReading);
+          }
+          // Get the due RH from nextDueReading (work order always has this)
           if (wo.nextDueReading) {
             dueRH = parseFloat(wo.nextDueReading);
           }

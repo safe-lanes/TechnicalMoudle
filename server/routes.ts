@@ -1868,6 +1868,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const component = wo.component ? componentsMap.get(wo.component) : null;
         
         // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
+        // FALLBACK: If job/component data is missing, use work order's own nextDueReading/currentReading
+        // This ensures UI display and status calculation use consistent data sources
         // Robust numeric parsing: handle strings, decimals, empty values
         const parseRH = (value: string | number | null | undefined): number | undefined => {
           if (value == null || value === '') return undefined;
@@ -1875,8 +1877,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return isNaN(num) ? undefined : num;
         };
         
-        const dueRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
-        const currentRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+        // Primary: job.nextDueRH, Fallback: workOrder.nextDueReading
+        const dueRH = wo.maintenanceBasis === 'Running Hours' 
+          ? (parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading)) 
+          : undefined;
+        // Primary: component.currentCumulativeRH, Fallback: workOrder.currentReading
+        const currentRH = wo.maintenanceBasis === 'Running Hours' 
+          ? (parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading)) 
+          : undefined;
         
         // Determine RH lead time based on job criticality (Critical vs Non-Critical)
         // NOTE: Using ?? (nullish coalescing) ensures explicit 0 values are preserved
@@ -1979,6 +1987,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const component = workOrder.component ? await storage.getComponent(workOrder.component) : null;
       
       // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
+      // FALLBACK: If job/component data is missing, use work order's own nextDueReading/currentReading
+      // This ensures UI display and status calculation use consistent data sources
       // Robust numeric parsing: handle strings, decimals, empty values
       const parseRH = (value: string | number | null | undefined): number | undefined => {
         if (value == null || value === '') return undefined;
@@ -1986,8 +1996,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return isNaN(num) ? undefined : num;
       };
       
-      const dueRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
-      const currentRH = workOrder.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+      // Primary: job.nextDueRH, Fallback: workOrder.nextDueReading
+      const dueRH = workOrder.maintenanceBasis === 'Running Hours' 
+        ? (parseRH(job?.nextDueRH) ?? parseRH(workOrder.nextDueReading)) 
+        : undefined;
+      // Primary: component.currentCumulativeRH, Fallback: workOrder.currentReading
+      const currentRH = workOrder.maintenanceBasis === 'Running Hours' 
+        ? (parseRH(component?.currentCumulativeRH) ?? parseRH(workOrder.currentReading)) 
+        : undefined;
       
       // Fetch vessel-specific grace settings for status calculation
       const vesselSettings = workOrder.vesselId ? await storage.getPmsVesselSettings(workOrder.vesselId) : null;
@@ -6753,8 +6769,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return isNaN(num) ? undefined : num;
           };
           
-          const dueRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(job?.nextDueRH) : undefined;
-          const currentRH = wo.maintenanceBasis === 'Running Hours' ? parseRH(component?.currentCumulativeRH) : undefined;
+          // Primary: job.nextDueRH, Fallback: workOrder.nextDueReading
+          const dueRH = wo.maintenanceBasis === 'Running Hours' 
+            ? (parseRH(job?.nextDueRH) ?? parseRH(wo.nextDueReading)) 
+            : undefined;
+          // Primary: component.currentCumulativeRH, Fallback: workOrder.currentReading
+          const currentRH = wo.maintenanceBasis === 'Running Hours' 
+            ? (parseRH(component?.currentCumulativeRH) ?? parseRH(wo.currentReading)) 
+            : undefined;
           
           // Determine RH lead time based on job criticality
           const isJobCritical = job?.jobPriority === 'Critical' || job?.classRelated === 'true' || job?.classRelated === true;

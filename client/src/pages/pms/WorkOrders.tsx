@@ -565,22 +565,7 @@ const WorkOrders: React.FC = () => {
                             : '—')
                         : workOrder.dueDate 
                           ? formatProfessionalDate(workOrder.dueDate)
-                          : workOrder.nextDueReading && workOrder.currentReading
-                            ? (() => {
-                                const nextDue = parseInt(workOrder.nextDueReading);
-                                const current = parseInt(workOrder.currentReading);
-                                const remaining = nextDue - current;
-                                if (remaining > 0) {
-                                  return <span className="text-blue-600 font-medium">{remaining} hrs remaining</span>;
-                                } else if (remaining === 0) {
-                                  return <span className="text-amber-600 font-medium">Due now</span>;
-                                } else {
-                                  return <span className="text-red-600 font-medium">Overdue by {Math.abs(remaining)} hrs</span>;
-                                }
-                              })()
-                            : workOrder.nextDueReading
-                              ? <span className="text-blue-600 font-medium">@ {workOrder.nextDueReading} hrs</span>
-                              : '—'}
+                          : '—'}
                     </span>
                     {activeTab !== "Pending Approval" && activeTab !== "Completed" && workOrder.dueDate && workOrder.leadTimeValue && workOrder.leadTimeUnit && (() => {
                       const leadTimeStatus = calculateLeadTimeStatus(
