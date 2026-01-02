@@ -495,11 +495,30 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           return spare;
         });
         
+        // Determine previousReading value:
+        // - For existing WOs: use saved previousReading from executionData
+        // - For new WOs (no saved previousReading): use component's currentCumulativeRH as initial value
+        const savedPreviousReading = context.executionData?.previousReading;
+        const hasNoSavedPreviousReading = savedPreviousReading === '' || savedPreviousReading == null || savedPreviousReading === undefined;
+        const fallbackPreviousReading = (hasNoSavedPreviousReading && context.component?.currentCumulativeRH != null)
+          ? String(context.component.currentCumulativeRH)
+          : undefined;
+        
+        // Single consolidated setExecutionData call to prevent React batching race conditions
         setExecutionData(prev => ({
           ...prev,
           ...context.executionData,
           consumedSpareParts: hydratedConsumedSpareParts,
-          woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId()
+          woExecutionId: prev.woExecutionId || context.executionData.woExecutionId || generateWOExecutionId(),
+          // Preserve saved previousReading; only use fallback for new WOs
+          // Use nullish check (not falsy) to preserve 0-hour readings correctly
+          ...(fallbackPreviousReading && (context.executionData.previousReading === '' || context.executionData.previousReading == null) ? { previousReading: fallbackPreviousReading } : {})
+        }));
+      } else if (context.component?.currentCumulativeRH != null) {
+        // No executionData at all (brand new WO) - populate previousReading from component RH
+        setExecutionData(prev => ({
+          ...prev,
+          previousReading: String(context.component.currentCumulativeRH)
         }));
       }
       
@@ -511,22 +530,6 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Load work order status for approval workflow
       if (context.workOrder?.status) {
         setCurrentWorkOrderStatus(context.workOrder.status);
-      }
-      
-      // Auto-populate previousReading from component's current running hours (Part B Section B3)
-      // Only set previousReading if it's not already set (avoid overwriting saved data when editing WOs)
-      // Use null/undefined check instead of truthiness to allow 0-hour readings (common after meter replacement)
-      if (context.component?.currentCumulativeRH != null) {
-        setExecutionData(prev => {
-          // Only populate if previousReading hasn't been set yet
-          if (prev.previousReading === '' || prev.previousReading == null) {
-            return {
-              ...prev,
-              previousReading: context.component.currentCumulativeRH
-            };
-          }
-          return prev;
-        });
       }
       
       // Mark context as loaded once to prevent re-hydration
@@ -1093,6 +1096,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Note: The form uses "currentReading" field for running hours input (B3 section)
       // We check both executionData.runningHours and executionData.currentReading for backwards compatibility
       const runningHoursValue = executionData.currentReading || executionData.runningHours;
+      
+      // Validate that currentReading is not less than previousReading (running hours can only increase)
+      if (runningHoursValue && executionData.previousReading) {
+        const currentRH = parseFloat(runningHoursValue);
+        const previousRH = parseFloat(executionData.previousReading);
+        
+        if (!isNaN(currentRH) && !isNaN(previousRH) && currentRH < previousRH) {
+          toast({
+            title: "Validation Error",
+            description: `Current Reading (${currentRH}) cannot be less than Previous Reading (${previousRH}). Running hours can only increase.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       
       if (hasCompletionData) {
         if ((workOrderContext as any)?.maintenanceBasis === 'Running Hours' && !runningHoursValue) {
