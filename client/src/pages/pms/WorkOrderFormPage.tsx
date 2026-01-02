@@ -1473,10 +1473,17 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   </nav>
                 </SheetContent>
               </Sheet>
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="WOF1">
-                <Marker id="WOF1" />
-                {isNewJobCreation ? 'Job Form' : 'Work Order Form'}
-              </h1>
+              <div className="flex flex-col">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate" data-testid="WOF1">
+                  <Marker id="WOF1" />
+                  {isNewJobCreation ? 'Job Form' : 'Work Order Form'}
+                </h1>
+                {!isNewJobCreation && workOrderNo && (
+                  <span className="text-sm text-blue-600 font-medium" data-testid="WOF-wo-number">
+                    {workOrderNo}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center">
               <Button
