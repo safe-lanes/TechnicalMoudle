@@ -44,6 +44,7 @@ interface RunningHoursConditionPanelProps {
   isExpanded?: boolean;
   onToggle?: (expanded: boolean) => void;
   readOnly?: boolean;
+  embedded?: boolean; // When true, skip collapsible wrapper (used inside AddEditComponentForm)
 }
 
 const RH_COUNTER_TYPES = [
@@ -58,6 +59,7 @@ export default function RunningHoursConditionPanel({
   isExpanded = false,
   onToggle,
   readOnly = false,
+  embedded = false,
 }: RunningHoursConditionPanelProps) {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(isExpanded);
@@ -209,6 +211,145 @@ export default function RunningHoursConditionPanel({
     );
   }
 
+  // Common table content shared by both embedded and collapsible modes
+  const tableContent = (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse" data-testid="rh-table">
+        <thead>
+          <tr className="bg-[#52baf3] text-white text-sm">
+            <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-counter-type">
+              RH Counter Type
+            </th>
+            <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-counter-source">
+              RH Counter Source
+            </th>
+            <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-running-hours">
+              Running Hours
+            </th>
+            <th className="p-3 text-left font-medium" data-testid="header-last-updated">
+              Last Updated
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b border-gray-100">
+            <td className="p-3" data-testid="cell-counter-type">
+              <Select
+                value={pendingCounterType || rhConfig?.rhCounterType || "NOT_RH_DRIVEN"}
+                onValueChange={handleCounterTypeChange}
+                disabled={readOnly || updateConfigMutation.isPending}
+              >
+                <SelectTrigger 
+                  className="w-full text-sm" 
+                  data-testid="select-counter-type"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RH_COUNTER_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {pendingCounterType === "INHERITED" && (
+                <div className="mt-2">
+                  <Select
+                    value={selectedMasterId}
+                    onValueChange={handleMasterSelect}
+                    disabled={readOnly || isLoadingMasters || updateConfigMutation.isPending}
+                  >
+                    <SelectTrigger 
+                      className="w-full text-sm" 
+                      data-testid="select-master-component"
+                    >
+                      <SelectValue placeholder="Select Master Component" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {masterComponents
+                        .filter((m) => m.id !== componentId)
+                        .map((master) => (
+                          <SelectItem key={master.id} value={master.id}>
+                            {master.name} ({master.rhCurrentMaster || "0"} hrs)
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </td>
+
+            <td className="p-3" data-testid="cell-counter-source">
+              <span className="text-sm text-gray-700" data-testid="text-counter-source">
+                {getRHSourceDisplay()}
+              </span>
+            </td>
+
+            <td className="p-3" data-testid="cell-running-hours">
+              {isEditable ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={localRHValue}
+                    onChange={(e) => setLocalRHValue(e.target.value)}
+                    className="w-32 text-sm"
+                    min="0"
+                    step="0.01"
+                    data-testid="input-running-hours"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveRH}
+                    disabled={updateMasterRHMutation.isPending}
+                    className="bg-[#52baf3] hover:bg-[#4aa3d9]"
+                    data-testid="button-save-rh"
+                  >
+                    {updateMasterRHMutation.isPending ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-sm font-medium" data-testid="text-running-hours">
+                  {rhConfig?.rhCurrentValue || "0"}
+                </span>
+              )}
+            </td>
+
+            <td className="p-3" data-testid="cell-last-updated">
+              <span className="text-sm text-gray-600" data-testid="text-last-updated">
+                {getLastUpdatedDisplay()}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const inheritedNote = rhConfig?.rhCounterType === "INHERITED" && (
+    <p className="mt-3 text-xs text-gray-500 italic" data-testid="inherited-note">
+      * Effective Running Hours (Inherited) - Source: {rhConfig.rhMasterComponentName || "Unknown"}
+    </p>
+  );
+
+  // Embedded mode: render table directly without Collapsible wrapper
+  if (embedded) {
+    return (
+      <div className="border border-[#52baf3] rounded-lg" data-testid="rh-condition-panel">
+        <div className="p-4 bg-white rounded-lg">
+          {tableContent}
+          {inheritedNote}
+        </div>
+      </div>
+    );
+  }
+
+  // Standard mode: render with Collapsible wrapper
   return (
     <Collapsible open={expanded} onOpenChange={handleToggle}>
       <div className="border border-[#52baf3] rounded-lg mb-4" data-testid="rh-condition-panel">
@@ -228,128 +369,8 @@ export default function RunningHoursConditionPanel({
 
         <CollapsibleContent>
           <div className="p-4 bg-white rounded-b-lg">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse" data-testid="rh-table">
-                <thead>
-                  <tr className="bg-[#52baf3] text-white text-sm">
-                    <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-counter-type">
-                      RH Counter Type
-                    </th>
-                    <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-counter-source">
-                      RH Counter Source
-                    </th>
-                    <th className="p-3 text-left font-medium border-r border-[#4aa3d9]" data-testid="header-running-hours">
-                      Running Hours
-                    </th>
-                    <th className="p-3 text-left font-medium" data-testid="header-last-updated">
-                      Last Updated
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-100">
-                    <td className="p-3" data-testid="cell-counter-type">
-                      <Select
-                        value={pendingCounterType || rhConfig?.rhCounterType || "NOT_RH_DRIVEN"}
-                        onValueChange={handleCounterTypeChange}
-                        disabled={readOnly || updateConfigMutation.isPending}
-                      >
-                        <SelectTrigger 
-                          className="w-full text-sm" 
-                          data-testid="select-counter-type"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {RH_COUNTER_TYPES.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {pendingCounterType === "INHERITED" && (
-                        <div className="mt-2">
-                          <Select
-                            value={selectedMasterId}
-                            onValueChange={handleMasterSelect}
-                            disabled={readOnly || isLoadingMasters || updateConfigMutation.isPending}
-                          >
-                            <SelectTrigger 
-                              className="w-full text-sm" 
-                              data-testid="select-master-component"
-                            >
-                              <SelectValue placeholder="Select Master Component" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {masterComponents
-                                .filter((m) => m.id !== componentId)
-                                .map((master) => (
-                                  <SelectItem key={master.id} value={master.id}>
-                                    {master.name} ({master.rhCurrentMaster || "0"} hrs)
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="p-3" data-testid="cell-counter-source">
-                      <span className="text-sm text-gray-700" data-testid="text-counter-source">
-                        {getRHSourceDisplay()}
-                      </span>
-                    </td>
-
-                    <td className="p-3" data-testid="cell-running-hours">
-                      {isEditable ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={localRHValue}
-                            onChange={(e) => setLocalRHValue(e.target.value)}
-                            className="w-32 text-sm"
-                            min="0"
-                            step="0.01"
-                            data-testid="input-running-hours"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={handleSaveRH}
-                            disabled={updateMasterRHMutation.isPending}
-                            className="bg-[#52baf3] hover:bg-[#4aa3d9]"
-                            data-testid="button-save-rh"
-                          >
-                            {updateMasterRHMutation.isPending ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-sm font-medium" data-testid="text-running-hours">
-                          {rhConfig?.rhCurrentValue || "0"}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-3" data-testid="cell-last-updated">
-                      <span className="text-sm text-gray-600" data-testid="text-last-updated">
-                        {getLastUpdatedDisplay()}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {rhConfig?.rhCounterType === "INHERITED" && (
-              <p className="mt-3 text-xs text-gray-500 italic" data-testid="inherited-note">
-                * Effective Running Hours (Inherited) - Source: {rhConfig.rhMasterComponentName || "Unknown"}
-              </p>
-            )}
+            {tableContent}
+            {inheritedNote}
           </div>
         </CollapsibleContent>
       </div>

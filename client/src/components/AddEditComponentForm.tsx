@@ -800,6 +800,7 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
                             vesselId={vesselId}
                             isExpanded={true}
                             readOnly={false}
+                            embedded={true}
                           />
                         </div>
                       )}
