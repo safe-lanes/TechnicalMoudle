@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Plus, Pen, Timer, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye } from "lucide-react";
 import { useLocation } from "wouter";
 import { useVessel } from "@/contexts/VesselContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -609,30 +609,49 @@ const WorkOrders: React.FC = () => {
                 )}
                 <td className="py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
-                    <button 
-                      className="p-1 hover:bg-gray-200 rounded"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePencilClick(workOrder);
-                      }}
-                      title="Edit Template"
-                      data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
-                    >
-                      {index === 0 && <Marker id="C31" />}
-                      <Pen className="h-4 w-4 text-gray-600" />
-                    </button>
-                    <button 
-                      className="p-1 hover:bg-gray-200 rounded"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTimerClick(workOrder);
-                      }}
-                      title="Postpone Work Order"
-                      data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
-                    >
-                      {index === 0 && <Marker id="C32" />}
-                      <Timer className="h-4 w-4 text-gray-600" />
-                    </button>
+                    {/* Hide Edit and Postpone buttons for Completed work orders (immutable records) */}
+                    {(workOrder.computedStatus || workOrder.status) !== "Completed" && (
+                      <>
+                        <button 
+                          className="p-1 hover:bg-gray-200 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePencilClick(workOrder);
+                          }}
+                          title="Edit Template"
+                          data-testid={index === 0 ? "C31" : `button-edit-wo-${workOrder.id}`}
+                        >
+                          {index === 0 && <Marker id="C31" />}
+                          <Pen className="h-4 w-4 text-gray-600" />
+                        </button>
+                        <button 
+                          className="p-1 hover:bg-gray-200 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTimerClick(workOrder);
+                          }}
+                          title="Postpone Work Order"
+                          data-testid={index === 0 ? "C32" : `button-postpone-wo-${workOrder.id}`}
+                        >
+                          {index === 0 && <Marker id="C32" />}
+                          <Timer className="h-4 w-4 text-gray-600" />
+                        </button>
+                      </>
+                    )}
+                    {/* View button - always available (clicking the row also opens view) */}
+                    {(workOrder.computedStatus || workOrder.status) === "Completed" && (
+                      <button 
+                        className="p-1 hover:bg-gray-200 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleWorkOrderClick(workOrder);
+                        }}
+                        title="View Work Order"
+                        data-testid={`button-view-wo-${workOrder.id}`}
+                      >
+                        <Eye className="h-4 w-4 text-gray-600" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
