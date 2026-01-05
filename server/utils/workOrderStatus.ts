@@ -115,22 +115,44 @@ export function extractJobNoFromWorkOrderNo(workOrderNo: string | undefined): st
 }
 
 /**
- * Build a set of job numbers that have active/blocking work orders
- * Used for job-level lock: "one active WO per job at a time"
+ * Result type for buildJobsWithActiveWOSet
+ * Contains both jobId-based and jobNo-based sets for comprehensive blocking
  */
-export function buildJobsWithActiveWOSet(workOrders: Array<{ status: string; workOrderNo?: string }>): Set<string> {
-  const jobsWithActiveWO = new Set<string>();
+export interface ActiveWOBlockingSets {
+  byJobId: Set<string>;   // Primary: Direct jobId matching (reliable)
+  byJobNo: Set<string>;   // Fallback: Extracted jobNo from workOrderNo (legacy)
+}
+
+/**
+ * Build sets of jobs that have active/blocking work orders
+ * Used for job-level lock: "one active WO per job at a time"
+ * 
+ * Returns two sets:
+ * - byJobId: Uses direct jobId field (preferred, reliable)
+ * - byJobNo: Uses extracted jobNo from workOrderNo (fallback for legacy records)
+ */
+export function buildJobsWithActiveWOSet(
+  workOrders: Array<{ status: string; jobId?: string | null; workOrderNo?: string }>
+): ActiveWOBlockingSets {
+  const byJobId = new Set<string>();
+  const byJobNo = new Set<string>();
   
   workOrders.forEach(wo => {
     if (isBlockingStatus(wo.status)) {
+      // Primary: Use jobId directly (reliable, no parsing needed)
+      if (wo.jobId) {
+        byJobId.add(wo.jobId);
+      }
+      
+      // Fallback: Extract jobNo from workOrderNo (for legacy records without jobId)
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        jobsWithActiveWO.add(jobNo);
+        byJobNo.add(jobNo);
       }
     }
   });
   
-  return jobsWithActiveWO;
+  return { byJobId, byJobNo };
 }
 
 /**

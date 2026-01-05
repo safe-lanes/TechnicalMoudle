@@ -274,10 +274,10 @@ export class WorkOrderService {
     // Get all work orders to check for duplicates
     const allWorkOrders = await this.getWorkOrders(vesselId);
     
-    // JOB-LEVEL LOCK: Build a set of jobNos that already have an active WO
+    // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
-    // Uses case-insensitive status matching via isBlockingStatus()
-    const jobsWithActiveWO = buildJobsWithActiveWOSet(allWorkOrders);
+    // Uses both jobId (primary) and jobNo (fallback) for comprehensive blocking
+    const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
     
     // CYCLE UNIQUENESS: Also build a map by (jobNo + cycleDueDate) for cycle-level check
     // Uses case-insensitive status matching via isBlockingStatus()
@@ -312,7 +312,9 @@ export class WorkOrderService {
       }
       
       // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
-      if (jobsWithActiveWO.has(job.jobNo)) {
+      // Primary check: by jobId (reliable, direct field match)
+      // Fallback check: by jobNo (for legacy WOs without jobId)
+      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(job.jobNo)) {
         continue; // Already has an active WO - skip
       }
       
@@ -380,9 +382,10 @@ export class WorkOrderService {
       results.generated++;
       results.workOrders.push(createdWO);
       
-      // Add to maps to prevent duplicate generation in same run
+      // Add to sets to prevent duplicate generation in same run
       existingCycleWOs.set(cycleKey, workOrderData as any);
-      jobsWithActiveWO.add(job.jobNo);
+      activeWOSets.byJobId.add(job.id);
+      activeWOSets.byJobNo.add(job.jobNo);
       
       const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
       console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
