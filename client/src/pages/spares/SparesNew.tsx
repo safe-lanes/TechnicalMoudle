@@ -165,6 +165,38 @@ const Spares: React.FC = () => {
     ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
   });
   
+  // Comprehensive edit spare form (includes all fields from Spare Part Details)
+  const [editSpareForm, setEditSpareForm] = useState({
+    // Basic Information
+    partCode: "",
+    partName: "",
+    partNumber: "",
+    uom: "",
+    componentId: "",
+    componentCode: "",
+    componentName: "",
+    // Stock & Location
+    rob: "",
+    min: "",
+    location: "",
+    location2: "",
+    critical: "No",
+    isActive: true,
+    // Technical Details
+    maker: "",
+    makerCode: "",
+    drawingNumber: "",
+    positionNumber: "",
+    specification: "",
+    // Manual Reference
+    manualName: "",
+    pageNumber: "",
+    // IHM & Notes
+    ihm: "No",
+    remarks: "",
+    note: ""
+  });
+  
   const { toast } = useToast();
   const [adjustingSpares, setAdjustingSpares] = useState<Set<number>>(new Set());
   const [pendingAdjustments, setPendingAdjustments] = useState<Map<number, number>>(new Map());
@@ -340,16 +372,37 @@ const Spares: React.FC = () => {
   // Open edit modal
   const openEditModal = (spare: Spare) => {
     setSelectedSpare(spare);
-    setAddSpareForm({
-      partCode: spare.partCode,
-      partName: spare.partName,
-      componentId: spare.componentId,
-      critical: spare.critical,
-      rob: spare.rob.toString(),
-      min: spare.min.toString(),
+    // Populate comprehensive edit form with all spare fields
+    // Use empty strings for missing values to preserve original state for change detection
+    setEditSpareForm({
+      // Basic Information
+      partCode: spare.partCode || "",
+      partName: spare.partName || "",
+      partNumber: spare.partNumber || "",
+      uom: spare.uom || "",
+      componentId: spare.componentId || "",
+      componentCode: spare.componentCode || "",
+      componentName: spare.componentName || "",
+      // Stock & Location
+      rob: spare.rob?.toString() || "0",
+      min: spare.min?.toString() || "0",
       location: spare.location || "",
-      ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
-      ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
+      location2: spare.location2 || "",
+      critical: spare.critical || "",
+      isActive: spare.isActive ?? true,
+      // Technical Details
+      maker: spare.maker || "",
+      makerCode: spare.makerCode || "",
+      drawingNumber: spare.drawingNumber || "",
+      positionNumber: spare.positionNumber || "",
+      specification: spare.specification || "",
+      // Manual Reference
+      manualName: spare.manualName || "",
+      pageNumber: spare.pageNumber || "",
+      // IHM & Notes
+      ihm: spare.ihm || "",
+      remarks: spare.remarks || "",
+      note: spare.note || ""
     });
     
     // In modify mode, store original data for change tracking
@@ -376,11 +429,33 @@ const Spares: React.FC = () => {
     if (!originalSpareData || !selectedSpare) return [];
     
     const changes: Array<{field: string, oldValue: any, newValue: any}> = [];
-    const fieldsToCheck: (keyof typeof addSpareForm)[] = ['partCode', 'partName', 'componentId', 'critical', 'rob', 'min', 'location'];
+    const fieldsToCheck: (keyof typeof editSpareForm)[] = [
+      'partCode', 'partName', 'partNumber', 'uom', 'componentId',
+      'rob', 'min', 'location', 'location2', 'critical', 'isActive',
+      'maker', 'makerCode', 'drawingNumber', 'positionNumber', 'specification',
+      'manualName', 'pageNumber', 'ihm', 'remarks', 'note'
+    ];
     
     for (const field of fieldsToCheck) {
-      const originalValue = String(originalSpareData[field as keyof Spare] ?? '');
-      const newValue = String(addSpareForm[field] ?? '');
+      // Handle isActive specially as it's a boolean
+      if (field === 'isActive') {
+        const originalValue = originalSpareData.isActive ?? true;
+        const newValue = editSpareForm.isActive;
+        if (originalValue !== newValue) {
+          changes.push({
+            field,
+            oldValue: originalValue ? 'Yes' : 'No',
+            newValue: newValue ? 'Yes' : 'No'
+          });
+        }
+        continue;
+      }
+      
+      // Normalize both values for comparison - treat null/undefined/'' as equivalent
+      const originalRaw = originalSpareData[field as keyof Spare];
+      const newRaw = editSpareForm[field];
+      const originalValue = (originalRaw === null || originalRaw === undefined) ? '' : String(originalRaw);
+      const newValue = (newRaw === null || newRaw === undefined) ? '' : String(newRaw);
       
       if (originalValue !== newValue) {
         changes.push({
@@ -749,7 +824,9 @@ const Spares: React.FC = () => {
         critical: "No",
         rob: "",
         min: "",
-        location: ""
+        location: "",
+        ihmPresence: "Unknown" as typeof IHM_PRESENCE[number],
+        ihmEvidenceType: "None" as typeof IHM_EVIDENCE_TYPES[number]
       });
     },
     onError: (error: any) => {
@@ -760,6 +837,57 @@ const Spares: React.FC = () => {
       });
     }
   });
+
+  // Update spare mutation
+  const updateSpareMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedSpare) throw new Error('No spare selected');
+      return apiRequest('PATCH', `/api/spares/${vesselId}/${selectedSpare.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      toast({ title: "Success", description: "Spare updated successfully" });
+      setIsEditModalOpen(false);
+      setSelectedSpare(null);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update spare",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Handle edit spare submit
+  const handleEditSpareSubmit = () => {
+    if (!selectedSpare) return;
+    
+    const updateData = {
+      partCode: editSpareForm.partCode,
+      partName: editSpareForm.partName,
+      partNumber: editSpareForm.partNumber || null,
+      uom: editSpareForm.uom || null,
+      rob: parseInt(editSpareForm.rob) || 0,
+      min: parseInt(editSpareForm.min) || 0,
+      location: editSpareForm.location || null,
+      location2: editSpareForm.location2 || null,
+      critical: editSpareForm.critical,
+      isActive: editSpareForm.isActive,
+      maker: editSpareForm.maker || null,
+      makerCode: editSpareForm.makerCode || null,
+      drawingNumber: editSpareForm.drawingNumber || null,
+      positionNumber: editSpareForm.positionNumber || null,
+      specification: editSpareForm.specification || null,
+      manualName: editSpareForm.manualName || null,
+      pageNumber: editSpareForm.pageNumber || null,
+      ihm: editSpareForm.ihm || null,
+      remarks: editSpareForm.remarks || null,
+      note: editSpareForm.note || null
+    };
+    
+    updateSpareMutation.mutate(updateData);
+  };
 
   // Bulk update mutation
   const bulkUpdateMutation = useMutation({
@@ -2206,85 +2334,295 @@ const Spares: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Spare Modal */}
+      {/* Edit Spare Modal - Comprehensive form matching Spare Part Details */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Spare</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-[#52baf3]">
+              <Edit2 className="h-5 w-5" />
+              Edit Spare Part
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-part-code">Part Code *</Label>
-                <Input
-                  id="edit-part-code"
-                  value={addSpareForm.partCode}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, partCode: e.target.value})}
-                  placeholder="e.g., SP-ME-001"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-part-name">Part Name *</Label>
-                <Input
-                  id="edit-part-name"
-                  value={addSpareForm.partName}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, partName: e.target.value})}
-                  placeholder="e.g., Fuel Injector"
-                  required
-                />
+          
+          <div className="space-y-6">
+            {/* Basic Information Section */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Basic Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-part-code">Part Code *</Label>
+                  <Input
+                    id="edit-part-code"
+                    value={editSpareForm.partCode}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, partCode: e.target.value})}
+                    placeholder="e.g., MV0001-00006"
+                    data-testid="input-edit-part-code"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-part-name">Part Name *</Label>
+                  <Input
+                    id="edit-part-name"
+                    value={editSpareForm.partName}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, partName: e.target.value})}
+                    placeholder="e.g., Exciter Rotor"
+                    data-testid="input-edit-part-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-part-number">Part Number</Label>
+                  <Input
+                    id="edit-part-number"
+                    value={editSpareForm.partNumber}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, partNumber: e.target.value})}
+                    placeholder="e.g., Fig. 11\3"
+                    data-testid="input-edit-part-number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-uom">UOM (Unit of Measure)</Label>
+                  <Input
+                    id="edit-uom"
+                    value={editSpareForm.uom}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, uom: e.target.value})}
+                    placeholder="e.g., PCS"
+                    data-testid="input-edit-uom"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-component-name">Component</Label>
+                  <Input
+                    id="edit-component-name"
+                    value={editSpareForm.componentName}
+                    readOnly
+                    className="bg-gray-100"
+                    data-testid="input-edit-component-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-component-code">Component Code</Label>
+                  <Input
+                    id="edit-component-code"
+                    value={editSpareForm.componentCode}
+                    readOnly
+                    className="bg-gray-100"
+                    data-testid="input-edit-component-code"
+                  />
+                </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="edit-critical">Critical</Label>
-                <Select value={addSpareForm.critical} onValueChange={(value) => setAddSpareForm({...addSpareForm, critical: value})}>
-                  <SelectTrigger id="edit-critical">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Yes">Yes</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-rob">ROB (Remain on Board)</Label>
-                <Input
-                  id="edit-rob"
-                  type="number"
-                  min="0"
-                  value={addSpareForm.rob}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, rob: e.target.value})}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-min">Minimum Stock</Label>
-                <Input
-                  id="edit-min"
-                  type="number"
-                  min="0"
-                  value={addSpareForm.min}
-                  onChange={(e) => setAddSpareForm({...addSpareForm, min: e.target.value})}
-                  placeholder="0"
-                />
+
+            {/* Stock & Location Section */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Stock & Location</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-rob">ROB (Total)</Label>
+                  <Input
+                    id="edit-rob"
+                    type="number"
+                    min="0"
+                    value={editSpareForm.rob}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, rob: e.target.value})}
+                    placeholder="0"
+                    data-testid="input-edit-rob"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-min">Minimum Stock</Label>
+                  <Input
+                    id="edit-min"
+                    type="number"
+                    min="0"
+                    value={editSpareForm.min}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, min: e.target.value})}
+                    placeholder="0"
+                    data-testid="input-edit-min"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-location-a">Location A</Label>
+                  <Input
+                    id="edit-location-a"
+                    value={editSpareForm.location}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, location: e.target.value})}
+                    placeholder="e.g., AAA-BBB-CCC"
+                    data-testid="input-edit-location-a"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-location-b">Location B</Label>
+                  <Input
+                    id="edit-location-b"
+                    value={editSpareForm.location2}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, location2: e.target.value})}
+                    placeholder="e.g., CCC-BB-XXX"
+                    data-testid="input-edit-location-b"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-critical">Criticality</Label>
+                  <Select 
+                    value={editSpareForm.critical || "No"} 
+                    onValueChange={(value) => setEditSpareForm({...editSpareForm, critical: value})}
+                  >
+                    <SelectTrigger id="edit-critical" data-testid="select-edit-critical">
+                      <SelectValue placeholder="Select criticality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-is-active">Is Active</Label>
+                  <Select 
+                    value={editSpareForm.isActive ? "Yes" : "No"} 
+                    onValueChange={(value) => setEditSpareForm({...editSpareForm, isActive: value === "Yes"})}
+                  >
+                    <SelectTrigger id="edit-is-active" data-testid="select-edit-is-active">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-            
-            <div>
-              <Label htmlFor="edit-location">Location</Label>
-              <Input
-                id="edit-location"
-                value={addSpareForm.location}
-                onChange={(e) => setAddSpareForm({...addSpareForm, location: e.target.value})}
-                placeholder="e.g., Store Room A"
-              />
+
+            {/* Technical Details Section */}
+            <div className="bg-green-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Technical Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-maker">Maker</Label>
+                  <Input
+                    id="edit-maker"
+                    value={editSpareForm.maker}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, maker: e.target.value})}
+                    placeholder="e.g., Mitsui Zosen Machinery Service"
+                    data-testid="input-edit-maker"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-maker-code">Maker Code</Label>
+                  <Input
+                    id="edit-maker-code"
+                    value={editSpareForm.makerCode}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, makerCode: e.target.value})}
+                    placeholder="e.g., MKR-000019"
+                    data-testid="input-edit-maker-code"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-drawing-number">Drawing Number</Label>
+                  <Input
+                    id="edit-drawing-number"
+                    value={editSpareForm.drawingNumber}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, drawingNumber: e.target.value})}
+                    placeholder="e.g., FIG. 11"
+                    data-testid="input-edit-drawing-number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-position-number">Position Number</Label>
+                  <Input
+                    id="edit-position-number"
+                    value={editSpareForm.positionNumber}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, positionNumber: e.target.value})}
+                    placeholder="e.g., 6"
+                    data-testid="input-edit-position-number"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-specification">Specification</Label>
+                  <Input
+                    id="edit-specification"
+                    value={editSpareForm.specification}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, specification: e.target.value})}
+                    placeholder="Enter specification details"
+                    data-testid="input-edit-specification"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Manual Reference Section */}
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">Manual Reference</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-manual-name">Manual Name</Label>
+                  <Input
+                    id="edit-manual-name"
+                    value={editSpareForm.manualName}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, manualName: e.target.value})}
+                    placeholder="e.g., Manual Name-0006"
+                    data-testid="input-edit-manual-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-page-number">Page Number</Label>
+                  <Input
+                    id="edit-page-number"
+                    value={editSpareForm.pageNumber}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, pageNumber: e.target.value})}
+                    placeholder="e.g., 6"
+                    data-testid="input-edit-page-number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* IHM & Notes Section */}
+            <div className="bg-purple-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">IHM & Notes</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-ihm">IHM (Inventory of Hazardous Materials)</Label>
+                  <Select 
+                    value={editSpareForm.ihm || "No"} 
+                    onValueChange={(value) => setEditSpareForm({...editSpareForm, ihm: value})}
+                  >
+                    <SelectTrigger id="edit-ihm" data-testid="select-edit-ihm">
+                      <SelectValue placeholder="Select IHM status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-evidence-type">Evidence Type</Label>
+                  <Input
+                    id="edit-evidence-type"
+                    value={editSpareForm.remarks}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, remarks: e.target.value})}
+                    placeholder="e.g., 22"
+                    data-testid="input-edit-evidence-type"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="edit-note">Note</Label>
+                  <Input
+                    id="edit-note"
+                    value={editSpareForm.note}
+                    onChange={(e) => setEditSpareForm({...editSpareForm, note: e.target.value})}
+                    placeholder="e.g., Sample-XX-YY-0006"
+                    data-testid="input-edit-note"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} data-testid="button-cancel-edit">
               Cancel
             </Button>
             {isModifyMode ? (
@@ -2297,12 +2635,13 @@ const Spares: React.FC = () => {
                 {isSubmittingChangeRequest ? "Submitting..." : "Save for Approval"}
               </Button>
             ) : (
-              <Button onClick={() => {
-                // TODO: Implement update mutation
-                toast({ title: "Info", description: "Edit functionality to be implemented" });
-                setIsEditModalOpen(false);
-              }}>
-                Save Changes
+              <Button 
+                onClick={handleEditSpareSubmit}
+                disabled={updateSpareMutation?.isPending}
+                className="bg-[#52baf3] hover:bg-[#40a8e0]"
+                data-testid="button-save-edit"
+              >
+                {updateSpareMutation?.isPending ? "Saving..." : "Save Changes"}
               </Button>
             )}
           </DialogFooter>
