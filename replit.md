@@ -43,3 +43,20 @@ The application features a modern full-stack architecture with a mobile-first, r
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
 *   **Development**: `vite`, `typescript`, `drizzle-kit`
+
+## Issue Tracker (26-Dec-2025 Findings)
+Progress tracking for issues from the 26-12-2025 findings document.
+
+| Issue # | Description | Status | Date Completed |
+|---------|-------------|--------|----------------|
+| 1-6 | Various fixes | Completed | Prior sessions |
+| 7 | Location-aware Consume/Receive for Spares | **Completed** | 05-Jan-2026 |
+| 8-14 | Pending issues | Pending | - |
+
+### Issue #7 Details (Completed 05-Jan-2026)
+**Multi-Location Inventory Tracking**: Added location selection for consuming and receiving spare parts.
+- **Backend**: Added `consumeSpareWithLocation` and `receiveSpareToLocation` methods in `server/postgresStorage.ts`
+- **API**: Added `/api/spares/:id/consume` and `/api/spares/:id/receive-to-location` endpoints
+- **Frontend**: Updated Consume/Receive modals with Location dropdown (Location A/B with available stock display)
+- **Validation**: Per-location stock validation prevents over-consumption
+- **History**: Location tracked in remarks field as "(Location A)" or "(Location B)"
