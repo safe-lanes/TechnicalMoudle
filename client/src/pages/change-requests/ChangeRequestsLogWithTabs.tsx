@@ -81,7 +81,7 @@ export default function ChangeRequestsLogWithTabs() {
   
   // Fetch change requests with filters
   const { data: changeRequests, isLoading, refetch } = useQuery<ChangeRequest[]>({
-    queryKey: ['/api/change-requests', activeTab, filters],
+    queryKey: ['/technical/api/change-requests', activeTab, filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       
@@ -108,7 +108,7 @@ export default function ChangeRequestsLogWithTabs() {
       if (filters.requestedBy) params.append('requestedBy', filters.requestedBy);
       if (filters.search) params.append('search', filters.search);
       
-      const response = await fetch(`/api/change-requests?${params.toString()}`);
+      const response = await fetch(`/technical/api/change-requests?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch change requests');
       return response.json();
     }

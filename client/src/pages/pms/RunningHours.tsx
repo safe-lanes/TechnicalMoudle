@@ -81,9 +81,9 @@ const RunningHours = () => {
     parent: { componentCode: string; name: string; currentCumulativeRH: string };
     children: ChildRHData[];
   }>({
-    queryKey: ['/api/running-hours/children', selectedParentForChildRH?.componentCode, vesselId],
+    queryKey: ['/technical/api/running-hours/children', selectedParentForChildRH?.componentCode, vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${vesselId}`);
+      const response = await fetch(`/technical/api/running-hours/children/${selectedParentForChildRH?.componentCode}?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch children RH');
       return response.json();
     },
@@ -97,9 +97,9 @@ const RunningHours = () => {
   
   // Fetch parent components with RH-based child jobs
   const { data: rawRunningHoursData = [], isLoading: isLoadingParents, refetch } = useQuery<any[]>({
-    queryKey: ['/api/running-hours/parents', vesselId],
+    queryKey: ['/technical/api/running-hours/parents', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/running-hours/parents?vesselId=${vesselId}`);
+      const response = await fetch(`/technical/api/running-hours/parents?vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch running hour parents');
       return response.json();
     },
@@ -121,14 +121,14 @@ const RunningHours = () => {
   // Cascade update mutation
   const cascadeUpdateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('POST', '/api/running-hours/cascade', data);
+      return await apiRequest('POST', '/technical/api/running-hours/cascade', data);
     },
     onSuccess: () => {
       // Invalidate all related queries with refetchType 'all' to force refetch even inactive queries
-      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/components'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config/master-components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/running-hours/parents'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/rh-config'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/rh-config/master-components'], refetchType: 'all' });
       toast({ title: "Success", description: "Running hours updated successfully" });
       setIsUpdateDialogOpen(false);
       handleCancelUpdate();
@@ -146,7 +146,7 @@ const RunningHours = () => {
   const bulkUpdateRunningHours = useMutation({
     mutationFn: async (updates: any[]) => {
       const promises = updates.map(update => 
-        apiRequest('POST', '/api/running-hours/cascade', {
+        apiRequest('POST', '/technical/api/running-hours/cascade', {
           parentComponentId: update.componentId,
           mode: update.mode,
           value: update.value,
@@ -161,10 +161,10 @@ const RunningHours = () => {
     },
     onSuccess: () => {
       // Invalidate all related queries with refetchType 'all' to force refetch even inactive queries
-      queryClient.invalidateQueries({ queryKey: ['/api/running-hours/parents'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/components'], refetchType: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['/api/rh-config/master-components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/running-hours/parents'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/rh-config'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/components'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/rh-config/master-components'], refetchType: 'all' });
       toast({
         title: "Success",
         description: "Bulk update completed successfully",

@@ -89,9 +89,9 @@ export default function DefectsReports() {
   const [reportData, setReportData] = useState<any>(null);
 
   const { data: vessels = [] } = useQuery({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
     queryFn: async () => {
-      const response = await fetch('/api/vessels');
+      const response = await fetch('/technical/api/vessels');
       if (!response.ok) throw new Error('Failed to fetch vessels');
       return response.json();
     }
@@ -99,7 +99,7 @@ export default function DefectsReports() {
 
   const runReportMutation = useMutation({
     mutationFn: async (reportId: string) => {
-      return apiRequest('POST', `/api/defects/reports/${reportId}`, filters);
+      return apiRequest('POST', `/technical/api/defects/reports/${reportId}`, filters);
     },
     onSuccess: (data) => {
       setReportData(data);

@@ -205,9 +205,9 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
   const saveDefectMutation = useMutation({
     mutationFn: async (data: DefectFormData) => {
       if (mode === 'edit' && defect) {
-        return apiRequest("PATCH", `/api/defects/${defect.id}`, data);
+        return apiRequest("PATCH", `/technical/api/defects/${defect.id}`, data);
       } else {
-        return apiRequest("POST", "/api/defects", data);
+        return apiRequest("POST", "/technical/api/defects", data);
       }
     },
     onSuccess: () => {
@@ -215,7 +215,7 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
         title: "Success", 
         description: mode === 'edit' ? "Defect updated successfully" : "Defect created successfully" 
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       onClose();
     },
     onError: (error: any) => {

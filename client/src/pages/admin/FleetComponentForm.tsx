@@ -39,7 +39,7 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
 
   // Fetch all fleet components for parent selection
   const { data: components } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
     enabled: open,
   });
 
@@ -93,10 +93,10 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: FleetComponentFormData) => {
-      return apiRequest('POST', '/api/fleet/components', { ...data, dataScope: 'fleet' });
+      return apiRequest('POST', '/technical/api/fleet/components', { ...data, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
       toast({
         title: "Success",
         description: "Fleet component created successfully",
@@ -116,10 +116,10 @@ export default function FleetComponentForm({ open, onOpenChange, component }: Fl
   const updateMutation = useMutation({
     mutationFn: async (data: FleetComponentFormData & { id: string }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/api/fleet/components/${id}`, { ...updateData, dataScope: 'fleet' });
+      return apiRequest('PATCH', `/technical/api/fleet/components/${id}`, { ...updateData, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
       toast({
         title: "Success",
         description: "Fleet component updated successfully",

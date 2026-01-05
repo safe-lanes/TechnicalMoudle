@@ -65,11 +65,11 @@ const MaintenanceReports: React.FC<MaintenanceReportsProps> = ({ onBack, globalF
   const { vesselId } = useVessel();
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/api/work-orders'],
+    queryKey: ['/technical/api/work-orders'],
   });
 
   const { data: jobs = [] } = useQuery<any[]>({
-    queryKey: ['/api/jobs', vesselId],
+    queryKey: ['/technical/api/jobs', vesselId],
   });
 
   const reports: MaintenanceReport[] = [

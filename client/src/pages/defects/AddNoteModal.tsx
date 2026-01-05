@@ -34,7 +34,7 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
       // In a real implementation, you'd upload files to storage first
       const attachmentNames = attachments.map(file => file.name);
       
-      return apiRequest('POST', `/api/defects/${defectId}/notes`, {
+      return apiRequest('POST', `/technical/api/defects/${defectId}/notes`, {
         noteText,
         attachments: attachmentNames,
         createdBy: 'Current User' // In real app, get from auth context
@@ -45,8 +45,8 @@ export default function AddNoteModal({ open, onClose, defectId }: AddNoteModalPr
         title: "Success",
         description: "Note added successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/defects', defectId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', defectId] });
       handleClose();
     },
     onError: (error: any) => {

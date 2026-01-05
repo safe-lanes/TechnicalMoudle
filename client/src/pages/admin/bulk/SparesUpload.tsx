@@ -13,8 +13,8 @@ interface SparesUploadProps {
 
 export default function SparesUpload({ vesselId, markers }: SparesUploadProps) {
   const handleRefreshData = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares'] });
   };
 
   return (

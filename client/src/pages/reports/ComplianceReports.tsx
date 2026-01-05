@@ -59,12 +59,12 @@ const ComplianceReports: React.FC<ComplianceReportsProps> = ({ onBack }) => {
   const { vesselId } = useVessel();
 
   const { data: certificates = [] } = useQuery<any[]>({
-    queryKey: ['/api/certificates', vesselId],
+    queryKey: ['/technical/api/certificates', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 
   const { data: surveys = [] } = useQuery<any[]>({
-    queryKey: ['/api/surveys', vesselId],
+    queryKey: ['/technical/api/surveys', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

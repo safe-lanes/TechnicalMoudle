@@ -711,7 +711,7 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
   
   // Fetch running hours data for the selected component
   const { data: runningHoursData } = useQuery<any>({
-    queryKey: [`/api/running-hours/${selectedComponent?.id}`],
+    queryKey: [`/technical/api/running-hours/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -795,7 +795,7 @@ const JobRow: React.FC<{
 
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
-      const response = await fetch(`/api/jobs/${job.id}/generate-wo`, {
+      const response = await fetch(`/technical/api/jobs/${job.id}/generate-wo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason })
@@ -813,10 +813,10 @@ const JobRow: React.FC<{
         title: "Work Order Created",
         description: `Work order ${data.workOrderNo} has been created successfully.`
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       // Invalidate all jobs queries (matching any vesselId parameter)
       queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/jobs')
+        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
       });
       setShowReasonDialog(false);
     },
@@ -925,13 +925,13 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   
   // Fetch jobs filtered by vesselId at the database level
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: !!vesselId,
   });
   
   // Get all components to find children (also filtered by vessel)
   const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: [`/api/components?vesselId=${vesselId}`],
+    queryKey: [`/technical/api/components?vesselId=${vesselId}`],
     enabled: !!vesselId,
   });
   
@@ -1064,7 +1064,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   
   // Fetch maintenance history for the selected component
   const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/component-maintenance-history', selectedComponent?.id],
+    queryKey: ['/technical/api/component-maintenance-history', selectedComponent?.id],
     enabled: !!selectedComponent?.id,
   });
 
@@ -1310,7 +1310,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
   
   const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: ['/api/components'],
+    queryKey: ['/technical/api/components'],
   });
   
   const getActualComponentId = (code: string): string | undefined => {
@@ -1321,10 +1321,10 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
   
   const { data: sparesWithInventory = [], isLoading: sparesLoading } = useQuery<SpareWithInventoryData[]>({
-    queryKey: ['/api/inventory/spares-by-component', selectedActualId],
+    queryKey: ['/technical/api/inventory/spares-by-component', selectedActualId],
     queryFn: async () => {
       if (!selectedActualId) return [];
-      const res = await fetch(`/api/inventory/spares-by-component/${selectedActualId}`);
+      const res = await fetch(`/technical/api/inventory/spares-by-component/${selectedActualId}`);
       if (!res.ok) throw new Error('Failed to fetch spares');
       const json = await res.json();
       return json.data || [];
@@ -1337,13 +1337,13 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     locationAName: string;
     locationBName: string;
   }>({
-    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    queryKey: [`/technical/api/vessel-location-names/${vesselId}`],
     enabled: !!vesselId,
   });
   
   const updateLocationNamesMutation = useMutation({
     mutationFn: async (data: { locationAName: string; locationBName: string }) => {
-      const response = await fetch(`/api/vessel-location-names/${vesselId}`, {
+      const response = await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, updatedBy: 'User' }),
@@ -1352,7 +1352,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
       setEditLocationDialogOpen(false);
     },
   });
@@ -1770,7 +1770,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   
   // Fetch documents for the selected component
   const { data: documents = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/component-documents/${selectedComponent?.id}`],
+    queryKey: [`/technical/api/component-documents/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -1884,7 +1884,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
 const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch class regulatory data for the selected component
   const { data: classRegData = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/component-class-regulatory/${selectedComponent?.id}`],
+    queryKey: [`/technical/api/component-class-regulatory/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -1967,7 +1967,7 @@ const ClassificationRegulatorySection: React.FC<{ selectedComponent: ComponentNo
 const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   // Fetch requisitions for the selected component
   const { data: requisitions = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/api/component-requisitions/${selectedComponent?.id}`],
+    queryKey: [`/technical/api/component-requisitions/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
   
@@ -2073,7 +2073,7 @@ const Components: React.FC = () => {
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: [`/api/components/${vesselId}`],
+    queryKey: [`/technical/api/components/${vesselId}`],
   });
   
   // Build component tree from fetched data
@@ -2293,7 +2293,7 @@ const Components: React.FC = () => {
       setIsPreviewMode(true);
       
       // Fetch the change request data
-      fetch(`/api/change-requests/${changeRequestId}`)
+      fetch(`/technical/api/change-requests/${changeRequestId}`)
         .then(res => res.json())
         .then(data => {
           setChangeRequestData(data);
@@ -2665,7 +2665,7 @@ const Components: React.FC = () => {
     };
 
     try {
-      const response = await fetch('/api/change-requests', {
+      const response = await fetch('/technical/api/change-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

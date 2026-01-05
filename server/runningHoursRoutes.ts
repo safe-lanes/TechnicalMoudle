@@ -19,7 +19,7 @@ const updateMasterRHSchema = z.object({
 
 export function registerRunningHoursRoutes(app: Express) {
   // Get all components with rhCounterType = 'MASTER' for the Running Hours module
-  app.get("/api/running-hours/parents", async (req, res) => {
+  app.get("/technical/api/running-hours/parents", async (req, res) => {
     try {
       const vesselId = (req.query.vesselId as string) || 'V001';
       
@@ -53,7 +53,7 @@ export function registerRunningHoursRoutes(app: Express) {
   
   // Get children RH values for a parent component (read-only popup)
   // Shows all children with their individual RH values - maintained independently via delta propagation
-  app.get("/api/running-hours/children/:parentCode", async (req, res) => {
+  app.get("/technical/api/running-hours/children/:parentCode", async (req, res) => {
     try {
       const { parentCode } = req.params;
       const vesselId = (req.query.vesselId as string) || 'V001';
@@ -98,7 +98,7 @@ export function registerRunningHoursRoutes(app: Express) {
   
   // Reset child RH to 0 (component replacement scenario)
   // After reset, child will continue receiving delta propagation from parent
-  app.post("/api/running-hours/reset-child/:componentId", async (req, res) => {
+  app.post("/technical/api/running-hours/reset-child/:componentId", async (req, res) => {
     try {
       const { componentId } = req.params;
       const { oldMeterFinal, userId, notes } = req.body;
@@ -152,7 +152,7 @@ export function registerRunningHoursRoutes(app: Express) {
   // ============= B7.B RH COUNTER TYPE CONFIGURATION ROUTES =============
 
   // Get all MASTER components for a vessel (for RH source selection dropdown)
-  app.get("/api/rh-config/master-components/:vesselId", async (req, res) => {
+  app.get("/technical/api/rh-config/master-components/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
       const masterComponents = await storage.getMasterComponents(vesselId);
@@ -171,7 +171,7 @@ export function registerRunningHoursRoutes(app: Express) {
   });
 
   // Get RH configuration for a specific component
-  app.get("/api/rh-config/:componentId", async (req, res) => {
+  app.get("/technical/api/rh-config/:componentId", async (req, res) => {
     try {
       const { componentId } = req.params;
       const component = await storage.getComponent(componentId);
@@ -226,7 +226,7 @@ export function registerRunningHoursRoutes(app: Express) {
   });
 
   // Update RH counter type configuration for a component
-  app.put("/api/rh-config/:componentId", async (req, res) => {
+  app.put("/technical/api/rh-config/:componentId", async (req, res) => {
     try {
       const { componentId } = req.params;
       
@@ -314,7 +314,7 @@ export function registerRunningHoursRoutes(app: Express) {
   });
 
   // Update MASTER running hours with cascade to INHERITED components
-  app.put("/api/rh-config/master/:componentId", async (req, res) => {
+  app.put("/technical/api/rh-config/master/:componentId", async (req, res) => {
     try {
       const { componentId } = req.params;
       
@@ -385,7 +385,7 @@ export function registerRunningHoursRoutes(app: Express) {
   });
 
   // Get all INHERITED components linked to a MASTER
-  app.get("/api/rh-config/inherited/:masterComponentId", async (req, res) => {
+  app.get("/technical/api/rh-config/inherited/:masterComponentId", async (req, res) => {
     try {
       const { masterComponentId } = req.params;
       const inheritedComponents = await storage.getInheritedComponents(masterComponentId);

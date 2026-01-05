@@ -24,44 +24,44 @@ export default function Admin4Dashboard() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
 
   const { data: makersData, isLoading: isMakersLoading } = useQuery({
-    queryKey: ['/api/fleet/makers'],
+    queryKey: ['/technical/api/fleet/makers'],
   });
 
   const { data: masterListsData, isLoading: isMasterListsLoading } = useQuery({
-    queryKey: ['/api/fleet/master-lists'],
+    queryKey: ['/technical/api/fleet/master-lists'],
   });
 
   const { data: componentsData, isLoading: isComponentsLoading } = useQuery({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
   });
 
   const { data: jobsData, isLoading: isJobsLoading } = useQuery({
-    queryKey: ['/api/fleet/jobs'],
+    queryKey: ['/technical/api/fleet/jobs'],
   });
 
   const { data: sparesData, isLoading: isSparesLoading } = useQuery({
-    queryKey: ['/api/fleet/spares'],
+    queryKey: ['/technical/api/fleet/spares'],
   });
 
   const { data: masterDataResponse, isLoading: isMasterDataLoading } = useQuery<{ items: any[]; total: number }>({
-    queryKey: ['/api/fleet-admin/master-data', 'dashboard'],
+    queryKey: ['/technical/api/fleet-admin/master-data', 'dashboard'],
     queryFn: async () => {
-      const response = await fetch('/api/fleet-admin/master-data?limit=1');
+      const response = await fetch('/technical/api/fleet-admin/master-data?limit=1');
       if (!response.ok) throw new Error('Failed to fetch master data');
       return response.json();
     }
   });
 
   const { data: pmsSettingsData, isLoading: isPmsSettingsLoading } = useQuery<PmsVesselSettings[]>({
-    queryKey: ['/api/pms-vessel-settings'],
+    queryKey: ['/technical/api/pms-vessel-settings'],
   });
 
   const { data: vesselsData, isLoading: isVesselsLoading } = useQuery<{id: string; name: string}[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 
   const { data: fleetsData, isLoading: isFleetsLoading } = useQuery<Fleet[]>({
-    queryKey: ['/api/fleets'],
+    queryKey: ['/technical/api/fleets'],
   });
 
   const totalMakers = Array.isArray(makersData) ? makersData.length : 0;

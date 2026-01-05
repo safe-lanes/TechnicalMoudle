@@ -79,9 +79,9 @@ export default function Alerts() {
 
   // Fetch alert policies
   const { data: policies, isLoading: policiesLoading } = useQuery({
-    queryKey: ['/api/alerts/policies'],
+    queryKey: ['/technical/api/alerts/policies'],
     queryFn: async () => {
-      const response = await fetch('/api/alerts/policies');
+      const response = await fetch('/technical/api/alerts/policies');
       if (!response.ok) throw new Error('Failed to fetch policies');
       const data = await response.json();
       setLocalPolicies(data);
@@ -91,9 +91,9 @@ export default function Alerts() {
 
   // Fetch alert configuration
   const { data: config, isLoading: configLoading } = useQuery({
-    queryKey: ['/api/alerts/config', selectedVesselId],
+    queryKey: ['/technical/api/alerts/config', selectedVesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/alerts/config/${selectedVesselId}`);
+      const response = await fetch(`/technical/api/alerts/config/${selectedVesselId}`);
       if (!response.ok) throw new Error('Failed to fetch config');
       const data = await response.json();
       setLocalConfig(data);
@@ -104,7 +104,7 @@ export default function Alerts() {
   // Batch update policies mutation
   const updatePoliciesMutation = useMutation({
     mutationFn: async (policies: AlertPolicy[]) => {
-      const response = await fetch('/api/alerts/policies/batch-update', {
+      const response = await fetch('/technical/api/alerts/policies/batch-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ policies })
@@ -113,7 +113,7 @@ export default function Alerts() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/alerts/policies'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/alerts/policies'] });
       toast({
         title: 'Alert Configuration Saved',
         description: 'Alert policies have been updated successfully.'
@@ -131,7 +131,7 @@ export default function Alerts() {
   // Update config mutation
   const updateConfigMutation = useMutation({
     mutationFn: async (config: AlertConfig) => {
-      const response = await fetch('/api/alerts/config', {
+      const response = await fetch('/technical/api/alerts/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -140,7 +140,7 @@ export default function Alerts() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/alerts/config', selectedVesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/alerts/config', selectedVesselId] });
       toast({
         title: 'Configuration Saved',
         description: 'Alert configuration has been updated successfully.'

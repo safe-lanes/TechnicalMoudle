@@ -45,10 +45,10 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: MakerFormData) => {
-      return apiRequest('POST', '/api/fleet/makers', data);
+      return apiRequest('POST', '/technical/api/fleet/makers', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/makers'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
       toast({
         title: "Success",
         description: "Maker created successfully",
@@ -68,10 +68,10 @@ export default function MakerForm({ open, onOpenChange, maker }: MakerFormProps)
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: MakerFormData) => {
-      return apiRequest('PUT', `/api/fleet/makers/${maker?.id}`, data);
+      return apiRequest('PUT', `/technical/api/fleet/makers/${maker?.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/makers'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
       toast({
         title: "Success",
         description: "Maker updated successfully",

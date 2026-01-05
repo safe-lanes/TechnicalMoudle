@@ -84,7 +84,7 @@ function ComponentTreeSelector({
   useEffect(() => {
     if (open) {
       // Fetch components
-      fetch(`/api/components/${vesselId}`)
+      fetch(`/technical/api/components/${vesselId}`)
         .then(res => res.json())
         .then(data => setComponents(data || []))
         .catch(console.error);

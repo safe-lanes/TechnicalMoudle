@@ -11,25 +11,25 @@ export default function TestE2E() {
     setLoading(true);
     try {
       // Clear and seed data
-      const seedResponse = await fetch('/api/defects-seed-e2e-test', {
+      const seedResponse = await fetch('/technical/api/defects-seed-e2e-test', {
         method: 'POST',
       });
       const seedData = await seedResponse.json();
       
       // Get counts
-      const countResponse = await fetch('/api/defects-count');
+      const countResponse = await fetch('/technical/api/defects-count');
       const counts = await countResponse.json();
       
       // Get all defects
-      const allDefectsResponse = await fetch('/api/defects?includeClosedDefects=true');
+      const allDefectsResponse = await fetch('/technical/api/defects?includeClosedDefects=true');
       const allDefects = await allDefectsResponse.json();
       
       // Get CoC defects
-      const cocDefectsResponse = await fetch('/api/defects?is_coc=true');
+      const cocDefectsResponse = await fetch('/technical/api/defects?is_coc=true');
       const cocDefects = await cocDefectsResponse.json();
       
       // Get recurring defects
-      const recurringResponse = await fetch('/api/recurring-defects');
+      const recurringResponse = await fetch('/technical/api/recurring-defects');
       const recurringDefects = await recurringResponse.json();
       
       const report = {

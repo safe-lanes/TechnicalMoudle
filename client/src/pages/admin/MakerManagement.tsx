@@ -22,16 +22,16 @@ export default function MakerManagement() {
 
   // Fetch makers
   const { data: makers, isLoading, error } = useQuery<Maker[]>({
-    queryKey: ['/api/fleet/makers'],
+    queryKey: ['/technical/api/fleet/makers'],
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('DELETE', `/api/fleet/makers/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet/makers/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/makers'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/makers'], exact: false });
       toast({
         title: "Success",
         description: "Maker deleted successfully",

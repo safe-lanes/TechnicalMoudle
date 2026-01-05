@@ -632,7 +632,7 @@ const FormConfigurationModal: React.FC<FormConfigurationModalProps> = ({
     evidenceType?: string;
     materials?: string[];
   }>({
-    queryKey: [`/api/ihm/component/${componentData.componentId}`],
+    queryKey: [`/technical/api/ihm/component/${componentData.componentId}`],
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
 

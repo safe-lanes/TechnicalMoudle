@@ -31,7 +31,7 @@ const JobsSelector: React.FC = () => {
 
   // Filter jobs by vesselId at the database level
   const { data: jobs = [], isLoading } = useQuery<Job[]>({
-    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: !!vesselId,
   });
 

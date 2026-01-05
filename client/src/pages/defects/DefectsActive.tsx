@@ -38,7 +38,7 @@ export default function DefectsActive() {
 
   // Get all defects to calculate counts and filter
   const { data: allDefects = [], isLoading } = useQuery({
-    queryKey: ['/api/defects', filters],
+    queryKey: ['/technical/api/defects', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       
@@ -50,7 +50,7 @@ export default function DefectsActive() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch defects');
       return response.json();
     },
@@ -129,7 +129,7 @@ export default function DefectsActive() {
   // Mutation for closing defects
   const closeDefectMutation = useMutation({
     mutationFn: async (defectId: string) => {
-      const response = await fetch(`/api/defects/${defectId}`, {
+      const response = await fetch(`/technical/api/defects/${defectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'Closed', dateCompleted: new Date().toISOString().split('T')[0] })
@@ -138,7 +138,7 @@ export default function DefectsActive() {
       return response.json();
     },
     onSuccess: (data, defectId) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       
       // Show success toast with action to view in Resolved tab
       toast({

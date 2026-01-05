@@ -153,15 +153,15 @@ const Stores: React.FC = () => {
   // Fetch stores items from API - uses default TanStack Query fetcher
   // The query key includes the full URL with query parameters
   const { data: storesData = [], isLoading: storesLoading } = useQuery<StoresApiItem[]>({
-    queryKey: vesselId ? [`/api/stores/${vesselId}?itemType=${activeTab}`] : ['stores-disabled'],
+    queryKey: vesselId ? [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] : ['stores-disabled'],
     enabled: !!vesselId,
   });
   
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
-    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    queryKey: [`/technical/api/vessel-location-names/${vesselId}`],
     queryFn: async () => {
-      const response = await fetch(`/api/vessel-location-names/${vesselId}`);
+      const response = await fetch(`/technical/api/vessel-location-names/${vesselId}`);
       if (!response.ok) return null;
       return response.json();
     },
@@ -211,9 +211,9 @@ const Stores: React.FC = () => {
   
   // Fetch stores history from API
   const { data: historyData = [], isLoading: historyLoading } = useQuery<any[]>({
-    queryKey: vesselId ? [`/api/stores/${vesselId}/history`, activeTab] : ['history-disabled'],
+    queryKey: vesselId ? [`/technical/api/stores/${vesselId}/history`, activeTab] : ['history-disabled'],
     queryFn: async () => {
-      const response = await fetch(`/api/stores/${vesselId}/history?itemType=${activeTab}`);
+      const response = await fetch(`/technical/api/stores/${vesselId}/history?itemType=${activeTab}`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     },
@@ -291,7 +291,7 @@ const Stores: React.FC = () => {
     
     try {
       // Save ROB quantities to store item
-      await fetch(`/api/stores/${vesselId}/${itemId}`, {
+      await fetch(`/technical/api/stores/${vesselId}/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -303,7 +303,7 @@ const Stores: React.FC = () => {
       
       // Save location names to vessel settings if they were edited
       if (locations.nameA || locations.nameB) {
-        await fetch(`/api/vessel-location-names/${vesselId}`, {
+        await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -311,10 +311,10 @@ const Stores: React.FC = () => {
             locationBName: locations.nameB || locationNames.locationB || 'Location B'
           }),
         });
-        queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
       }
       
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
       toast({ title: "Saved", description: "Location settings updated" });
     } catch (error) {
       console.error('Failed to save location:', error);
@@ -369,7 +369,7 @@ const Stores: React.FC = () => {
   ) => {
     // History is now managed by the backend via /api/stores/:vesselId/batch-consume and /api/stores/:vesselId/batch-receive
     // After a consume/receive action, invalidate the history query to refresh the data
-    queryClient.invalidateQueries({ queryKey: [`/api/stores/${vesselId}/history`, activeTab] });
+    queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
   };
 
   // Calculate stock status based on ROB and Min
@@ -664,7 +664,7 @@ const Stores: React.FC = () => {
     setIsSubmittingChangeRequest(true);
     
     try {
-      await apiRequest('POST', '/api/change-requests', {
+      await apiRequest('POST', '/technical/api/change-requests', {
         vesselId: vesselId || 'V001',
         category: 'stores',
         title: `Store Change: ${originalStoreData.itemCode} - ${originalStoreData.itemName}`,
@@ -677,7 +677,7 @@ const Stores: React.FC = () => {
         requestedByUserId: 'Current User'
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       
       toast({
         title: "Change request submitted",

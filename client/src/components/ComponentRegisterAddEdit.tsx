@@ -128,7 +128,7 @@ export default function ComponentRegisterAddEdit({
   });
 
   const { data: components = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: [`/api/components/${vesselId}`],
+    queryKey: [`/technical/api/components/${vesselId}`],
   });
 
   // Auto-generate component code when form opens with a parent and components are loaded
@@ -194,28 +194,28 @@ export default function ComponentRegisterAddEdit({
   }, [parentComponent?.code, componentId, components, vesselId, componentData.componentCode]);
 
   const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
-    queryKey: [`/api/components/details/${componentId}`],
+    queryKey: [`/technical/api/components/details/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   // Filter jobs by vesselId at the database level
   const { data: allJobs = [] } = useQuery<any[]>({
-    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: isEditMode && !!vesselId,
   });
 
   const { data: allSpares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares'],
+    queryKey: ['/technical/api/spares'],
     enabled: isEditMode,
   });
 
   const activeComponentId = componentId || selectedComponentId;
   
   const { data: componentDocuments = [], isLoading: isLoadingDocuments, refetch: refetchDocuments } = useQuery<ComponentDocument[]>({
-    queryKey: ['/api/component-documents', activeComponentId],
+    queryKey: ['/technical/api/component-documents', activeComponentId],
     queryFn: async () => {
       if (!activeComponentId) return [];
-      const response = await fetch(`/api/component-documents/${activeComponentId}`, {
+      const response = await fetch(`/technical/api/component-documents/${activeComponentId}`, {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -297,7 +297,7 @@ export default function ComponentRegisterAddEdit({
       formData.append('canShipDownload', 'true');
       formData.append('notes', docType);
 
-      const response = await fetch('/api/component-documents', {
+      const response = await fetch('/technical/api/component-documents', {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -330,7 +330,7 @@ export default function ComponentRegisterAddEdit({
 
   const handleViewDocument = async (docId: number) => {
     try {
-      window.open(`/api/component-documents/${docId}/download`, '_blank');
+      window.open(`/technical/api/component-documents/${docId}/download`, '_blank');
     } catch (error) {
       toast({
         title: "Error",
@@ -346,7 +346,7 @@ export default function ComponentRegisterAddEdit({
     }
 
     try {
-      const response = await fetch(`/api/component-documents/${docId}`, {
+      const response = await fetch(`/technical/api/component-documents/${docId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -685,13 +685,13 @@ export default function ComponentRegisterAddEdit({
       };
 
       if (isEditMode && componentId) {
-        await apiRequest('PATCH', `/api/components/${componentId}`, payload);
+        await apiRequest('PATCH', `/technical/api/components/${componentId}`, payload);
         toast({
           title: "Component Updated",
           description: "Component has been updated successfully.",
         });
       } else {
-        await apiRequest('POST', '/api/components', payload);
+        await apiRequest('POST', '/technical/api/components', payload);
         toast({
           title: "Component Created",
           description: "New component has been created successfully.",
@@ -703,7 +703,7 @@ export default function ComponentRegisterAddEdit({
       await queryClient.refetchQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
-          const matches = typeof key === 'string' && key.startsWith('/api/components');
+          const matches = typeof key === 'string' && key.startsWith('/technical/api/components');
           if (matches) console.log('🔄 Refetching query:', query.queryKey);
           return matches;
         }

@@ -74,10 +74,10 @@ export function DefectForm({ defect, onSuccess, onCancel }: DefectFormProps) {
   const onSubmit = async (data: DefectFormData) => {
     try {
       if (defect?.id) {
-        await apiRequest(`/api/defects/${defect.id}`, "PATCH", data);
+        await apiRequest(`/technical/api/defects/${defect.id}`, "PATCH", data);
         toast({ title: "Defect updated successfully" });
       } else {
-        await apiRequest("/api/defects", "POST", data);
+        await apiRequest("/technical/api/defects", "POST", data);
         toast({ title: "Defect created successfully" });
       }
       onSuccess?.();

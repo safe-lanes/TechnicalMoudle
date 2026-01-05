@@ -240,23 +240,23 @@ export default function CertificatesPage() {
   const { toast } = useToast();
 
   const { data: certificates = [], isLoading: isLoadingCertificates } = useQuery<CertificateData[]>({
-    queryKey: ['/api/certificates'],
+    queryKey: ['/technical/api/certificates'],
   });
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 
   const { data: fleets = [] } = useQuery<Fleet[]>({
-    queryKey: ['/api/fleets'],
+    queryKey: ['/technical/api/fleets'],
   });
 
   const updateCertificateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CertificateData> }) => {
-      return apiRequest('PATCH', `/api/certificates/${id}`, updates);
+      return apiRequest('PATCH', `/technical/api/certificates/${id}`, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/certificates'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
       toast({
         title: 'Updated',
         description: 'Certificate updated successfully.',
@@ -268,7 +268,7 @@ export default function CertificatesPage() {
         description: error.message || 'Failed to update certificate',
         variant: 'destructive',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/certificates'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/certificates'] });
     },
   });
 

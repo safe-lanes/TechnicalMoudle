@@ -24,7 +24,7 @@ export default function DefectsResolved() {
   const [filters, setFilters] = useState<DefectsFilters>({});
 
   const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['/api/defects', { ...filters, statusView: 'resolved' }],
+    queryKey: ['/technical/api/defects', { ...filters, statusView: 'resolved' }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('statusView', 'resolved'); // Force resolved filter
@@ -37,7 +37,7 @@ export default function DefectsResolved() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.completionPeriod) params.append('completionPeriod', filters.completionPeriod);
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch defects');
       return response.json();
     },

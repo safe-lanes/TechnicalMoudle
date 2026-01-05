@@ -69,7 +69,7 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
   
   // Fetch components from API
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
-    queryKey: [`/api/components/${vesselId}`],
+    queryKey: [`/technical/api/components/${vesselId}`],
   });
   
   const [selectedNode, setSelectedNode] = useState<ComponentNode | null>(null);
@@ -225,13 +225,13 @@ const ComponentRegisterForm: React.FC<ComponentRegisterFormProps> = ({
     evidenceType?: string;
     materials?: string[];
   }>({
-    queryKey: [`/api/ihm/component/${componentData.componentId}`],
+    queryKey: [`/technical/api/ihm/component/${componentData.componentId}`],
     enabled: FEATURES.IHM && !!componentData.componentId,
   });
 
   // Fetch linked spares with inventory for the component
   const { data: linkedSparesResponse, isLoading: isLoadingLinkedSpares } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: ['/api/inventory/spares-by-component', componentData.componentId],
+    queryKey: ['/technical/api/inventory/spares-by-component', componentData.componentId],
     enabled: !!componentData.componentId,
   });
   const linkedSpares = linkedSparesResponse?.data || [];

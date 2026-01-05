@@ -8,7 +8,7 @@ interface Vessel {
 
 export function useVessels() {
   return useQuery<Vessel[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 }
 

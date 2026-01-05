@@ -33,9 +33,9 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
 
   // Fetch all defects for searching
   const { data: allDefects = [], isLoading } = useQuery<Defect[]>({
-    queryKey: ['/api/defects', { excludeId: defectId }],
+    queryKey: ['/technical/api/defects', { excludeId: defectId }],
     queryFn: async () => {
-      const response = await fetch('/api/defects');
+      const response = await fetch('/technical/api/defects');
       if (!response.ok) throw new Error('Failed to fetch defects');
       const defects = await response.json();
       // Filter out the current defect
@@ -56,7 +56,7 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
 
   const linkDefectsMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('PATCH', `/api/defects/${defectId}/link`, {
+      return apiRequest('PATCH', `/technical/api/defects/${defectId}/link`, {
         linkedDefects: selectedDefects
       });
     },
@@ -65,8 +65,8 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
         title: "Success",
         description: `Linked ${selectedDefects.length} defect(s) successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/defects', defectId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects', defectId] });
       handleClose();
     },
     onError: (error: any) => {

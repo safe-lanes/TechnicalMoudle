@@ -83,38 +83,38 @@ export default function FleetVesselMapping() {
   const [selectedAutoMatches, setSelectedAutoMatches] = useState<string[]>([]);
 
   const { data: fleetComponents = [], isLoading: isLoadingFleetComponents } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
   });
 
   const { data: fleetJobs = [], isLoading: isLoadingFleetJobs } = useQuery<Job[]>({
-    queryKey: ['/api/fleet/jobs'],
+    queryKey: ['/technical/api/fleet/jobs'],
   });
 
   const { data: fleetSpares = [], isLoading: isLoadingFleetSpares } = useQuery<Spare[]>({
-    queryKey: ['/api/fleet/spares'],
+    queryKey: ['/technical/api/fleet/spares'],
   });
 
   const { data: vesselComponents = [], isLoading: isLoadingVesselComponents } = useQuery<Component[]>({
-    queryKey: ['/api/components', selectedVessel],
+    queryKey: ['/technical/api/components', selectedVessel],
     enabled: !!selectedVessel,
   });
 
   const { data: vesselJobs = [], isLoading: isLoadingVesselJobs } = useQuery<Job[]>({
-    queryKey: ['/api/jobs', selectedVessel],
+    queryKey: ['/technical/api/jobs', selectedVessel],
     enabled: !!selectedVessel,
   });
 
   const { data: vesselSpares = [], isLoading: isLoadingVesselSpares } = useQuery<Spare[]>({
-    queryKey: ['/api/spares', selectedVessel],
+    queryKey: ['/technical/api/spares', selectedVessel],
     enabled: !!selectedVessel,
   });
 
   const { data: vessels = [] } = useQuery<Array<{id: string, name: string, code: string}>>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 
   const { data: vesselMappings = [], isLoading: isLoadingMappings } = useQuery<VesselMapping[]>({
-    queryKey: ['/api/fleet/vessel-mappings'],
+    queryKey: ['/technical/api/fleet/vessel-mappings'],
   });
 
   const createMappingMutation = useMutation({
@@ -125,11 +125,11 @@ export default function FleetVesselMapping() {
       vesselEntityId?: string;
       vesselEntityCode?: string;
     }) => {
-      const response = await apiRequest('POST', '/api/fleet/vessel-mappings', data);
+      const response = await apiRequest('POST', '/technical/api/fleet/vessel-mappings', data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/vessel-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/vessel-mappings'] });
       toast({ title: "Success", description: "Mapping created successfully" });
       setAddMappingDialogOpen(false);
       setSelectedFleetItem(null);
@@ -142,10 +142,10 @@ export default function FleetVesselMapping() {
 
   const deleteMappingMutation = useMutation({
     mutationFn: async (mappingId: string) => {
-      await apiRequest('DELETE', `/api/fleet/vessel-mappings/${mappingId}`);
+      await apiRequest('DELETE', `/technical/api/fleet/vessel-mappings/${mappingId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/vessel-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/vessel-mappings'] });
       toast({ title: "Success", description: "Mapping removed successfully" });
     },
     onError: (error: any) => {
@@ -157,13 +157,13 @@ export default function FleetVesselMapping() {
     mutationFn: async (mappings: Array<{fleetEntityType: string; fleetEntityIds: string[]; vesselId: string; vesselEntityCode?: string}>) => {
       const results = [];
       for (const mapping of mappings) {
-        const response = await apiRequest('POST', '/api/fleet/vessel-mappings', mapping);
+        const response = await apiRequest('POST', '/technical/api/fleet/vessel-mappings', mapping);
         results.push(await response.json());
       }
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/vessel-mappings'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/vessel-mappings'] });
       toast({ title: "Success", description: "Mappings created successfully" });
       setAutoMatchDialogOpen(false);
       setAutoMatchResults([]);
@@ -409,10 +409,10 @@ export default function FleetVesselMapping() {
         <Button
           variant="outline"
           onClick={() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/fleet/vessel-mappings'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/components', selectedVessel] });
-            queryClient.invalidateQueries({ queryKey: ['/api/jobs', selectedVessel] });
-            queryClient.invalidateQueries({ queryKey: ['/api/spares', selectedVessel] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/vessel-mappings'] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/components', selectedVessel] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs', selectedVessel] });
+            queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', selectedVessel] });
           }}
           disabled={isLoading}
           data-testid="button-refresh"

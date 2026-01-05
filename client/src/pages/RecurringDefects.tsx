@@ -99,7 +99,7 @@ export default function RecurringDefects() {
   
   // Fetch recurring defects
   const { data: recurringDefects = [], isLoading } = useQuery<RecurringDefect[]>({
-    queryKey: [`/api/recurring-defects?${queryParams.toString()}`]
+    queryKey: [`/technical/api/recurring-defects?${queryParams.toString()}`]
   });
 
   // Filter recurring defects based on active tab
@@ -116,7 +116,7 @@ export default function RecurringDefects() {
   // Load defects for selected recurring defect
   const loadDefectsForRecurring = async (recurringId: number) => {
     try {
-      const response = await apiRequest("GET", `/api/recurring-defects/${recurringId}/defects`);
+      const response = await apiRequest("GET", `/technical/api/recurring-defects/${recurringId}/defects`);
       const defects = await response.json();
       const recurring = recurringDefects.find(r => r.id === recurringId);
       if (recurring) {

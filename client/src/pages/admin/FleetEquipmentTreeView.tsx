@@ -40,20 +40,20 @@ export default function FleetEquipmentTreeView() {
   const [selectedEquipment, setSelectedEquipment] = useState<MasterData | null>(null);
   
   const { data: masterDataResponse, isLoading, refetch } = useQuery<MasterDataResponse>({
-    queryKey: ['/api/fleet-admin/master-data', 'tree'],
+    queryKey: ['/technical/api/fleet-admin/master-data', 'tree'],
     queryFn: async () => {
-      const response = await fetch('/api/fleet-admin/master-data?limit=10000');
+      const response = await fetch('/technical/api/fleet-admin/master-data?limit=10000');
       if (!response.ok) throw new Error('Failed to fetch master data');
       return response.json();
     }
   });
   
   const { data: fleetJobsData } = useQuery<Job[]>({
-    queryKey: ['/api/fleet/jobs'],
+    queryKey: ['/technical/api/fleet/jobs'],
   });
   
   const { data: fleetSparesData } = useQuery<Spare[]>({
-    queryKey: ['/api/fleet/spares'],
+    queryKey: ['/technical/api/fleet/spares'],
   });
   
   const masterDataList = masterDataResponse?.items ?? [];

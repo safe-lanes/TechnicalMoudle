@@ -42,10 +42,10 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
 
   // Fetch active components from API for the component selector (Issue #6)
   const { data: components = [], isLoading: componentsLoading } = useQuery<Component[]>({
-    queryKey: ['/api/components', vesselId],
+    queryKey: ['/technical/api/components', vesselId],
     queryFn: async () => {
       if (!vesselId) return [];
-      const response = await fetch(`/api/components/${vesselId}`);
+      const response = await fetch(`/technical/api/components/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       const allComponents = await response.json() as Component[];
       // Filter to show only active components (isActive can be boolean or null)

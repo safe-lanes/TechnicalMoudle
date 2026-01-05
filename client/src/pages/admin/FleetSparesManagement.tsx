@@ -24,21 +24,21 @@ export default function FleetSparesManagement() {
 
   // Fetch fleet spares
   const { data: spares, isLoading, error } = useQuery<Spare[]>({
-    queryKey: ['/api/fleet/spares'],
+    queryKey: ['/technical/api/fleet/spares'],
   });
 
   // Fetch fleet components for equipment filter
   const { data: components } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('DELETE', `/api/fleet/spares/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet/spares/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/spares'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
       toast({
         title: "Success",
         description: "Fleet spare deleted successfully",
@@ -96,7 +96,7 @@ export default function FleetSparesManagement() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch('/api/fleet/spares/export');
+      const response = await fetch('/technical/api/fleet/spares/export');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

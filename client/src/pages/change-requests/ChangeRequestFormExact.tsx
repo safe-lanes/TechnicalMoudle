@@ -62,9 +62,9 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
 
   const { data: vessels = [] } = useQuery({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
     queryFn: async () => {
-      const response = await fetch('/api/vessels');
+      const response = await fetch('/technical/api/vessels');
       if (!response.ok) throw new Error('Failed to fetch vessels');
       return response.json();
     }
@@ -101,14 +101,14 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
         ...data,
         proposedChangesJson: proposedChanges.length > 0 ? proposedChanges : null,
       };
-      return apiRequest('POST', '/api/change-requests', requestData);
+      return apiRequest('POST', '/technical/api/change-requests', requestData);
     },
     onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `Change request CR-${String(data.id).padStart(4, '0')} created successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       onClose();
     },
     onError: (error: any) => {
@@ -127,14 +127,14 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
         ...data,
         proposedChangesJson: proposedChanges.length > 0 ? proposedChanges : null,
       };
-      return apiRequest('PATCH', `/api/change-requests/${changeRequest?.id}`, requestData);
+      return apiRequest('PATCH', `/technical/api/change-requests/${changeRequest?.id}`, requestData);
     },
     onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `Change request CR-${String(data.id).padStart(4, '0')} updated successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       onClose();
     },
     onError: (error: any) => {
@@ -150,7 +150,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!changeRequest) return;
-      return apiRequest('POST', `/api/change-requests/${changeRequest.id}/submit`, {
+      return apiRequest('POST', `/technical/api/change-requests/${changeRequest.id}/submit`, {
         userId: 'Current User' // In real app, get from auth context
       });
     },
@@ -159,7 +159,7 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
         title: "Success",
         description: "Change request submitted for approval",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       onClose();
     },
     onError: (error: any) => {

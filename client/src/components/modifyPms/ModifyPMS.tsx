@@ -97,7 +97,7 @@ export function ModifyPMS() {
 
   // Fetch change requests
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['/api/change-requests', categoryFilter],
+    queryKey: ['/technical/api/change-requests', categoryFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('vesselId', 'V001');
@@ -106,7 +106,7 @@ export function ModifyPMS() {
         params.append('category', categoryFilter);
       }
       
-      const response = await fetch(`/api/change-requests?${params}`);
+      const response = await fetch(`/technical/api/change-requests?${params}`);
       if (!response.ok) throw new Error('Failed to fetch requests');
       return response.json();
     }
@@ -121,7 +121,7 @@ export function ModifyPMS() {
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async ({ id, comment }: { id: number; comment: string }) => {
-      const response = await fetch(`/api/change-requests/${id}/approve`, {
+      const response = await fetch(`/technical/api/change-requests/${id}/approve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment, reviewerId: 'current_user' })
@@ -137,13 +137,13 @@ export function ModifyPMS() {
     },
     onSuccess: (updatedRequest) => {
       // Invalidate both list queries and individual request query
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       if (viewingRequest) {
-        queryClient.invalidateQueries({ queryKey: [`/api/change-requests/${viewingRequest.id}`] });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
       }
       
       // Force refetch to ensure UI updates immediately
-      queryClient.refetchQueries({ queryKey: ['/api/change-requests', categoryFilter] });
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', categoryFilter] });
       
       setViewingRequest(null);
       toast({
@@ -156,7 +156,7 @@ export function ModifyPMS() {
   // Reject mutation
   const rejectMutation = useMutation({
     mutationFn: async ({ id, comment }: { id: number; comment: string }) => {
-      const response = await fetch(`/api/change-requests/${id}/reject`, {
+      const response = await fetch(`/technical/api/change-requests/${id}/reject`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment, reviewerId: 'current_user' })
@@ -172,13 +172,13 @@ export function ModifyPMS() {
     },
     onSuccess: (updatedRequest) => {
       // Invalidate both list queries and individual request query
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       if (viewingRequest) {
-        queryClient.invalidateQueries({ queryKey: [`/api/change-requests/${viewingRequest.id}`] });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
       }
       
       // Force refetch to ensure UI updates immediately
-      queryClient.refetchQueries({ queryKey: ['/api/change-requests', categoryFilter] });
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', categoryFilter] });
       
       setViewingRequest(null);
       toast({

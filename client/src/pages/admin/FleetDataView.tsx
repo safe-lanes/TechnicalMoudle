@@ -303,34 +303,34 @@ export default function FleetDataView() {
     items: MasterData[];
     total: number;
   }>({
-    queryKey: ["/api/fleet-admin/master-data?limit=1000"],
+    queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"],
   });
 
   const { data: fleetJobs } = useQuery<FleetJob[]>({
-    queryKey: ["/api/fleet/jobs"],
+    queryKey: ["/technical/api/fleet/jobs"],
   });
 
   const { data: fleetSpares } = useQuery<FleetSpare[]>({
-    queryKey: ["/api/fleet/spares"],
+    queryKey: ["/technical/api/fleet/spares"],
   });
 
   const { data: vessels } = useQuery<{ id: string; code?: string; name: string }[]>({
-    queryKey: ["/api/vessels"],
+    queryKey: ["/technical/api/vessels"],
   });
 
   const { data: componentVesselMappings } = useQuery<ComponentVesselMapping[]>({
-    queryKey: ["/api/fleet-admin/component-vessel-mappings"],
+    queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"],
   });
 
   const removeMappingsMutation = useMutation({
     mutationFn: async (ids: number[]) => {
       const results = await Promise.all(
-        ids.map(id => apiRequest("DELETE", `/api/fleet-admin/component-vessel-mappings/${id}`))
+        ids.map(id => apiRequest("DELETE", `/technical/api/fleet-admin/component-vessel-mappings/${id}`))
       );
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
       setSelectedMappingIds(new Set());
       toast({
         title: "Success",
@@ -348,10 +348,10 @@ export default function FleetDataView() {
 
   const addMappingMutation = useMutation({
     mutationFn: async (data: { fleetEquipmentCode: string; vesselCode: string; vesselName: string; componentCode?: string; componentName?: string }) => {
-      return apiRequest("POST", "/api/fleet-admin/component-vessel-mappings", data);
+      return apiRequest("POST", "/technical/api/fleet-admin/component-vessel-mappings", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
       toast({
         title: "Success",
         description: "Component mapping has been added",
@@ -368,7 +368,7 @@ export default function FleetDataView() {
 
   const createFleetJobMutation = useMutation({
     mutationFn: async (data: Partial<FleetJob> & { fleetEquipmentCode: string }) => {
-      return apiRequest("POST", "/api/fleet/jobs", {
+      return apiRequest("POST", "/technical/api/fleet/jobs", {
         ...data,
         dataScope: "fleet",
         componentCode: data.fleetEquipmentCode,
@@ -377,7 +377,7 @@ export default function FleetDataView() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet/jobs"] });
       setIsAddJobDialogOpen(false);
       setNewJobFormData({});
       toast({
@@ -588,7 +588,7 @@ export default function FleetDataView() {
       setSelectedVesselsToMap(new Set());
       setVesselMappingSearchQuery("");
       setIsVesselMappingDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
       toast({
         title: "Success",
         description: `${vesselsToMap.length} vessel(s) have been mapped`,
@@ -673,7 +673,7 @@ export default function FleetDataView() {
       setSelectedComponentsToMap(new Set());
       setComponentMappingSearchQuery("");
       setIsComponentMappingDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
       toast({
         title: "Success",
         description: `${componentsToMap.length} component(s) have been mapped`,
@@ -739,7 +739,7 @@ export default function FleetDataView() {
         setSelectedDetailMappingIds(new Set());
         setIsDetailDialogOpen(false);
         setSelectedVesselForDetail(null);
-        queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/component-vessel-mappings"] });
+        queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/component-vessel-mappings"] });
         toast({
           title: "Success",
           description: "Selected mappings have been removed",

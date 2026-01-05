@@ -117,7 +117,7 @@ export default function AlertPolicyDrawer({
 
   const handleSendTest = async () => {
     try {
-      const response = await fetch('/api/alerts/test', {
+      const response = await fetch('/technical/api/alerts/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

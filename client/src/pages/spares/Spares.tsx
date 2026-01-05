@@ -381,7 +381,7 @@ const Spares: React.FC = () => {
   
   // Fetch spares from API with inventory data (uses spareComponentLinks for many-to-many support)
   const { data: sparesWithInventoryResponse, isLoading: sparesLoading } = useQuery<{success: boolean; data: any[]}>({
-    queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`],
+    queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`],
     enabled: !!vesselId,
   });
   const sparesData = useMemo(() => {
@@ -397,14 +397,14 @@ const Spares: React.FC = () => {
   
   // Fetch inventory transactions for history tab
   const { data: inventoryTransactionsResponse, isLoading: transactionsLoading } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: [`/api/inventory/transactions/${vesselId}`],
+    queryKey: [`/technical/api/inventory/transactions/${vesselId}`],
     enabled: activeTab === 'history' && !!vesselId,
   });
   const inventoryTransactions = inventoryTransactionsResponse?.data || [];
 
   // Fetch vessel locations for consume/receive dialogs
   const { data: locationsResponse } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: [`/api/inventory/locations/${vesselId}`],
+    queryKey: [`/technical/api/inventory/locations/${vesselId}`],
     enabled: !!vesselId,
   });
   const vesselLocations = locationsResponse?.data || [];
@@ -420,16 +420,16 @@ const Spares: React.FC = () => {
       referenceId?: string;
       referenceNote?: string;
     }) => {
-      return apiRequest('POST', '/api/inventory/transactions', {
+      return apiRequest('POST', '/technical/api/inventory/transactions', {
         vesselId,
         ...data,
         userId: 'system', // Will be replaced with actual user when auth is implemented
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/inventory/transactions/${vesselId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/inventory/locations/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/transactions/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/locations/${vesselId}`] });
       setConsumeDialogOpen(false);
       setReceiveDialogOpen(false);
       setSelectedSpareForTransaction(null);
@@ -661,7 +661,7 @@ const Spares: React.FC = () => {
       
       // Execute consume operations
       if (itemsToConsume.length > 0) {
-        await apiRequest('POST', `/api/spares/${vesselId}/batch-consume`, {
+        await apiRequest('POST', `/technical/api/spares/${vesselId}/batch-consume`, {
           items: itemsToConsume,
           consumedBy: 'System'
         });
@@ -669,7 +669,7 @@ const Spares: React.FC = () => {
       
       // Execute receive operations
       if (itemsToReceive.length > 0) {
-        await apiRequest('POST', `/api/spares/${vesselId}/batch-receive`, {
+        await apiRequest('POST', `/technical/api/spares/${vesselId}/batch-receive`, {
           items: itemsToReceive,
           receivedBy: 'System',
           purchaseOrderRef: `BULK-${new Date().toISOString().split('T')[0]}`
@@ -677,7 +677,7 @@ const Spares: React.FC = () => {
       }
       
       // Invalidate cache to refresh data
-      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`] });
       
       toast({
         title: "Success",

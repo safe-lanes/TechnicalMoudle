@@ -58,11 +58,11 @@ const AlertsApprovalsAdminReports: React.FC<AlertsApprovalsAdminReportsProps> = 
   const { vesselId } = useVessel();
 
   const { data: workOrders = [] } = useQuery<any[]>({
-    queryKey: ['/api/work-orders'],
+    queryKey: ['/technical/api/work-orders'],
   });
 
   const { data: defects = [] } = useQuery<any[]>({
-    queryKey: ['/api/defects', vesselId],
+    queryKey: ['/technical/api/defects', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

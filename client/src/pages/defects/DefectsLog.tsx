@@ -81,7 +81,7 @@ export default function DefectsLog() {
   });
 
   const { data: defects = [], isLoading } = useQuery({
-    queryKey: ['/api/defects', filters],
+    queryKey: ['/technical/api/defects', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       
@@ -94,7 +94,7 @@ export default function DefectsLog() {
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       if (filters.includeClosedDefects) params.append('includeClosedDefects', 'true');
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch defects');
       return response.json();
     },
@@ -577,7 +577,7 @@ export default function DefectsLog() {
               onCompleted={() => {
                 setCloseModal({ open: false, defect: null });
                 // Invalidate queries to refresh the defects list
-                queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+                queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
               }}
             />
           </DialogContent>

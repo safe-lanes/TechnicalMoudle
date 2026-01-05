@@ -68,9 +68,9 @@ export default function RunningHoursConditionPanel({
   const [pendingCounterType, setPendingCounterType] = useState<string>("");
 
   const { data: rhConfig, isLoading: isLoadingConfig } = useQuery<RHConfig>({
-    queryKey: ["/api/rh-config", componentId],
+    queryKey: ["/technical/api/rh-config", componentId],
     queryFn: async () => {
-      const res = await fetch(`/api/rh-config/${componentId}`);
+      const res = await fetch(`/technical/api/rh-config/${componentId}`);
       if (!res.ok) throw new Error("Failed to fetch RH config");
       return res.json();
     },
@@ -79,9 +79,9 @@ export default function RunningHoursConditionPanel({
   });
 
   const { data: masterComponents = [], isLoading: isLoadingMasters } = useQuery<MasterComponent[]>({
-    queryKey: ["/api/rh-config/master-components", vesselId],
+    queryKey: ["/technical/api/rh-config/master-components", vesselId],
     queryFn: async () => {
-      const res = await fetch(`/api/rh-config/master-components/${vesselId}`);
+      const res = await fetch(`/technical/api/rh-config/master-components/${vesselId}`);
       if (!res.ok) throw new Error("Failed to fetch master components");
       return res.json();
     },
@@ -99,14 +99,14 @@ export default function RunningHoursConditionPanel({
 
   const updateConfigMutation = useMutation({
     mutationFn: async (data: { rhCounterType: string; rhMasterComponentId?: string | null }) => {
-      const res = await apiRequest("PUT", `/api/rh-config/${componentId}`, {
+      const res = await apiRequest("PUT", `/technical/api/rh-config/${componentId}`, {
         ...data,
         userId: "admin",
       });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rh-config", componentId] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/rh-config", componentId] });
       toast({
         title: "Success",
         description: "RH configuration updated successfully",
@@ -123,7 +123,7 @@ export default function RunningHoursConditionPanel({
 
   const updateMasterRHMutation = useMutation({
     mutationFn: async (newRHValue: number) => {
-      const res = await apiRequest("PUT", `/api/rh-config/master/${componentId}`, {
+      const res = await apiRequest("PUT", `/technical/api/rh-config/master/${componentId}`, {
         newRHValue,
         updateSource: "MANUAL",
         userId: "admin",
@@ -131,7 +131,7 @@ export default function RunningHoursConditionPanel({
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/rh-config", componentId] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/rh-config", componentId] });
       toast({
         title: "Success",
         description: `Running hours updated. ${data.inheritedUpdated > 0 ? `Cascaded to ${data.inheritedUpdated} inherited components.` : ""}`,

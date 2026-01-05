@@ -41,7 +41,7 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
 
   // Fetch fleet components for equipment selection
   const { data: components } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
     enabled: open,
   });
 
@@ -101,10 +101,10 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: FleetJobFormData) => {
-      return apiRequest('POST', '/api/fleet/jobs', { ...data, dataScope: 'fleet' });
+      return apiRequest('POST', '/technical/api/fleet/jobs', { ...data, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/jobs'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
       toast({
         title: "Success",
         description: "Fleet job created successfully",
@@ -124,10 +124,10 @@ export default function FleetJobForm({ open, onOpenChange, job }: FleetJobFormPr
   const updateMutation = useMutation({
     mutationFn: async (data: FleetJobFormData & { id: string }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/api/fleet/jobs/${id}`, { ...updateData, dataScope: 'fleet' });
+      return apiRequest('PATCH', `/technical/api/fleet/jobs/${id}`, { ...updateData, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/jobs'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
       toast({
         title: "Success",
         description: "Fleet job updated successfully",

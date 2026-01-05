@@ -58,12 +58,12 @@ const SparesReports: React.FC<SparesReportsProps> = ({ onBack }) => {
   const { vesselId } = useVessel();
 
   const { data: spares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 
   const { data: spareHistory = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares', vesselId, 'history'],
+    queryKey: ['/technical/api/spares', vesselId, 'history'],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

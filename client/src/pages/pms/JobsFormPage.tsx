@@ -121,7 +121,7 @@ const JobsFormPage: React.FC = () => {
   const isModifyMode = urlParams.get('modify') === '1';
 
   const { data: jobContext, isLoading } = useQuery({
-    queryKey: [`/api/jobs/${jobId}/context`],
+    queryKey: [`/technical/api/jobs/${jobId}/context`],
     enabled: !!jobId
   });
   
@@ -239,7 +239,7 @@ const JobsFormPage: React.FC = () => {
       }));
       
       // Create change request via backend API
-      await apiRequest('POST', '/api/change-requests', {
+      await apiRequest('POST', '/technical/api/change-requests', {
         vesselId: 'V001',
         category: 'jobs',
         title: `Job Change: ${templateData.woTemplateCode || templateData.woTitle || 'Unknown'}`,
@@ -253,7 +253,7 @@ const JobsFormPage: React.FC = () => {
       });
       
       // Invalidate change requests cache so ModifyPMS shows the new request
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       
       toast({
         title: "Change request submitted",

@@ -143,12 +143,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   // Use job context endpoint for template mode (viewing job template), 
   // work order context endpoint otherwise
   const { data: jobContext, isLoading: isJobContextLoading } = useQuery({
-    queryKey: [`/api/jobs/${workOrderId}/context`],
+    queryKey: [`/technical/api/jobs/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode === 'template'
   });
 
   const { data: woContext, isLoading: isWoContextLoading } = useQuery({
-    queryKey: [`/api/work-orders/${workOrderId}/context`],
+    queryKey: [`/technical/api/work-orders/${workOrderId}/context`],
     enabled: !!workOrderId && resolvedMode !== 'template'
   });
   
@@ -170,13 +170,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     locationA: string | null;
     locationB: string | null;
   }>>({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     enabled: !!vesselId
   });
 
   // Fetch vessel locations for location selection in B4
   const { data: locationsResponse } = useQuery<{ success: boolean; data: Array<{ id: number; locationName: string }> }>({
-    queryKey: [`/api/inventory/locations/${vesselId}`],
+    queryKey: [`/technical/api/inventory/locations/${vesselId}`],
     enabled: !!vesselId
   });
   const vesselLocations = locationsResponse?.data || [];
@@ -188,7 +188,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     stockStatus: string;
     locations: Array<{ locationId: number; locationName: string; qty: number }>;
   }> }>({
-    queryKey: [`/api/inventory/spares-with-inventory/${vesselId}`],
+    queryKey: [`/technical/api/inventory/spares-with-inventory/${vesselId}`],
     enabled: !!vesselId
   });
   const sparesWithInventory = sparesWithInventoryResponse?.data || [];
@@ -824,7 +824,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       formData.append('file', file);
       formData.append('documentType', documentType);
 
-      const response = await fetch('/api/upload-document', {
+      const response = await fetch('/technical/api/upload-document', {
         method: 'POST',
         body: formData
       });
@@ -871,7 +871,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     try {
       const fileKeyEncoded = encodeURIComponent(document.fileKey.substring(1));
-      const response = await fetch(`/api/documents/${fileKeyEncoded}`);
+      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
       
       if (!response.ok) {
         throw new Error('Failed to retrieve document');
@@ -902,7 +902,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
     try {
       const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
-      const response = await fetch(`/api/documents/${fileKeyEncoded}`, {
+      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`, {
         method: 'DELETE'
       });
 
@@ -1184,7 +1184,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         runningHours: runningHoursValue || executionData.runningHours
       };
       
-      response = await fetch(`/api/work-orders/${workOrderId}`, {
+      response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -1206,8 +1206,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       
       // Invalidate all work orders-related caches so the updated status is reflected
       // This includes the list (with any vesselId variants) and the specific work order context
-      await queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
-      await queryClient.invalidateQueries({ queryKey: [`/api/work-orders/${workOrderId}/context`] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
+      await queryClient.invalidateQueries({ queryKey: [`/technical/api/work-orders/${workOrderId}/context`] });
       
       toast({
         title: "Success",
@@ -1297,11 +1297,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         dataScope: 'vessel', // Jobs created from UI are vessel-specific
       };
       
-      const response = await apiRequest('POST', '/api/jobs', jobPayload);
+      const response = await apiRequest('POST', '/technical/api/jobs', jobPayload);
       const result = await response.json();
       
       // Invalidate jobs cache so the new job appears in the list
-      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
       
       toast({
         title: "Success",
@@ -1325,7 +1325,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     
     setIsProcessingApproval(true);
     try {
-      const response = await fetch(`/api/work-orders/${workOrderId}`, {
+      const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -1374,7 +1374,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     
     setIsProcessingApproval(true);
     try {
-      const response = await fetch(`/api/work-orders/${workOrderId}`, {
+      const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

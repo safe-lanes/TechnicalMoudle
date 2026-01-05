@@ -176,10 +176,10 @@ export default function MaintenancePlanner() {
 
   // Fetch planner data
   const { data, isLoading, refetch, isFetching } = useQuery<PlannerResponse>({
-    queryKey: ["/api/maintenance-planner", queryParams],
+    queryKey: ["/technical/api/maintenance-planner", queryParams],
     queryFn: async () => {
       const searchParams = new URLSearchParams(queryParams);
-      const response = await fetch(`/api/maintenance-planner?${searchParams.toString()}`);
+      const response = await fetch(`/technical/api/maintenance-planner?${searchParams.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch planner data");
       return response.json();
     },
@@ -191,7 +191,7 @@ export default function MaintenancePlanner() {
   const exportMutation = useMutation({
     mutationFn: async (exportFormat: "excel" | "pdf") => {
       const searchParams = new URLSearchParams({ ...queryParams, format: exportFormat });
-      const response = await fetch(`/api/maintenance-planner/export?${searchParams.toString()}`);
+      const response = await fetch(`/technical/api/maintenance-planner/export?${searchParams.toString()}`);
       
       if (!response.ok) throw new Error("Export failed");
       

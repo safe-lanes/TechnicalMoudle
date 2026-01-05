@@ -97,44 +97,44 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   // Fetch existing component data if in edit mode
   const { data: existingComponent, isLoading: isLoadingComponent } = useQuery<any>({
-    queryKey: ['/api/components', componentId],
+    queryKey: ['/technical/api/components', componentId],
     enabled: isEditMode && !!componentId,
   });
 
   // Fetch related data for sections B-H (only in edit mode)
   // Filter jobs by vesselId at the database level
   const { data: allJobs = [], isLoading: isLoadingJobs } = useQuery<any[]>({
-    queryKey: [`/api/jobs?vesselId=${vesselId}`],
+    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
     enabled: isEditMode && !!vesselId,
   });
 
   const { data: maintenanceHistory = [], isLoading: isLoadingHistory } = useQuery<any[]>({
-    queryKey: [`/api/component-maintenance-history/${componentId}`],
+    queryKey: [`/technical/api/component-maintenance-history/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: allSpares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares'],
+    queryKey: ['/technical/api/spares'],
     enabled: isEditMode,
   });
 
   const { data: documents = [], isLoading: isLoadingDocs } = useQuery<any[]>({
-    queryKey: [`/api/component-documents/${componentId}`],
+    queryKey: [`/technical/api/component-documents/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: classRegData = [], isLoading: isLoadingClassReg } = useQuery<any[]>({
-    queryKey: [`/api/component-class-regulatory/${componentId}`],
+    queryKey: [`/technical/api/component-class-regulatory/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: requisitions = [], isLoading: isLoadingRequisitions } = useQuery<any[]>({
-    queryKey: [`/api/component-requisitions/${componentId}`],
+    queryKey: [`/technical/api/component-requisitions/${componentId}`],
     enabled: isEditMode && !!componentId,
   });
 
   const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: ['/api/components'],
+    queryKey: ['/technical/api/components'],
     enabled: isEditMode,
   });
 
@@ -163,21 +163,21 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
   // Fetch master component data if type is INHERITED
   const { data: masterComponent, isLoading: isMasterLoading } = useQuery<any>({
-    queryKey: [`/api/components/details/${rhMasterComponentId}`],
+    queryKey: [`/technical/api/components/details/${rhMasterComponentId}`],
     enabled: isEditMode && rhCounterType === 'INHERITED' && !!rhMasterComponentId,
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch parent component for INHERITED type
   const { data: rhParentComponent } = useQuery<any>({
-    queryKey: [`/api/components/details/${parentId}`],
+    queryKey: [`/technical/api/components/details/${parentId}`],
     enabled: isEditMode && rhCounterType === 'INHERITED' && !!parentId,
     staleTime: 5 * 60 * 1000,
   });
 
   // Fetch running hours data for accurate timestamps (for MASTER type)
   const { data: runningHoursData = [] } = useQuery<any[]>({
-    queryKey: [`/api/running-hours/${componentId}`],
+    queryKey: [`/technical/api/running-hours/${componentId}`],
     enabled: isEditMode && !!componentId && rhCounterType === 'MASTER',
     staleTime: 60 * 1000,
   });
@@ -363,13 +363,13 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
       };
 
       if (isEditMode && componentId) {
-        await apiRequest('PATCH', `/api/components/${componentId}`, payload);
+        await apiRequest('PATCH', `/technical/api/components/${componentId}`, payload);
         toast({
           title: "Component Updated",
           description: "Component has been updated successfully.",
         });
       } else {
-        await apiRequest('POST', '/api/components', payload);
+        await apiRequest('POST', '/technical/api/components', payload);
         toast({
           title: "Component Created",
           description: "New component has been created successfully.",
@@ -378,12 +378,12 @@ const AddEditComponentForm: React.FC<AddEditComponentFormProps> = ({
 
       // Invalidate all component-related queries to force fresh data fetch
       console.log('🔄 Invalidating component queries after save, vesselId:', vesselId);
-      await queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/components'] });
       
       // Also invalidate the vessel-specific query
       const currentVesselId = vesselId || 'V001';
       await queryClient.invalidateQueries({ 
-        queryKey: [`/api/components/${currentVesselId}`] 
+        queryKey: [`/technical/api/components/${currentVesselId}`] 
       });
       console.log('[CREATE] Cache invalidated for vessel:', currentVesselId);
       onClose();

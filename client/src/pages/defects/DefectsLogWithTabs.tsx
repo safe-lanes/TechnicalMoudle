@@ -79,7 +79,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch active defects');
       return response.json();
     },
@@ -99,7 +99,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       // Don't apply dueOverdue filter for resolved defects
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch resolved defects');
       return response.json();
     },
@@ -118,7 +118,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects/coc?${params}`);
+      const response = await fetch(`/technical/api/defects/coc?${params}`);
       if (!response.ok) throw new Error('Failed to fetch CoC defects');
       return response.json();
     },
@@ -137,7 +137,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects/recurring?${params}`);
+      const response = await fetch(`/technical/api/defects/recurring?${params}`);
       if (!response.ok) throw new Error('Failed to fetch recurring defects');
       return response.json();
     },
@@ -159,7 +159,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects/count?${params}`);
+      const response = await fetch(`/technical/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch active count');
       const data = await response.json();
       return data.count;
@@ -180,7 +180,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       // Don't apply dueOverdue filter for resolved defects (matches list query)
       
-      const response = await fetch(`/api/defects/count?${params}`);
+      const response = await fetch(`/technical/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch resolved count');
       const data = await response.json();
       return data.count;
@@ -201,7 +201,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects/count?${params}`);
+      const response = await fetch(`/technical/api/defects/count?${params}`);
       if (!response.ok) throw new Error('Failed to fetch CoC count');
       const data = await response.json();
       return data.count;
@@ -221,7 +221,7 @@ export default function DefectsLogWithTabs() {
       if (filters.addGroup) params.append('group', filters.addGroup);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects/count/recurring?${params}`);
+      const response = await fetch(`/technical/api/defects/count/recurring?${params}`);
       if (!response.ok) throw new Error('Failed to fetch recurring count');
       const data = await response.json();
       return data.count;

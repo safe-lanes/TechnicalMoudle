@@ -49,18 +49,18 @@ export default function BulkImportHistory({ vesselId, moduleType }: BulkImportHi
   queryParams.set('offset', (page * pageSize).toString());
 
   const { data: historyData, isLoading, refetch } = useQuery<{ items: BulkImportHistoryType[], total: number }>({
-    queryKey: ['/api/fleet-admin/import-history', selectedVessel, selectedModule, selectedStatus, page],
+    queryKey: ['/technical/api/fleet-admin/import-history', selectedVessel, selectedModule, selectedStatus, page],
     queryFn: async () => {
-      const response = await fetch(`/api/fleet-admin/import-history?${queryParams}`);
+      const response = await fetch(`/technical/api/fleet-admin/import-history?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch import history');
       return response.json();
     }
   });
 
   const { data: selectedImportErrors, isLoading: isLoadingErrors } = useQuery<BulkImportError[]>({
-    queryKey: ['/api/fleet-admin/import-history', selectedImport?.id, 'errors'],
+    queryKey: ['/technical/api/fleet-admin/import-history', selectedImport?.id, 'errors'],
     queryFn: async () => {
-      const response = await fetch(`/api/fleet-admin/import-history/${selectedImport?.id}/errors`);
+      const response = await fetch(`/technical/api/fleet-admin/import-history/${selectedImport?.id}/errors`);
       if (!response.ok) throw new Error('Failed to fetch import errors');
       return response.json();
     },

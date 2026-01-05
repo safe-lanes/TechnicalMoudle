@@ -44,7 +44,7 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
 
   // Fetch fleet components for equipment selection
   const { data: components } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
     enabled: open,
   });
 
@@ -107,10 +107,10 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: FleetSpareFormData) => {
-      return apiRequest('POST', '/api/fleet/spares', { ...data, dataScope: 'fleet' });
+      return apiRequest('POST', '/technical/api/fleet/spares', { ...data, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/spares'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
       toast({
         title: "Success",
         description: "Fleet spare created successfully",
@@ -130,10 +130,10 @@ export default function FleetSpareForm({ open, onOpenChange, spare }: FleetSpare
   const updateMutation = useMutation({
     mutationFn: async (data: FleetSpareFormData & { id: number }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/api/fleet/spares/${id}`, { ...updateData, dataScope: 'fleet' });
+      return apiRequest('PATCH', `/technical/api/fleet/spares/${id}`, { ...updateData, dataScope: 'fleet' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/spares'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/spares'], exact: false });
       toast({
         title: "Success",
         description: "Fleet spare updated successfully",

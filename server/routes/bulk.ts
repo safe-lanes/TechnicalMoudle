@@ -2293,7 +2293,7 @@ router.post('/dry-run', upload.single('file'), async (req, res) => {
       summary: results.summary,
       rows: results.rows, // Return all rows for proper pagination and filtering
       totalRows: results.rows.length,
-      errorReportUrl: results.summary.errors > 0 ? `/api/bulk/history/tmp/${fileToken}/errors.csv` : undefined
+      errorReportUrl: results.summary.errors > 0 ? `/technical/api/bulk/history/tmp/${fileToken}/errors.csv` : undefined
     });
   } catch (error) {
     console.error('Dry-run error:', error);
@@ -5204,7 +5204,7 @@ async function getHistoryFile(id: string, fileType: string): Promise<{ mimeType:
   return null;
 }
 
-// POST /api/bulk/undo/:historyId - Undo an import with conflict detection
+// POST /technical/api/bulk/undo/:historyId - Undo an import with conflict detection
 router.post('/undo/:historyId', async (req, res) => {
   const { historyId } = req.params;
   

@@ -33,7 +33,7 @@ export default function StoresUpload({ vesselId, markers }: StoresUploadProps) {
   const handleRefreshData = () => {
     // Invalidate all stores queries for all tabs (stores, lubes, chemicals, others)
     ['stores', 'lubes', 'chemicals', 'others'].forEach(tab => {
-      queryClient.invalidateQueries({ queryKey: [`/api/stores/${vesselId}?itemType=${tab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${tab}`] });
     });
   };
 

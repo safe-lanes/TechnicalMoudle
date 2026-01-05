@@ -47,9 +47,9 @@ export default function MasterDataManagement() {
   type MasterDataResponse = { items: MasterData[]; total: number; limit: number; offset: number };
   
   const { data: masterDataResponse, isLoading, error, refetch } = useQuery<MasterDataResponse>({
-    queryKey: ['/api/fleet-admin/master-data', { limit: 10000 }],
+    queryKey: ['/technical/api/fleet-admin/master-data', { limit: 10000 }],
     queryFn: async () => {
-      const response = await fetch('/api/fleet-admin/master-data?limit=10000');
+      const response = await fetch('/technical/api/fleet-admin/master-data?limit=10000');
       if (!response.ok) throw new Error('Failed to fetch master data');
       return response.json();
     }
@@ -58,7 +58,7 @@ export default function MasterDataManagement() {
   const masterDataList = masterDataResponse?.items ?? [];
 
   const { data: sfiDetails } = useQuery<SfiDetails[]>({
-    queryKey: ['/api/fleet-admin/sfi-details'],
+    queryKey: ['/technical/api/fleet-admin/sfi-details'],
   });
 
   const form = useForm<MasterDataFormData>({
@@ -78,10 +78,10 @@ export default function MasterDataManagement() {
 
   const createMutation = useMutation({
     mutationFn: async (data: MasterDataFormData) => {
-      return apiRequest('POST', '/api/fleet-admin/master-data', data);
+      return apiRequest('POST', '/technical/api/fleet-admin/master-data', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/master-data'], exact: false });
       toast({
         title: "Success",
         description: "Master data entry created successfully. Fleet Equipment Code was auto-generated.",
@@ -101,10 +101,10 @@ export default function MasterDataManagement() {
   const updateMutation = useMutation({
     mutationFn: async (data: MasterDataFormData & { id: number }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PATCH', `/api/fleet-admin/master-data/${id}`, updateData);
+      return apiRequest('PATCH', `/technical/api/fleet-admin/master-data/${id}`, updateData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/master-data'], exact: false });
       toast({
         title: "Success",
         description: "Master data entry updated successfully",
@@ -123,10 +123,10 @@ export default function MasterDataManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('DELETE', `/api/fleet-admin/master-data/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet-admin/master-data/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/master-data'], exact: false });
       toast({
         title: "Success",
         description: "Master data entry deleted successfully",

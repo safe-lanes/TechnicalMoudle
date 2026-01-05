@@ -57,10 +57,10 @@ export function DefectFormSimple({ onSuccess, onCancel }: DefectFormSimpleProps)
 
   const onSubmit = async (data: DefectFormData) => {
     try {
-      await apiRequest("POST", "/api/defects", data);
+      await apiRequest("POST", "/technical/api/defects", data);
       
       // Invalidate and refetch defects list
-      await queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
       
       toast({ title: "Defect created successfully" });
       onSuccess?.();

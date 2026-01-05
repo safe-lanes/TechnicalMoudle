@@ -88,7 +88,7 @@ export default function DefectsDashboard() {
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
-    queryKey: ['/api/defects?includeClosedDefects=true'],
+    queryKey: ['/technical/api/defects?includeClosedDefects=true'],
   });
 
   const getDateRangeStart = () => {

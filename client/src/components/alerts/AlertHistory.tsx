@@ -72,7 +72,7 @@ export default function AlertHistory() {
 
   // Fetch alert events
   const { data: events, isLoading, refetch } = useQuery({
-    queryKey: ['/api/alerts/events', filters],
+    queryKey: ['/technical/api/alerts/events', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.startDate) params.append('startDate', filters.startDate);
@@ -80,7 +80,7 @@ export default function AlertHistory() {
       if (filters.alertType && filters.alertType !== 'all') params.append('alertType', filters.alertType);
       if (filters.priority && filters.priority !== 'all') params.append('priority', filters.priority);
       
-      const response = await fetch(`/api/alerts/events?${params}`);
+      const response = await fetch(`/technical/api/alerts/events?${params}`);
       if (!response.ok) throw new Error('Failed to fetch events');
       return response.json();
     }
@@ -88,7 +88,7 @@ export default function AlertHistory() {
 
   const handleAcknowledge = async (eventId: number) => {
     try {
-      const response = await fetch(`/api/alerts/events/${eventId}/acknowledge`, {
+      const response = await fetch(`/technical/api/alerts/events/${eventId}/acknowledge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: 'user1' })

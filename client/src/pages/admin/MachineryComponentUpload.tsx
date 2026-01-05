@@ -27,8 +27,8 @@ interface MachineryComponentUploadProps {
 
 export default function MachineryComponentUpload({ vesselId, markers }: MachineryComponentUploadProps) {
   const handleRefreshData = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/components', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/components'] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/components', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/components'] });
   };
 
   return (

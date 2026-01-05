@@ -40,9 +40,9 @@ export default function MasterListsManagement() {
 
   // Fetch master lists based on selected type
   const { data: masterLists, isLoading, error } = useQuery<MasterList[]>({
-    queryKey: ['/api/fleet/master-lists', selectedListType],
+    queryKey: ['/technical/api/fleet/master-lists', selectedListType],
     queryFn: async () => {
-      const response = await fetch(`/api/fleet/master-lists?listType=${selectedListType}`);
+      const response = await fetch(`/technical/api/fleet/master-lists?listType=${selectedListType}`);
       if (!response.ok) throw new Error('Failed to fetch master lists');
       return response.json();
     },
@@ -62,10 +62,10 @@ export default function MasterListsManagement() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: MasterListFormData) => {
-      return apiRequest('POST', '/api/fleet/master-lists', data);
+      return apiRequest('POST', '/technical/api/fleet/master-lists', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/master-lists'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/master-lists'], exact: false });
       toast({
         title: "Success",
         description: "Master list item created successfully",
@@ -92,10 +92,10 @@ export default function MasterListsManagement() {
   const updateMutation = useMutation({
     mutationFn: async (data: MasterListFormData & { id: number }) => {
       const { id, ...updateData } = data;
-      return apiRequest('PUT', `/api/fleet/master-lists/${id}`, updateData);
+      return apiRequest('PUT', `/technical/api/fleet/master-lists/${id}`, updateData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/master-lists'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/master-lists'], exact: false });
       toast({
         title: "Success",
         description: "Master list item updated successfully",
@@ -116,10 +116,10 @@ export default function MasterListsManagement() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest('DELETE', `/api/fleet/master-lists/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet/master-lists/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/master-lists'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/master-lists'], exact: false });
       toast({
         title: "Success",
         description: "Master list item deleted successfully",

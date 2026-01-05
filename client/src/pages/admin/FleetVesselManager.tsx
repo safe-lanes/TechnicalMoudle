@@ -117,19 +117,19 @@ export default function FleetVesselManager() {
   });
 
   const { data: fleets = [], isLoading: isFleetsLoading } = useQuery<Fleet[]>({
-    queryKey: ["/api/fleets"],
+    queryKey: ["/technical/api/fleets"],
   });
 
   const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<VesselWithFleet[]>({
-    queryKey: ["/api/vessels-with-fleets"],
+    queryKey: ["/technical/api/vessels-with-fleets"],
   });
 
   const createFleetMutation = useMutation({
     mutationFn: async (data: FleetFormData) => {
-      return await apiRequest("POST", "/api/fleets", data);
+      return await apiRequest("POST", "/technical/api/fleets", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets"] });
       toast({ title: "Fleet created successfully" });
       setIsFleetDialogOpen(false);
       fleetForm.reset();
@@ -141,11 +141,11 @@ export default function FleetVesselManager() {
 
   const updateFleetMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: FleetFormData }) => {
-      return await apiRequest("PUT", `/api/fleets/${id}`, data);
+      return await apiRequest("PUT", `/technical/api/fleets/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
       toast({ title: "Fleet updated successfully" });
       setIsFleetDialogOpen(false);
       setEditingFleet(null);
@@ -158,10 +158,10 @@ export default function FleetVesselManager() {
 
   const deleteFleetMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/fleets/${id}`);
+      return await apiRequest("DELETE", `/technical/api/fleets/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleets"] });
       toast({ title: "Fleet deleted successfully" });
     },
     onError: (error: any) => {
@@ -171,7 +171,7 @@ export default function FleetVesselManager() {
 
   const createVesselMutation = useMutation({
     mutationFn: async (data: VesselFormData) => {
-      return await apiRequest("POST", "/api/vessels", {
+      return await apiRequest("POST", "/technical/api/vessels", {
         ...data,
         code: data.code || data.id,
         fleetId: data.fleetId || null,
@@ -181,8 +181,8 @@ export default function FleetVesselManager() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vessels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
       toast({ title: "Vessel created successfully" });
       setIsVesselDialogOpen(false);
       vesselForm.reset();
@@ -194,11 +194,11 @@ export default function FleetVesselManager() {
 
   const updateVesselFleetMutation = useMutation({
     mutationFn: async ({ id, fleetId }: { id: string; fleetId: string | null }) => {
-      return await apiRequest("PUT", `/api/vessels/${id}/fleet`, { fleetId });
+      return await apiRequest("PUT", `/technical/api/vessels/${id}/fleet`, { fleetId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vessels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vessels-with-fleets"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/vessels-with-fleets"] });
       toast({ title: "Vessel assignment updated successfully" });
       setIsVesselDialogOpen(false);
       setEditingVessel(null);

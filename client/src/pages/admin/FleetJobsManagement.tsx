@@ -39,21 +39,21 @@ export default function FleetJobsManagement() {
 
   // Fetch fleet jobs
   const { data: jobs, isLoading, error } = useQuery<WorkOrder[]>({
-    queryKey: ['/api/fleet/jobs'],
+    queryKey: ['/technical/api/fleet/jobs'],
   });
 
   // Fetch fleet components for equipment filter
   const { data: components } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest('DELETE', `/api/fleet/jobs/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet/jobs/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/jobs'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/jobs'], exact: false });
       toast({
         title: "Success",
         description: "Fleet job deleted successfully",
@@ -73,7 +73,7 @@ export default function FleetJobsManagement() {
   // Generate WO on-demand mutation - use raw fetch to preserve JSON error body
   const generateWOMutation = useMutation({
     mutationFn: async ({ jobId, reason }: { jobId: string; reason: 'Planning' | 'Breakdown' | 'Other' }) => {
-      const response = await fetch(`/api/jobs/${jobId}/generate-wo`, {
+      const response = await fetch(`/technical/api/jobs/${jobId}/generate-wo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
@@ -98,7 +98,7 @@ export default function FleetJobsManagement() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'], exact: false });
       toast({
         title: "Work Order Created",
         description: `Work Order ${data.workOrderNo || data.id || 'N/A'} has been created successfully.`,
@@ -176,7 +176,7 @@ export default function FleetJobsManagement() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch('/api/fleet/jobs/export');
+      const response = await fetch('/technical/api/fleet/jobs/export');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

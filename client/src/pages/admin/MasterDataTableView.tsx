@@ -88,10 +88,10 @@ export default function MasterDataTableView() {
         equipmentName: data.equipmentName,
         isActive: true,
       };
-      return apiRequest('POST', '/api/fleet-admin/master-data', payload);
+      return apiRequest('POST', '/technical/api/fleet-admin/master-data', payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/master-data'] });
       setIsAddDialogOpen(false);
       setFormData(initialFormState);
       toast({
@@ -124,10 +124,10 @@ export default function MasterDataTableView() {
         equipmentName: data.equipmentName,
         isActive: true,
       };
-      return apiRequest('PATCH', `/api/fleet-admin/master-data/${id}`, payload);
+      return apiRequest('PATCH', `/technical/api/fleet-admin/master-data/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet-admin/master-data'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet-admin/master-data'] });
       setIsEditDialogOpen(false);
       setEditFormData(initialFormState);
       setSelectedRow(null);
@@ -218,7 +218,7 @@ export default function MasterDataTableView() {
   };
 
   const { data: masterDataResponse, isLoading } = useQuery<MasterDataResponse>({
-    queryKey: ['/api/fleet-admin/master-data', 'table-view'],
+    queryKey: ['/technical/api/fleet-admin/master-data', 'table-view'],
   });
 
   const masterDataItems = masterDataResponse?.items || [];

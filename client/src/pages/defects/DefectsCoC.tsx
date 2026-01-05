@@ -40,7 +40,7 @@ export default function DefectsCoC() {
 
   // Get CoC defects only
   const { data: allDefects = [], isLoading } = useQuery({
-    queryKey: ['/api/defects', { ...filters, is_coc: true }],
+    queryKey: ['/technical/api/defects', { ...filters, is_coc: true }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('is_coc', 'true'); // Filter for CoC defects only
@@ -51,7 +51,7 @@ export default function DefectsCoC() {
       if (filters.fleet) params.append('fleet', filters.fleet);
       if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
       
-      const response = await fetch(`/api/defects?${params}`);
+      const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch CoC defects');
       return response.json();
     },
@@ -190,12 +190,12 @@ export default function DefectsCoC() {
                       setShowNewDefectForm(false);
                       setSelectedDefect(null);
                       // Invalidate both general and CoC-specific queries
-                      queryClient.invalidateQueries({ queryKey: ['/api/defects'] });
+                      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
                       queryClient.invalidateQueries({ 
                         predicate: (query) => {
                           const queryKey = query.queryKey;
                           return Array.isArray(queryKey) && 
-                                 queryKey[0] === '/api/defects' && 
+                                 queryKey[0] === '/technical/api/defects' && 
                                  queryKey[1] && 
                                  typeof queryKey[1] === 'object' && 
                                  'is_coc' in queryKey[1];
@@ -503,7 +503,7 @@ export default function DefectsCoC() {
                 predicate: (query) => {
                   const queryKey = query.queryKey;
                   return Array.isArray(queryKey) && 
-                         queryKey[0] === '/api/defects' && 
+                         queryKey[0] === '/technical/api/defects' && 
                          queryKey[1] && 
                          typeof queryKey[1] === 'object' && 
                          'is_coc' in queryKey[1];
@@ -524,7 +524,7 @@ export default function DefectsCoC() {
                   predicate: (query) => {
                     const queryKey = query.queryKey;
                     return Array.isArray(queryKey) && 
-                           queryKey[0] === '/api/defects' && 
+                           queryKey[0] === '/technical/api/defects' && 
                            queryKey[1] && 
                            typeof queryKey[1] === 'object' && 
                            'is_coc' in queryKey[1];

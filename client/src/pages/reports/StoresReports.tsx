@@ -54,7 +54,7 @@ const StoresReports: React.FC<StoresReportsProps> = ({ onBack }) => {
   const { vesselId } = useVessel();
 
   const { data: storesItems = [] } = useQuery<any[]>({
-    queryKey: ['/api/stores', vesselId],
+    queryKey: ['/technical/api/stores', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

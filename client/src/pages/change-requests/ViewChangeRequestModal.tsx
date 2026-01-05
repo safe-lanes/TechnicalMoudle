@@ -43,9 +43,9 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
   });
 
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
-    queryKey: ['/api/change-requests', requestId],
+    queryKey: ['/technical/api/change-requests', requestId],
     queryFn: async () => {
-      const response = await fetch(`/api/change-requests/${requestId}`);
+      const response = await fetch(`/technical/api/change-requests/${requestId}`);
       if (!response.ok) throw new Error('Failed to fetch change request');
       return response.json();
     },
@@ -53,9 +53,9 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
   });
 
   const { data: comments = [] } = useQuery({
-    queryKey: ['/api/change-requests', requestId, 'comments'],
+    queryKey: ['/technical/api/change-requests', requestId, 'comments'],
     queryFn: async () => {
-      const response = await fetch(`/api/change-requests/${requestId}/comments`);
+      const response = await fetch(`/technical/api/change-requests/${requestId}/comments`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       return response.json();
     },
@@ -63,9 +63,9 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
   });
 
   const { data: attachments = [] } = useQuery({
-    queryKey: ['/api/change-requests', requestId, 'attachments'],
+    queryKey: ['/technical/api/change-requests', requestId, 'attachments'],
     queryFn: async () => {
-      const response = await fetch(`/api/change-requests/${requestId}/attachments`);
+      const response = await fetch(`/technical/api/change-requests/${requestId}/attachments`);
       if (!response.ok) throw new Error('Failed to fetch attachments');
       return response.json();
     },

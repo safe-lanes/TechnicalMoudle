@@ -79,9 +79,9 @@ export default function WorkOrderUpload() {
 
   // Fetch import history
   const { data: history, isLoading: historyLoading } = useQuery({
-    queryKey: ['/api/bulk/history', 'work-orders'],
+    queryKey: ['/technical/api/bulk/history', 'work-orders'],
     queryFn: async () => {
-      const response = await fetch('/api/bulk/history?type=work-orders&limit=50');
+      const response = await fetch('/technical/api/bulk/history?type=work-orders&limit=50');
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
@@ -91,7 +91,7 @@ export default function WorkOrderUpload() {
   const handleDownloadTemplate = async () => {
     try {
       // Include vesselId to populate Components sheet with all system components
-      const response = await fetch('/api/bulk/template?type=work-orders&vesselId=V001');
+      const response = await fetch('/technical/api/bulk/template?type=work-orders&vesselId=V001');
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -150,7 +150,7 @@ export default function WorkOrderUpload() {
     formData.append('archiveMissing', 'false');
 
     try {
-      const response = await fetch('/api/bulk/dry-run', {
+      const response = await fetch('/technical/api/bulk/dry-run', {
         method: 'POST',
         body: formData
       });
@@ -193,7 +193,7 @@ export default function WorkOrderUpload() {
     setIsImporting(true);
 
     try {
-      const response = await fetch('/api/bulk/import', {
+      const response = await fetch('/technical/api/bulk/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -222,8 +222,8 @@ export default function WorkOrderUpload() {
       setDryRunResult(null);
       
       // Refresh history
-      queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', 'work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', 'work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       
     } catch (error: any) {
       toast({

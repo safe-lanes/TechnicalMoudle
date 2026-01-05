@@ -53,12 +53,12 @@ const RunningHoursReports: React.FC<RunningHoursReportsProps> = ({ onBack }) => 
   const { vesselId } = useVessel();
 
   const { data: components = [] } = useQuery<any[]>({
-    queryKey: ['/api/components', vesselId],
+    queryKey: ['/technical/api/components', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 
   const { data: runningHours = [] } = useQuery<any[]>({
-    queryKey: ['/api/running-hours', vesselId],
+    queryKey: ['/technical/api/running-hours', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

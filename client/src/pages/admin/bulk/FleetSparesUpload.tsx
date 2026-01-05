@@ -10,8 +10,8 @@ export default function FleetSparesUpload() {
   const { vesselId } = useVessel();
   
   const handleRefreshData = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/spares'] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares'] });
   };
 
   return (

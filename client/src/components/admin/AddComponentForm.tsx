@@ -142,7 +142,7 @@ export default function AddComponentForm({ open, onOpenChange }: AddComponentFor
         ihmEvidenceType: formData.ihmEvidenceType
       };
 
-      const response = await fetch('/api/components', {
+      const response = await fetch('/technical/api/components', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(componentData)

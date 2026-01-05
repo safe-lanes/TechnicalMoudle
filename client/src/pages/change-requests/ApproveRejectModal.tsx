@@ -32,9 +32,9 @@ export default function ApproveRejectModal({
 
   // Fetch change request details
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
-    queryKey: ['/api/change-requests', requestId],
+    queryKey: ['/technical/api/change-requests', requestId],
     queryFn: async () => {
-      const response = await fetch(`/api/change-requests/${requestId}`);
+      const response = await fetch(`/technical/api/change-requests/${requestId}`);
       if (!response.ok) throw new Error('Failed to fetch change request');
       return response.json();
     },
@@ -43,7 +43,7 @@ export default function ApproveRejectModal({
 
   const approveMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('PUT', `/api/change-requests/${requestId}/approve`, {
+      return apiRequest('PUT', `/technical/api/change-requests/${requestId}/approve`, {
         reviewedByUserId: 'Current User', // In real app, get from auth context
         reviewComments: comment
       });
@@ -53,8 +53,8 @@ export default function ApproveRejectModal({
         title: "Success",
         description: "Change request approved successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId] });
       handleClose();
       onProcessed?.();
     },
@@ -69,7 +69,7 @@ export default function ApproveRejectModal({
 
   const rejectMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('PUT', `/api/change-requests/${requestId}/reject`, {
+      return apiRequest('PUT', `/technical/api/change-requests/${requestId}/reject`, {
         reviewedByUserId: 'Current User', // In real app, get from auth context
         reviewComments: comment
       });
@@ -79,8 +79,8 @@ export default function ApproveRejectModal({
         title: "Success",
         description: "Change request rejected",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId] });
       handleClose();
       onProcessed?.();
     },
@@ -95,7 +95,7 @@ export default function ApproveRejectModal({
 
   const returnMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('PUT', `/api/change-requests/${requestId}/return`, {
+      return apiRequest('PUT', `/technical/api/change-requests/${requestId}/return`, {
         returnedByUserId: 'Current User', // In real app, get from auth context
         returnComments: comment
       });
@@ -105,8 +105,8 @@ export default function ApproveRejectModal({
         title: "Success",
         description: "Change request returned for revisions",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId] });
       handleClose();
       onProcessed?.();
     },

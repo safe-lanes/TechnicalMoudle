@@ -52,7 +52,7 @@ const IhmReports: React.FC<IhmReportsProps> = ({ onBack }) => {
   const { vesselId } = useVessel();
 
   const { data: spares = [] } = useQuery<any[]>({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     enabled: !!vesselId && vesselId !== 'all',
   });
 

@@ -23,16 +23,16 @@ export default function FleetComponentsManagement() {
 
   // Fetch fleet components
   const { data: components, isLoading, error } = useQuery<Component[]>({
-    queryKey: ['/api/fleet/components'],
+    queryKey: ['/technical/api/fleet/components'],
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest('DELETE', `/api/fleet/components/${id}`);
+      return apiRequest('DELETE', `/technical/api/fleet/components/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/fleet/components'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/fleet/components'], exact: false });
       toast({
         title: "Success",
         description: "Component deleted successfully",
@@ -132,7 +132,7 @@ export default function FleetComponentsManagement() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch('/api/fleet/components/export');
+      const response = await fetch('/technical/api/fleet/components/export');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

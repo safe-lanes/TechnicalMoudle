@@ -36,10 +36,10 @@ export function TargetPicker({
 
   // Fetch data based on category
   const { data, isLoading, error } = useQuery({
-    queryKey: [`/api/${getApiEndpoint(category)}`, vesselId],
+    queryKey: [`/technical/api/${getApiEndpoint(category)}`, vesselId],
     queryFn: async () => {
       const endpoint = getApiEndpoint(category);
-      const response = await fetch(`/api/${endpoint}${endpoint === 'components' ? `/${vesselId}` : `?vesselId=${vesselId}`}`);
+      const response = await fetch(`/technical/api/${endpoint}${endpoint === 'components' ? `/${vesselId}` : `?vesselId=${vesselId}`}`);
       if (!response.ok) throw new Error(`Failed to fetch ${category}`);
       return response.json();
     },

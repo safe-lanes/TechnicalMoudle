@@ -132,15 +132,15 @@ export default function SurveysPage() {
   const { toast } = useToast();
 
   const { data: vessels = [] } = useQuery<Vessel[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 
   const { data: fleets = [] } = useQuery<Fleet[]>({
-    queryKey: ['/api/fleets'],
+    queryKey: ['/technical/api/fleets'],
   });
 
   const { data: surveys = [], isLoading } = useQuery<SurveyData[]>({
-    queryKey: ['/api/surveys'],
+    queryKey: ['/technical/api/surveys'],
   });
 
   const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
@@ -194,10 +194,10 @@ export default function SurveysPage() {
 
   const updateSurveyMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SurveyData> }) => {
-      return apiRequest('PATCH', `/api/surveys/${id}`, updates);
+      return apiRequest('PATCH', `/technical/api/surveys/${id}`, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
       toast({
         title: 'Updated',
         description: 'Survey updated successfully.',
@@ -209,7 +209,7 @@ export default function SurveysPage() {
         description: error.message || 'Failed to update survey',
         variant: 'destructive',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/surveys'] });
     },
   });
 

@@ -691,11 +691,11 @@ export default function ComponentRegisterFormCR({
   // Submit mutation
   const submitChangeRequest = useMutation({
     mutationFn: async (payload: any) => {
-      const response = await apiRequest("POST", "/api/modify-pms/requests", payload);
+      const response = await apiRequest("POST", "/technical/api/modify-pms/requests", payload);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modify-pms/requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/modify-pms/requests"] });
       toast({
         title: "Success",
         description: "Change request submitted successfully"

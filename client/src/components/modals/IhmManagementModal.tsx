@@ -38,7 +38,7 @@ const IhmManagementModal: React.FC<IhmManagementModalProps> = ({
   
   // Fetch existing IHM data
   const { data: existingData } = useQuery({
-    queryKey: [`/api/ihm/${type}/${type === 'component' ? componentId : spareId}`],
+    queryKey: [`/technical/api/ihm/${type}/${type === 'component' ? componentId : spareId}`],
     enabled: isOpen && !!(componentId || spareId),
   });
   
@@ -56,7 +56,7 @@ const IhmManagementModal: React.FC<IhmManagementModalProps> = ({
   
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/ihm', {
+      const response = await fetch('/technical/api/ihm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -70,7 +70,7 @@ const IhmManagementModal: React.FC<IhmManagementModalProps> = ({
         description: 'IHM data saved successfully'
       });
       queryClient.invalidateQueries({ 
-        queryKey: [`/api/ihm/${type}/${type === 'component' ? componentId : spareId}`] 
+        queryKey: [`/technical/api/ihm/${type}/${type === 'component' ? componentId : spareId}`] 
       });
       onClose();
     },

@@ -11,9 +11,9 @@ interface MasterListItem {
 
 export function useDepartments() {
   return useQuery<MasterListItem[]>({
-    queryKey: ['/api/fleet/master-lists', { listType: 'department' }],
+    queryKey: ['/technical/api/fleet/master-lists', { listType: 'department' }],
     queryFn: async () => {
-      const res = await fetch('/api/fleet/master-lists?listType=department');
+      const res = await fetch('/technical/api/fleet/master-lists?listType=department');
       if (!res.ok) throw new Error('Failed to fetch departments');
       return res.json();
     }
@@ -36,9 +36,9 @@ export function useDepartmentOptions() {
 
 export function useMasterList(listType: string) {
   return useQuery<MasterListItem[]>({
-    queryKey: ['/api/fleet/master-lists', { listType }],
+    queryKey: ['/technical/api/fleet/master-lists', { listType }],
     queryFn: async () => {
-      const res = await fetch(`/api/fleet/master-lists?listType=${listType}`);
+      const res = await fetch(`/technical/api/fleet/master-lists?listType=${listType}`);
       if (!res.ok) throw new Error(`Failed to fetch ${listType} list`);
       return res.json();
     }

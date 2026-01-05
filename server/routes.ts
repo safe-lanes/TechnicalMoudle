@@ -36,8 +36,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Apply mock authentication middleware for all API routes during development
   // This populates req.user with an admin user for testing purposes
-  app.use('/api', mockAuthMiddleware);
-  console.log('🔒 Mock authentication enabled for /api/* routes');
+  app.use('/technical/api', mockAuthMiddleware);
+  console.log('🔒 Mock authentication enabled for /technical/api/* routes');
   
   // Documentation download endpoint
   app.get("/download/docs/:filename", (req, res) => {
@@ -76,11 +76,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Components API routes (for Target Picker)
-  app.get("/api/components/:vesselId", async (req, res) => {
+  app.get("/technical/api/components/:vesselId", async (req, res) => {
     try {
       const components = await storage.getComponents(req.params.vesselId);
       // Debug logging for component tree building
-      console.log(`📋 GET /api/components/${req.params.vesselId} returning ${components.length} components`);
+      console.log(`📋 GET /technical/api/components/${req.params.vesselId} returning ${components.length} components`);
       components.slice(0, 5).forEach(c => {
         console.log(`  - code: ${c.componentCode}, name: ${c.name?.substring(0, 30)}, parentId: ${c.parentId || 'none'}`);
       });
@@ -92,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single component by ID (for component details)
-  app.get("/api/components/details/:id", async (req, res) => {
+  app.get("/technical/api/components/details/:id", async (req, res) => {
     try {
       const component = await storage.getComponent(req.params.id);
       if (!component) {
@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Component Upload Route
-  app.post("/api/components/upload", upload.single('file'), async (req, res) => {
+  app.post("/technical/api/components/upload", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -394,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Jobs API routes (Job templates linked to components)
   
   // Get all jobs with optional filters
-  app.get("/api/jobs", async (req, res) => {
+  app.get("/technical/api/jobs", async (req, res) => {
     try {
       const vesselId = req.query.vesselId as string | undefined;
       const componentId = req.query.componentId as string | undefined;
@@ -430,7 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get single job by ID
-  app.get("/api/jobs/:id", async (req, res) => {
+  app.get("/technical/api/jobs/:id", async (req, res) => {
     try {
       const job = await storage.getJob(req.params.id);
       if (!job) {
@@ -444,7 +444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get job context (for job template viewing - Part A hydration)
-  app.get("/api/jobs/:id/context", async (req, res) => {
+  app.get("/technical/api/jobs/:id/context", async (req, res) => {
     try {
       const job = await storage.getJob(req.params.id);
       if (!job) {
@@ -598,7 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new job
-  app.post("/api/jobs", async (req, res) => {
+  app.post("/technical/api/jobs", async (req, res) => {
     try {
       const { insertJobSchema } = await import("@shared/schema");
       const { calculateNextDueDate } = await import("@shared/dateUtils");
@@ -711,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update job
-  app.patch("/api/jobs/:id", async (req, res) => {
+  app.patch("/technical/api/jobs/:id", async (req, res) => {
     try {
       const { calculateNextDueDate } = await import("@shared/dateUtils");
       let updateData = { ...req.body };
@@ -834,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete job
-  app.delete("/api/jobs/:id", async (req, res) => {
+  app.delete("/technical/api/jobs/:id", async (req, res) => {
     try {
       await storage.deleteJob(req.params.id);
       res.status(204).send();
@@ -848,7 +848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // MAINTENANCE PLANNER API - Read-only aggregation view for planning
   // ============================================================================
   
-  app.get("/api/maintenance-planner", async (req, res) => {
+  app.get("/technical/api/maintenance-planner", async (req, res) => {
     try {
       const {
         vesselId,
@@ -1137,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Maintenance Planner Export endpoint
-  app.get("/api/maintenance-planner/export", async (req, res) => {
+  app.get("/technical/api/maintenance-planner/export", async (req, res) => {
     try {
       const format = req.query.format as string || 'excel';
       const vesselId = req.query.vesselId as string;
@@ -1147,7 +1147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Reuse the same logic - call the planner endpoint internally
-      const plannerResponse = await fetch(`http://localhost:${process.env.PORT || 5000}/api/maintenance-planner?${new URLSearchParams(req.query as Record<string, string>).toString()}`);
+      const plannerResponse = await fetch(`http://localhost:${process.env.PORT || 5000}/technical/api/maintenance-planner?${new URLSearchParams(req.query as Record<string, string>).toString()}`);
       const plannerData = await plannerResponse.json();
 
       if (format === 'excel') {
@@ -1214,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Component Documents API routes
   // Component Documents API routes (with file upload support)
-  app.get("/api/component-documents/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-documents/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First, verify the component exists and check vessel access
       const component = await storage.getComponent(req.params.componentId);
@@ -1260,7 +1260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Upload component document with file (PMS Admin only)
-  app.post("/api/component-documents", requirePMSAdmin, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/component-documents", requirePMSAdmin, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     try {
       // Enforce file presence - document uploads must include a file
       if (!req.file) {
@@ -1372,7 +1372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Update component document metadata (PMS Admin only)
   // Note: File replacement not supported - create new document version instead
-  app.put("/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.put("/technical/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       // Create update schema that excludes immutable fields
       const updateSchema = insertComponentDocumentSchema.pick({
@@ -1428,7 +1428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Soft delete component document (PMS Admin only)
-  app.delete("/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.delete("/technical/api/component-documents/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       await storage.deleteComponentDocument(parseInt(req.params.id));
       res.json({ success: true });
@@ -1439,7 +1439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Download component document file
-  app.get("/api/component-documents/:id/download", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-documents/:id/download", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // Get document by ID using proper storage method
       const document = await storage.getComponentDocument(parseInt(req.params.id));
@@ -1498,7 +1498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Component Class Regulatory API routes (Read: all authenticated users, Write: Admin only)
-  app.get("/api/component-class-regulatory/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-class-regulatory/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First, verify the component exists and check vessel access
       const component = await storage.getComponent(req.params.componentId);
@@ -1525,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/component-class-regulatory", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/component-class-regulatory", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       // insertComponentClassRegulatorySchema already omits id, createdAt, updatedAt
       const validatedData = insertComponentClassRegulatorySchema.parse({
@@ -1545,7 +1545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put("/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.put("/technical/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       // Use partial validation for updates - only validate provided fields
       const validatedData = insertComponentClassRegulatorySchema.partial().parse({
@@ -1564,7 +1564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.delete("/technical/api/component-class-regulatory/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       await storage.deleteComponentClassRegulatory(parseInt(req.params.id));
       res.json({ success: true });
@@ -1577,7 +1577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Component Requisitions API routes (Section H)
   
   // Get requisitions for a specific component (with vessel scoping for Ship users)
-  app.get("/api/component-requisitions/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-requisitions/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First, verify the component exists and check vessel access
       const component = await storage.getComponent(req.params.componentId);
@@ -1638,7 +1638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get all requisitions (optionally filtered by vessel, with vessel scoping for Ship users)
-  app.get("/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       let vesselCode = req.query.vesselCode as string | undefined;
       
@@ -1656,7 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get a single requisition by id (with vessel scoping for Ship users)
-  app.get("/api/component-requisitions/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-requisitions/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const item = await storage.getComponentRequisitionItem(parseInt(req.params.id));
       if (!item) {
@@ -1682,7 +1682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create a new requisition (Office/PMS Admin only can create)
-  app.post("/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/component-requisitions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // Ship users can only create requisitions for their assigned vessel
       if (req.user!.role === "Ship" && req.user!.vesselId) {
@@ -1714,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update a requisition (with vessel scoping and Zod validation)
-  app.put("/api/component-requisitions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/technical/api/component-requisitions/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First check if requisition exists and verify vessel access
       const existing = await storage.getComponentRequisitionItem(parseInt(req.params.id));
@@ -1755,7 +1755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete a requisition (PMS Admin only)
-  app.delete("/api/component-requisitions/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
+  app.delete("/technical/api/component-requisitions/:id", requirePMSAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       await storage.deleteComponentRequisition(parseInt(req.params.id));
       res.json({ success: true });
@@ -1768,7 +1768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Component Maintenance History API routes (read-only, immutable records)
   
   // Get ALL maintenance history records (for global display)
-  app.get("/api/component-maintenance-history", async (req, res) => {
+  app.get("/technical/api/component-maintenance-history", async (req, res) => {
     try {
       const allHistory = await storage.getAllComponentMaintenanceHistory();
       res.json(allHistory);
@@ -1778,7 +1778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/component-maintenance-history/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-maintenance-history/:componentId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       // First, verify the component exists and check vessel access
       const component = await storage.getComponent(req.params.componentId);
@@ -1805,7 +1805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/component-maintenance-history/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.get("/technical/api/component-maintenance-history/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const item = await storage.getComponentMaintenanceHistoryItem(parseInt(req.params.id));
       if (!item) {
@@ -1833,7 +1833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Work Orders API routes
   
   // Get all work orders with optional vessel filter
-  app.get("/api/work-orders", async (req, res) => {
+  app.get("/technical/api/work-orders", async (req, res) => {
     try {
       const vesselId = req.query.vesselId as string;
       const workOrders = await storage.getWorkOrders(vesselId);
@@ -1962,7 +1962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get single work order
-  app.get("/api/work-orders/:id", async (req, res) => {
+  app.get("/technical/api/work-orders/:id", async (req, res) => {
     try {
       const workOrder = await storage.getWorkOrder(req.params.id);
       if (!workOrder) {
@@ -2051,7 +2051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get work order context (for running hours validation and Part A hydration)
-  app.get("/api/work-orders/:id/context", async (req, res) => {
+  app.get("/technical/api/work-orders/:id/context", async (req, res) => {
     try {
       const workOrder = await storage.getWorkOrder(req.params.id);
       if (!workOrder) {
@@ -2279,7 +2279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new work order
-  app.post("/api/work-orders", async (req, res) => {
+  app.post("/technical/api/work-orders", async (req, res) => {
     try {
       let workOrderData = insertWorkOrderSchema.parse(req.body);
       
@@ -2446,7 +2446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update work order
-  app.patch("/api/work-orders/:id", async (req, res) => {
+  app.patch("/technical/api/work-orders/:id", async (req, res) => {
     try {
       // Log incoming data for debugging
       console.log('📝 PATCH work order request body keys:', Object.keys(req.body));
@@ -2679,7 +2679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Complete work order with running hours update (atomic operation)
-  app.post("/api/work-orders/:id/complete", async (req, res) => {
+  app.post("/technical/api/work-orders/:id/complete", async (req, res) => {
     try {
       const { runningHours, dateOfCompletion, ...executionData } = req.body;
       
@@ -3083,7 +3083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete work order
-  app.delete("/api/work-orders/:id", async (req, res) => {
+  app.delete("/technical/api/work-orders/:id", async (req, res) => {
     try {
       await storage.deleteWorkOrder(req.params.id);
       res.json({ success: true });
@@ -3096,7 +3096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Auto-generate work orders for Calendar-based and RH-based jobs that have reached their lead time threshold
-  app.post("/api/work-orders/auto-generate", async (req, res) => {
+  app.post("/technical/api/work-orders/auto-generate", async (req, res) => {
     try {
       const vesselId = req.body.vesselId as string;
       if (!vesselId) {
@@ -3294,7 +3294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Backfill jobId for legacy work orders (Task 33)
-  app.post("/api/work-orders/backfill-job-ids", async (req, res) => {
+  app.post("/technical/api/work-orders/backfill-job-ids", async (req, res) => {
     try {
       const vesselId = req.body.vesselId as string | undefined;
       
@@ -3358,7 +3358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Work Order Execution API routes
   
   // Get all executions for a component
-  app.get("/api/work-order-executions/:componentId", async (req, res) => {
+  app.get("/technical/api/work-order-executions/:componentId", async (req, res) => {
     try {
       const executions = await storage.getWorkOrderExecutions(req.params.componentId);
       res.json(executions);
@@ -3369,7 +3369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get single execution by ID
-  app.get("/api/work-order-executions/details/:id", async (req, res) => {
+  app.get("/technical/api/work-order-executions/details/:id", async (req, res) => {
     try {
       const execution = await storage.getWorkOrderExecutionById(req.params.id);
       if (!execution) {
@@ -3383,7 +3383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new execution
-  app.post("/api/work-order-executions", async (req, res) => {
+  app.post("/technical/api/work-order-executions", async (req, res) => {
     try {
       const executionData = insertWorkOrderExecutionSchema.parse(req.body);
       const execution = await storage.createWorkOrderExecution(executionData);
@@ -3398,7 +3398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update execution
-  app.patch("/api/work-order-executions/:id", async (req, res) => {
+  app.patch("/technical/api/work-order-executions/:id", async (req, res) => {
     try {
       const partialExecutionSchema = insertWorkOrderExecutionSchema.partial();
       const validatedData = partialExecutionSchema.parse(req.body);
@@ -3419,7 +3419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Defects API routes
   
   // Get all defects with optional filters
-  app.get("/api/defects", async (req, res) => {
+  app.get("/technical/api/defects", async (req, res) => {
     try {
       const filters = {
         vesselId: req.query.vesselId as string,
@@ -3444,7 +3444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // CoC-specific defects endpoint
-  app.get("/api/defects/coc", async (req, res) => {
+  app.get("/technical/api/defects/coc", async (req, res) => {
     try {
       const filters = {
         vesselId: req.query.vesselId as string,
@@ -3466,7 +3466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Recurring defects endpoint
-  app.get("/api/defects/recurring", async (req, res) => {
+  app.get("/technical/api/defects/recurring", async (req, res) => {
     try {
       const filters = {
         windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : undefined,
@@ -3483,7 +3483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get defects count
-  app.get("/api/defects/count", async (req, res) => {
+  app.get("/technical/api/defects/count", async (req, res) => {
     try {
       const filters: any = {
         statusView: req.query.statusScope as 'active' | 'resolved' | undefined || 
@@ -3507,7 +3507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get recurring defects count
-  app.get("/api/defects/count/recurring", async (req, res) => {
+  app.get("/technical/api/defects/count/recurring", async (req, res) => {
     try {
       const recurringDefects = await storage.getRecurringDefects({});
       res.json({ count: recurringDefects.length });
@@ -3517,7 +3517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get single defect
-  app.get("/api/defects/:id", async (req, res) => {
+  app.get("/technical/api/defects/:id", async (req, res) => {
     try {
       const defect = await storage.getDefect(req.params.id);
       if (!defect) {
@@ -3530,7 +3530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new defect
-  app.post("/api/defects", async (req, res) => {
+  app.post("/technical/api/defects", async (req, res) => {
     try {
       const validatedData = insertDefectSchema.parse(req.body);
       
@@ -3559,7 +3559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update defect
-  app.patch("/api/defects/:id", async (req, res) => {
+  app.patch("/technical/api/defects/:id", async (req, res) => {
     try {
       const partialDefectSchema = insertDefectSchema.partial();
       const validatedData = partialDefectSchema.parse(req.body);
@@ -3577,7 +3577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete defect
-  app.delete("/api/defects/:id", async (req, res) => {
+  app.delete("/technical/api/defects/:id", async (req, res) => {
     try {
       await storage.deleteDefect(req.params.id);
       res.json({ success: true });
@@ -3590,7 +3590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clear all defects data endpoint
-  app.delete("/api/defects-clear-all", async (req, res) => {
+  app.delete("/technical/api/defects-clear-all", async (req, res) => {
     res.status(501).json({ 
       error: "Not Implemented",
       message: "The clearAllDefectsData method is not implemented in storage. This endpoint is reserved for future admin/testing functionality." 
@@ -3598,7 +3598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seed E2E test data endpoint
-  app.post("/api/defects-seed-e2e-test", async (req, res) => {
+  app.post("/technical/api/defects-seed-e2e-test", async (req, res) => {
     res.status(501).json({ 
       error: "Not Implemented",
       message: "The seedE2ETestData method is not implemented in storage. This endpoint is reserved for future testing functionality." 
@@ -3606,7 +3606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get defects count endpoint (returns active and resolved counts)
-  app.get("/api/defects-count", async (req, res) => {
+  app.get("/technical/api/defects-count", async (req, res) => {
     try {
       const activeCount = await storage.getDefectsCount({ statusView: 'active' });
       const resolvedCount = await storage.getDefectsCount({ statusView: 'resolved' });
@@ -3621,7 +3621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get defect actions for a specific defect
-  app.get("/api/defects/:defectId/actions", async (req, res) => {
+  app.get("/technical/api/defects/:defectId/actions", async (req, res) => {
     try {
       const actions = await storage.getDefectActions(req.params.defectId);
       res.json(actions);
@@ -3631,7 +3631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create defect action
-  app.post("/api/defects/:defectId/actions", async (req, res) => {
+  app.post("/technical/api/defects/:defectId/actions", async (req, res) => {
     try {
       const actionData = {
         ...req.body,
@@ -3649,7 +3649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update defect action
-  app.patch("/api/defects/actions/:actionId", async (req, res) => {
+  app.patch("/technical/api/defects/actions/:actionId", async (req, res) => {
     try {
       const partialActionSchema = insertDefectActionSchema.partial();
       const validatedData = partialActionSchema.parse(req.body);
@@ -3667,7 +3667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete defect action
-  app.delete("/api/defects/actions/:actionId", async (req, res) => {
+  app.delete("/technical/api/defects/actions/:actionId", async (req, res) => {
     try {
       await storage.deleteDefectAction(parseInt(req.params.actionId));
       res.json({ success: true });
@@ -3680,7 +3680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get defect attachments for a specific defect
-  app.get("/api/defects/:defectId/attachments", async (req, res) => {
+  app.get("/technical/api/defects/:defectId/attachments", async (req, res) => {
     try {
       const attachments = await storage.getDefectAttachments(req.params.defectId);
       res.json(attachments);
@@ -3690,7 +3690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create defect attachment
-  app.post("/api/defects/:defectId/attachments", async (req, res) => {
+  app.post("/technical/api/defects/:defectId/attachments", async (req, res) => {
     try {
       const attachmentData = {
         ...req.body,
@@ -3708,7 +3708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete defect attachment
-  app.delete("/api/defects/attachments/:attachmentId", async (req, res) => {
+  app.delete("/technical/api/defects/attachments/:attachmentId", async (req, res) => {
     try {
       await storage.deleteDefectAttachment(parseInt(req.params.attachmentId));
       res.json({ success: true });
@@ -3721,7 +3721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Add note to defect
-  app.post("/api/defects/:id/notes", async (req, res) => {
+  app.post("/technical/api/defects/:id/notes", async (req, res) => {
     try {
       const { noteText, attachments, createdBy } = req.body;
       
@@ -3745,7 +3745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Link related defects
-  app.patch("/api/defects/:id/link", async (req, res) => {
+  app.patch("/technical/api/defects/:id/link", async (req, res) => {
     try {
       const { linkedDefects } = req.body;
       
@@ -3761,7 +3761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Close defect
-  app.patch("/api/defects/:id/close", async (req, res) => {
+  app.patch("/technical/api/defects/:id/close", async (req, res) => {
     try {
       const { closedBy, closureComment, closureFiles, actionTakenRequested, targetCloseDate, dateCompleted } = req.body;
       
@@ -3795,7 +3795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Defects Reports API
-  app.post("/api/defects/reports/:reportKey", async (req, res) => {
+  app.post("/technical/api/defects/reports/:reportKey", async (req, res) => {
     try {
       const { reportKey } = req.params;
       const filters = req.body;
@@ -3929,7 +3929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Running hours routes...
   
   // Get running hours audits for a specific component
-  app.get("/api/running-hours/:componentId", async (req, res) => {
+  app.get("/technical/api/running-hours/:componentId", async (req, res) => {
     try {
       const audits = await storage.getRunningHoursAudits(req.params.componentId);
       res.json(audits);
@@ -3939,7 +3939,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create a new running hours audit
-  app.post("/api/running-hours", async (req, res) => {
+  app.post("/technical/api/running-hours", async (req, res) => {
     try {
       const validatedData = insertRunningHoursAuditSchema.parse(req.body);
       const audit = await storage.createRunningHoursAudit(validatedData);
@@ -3953,12 +3953,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // TEST endpoint - does ANY new code load?
-  app.get("/api/test-new-endpoint", async (req, res) => {
+  app.get("/technical/api/test-new-endpoint", async (req, res) => {
     res.json({ message: "This is a brand new endpoint added just now!", timestamp: new Date().toISOString() });
   });
   
   // DEBUG endpoint to check jobs data
-  app.get("/api/debug/jobs", async (req, res) => {
+  app.get("/technical/api/debug/jobs", async (req, res) => {
     try {
       const allJobs = await storage.getJobs();
       const rhJobs = allJobs.filter(j => j.maintenanceBasis === "Running Hours" && j.vesselId === "V001");
@@ -3981,7 +3981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // REMOVED: Running Hours parents endpoint now registered in runningHoursRoutes.ts
   
   // Cascade running hours update to parent and children
-  app.post("/api/running-hours/cascade", async (req, res) => {
+  app.post("/technical/api/running-hours/cascade", async (req, res) => {
     try {
       const validatedData = cascadeRunningHoursSchema.parse(req.body);
       const result = await storage.cascadeRunningHoursUpdate(validatedData);
@@ -3996,7 +3996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update existing audit by ID - COMMENTED OUT: method not implemented in storage
-  // app.patch("/api/running-hours/:id", async (req, res) => {
+  // app.patch("/technical/api/running-hours/:id", async (req, res) => {
   //   try {
   //     const partialAuditSchema = insertRunningHoursAuditSchema.partial();
   //     const validatedData = partialAuditSchema.parse(req.body);
@@ -4014,7 +4014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // });
   
   // Delete audit by ID - COMMENTED OUT: method not implemented in storage
-  // app.delete("/api/running-hours/:id", async (req, res) => {
+  // app.delete("/technical/api/running-hours/:id", async (req, res) => {
   //   try {
   //     await storage.deleteRunningHoursAudit(parseInt(req.params.id));
   //     res.json({ success: true });
@@ -4027,7 +4027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // });
 
   // Components routes...
-  app.post("/api/components", async (req, res) => {
+  app.post("/technical/api/components", async (req, res) => {
     try {
       const data = req.body;
       
@@ -4088,7 +4088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/components", async (req, res) => {
+  app.get("/technical/api/components", async (req, res) => {
     try {
       const vesselId = req.query.vesselId as string | undefined;
       // getComponents requires vesselId - use default 'V001' if not provided
@@ -4099,7 +4099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/components/:id", async (req, res) => {
+  app.get("/technical/api/components/:id", async (req, res) => {
     try {
       const component = await storage.getComponent(req.params.id);
       if (!component) {
@@ -4111,7 +4111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/components/:id", async (req, res) => {
+  app.patch("/technical/api/components/:id", async (req, res) => {
     try {
       console.log(`🔧 PATCH /api/components/${req.params.id} with:`, JSON.stringify(req.body, null, 2).substring(0, 500));
       const data = req.body;
@@ -4231,7 +4231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/components/:id", async (req, res) => {
+  app.delete("/technical/api/components/:id", async (req, res) => {
     try {
       await storage.deleteComponent(req.params.id);
       res.json({ success: true });
@@ -4246,7 +4246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rule #14: Component Inactivation (preferred over delete)
   // Option A (default): Block if any child is ACTIVE
   // Option B: Cascade inactivate with cascadeInactivate=true
-  app.post("/api/components/:id/inactivate", async (req, res) => {
+  app.post("/technical/api/components/:id/inactivate", async (req, res) => {
     try {
       const { cascadeInactivate, userId } = req.body;
       const result = await storage.inactivateComponent(
@@ -4281,7 +4281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Spares routes...
   
   // Get ALL spares (for components page to filter by component ID)
-  app.get("/api/spares", async (req, res) => {
+  app.get("/technical/api/spares", async (req, res) => {
     try {
       const allSpares = await storage.getAllSpares();
       res.json(allSpares);
@@ -4293,7 +4293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // IMPORTANT: This route MUST come BEFORE /api/spares/:vesselId to avoid route conflict
   // Route format: /api/spares/history/:vesselId (client-expected format)
-  app.get("/api/spares/history/:vesselId", async (req, res) => {
+  app.get("/technical/api/spares/history/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
       console.log('[API] Fetching spare history for vessel:', vesselId);
@@ -4307,7 +4307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get spares for a vessel
-  app.get("/api/spares/:vesselId", async (req, res) => {
+  app.get("/technical/api/spares/:vesselId", async (req, res) => {
     try {
       const spares = await storage.getSpares(req.params.vesselId);
       res.json(spares);
@@ -4318,7 +4318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get spare by ID (optional - useful for detail views)
-  app.get("/api/spares/:vesselId/:id", async (req, res) => {
+  app.get("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
       const spare = await storage.getSpare(parseInt(req.params.id));
       if (!spare) {
@@ -4331,7 +4331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create a new spare
-  app.post("/api/spares/:vesselId", async (req, res) => {
+  app.post("/technical/api/spares/:vesselId", async (req, res) => {
     try {
       const spare = await storage.createSpare({
         ...req.body,
@@ -4344,7 +4344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update spare
-  app.patch("/api/spares/:vesselId/:id", async (req, res) => {
+  app.patch("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
       const spare = await storage.updateSpare(parseInt(req.params.id), req.body);
       res.json(spare);
@@ -4357,7 +4357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete spare
-  app.delete("/api/spares/:vesselId/:id", async (req, res) => {
+  app.delete("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
       await storage.deleteSpare(parseInt(req.params.id));
       res.json({ success: true });
@@ -4370,7 +4370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Adjust spare quantity (for +/- buttons)
-  app.post("/api/spares/:vesselId/:id/adjust", async (req, res) => {
+  app.post("/technical/api/spares/:vesselId/:id/adjust", async (req, res) => {
     try {
       const adjustPayloadSchema = z.object({
         qtyChange: z.number(),
@@ -4405,7 +4405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Inventory history endpoints
   // Route format: /api/spares/:vesselId/history (legacy)
-  app.get("/api/spares/:vesselId/history", async (req, res) => {
+  app.get("/technical/api/spares/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
       console.log('[API] Fetching spare history for vessel (legacy route):', vesselId);
@@ -4418,7 +4418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get low stock spares (below minimum quantity)
-  app.get("/api/spares/:vesselId/low-stock", async (req, res) => {
+  app.get("/technical/api/spares/:vesselId/low-stock", async (req, res) => {
     try {
       const spares = await storage.getSpares(req.params.vesselId);
       const lowStockSpares = spares.filter(spare => (spare.rob || 0) <= (spare.min || 0));
@@ -4429,7 +4429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch consume spares (for work order consumption)
-  app.post("/api/spares/:vesselId/batch-consume", async (req, res) => {
+  app.post("/technical/api/spares/:vesselId/batch-consume", async (req, res) => {
     try {
       const { items, workOrderId, consumedBy } = req.body;
       
@@ -4456,7 +4456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch receive spares (for purchase order receiving)
-  app.post("/api/spares/:vesselId/batch-receive", async (req, res) => {
+  app.post("/technical/api/spares/:vesselId/batch-receive", async (req, res) => {
     try {
       const { items, purchaseOrderRef, receivedBy } = req.body;
       
@@ -4484,7 +4484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Simple consume endpoint (legacy - consumes from Location A by default)
-  app.post("/api/spares/:id/consume", async (req, res) => {
+  app.post("/technical/api/spares/:id/consume", async (req, res) => {
     try {
       const spareId = parseInt(req.params.id);
       if (isNaN(spareId)) {
@@ -4519,7 +4519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Simple receive endpoint (legacy - receives to Location A by default)
-  app.post("/api/spares/:id/receive", async (req, res) => {
+  app.post("/technical/api/spares/:id/receive", async (req, res) => {
     try {
       const spareId = parseInt(req.params.id);
       if (isNaN(spareId)) {
@@ -4568,7 +4568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     id: z.coerce.number().int().positive('Spare ID must be a positive integer')
   });
   
-  app.post("/api/spares/:id/consume-from-location", async (req, res) => {
+  app.post("/technical/api/spares/:id/consume-from-location", async (req, res) => {
     try {
       // Validate params
       const paramsResult = consumeFromLocationParamsSchema.safeParse(req.params);
@@ -4661,7 +4661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     id: z.coerce.number().int().positive('Spare ID must be a positive integer')
   });
   
-  app.post("/api/spares/:id/receive-to-location", async (req, res) => {
+  app.post("/technical/api/spares/:id/receive-to-location", async (req, res) => {
     try {
       // Validate params
       const paramsResult = receiveToLocationParamsSchema.safeParse(req.params);
@@ -4728,7 +4728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= INVENTORY MANAGEMENT: LOCATIONS =============
   
-  app.get("/api/inventory/locations/:vesselId", async (req, res) => {
+  app.get("/technical/api/inventory/locations/:vesselId", async (req, res) => {
     try {
       const locations = await storage.getLocations(req.params.vesselId);
       res.json({ success: true, data: locations });
@@ -4738,7 +4738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/locations/:vesselId/:id", async (req, res) => {
+  app.get("/technical/api/inventory/locations/:vesselId/:id", async (req, res) => {
     try {
       const location = await storage.getLocationById(parseInt(req.params.id));
       if (!location) {
@@ -4751,7 +4751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory/locations/:vesselId", async (req, res) => {
+  app.post("/technical/api/inventory/locations/:vesselId", async (req, res) => {
     try {
       const { locationName, createdBy } = req.body;
       if (!locationName) {
@@ -4772,7 +4772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= INVENTORY MANAGEMENT: SPARE-COMPONENT LINKS =============
   
-  app.get("/api/inventory/spare-links/:vesselId", async (req, res) => {
+  app.get("/technical/api/inventory/spare-links/:vesselId", async (req, res) => {
     try {
       const links = await storage.getSpareComponentLinks(req.params.vesselId);
       res.json({ success: true, data: links });
@@ -4782,7 +4782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/spare-links/by-spare/:spareId", async (req, res) => {
+  app.get("/technical/api/inventory/spare-links/by-spare/:spareId", async (req, res) => {
     try {
       const spareId = parseInt(req.params.spareId);
       const links = await storage.getSpareComponentLinksBySpare(spareId);
@@ -4794,7 +4794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/spare-links/by-component/:componentId", async (req, res) => {
+  app.get("/technical/api/inventory/spare-links/by-component/:componentId", async (req, res) => {
     try {
       const links = await storage.getSpareComponentLinksByComponent(req.params.componentId);
       res.json({ success: true, data: links });
@@ -4804,7 +4804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory/spare-links", async (req, res) => {
+  app.post("/technical/api/inventory/spare-links", async (req, res) => {
     try {
       const { vesselId, spareId, componentId, createdBy } = req.body;
       if (!vesselId || !spareId || !componentId) {
@@ -4830,7 +4830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/inventory/spare-links/:spareId/:componentId", async (req, res) => {
+  app.delete("/technical/api/inventory/spare-links/:spareId/:componentId", async (req, res) => {
     try {
       const spareId = parseInt(req.params.spareId);
       await storage.deleteSpareComponentLink(spareId, req.params.componentId);
@@ -4843,7 +4843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
   
-  app.get("/api/inventory/stock/:spareId", async (req, res) => {
+  app.get("/technical/api/inventory/stock/:spareId", async (req, res) => {
     try {
       const spareId = parseInt(req.params.spareId);
       const stockRecords = await storage.getSpareLocationStock(spareId);
@@ -4865,7 +4865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/stock/by-location/:locationId", async (req, res) => {
+  app.get("/technical/api/inventory/stock/by-location/:locationId", async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       const spares = await storage.getSparesAtLocation(locationId);
@@ -4876,7 +4876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory/stock/:spareId/:locationId", async (req, res) => {
+  app.post("/technical/api/inventory/stock/:spareId/:locationId", async (req, res) => {
     try {
       const spareId = parseInt(req.params.spareId);
       const locationId = parseInt(req.params.locationId);
@@ -4917,7 +4917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: z.string(),
   });
 
-  app.post("/api/inventory/transactions", async (req, res) => {
+  app.post("/technical/api/inventory/transactions", async (req, res) => {
     try {
       const parsed = inventoryTransactionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -4975,7 +4975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/transactions/:vesselId", async (req, res) => {
+  app.get("/technical/api/inventory/transactions/:vesselId", async (req, res) => {
     try {
       const { spareId, locationId, eventType, limit } = req.query;
       
@@ -5010,7 +5010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= INVENTORY MANAGEMENT: ENHANCED SPARE DATA =============
   
-  app.get("/api/inventory/spares-with-inventory/:vesselId", async (req, res) => {
+  app.get("/technical/api/inventory/spares-with-inventory/:vesselId", async (req, res) => {
     try {
       const spares = await storage.getSparesWithInventoryByVessel(req.params.vesselId);
       res.json({ success: true, data: spares });
@@ -5020,7 +5020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/spare-with-inventory/:spareId", async (req, res) => {
+  app.get("/technical/api/inventory/spare-with-inventory/:spareId", async (req, res) => {
     try {
       const spareId = parseInt(req.params.spareId);
       const spareWithInventory = await storage.getSpareWithInventory(spareId);
@@ -5036,7 +5036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/spares-by-component/:componentId", async (req, res) => {
+  app.get("/technical/api/inventory/spares-by-component/:componentId", async (req, res) => {
     try {
       const spares = await storage.getSparesWithInventoryByComponent(req.params.componentId);
       res.json({ success: true, data: spares });
@@ -5048,7 +5048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   // Note: Auth removed to match spares endpoint pattern for development
-  app.get("/api/stores/:vesselId", async (req, res) => {
+  app.get("/technical/api/stores/:vesselId", async (req, res) => {
     try {
       const { itemType } = req.query;
       const stores = await storage.getStoresItems(
@@ -5061,7 +5061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/:vesselId/history", async (req, res) => {
+  app.get("/technical/api/stores/:vesselId/history", async (req, res) => {
     try {
       const { vesselId } = req.params;
       const { itemType } = req.query;
@@ -5075,7 +5075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/stores/item/:id/history", async (req, res) => {
+  app.get("/technical/api/stores/item/:id/history", async (req, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const history = await storage.getStoresItemHistory(itemId);
@@ -5085,7 +5085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/stores/:vesselId/create", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/stores/:vesselId/create", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { vesselId } = req.params;
       const itemData = { ...req.body, vesselId };
@@ -5096,7 +5096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put("/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.put("/technical/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const item = await storage.updateStoresItem(itemId, req.body);
@@ -5107,7 +5107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PATCH endpoint for partial updates (location ROB updates)
-  app.patch("/api/stores/:vesselId/:id", async (req, res) => {
+  app.patch("/technical/api/stores/:vesselId/:id", async (req, res) => {
     try {
       const itemId = parseInt(req.params.id);
       const { robLocationA, robLocationB, rob } = req.body;
@@ -5126,7 +5126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.delete("/technical/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
       await storage.deleteStoresItem(itemId);
@@ -5137,7 +5137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch consume stores
-  app.post("/api/stores/:vesselId/batch-consume", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/stores/:vesselId/batch-consume", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { items, consumedBy } = req.body;
       const userId = req.user?.id?.toString() || consumedBy || 'System';
@@ -5171,7 +5171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch receive stores
-  app.post("/api/stores/:vesselId/batch-receive", requireAuth, async (req: AuthenticatedRequest, res) => {
+  app.post("/technical/api/stores/:vesselId/batch-receive", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { items, purchaseOrderRef, receivedBy } = req.body;
       const userId = req.user?.id?.toString() || receivedBy || 'System';
@@ -5206,7 +5206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Reports endpoint
-  app.get("/api/reports/:reportType", async (req, res) => {
+  app.get("/technical/api/reports/:reportType", async (req, res) => {
     try {
       const { reportType } = req.params;
       const { vesselId, dateFrom, dateTo, format } = req.query;
@@ -5261,7 +5261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // User routes
-  app.get("/api/me", async (req, res) => {
+  app.get("/technical/api/me", async (req, res) => {
     res.json({ 
       user: { 
         id: 1, 
@@ -5272,7 +5272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  app.get("/api/users", async (req, res) => {
+  app.get("/technical/api/users", async (req, res) => {
     try {
       const users = await storage.getUsers();
       res.json(users);
@@ -5282,23 +5282,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Register bulk routes
-  app.use("/api/bulk", bulkRouter);
+  app.use("/technical/api/bulk", bulkRouter);
   
   // Register alert routes
-  app.use("/api/alerts", alertRouter);
+  app.use("/technical/api/alerts", alertRouter);
   
   // Register form routes
-  app.use("/api/forms", formRouter);
+  app.use("/technical/api/forms", formRouter);
   
   // Register Fleet Admin routes
-  app.use("/api/fleet-admin", fleetAdminRouter);
+  app.use("/technical/api/fleet-admin", fleetAdminRouter);
   
   // Mount the Change Requests router  
   const changeRequestsRouter = createChangeRequestsRouter(storage);
-  app.use("/api/change-requests", changeRequestsRouter);
+  app.use("/technical/api/change-requests", changeRequestsRouter);
   
   // Template builder endpoints
-  app.get("/api/template-builder/:templateType", async (req, res) => {
+  app.get("/technical/api/template-builder/:templateType", async (req, res) => {
     try {
       const { templateType } = req.params;
       
@@ -5320,7 +5320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Recurring Defects API routes
   
   // Get all recurring defects with filters
-  app.get("/api/recurring-defects", async (req, res) => {
+  app.get("/technical/api/recurring-defects", async (req, res) => {
     try {
       const filters = {
         windowMonths: req.query.windowMonths ? parseInt(req.query.windowMonths as string) : 12,
@@ -5364,7 +5364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get specific recurring defect
-  app.get("/api/recurring-defects/:id", async (req, res) => {
+  app.get("/technical/api/recurring-defects/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const recurringDefect = await storage.getRecurringDefect(id);
@@ -5378,7 +5378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get defects linked to a recurring defect
-  app.get("/api/recurring-defects/:id/defects", async (req, res) => {
+  app.get("/technical/api/recurring-defects/:id/defects", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const defects = await storage.getDefectsForRecurring(id);
@@ -5389,7 +5389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Manually trigger recalculation for an equipment key
-  app.post("/api/recurring-defects/recalculate", async (req, res) => {
+  app.post("/technical/api/recurring-defects/recalculate", async (req, res) => {
     try {
       const { equipmentKey, windowMonths } = req.body;
       if (!equipmentKey) {
@@ -5526,7 +5526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Components Routes
   
   // Get all fleet components
-  app.get("/api/fleet/components", async (req, res) => {
+  app.get("/technical/api/fleet/components", async (req, res) => {
     try {
       const components = await storage.getFleetComponents();
       res.json(components);
@@ -5537,7 +5537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get fleet component by ID
-  app.get("/api/fleet/components/:id", async (req, res) => {
+  app.get("/technical/api/fleet/components/:id", async (req, res) => {
     try {
       const component = await storage.getFleetComponent(req.params.id);
       if (!component) {
@@ -5551,7 +5551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new fleet component
-  app.post("/api/fleet/components", async (req, res) => {
+  app.post("/technical/api/fleet/components", async (req, res) => {
     try {
       const validatedData = insertComponentSchema.parse(req.body);
       const component = await storage.createFleetComponent(validatedData);
@@ -5569,7 +5569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update fleet component
-  app.patch("/api/fleet/components/:id", async (req, res) => {
+  app.patch("/technical/api/fleet/components/:id", async (req, res) => {
     try {
       const partialComponentSchema = insertComponentSchema.partial();
       const validatedData = partialComponentSchema.parse(req.body);
@@ -5591,7 +5591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete fleet component
-  app.delete("/api/fleet/components/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/components/:id", async (req, res) => {
     try {
       await storage.deleteFleetComponent(req.params.id);
       res.json({ success: true });
@@ -5610,7 +5610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Jobs Routes
   
   // Get all fleet jobs
-  app.get("/api/fleet/jobs", async (req, res) => {
+  app.get("/technical/api/fleet/jobs", async (req, res) => {
     try {
       const jobs = await storage.getFleetJobs();
       res.json(jobs);
@@ -5621,7 +5621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get fleet job by ID
-  app.get("/api/fleet/jobs/:id", async (req, res) => {
+  app.get("/technical/api/fleet/jobs/:id", async (req, res) => {
     try {
       const job = await storage.getFleetJob(req.params.id);
       if (!job) {
@@ -5635,7 +5635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new fleet job
-  app.post("/api/fleet/jobs", async (req, res) => {
+  app.post("/technical/api/fleet/jobs", async (req, res) => {
     try {
       const validatedData = insertJobSchema.parse(req.body);
       const job = await storage.createFleetJob(validatedData);
@@ -5653,7 +5653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update fleet job
-  app.patch("/api/fleet/jobs/:id", async (req, res) => {
+  app.patch("/technical/api/fleet/jobs/:id", async (req, res) => {
     try {
       const partialJobSchema = insertJobSchema.partial();
       const validatedData = partialJobSchema.parse(req.body);
@@ -5675,7 +5675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete fleet job
-  app.delete("/api/fleet/jobs/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/jobs/:id", async (req, res) => {
     try {
       await storage.deleteFleetJob(req.params.id);
       res.json({ success: true });
@@ -5694,7 +5694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Spares Routes
   
   // Get all fleet spares
-  app.get("/api/fleet/spares", async (req, res) => {
+  app.get("/technical/api/fleet/spares", async (req, res) => {
     try {
       const spares = await storage.getFleetSpares();
       res.json(spares);
@@ -5705,7 +5705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get fleet spare by ID
-  app.get("/api/fleet/spares/:id", async (req, res) => {
+  app.get("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
       const spare = await storage.getFleetSpare(parseInt(req.params.id));
       if (!spare) {
@@ -5719,7 +5719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new fleet spare
-  app.post("/api/fleet/spares", async (req, res) => {
+  app.post("/technical/api/fleet/spares", async (req, res) => {
     try {
       const validatedData = insertSpareSchema.parse(req.body);
       const spare = await storage.createFleetSpare(validatedData);
@@ -5737,7 +5737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update fleet spare
-  app.patch("/api/fleet/spares/:id", async (req, res) => {
+  app.patch("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
       const partialSpareSchema = insertSpareSchema.partial();
       const validatedData = partialSpareSchema.parse(req.body);
@@ -5759,7 +5759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete fleet spare
-  app.delete("/api/fleet/spares/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/spares/:id", async (req, res) => {
     try {
       await storage.deleteFleetSpare(parseInt(req.params.id));
       res.json({ success: true });
@@ -5778,7 +5778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Makers Routes
   
   // Get all makers with optional search query param
-  app.get("/api/fleet/makers", async (req, res) => {
+  app.get("/technical/api/fleet/makers", async (req, res) => {
     try {
       const search = req.query.search as string | undefined;
       const makers = await storage.getMakers(search);
@@ -5790,7 +5790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get maker by ID
-  app.get("/api/fleet/makers/:id", async (req, res) => {
+  app.get("/technical/api/fleet/makers/:id", async (req, res) => {
     try {
       const maker = await storage.getMakerById(parseInt(req.params.id));
       if (!maker) {
@@ -5804,7 +5804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new maker
-  app.post("/api/fleet/makers", async (req, res) => {
+  app.post("/technical/api/fleet/makers", async (req, res) => {
     try {
       const validatedData = insertMakerSchema.parse(req.body);
       
@@ -5835,7 +5835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update existing maker
-  app.put("/api/fleet/makers/:id", async (req, res) => {
+  app.put("/technical/api/fleet/makers/:id", async (req, res) => {
     try {
       const partialMakerSchema = insertMakerSchema.partial();
       const validatedData = partialMakerSchema.parse(req.body);
@@ -5860,7 +5860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete maker
-  app.delete("/api/fleet/makers/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/makers/:id", async (req, res) => {
     try {
       await storage.deleteMaker(parseInt(req.params.id));
       res.json({ success: true });
@@ -5876,7 +5876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fleet Admin - Master Lists Routes
   
   // Get all master lists with optional listType query param
-  app.get("/api/fleet/master-lists", async (req, res) => {
+  app.get("/technical/api/fleet/master-lists", async (req, res) => {
     try {
       const listType = req.query.listType as string | undefined;
       const masterLists = await storage.getMasterLists(listType);
@@ -5888,7 +5888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get master list by ID
-  app.get("/api/fleet/master-lists/:id", async (req, res) => {
+  app.get("/technical/api/fleet/master-lists/:id", async (req, res) => {
     try {
       const masterList = await storage.getMasterListById(parseInt(req.params.id));
       if (!masterList) {
@@ -5902,7 +5902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new master list
-  app.post("/api/fleet/master-lists", async (req, res) => {
+  app.post("/technical/api/fleet/master-lists", async (req, res) => {
     try {
       const validatedData = insertMasterListSchema.parse(req.body);
       const masterList = await storage.createMasterList(validatedData);
@@ -5917,7 +5917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update existing master list
-  app.put("/api/fleet/master-lists/:id", async (req, res) => {
+  app.put("/technical/api/fleet/master-lists/:id", async (req, res) => {
     try {
       const partialMasterListSchema = insertMasterListSchema.partial();
       const validatedData = partialMasterListSchema.parse(req.body);
@@ -5936,7 +5936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete master list
-  app.delete("/api/fleet/master-lists/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/master-lists/:id", async (req, res) => {
     try {
       await storage.deleteMasterList(parseInt(req.params.id));
       res.json({ success: true });
@@ -5954,7 +5954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Get all vessel mappings
-  app.get("/api/fleet/vessel-mappings", async (req, res) => {
+  app.get("/technical/api/fleet/vessel-mappings", async (req, res) => {
     try {
       const mappings = await storage.getFleetVesselMappings();
       res.json(mappings);
@@ -5965,7 +5965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create vessel mappings (batch)
-  app.post("/api/fleet/vessel-mappings", async (req, res) => {
+  app.post("/technical/api/fleet/vessel-mappings", async (req, res) => {
     try {
       const { fleetEntityType, fleetEntityIds, vesselId, vesselEntityId, vesselEntityCode } = req.body;
       
@@ -5990,7 +5990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete vessel mapping
-  app.delete("/api/fleet/vessel-mappings/:id", async (req, res) => {
+  app.delete("/technical/api/fleet/vessel-mappings/:id", async (req, res) => {
     try {
       await storage.deleteFleetVesselMapping(req.params.id);
       res.json({ success: true });
@@ -6005,7 +6005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Get all active fleets
-  app.get("/api/fleets", async (req, res) => {
+  app.get("/technical/api/fleets", async (req, res) => {
     try {
       const includeInactive = req.query.includeInactive === 'true';
       const fleets = includeInactive 
@@ -6019,7 +6019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get fleet by ID
-  app.get("/api/fleets/:id", async (req, res) => {
+  app.get("/technical/api/fleets/:id", async (req, res) => {
     try {
       const fleet = await storage.getFleetById(req.params.id);
       if (!fleet) {
@@ -6033,7 +6033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new fleet
-  app.post("/api/fleets", async (req, res) => {
+  app.post("/technical/api/fleets", async (req, res) => {
     try {
       const { id, code, name, description, isActive } = req.body;
       
@@ -6060,7 +6060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a fleet
-  app.put("/api/fleets/:id", async (req, res) => {
+  app.put("/technical/api/fleets/:id", async (req, res) => {
     try {
       const { code, name, description, isActive } = req.body;
       
@@ -6085,7 +6085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a fleet
-  app.delete("/api/fleets/:id", async (req, res) => {
+  app.delete("/technical/api/fleets/:id", async (req, res) => {
     try {
       await storage.deleteFleet(req.params.id);
       res.json({ success: true });
@@ -6102,7 +6102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vessels by fleet
-  app.get("/api/fleets/:id/vessels", async (req, res) => {
+  app.get("/technical/api/fleets/:id/vessels", async (req, res) => {
     try {
       const vessels = await storage.getVesselsByFleet(req.params.id);
       res.json(vessels);
@@ -6113,7 +6113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Assign vessel to fleet
-  app.put("/api/vessels/:id/fleet", async (req, res) => {
+  app.put("/technical/api/vessels/:id/fleet", async (req, res) => {
     try {
       const { fleetId } = req.body;
       const vessel = await storage.assignVesselToFleet(req.params.id, fleetId);
@@ -6128,7 +6128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vessels with fleet info
-  app.get("/api/vessels-with-fleets", async (req, res) => {
+  app.get("/technical/api/vessels-with-fleets", async (req, res) => {
     try {
       const vessels = await storage.getVesselsWithFleets();
       res.json(vessels);
@@ -6139,7 +6139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vessels list (for dropdown)
-  app.get("/api/vessels", async (req, res) => {
+  app.get("/technical/api/vessels", async (req, res) => {
     try {
       const vessels = await storage.getVessels();
       res.json(vessels);
@@ -6150,7 +6150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new vessel
-  app.post("/api/vessels", async (req, res) => {
+  app.post("/technical/api/vessels", async (req, res) => {
     try {
       const { id, name, code, fleetId, imoNumber, vesselType, flag, isActive } = req.body;
       
@@ -6184,7 +6184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Get all PMS vessel settings 
-  app.get("/api/pms-vessel-settings", async (req, res) => {
+  app.get("/technical/api/pms-vessel-settings", async (req, res) => {
     try {
       const settings = await storage.getAllPmsVesselSettings();
       res.json(settings);
@@ -6195,7 +6195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new PMS vessel settings
-  app.post("/api/pms-vessel-settings", async (req, res) => {
+  app.post("/technical/api/pms-vessel-settings", async (req, res) => {
     try {
       const { vesselId, ...settingsData } = req.body;
       if (!vesselId) {
@@ -6222,7 +6222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get PMS vessel settings by vessel ID
-  app.get("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+  app.get("/technical/api/pms-vessel-settings/:vesselId", async (req, res) => {
     try {
       const settings = await storage.getPmsVesselSettings(req.params.vesselId);
       if (!settings) {
@@ -6236,7 +6236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create or update PMS vessel settings
-  app.put("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+  app.put("/technical/api/pms-vessel-settings/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
       const updatedBy = req.body.updatedBy || (req as any).user?.username || 'test';
@@ -6265,7 +6265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete PMS vessel settings
-  app.delete("/api/pms-vessel-settings/:vesselId", async (req, res) => {
+  app.delete("/technical/api/pms-vessel-settings/:vesselId", async (req, res) => {
     try {
       await storage.deletePmsVesselSettings(req.params.vesselId);
       res.json({ success: true });
@@ -6277,7 +6277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Manually trigger work order status recalculation
   // Useful for immediate updates after settings changes or for admin operations
-  app.post("/api/work-orders/recalculate-statuses", async (req, res) => {
+  app.post("/technical/api/work-orders/recalculate-statuses", async (req, res) => {
     try {
       const { workOrderStatusRecalculator } = await import("./services/workOrderStatusRecalculator");
       const result = await workOrderStatusRecalculator.forceRecalculation();
@@ -6294,7 +6294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get vessel location names (with defaults if settings don't exist)
-  app.get("/api/vessel-location-names/:vesselId", async (req, res) => {
+  app.get("/technical/api/vessel-location-names/:vesselId", async (req, res) => {
     try {
       const settings = await storage.getPmsVesselSettings(req.params.vesselId);
       res.json({
@@ -6309,7 +6309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update vessel location names (PATCH semantics - only updates location fields)
-  app.put("/api/vessel-location-names/:vesselId", async (req, res) => {
+  app.put("/technical/api/vessel-location-names/:vesselId", async (req, res) => {
     try {
       const { vesselId } = req.params;
       const { locationAName, locationBName } = req.body;
@@ -6368,7 +6368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Generate work order on demand from job
-  app.post("/api/jobs/:id/generate-wo", async (req, res) => {
+  app.post("/technical/api/jobs/:id/generate-wo", async (req, res) => {
     try {
       const jobId = req.params.id;
       const { reason } = req.body; // 'Planning' | 'Breakdown' | 'Other'
@@ -6397,7 +6397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Check and revert expired postponements
-  app.post("/api/work-orders/check-postponements", async (req, res) => {
+  app.post("/technical/api/work-orders/check-postponements", async (req, res) => {
     try {
       const { vesselId } = req.body;
       const result = await storage.checkAndRevertPostponedWorkOrders(vesselId);
@@ -6415,7 +6415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Document Management API routes for Work Orders
   // Upload document to object storage using SDK
-  app.post("/api/upload-document", upload.single('file'), async (req, res) => {
+  app.post("/technical/api/upload-document", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -6464,7 +6464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get document using Object Storage SDK
-  app.get("/api/documents/:fileKey(*)", async (req, res) => {
+  app.get("/technical/api/documents/:fileKey(*)", async (req, res) => {
     try {
       const fileKey = '/' + req.params.fileKey;
       const objectStorageService = new ObjectStorageService();
@@ -6496,7 +6496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete document from object storage using SDK
-  app.delete("/api/documents/:fileKey(*)", async (req, res) => {
+  app.delete("/technical/api/documents/:fileKey(*)", async (req, res) => {
     try {
       const fileKey = '/' + req.params.fileKey;
       const objectStorageService = new ObjectStorageService();
@@ -6519,7 +6519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Admin endpoint: Trigger job due scan manually (for testing/debugging WO generation)
   // GET version for easy testing
-  app.get("/api/admin/job-due-scan", async (req, res) => {
+  app.get("/technical/api/admin/job-due-scan", async (req, res) => {
     try {
       console.log('🔍 Manual job due scan triggered (GET) for ALL vessels');
       
@@ -6551,7 +6551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST version for programmatic triggering
-  app.post("/api/admin/job-due-scan", async (req, res) => {
+  app.post("/technical/api/admin/job-due-scan", async (req, res) => {
     try {
       const { vesselId } = req.body;
       
@@ -6584,7 +6584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoint: Purge all jobs and linked data
-  app.post("/api/admin/purge-jobs", async (req, res) => {
+  app.post("/technical/api/admin/purge-jobs", async (req, res) => {
     try {
       const { vesselId } = req.body;
       
@@ -6639,7 +6639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Migrate existing spares data to new inventory structure
   // This converts legacy location text fields to normalized location entities
-  app.post("/api/admin/migrate-inventory", async (req, res) => {
+  app.post("/technical/api/admin/migrate-inventory", async (req, res) => {
     try {
       const { vesselId, dryRun = true } = req.body;
       
@@ -6796,7 +6796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Sync stale stored status values with computed status
   // This ensures the database status field matches the runtime computed status
-  app.post("/api/admin/sync-work-order-status", async (req, res) => {
+  app.post("/technical/api/admin/sync-work-order-status", async (req, res) => {
     try {
       const { vesselId, dryRun = true } = req.body;
       
@@ -7031,7 +7031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   initializeCertificates();
   
   // GET all certificates
-  app.get("/api/certificates", async (req, res) => {
+  app.get("/technical/api/certificates", async (req, res) => {
     try {
       const certificates = await storage.getCertificates();
       res.json(certificates);
@@ -7042,7 +7042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // GET single certificate
-  app.get("/api/certificates/:id", async (req, res) => {
+  app.get("/technical/api/certificates/:id", async (req, res) => {
     try {
       const certificate = await storage.getCertificate(req.params.id);
       if (!certificate) {
@@ -7056,7 +7056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PATCH update certificate (for toggling applicable status)
-  app.patch("/api/certificates/:id", async (req, res) => {
+  app.patch("/technical/api/certificates/:id", async (req, res) => {
     try {
       const updatedCertificate = await storage.updateCertificate(req.params.id, req.body);
       res.json(updatedCertificate);
@@ -7070,7 +7070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST create new certificate
-  app.post("/api/certificates", async (req, res) => {
+  app.post("/technical/api/certificates", async (req, res) => {
     try {
       const newCertificate = await storage.createCertificate(req.body);
       res.status(201).json(newCertificate);
@@ -7171,7 +7171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   initializeSurveys();
   
   // GET all surveys
-  app.get("/api/surveys", async (req, res) => {
+  app.get("/technical/api/surveys", async (req, res) => {
     try {
       const surveys = await storage.getSurveys();
       res.json(surveys);
@@ -7182,7 +7182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // GET single survey
-  app.get("/api/surveys/:id", async (req, res) => {
+  app.get("/technical/api/surveys/:id", async (req, res) => {
     try {
       const survey = await storage.getSurvey(req.params.id);
       if (!survey) {
@@ -7196,7 +7196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PATCH update survey (for toggling applicable status)
-  app.patch("/api/surveys/:id", async (req, res) => {
+  app.patch("/technical/api/surveys/:id", async (req, res) => {
     try {
       const updatedSurvey = await storage.updateSurvey(req.params.id, req.body);
       res.json(updatedSurvey);
@@ -7210,7 +7210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST create new survey
-  app.post("/api/surveys", async (req, res) => {
+  app.post("/technical/api/surveys", async (req, res) => {
     try {
       const newSurvey = await storage.createSurvey(req.body);
       res.status(201).json(newSurvey);

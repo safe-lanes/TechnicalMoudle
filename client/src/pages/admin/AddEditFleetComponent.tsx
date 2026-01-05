@@ -222,23 +222,23 @@ export default function AddEditFleetComponent() {
     items: MasterData[];
     total: number;
   }>({
-    queryKey: ["/api/fleet-admin/master-data?limit=1000"],
+    queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"],
   });
 
   const { data: vessels = [] } = useQuery<{ id: string; code?: string; name: string }[]>({
-    queryKey: ["/api/vessels"],
+    queryKey: ["/technical/api/vessels"],
   });
 
   const { data: makers = [] } = useQuery<Maker[]>({
-    queryKey: ["/api/fleet/makers"],
+    queryKey: ["/technical/api/fleet/makers"],
   });
 
   const updateMasterDataMutation = useMutation({
     mutationFn: async (data: { id: number; updates: Partial<MasterData> }) => {
-      return apiRequest("PATCH", `/api/fleet-admin/master-data/${data.id}`, data.updates);
+      return apiRequest("PATCH", `/technical/api/fleet-admin/master-data/${data.id}`, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/master-data?limit=1000"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
       toast({ title: "Success", description: "Component saved successfully" });
     },
     onError: (error: any) => {
@@ -248,10 +248,10 @@ export default function AddEditFleetComponent() {
 
   const createMasterDataMutation = useMutation({
     mutationFn: async (data: Partial<MasterData>) => {
-      return apiRequest("POST", "/api/fleet-admin/master-data", data);
+      return apiRequest("POST", "/technical/api/fleet-admin/master-data", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/master-data?limit=1000"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
       toast({ title: "Success", description: "Component created successfully" });
       setIsAddingNew(false);
       setNewComponentCode("");
@@ -263,10 +263,10 @@ export default function AddEditFleetComponent() {
 
   const deleteMasterDataMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/fleet-admin/master-data/${id}`);
+      return apiRequest("DELETE", `/technical/api/fleet-admin/master-data/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fleet-admin/master-data?limit=1000"] });
+      queryClient.invalidateQueries({ queryKey: ["/technical/api/fleet-admin/master-data?limit=1000"] });
       toast({ title: "Success", description: "Component deleted successfully" });
       setSelectedNode(null);
       resetForm();

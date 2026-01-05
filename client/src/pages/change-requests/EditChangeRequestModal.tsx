@@ -37,9 +37,9 @@ export default function EditChangeRequestModal({ open, onClose, requestId }: Edi
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
 
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
-    queryKey: ['/api/change-requests', requestId],
+    queryKey: ['/technical/api/change-requests', requestId],
     queryFn: async () => {
-      const response = await fetch(`/api/change-requests/${requestId}`);
+      const response = await fetch(`/technical/api/change-requests/${requestId}`);
       if (!response.ok) throw new Error('Failed to fetch change request');
       return response.json();
     },
@@ -72,15 +72,15 @@ export default function EditChangeRequestModal({ open, onClose, requestId }: Edi
         ...data,
         proposedChangesJson: proposedChanges.length > 0 ? proposedChanges : null,
       };
-      return apiRequest('PATCH', `/api/change-requests/${requestId}`, updateData);
+      return apiRequest('PATCH', `/technical/api/change-requests/${requestId}`, updateData);
     },
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Change request updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId] });
       onClose();
     },
     onError: (error: any) => {

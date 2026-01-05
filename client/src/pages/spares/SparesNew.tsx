@@ -270,7 +270,7 @@ const Spares: React.FC = () => {
         const quantity = Math.abs(deltaA);
         const endpoint = deltaA > 0 ? 'receive-to-location' : 'consume-from-location';
         
-        const resA = await fetch(`/api/spares/${spareId}/${endpoint}`, {
+        const resA = await fetch(`/technical/api/spares/${spareId}/${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -299,7 +299,7 @@ const Spares: React.FC = () => {
         const quantity = Math.abs(deltaB);
         const endpoint = deltaB > 0 ? 'receive-to-location' : 'consume-from-location';
         
-        const resB = await fetch(`/api/spares/${spareId}/${endpoint}`, {
+        const resB = await fetch(`/technical/api/spares/${spareId}/${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -326,7 +326,7 @@ const Spares: React.FC = () => {
     if (locations.nameA || locations.nameB) {
       attemptCount++;
       try {
-        const res = await fetch(`/api/vessel-location-names/${vesselId}`, {
+        const res = await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -339,7 +339,7 @@ const Spares: React.FC = () => {
           nameUpdateSuccess = false;
         } else {
           successCount++;
-          queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
         }
       } catch (e: any) {
         errors.push(`Location names: ${e.message || 'Network error'}`);
@@ -348,8 +348,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
     
     const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
     const hadNameChanges = !!(locations.nameA || locations.nameB);
@@ -380,7 +380,7 @@ const Spares: React.FC = () => {
   // Quick adjust mutation (for +/- buttons) with optimistic updates
   const adjustMutation = useMutation({
     mutationFn: async ({ spareId, qtyChange, eventType, notes }: { spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE', notes?: string }) => {
-      const response = await fetch(`/api/spares/${vesselId}/${spareId}/adjust`, {
+      const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qtyChange, eventType, notes: notes || 'Manual adjustment' }),
@@ -426,8 +426,8 @@ const Spares: React.FC = () => {
     },
     onSettled: async (data, error, variables) => {
       // Wait for queries to refetch before clearing pending state
-      await queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+      await queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       
       // Clear pending adjustment and loading state
       setPendingAdjustments(prev => {
@@ -593,7 +593,7 @@ const Spares: React.FC = () => {
     setIsSubmittingChangeRequest(true);
     
     try {
-      await apiRequest('POST', '/api/change-requests', {
+      await apiRequest('POST', '/technical/api/change-requests', {
         vesselId: vesselId || 'V001',
         category: 'spares',
         title: `Spare Change: ${originalSpareData.partCode} - ${originalSpareData.partName}`,
@@ -606,7 +606,7 @@ const Spares: React.FC = () => {
         requestedByUserId: 'Current User'
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       
       toast({
         title: "Change request submitted",
@@ -659,9 +659,9 @@ const Spares: React.FC = () => {
 
   // Fetch spares data
   const { data: sparesData = [], isLoading, refetch } = useQuery({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/spares/${vesselId}`);
+      const response = await fetch(`/technical/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     }
@@ -669,9 +669,9 @@ const Spares: React.FC = () => {
 
   // Fetch history data
   const { data: historyData = [] } = useQuery({
-    queryKey: ['/api/spares/history', vesselId],
+    queryKey: ['/technical/api/spares/history', vesselId],
     queryFn: async () => {
-      const response = await fetch(`/api/spares/history/${vesselId}`);
+      const response = await fetch(`/technical/api/spares/history/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     },
@@ -680,7 +680,7 @@ const Spares: React.FC = () => {
 
   // Fetch components for tree display
   const { data: fetchedComponents = [] } = useQuery<any[]>({
-    queryKey: [`/api/components/${vesselId}`],
+    queryKey: [`/technical/api/components/${vesselId}`],
   });
   
   // Build component tree from fetched data (same logic as Components.tsx)
@@ -825,9 +825,9 @@ const Spares: React.FC = () => {
 
   // Fetch vessel location names
   const { data: locationNamesData } = useQuery({
-    queryKey: [`/api/vessel-location-names/${vesselId}`],
+    queryKey: [`/technical/api/vessel-location-names/${vesselId}`],
     queryFn: async () => {
-      const response = await fetch(`/api/vessel-location-names/${vesselId}`);
+      const response = await fetch(`/technical/api/vessel-location-names/${vesselId}`);
       if (!response.ok) return { locationAName: 'Location A', locationBName: 'Location B' };
       return response.json();
     },
@@ -842,7 +842,7 @@ const Spares: React.FC = () => {
   // Consume spare mutation (location-aware)
   const consumeSpareMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number, quantity: number, location: 'A' | 'B', workOrderRef?: string, remarks?: string, userId?: string }) => {
-      const response = await fetch(`/api/spares/${id}/consume-from-location`, {
+      const response = await fetch(`/technical/api/spares/${id}/consume-from-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -858,8 +858,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       if (data.warning) {
         toast({ title: "Partial Consumption", description: data.warning.message, variant: "default" });
       } else {
@@ -880,7 +880,7 @@ const Spares: React.FC = () => {
   // Receive spare mutation (location-aware)
   const receiveSpareMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number, quantity: number, location: 'A' | 'B', supplierPO?: string, remarks?: string, userId?: string, dateLocal?: string }) => {
-      const response = await fetch(`/api/spares/${id}/receive-to-location`, {
+      const response = await fetch(`/technical/api/spares/${id}/receive-to-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -896,8 +896,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
       setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
@@ -914,10 +914,10 @@ const Spares: React.FC = () => {
   // Create spare mutation
   const createSpareMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', '/api/spares', data);
+      return apiRequest('POST', '/technical/api/spares', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
       toast({ title: "Success", description: "Spare created successfully" });
       setIsAddSpareModalOpen(false);
       setAddSpareForm({
@@ -945,10 +945,10 @@ const Spares: React.FC = () => {
   const updateSpareMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!selectedSpare) throw new Error('No spare selected');
-      return apiRequest('PATCH', `/api/spares/${vesselId}/${selectedSpare.id}`, data);
+      return apiRequest('PATCH', `/technical/api/spares/${vesselId}/${selectedSpare.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
       toast({ title: "Success", description: "Spare updated successfully" });
       setIsEditModalOpen(false);
       setSelectedSpare(null);
@@ -1004,7 +1004,7 @@ const Spares: React.FC = () => {
       remarks?: string,
       userId: string
     }> }) => {
-      const response = await fetch('/api/spares/bulk-update', {
+      const response = await fetch('/technical/api/spares/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1021,7 +1021,7 @@ const Spares: React.FC = () => {
     },
     onSuccess: (results) => {
       // Update the spares data with new ROB values
-      queryClient.setQueryData(['/api/spares', vesselId], (old: any) => {
+      queryClient.setQueryData(['/technical/api/spares', vesselId], (old: any) => {
         if (!old) return old;
         return old.map((spare: any) => {
           const result = results.find((r: any) => r.componentSpareId === spare.id && r.success);
@@ -1032,7 +1032,7 @@ const Spares: React.FC = () => {
         });
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       
       // Count successes, failures, and skipped
       const succeeded = results.filter((r: any) => r.success).length;
@@ -1058,7 +1058,7 @@ const Spares: React.FC = () => {
   // Delete spare mutation
   const deleteSpareMutation = useMutation({
     mutationFn: async (spareId: number) => {
-      const response = await fetch(`/api/spares/${vesselId}/${spareId}`, {
+      const response = await fetch(`/technical/api/spares/${vesselId}/${spareId}`, {
         method: 'DELETE',
       });
       
@@ -1070,8 +1070,8 @@ const Spares: React.FC = () => {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare deleted successfully" });
     },
     onError: (error: any) => {
@@ -1288,7 +1288,7 @@ const Spares: React.FC = () => {
     if (qtyA > 0) {
       attemptCount++;
       try {
-        const resA = await fetch(`/api/spares/${selectedSpare.id}/consume-from-location`, {
+        const resA = await fetch(`/technical/api/spares/${selectedSpare.id}/consume-from-location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1319,7 +1319,7 @@ const Spares: React.FC = () => {
     if (qtyB > 0) {
       attemptCount++;
       try {
-        const resB = await fetch(`/api/spares/${selectedSpare.id}/consume-from-location`, {
+        const resB = await fetch(`/technical/api/spares/${selectedSpare.id}/consume-from-location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1347,8 +1347,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {
@@ -1393,7 +1393,7 @@ const Spares: React.FC = () => {
     if (qtyA > 0) {
       attemptCount++;
       try {
-        const resA = await fetch(`/api/spares/${selectedSpare.id}/receive-to-location`, {
+        const resA = await fetch(`/technical/api/spares/${selectedSpare.id}/receive-to-location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1424,7 +1424,7 @@ const Spares: React.FC = () => {
     if (qtyB > 0) {
       attemptCount++;
       try {
-        const resB = await fetch(`/api/spares/${selectedSpare.id}/receive-to-location`, {
+        const resB = await fetch(`/technical/api/spares/${selectedSpare.id}/receive-to-location`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1452,8 +1452,8 @@ const Spares: React.FC = () => {
     }
     
     // Always invalidate cache to reflect any partial changes
-    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
     
     if (errors.length === 0 && attemptCount > 0) {
       if (warnings.length > 0) {

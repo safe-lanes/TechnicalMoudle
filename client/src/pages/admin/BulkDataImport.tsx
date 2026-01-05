@@ -206,11 +206,11 @@ export default function BulkDataImport() {
 
   const createVesselMutation = useMutation({
     mutationFn: async (data: { id: string; name: string; code: string }) => {
-      const response = await apiRequest('POST', '/api/vessels', data);
+      const response = await apiRequest('POST', '/technical/api/vessels', data);
       return response.json();
     },
     onSuccess: (vessel) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/vessels'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/vessels'] });
       setSelectedVessel(vessel.id);
       setNewVesselId('');
       setNewVesselName('');

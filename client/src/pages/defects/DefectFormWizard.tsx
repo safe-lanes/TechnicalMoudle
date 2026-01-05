@@ -94,7 +94,7 @@ export default function DefectFormWizard({
     queryKey: ['defects', params.id],
     enabled: !!params.id && !defect,
     queryFn: async () => {
-      const response = await fetch(`/api/defects/${params.id}`);
+      const response = await fetch(`/technical/api/defects/${params.id}`);
       if (!response.ok) throw new Error('Failed to fetch defect');
       return response.json();
     }
@@ -232,7 +232,7 @@ export default function DefectFormWizard({
       const isUpdate = currentDefect?.id || params.id;
       
       if (isUpdate) {
-        await apiRequest("PATCH", `/api/defects/${isUpdate}`, submitData);
+        await apiRequest("PATCH", `/technical/api/defects/${isUpdate}`, submitData);
         if (showToast) {
           const message = submitData.status === 'Closed' 
             ? "Defect closed successfully" 
@@ -240,7 +240,7 @@ export default function DefectFormWizard({
           toast({ title: message });
         }
       } else {
-        await apiRequest("POST", "/api/defects", submitData);
+        await apiRequest("POST", "/technical/api/defects", submitData);
         if (showToast) toast({ title: "Defect created successfully" });
       }
       

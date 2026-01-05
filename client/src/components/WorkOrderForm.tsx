@@ -126,7 +126,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       setIsPreviewMode(true);
       
       // Fetch change request data to get proposed changes
-      fetch(`/api/change-requests/${changeRequestId}`)
+      fetch(`/technical/api/change-requests/${changeRequestId}`)
         .then(res => res.json())
         .then(data => {
           setChangeRequestData(data);
@@ -325,7 +325,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
   // Fetch spare BOM for the component (from spare_component_links)
   const componentCode = workOrder?.componentCode || component?.code || templateData?.componentCode;
   const { data: spareBomResponse, isLoading: spareBomLoading } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: [`/api/inventory/spares-by-component/${componentCode}`],
+    queryKey: [`/technical/api/inventory/spares-by-component/${componentCode}`],
     enabled: !!componentCode && isOpen,
   });
   const componentSpareBom = spareBomResponse?.data || [];
@@ -339,7 +339,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
         consumedParts
           .filter(part => part.isFromBom && part.spareId && part.locationId)
           .map(part => 
-            apiRequest('POST', '/api/inventory/transactions', {
+            apiRequest('POST', '/technical/api/inventory/transactions', {
               vesselId,
               spareId: part.spareId,
               locationId: part.locationId,
@@ -355,8 +355,8 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory/transactions'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/inventory/spares-by-component/${componentCode}`] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/transactions'] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/inventory/spares-by-component/${componentCode}`] });
     },
     onError: (error: any) => {
       console.error('Consumption transaction failed:', error);
@@ -603,7 +603,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       formData.append('documentType', documentType);
 
       // Upload to backend
-      const response = await fetch('/api/upload-document', {
+      const response = await fetch('/technical/api/upload-document', {
         method: 'POST',
         body: formData
       });
@@ -653,7 +653,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     try {
       // Get signed URL from backend
       const fileKeyEncoded = encodeURIComponent(document.fileKey.substring(1));
-      const response = await fetch(`/api/documents/${fileKeyEncoded}`);
+      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`);
       
       if (!response.ok) {
         throw new Error('Failed to retrieve document');
@@ -687,7 +687,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
     try {
       // Delete from backend
       const fileKeyEncoded = encodeURIComponent(documentToDelete.fileKey.substring(1));
-      const response = await fetch(`/api/documents/${fileKeyEncoded}`, {
+      const response = await fetch(`/technical/api/documents/${fileKeyEncoded}`, {
         method: 'DELETE'
       });
 
@@ -2014,7 +2014,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
 
                             console.log("Submitting change request:", changeRequest);
                             
-                            const response = await fetch('/api/change-requests', {
+                            const response = await fetch('/technical/api/change-requests', {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
@@ -2862,7 +2862,7 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
 
                             console.log("Submitting change request:", changeRequest);
                             
-                            const response = await fetch('/api/change-requests', {
+                            const response = await fetch('/technical/api/change-requests', {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',

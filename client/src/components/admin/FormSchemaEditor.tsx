@@ -82,7 +82,7 @@ export default function FormSchemaEditor({
   // Update schema mutation
   const updateSchemaMutation = useMutation({
     mutationFn: (schemaJson: any) =>
-      apiRequest(`/api/admin/forms/${version.formId}/versions/${version.id}/schema`, {
+      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/schema`, {
         method: 'PUT',
         body: JSON.stringify({ schemaJson }),
       }),
@@ -105,7 +105,7 @@ export default function FormSchemaEditor({
   // Publish version mutation
   const publishMutation = useMutation({
     mutationFn: (changelog: string) =>
-      apiRequest(`/api/admin/forms/${version.formId}/versions/${version.id}/publish`, {
+      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/publish`, {
         method: 'POST',
         body: JSON.stringify({ userId: 'admin', changelog }),
       }),
@@ -130,7 +130,7 @@ export default function FormSchemaEditor({
   // Discard draft mutation
   const discardMutation = useMutation({
     mutationFn: () =>
-      apiRequest(`/api/admin/forms/${version.formId}/versions/${version.id}/discard`, {
+      apiRequest(`/technical/api/admin/forms/${version.formId}/versions/${version.id}/discard`, {
         method: 'POST',
       }),
     onSuccess: () => {

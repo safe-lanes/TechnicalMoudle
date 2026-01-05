@@ -48,7 +48,7 @@ export interface ReportColumn {
 }
 
 class ReportGeneratorService {
-  private baseURL = '/api/reports';
+  private baseURL = '/technical/api/reports';
 
   async generateReport(
     reportId: string,

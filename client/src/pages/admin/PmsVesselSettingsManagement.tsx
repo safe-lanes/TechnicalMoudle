@@ -35,21 +35,21 @@ export default function PmsVesselSettingsManagement() {
   });
 
   const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<Vessel[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
   });
 
   const { data: allSettings = [], isLoading: isSettingsLoading } = useQuery<PmsVesselSettings[]>({
-    queryKey: ['/api/pms-vessel-settings'],
+    queryKey: ['/technical/api/pms-vessel-settings'],
   });
 
   const settingsMap = new Map(allSettings.map(s => [s.vesselId, s]));
 
   const saveMutation = useMutation({
     mutationFn: async (data: { vesselId: string; settings: typeof formData }) => {
-      return apiRequest('PUT', `/api/pms-vessel-settings/${data.vesselId}`, data.settings);
+      return apiRequest('PUT', `/technical/api/pms-vessel-settings/${data.vesselId}`, data.settings);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/pms-vessel-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/pms-vessel-settings'] });
       setIsEditDialogOpen(false);
       toast({
         title: "Settings Saved",

@@ -21,7 +21,7 @@ export default function AddCommentModal({ open, onClose, requestId }: AddComment
 
   const addCommentMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', `/api/change-requests/${requestId}/comments`, {
+      return apiRequest('POST', `/technical/api/change-requests/${requestId}/comments`, {
         message,
         userId: 'Current User' // In real app, get from auth context
       });
@@ -31,9 +31,9 @@ export default function AddCommentModal({ open, onClose, requestId }: AddComment
         title: "Success",
         description: "Comment added successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests', requestId, 'comments'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests', requestId, 'comments'] });
       handleClose();
     },
     onError: (error: any) => {

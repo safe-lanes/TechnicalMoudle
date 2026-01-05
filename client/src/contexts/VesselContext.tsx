@@ -22,7 +22,7 @@ export const VesselProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const { data: vessels = [], isLoading } = useQuery<Vessel[]>({
-    queryKey: ['/api/vessels'],
+    queryKey: ['/technical/api/vessels'],
     staleTime: 5 * 60 * 1000,
   });
 

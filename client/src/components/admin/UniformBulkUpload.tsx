@@ -174,9 +174,9 @@ export default function UniformBulkUpload({
   const { toast } = useToast();
 
   const { data: historyData, isLoading: historyLoading } = useQuery<{items: ImportHistory[], total: number}>({
-    queryKey: ['/api/bulk/history', templateType],
+    queryKey: ['/technical/api/bulk/history', templateType],
     queryFn: async () => {
-      const response = await fetch(`/api/bulk/history?type=${templateType}&limit=50`);
+      const response = await fetch(`/technical/api/bulk/history?type=${templateType}&limit=50`);
       if (!response.ok) throw new Error('Failed to fetch history');
       return response.json();
     }
@@ -186,7 +186,7 @@ export default function UniformBulkUpload({
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`/api/bulk/template?type=${templateType}&vesselId=${vesselId}`);
+      const response = await fetch(`/technical/api/bulk/template?type=${templateType}&vesselId=${vesselId}`);
       if (!response.ok) throw new Error('Failed to download template');
       
       const blob = await response.blob();
@@ -221,7 +221,7 @@ export default function UniformBulkUpload({
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/bulk/sheets', {
+      const response = await fetch('/technical/api/bulk/sheets', {
         method: 'POST',
         body: formData
       });
@@ -328,7 +328,7 @@ export default function UniformBulkUpload({
     }
 
     try {
-      const response = await fetch('/api/bulk/dry-run', {
+      const response = await fetch('/technical/api/bulk/dry-run', {
         method: 'POST',
         body: formData
       });
@@ -392,7 +392,7 @@ export default function UniformBulkUpload({
         requestBody.storeType = selectedStoreType;
       }
 
-      const response = await fetch('/api/bulk/import', {
+      const response = await fetch('/technical/api/bulk/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -420,7 +420,7 @@ export default function UniformBulkUpload({
         setSelectedStoreType('');
       }
       
-      queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
       
       // Invalidate domain-specific caches to ensure fresh data displays
       invalidateAfterBulkImport(templateType, vesselId);
@@ -501,7 +501,7 @@ export default function UniformBulkUpload({
     setIsUndoing(true);
     
     try {
-      const response = await fetch(`/api/bulk/undo/${selectedHistoryId}`, {
+      const response = await fetch(`/technical/api/bulk/undo/${selectedHistoryId}`, {
         method: 'POST'
       });
       
@@ -517,7 +517,7 @@ export default function UniformBulkUpload({
         description: `Deleted: ${result.deleted}, Restored: ${result.restored}, Unarchived: ${result.unarchived}`
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/bulk/history', templateType] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/bulk/history', templateType] });
       
       // Invalidate domain-specific caches after undo
       invalidateAfterBulkImport(templateType, vesselId);
@@ -557,7 +557,7 @@ export default function UniformBulkUpload({
 
   const handleDownloadOriginalFile = async (historyId: string, fileName?: string) => {
     try {
-      const response = await fetch(`/api/bulk/history/${historyId}/download-original`);
+      const response = await fetch(`/technical/api/bulk/history/${historyId}/download-original`);
       
       if (!response.ok) {
         const error = await response.json();

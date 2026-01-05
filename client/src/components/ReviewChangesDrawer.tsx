@@ -50,7 +50,7 @@ export const ReviewChangesDrawer: React.FC<ReviewChangesDrawerProps> = ({
     
     setIsSubmitting(true);
     try {
-      const response = await apiRequest('POST', '/api/change-requests', {
+      const response = await apiRequest('POST', '/technical/api/change-requests', {
         title: changeRequestTitle || 'Untitled Change Request',
         category: changeRequestCategory || targetType,
         targetType,

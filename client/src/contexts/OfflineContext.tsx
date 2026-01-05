@@ -35,34 +35,34 @@ const OfflineContext = createContext<OfflineContextType | null>(null);
 
 const ENTITY_ENDPOINTS: Record<string, { create: string; update: (id: string) => string; delete: (id: string) => string }> = {
   component: {
-    create: '/api/components',
-    update: (id) => `/api/components/${id}`,
-    delete: (id) => `/api/components/${id}`
+    create: '/technical/api/components',
+    update: (id) => `/technical/api/components/${id}`,
+    delete: (id) => `/technical/api/components/${id}`
   },
   job: {
-    create: '/api/jobs',
-    update: (id) => `/api/jobs/${id}`,
-    delete: (id) => `/api/jobs/${id}`
+    create: '/technical/api/jobs',
+    update: (id) => `/technical/api/jobs/${id}`,
+    delete: (id) => `/technical/api/jobs/${id}`
   },
   workOrder: {
-    create: '/api/work-orders',
-    update: (id) => `/api/work-orders/${id}`,
-    delete: (id) => `/api/work-orders/${id}`
+    create: '/technical/api/work-orders',
+    update: (id) => `/technical/api/work-orders/${id}`,
+    delete: (id) => `/technical/api/work-orders/${id}`
   },
   spare: {
-    create: '/api/spares',
-    update: (id) => `/api/spares/${id}`,
-    delete: (id) => `/api/spares/${id}`
+    create: '/technical/api/spares',
+    update: (id) => `/technical/api/spares/${id}`,
+    delete: (id) => `/technical/api/spares/${id}`
   },
   defect: {
-    create: '/api/defects',
-    update: (id) => `/api/defects/${id}`,
-    delete: (id) => `/api/defects/${id}`
+    create: '/technical/api/defects',
+    update: (id) => `/technical/api/defects/${id}`,
+    delete: (id) => `/technical/api/defects/${id}`
   },
   runningHours: {
-    create: '/api/running-hours/cascade-update',
-    update: (id) => `/api/running-hours/cascade-update`,
-    delete: (id) => `/api/running-hours/${id}`
+    create: '/technical/api/running-hours/cascade-update',
+    update: (id) => `/technical/api/running-hours/cascade-update`,
+    delete: (id) => `/technical/api/running-hours/${id}`
   }
 };
 

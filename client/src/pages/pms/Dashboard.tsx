@@ -65,11 +65,11 @@ const Dashboard = () => {
 
   // Fetch real work orders data
   const { data: workOrdersData = [], isLoading: isWorkOrdersLoading } = useQuery<WorkOrder[]>({
-    queryKey: ['/api/work-orders', vesselId],
+    queryKey: ['/technical/api/work-orders', vesselId],
     queryFn: async () => {
       const url = isAllVessels 
-        ? '/api/work-orders' 
-        : `/api/work-orders?vesselId=${vesselId}`;
+        ? '/technical/api/work-orders' 
+        : `/technical/api/work-orders?vesselId=${vesselId}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch work orders');
       return await response.json();
@@ -79,13 +79,13 @@ const Dashboard = () => {
 
   // Fetch spares data - for all vessels, fetch each vessel's spares and combine
   const { data: sparesData = [], isLoading: isSparesLoading } = useQuery<Spare[]>({
-    queryKey: ['/api/spares', vesselId],
+    queryKey: ['/technical/api/spares', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allSpares: Spare[] = [];
         for (const vessel of vessels) {
           try {
-            const response = await fetch(`/api/spares/${vessel.id}`);
+            const response = await fetch(`/technical/api/spares/${vessel.id}`);
             if (response.ok) {
               const vesselSpares = await response.json();
               allSpares.push(...vesselSpares);
@@ -96,7 +96,7 @@ const Dashboard = () => {
         }
         return allSpares;
       }
-      const response = await fetch(`/api/spares/${vesselId}`);
+      const response = await fetch(`/technical/api/spares/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch spares');
       return response.json();
     },
@@ -105,13 +105,13 @@ const Dashboard = () => {
 
   // Fetch stores data - for all vessels, fetch each vessel's stores and combine
   const { data: storesData = [], isLoading: isStoresLoading } = useQuery<StoresItem[]>({
-    queryKey: ['/api/stores', vesselId],
+    queryKey: ['/technical/api/stores', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allStores: StoresItem[] = [];
         for (const vessel of vessels) {
           try {
-            const response = await fetch(`/api/stores/${vessel.id}`);
+            const response = await fetch(`/technical/api/stores/${vessel.id}`);
             if (response.ok) {
               const vesselStores = await response.json();
               allStores.push(...vesselStores);
@@ -122,7 +122,7 @@ const Dashboard = () => {
         }
         return allStores;
       }
-      const response = await fetch(`/api/stores/${vesselId}`);
+      const response = await fetch(`/technical/api/stores/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch stores');
       return response.json();
     },
@@ -131,13 +131,13 @@ const Dashboard = () => {
 
   // Fetch components data - for all vessels, fetch each vessel's components and combine
   const { data: componentsData = [], isLoading: isComponentsLoading } = useQuery<Component[]>({
-    queryKey: ['/api/components', vesselId],
+    queryKey: ['/technical/api/components', vesselId],
     queryFn: async () => {
       if (isAllVessels) {
         const allComponents: Component[] = [];
         for (const vessel of vessels) {
           try {
-            const response = await fetch(`/api/components/${vessel.id}`);
+            const response = await fetch(`/technical/api/components/${vessel.id}`);
             if (response.ok) {
               const vesselComponents = await response.json();
               allComponents.push(...vesselComponents);
@@ -148,7 +148,7 @@ const Dashboard = () => {
         }
         return allComponents;
       }
-      const response = await fetch(`/api/components/${vesselId}`);
+      const response = await fetch(`/technical/api/components/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       return response.json();
     },

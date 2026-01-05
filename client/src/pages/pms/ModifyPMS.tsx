@@ -153,7 +153,7 @@ export default function ModifyPMS() {
 
   // Fetch change requests
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['/api/change-requests', categoryFilter, statusFilter, searchQuery],
+    queryKey: ['/technical/api/change-requests', categoryFilter, statusFilter, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('vesselId', selectedVessel);
@@ -161,7 +161,7 @@ export default function ModifyPMS() {
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (searchQuery) params.append('q', searchQuery);
       
-      const response = await fetch(`/api/change-requests?${params}`);
+      const response = await fetch(`/technical/api/change-requests?${params}`);
       if (!response.ok) throw new Error('Failed to fetch requests');
       return response.json();
     }
@@ -170,7 +170,7 @@ export default function ModifyPMS() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest('POST', '/api/change-requests', {
+      const res = await apiRequest('POST', '/technical/api/change-requests', {
         ...data,
         vesselId: selectedVessel,
         requestedByUserId: 'current_user'
@@ -178,7 +178,7 @@ export default function ModifyPMS() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       setShowCreateDialog(false);
       resetForm();
     }
@@ -187,7 +187,7 @@ export default function ModifyPMS() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      const res = await apiRequest('PUT', `/api/change-requests/${id}`, {
+      const res = await apiRequest('PUT', `/technical/api/change-requests/${id}`, {
         ...data,
         vesselId: selectedVessel,
         requestedByUserId: 'current_user'
@@ -195,7 +195,7 @@ export default function ModifyPMS() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       setEditingRequest(null);
       resetForm();
     }
@@ -204,25 +204,25 @@ export default function ModifyPMS() {
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest('PATCH', `/api/change-requests/${id}/status`, {
+      const res = await apiRequest('PATCH', `/technical/api/change-requests/${id}/status`, {
         status: 'submitted',
         reviewedByUserId: 'current_user'
       });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
     }
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest('DELETE', `/api/change-requests/${id}`);
+      const res = await apiRequest('DELETE', `/technical/api/change-requests/${id}`);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
     }
   });
 
@@ -335,14 +335,14 @@ export default function ModifyPMS() {
     // If editing an existing request, update it immediately
     if (editingRequest) {
       try {
-        await apiRequest('PUT', `/api/change-requests/${editingRequest.id}`, {
+        await apiRequest('PUT', `/technical/api/change-requests/${editingRequest.id}`, {
           targetType: actualTargetType,
           targetId: actualTargetId,
           snapshotBeforeJson: snapshot
         });
         
         // Refresh the request data
-        queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
       } catch (error) {
         console.error('Failed to update target:', error);
       }
@@ -369,7 +369,7 @@ export default function ModifyPMS() {
 
   const handleView = async (request: ChangeRequest) => {
     // Fetch full details including comments and attachments
-    const response = await fetch(`/api/change-requests/${request.id}`);
+    const response = await fetch(`/technical/api/change-requests/${request.id}`);
     if (response.ok) {
       const fullRequest = await response.json();
       setViewingRequest(fullRequest);
@@ -730,7 +730,7 @@ export default function ModifyPMS() {
                     }));
                     // Save proposed changes to backend
                     if (editingRequest) {
-                      fetch(`/api/change-requests/${editingRequest.id}`, {
+                      fetch(`/technical/api/change-requests/${editingRequest.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1081,12 +1081,12 @@ export default function ModifyPMS() {
                     onClick={() => {
                       const comment = prompt('Please provide a reason for rejection:');
                       if (comment) {
-                        fetch(`/api/change-requests/${viewingRequest.id}/reject`, {
+                        fetch(`/technical/api/change-requests/${viewingRequest.id}/reject`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ comment, reviewerId: 'current_user' })
                         }).then(() => {
-                          queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+                          queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
                           setViewingRequest(null);
                           toast({
                             title: "Change request rejected",
@@ -1104,12 +1104,12 @@ export default function ModifyPMS() {
                     onClick={() => {
                       const comment = prompt('Please provide approval comments:');
                       if (comment) {
-                        fetch(`/api/change-requests/${viewingRequest.id}/approve`, {
+                        fetch(`/technical/api/change-requests/${viewingRequest.id}/approve`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ comment, reviewerId: 'current_user' })
                         }).then(() => {
-                          queryClient.invalidateQueries({ queryKey: ['/api/change-requests'] });
+                          queryClient.invalidateQueries({ queryKey: ['/technical/api/change-requests'] });
                           setViewingRequest(null);
                           toast({
                             title: "Change request approved",
