@@ -267,6 +267,16 @@ const RunningHours = () => {
   const handleSaveUpdate = () => {
     if (!selectedComponent) return;
     
+    // Validate date is provided
+    if (!updateForm.dateUpdated || updateForm.dateUpdated.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Date is required. Please select a date.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Validate date not in future
     const selectedDate = new Date(updateForm.dateUpdated);
     const today = new Date();

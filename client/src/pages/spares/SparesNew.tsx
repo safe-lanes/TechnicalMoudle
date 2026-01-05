@@ -1719,7 +1719,7 @@ const Spares: React.FC = () => {
                             data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
                           >
                             {isFirstRow && <Marker id="E36" />}
-                            <Square className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
                       </div>
