@@ -71,3 +71,22 @@ Progress tracking for issues from the 26-12-2025 findings document.
 - **API**: Added `/technical/api/job-maintenance-history/:jobId` endpoint for job-based history queries
 - **Fallback Logic**: Component history query now uses `componentCode` as fallback when `componentId` doesn't match (handles legacy records)
 - **Storage**: Added `getMaintenanceHistoryByJobId` and `getMaintenanceHistoryByComponentCode` methods
+
+### Duplicate Work Order Prevention (Completed 05-Jan-2026)
+**Root Cause**: Auto-generation scanner was using workOrderNo parsing instead of direct jobId matching, causing duplicate active WOs during server restarts.
+
+**Three-Layer Protection Implemented**:
+1. **Layer 1 - Application Logic** (`server/utils/workOrderStatus.ts`):
+   - Modified `buildJobsWithActiveWOSet()` to return `ActiveWOBlockingSets` with both `byJobId` and `byJobNo` sets
+   - Primary check uses `jobId` directly (reliable), fallback uses extracted `jobNo` (legacy compatibility)
+   
+2. **Layer 2 - Pre-Creation Validation** (`server/services/workOrderService.ts`):
+   - Added duplicate check in `createWorkOrder()` using `isBlockingStatus()` before insert
+   - Throws clear error message if active WO already exists for the same job
+   
+3. **Layer 3 - Database Constraint**:
+   - Added partial unique index `idx_wo_unique_active_job` on `(job_id, vessel_id)`
+   - WHERE clause excludes Completed/Cancelled/Rejected statuses
+   - Provides ultimate protection at database level
+
+**Data Cleanup**: Cancelled 17 duplicate work orders in V015, keeping earliest WO per job with explanatory remarks.
