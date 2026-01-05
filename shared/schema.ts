@@ -1507,6 +1507,8 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   componentId: text("component_id").notNull(),
   componentCode: text("component_code").notNull(),
   vesselCode: text("vessel_code").notNull(),
+  jobId: text("job_id"), // Link to parent job for Jobs Form A5 history
+  jobCode: text("job_code"), // Job number for querying (e.g., MKR-IN-00001)
   workOrderId: text("work_order_id").notNull(), // Link to completed work order
   workOrderNo: text("work_order_no").notNull(),
   jobTitle: text("job_title").notNull(),
@@ -1526,6 +1528,8 @@ export const componentMaintenanceHistory = pgTable("component_maintenance_histor
   componentIdIdx: index("idx_history_component_id").on(table.componentId),
   componentCodeIdx: index("idx_history_component_code").on(table.componentCode),
   vesselCodeIdx: index("idx_history_vessel_code").on(table.vesselCode),
+  jobIdIdx: index("idx_history_job_id").on(table.jobId),
+  jobCodeIdx: index("idx_history_job_code").on(table.jobCode),
   workOrderIdIdx: index("idx_history_work_order_id").on(table.workOrderId),
   dateCompletedIdx: index("idx_history_date_completed").on(table.dateCompleted),
 }));

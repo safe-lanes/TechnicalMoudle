@@ -449,6 +449,9 @@ export interface IStorage {
   // Component Maintenance History methods
   getAllComponentMaintenanceHistory(): Promise<any[]>;
   getComponentMaintenanceHistory(componentId: string): Promise<any[]>;
+  getComponentMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<any[]>;
+  getMaintenanceHistoryByJobId(jobId: string): Promise<any[]>;
+  getMaintenanceHistoryByJobCode(jobCode: string): Promise<any[]>;
   getComponentMaintenanceHistoryItem(id: number): Promise<any | undefined>;
   getMaintenanceHistoryByWorkOrderId(workOrderId: string): Promise<any | undefined>;
   createComponentMaintenanceHistory(history: any): Promise<any>;

@@ -1797,11 +1797,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const history = await storage.getComponentMaintenanceHistory(req.params.componentId);
+      // First try to get history by componentId
+      let history = await storage.getComponentMaintenanceHistory(req.params.componentId);
+      
+      // If no history found by ID, try fallback by componentCode + vesselCode
+      // This handles cases where legacy records used different componentId format
+      if (history.length === 0 && component.componentCode && component.vesselCode) {
+        history = await storage.getComponentMaintenanceHistoryByCode(
+          component.componentCode,
+          component.vesselCode
+        );
+      }
+      
       res.json(history);
     } catch (error) {
       console.error("Failed to get component maintenance history:", error);
       res.status(500).json({ error: "Failed to get component maintenance history" });
+    }
+  });
+  
+  // Get maintenance history by job ID (for Jobs Form A5)
+  app.get("/technical/api/job-maintenance-history/:jobId", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const job = await storage.getJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      // For Ship users, enforce vessel scoping
+      if (req.user!.role === "Ship" && req.user!.vesselId) {
+        if (job.vesselId !== req.user!.vesselId) {
+          return res.status(403).json({ 
+            error: "Cannot access maintenance history for jobs from other vessels"
+          });
+        }
+      }
+      
+      // First try to get history by jobId
+      let history = await storage.getMaintenanceHistoryByJobId(req.params.jobId);
+      
+      // If no history found by jobId, try by jobCode (jobNo)
+      if (history.length === 0 && job.jobNo) {
+        history = await storage.getMaintenanceHistoryByJobCode(job.jobNo);
+      }
+      
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get job maintenance history:", error);
+      res.status(500).json({ error: "Failed to get job maintenance history" });
     }
   });
   
@@ -2859,12 +2902,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return date.toISOString().split('T')[0];
           };
 
+          // Get job information for proper job linkage in maintenance history
+          let parentJob = null;
+          let parentJobNo: string | null = null;
+          
+          // First try direct lookup by jobId
+          if (workOrder.jobId) {
+            parentJob = await storage.getJob(workOrder.jobId);
+            if (parentJob) {
+              parentJobNo = parentJob.jobNo;
+            }
+          }
+          
+          // Fallback: Extract jobNo from work order number
+          if (!parentJobNo && workOrder.workOrderNo) {
+            const woNumber = workOrder.workOrderNo;
+            // Try NEW format first: <JOB_NO>-<COMPONENT_CODE>-<YYYY>-<RUNNING>
+            const newFormatMatch = woNumber.match(/^(.+?)-\d+\.\d+.*-\d{4}-\d+$/);
+            if (newFormatMatch) {
+              parentJobNo = newFormatMatch[1];
+            }
+            // Try OLD format: MKR-IN-00001-2025-001 (jobNo-year-running)
+            if (!parentJobNo) {
+              const oldFormatMatch = woNumber.match(/^(.+)-\d{4}-\d+$/);
+              if (oldFormatMatch) {
+                parentJobNo = oldFormatMatch[1];
+              }
+            }
+            // If we extracted a job number but don't have job object, try to find it
+            if (parentJobNo && !parentJob) {
+              const allJobs = await storage.getJobsByVessel(workOrder.vesselId);
+              parentJob = allJobs.find(j => j.jobNo === parentJobNo) || null;
+            }
+          }
+
           // Use schema validation for type safety and defaults
           // FIX: Use component.id (actual UUID) not workOrder.component (which is the component NAME)
           const historyPayload = {
             componentId: component.id,
             componentCode: workOrder.componentCode || component.componentCode,
             vesselCode: workOrder.vesselId,
+            jobId: parentJob?.id || workOrder.jobId || null,
+            jobCode: parentJobNo || null,
             workOrderId: workOrder.id,
             workOrderNo: workOrder.templateCode || `WO-${workOrder.id}`,
             jobTitle: workOrder.jobTitle,
@@ -2882,7 +2961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           await storage.createComponentMaintenanceHistory(historyPayload);
-          console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id})`);
+          console.log(`✅ Auto-populated maintenance history for work order ${workOrder.id} (componentId: ${component.id}, jobId: ${historyPayload.jobId}, jobCode: ${historyPayload.jobCode})`);
         }
       } catch (historyError) {
         console.error('Failed to create maintenance history record:', historyError);

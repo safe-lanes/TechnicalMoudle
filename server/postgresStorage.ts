@@ -1214,6 +1214,30 @@ export class PostgresStorage {
       .orderBy(desc(componentMaintenanceHistory.dateCompleted));
   }
 
+  async getComponentMaintenanceHistoryByCode(componentCode: string, vesselCode: string): Promise<ComponentMaintenanceHistory[]> {
+    const db = await getDb();
+    return await db.select().from(componentMaintenanceHistory)
+      .where(and(
+        eq(componentMaintenanceHistory.componentCode, componentCode),
+        eq(componentMaintenanceHistory.vesselCode, vesselCode)
+      ))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+  }
+
+  async getMaintenanceHistoryByJobId(jobId: string): Promise<ComponentMaintenanceHistory[]> {
+    const db = await getDb();
+    return await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.jobId, jobId))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+  }
+
+  async getMaintenanceHistoryByJobCode(jobCode: string): Promise<ComponentMaintenanceHistory[]> {
+    const db = await getDb();
+    return await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.jobCode, jobCode))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+  }
+
   async getComponentMaintenanceHistoryItem(id: number): Promise<ComponentMaintenanceHistory | undefined> {
     const db = await getDb();
     const result = await db.select().from(componentMaintenanceHistory)
