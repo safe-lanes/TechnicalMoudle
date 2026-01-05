@@ -4646,6 +4646,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rule A3: Location-aware spare receiving
+  // Adds to specified location
+  const receiveToLocationBodySchema = z.object({
+    quantity: z.coerce.number().positive('Quantity must be a positive number'),
+    location: z.enum(['A', 'B'], { errorMap: () => ({ message: 'Location must be "A" or "B"' }) }),
+    userId: z.string().optional(),
+    remarks: z.string().optional(),
+    supplierPO: z.string().optional(),
+    dateLocal: z.string().optional()
+  });
+  
+  const receiveToLocationParamsSchema = z.object({
+    id: z.coerce.number().int().positive('Spare ID must be a positive integer')
+  });
+  
+  app.post("/api/spares/:id/receive-to-location", async (req, res) => {
+    try {
+      // Validate params
+      const paramsResult = receiveToLocationParamsSchema.safeParse(req.params);
+      if (!paramsResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: paramsResult.error.errors[0]?.message || 'Invalid spare ID',
+            field: 'id'
+          }
+        });
+      }
+      
+      // Validate body
+      const bodyResult = receiveToLocationBodySchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({
+          success: false,
+          errors: bodyResult.error.errors.map(err => ({
+            code: 'VALIDATION_ERROR',
+            message: err.message,
+            field: err.path.join('.')
+          }))
+        });
+      }
+      
+      const { id: spareId } = paramsResult.data;
+      const { quantity, location, userId, remarks, supplierPO, dateLocal } = bodyResult.data;
+      
+      const result = await storage.receiveSpareToLocation(
+        spareId,
+        quantity,
+        location,
+        userId || 'system',
+        remarks,
+        supplierPO,
+        dateLocal
+      );
+      
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("Error receiving spare to location:", error);
+      
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: error.message
+          }
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error.message || "Failed to receive spare to location"
+        }
+      });
+    }
+  });
+
   // ============= INVENTORY MANAGEMENT: LOCATIONS =============
   
   app.get("/api/inventory/locations/:vesselId", async (req, res) => {

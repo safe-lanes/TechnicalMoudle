@@ -149,8 +149,8 @@ const Spares: React.FC = () => {
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
-  const [consumeForm, setConsumeForm] = useState({ quantity: "", date: "", workOrder: "", remarks: "" });
-  const [receiveForm, setReceiveForm] = useState({ quantity: "", date: "", supplier: "", remarks: "" });
+  const [consumeForm, setConsumeForm] = useState({ quantity: "", date: "", workOrder: "", remarks: "", location: "" as "A" | "B" | "" });
+  const [receiveForm, setReceiveForm] = useState({ quantity: "", date: "", supplier: "", remarks: "", location: "" as "A" | "B" | "" });
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string}}>({});
   const [addSpareForm, setAddSpareForm] = useState({
     partCode: "",
@@ -740,10 +740,10 @@ const Spares: React.FC = () => {
     locationB: locationNamesData?.locationBName || 'Location B'
   };
 
-  // Consume spare mutation
+  // Consume spare mutation (location-aware)
   const consumeSpareMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number, qty: number, dateLocal: string, tz?: string, place?: string, remarks?: string, userId?: string, vesselId: string }) => {
-      const response = await fetch(`/api/spares/${id}/consume`, {
+    mutationFn: async ({ id, ...data }: { id: number, quantity: number, location: 'A' | 'B', workOrderRef?: string, remarks?: string, userId?: string }) => {
+      const response = await fetch(`/api/spares/${id}/consume-from-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -753,17 +753,21 @@ const Spares: React.FC = () => {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to consume spare');
+        throw new Error(error.error?.message || error.error || 'Failed to consume spare');
       }
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
       queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
-      toast({ title: "Success", description: "Spare consumed successfully" });
+      if (data.warning) {
+        toast({ title: "Partial Consumption", description: data.warning.message, variant: "default" });
+      } else {
+        toast({ title: "Success", description: "Spare consumed successfully" });
+      }
       setIsConsumeModalOpen(false);
-      setConsumeForm({ quantity: "", date: "", workOrder: "", remarks: "" });
+      setConsumeForm({ quantity: "", date: "", workOrder: "", remarks: "", location: "" });
     },
     onError: (error: any) => {
       toast({ 
@@ -774,10 +778,10 @@ const Spares: React.FC = () => {
     }
   });
 
-  // Receive spare mutation
+  // Receive spare mutation (location-aware)
   const receiveSpareMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number, qty: number, dateLocal: string, tz?: string, place?: string, supplierPO?: string, remarks?: string, userId?: string, vesselId: string }) => {
-      const response = await fetch(`/api/spares/${id}/receive`, {
+    mutationFn: async ({ id, ...data }: { id: number, quantity: number, location: 'A' | 'B', supplierPO?: string, remarks?: string, userId?: string, dateLocal?: string }) => {
+      const response = await fetch(`/api/spares/${id}/receive-to-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -787,7 +791,7 @@ const Spares: React.FC = () => {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to receive spare');
+        throw new Error(error.error?.message || error.error || 'Failed to receive spare');
       }
       
       return response.json();
@@ -797,7 +801,7 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
-      setReceiveForm({ quantity: "", date: "", supplier: "", remarks: "" });
+      setReceiveForm({ quantity: "", date: "", supplier: "", remarks: "", location: "" });
     },
     onError: (error: any) => {
       toast({ 
@@ -1132,7 +1136,8 @@ const Spares: React.FC = () => {
       quantity: "", 
       date: format(new Date(), 'yyyy-MM-dd'), 
       workOrder: "", 
-      remarks: "" 
+      remarks: "",
+      location: ""
     });
     setIsConsumeModalOpen(true);
   };
@@ -1144,15 +1149,16 @@ const Spares: React.FC = () => {
       quantity: "", 
       date: format(new Date(), 'yyyy-MM-dd'), 
       supplier: "", 
-      remarks: "" 
+      remarks: "",
+      location: ""
     });
     setIsReceiveModalOpen(true);
   };
 
   // Handle consume submit
   const handleConsumeSubmit = () => {
-    if (!selectedSpare || !consumeForm.quantity || !consumeForm.date) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+    if (!selectedSpare || !consumeForm.quantity || !consumeForm.date || !consumeForm.location) {
+      toast({ title: "Error", description: "Please fill in all required fields including location", variant: "destructive" });
       return;
     }
     
@@ -1162,27 +1168,30 @@ const Spares: React.FC = () => {
       return;
     }
     
-    if (quantity > selectedSpare.rob) {
-      toast({ title: "Error", description: "Insufficient stock", variant: "destructive" });
+    // Check stock at selected location
+    const availableAtLocation = consumeForm.location === 'A' 
+      ? (selectedSpare.robLocationA ?? 0) 
+      : (selectedSpare.robLocationB ?? 0);
+    
+    if (quantity > availableAtLocation) {
+      toast({ title: "Error", description: `Insufficient stock at ${locationNames[consumeForm.location === 'A' ? 'locationA' : 'locationB']}. Available: ${availableAtLocation}`, variant: "destructive" });
       return;
     }
     
     consumeSpareMutation.mutate({
       id: selectedSpare.id,
-      qty: quantity,
-      dateLocal: consumeForm.date,
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      place: consumeForm.workOrder || undefined,
+      quantity,
+      location: consumeForm.location as 'A' | 'B',
+      workOrderRef: consumeForm.workOrder || undefined,
       remarks: consumeForm.remarks || undefined,
-      userId: 'user',
-      vesselId
+      userId: 'user'
     });
   };
 
   // Handle receive submit
   const handleReceiveSubmit = () => {
-    if (!selectedSpare || !receiveForm.quantity || !receiveForm.date) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+    if (!selectedSpare || !receiveForm.quantity || !receiveForm.date || !receiveForm.location) {
+      toast({ title: "Error", description: "Please fill in all required fields including location", variant: "destructive" });
       return;
     }
     
@@ -1194,13 +1203,12 @@ const Spares: React.FC = () => {
     
     receiveSpareMutation.mutate({
       id: selectedSpare.id,
-      qty: quantity,
+      quantity,
+      location: receiveForm.location as 'A' | 'B',
       dateLocal: receiveForm.date,
-      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       supplierPO: receiveForm.supplier || undefined,
       remarks: receiveForm.remarks || undefined,
-      userId: 'user',
-      vesselId
+      userId: 'user'
     });
   };
 
@@ -2668,7 +2676,8 @@ const Spares: React.FC = () => {
                       quantity: "", 
                       date: format(new Date(), 'yyyy-MM-dd'), 
                       workOrder: "", 
-                      remarks: "" 
+                      remarks: "",
+                      location: ""
                     });
                     setIsConsumeModalOpen(true);
                   }
@@ -2687,7 +2696,8 @@ const Spares: React.FC = () => {
                       quantity: "", 
                       date: format(new Date(), 'yyyy-MM-dd'), 
                       supplier: "", 
-                      remarks: "" 
+                      remarks: "",
+                      location: ""
                     });
                     setIsReceiveModalOpen(true);
                   }
@@ -2720,21 +2730,47 @@ const Spares: React.FC = () => {
               <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
             </div>
             <div>
+              <Label htmlFor="consume-location">Location *</Label>
+              <Select 
+                value={consumeForm.location} 
+                onValueChange={(value: "A" | "B") => setConsumeForm({...consumeForm, location: value})}
+              >
+                <SelectTrigger id="consume-location" data-testid="select-consume-location">
+                  <SelectValue placeholder="Select location to consume from" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A" data-testid="option-location-a">
+                    {locationNames.locationA} ({selectedSpare?.robLocationA ?? 0} available)
+                  </SelectItem>
+                  <SelectItem value="B" data-testid="option-location-b">
+                    {locationNames.locationB} ({selectedSpare?.robLocationB ?? 0} available)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="consume-quantity">Quantity *</Label>
               <Input
                 id="consume-quantity"
+                data-testid="input-consume-quantity"
                 type="number"
                 min="1"
-                max={selectedSpare?.rob}
+                max={consumeForm.location === 'A' ? (selectedSpare?.robLocationA ?? 0) : consumeForm.location === 'B' ? (selectedSpare?.robLocationB ?? 0) : selectedSpare?.rob}
                 value={consumeForm.quantity}
                 onChange={(e) => setConsumeForm({...consumeForm, quantity: e.target.value})}
                 required
               />
+              {consumeForm.location && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Max available at {locationNames[consumeForm.location === 'A' ? 'locationA' : 'locationB']}: {consumeForm.location === 'A' ? (selectedSpare?.robLocationA ?? 0) : (selectedSpare?.robLocationB ?? 0)}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="consume-date">Date *</Label>
               <Input
                 id="consume-date"
+                data-testid="input-consume-date"
                 type="date"
                 value={consumeForm.date}
                 onChange={(e) => setConsumeForm({...consumeForm, date: e.target.value})}
@@ -2745,6 +2781,7 @@ const Spares: React.FC = () => {
               <Label htmlFor="consume-work-order">Work Order/Reference</Label>
               <Input
                 id="consume-work-order"
+                data-testid="input-consume-workorder"
                 value={consumeForm.workOrder}
                 onChange={(e) => setConsumeForm({...consumeForm, workOrder: e.target.value})}
                 placeholder="Optional"
@@ -2754,6 +2791,7 @@ const Spares: React.FC = () => {
               <Label htmlFor="consume-remarks">Remarks</Label>
               <Input
                 id="consume-remarks"
+                data-testid="input-consume-remarks"
                 value={consumeForm.remarks}
                 onChange={(e) => setConsumeForm({...consumeForm, remarks: e.target.value})}
                 placeholder="Optional"
@@ -2764,7 +2802,7 @@ const Spares: React.FC = () => {
             <Button variant="outline" onClick={() => setIsConsumeModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConsumeSubmit} disabled={consumeSpareMutation.isPending}>
+            <Button data-testid="button-consume-save" onClick={handleConsumeSubmit} disabled={consumeSpareMutation.isPending}>
               Save
             </Button>
           </DialogFooter>
@@ -2783,9 +2821,29 @@ const Spares: React.FC = () => {
               <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
             </div>
             <div>
+              <Label htmlFor="receive-location">Location *</Label>
+              <Select 
+                value={receiveForm.location} 
+                onValueChange={(value: "A" | "B") => setReceiveForm({...receiveForm, location: value})}
+              >
+                <SelectTrigger id="receive-location" data-testid="select-receive-location">
+                  <SelectValue placeholder="Select location to receive to" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A" data-testid="option-receive-location-a">
+                    {locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})
+                  </SelectItem>
+                  <SelectItem value="B" data-testid="option-receive-location-b">
+                    {locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="receive-quantity">Quantity *</Label>
               <Input
                 id="receive-quantity"
+                data-testid="input-receive-quantity"
                 type="number"
                 min="1"
                 value={receiveForm.quantity}
@@ -2797,6 +2855,7 @@ const Spares: React.FC = () => {
               <Label htmlFor="receive-date">Date *</Label>
               <Input
                 id="receive-date"
+                data-testid="input-receive-date"
                 type="date"
                 value={receiveForm.date}
                 onChange={(e) => setReceiveForm({...receiveForm, date: e.target.value})}
@@ -2807,6 +2866,7 @@ const Spares: React.FC = () => {
               <Label htmlFor="receive-supplier">Supplier/PO</Label>
               <Input
                 id="receive-supplier"
+                data-testid="input-receive-supplier"
                 value={receiveForm.supplier}
                 onChange={(e) => setReceiveForm({...receiveForm, supplier: e.target.value})}
                 placeholder="Optional"
@@ -2816,6 +2876,7 @@ const Spares: React.FC = () => {
               <Label htmlFor="receive-remarks">Remarks</Label>
               <Input
                 id="receive-remarks"
+                data-testid="input-receive-remarks"
                 value={receiveForm.remarks}
                 onChange={(e) => setReceiveForm({...receiveForm, remarks: e.target.value})}
                 placeholder="Optional"
@@ -2826,7 +2887,7 @@ const Spares: React.FC = () => {
             <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleReceiveSubmit} disabled={receiveSpareMutation.isPending}>
+            <Button data-testid="button-receive-save" onClick={handleReceiveSubmit} disabled={receiveSpareMutation.isPending}>
               Save
             </Button>
           </DialogFooter>

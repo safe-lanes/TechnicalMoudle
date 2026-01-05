@@ -1922,6 +1922,74 @@ export class PostgresStorage {
     };
   }
 
+  async receiveSpareToLocation(
+    id: number,
+    quantity: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    supplierPO?: string,
+    dateLocal?: string
+  ): Promise<{ spare: Spare; received: number }> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const currentRobA = spare.robLocationA ?? 0;
+    const currentRobB = spare.robLocationB ?? 0;
+    const currentRob = spare.rob ?? 0;
+    
+    let newRobA = currentRobA;
+    let newRobB = currentRobB;
+    
+    if (location === 'A') {
+      newRobA = currentRobA + quantity;
+    } else {
+      newRobB = currentRobB + quantity;
+    }
+    
+    const newRob = currentRob + quantity;
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newRob,
+        robLocationA: newRobA,
+        robLocationB: newRobB,
+        lastOrderDate: dateLocal ?? null,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'RECEIVE',
+      qtyChange: quantity,
+      robAfter: newRob,
+      userId,
+      remarks: remarks ? `${remarks} (Location ${location})${supplierPO ? ` PO: ${supplierPO}` : ''}` : `Location ${location}`,
+      reference: supplierPO ?? null,
+      dateLocal: dateLocal ?? null,
+      tz: null,
+      place: null,
+    });
+    
+    return {
+      spare: updated[0],
+      received: quantity,
+    };
+  }
+
   async receiveSpare(
     id: number, 
     quantity: number, 
