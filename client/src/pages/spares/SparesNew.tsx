@@ -149,9 +149,9 @@ const Spares: React.FC = () => {
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
-  const [consumeForm, setConsumeForm] = useState({ quantity: "", date: "", workOrder: "", remarks: "", location: "" as "A" | "B" | "" });
-  const [receiveForm, setReceiveForm] = useState({ quantity: "", date: "", supplier: "", remarks: "", location: "" as "A" | "B" | "" });
-  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string}}>({});
+  const [consumeForm, setConsumeForm] = useState({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
+  const [receiveForm, setReceiveForm] = useState({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
+  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   const [addSpareForm, setAddSpareForm] = useState({
     partCode: "",
     partName: "",
@@ -227,39 +227,106 @@ const Spares: React.FC = () => {
     };
   }, [openLocationDropdown, editingLocations]);
   
+  const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number}}>({});
+  
   const handleOpenLocationDropdown = (spare: Spare) => {
     setOpenLocationDropdown(spare.id);
+    const origA = spare.robLocationA ?? 0;
+    const origB = spare.robLocationB ?? 0;
+    setOriginalLocationValues(prev => ({
+      ...prev,
+      [spare.id]: { locationA: origA, locationB: origB }
+    }));
     setEditingLocations(prev => ({
       ...prev,
       [spare.id]: {
-        locationA: String(spare.robLocationA ?? 0),
-        locationB: String(spare.robLocationB ?? 0)
+        locationA: String(origA),
+        locationB: String(origB)
       }
     }));
   };
   
   const handleSaveLocation = async (spareId: number) => {
     const locations = editingLocations[spareId];
+    const original = originalLocationValues[spareId];
     if (!locations) return;
     
-    const robA = parseInt(locations.locationA) || 0;
-    const robB = parseInt(locations.locationB) || 0;
+    const newRobA = parseInt(locations.locationA) || 0;
+    const newRobB = parseInt(locations.locationB) || 0;
+    const origRobA = original?.locationA ?? 0;
+    const origRobB = original?.locationB ?? 0;
     
-    try {
-      // Save ROB quantities to spare
-      await fetch(`/api/spares/${vesselId}/${spareId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          robLocationA: robA,
-          robLocationB: robB,
-          rob: robA + robB
-        }),
-      });
-      
-      // Save location names to vessel settings if they were edited
-      if (locations.nameA || locations.nameB) {
-        await fetch(`/api/vessel-location-names/${vesselId}`, {
+    const deltaA = newRobA - origRobA;
+    const deltaB = newRobB - origRobB;
+    
+    const errors: string[] = [];
+    let successCount = 0;
+    let attemptCount = 0;
+    
+    // Create transactions for Location A if changed
+    if (deltaA !== 0) {
+      attemptCount++;
+      try {
+        const quantity = Math.abs(deltaA);
+        const endpoint = deltaA > 0 ? 'receive-to-location' : 'consume-from-location';
+        
+        const resA = await fetch(`/api/spares/${spareId}/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'A',
+            quantity: quantity,
+            dateLocal: format(new Date(), 'yyyy-MM-dd'),
+            remarks: `Quick adjustment via ROB panel`,
+            userId: 'user'
+          }),
+        });
+        if (!resA.ok) {
+          const err = await resA.json();
+          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Create transactions for Location B if changed
+    if (deltaB !== 0) {
+      attemptCount++;
+      try {
+        const quantity = Math.abs(deltaB);
+        const endpoint = deltaB > 0 ? 'receive-to-location' : 'consume-from-location';
+        
+        const resB = await fetch(`/api/spares/${spareId}/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'B',
+            quantity: quantity,
+            dateLocal: format(new Date(), 'yyyy-MM-dd'),
+            remarks: `Quick adjustment via ROB panel`,
+            userId: 'user'
+          }),
+        });
+        if (!resB.ok) {
+          const err = await resB.json();
+          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Save location names to vessel settings if they were edited
+    let nameUpdateSuccess = true;
+    if (locations.nameA || locations.nameB) {
+      attemptCount++;
+      try {
+        const res = await fetch(`/api/vessel-location-names/${vesselId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -267,14 +334,46 @@ const Spares: React.FC = () => {
             locationBName: locations.nameB || locationNames.locationB || 'Location B'
           }),
         });
-        queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+        if (!res.ok) {
+          errors.push('Failed to save location names');
+          nameUpdateSuccess = false;
+        } else {
+          successCount++;
+          queryClient.invalidateQueries({ queryKey: [`/api/vessel-location-names/${vesselId}`] });
+        }
+      } catch (e: any) {
+        errors.push(`Location names: ${e.message || 'Network error'}`);
+        nameUpdateSuccess = false;
       }
-      
-      queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
-      toast({ title: "Saved", description: "Location settings updated" });
-    } catch (error) {
-      console.error('Failed to save location:', error);
-      toast({ title: "Error", description: "Failed to save location settings", variant: "destructive" });
+    }
+    
+    // Always invalidate cache to reflect any partial changes
+    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    
+    const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
+    const hadNameChanges = !!(locations.nameA || locations.nameB);
+    
+    if (errors.length === 0 && attemptCount > 0) {
+      if (hadInventoryChanges) {
+        const actions = [];
+        if (deltaA > 0) actions.push(`+${deltaA} to ${locationNames.locationA}`);
+        if (deltaA < 0) actions.push(`${deltaA} from ${locationNames.locationA}`);
+        if (deltaB > 0) actions.push(`+${deltaB} to ${locationNames.locationB}`);
+        if (deltaB < 0) actions.push(`${deltaB} from ${locationNames.locationB}`);
+        toast({ title: "Inventory Updated", description: actions.join(', ') });
+      } else if (hadNameChanges) {
+        toast({ title: "Saved", description: "Location names updated" });
+      }
+    } else if (errors.length === 0 && attemptCount === 0) {
+      // No changes detected
+      toast({ title: "No Changes", description: "No changes to save" });
+    } else if (successCount > 0 && errors.length > 0) {
+      // Partial success - some attempts succeeded, some failed
+      toast({ title: "Partial Update", description: `Some updates failed: ${errors.join('; ')}`, variant: "default" });
+    } else {
+      // All attempts failed
+      toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
     }
   };
 
@@ -767,7 +866,7 @@ const Spares: React.FC = () => {
         toast({ title: "Success", description: "Spare consumed successfully" });
       }
       setIsConsumeModalOpen(false);
-      setConsumeForm({ quantity: "", date: "", workOrder: "", remarks: "", location: "" });
+      setConsumeForm({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
     },
     onError: (error: any) => {
       toast({ 
@@ -801,7 +900,7 @@ const Spares: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
       toast({ title: "Success", description: "Spare received successfully" });
       setIsReceiveModalOpen(false);
-      setReceiveForm({ quantity: "", date: "", supplier: "", remarks: "", location: "" });
+      setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
     },
     onError: (error: any) => {
       toast({ 
@@ -1133,11 +1232,11 @@ const Spares: React.FC = () => {
   const openConsumeModal = (spare: Spare) => {
     setSelectedSpare(spare);
     setConsumeForm({ 
-      quantity: "", 
+      qtyA: "", 
+      qtyB: "",
       date: format(new Date(), 'yyyy-MM-dd'), 
       workOrder: "", 
-      remarks: "",
-      location: ""
+      remarks: ""
     });
     setIsConsumeModalOpen(true);
   };
@@ -1146,70 +1245,233 @@ const Spares: React.FC = () => {
   const openReceiveModal = (spare: Spare) => {
     setSelectedSpare(spare);
     setReceiveForm({ 
-      quantity: "", 
+      qtyA: "",
+      qtyB: "", 
       date: format(new Date(), 'yyyy-MM-dd'), 
       supplier: "", 
-      remarks: "",
-      location: ""
+      remarks: ""
     });
     setIsReceiveModalOpen(true);
   };
 
-  // Handle consume submit
-  const handleConsumeSubmit = () => {
-    if (!selectedSpare || !consumeForm.quantity || !consumeForm.date || !consumeForm.location) {
-      toast({ title: "Error", description: "Please fill in all required fields including location", variant: "destructive" });
+  // Handle consume submit - processes both locations with proper error tracking
+  const handleConsumeSubmit = async () => {
+    if (!selectedSpare || !consumeForm.date) {
+      toast({ title: "Error", description: "Please fill in the date", variant: "destructive" });
       return;
     }
     
-    const quantity = parseInt(consumeForm.quantity);
-    if (quantity <= 0) {
-      toast({ title: "Error", description: "Quantity must be greater than 0", variant: "destructive" });
+    const qtyA = parseInt(consumeForm.qtyA) || 0;
+    const qtyB = parseInt(consumeForm.qtyB) || 0;
+    
+    if (qtyA <= 0 && qtyB <= 0) {
+      toast({ title: "Error", description: "Please enter quantity for at least one location", variant: "destructive" });
       return;
     }
     
-    // Check stock at selected location
-    const availableAtLocation = consumeForm.location === 'A' 
-      ? (selectedSpare.robLocationA ?? 0) 
-      : (selectedSpare.robLocationB ?? 0);
-    
-    if (quantity > availableAtLocation) {
-      toast({ title: "Error", description: `Insufficient stock at ${locationNames[consumeForm.location === 'A' ? 'locationA' : 'locationB']}. Available: ${availableAtLocation}`, variant: "destructive" });
+    // Check stock at each location
+    if (qtyA > (selectedSpare.robLocationA ?? 0)) {
+      toast({ title: "Error", description: `Insufficient stock at ${locationNames.locationA}. Available: ${selectedSpare.robLocationA ?? 0}`, variant: "destructive" });
+      return;
+    }
+    if (qtyB > (selectedSpare.robLocationB ?? 0)) {
+      toast({ title: "Error", description: `Insufficient stock at ${locationNames.locationB}. Available: ${selectedSpare.robLocationB ?? 0}`, variant: "destructive" });
       return;
     }
     
-    consumeSpareMutation.mutate({
-      id: selectedSpare.id,
-      quantity,
-      location: consumeForm.location as 'A' | 'B',
-      workOrderRef: consumeForm.workOrder || undefined,
-      remarks: consumeForm.remarks || undefined,
-      userId: 'user'
-    });
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let successCount = 0;
+    let attemptCount = 0;
+    
+    // Consume from Location A if qty > 0
+    if (qtyA > 0) {
+      attemptCount++;
+      try {
+        const resA = await fetch(`/api/spares/${selectedSpare.id}/consume-from-location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'A',
+            quantity: qtyA,
+            dateLocal: consumeForm.date,
+            workOrderRef: consumeForm.workOrder || undefined,
+            remarks: consumeForm.remarks || undefined,
+            userId: 'user'
+          }),
+        });
+        if (!resA.ok) {
+          const err = await resA.json();
+          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+          const data = await resA.json();
+          if (data.warning) {
+            warnings.push(data.warning.message || data.warning);
+          }
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Consume from Location B if qty > 0
+    if (qtyB > 0) {
+      attemptCount++;
+      try {
+        const resB = await fetch(`/api/spares/${selectedSpare.id}/consume-from-location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'B',
+            quantity: qtyB,
+            dateLocal: consumeForm.date,
+            workOrderRef: consumeForm.workOrder || undefined,
+            remarks: consumeForm.remarks || undefined,
+            userId: 'user'
+          }),
+        });
+        if (!resB.ok) {
+          const err = await resB.json();
+          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+          const data = await resB.json();
+          if (data.warning) {
+            warnings.push(data.warning.message || data.warning);
+          }
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Always invalidate cache to reflect any partial changes
+    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    
+    if (errors.length === 0 && attemptCount > 0) {
+      if (warnings.length > 0) {
+        toast({ title: "Consumed with Warning", description: warnings.join('; '), variant: "default" });
+      } else {
+        toast({ title: "Success", description: `Consumed ${qtyA + qtyB} units` });
+      }
+      setIsConsumeModalOpen(false);
+      setConsumeForm({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
+    } else if (successCount > 0 && errors.length > 0) {
+      // Partial success - some attempts succeeded, some failed
+      toast({ title: "Partial Success", description: `Some operations failed: ${errors.join('; ')}`, variant: "default" });
+      setIsConsumeModalOpen(false);
+      setConsumeForm({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
+    } else {
+      // All attempts failed - keep modal open for retry
+      toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
+    }
   };
 
-  // Handle receive submit
-  const handleReceiveSubmit = () => {
-    if (!selectedSpare || !receiveForm.quantity || !receiveForm.date || !receiveForm.location) {
-      toast({ title: "Error", description: "Please fill in all required fields including location", variant: "destructive" });
+  // Handle receive submit - processes both locations with proper error tracking
+  const handleReceiveSubmit = async () => {
+    if (!selectedSpare || !receiveForm.date) {
+      toast({ title: "Error", description: "Please fill in the date", variant: "destructive" });
       return;
     }
     
-    const quantity = parseInt(receiveForm.quantity);
-    if (quantity <= 0) {
-      toast({ title: "Error", description: "Quantity must be greater than 0", variant: "destructive" });
+    const qtyA = parseInt(receiveForm.qtyA) || 0;
+    const qtyB = parseInt(receiveForm.qtyB) || 0;
+    
+    if (qtyA <= 0 && qtyB <= 0) {
+      toast({ title: "Error", description: "Please enter quantity for at least one location", variant: "destructive" });
       return;
     }
     
-    receiveSpareMutation.mutate({
-      id: selectedSpare.id,
-      quantity,
-      location: receiveForm.location as 'A' | 'B',
-      dateLocal: receiveForm.date,
-      supplierPO: receiveForm.supplier || undefined,
-      remarks: receiveForm.remarks || undefined,
-      userId: 'user'
-    });
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let successCount = 0;
+    let attemptCount = 0;
+    
+    // Receive to Location A if qty > 0
+    if (qtyA > 0) {
+      attemptCount++;
+      try {
+        const resA = await fetch(`/api/spares/${selectedSpare.id}/receive-to-location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'A',
+            quantity: qtyA,
+            dateLocal: receiveForm.date,
+            supplierPO: receiveForm.supplier || undefined,
+            remarks: receiveForm.remarks || undefined,
+            userId: 'user'
+          }),
+        });
+        if (!resA.ok) {
+          const err = await resA.json();
+          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+          const data = await resA.json();
+          if (data.warning) {
+            warnings.push(data.warning.message || data.warning);
+          }
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Receive to Location B if qty > 0
+    if (qtyB > 0) {
+      attemptCount++;
+      try {
+        const resB = await fetch(`/api/spares/${selectedSpare.id}/receive-to-location`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'B',
+            quantity: qtyB,
+            dateLocal: receiveForm.date,
+            supplierPO: receiveForm.supplier || undefined,
+            remarks: receiveForm.remarks || undefined,
+            userId: 'user'
+          }),
+        });
+        if (!resB.ok) {
+          const err = await resB.json();
+          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
+        } else {
+          successCount++;
+          const data = await resB.json();
+          if (data.warning) {
+            warnings.push(data.warning.message || data.warning);
+          }
+        }
+      } catch (e: any) {
+        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+      }
+    }
+    
+    // Always invalidate cache to reflect any partial changes
+    queryClient.invalidateQueries({ queryKey: ['/api/spares', vesselId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/spares/history', vesselId] });
+    
+    if (errors.length === 0 && attemptCount > 0) {
+      if (warnings.length > 0) {
+        toast({ title: "Received with Warning", description: warnings.join('; '), variant: "default" });
+      } else {
+        toast({ title: "Success", description: `Received ${qtyA + qtyB} units` });
+      }
+      setIsReceiveModalOpen(false);
+      setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
+    } else if (successCount > 0 && errors.length > 0) {
+      // Partial success - some attempts succeeded, some failed
+      toast({ title: "Partial Success", description: `Some operations failed: ${errors.join('; ')}`, variant: "default" });
+      setIsReceiveModalOpen(false);
+      setReceiveForm({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
+    } else {
+      // All attempts failed - keep modal open for retry
+      toast({ title: "Error", description: errors.join('; '), variant: "destructive" });
+    }
   };
 
   // Handle bulk update modal
@@ -2520,11 +2782,11 @@ const Spares: React.FC = () => {
                   setIsConsumeReceiveModalOpen(false);
                   if (selectedSpare) {
                     setConsumeForm({ 
-                      quantity: "", 
+                      qtyA: "", 
+                      qtyB: "",
                       date: format(new Date(), 'yyyy-MM-dd'), 
                       workOrder: "", 
-                      remarks: "",
-                      location: ""
+                      remarks: ""
                     });
                     setIsConsumeModalOpen(true);
                   }
@@ -2540,11 +2802,11 @@ const Spares: React.FC = () => {
                   setIsConsumeReceiveModalOpen(false);
                   if (selectedSpare) {
                     setReceiveForm({ 
-                      quantity: "", 
+                      qtyA: "",
+                      qtyB: "", 
                       date: format(new Date(), 'yyyy-MM-dd'), 
                       supplier: "", 
-                      remarks: "",
-                      location: ""
+                      remarks: ""
                     });
                     setIsReceiveModalOpen(true);
                   }
@@ -2576,42 +2838,37 @@ const Spares: React.FC = () => {
               <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
               <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
             </div>
-            <div>
-              <Label htmlFor="consume-location">Location *</Label>
-              <Select 
-                value={consumeForm.location} 
-                onValueChange={(value: "A" | "B") => setConsumeForm({...consumeForm, location: value})}
-              >
-                <SelectTrigger id="consume-location" data-testid="select-consume-location">
-                  <SelectValue placeholder="Select location to consume from" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A" data-testid="option-location-a">
-                    {locationNames.locationA} ({selectedSpare?.robLocationA ?? 0} available)
-                  </SelectItem>
-                  <SelectItem value="B" data-testid="option-location-b">
-                    {locationNames.locationB} ({selectedSpare?.robLocationB ?? 0} available)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="consume-quantity">Quantity *</Label>
-              <Input
-                id="consume-quantity"
-                data-testid="input-consume-quantity"
-                type="number"
-                min="1"
-                max={consumeForm.location === 'A' ? (selectedSpare?.robLocationA ?? 0) : consumeForm.location === 'B' ? (selectedSpare?.robLocationB ?? 0) : selectedSpare?.rob}
-                value={consumeForm.quantity}
-                onChange={(e) => setConsumeForm({...consumeForm, quantity: e.target.value})}
-                required
-              />
-              {consumeForm.location && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Max available at {locationNames[consumeForm.location === 'A' ? 'locationA' : 'locationB']}: {consumeForm.location === 'A' ? (selectedSpare?.robLocationA ?? 0) : (selectedSpare?.robLocationB ?? 0)}
-                </p>
-              )}
+            <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
+              <div className="text-xs font-medium text-gray-500">Quantity to Consume by Location</div>
+              <div>
+                <Label htmlFor="consume-qty-a">{locationNames.locationA} (Available: {selectedSpare?.robLocationA ?? 0})</Label>
+                <Input
+                  id="consume-qty-a"
+                  data-testid="input-consume-qty-a"
+                  type="number"
+                  min="0"
+                  max={selectedSpare?.robLocationA ?? 0}
+                  value={consumeForm.qtyA || ''}
+                  onChange={(e) => setConsumeForm({...consumeForm, qtyA: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="consume-qty-b">{locationNames.locationB} (Available: {selectedSpare?.robLocationB ?? 0})</Label>
+                <Input
+                  id="consume-qty-b"
+                  data-testid="input-consume-qty-b"
+                  type="number"
+                  min="0"
+                  max={selectedSpare?.robLocationB ?? 0}
+                  value={consumeForm.qtyB || ''}
+                  onChange={(e) => setConsumeForm({...consumeForm, qtyB: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+              <div className="text-xs text-gray-500 text-center border-t pt-2">
+                Total to Consume: {(parseInt(consumeForm.qtyA || '0') || 0) + (parseInt(consumeForm.qtyB || '0') || 0)}
+              </div>
             </div>
             <div>
               <Label htmlFor="consume-date">Date *</Label>
@@ -2667,36 +2924,35 @@ const Spares: React.FC = () => {
               <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
               <p className="text-sm text-gray-500">Current ROB: {selectedSpare?.rob}</p>
             </div>
-            <div>
-              <Label htmlFor="receive-location">Location *</Label>
-              <Select 
-                value={receiveForm.location} 
-                onValueChange={(value: "A" | "B") => setReceiveForm({...receiveForm, location: value})}
-              >
-                <SelectTrigger id="receive-location" data-testid="select-receive-location">
-                  <SelectValue placeholder="Select location to receive to" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A" data-testid="option-receive-location-a">
-                    {locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})
-                  </SelectItem>
-                  <SelectItem value="B" data-testid="option-receive-location-b">
-                    {locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="receive-quantity">Quantity *</Label>
-              <Input
-                id="receive-quantity"
-                data-testid="input-receive-quantity"
-                type="number"
-                min="1"
-                value={receiveForm.quantity}
-                onChange={(e) => setReceiveForm({...receiveForm, quantity: e.target.value})}
-                required
-              />
+            <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
+              <div className="text-xs font-medium text-gray-500">Quantity to Receive by Location</div>
+              <div>
+                <Label htmlFor="receive-qty-a">{locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})</Label>
+                <Input
+                  id="receive-qty-a"
+                  data-testid="input-receive-qty-a"
+                  type="number"
+                  min="0"
+                  value={receiveForm.qtyA || ''}
+                  onChange={(e) => setReceiveForm({...receiveForm, qtyA: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="receive-qty-b">{locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})</Label>
+                <Input
+                  id="receive-qty-b"
+                  data-testid="input-receive-qty-b"
+                  type="number"
+                  min="0"
+                  value={receiveForm.qtyB || ''}
+                  onChange={(e) => setReceiveForm({...receiveForm, qtyB: e.target.value})}
+                  placeholder="0"
+                />
+              </div>
+              <div className="text-xs text-gray-500 text-center border-t pt-2">
+                Total to Receive: {(parseInt(receiveForm.qtyA || '0') || 0) + (parseInt(receiveForm.qtyB || '0') || 0)}
+              </div>
             </div>
             <div>
               <Label htmlFor="receive-date">Date *</Label>
