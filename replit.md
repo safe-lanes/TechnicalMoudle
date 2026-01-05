@@ -52,7 +52,9 @@ Progress tracking for issues from the 26-12-2025 findings document.
 |---------|-------------|--------|----------------|
 | 1-6 | Various fixes | Completed | Prior sessions |
 | 7 | Location-aware Consume/Receive for Spares | **Completed** | 05-Jan-2026 |
-| 8-14 | Pending issues | Pending | - |
+| 8-9 | Pending issues | Pending | - |
+| 10 | Maintenance History not showing in Components D Section & Jobs Form A5 | **Completed** | 05-Jan-2026 |
+| 11-14 | Pending issues | Pending | - |
 
 ### Issue #7 Details (Completed 05-Jan-2026)
 **Multi-Location Inventory Tracking**: Added location selection for consuming and receiving spare parts.
@@ -61,3 +63,11 @@ Progress tracking for issues from the 26-12-2025 findings document.
 - **Frontend**: Updated Consume/Receive modals with Location dropdown (Location A/B with available stock display)
 - **Validation**: Per-location stock validation prevents over-consumption
 - **History**: Location tracked in remarks field as "(Location A)" or "(Location B)"
+
+### Issue #10 Details (Completed 05-Jan-2026)
+**Maintenance History Linking**: Fixed maintenance history not appearing in Components D Section and Jobs Form A5.
+- **Schema**: Added `jobId` and `jobCode` columns to `component_maintenance_history` table with proper indexing
+- **WO Completion**: Updated work order approval route to include job metadata (jobId, jobCode) in history records
+- **API**: Added `/technical/api/job-maintenance-history/:jobId` endpoint for job-based history queries
+- **Fallback Logic**: Component history query now uses `componentCode` as fallback when `componentId` doesn't match (handles legacy records)
+- **Storage**: Added `getMaintenanceHistoryByJobId` and `getMaintenanceHistoryByComponentCode` methods
