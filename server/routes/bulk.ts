@@ -3839,6 +3839,7 @@ async function performImport(
             isActive: isActiveVal === 'Yes' || isActiveVal === true ? true : (isActiveVal === 'No' ? false : true),
             ihm: ihmVal === 'Yes' || ihmVal === true ? 'Yes' : 'No',
             remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
+            fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
             dataScope: 'vessel'
           });
           
@@ -3916,7 +3917,8 @@ async function performImport(
             pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
             isActive: isActiveValUpdate === 'Yes' || isActiveValUpdate === true ? true : (isActiveValUpdate === 'No' ? false : existingSpare.isActive),
             ihm: ihmValUpdate === 'Yes' || ihmValUpdate === true ? 'Yes' : (ihmValUpdate === 'No' ? 'No' : existingSpare.ihm),
-            remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
+            remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
+            fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
           });
           
           sparesByPartCode.set(partCode, updatedSpare);
@@ -4005,7 +4007,8 @@ async function performImport(
                 pageNumber: row['Page Number'] ? String(row['Page Number']).trim() : existingSpare.pageNumber,
                 isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : existingSpare.isActive),
                 ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : (ihmValUpsert === 'No' ? 'No' : existingSpare.ihm),
-                remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks
+                remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : existingSpare.remarks,
+                fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : existingSpare.fleetEquipmentCode
               });
               
               sparesByPartCode.set(partCode, updatedSpare);
@@ -4063,6 +4066,7 @@ async function performImport(
               isActive: isActiveValUpsert === 'Yes' || isActiveValUpsert === true ? true : (isActiveValUpsert === 'No' ? false : true),
               ihm: ihmValUpsert === 'Yes' || ihmValUpsert === true ? 'Yes' : 'No',
               remarks: row['Evidence Type'] ? String(row['Evidence Type']).trim() : null,
+              fleetEquipmentCode: row['Fleet Equipment Code'] ? String(row['Fleet Equipment Code']).trim() : null,
               dataScope: 'vessel'
             });
             
