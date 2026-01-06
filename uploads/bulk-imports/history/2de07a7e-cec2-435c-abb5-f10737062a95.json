@@ -1,0 +1,19 @@
+{
+  "id": "2de07a7e-cec2-435c-abb5-f10737062a95",
+  "type": "spares",
+  "mode": "upsert",
+  "vesselId": "V111",
+  "userId": 1,
+  "startedAt": "2026-01-06T08:49:48.086Z",
+  "completedAt": "2026-01-06T08:51:27.859Z",
+  "status": "complete",
+  "created": 1274,
+  "updated": 2699,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "spares 1 - Copy.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/spares/1767689487857_spares_1_-_Copy.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 3973
+}
