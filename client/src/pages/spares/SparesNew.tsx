@@ -72,6 +72,7 @@ interface SpareHistory {
   componentCode?: string;
   componentName: string;
   componentSpareCode?: string;
+  partNumber?: string;
   eventType: string;
   qtyChange: number;
   robAfter: number;
@@ -1830,7 +1831,7 @@ const Spares: React.FC = () => {
                         <div className="text-gray-900" data-testid={isFirstRow ? "E24" : undefined}>{isFirstRow && <Marker id="E24" />}{spare.partCode}</div>
                         <div className="text-gray-700" data-testid={isFirstRow ? "E25" : undefined}>{isFirstRow && <Marker id="E25" />}{spare.partName}</div>
                         <div className="text-gray-700" data-testid={isFirstRow ? "E26" : undefined}>{isFirstRow && <Marker id="E26" />}{spare.componentName}</div>
-                        <div className="text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.componentSpareCode || '-'}</div>
+                        <div className="text-blue-600 font-medium" data-testid={isFirstRow ? "E27" : undefined}>{isFirstRow && <Marker id="E27" />}{spare.partNumber || '-'}</div>
                         <div data-testid={isFirstRow ? "E28" : undefined}>
                           {isFirstRow && <Marker id="E28" />}
                           <span className={`px-2 py-1 rounded text-xs ${
@@ -2082,7 +2083,7 @@ const Spares: React.FC = () => {
                         <div className="text-gray-700">{history.partCode}</div>
                         <div className="text-gray-700">{history.partName}</div>
                         <div className="text-gray-700">{history.componentName}</div>
-                        <div className="text-blue-600 font-medium">{history.componentSpareCode || '-'}</div>
+                        <div className="text-blue-600 font-medium">{history.partNumber || '-'}</div>
                         <div>
                           <span className={`px-2 py-1 rounded text-xs ${
                             history.eventType === 'CONSUME' 
