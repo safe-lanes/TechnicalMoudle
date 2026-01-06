@@ -400,26 +400,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const componentId = req.query.componentId as string | undefined;
       const jobs = await storage.getJobs(vesselId, componentId);
       
-      // Hydrate Running Hours jobs with component's current RH for remaining RH calculation
+      // PERFORMANCE OPTIMIZATION: Batch fetch all job-component links
+      // This avoids N+1 queries when hydrating each job
+      let jobLinksMap = new Map<string, string[]>();
+      if (vesselId) {
+        const allLinks = await storage.getJobComponentLinks(vesselId);
+        for (const link of allLinks) {
+          const existing = jobLinksMap.get(link.jobId) || [];
+          existing.push(link.componentCode);
+          jobLinksMap.set(link.jobId, existing);
+        }
+      } else if (jobs.length > 0) {
+        // Fallback: fetch links for each unique vesselId found in jobs
+        const vesselIds = [...new Set(jobs.map(j => j.vesselId).filter(Boolean))];
+        for (const vid of vesselIds) {
+          const links = await storage.getJobComponentLinks(vid as string);
+          for (const link of links) {
+            const existing = jobLinksMap.get(link.jobId) || [];
+            existing.push(link.componentCode);
+            jobLinksMap.set(link.jobId, existing);
+          }
+        }
+      }
+      
+      // PERFORMANCE OPTIMIZATION: Cache component lookups by ID and by code
+      const componentCacheById = new Map<string, any>();
+      const componentCacheByCode = new Map<string, any>();
+      
+      const getComponentCached = async (compId: string) => {
+        if (!componentCacheById.has(compId)) {
+          componentCacheById.set(compId, await storage.getComponent(compId));
+        }
+        return componentCacheById.get(compId);
+      };
+      
+      const getComponentByCodeCached = async (code: string, vesselId: string) => {
+        const key = `${vesselId}:${code}`;
+        if (!componentCacheByCode.has(key)) {
+          componentCacheByCode.set(key, await storage.getComponentByCode(code, vesselId));
+        }
+        return componentCacheByCode.get(key);
+      };
+      
+      // Hydrate jobs with:
+      // 1. linkedComponentCodes from junction table (for M:N display)
+      // 2. Running Hours jobs with component's current RH for remaining RH calculation
       const hydratedJobs = await Promise.all(jobs.map(async (job) => {
+        // MANY-TO-MANY: Get all linked component codes from batched map
+        const linkedComponentCodes = jobLinksMap.get(job.id) || [];
+        
+        // Include the deprecated componentCode if not already in linked list (backwards compatibility)
+        if (job.componentCode && !linkedComponentCodes.includes(job.componentCode)) {
+          linkedComponentCodes.push(job.componentCode);
+        }
+        
+        let hydratedJob: any = {
+          ...job,
+          linkedComponentCodes, // Array of all linked component codes
+        };
+        
         if (job.maintenanceBasis === 'Running Hours' && job.componentId) {
-          const component = await storage.getComponent(job.componentId);
+          const component = await getComponentCached(job.componentId);
           if (component) {
             // Get parent component's running hours if component has a parent
             let currentRH = parseFloat(component.currentCumulativeRH || component.runningHours || '0');
-            if (component.parentId) {
-              const parentComponent = await storage.getComponentByCode(component.parentId, job.vesselId || '');
+            if (component.parentId && job.vesselId) {
+              const parentComponent = await getComponentByCodeCached(component.parentId, job.vesselId);
               if (parentComponent) {
                 currentRH = parseFloat(parentComponent.currentCumulativeRH || parentComponent.runningHours || '0');
               }
             }
-            return {
-              ...job,
-              componentCurrentRH: currentRH.toFixed(2)
-            };
+            hydratedJob.componentCurrentRH = currentRH.toFixed(2);
           }
         }
-        return job;
+        return hydratedJob;
       }));
       
       res.json(hydratedJobs);

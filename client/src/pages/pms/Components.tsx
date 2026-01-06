@@ -947,7 +947,16 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const relevantComponentCodes = [componentCode, ...getAllChildCodes(componentCode)];
   
   // Filter jobs for this component AND all its children
-  const jobs = allJobs.filter(job => relevantComponentCodes.includes(job.componentCode));
+  // MANY-TO-MANY: Use linkedComponentCodes array (from junction table) instead of deprecated componentCode
+  const jobs = allJobs.filter(job => {
+    const linkedCodes: string[] = job.linkedComponentCodes || [];
+    // Include the deprecated componentCode as fallback for backwards compatibility
+    const allJobCodes = job.componentCode && !linkedCodes.includes(job.componentCode) 
+      ? [...linkedCodes, job.componentCode] 
+      : linkedCodes;
+    // Check if any of the job's linked component codes match our relevant codes
+    return allJobCodes.some(code => relevantComponentCodes.includes(code));
+  });
   
   // Check URL parameter to navigate to job page when returning from Maintenance Records
   React.useEffect(() => {
