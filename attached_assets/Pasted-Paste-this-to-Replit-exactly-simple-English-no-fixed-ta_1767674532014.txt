@@ -1,0 +1,174 @@
+Paste this to Replit exactly (simple English, no fixed table/field names).
+
+---
+
+## REPLIT INSTRUCTIONS: Bulk Upload must link Jobs + Spares to Components using Component Codes (Many-to-Many)
+
+### What is wrong today
+
+Right now the system is behaving like:
+
+* **1 job → only 1 component**
+* **1 spare → only 1 component**
+
+So when the same job/spare is meant for **multiple components**, it gets attached to only the first one and stops.
+
+### What we need
+
+* **A job can be linked to many components**
+* **A component can have many jobs**
+* **A spare can be linked to many components**
+* **A component can have many spares**
+* Same job + same spare can also be used across many components
+
+So you must treat both relationships as **many-to-many**, not one-to-one.
+
+---
+
+## 1) Do NOT “store component code inside the job/spare record” as a single value
+
+If the job/spare record has a single “componentCode” field, it will always force one-to-one.
+
+Instead:
+
+* Keep Job master separate
+* Keep Spare master separate
+* Create separate “link rows” to connect them to components
+
+---
+
+## 2) Create two separate link lists (or link storage) in the system
+
+### A) Component ↔ Job link list
+
+Each link row stores:
+
+* component reference (found by component code from upload)
+* job reference (found/created from job code in upload)
+* job-specific settings for that component if needed (optional)
+
+### B) Component ↔ Spare link list
+
+Each link row stores:
+
+* component reference (found by component code from upload)
+* spare reference (found/created from spare identifier in upload: impa/part no/name)
+* qty/uom/mandatory/remarks (optional if you want component-specific spare needs)
+
+**Important rule**
+
+* A link row is unique by (component + job) and (component + spare)
+* If same link comes again in upload → update the existing link (don’t duplicate)
+
+---
+
+## 3) Bulk Upload logic (must change)
+
+### Step-by-step for each row in bulk upload file
+
+For every row that has a **component code**:
+
+#### Step 1 — Find the component
+
+* Search component list using the component code
+* If not found → mark row as error “Component code not found” and skip linking
+
+#### Step 2 — Identify the job
+
+* Find the job using job code (or whatever unique job identifier you already use)
+* If job doesn’t exist → create it from the uploaded job fields
+* Do NOT attach the job directly to a component here
+
+#### Step 3 — Create/update Component↔Job link
+
+* Check if a link already exists for (this component + this job)
+
+  * If yes → do nothing OR update component-specific job settings
+  * If no → create a new link row
+
+#### Step 4 — Identify the spare(s)
+
+If the upload row includes spares:
+
+* Find spare master using IMPA code / Part No / Spare name (whatever your file uses)
+* If spare doesn’t exist → create spare master
+* Do NOT attach the spare directly to a component here
+
+#### Step 5 — Create/update Component↔Spare link
+
+* Check if a link exists for (this component + this spare)
+
+  * If yes → update qty/uom if provided
+  * If no → create a new link row
+
+---
+
+## 4) Mandatory change: allow SAME job/spare to be linked to MULTIPLE components
+
+While processing upload:
+
+* Do NOT stop after linking once
+* Do NOT “move” the job/spare from one component to another
+* Each component mentioned by component code must get its own link row
+
+Example:
+
+* LO Pump 1 code = E-ENG-001
+* LO Pump 2 code = E-ENG-002
+* Job code = J-LOPUMP-001
+
+Upload has both component codes referencing the same job code.
+
+✅ Correct result:
+
+* Link row exists for (E-ENG-001 ↔ J-LOPUMP-001)
+* Link row exists for (E-ENG-002 ↔ J-LOPUMP-001)
+
+NOT only one.
+
+---
+
+## 5) UI listing rules (must match many-to-many)
+
+### On Component screen:
+
+* “Jobs” tab must show jobs by reading the Component↔Job link list filtered for this component
+* “Spares” tab must show spares by reading Component↔Spare link list filtered for this component
+
+### On Job screen (optional but recommended):
+
+* Show “Linked components” list (read reverse: all components that link to this job)
+
+### On Spare screen (optional but recommended):
+
+* Show “Linked components” list (read reverse: all components that link to this spare)
+
+---
+
+## 6) Critical fix to current bug
+
+Find the current code where it does something like:
+
+* “job has componentCode” OR “spare has componentCode” OR “componentId inside job/spare”
+  and replace it with:
+* “create/update a link row instead”
+
+Because that single field is what is forcing one-to-one behavior.
+
+---
+
+## 7) Output of bulk upload must show correct results
+
+After upload finishes:
+
+* Show counts:
+
+  * how many jobs created
+  * how many spares created
+  * how many component-job links created
+  * how many component-spare links created
+* Show list of rows skipped with reasons (component code missing/not found, etc.)
+
+---
+
+If you want, I can also give a **short “developer checklist”** that Replit must tick off to confirm it’s fixed (example test cases with LO Pump 1/2).
