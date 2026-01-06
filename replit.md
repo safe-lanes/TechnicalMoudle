@@ -124,3 +124,13 @@ Progress tracking for issues from the 26-12-2025 findings document.
    - Updated to query jobs via both deprecated `componentId` AND `jobComponentLinks` table
    - Deduplicates job IDs using Sets before updating to prevent double-counting
 5. **Result Output**: Final log message includes link counts: `{X} job-component links created, {Y} spare-component links created`
+
+### Many-to-Many Job Display Fix (Completed 06-Jan-2026)
+**Problem**: Jobs uploaded via bulk import were correctly creating junction table links, but the UI was filtering by the deprecated `componentCode` field (which only stores ONE component), so jobs only appeared under one component.
+
+**Solution**: 
+1. **Backend (GET /technical/api/jobs)**: Now hydrates each job with `linkedComponentCodes[]` array fetched from `job_component_links` junction table
+2. **Frontend (Components.tsx)**: Filters jobs by checking if ANY of `linkedComponentCodes` matches the component tree
+3. **Performance**: Batch fetches all links per vessel in ONE query, caches component lookups to avoid N+1
+
+**Result**: Jobs now correctly appear under ALL linked components, not just the first one
