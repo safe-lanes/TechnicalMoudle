@@ -558,9 +558,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Get spare parts, tools, safety requirements from actual job data
-      const spareParts = job.requiredSpareParts || [];
+      const rawSpareParts = job.requiredSpareParts || [];
       const tools = job.requiredTools || [];
       const safetyReqs = job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] };
+      
+      // Enrich spare parts with ROB (Remaining On Board) inventory data
+      const partNumbers = rawSpareParts.map((sp: any) => sp.partNo).filter(Boolean);
+      const inventoryMap = await storage.getSpareInventoryByPartNumbers(job.vesselId, partNumbers);
+      
+      const spareParts = rawSpareParts.map((sp: any) => {
+        const inventory = inventoryMap.get(sp.partNo);
+        return {
+          ...sp,
+          rob: inventory ? inventory.rob : null,
+          robLocationA: inventory ? inventory.robLocationA : null,
+          robLocationB: inventory ? inventory.robLocationB : null
+        };
+      });
       
       // Build template data from job fields (matching work order form structure)
       const templateData = {
@@ -2183,8 +2197,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return dateStr;
       };
       
+      // Enrich spare parts with ROB (Remaining On Board) inventory data
+      const enrichSparePartsWithROB = async (spareParts: any[], vesselId: string) => {
+        if (!spareParts || spareParts.length === 0) return spareParts;
+        const partNumbers = spareParts.map((sp: any) => sp.partNo).filter(Boolean);
+        const inventoryMap = await storage.getSpareInventoryByPartNumbers(vesselId, partNumbers);
+        return spareParts.map((sp: any) => {
+          const inventory = inventoryMap.get(sp.partNo);
+          return {
+            ...sp,
+            rob: inventory ? inventory.rob : null,
+            robLocationA: inventory ? inventory.robLocationA : null,
+            robLocationB: inventory ? inventory.robLocationB : null
+          };
+        });
+      };
+      
       // Build templateData from job data (Part A - immutable from job definition)
       // This ensures Section A is populated from the job template
+      const rawSpareParts = job?.requiredSpareParts || [];
+      const enrichedSpareParts = await enrichSparePartsWithROB(rawSpareParts, workOrder.vesselId);
+      
       const templateData = job ? {
         woTitle: job.jobTitle,
         jobTitle: job.jobTitle,
@@ -2210,7 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nextDueRH: job.nextDueRH?.toString() || '',
         briefWorkDescription: job.briefWorkDescription || job.jobDescription,
         jobDescription: job.jobDescription,
-        requiredSpareParts: job.requiredSpareParts || [],
+        requiredSpareParts: enrichedSpareParts,
         requiredTools: job.requiredTools || [],
         safetyRequirements: job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] },
         vesselId: workOrder.vesselId
@@ -2278,44 +2311,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completionRemarks: workOrder.completionRemarks || ''
       };
       
-      // Add dummy data for demo work orders MKR-IN-00001.WO-2025-003 and MKR-SE-00001.WO-2025-001
-      let finalTemplateData: any = { ...templateData };
-      if (workOrder.workOrderNo === 'MKR-IN-00001.WO-2025-003' || workOrder.workOrderNo === 'MKR-SE-00001.WO-2025-001') {
-        // A2: Required Spare Parts (2 rows)
-        finalTemplateData.requiredSpareParts = [
-          { partNo: 'SP-00004', description: 'Impressed Current Anode', quantityRequired: '2', remarks: 'Annual replacement' },
-          { partNo: 'SP-00005', description: 'Reference Cell Electrode', quantityRequired: '1', remarks: 'Check and replace if corroded' }
-        ];
-        
-        // A3: Required Tools & Equipment (2 rows)
-        finalTemplateData.requiredTools = [
-          { toolName: 'Digital Multimeter', quantity: '1', remarks: 'For voltage measurement' },
-          { toolName: 'Insulation Tester (Megger)', quantity: '1', remarks: 'For insulation resistance check' }
-        ];
-        
-        // A4: Safety Requirements (2 items each)
-        finalTemplateData.safetyRequirements = {
-          ppeRequirements: ['Safety Gloves (Electrical)', 'Safety Goggles'],
-          permitRequirements: ['Electrical Work Permit', 'Diving Operations Permit'],
-          otherRequirements: ['System isolated before work', 'Vessel grounded properly']
-        };
-        
-        // A5: Work History (2 rows with completed status)
-        finalTemplateData.workHistory = [
-          { woNo: 'MKR-IN-00001.WO-2024-002', assignedTo: '2nd Engineer', performedBy: '2nd Engineer', workDate: '2024-11-15', runDate: '', completionDate: '2024-11-15', status: 'Completed', description: 'Impressed current system inspection', remarks: 'All anodes functional' },
-          { woNo: 'MKR-IN-00001.WO-2024-001', assignedTo: '3rd Engineer', performedBy: '3rd Engineer', workDate: '2024-05-20', runDate: '', completionDate: '2024-05-22', status: 'Completed', description: 'Annual anode replacement', remarks: '2 anodes replaced' }
-        ];
-        
-        // B3: Running Hours (dummy values)
-        executionData.previousReading = '8500';
-        executionData.currentReading = '8750';
-        
-        // B4: Spare Parts Consumed (2 rows - same as A2 but editable)
-        executionData.consumedSpareParts = [
-          { partNo: 'SP-00004', description: 'Impressed Current Anode', quantityConsumed: '2', comments: 'Replaced worn anodes' },
-          { partNo: 'SP-00005', description: 'Reference Cell Electrode', quantityConsumed: '1', comments: 'Corroded electrode replaced' }
-        ];
-      }
+      // Use actual database data - no dummy data overrides
+      const finalTemplateData: any = { ...templateData };
       
       res.json({
         workOrder,
