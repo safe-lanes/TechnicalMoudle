@@ -1,0 +1,19 @@
+{
+  "id": "531635d1-020c-43e1-bc3d-fe33c81b79e0",
+  "type": "components",
+  "mode": "upsert",
+  "vesselId": "V111",
+  "userId": 1,
+  "startedAt": "2026-01-06T05:08:07.464Z",
+  "completedAt": "2026-01-06T05:08:09.329Z",
+  "status": "complete",
+  "created": 329,
+  "updated": 94,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "components 1 - Copy.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/components/1767676089328_components_1_-_Copy.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

@@ -1,0 +1,19 @@
+{
+  "id": "b1bc3bc2-f127-46f7-a6de-56e63cba55dd",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "V111",
+  "userId": 1,
+  "startedAt": "2026-01-06T05:08:48.897Z",
+  "completedAt": "2026-01-06T05:08:50.418Z",
+  "status": "complete",
+  "created": 57,
+  "updated": 163,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "jobs 1 - Copy.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/jobs/1767676130417_jobs_1_-_Copy.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 219,
+  "spareComponentLinksCreated": 0
+}
