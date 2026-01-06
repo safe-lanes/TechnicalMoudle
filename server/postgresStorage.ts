@@ -5190,6 +5190,41 @@ export class PostgresStorage {
     
     return results;
   }
+
+  async getSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]): Promise<Map<string, { rob: number; robLocationA: number; robLocationB: number }>> {
+    const db = await getDb();
+    const result = new Map<string, { rob: number; robLocationA: number; robLocationB: number }>();
+    
+    if (!partNumbers || partNumbers.length === 0) {
+      return result;
+    }
+    
+    const matchingSpares = await db.select({
+      partNumber: spares.partNumber,
+      rob: spares.rob,
+      robLocationA: spares.robLocationA,
+      robLocationB: spares.robLocationB
+    })
+    .from(spares)
+    .where(
+      and(
+        eq(spares.vesselId, vesselId),
+        inArray(spares.partNumber, partNumbers)
+      )
+    );
+    
+    for (const spare of matchingSpares) {
+      if (spare.partNumber) {
+        result.set(spare.partNumber, {
+          rob: spare.rob,
+          robLocationA: spare.robLocationA,
+          robLocationB: spare.robLocationB
+        });
+      }
+    }
+    
+    return result;
+  }
 }
 
 export const postgresStorage = new PostgresStorage();
