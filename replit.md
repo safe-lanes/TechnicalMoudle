@@ -90,3 +90,15 @@ Progress tracking for issues from the 26-12-2025 findings document.
    - Provides ultimate protection at database level
 
 **Data Cleanup**: Cancelled 17 duplicate work orders in V015, keeping earliest WO per job with explanatory remarks.
+
+### Spare Parts Data Flow (Verified 06-Jan-2026)
+**Complete Job → WO → Inventory Pipeline**:
+1. **Job A2 (Required Spare Parts)** → Populated via `scripts/populateJobSpares.ts` (40 jobs × 4-5 spares each)
+2. **WO A2 (Required Spare Parts)** ← Copied from job on WO creation (`workOrderService.ts` line 383)
+3. **WO B4 (Spare Parts Consumed)** → User enters consumption with location selection
+4. **Inventory Transactions** ← Auto-deduct with WO ID linkage (`routes.ts` lines 3104-3108):
+   - `referenceType: 'WORK_ORDER'`
+   - `referenceId: workOrder.id`
+   - `referenceNote: 'WO: {workOrderNo} - {comments}'`
+
+**Route Clarification**: Work Order form uses `/pms/work-order/:id` (NOT `/pms/wo/:id`)
