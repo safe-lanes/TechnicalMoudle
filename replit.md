@@ -115,6 +115,7 @@ Progress tracking for issues from the 26-12-2025 findings document.
    - Creates new `jobComponentLink` entries when needed
    - Same job can now link to multiple components without being skipped
    - Tracks `jobComponentLinksCreated` counter
+   - **CRITICAL FIX**: Separated deprecated component fields (`componentId`, `componentCode`, `componentName`) from `jobData` to prevent overwrites during updates. Component fields are only included for NEW job creation (backwards compatibility), not for updates.
 3. **Spare Bulk Upload** (add/upsert modes):
    - Changed from deprecated `componentId` comparison to checking via `spareComponentLinks` table
    - Same spare can now link to multiple components
