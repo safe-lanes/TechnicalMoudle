@@ -4535,12 +4535,17 @@ async function performImport(
         }));
       };
       
+      // MANY-TO-MANY: Separate component fields from job master data
+      // Component association is now handled via jobComponentLinks table, NOT the job record
+      const componentFields = {
+        componentId: component.id,          // DEPRECATED: FK reference to component (UUID)
+        componentCode: componentCode,       // DEPRECATED: Display/tracking field (SFI code)
+        componentName: row['Component Name'] || component.name || null, // DEPRECATED
+      };
+      
       const jobData: any = {
         vesselId: canonicalVesselId,        // FK reference to vessel
         vesselCode: vesselCodeFromExcel,    // Display/tracking field from Excel
-        componentId: component.id,          // FK reference to component (UUID)
-        componentCode: componentCode,       // Display/tracking field (SFI code)
-        componentName: row['Component Name'] || component.name || null,
         fleetEquipmentCode: row['Fleet Equipment Code'] || null,
         fleetEquipmentName: row['Fleet Equipment Name'] || null,
         jobTitle: row['WO Title'],          // Job title from WO Title column
@@ -4596,7 +4601,9 @@ async function performImport(
       
       if (mode === 'add') {
         if (!existingJob) {
-          const createdJob = await storage.createJob(jobData);
+          // For NEW jobs: include deprecated component fields for backwards compatibility
+          const newJobData = { ...jobData, ...componentFields };
+          const createdJob = await storage.createJob(newJobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
@@ -4720,7 +4727,9 @@ async function performImport(
             result.skipped++;
           }
         } else {
-          const createdJob = await storage.createJob(jobData);
+          // For NEW jobs (upsert creates): include deprecated component fields for backwards compatibility
+          const newJobData = { ...jobData, ...componentFields };
+          const createdJob = await storage.createJob(newJobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
