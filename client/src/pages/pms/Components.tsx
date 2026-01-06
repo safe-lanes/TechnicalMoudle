@@ -1072,8 +1072,9 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   
   // Fetch maintenance history for the selected component
+  // NOTE: URL must include componentId in the path, not as separate queryKey segment
   const { data: maintenanceHistory = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/technical/api/component-maintenance-history', selectedComponent?.id],
+    queryKey: [`/technical/api/component-maintenance-history/${selectedComponent?.id}`],
     enabled: !!selectedComponent?.id,
   });
 
