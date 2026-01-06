@@ -1886,103 +1886,111 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      (templateData.requiredSpareParts || []).map((part, index) => (
-                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          {editingSparePart === index ? (
-                            <>
-                              <td className="p-2">
-                                <Input
-                                  value={part.partNo}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
-                                  placeholder="Part number"
-                                  className="text-sm"
-                                  data-testid={`input-spare-part-no-${index}`}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  value={part.description}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
-                                  placeholder="Description"
-                                  className="text-sm"
-                                  data-testid={`input-spare-description-${index}`}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  value={part.quantityRequired}
-                                  onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
-                                  placeholder="Qty"
-                                  className="text-sm"
-                                  data-testid={`input-spare-quantity-${index}`}
-                                />
-                              </td>
-                              <td className="p-2 text-center text-gray-500">-</td>
-                              <td className="p-2">
-                                <StatusPill status="available" />
-                              </td>
-                              <td className="p-2">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleSaveSparePart(index)}
-                                    className="h-7 px-2"
-                                    data-testid={`button-save-spare-${index}`}
-                                  >
-                                    <Check className="h-4 w-4 text-green-600" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={handleCancelEditSparePart}
-                                    className="h-7 px-2"
-                                    data-testid={`button-cancel-spare-${index}`}
-                                  >
-                                    <X className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
-                              <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
-                              <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
-                              <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>-</td>
-                              <td className="p-2">
-                                <span data-testid={`status-spare-${index}`}>
-                                  <StatusPill status="available" />
-                                </span>
-                              </td>
-                              {!isReadOnly && (
+                      (templateData.requiredSpareParts || []).map((part: any, index) => {
+                        const robValue = part.rob !== null && part.rob !== undefined ? part.rob : null;
+                        const qtyRequired = parseInt(part.quantityRequired) || 0;
+                        const isAvailable = robValue !== null && robValue >= qtyRequired;
+                        const isLowStock = robValue !== null && robValue > 0 && robValue < qtyRequired;
+                        const stockStatus = robValue === null ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
+                        
+                        return (
+                          <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                            {editingSparePart === index ? (
+                              <>
+                                <td className="p-2">
+                                  <Input
+                                    value={part.partNo}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'partNo', e.target.value)}
+                                    placeholder="Part number"
+                                    className="text-sm"
+                                    data-testid={`input-spare-part-no-${index}`}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    value={part.description}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'description', e.target.value)}
+                                    placeholder="Description"
+                                    className="text-sm"
+                                    data-testid={`input-spare-description-${index}`}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    value={part.quantityRequired}
+                                    onChange={(e) => handleUpdateSparePartField(index, 'quantityRequired', e.target.value)}
+                                    placeholder="Qty"
+                                    className="text-sm"
+                                    data-testid={`input-spare-quantity-${index}`}
+                                  />
+                                </td>
+                                <td className="p-2 text-center text-gray-500">{robValue !== null ? robValue : '-'}</td>
+                                <td className="p-2">
+                                  <StatusPill status={stockStatus} />
+                                </td>
                                 <td className="p-2">
                                   <div className="flex items-center justify-center gap-1">
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleEditSparePart(index)}
+                                      onClick={() => handleSaveSparePart(index)}
                                       className="h-7 px-2"
-                                      data-testid={`button-edit-spare-${index}`}
+                                      data-testid={`button-save-spare-${index}`}
                                     >
-                                      <Edit2 className="h-4 w-4 text-blue-600" />
+                                      <Check className="h-4 w-4 text-green-600" />
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleDeleteSparePart(index)}
+                                      onClick={handleCancelEditSparePart}
                                       className="h-7 px-2"
-                                      data-testid={`button-delete-spare-${index}`}
+                                      data-testid={`button-cancel-spare-${index}`}
                                     >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                      <X className="h-4 w-4 text-red-600" />
                                     </Button>
                                   </div>
                                 </td>
-                              )}
-                            </>
-                          )}
-                        </tr>
-                      ))
+                              </>
+                            ) : (
+                              <>
+                                <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
+                                <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
+                                <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
+                                <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>{robValue !== null ? robValue : '-'}</td>
+                                <td className="p-2">
+                                  <span data-testid={`status-spare-${index}`}>
+                                    <StatusPill status={stockStatus} />
+                                  </span>
+                                </td>
+                                {!isReadOnly && (
+                                  <td className="p-2">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleEditSparePart(index)}
+                                        className="h-7 px-2"
+                                        data-testid={`button-edit-spare-${index}`}
+                                      >
+                                        <Edit2 className="h-4 w-4 text-blue-600" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteSparePart(index)}
+                                        className="h-7 px-2"
+                                        data-testid={`button-delete-spare-${index}`}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-600" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                )}
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

@@ -1,7 +1,7 @@
 import { Check, Clock, AlertCircle, PackageX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-export type StatusType = 'available' | 'reserved' | 'order-required' | 'completed' | 'postponed' | 'active' | 'overdue';
+export type StatusType = 'available' | 'reserved' | 'order-required' | 'completed' | 'postponed' | 'active' | 'overdue' | 'low' | 'unknown' | 'unavailable';
 
 interface StatusPillProps {
   status: StatusType;
@@ -49,6 +49,21 @@ const statusConfig: Record<StatusType, {
     label: 'Overdue',
     className: 'bg-[hsl(var(--status-order-required))] text-[hsl(var(--status-order-required-foreground))] hover:bg-[hsl(var(--status-order-required))]',
     icon: AlertCircle
+  },
+  'low': {
+    label: 'Low Stock',
+    className: 'bg-amber-500 text-white hover:bg-amber-500',
+    icon: AlertCircle
+  },
+  'unknown': {
+    label: 'Unknown',
+    className: 'bg-gray-400 text-white hover:bg-gray-400',
+    icon: undefined
+  },
+  'unavailable': {
+    label: 'Out of Stock',
+    className: 'bg-[hsl(var(--status-order-required))] text-[hsl(var(--status-order-required-foreground))] hover:bg-[hsl(var(--status-order-required))]',
+    icon: PackageX
   }
 };
 

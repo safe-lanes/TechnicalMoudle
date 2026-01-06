@@ -655,18 +655,27 @@ const JobsFormPage: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      (templateData.requiredSpareParts || []).map((part, index) => (
-                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2" data-testid={index === 0 ? "JF.A2.8" : `text-spare-part-no-${index}`}>{index === 0 && <Marker id="JF.A2.8" />}{part.partNo || '-'}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A2.9" : `text-spare-description-${index}`}>{index === 0 && <Marker id="JF.A2.9" />}{part.description || '-'}</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A2.10" : `text-spare-quantity-${index}`}>{index === 0 && <Marker id="JF.A2.10" />}{part.quantityRequired || '-'}</td>
-                          <td className="p-2 text-center" data-testid={index === 0 ? "JF.A2.11" : `text-spare-rob-${index}`}>{index === 0 && <Marker id="JF.A2.11" />}-</td>
-                          <td className="p-2" data-testid={index === 0 ? "JF.A2.12" : `status-spare-${index}`}>
-                            {index === 0 && <Marker id="JF.A2.12" />}
-                            <StatusPill status="available" />
-                          </td>
-                        </tr>
-                      ))
+                      (templateData.requiredSpareParts || []).map((part: any, index) => {
+                        const robValue = part.rob !== null && part.rob !== undefined ? part.rob : null;
+                        const qtyRequired = parseInt(part.quantityRequired) || 0;
+                        const isAvailable = robValue !== null && robValue >= qtyRequired;
+                        const isLowStock = robValue !== null && robValue > 0 && robValue < qtyRequired;
+                        const isOutOfStock = robValue === 0;
+                        const stockStatus = robValue === null ? 'unknown' : isAvailable ? 'available' : isLowStock ? 'low' : 'unavailable';
+                        
+                        return (
+                          <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                            <td className="p-2" data-testid={index === 0 ? "JF.A2.8" : `text-spare-part-no-${index}`}>{index === 0 && <Marker id="JF.A2.8" />}{part.partNo || '-'}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A2.9" : `text-spare-description-${index}`}>{index === 0 && <Marker id="JF.A2.9" />}{part.description || '-'}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A2.10" : `text-spare-quantity-${index}`}>{index === 0 && <Marker id="JF.A2.10" />}{part.quantityRequired || '-'}</td>
+                            <td className="p-2 text-center" data-testid={index === 0 ? "JF.A2.11" : `text-spare-rob-${index}`}>{index === 0 && <Marker id="JF.A2.11" />}{robValue !== null ? robValue : '-'}</td>
+                            <td className="p-2" data-testid={index === 0 ? "JF.A2.12" : `status-spare-${index}`}>
+                              {index === 0 && <Marker id="JF.A2.12" />}
+                              <StatusPill status={stockStatus} />
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
