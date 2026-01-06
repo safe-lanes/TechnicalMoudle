@@ -119,6 +119,9 @@ const JobsFormPage: React.FC = () => {
 
   const urlParams = new URLSearchParams(window.location.search);
   const isModifyMode = urlParams.get('modify') === '1';
+  // activeComponentCode from URL allows the job to be viewed in context of a specific component
+  // This is crucial for multi-linked jobs where the same job can be accessed from different components
+  const activeComponentCode = urlParams.get('activeComponentCode') || '';
 
   const { data: jobContext, isLoading } = useQuery({
     queryKey: [`/technical/api/jobs/${jobId}/context`],
@@ -174,12 +177,17 @@ const JobsFormPage: React.FC = () => {
           ? (context.templateData.intervalRunningHour || context.templateData.frequencyValue || '')
           : (context.templateData.frequencyValue || '');
         
+        // IMPORTANT: Use activeComponentCode from URL if provided (for multi-linked jobs),
+        // otherwise fall back to the job's stored componentCode
+        // This ensures clicking a job from component X always binds to component X
+        const effectiveComponentCode = activeComponentCode || context.templateData.componentCode || context.templateData.sfiCode || '';
+        
         const newTemplateData = {
           ...context.templateData,
           woTitle: context.templateData.woTitle || context.templateData.jobTitle || '',
           woTemplateCode: context.templateData.jobNo || context.templateData.woTemplateCode || '',
           componentName: context.templateData.componentName || '',
-          componentCode: context.templateData.componentCode || context.templateData.sfiCode || '',
+          componentCode: effectiveComponentCode,
           frequencyValue: String(frequencyValue),
           frequencyUnit: normalizedFrequencyUnit,
           taskType: context.templateData.maintenanceType || context.templateData.taskType || 'Inspection',
@@ -197,7 +205,7 @@ const JobsFormPage: React.FC = () => {
         }
       }
     }
-  }, [jobContext, isModifyMode]);
+  }, [jobContext, isModifyMode, activeComponentCode]);
 
   const handleFieldChange = (field: string, value: string) => {
     setTemplateData(prev => ({
@@ -275,7 +283,12 @@ const JobsFormPage: React.FC = () => {
     if (isModifyMode) {
       navigate("/pms/modify-pms/jobs");
     } else {
-      navigate("/pms/components");
+      // Preserve component context when navigating back if activeComponentCode was provided
+      if (activeComponentCode) {
+        navigate(`/pms/components?scrollTo=${encodeURIComponent(activeComponentCode)}`);
+      } else {
+        navigate("/pms/components");
+      }
     }
   };
 

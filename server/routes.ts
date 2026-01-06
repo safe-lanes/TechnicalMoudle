@@ -6470,7 +6470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/jobs/:id/generate-wo", async (req, res) => {
     try {
       const jobId = req.params.id;
-      const { reason } = req.body; // 'Planning' | 'Breakdown' | 'Other'
+      const { reason, activeComponentCode } = req.body; // 'Planning' | 'Breakdown' | 'Other', optional component override
       
       if (!reason || !['Planning', 'Breakdown', 'Other'].includes(reason)) {
         return res.status(400).json({ error: "Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'" });
@@ -6482,7 +6482,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate work order from job with on-demand reason
-      const workOrder = await storage.generateOnDemandWorkOrder(jobId, reason);
+      // Pass activeComponentCode to bind the WO to the correct component context (for multi-linked jobs)
+      const workOrder = await storage.generateOnDemandWorkOrder(jobId, reason, activeComponentCode);
       
       res.status(201).json(workOrder);
     } catch (error: any) {

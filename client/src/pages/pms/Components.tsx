@@ -790,7 +790,8 @@ const JobRow: React.FC<{
   job: any;
   onRowClick: (job: any) => void;
   toast: any;
-}> = ({ job, onRowClick, toast }) => {
+  activeComponentCode: string; // The component context from which this job is being viewed
+}> = ({ job, onRowClick, toast, activeComponentCode }) => {
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
   const generateWOMutation = useMutation({
@@ -798,7 +799,8 @@ const JobRow: React.FC<{
       const response = await fetch(`/technical/api/jobs/${job.id}/generate-wo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
+        // Pass activeComponentCode to ensure work order is created with correct component context
+        body: JSON.stringify({ reason, activeComponentCode })
       });
       
       if (!response.ok) {
@@ -918,7 +920,7 @@ const JobRow: React.FC<{
   );
 };
 
-const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string }> = ({ componentCode, componentName }) => {
+const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string; componentId?: string }> = ({ componentCode, componentName, componentId }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
@@ -1008,8 +1010,9 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   };
 
   const handleRowClick = (job: any) => {
-    // Navigate to Jobs Form page
-    setLocation(`/pms/job/${job.id}`);
+    // Navigate to Jobs Form page with activeComponentCode context
+    // This ensures when a job is viewed from a specific component, that component context is preserved
+    setLocation(`/pms/job/${job.id}?activeComponentCode=${encodeURIComponent(componentCode)}`);
   };
 
   return (
@@ -1058,6 +1061,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                   job={job}
                   onRowClick={handleRowClick}
                   toast={toast}
+                  activeComponentCode={componentCode}
                 />
               ))
             )}

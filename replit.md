@@ -134,3 +134,24 @@ Progress tracking for issues from the 26-12-2025 findings document.
 3. **Performance**: Batch fetches all links per vessel in ONE query, caches component lookups to avoid N+1
 
 **Result**: Jobs now correctly appear under ALL linked components, not just the first one
+
+### Multi-Linked Job Component Context Fix (Completed 06-Jan-2026)
+**Problem**: When a job is linked to multiple components via `linkedComponentCodes[]`, clicking the job from component X would open the job bound to the wrong component (typically `linkedComponentCodes[0]` instead of component X).
+
+**Root Cause**: The UI was navigating to `/pms/job/:id` without preserving which component the user clicked from. Downstream actions (viewing, generating WO) would use the job's stored `componentCode` field which doesn't represent the active viewing context.
+
+**Solution - Explicit Component Binding**:
+1. **Navigation**: `handleRowClick` now includes `activeComponentCode` as URL parameter: `/pms/job/:id?activeComponentCode=X`
+2. **JobRow Component**: Accepts `activeComponentCode` prop, passes it to Generate WO API calls
+3. **JobsFormPage**: Reads `activeComponentCode` from URL, uses it instead of `job.componentCode` for `templateData.componentCode`
+4. **Backend API** (`POST /technical/api/jobs/:id/generate-wo`): Accepts optional `activeComponentCode` in request body
+5. **Storage** (`generateOnDemandWorkOrder`): Uses `activeComponentCode` override if provided, ensuring WO is created with correct component context
+
+**Key Files Changed**:
+- `client/src/pages/pms/Components.tsx` - JobRow, WorkOrdersSection, handleRowClick
+- `client/src/pages/pms/JobsFormPage.tsx` - activeComponentCode URL param handling
+- `server/routes.ts` - generate-wo endpoint
+- `server/storage.ts` - interface update
+- `server/postgresStorage.ts` - implementation update
+
+**Validation Scenario**: Job linked to components 651.003.05 and 401.005. User opens job from 651.003.05 → Job shows componentCode=651.003.05, not 401.005

@@ -4525,7 +4525,7 @@ export class PostgresStorage {
 
   // ============= ON-DEMAND WORK ORDER GENERATION (Rule #4) =============
   
-  async generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other'): Promise<WorkOrder> {
+  async generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other', activeComponentCode?: string): Promise<WorkOrder> {
     const db = await getDb();
     
     // Get the job
@@ -4547,6 +4547,10 @@ export class PostgresStorage {
     const woCount = existingWOs.length + 1;
     const workOrderNo = `${job.jobNo}.WO-${year}-${String(woCount).padStart(3, '0')}`;
     
+    // Use activeComponentCode if provided (for multi-linked jobs), otherwise fall back to job's componentCode
+    // This ensures the work order is bound to the correct component context
+    const effectiveComponentCode = activeComponentCode || job.componentCode;
+    
     // Create the work order
     const newWorkOrder: InsertWorkOrder = {
       id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -4558,7 +4562,7 @@ export class PostgresStorage {
       jobTitle: job.jobTitle,
       componentId: job.componentId,
       component: job.componentName || '',
-      componentCode: job.componentCode,
+      componentCode: effectiveComponentCode,
       status: 'Active',
       dueDate: job.nextDueDate || new Date().toISOString().split('T')[0],
       remarks: `On-demand work order generated. Reason: ${reason}`,
