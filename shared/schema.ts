@@ -735,12 +735,13 @@ export type InsertAlertConfig = z.infer<typeof insertAlertConfigSchema>;
 export type AlertConfig = typeof alertConfig.$inferSelect;
 
 // Jobs Table - Templates/Blueprints for maintenance jobs linked to components
+// NOTE: componentId/componentCode/componentName are DEPRECATED - use jobComponentLinks table for many-to-many relationships
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   vesselId: text("vessel_id"),
-  componentId: text("component_id").notNull(), // Component this job belongs to
-  componentCode: text("component_code").notNull(),
-  componentName: text("component_name").notNull(),
+  componentId: text("component_id"), // DEPRECATED: Use jobComponentLinks for many-to-many. Nullable for backward compatibility
+  componentCode: text("component_code"), // DEPRECATED: Use jobComponentLinks for many-to-many
+  componentName: text("component_name"), // DEPRECATED: Use jobComponentLinks for many-to-many
   jobNo: text("job_no").notNull(), // Auto-generated JOB-XXXXXXX (not globally unique - same job_no can exist across vessels/components)
   jobTitle: text("job_title").notNull(),
   assignedTo: text("assigned_to"),

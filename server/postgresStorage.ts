@@ -775,17 +775,31 @@ export class PostgresStorage {
         .where(inArray(components.id, childIds));
       componentsInactivated += childIds.length;
       
-      // Inactivate jobs linked to children
+      // Inactivate jobs linked to children (via direct componentId and jobComponentLinks)
+      // Collect all unique job IDs to avoid duplicate updates/counts
+      const childJobIdsToInactivate = new Set<string>();
+      
       for (const childId of childIds) {
-        const linkedJobs = await db.select().from(jobs)
+        // Jobs linked via deprecated componentId field
+        const directJobs = await db.select().from(jobs)
           .where(eq(jobs.componentId, childId));
-        if (linkedJobs.length > 0) {
-          await db.update(jobs)
-            .set({ isActive: false })
-            .where(eq(jobs.componentId, childId));
-          jobsInactivated += linkedJobs.length;
+        for (const job of directJobs) {
+          childJobIdsToInactivate.add(job.id);
+        }
+        // Jobs linked via jobComponentLinks table (many-to-many)
+        const linkedJobIds = await this.getJobComponentLinksByComponent(childId);
+        for (const link of linkedJobIds) {
+          childJobIdsToInactivate.add(link.jobId);
         }
       }
+      
+      // Batch update all unique jobs
+      for (const jobId of childJobIdsToInactivate) {
+        await db.update(jobs)
+          .set({ isActive: false })
+          .where(eq(jobs.id, jobId));
+      }
+      jobsInactivated += childJobIdsToInactivate.size;
     }
     
     // Inactivate the main component
@@ -794,15 +808,28 @@ export class PostgresStorage {
       .where(eq(components.id, id));
     componentsInactivated++;
     
-    // Inactivate jobs linked to main component
-    const linkedJobs = await db.select().from(jobs)
+    // Inactivate jobs linked to main component (via direct componentId and jobComponentLinks)
+    // Collect all unique job IDs to avoid duplicate updates/counts
+    const mainJobIdsToInactivate = new Set<string>();
+    
+    const directJobs = await db.select().from(jobs)
       .where(eq(jobs.componentId, id));
-    if (linkedJobs.length > 0) {
+    for (const job of directJobs) {
+      mainJobIdsToInactivate.add(job.id);
+    }
+    // Jobs linked via jobComponentLinks table (many-to-many)
+    const linkedJobIds = await this.getJobComponentLinksByComponent(id);
+    for (const link of linkedJobIds) {
+      mainJobIdsToInactivate.add(link.jobId);
+    }
+    
+    // Batch update all unique jobs
+    for (const jobId of mainJobIdsToInactivate) {
       await db.update(jobs)
         .set({ isActive: false })
-        .where(eq(jobs.componentId, id));
-      jobsInactivated += linkedJobs.length;
+        .where(eq(jobs.id, jobId));
     }
+    jobsInactivated += mainJobIdsToInactivate.size;
     
     return {
       success: true,

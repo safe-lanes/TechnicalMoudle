@@ -3448,7 +3448,9 @@ async function performImport(
     created: 0,
     updated: 0,
     skipped: 0,
-    archived: 0
+    archived: 0,
+    jobComponentLinksCreated: 0,
+    spareComponentLinksCreated: 0
   };
 
   if (type === 'components') {
@@ -3762,40 +3764,29 @@ async function performImport(
         
         if (mode === 'add') {
           if (existingSpare) {
-            // MANY-TO-MANY SUPPORT: If Part Code exists but for a DIFFERENT component,
-            // create a spare_component_link to share this spare across multiple components
-            if (existingSpare.componentId !== component.id) {
-              try {
-                // Check if link already exists before creating
-                const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-                const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
+            try {
+              const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              
+              if (!linkAlreadyExists) {
+                await storage.createSpareComponentLink({
+                  vesselId: sparesVesselId,
+                  spareId: existingSpare.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                result.spareComponentLinksCreated++;
+                console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
                 
-                if (!linkAlreadyExists) {
-                  await storage.createSpareComponentLink({
-                    vesselId: sparesVesselId,
-                    spareId: existingSpare.id,
-                    componentId: component.id,
-                    linkedBy: 'system-bulk-import',
-                  });
-                  console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode}`);
-                  
-                  // Note: Spare-component links are not tracked in import history since
-                  // they represent relationships rather than entity changes. The spare
-                  // itself remains unchanged - only the link is created.
-                  
-                  // Count as an update since we modified the spare's relationships
-                  result.updated++;
-                } else {
-                  console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
-                  result.skipped++;
-                }
-              } catch (linkError: any) {
-                console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+                // Count as an update since we modified the spare's relationships
+                result.updated++;
+              } else {
+                console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
                 result.skipped++;
               }
-            } else {
-              // Same Part Code with same component - true duplicate, skip
-              console.log(`⏭️ Part Code ${partCode} already exists for same component, skipping`);
+            } catch (linkError: any) {
+              console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
               result.skipped++;
             }
             continue;
@@ -3871,6 +3862,7 @@ async function performImport(
             isNewSpare: true,
             userId: 'system-import',
           });
+          result.spareComponentLinksCreated++; // Link created by processSpareInventory
           
           console.log(`✅ Created spare: ${partCode} - ${newSpare.partName}`);
           
@@ -3970,32 +3962,24 @@ async function performImport(
           const robLocationBUpsert = parseInt(row['Location B - ROB']) || 0;
           
           if (existingSpare) {
-            // MANY-TO-MANY SUPPORT: If Part Code exists but for a DIFFERENT component,
-            // create a spare_component_link instead of updating the spare's component reference
-            if (existingSpare.componentId !== component.id) {
-              try {
-                // Check if link already exists before creating
-                const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
-                const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
-                
-                if (!linkAlreadyExists) {
-                  await storage.createSpareComponentLink({
-                    vesselId: sparesVesselId,
-                    spareId: existingSpare.id,
-                    componentId: component.id,
-                    linkedBy: 'system-bulk-import',
-                  });
-                  console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
-                  result.updated++;
-                } else {
-                  console.log(`⏭️ Spare ${partCode} already linked to component ${componentCode}, skipping`);
-                  result.skipped++;
-                }
-              } catch (linkError: any) {
-                console.warn(`⚠️ Failed to create spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
-                result.skipped++;
+            // MANY-TO-MANY SUPPORT: Check via spareComponentLinks (source of truth) if spare is already linked to this component
+            try {
+              const existingLinks = await storage.getSpareComponentLinksBySpare(existingSpare.id);
+              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+              
+              if (!linkAlreadyExists) {
+                // Create new link for this component
+                await storage.createSpareComponentLink({
+                  vesselId: sparesVesselId,
+                  spareId: existingSpare.id,
+                  componentId: component.id,
+                  linkedBy: 'system-bulk-import',
+                });
+                result.spareComponentLinksCreated++;
+                console.log(`🔗 Linked spare ${partCode} to additional component ${componentCode} (upsert mode)`);
               }
-            } else {
+              
+              // Always update the spare with latest data (upsert behavior)
               // Same component - update existing spare
               const updatedSpare = await storage.updateSpare(existingSpare.id, {
                 partName: String(row['Part Name']).trim(),
@@ -4045,6 +4029,9 @@ async function performImport(
               });
               
               console.log(`🔄 Updated spare (upsert): ${partCode} - ${updatedSpare.partName}`);
+            } catch (linkError: any) {
+              console.warn(`⚠️ Failed to process spare-component link for ${partCode} -> ${componentCode}: ${linkError.message}`);
+              result.skipped++;
             }
           } else {
             // Create new - use criticalValUpsert from parent scope
@@ -4098,6 +4085,7 @@ async function performImport(
               isNewSpare: true,
               userId: 'system-import',
             });
+            result.spareComponentLinksCreated++; // Link created by processSpareInventory
             
             console.log(`✅ Created spare (upsert): ${partCode} - ${newSpare.partName}`);
           }
@@ -4108,7 +4096,7 @@ async function performImport(
       }
     }
     
-    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`);
+    console.log(`✅ Spares import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.spareComponentLinksCreated} spare-component links created`);
   } else if (type === 'stores') {
     console.log(`🚀 Starting stores import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}, storeType: ${storeType}`);
     
@@ -4612,50 +4600,77 @@ async function performImport(
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
           
+          // MANY-TO-MANY: Always create job-component link for the new job
+          try {
+            await storage.createJobComponentLink({
+              vesselId: canonicalVesselId,
+              jobId: createdJob.id,
+              componentId: component.id,
+              componentCode: componentCode,
+              linkedBy: 'system-bulk-import',
+            });
+            result.jobComponentLinksCreated++;
+            console.log(`🔗 Created job ${createdJob.jobNo} and linked to component ${componentCode}`);
+          } catch (linkError: any) {
+            console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
+          }
+          
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
             const canonicalJob = await storage.getJob(createdJob.id);
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         } else {
-          // MANY-TO-MANY SUPPORT: If Job Code exists but for a DIFFERENT component,
-          // create a job_component_link to share this job across multiple components
-          if (existingJob.componentId !== component.id) {
-            try {
-              // Check if link already exists before creating
-              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+          // MANY-TO-MANY SUPPORT: Job Code exists - check if we need to link to this component
+          try {
+            // Check if link already exists before creating
+            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            
+            if (!linkAlreadyExists) {
+              await storage.createJobComponentLink({
+                vesselId: canonicalVesselId,
+                jobId: existingJob.id,
+                componentId: component.id,
+                componentCode: componentCode,
+                linkedBy: 'system-bulk-import',
+              });
+              result.jobComponentLinksCreated++;
+              console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode}`);
               
-              if (!linkAlreadyExists) {
-                await storage.createJobComponentLink({
-                  vesselId: canonicalVesselId,
-                  jobId: existingJob.id,
-                  componentId: component.id,
-                  linkedBy: 'system-bulk-import',
-                });
-                console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode}`);
-                
-                // Note: Job-component links are not tracked in import history since
-                // they represent relationships rather than entity changes.
-                
-                // Count as an update since we modified the job's relationships
-                result.updated++;
-              } else {
-                console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
-                result.skipped++;
-              }
-            } catch (linkError: any) {
-              console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
+              // Count as an update since we modified the job's relationships
+              result.updated++;
+            } else {
+              console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
               result.skipped++;
             }
-          } else {
-            // Same Job Code with same component - true duplicate, skip
-            console.log(`⏭️ Job ${jobData.jobNo} already exists for same component, skipping`);
+          } catch (linkError: any) {
+            console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
             result.skipped++;
           }
         }
       } else if (mode === 'update') {
         if (existingJob) {
+          // MANY-TO-MANY: Create link if it doesn't exist
+          try {
+            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            
+            if (!linkAlreadyExists) {
+              await storage.createJobComponentLink({
+                vesselId: canonicalVesselId,
+                jobId: existingJob.id,
+                componentId: component.id,
+                componentCode: componentCode,
+                linkedBy: 'system-bulk-import',
+              });
+              result.jobComponentLinksCreated++;
+              console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (update mode)`);
+            }
+          } catch (linkError: any) {
+            console.warn(`⚠️ Failed to create job-component link: ${linkError.message}`);
+          }
+          
           const previousSnapshot = createRecordSnapshot(existingJob);
           const updatedJob = await storage.updateJob(existingJob.id, jobData);
           jobsByJobNo.set(updatedJob.jobNo, updatedJob);
@@ -4671,34 +4686,25 @@ async function performImport(
         }
       } else if (mode === 'upsert') {
         if (existingJob) {
-          // MANY-TO-MANY SUPPORT: If Job Code exists but for a DIFFERENT component,
-          // create a job_component_link to share this job across multiple components
-          // (instead of updating the existing job's component reference)
-          if (existingJob.componentId !== component.id) {
-            try {
-              // Check if link already exists before creating
-              const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-              const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
-              
-              if (!linkAlreadyExists) {
-                await storage.createJobComponentLink({
-                  vesselId: canonicalVesselId,
-                  jobId: existingJob.id,
-                  componentId: component.id,
-                  linkedBy: 'system-bulk-import',
-                });
-                console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode} (upsert mode)`);
-                result.updated++;
-              } else {
-                console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
-                result.skipped++;
-              }
-            } catch (linkError: any) {
-              console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
-              result.skipped++;
+          // MANY-TO-MANY SUPPORT: Check if we need to create/update link to this component
+          try {
+            // Check if link already exists before creating
+            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
+            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
+            
+            if (!linkAlreadyExists) {
+              await storage.createJobComponentLink({
+                vesselId: canonicalVesselId,
+                jobId: existingJob.id,
+                componentId: component.id,
+                componentCode: componentCode,
+                linkedBy: 'system-bulk-import',
+              });
+              result.jobComponentLinksCreated++;
+              console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (upsert mode)`);
             }
-          } else {
-            // Same component - update the existing job
+            
+            // Update the job master record with latest data (regardless of component)
             const previousSnapshot = createRecordSnapshot(existingJob);
             const updatedJob = await storage.updateJob(existingJob.id, jobData);
             jobsByJobNo.set(updatedJob.jobNo, updatedJob);
@@ -4709,11 +4715,29 @@ async function performImport(
               const canonicalJob = await storage.getJob(updatedJob.id);
               await trackChange(importHistoryId, 'updated', 'job', updatedJob.id, existingJob, canonicalJob);
             }
+          } catch (linkError: any) {
+            console.warn(`⚠️ Failed to process job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
+            result.skipped++;
           }
         } else {
           const createdJob = await storage.createJob(jobData);
           jobsByJobNo.set(createdJob.jobNo, createdJob);
           result.created++;
+          
+          // MANY-TO-MANY: Always create job-component link for the new job
+          try {
+            await storage.createJobComponentLink({
+              vesselId: canonicalVesselId,
+              jobId: createdJob.id,
+              componentId: component.id,
+              componentCode: componentCode,
+              linkedBy: 'system-bulk-import',
+            });
+            result.jobComponentLinksCreated++;
+            console.log(`🔗 Created job ${createdJob.jobNo} and linked to component ${componentCode}`);
+          } catch (linkError: any) {
+            console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
+          }
           
           // Track job creation with canonical state (refetch for accuracy)
           if (importHistoryId) {
@@ -4749,7 +4773,7 @@ async function performImport(
       }
     }
     
-    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived`);
+    console.log(`✅ Jobs import complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.archived} archived, ${result.jobComponentLinksCreated || 0} job-component links created`);
   }
 
   return result;
