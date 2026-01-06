@@ -102,3 +102,24 @@ Progress tracking for issues from the 26-12-2025 findings document.
    - `referenceNote: 'WO: {workOrderNo} - {comments}'`
 
 **Route Clarification**: Work Order form uses `/pms/work-order/:id` (NOT `/pms/wo/:id`)
+
+### Many-to-Many Bulk Upload Support (Completed 06-Jan-2026)
+**Problem**: Bulk upload system incorrectly treated jobs/spares-to-components as 1:1 relationships, causing duplicate job numbers for different components to be skipped.
+
+**Solution**: Junction tables (`jobComponentLinks`, `spareComponentLinks`) are now the source of truth for all bulk upload operations.
+
+**Key Changes**:
+1. **Schema**: Made `componentId`, `componentCode`, `componentName` nullable on jobs table (deprecated in favor of link table)
+2. **Job Bulk Upload** (add/update/upsert modes):
+   - All modes now check existing links via `getJobComponentLinksByJob()`
+   - Creates new `jobComponentLink` entries when needed
+   - Same job can now link to multiple components without being skipped
+   - Tracks `jobComponentLinksCreated` counter
+3. **Spare Bulk Upload** (add/upsert modes):
+   - Changed from deprecated `componentId` comparison to checking via `spareComponentLinks` table
+   - Same spare can now link to multiple components
+   - Tracks `spareComponentLinksCreated` counter
+4. **Cascade Inactivation**:
+   - Updated to query jobs via both deprecated `componentId` AND `jobComponentLinks` table
+   - Deduplicates job IDs using Sets before updating to prevent double-counting
+5. **Result Output**: Final log message includes link counts: `{X} job-component links created, {Y} spare-component links created`
