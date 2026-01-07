@@ -63,10 +63,10 @@ const menuConfigs: Record<string, MenuItem[]> = {
     { id: "reports", label: "Reports", icon: FileText },
   ],
   admin: [
-    { id: "alerts", label: "Alerts", icon: AlertTriangle },
-    { id: "users", label: "Users", icon: Users },
-    { id: "permissions", label: "Permissions", icon: Shield },
-    { id: "bulk-data-import", label: "Data Management", icon: FileSpreadsheet },
+    // { id: "alerts", label: "Alerts", icon: AlertTriangle },
+ { id: "masters", label: "Masters", icon: FileSpreadsheet },
+     // { id: "permissions", label: "Permissions", icon: Shield },
+    // { id: "bulk-data-import", label: "Data Management", icon: FileSpreadsheet },
   ],
 };
 

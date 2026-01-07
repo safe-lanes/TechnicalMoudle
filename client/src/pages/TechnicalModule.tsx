@@ -23,6 +23,7 @@ import RecurringDefects from "./RecurringDefects";
 import CertificatesPage from "./cert-surveys/CertificatesPage";
 import SurveysPage from "./cert-surveys/SurveysPage";
 import { useLocation, useParams } from "wouter";
+import DataMasters from "./admin/DataMasters";
 
 export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
@@ -31,7 +32,7 @@ export const TechnicalModule = () => {
   // Derive state from URL
   const getStateFromUrl = () => {
     if (location === "/admin") {
-      return { subModule: "admin", menuItem: "alerts" }; // Default to alerts when accessing /admin
+      return { subModule: "admin", menuItem: "masters" }; // Default to alerts when accessing /admin
     } else if (location.startsWith("/admin/")) {
       const subpage = location.replace("/admin/", "");
       return { subModule: "admin", menuItem: subpage };
@@ -83,8 +84,8 @@ export const TechnicalModule = () => {
     setSelectedSubModule(subModule);
     // Set default menu item based on submodule and navigate
     if (subModule === "admin") {
-      setSelectedMenuItem("alerts"); // Default to alerts for admin
-      setLocation("/admin/alerts");
+      setSelectedMenuItem("masters"); // Default to alerts for admin
+      setLocation("/admin/masters");
     } else if (subModule === "defects") {
       setSelectedMenuItem("active"); // Default to active for defects
       setLocation("/defects");
@@ -144,7 +145,10 @@ export const TechnicalModule = () => {
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem.startsWith("maintenance-records") ? (
             <MaintenanceRecords />
-          ) : selectedSubModule === "admin" ? (
+          ) : selectedSubModule === "admin" && selectedMenuItem === "masters" ? (
+            <DataMasters />
+          )
+          : selectedSubModule === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />

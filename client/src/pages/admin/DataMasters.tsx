@@ -1,0 +1,351 @@
+import { useState, useMemo, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { Search, Loader2 } from "lucide-react";
+import {
+  useExternalNationalities,
+  useExternalVessels,
+  useExternalVesselTypes,
+  useExternalLicenses,
+  useExternalAdditionalGroups,
+  useExternalPorts,
+  useExternalLanguages,
+  useExternalFleetGroups,
+  useExternalCountries,
+  useExternalManningAgents,
+  useExternalCrewPools,
+  useExternalAppraisalTypes,
+  useExternalUsers,
+} from "@/hooks/useExternalMasterData";
+
+interface ColumnDef {
+  header: string;
+  fields: string[];
+}
+
+interface MasterType {
+  id: string;
+  name: string;
+  idFields: string[];
+  columns: ColumnDef[];
+}
+
+const masterTypes: MasterType[] = [
+  // {
+  //   id: "nationality",
+  //   name: "Nationality Master",
+  //   idFields: ["cid", "id", "nationalityId"],
+  //   columns: [
+  //     { header: "Nationality", fields: ["countryName", "nationalityName", "name"] },
+  //     { header: "Country", fields: ["country_name", "countryName", "country"] },
+  //   ],
+  // },
+  {
+    id: "vessel",
+    name: "Vessel Master",
+    idFields: ["vuid", "vesselId"],
+    columns: [
+      { header: "Vessel", fields: ["vessel", "vesselName", "name"] },
+      { header: "IMO Number", fields: ["imo_number", "imoNumber", "imo_no", "imo"] },
+      { header: "Vessel Type", fields: ["vessel_type_name", "vesselTypeName", "vessel_type", "vesselType", "type"] },
+    ],
+  },
+  {
+    id: "vesselType",
+    name: "Vessel Type",
+    idFields: ["vtuid", "id", "vesselTypeId"],
+    columns: [
+      { header: "Vessel Type", fields: ["vesselType", "vesselTypeName", "name", "type_name"] },
+      { header: "Classification", fields: ["classification", "classification_name", "class_name", "class"] },
+
+    ],
+  },
+
+  {
+    id: "additionalGroup",
+    name: "Additional Group",
+    idFields: ["id", "groupId", "additional_group_id"],
+    columns: [
+      { header: "Name", fields: ["group_name", "groupName", "name", "additional_group_name"] },
+      { header: "Description", fields: ["vessels", "group_description", "desc"] },
+    ],
+  },
+  {
+    id: "ports",
+    name: "Ports",
+    idFields: ["puid", "id", "portId"],
+    columns: [
+      { header: "Port Name", fields: ["port_name", "portName", "name"] },
+      { header: "Country", fields: ["country_name", "countryName", "country"] },
+    ],
+  },
+    {
+    id: "users",
+    name: "Users",
+    idFields: ["uuid", "id", "userId"],
+    columns: [
+      { header: "User Name", fields: ["fullname", "userName", "name", "username", "full_name"] },
+      { header: "Role", fields: ["role", "role_name", "roleName", "user_role"] },
+      { header: "Designation", fields: ["designation", "position", "title", "job_title"] },
+      { header: "User Type", fields: ["user_type", "userType", "type"] },
+      { header: "Department", fields: ["department", "department_name", "dept"] },
+      { header: "Email", fields: ["email", "email_address", "user_email"] },
+    ],
+  },
+  {
+    id: "fleetGroup",
+    name: "Fleet Group",
+    idFields: ["fleet_group_id", "id", "fleetGroupId"],
+    columns: [
+      { header: "Name", fields: ["fleet_group_name", "fleetGroupName", "name", "group_name"] },
+      { header: "Description", fields: ["vessels", "fleet_group_description", "desc"] },
+    ],
+  },
+   // {
+  //   id: "licenseDce",
+  //   name: "License & DCE Master",
+  //   idFields: ["license_id", "id", "licenseId"],
+  //   columns: [
+  //     { header: "Name", fields: ["license_name", "licenseName", "name"] },
+  //     { header: "Description", fields: ["description", "license_description", "desc"] },
+  //   ],
+  // },
+  // {
+  //   id: "language",
+  //   name: "Language",
+  //   idFields: ["luid", "id", "languageId"],
+  //   columns: [
+  //     { header: "Language Name", fields: ["language_name", "languageName", "name"] },
+  //     { header: "Native Name", fields: ["native_name", "nativeName", "native"] },
+  //     { header: "ISO Code", fields: ["iso_code", "isoCode", "code", "language_code"] },
+  //   ],
+  // },
+
+  // {
+  //   id: "country",
+  //   name: "Country",
+  //   idFields: ["nuid", "id", "countryId"],
+  //   columns: [
+  //     { header: "Country Name", fields: ["country_name", "countryName", "name"] },
+  //   ],
+  // },
+  // {
+  //   id: "manningAgents",
+  //   name: "Manning Agents",
+  //   idFields: ["agent_id", "id", "agentId", "manning_agent_id"],
+  //   columns: [
+  //     { header: "Name", fields: ["agent_name", "agentName", "name", "manning_agent_name"] },
+  //     { header: "Country", fields: ["country_name", "countryName", "country"] },
+  //     { header: "Email", fields: ["email", "agent_email", "email_address"] },
+  //   ],
+  // },
+  // {
+  //   id: "crewPool",
+  //   name: "Crew Pool",
+  //   idFields: ["pool_id", "id", "poolId", "crew_pool_id"],
+  //   columns: [
+  //     { header: "Name", fields: ["pool_name", "poolName", "name", "crew_pool_name"] },
+  //   ],
+  // },
+  // {
+  //   id: "appraisalType",
+  //   name: "Appraisal Type",
+  //   idFields: ["appraisal_type_id", "id", "appraisalTypeId"],
+  //   columns: [
+  //     { header: "Name", fields: ["appraisal_type_name", "appraisalTypeName", "name", "type_name"] },
+  //   ],
+  // },
+
+];
+
+export default function DataMasters() {
+  const [selectedMaster, setSelectedMaster] = useState<string>("vessel");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const nationalitiesQuery = useExternalNationalities({ enabled: selectedMaster === "nationality" });
+  const vesselsQuery = useExternalVessels({ enabled: selectedMaster === "vessel" });
+  const vesselTypesQuery = useExternalVesselTypes({ enabled: selectedMaster === "vesselType" });
+  const licensesQuery = useExternalLicenses({ enabled: selectedMaster === "licenseDce" });
+  const additionalGroupsQuery = useExternalAdditionalGroups({ enabled: selectedMaster === "additionalGroup" });
+  const portsQuery = useExternalPorts({ enabled: selectedMaster === "ports" });
+  const languagesQuery = useExternalLanguages({ enabled: selectedMaster === "language" });
+  const fleetGroupsQuery = useExternalFleetGroups({ enabled: selectedMaster === "fleetGroup" });
+  const countriesQuery = useExternalCountries({ enabled: selectedMaster === "country" });
+  const manningAgentsQuery = useExternalManningAgents({ enabled: selectedMaster === "manningAgents" });
+  const crewPoolsQuery = useExternalCrewPools({ enabled: selectedMaster === "crewPool" });
+  const appraisalTypesQuery = useExternalAppraisalTypes({ enabled: selectedMaster === "appraisalType" });
+  const usersQuery = useExternalUsers({ enabled: selectedMaster === "users" });
+
+  const queryMap: Record<string, { data: any[]; isLoading: boolean; error: Error | null }> = {
+    nationality: { data: nationalitiesQuery.data || [], isLoading: nationalitiesQuery.isLoading, error: nationalitiesQuery.error },
+    vessel: { data: vesselsQuery.data || [], isLoading: vesselsQuery.isLoading, error: vesselsQuery.error },
+    vesselType: { data: vesselTypesQuery.data || [], isLoading: vesselTypesQuery.isLoading, error: vesselTypesQuery.error },
+    licenseDce: { data: licensesQuery.data || [], isLoading: licensesQuery.isLoading, error: licensesQuery.error },
+    additionalGroup: { data: additionalGroupsQuery.data || [], isLoading: additionalGroupsQuery.isLoading, error: additionalGroupsQuery.error },
+    ports: { data: portsQuery.data || [], isLoading: portsQuery.isLoading, error: portsQuery.error },
+    language: { data: languagesQuery.data || [], isLoading: languagesQuery.isLoading, error: languagesQuery.error },
+    fleetGroup: { data: fleetGroupsQuery.data || [], isLoading: fleetGroupsQuery.isLoading, error: fleetGroupsQuery.error },
+    country: { data: countriesQuery.data || [], isLoading: countriesQuery.isLoading, error: countriesQuery.error },
+    manningAgents: { data: manningAgentsQuery.data || [], isLoading: manningAgentsQuery.isLoading, error: manningAgentsQuery.error },
+    crewPool: { data: crewPoolsQuery.data || [], isLoading: crewPoolsQuery.isLoading, error: crewPoolsQuery.error },
+    appraisalType: { data: appraisalTypesQuery.data || [], isLoading: appraisalTypesQuery.isLoading, error: appraisalTypesQuery.error },
+    users: { data: usersQuery.data || [], isLoading: usersQuery.isLoading, error: usersQuery.error },
+  };
+
+  const currentMaster = masterTypes.find(m => m.id === selectedMaster);
+  const currentQuery = queryMap[selectedMaster];
+  const entries = currentQuery?.data || [];
+  const isLoading = currentQuery?.isLoading || false;
+  const error = currentQuery?.error;
+
+  useEffect(() => {
+    if (entries.length > 0) {
+      console.log(`[DataMasters] ${selectedMaster} sample entry keys:`, Object.keys(entries[0]));
+    }
+  }, [entries, selectedMaster]);
+
+  const getFieldValue = (entry: any, fieldOptions: string[]): string => {
+    for (const field of fieldOptions) {
+      if (entry[field] !== undefined && entry[field] !== null) {
+        return String(entry[field]);
+      }
+    }
+    return '';
+  };
+
+  const getEntryId = (entry: any): string => {
+    if (!currentMaster) return String(entry.id || '');
+    for (const field of currentMaster.idFields) {
+      if (entry[field] !== undefined && entry[field] !== null) {
+        return String(entry[field]);
+      }
+    }
+    const keys = Object.keys(entry);
+    const idKey = keys.find(k => k.toLowerCase().includes('id'));
+    return idKey ? String(entry[idKey] || '') : String(Math.random());
+  };
+
+  const filteredEntries = useMemo(() => {
+    if (!searchTerm || !currentMaster) return entries;
+    const lowerSearch = searchTerm.toLowerCase();
+    return entries.filter((entry: any) => {
+      const id = getEntryId(entry).toLowerCase();
+      if (id.includes(lowerSearch)) return true;
+      return currentMaster.columns.some(col => {
+        const val = getFieldValue(entry, col.fields).toLowerCase();
+        return val.includes(lowerSearch);
+      });
+    });
+  }, [entries, searchTerm, currentMaster]);
+
+   const getMasterIdDisplay = (index: number) => {
+    return `ID:${String(index + 1).padStart(3, '0')}`;
+  };
+
+  const gridTemplateColumns = currentMaster 
+    ? `minmax(100px, 140px) repeat(${currentMaster.columns.length}, minmax(0, 1fr)) minmax(60px, 80px)`
+    : 'minmax(100px, 140px) 1fr 1fr minmax(60px, 80px)';
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
+      </div>
+
+      <div className="relative max-w-sm mb-6">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          type="text"
+          placeholder="Search in selected Data Master"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 bg-white"
+          data-testid="input-search-master"
+        />
+      </div>
+
+      <div className="flex gap-6">
+        <div className="w-80 flex-shrink-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-[#52baf3] text-white px-4 py-3 font-medium text-sm">
+            Data Master Name
+          </div>
+          <ScrollArea className="h-[500px]">
+            {masterTypes.map((master, index) => (
+              <button
+                key={master.id}
+                onClick={() => {
+                  setSelectedMaster(master.id);
+                  setSearchTerm("");
+                }}
+                className={cn(
+                  "w-full px-4 py-3 flex items-center justify-between text-left border-b border-gray-100 hover:bg-gray-50 transition-colors",
+                  selectedMaster === master.id && "bg-blue-50 border-l-4 border-l-[#52baf3]"
+                )}
+                data-testid={`btn-master-${master.id}`}
+              >
+                <span className={cn(
+                  "text-sm",
+                  selectedMaster === master.id ? "text-[#52baf3] font-medium" : "text-gray-700"
+                )}>
+                  {master.name}
+                </span>
+                <span className="text-xs text-gray-400">{getMasterIdDisplay(index)}</span>
+              </button>
+            ))}
+          </ScrollArea>
+        </div>
+
+        <div className="flex-1 min-w-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-[#52baf3] text-white">
+            <div
+              className="font-medium text-sm"
+              style={{ display: 'grid', gridTemplateColumns }}
+            >
+              <div className="px-4 py-3 border-r border-blue-400/30">Entry ID</div>
+              {currentMaster?.columns.map((col, idx) => (
+                <div key={idx} className="px-4 py-3 border-r border-blue-400/30">{col.header}</div>
+              ))}
+              <div className="px-4 py-3">Actions</div>
+            </div>
+          </div>
+          <ScrollArea className="h-[500px]">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-[#52baf3]" />
+                <span className="ml-2 text-gray-500">Loading data...</span>
+              </div>
+            ) : error ? (
+              <div className="px-4 py-8 text-center text-red-500">
+                Failed to load data: {error.message}
+              </div>
+            ) : filteredEntries.length > 0 ? (
+              filteredEntries.map((entry: any, index: number) => (
+                <div
+                  key={getEntryId(entry) || index}
+                  className="border-b border-gray-200 hover:bg-gray-50 text-sm"
+                  style={{ display: 'grid', gridTemplateColumns }}
+                  data-testid={`row-entry-${getEntryId(entry)}`}
+                >
+                  <div className="px-4 py-3 text-gray-600 text-sm break-words border-r border-gray-200">{getEntryId(entry)}</div>
+                  {currentMaster?.columns.map((col, idx) => (
+                    <div key={idx} className="px-4 py-3 text-gray-900 break-words overflow-hidden border-r border-gray-200" title={getFieldValue(entry, col.fields)}>
+                      {getFieldValue(entry, col.fields) || '-'}
+                    </div>
+                  ))}
+                  <div className="px-4 py-3">
+                    <span className="text-gray-400 text-sm">External</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-8 text-center text-gray-500">
+                No entries found
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      </div>
+    </div>
+  );
+}
