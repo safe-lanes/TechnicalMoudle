@@ -1,6 +1,5 @@
-import { useState, useMemo } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +12,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Settings, Ship, Save, X, Calendar, Gauge, AlertCircle, CheckCircle2 } from "lucide-react";
 import type { PmsVesselSettings } from "@shared/schema";
 import { Marker } from "@/components/Marker";
-import { useExternalVessels } from "@/hooks/useExternalMasterData";
 
 interface Vessel {
   id: string;
   name: string;
+  vesselCode?: string;
 }
 
 export default function PmsVesselSettingsManagement() {
@@ -35,18 +34,9 @@ export default function PmsVesselSettingsManagement() {
     rhGraceHours: 168,
   });
 
-  const { data: externalVessels = [], isLoading: isVesselsLoading } = useExternalVessels();
-
-  const vessels: Vessel[] = useMemo(() => {
-    return externalVessels.map((v: any) => {
-      const entryId = v.vuid || v.vesselId || v.id || '';
-      const vesselName = v.vessel || v.vesselName || v.name || '';
-      return {
-        id: String(entryId),
-        name: String(vesselName),
-      };
-    }).filter((v: Vessel) => v.id && v.name);
-  }, [externalVessels]);
+  const { data: vessels = [], isLoading: isVesselsLoading } = useQuery<Vessel[]>({
+    queryKey: ['/technical/api/vessels'],
+  });
 
   const { data: allSettings = [], isLoading: isSettingsLoading } = useQuery<PmsVesselSettings[]>({
     queryKey: ['/technical/api/pms-vessel-settings'],
