@@ -1738,7 +1738,7 @@ const Spares: React.FC = () => {
             <SelectContent>
               {vessels.map(vessel => (
                 <SelectItem key={vessel.id} value={vessel.id}>
-                  {vessel.id} - {vessel.name}
+                  {vessel.name}
                 </SelectItem>
               ))}
             </SelectContent>
