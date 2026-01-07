@@ -730,12 +730,13 @@ const Spares: React.FC = () => {
       if (code.match(/^[1-8]$/)) {
         return;
       }
+      // Spread comp first, then override id/code to use componentCode (not database id)
       const node: ComponentNode = {
+        ...comp,
         id: code,
         code: code,
         name: comp.name,
         parentId: comp.parentId,
-        ...comp,
         children: []
       };
       componentMap.set(node.code, node);
