@@ -1356,7 +1356,8 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Criticality', key: 'criticality', width: 15 },
     { header: 'Is Active', key: 'isActive', width: 12 },
     { header: 'Vessel Code', key: 'vesselCode', width: 15 },
-    // Part A fields - Work Order Form fields (semicolon-separated lists)
+    // Part A fields - Work Order Form fields
+    // Required Spare Parts format: "PartCode1:Quantity1; PartCode2:Quantity2" (e.g., "MV0001-00001:2; MV0001-00002:1")
     { header: 'Required Spare Parts', key: 'requiredSpareParts', width: 40 },
     { header: 'Required Tools', key: 'requiredTools', width: 40 },
     { header: 'PPE Requirements', key: 'ppeRequirements', width: 35 },
@@ -4410,6 +4411,12 @@ async function performImport(
     const allComponentCodes = data.map(row => String(row['Component Code']).trim());
     const componentsByCode = await storage.getComponentsByCodes(allComponentCodes, vesselId);
     
+    // Step 1.6: Prefetch all spares for this vessel to enable spare part linking
+    // This allows parsing "PartCode:Quantity" format and looking up actual spare details
+    const allSpares = vesselId ? await storage.getSpares(vesselId) : [];
+    const sparesByPartCode = new Map(allSpares.map(s => [s.partCode, s]));
+    console.log(`📦 Prefetched ${allSpares.length} spares for spare part linking`);
+    
     // Step 2: Process each row individually with authoritative state capture
     for (const row of data) {
       const componentCode = String(row['Component Code']).trim();
@@ -4517,15 +4524,51 @@ async function performImport(
       };
       
       // Parse spare parts from semicolon-separated string into structured objects
-      // Format: "Part Name 1; Part Name 2" => [{partNo: '', description: 'Part Name 1', quantityRequired: '', remarks: ''}, ...]
+      // NEW FORMAT: "PartCode1:Quantity1; PartCode2:Quantity2" => looks up spare by partCode and fills in details
+      // Example: "MV0001-00001:2; MV0001-00002:1" => [{partNo: '4095', description: 'Brake Spring', quantityRequired: '2', remarks: 'PartCode: MV0001-00001'}, ...]
+      // Falls back to old format if no colon present: "Part Name 1; Part Name 2" => [{partNo: '', description: 'Part Name 1', ...}]
       const parseSpareParts = (value: any): Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> => {
         const items = parseStringList(value);
-        return items.map(item => ({
-          partNo: '',
-          description: item,
-          quantityRequired: '',
-          remarks: ''
-        }));
+        const result: Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> = [];
+        
+        for (const item of items) {
+          // Check if item contains colon (new format: PartCode:Quantity)
+          if (item.includes(':')) {
+            const [partCode, quantityStr] = item.split(':').map(s => s.trim());
+            const quantity = parseInt(quantityStr) || 1;
+            
+            // Look up spare by partCode from prefetched map
+            const spare = sparesByPartCode.get(partCode);
+            if (spare) {
+              result.push({
+                partNo: spare.partNumber || partCode, // Use Part Number for display, fallback to partCode
+                description: spare.partName || '',
+                quantityRequired: String(quantity),
+                remarks: `PartCode: ${partCode}` // Store partCode in remarks for reference
+              });
+              console.log(`✅ Linked spare: ${partCode} (${spare.partName}) x${quantity}`);
+            } else {
+              // Spare not found - still add entry but mark as not found
+              result.push({
+                partNo: partCode,
+                description: `[NOT FOUND: ${partCode}]`,
+                quantityRequired: String(quantity),
+                remarks: `PartCode not found in spares database`
+              });
+              console.warn(`⚠️ Spare not found for PartCode: ${partCode}`);
+            }
+          } else {
+            // Old format: just a description string
+            result.push({
+              partNo: '',
+              description: item,
+              quantityRequired: '',
+              remarks: ''
+            });
+          }
+        }
+        
+        return result;
       };
       
       // Parse tools from semicolon-separated string into structured objects
