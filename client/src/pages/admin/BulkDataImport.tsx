@@ -4,12 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { FileSpreadsheet, Ship, History, Plus } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { FileSpreadsheet, Ship, History } from "lucide-react";
 import MachineryComponentUpload from "./MachineryComponentUpload";
 import JobUpload from "./JobUpload";
 import SparesUpload from "./bulk/SparesUpload";
@@ -21,7 +16,7 @@ import FleetJobsUpload from "./bulk/FleetJobsUpload";
 import FleetSparesUpload from "./bulk/FleetSparesUpload";
 import MasterListsUpload from "./bulk/MasterListsUpload";
 import BulkImportHistory from "./bulk/BulkImportHistory";
-import { useVessels } from "@/hooks/useVessels";
+import { useExternalVessels } from "@/hooks/useExternalMasterData";
 
 type VesselTemplateType = 'machinery' | 'stores' | 'spares' | 'jobs';
 type FleetTemplateType = 'maker-list' | 'master-data' | 'fleet-component' | 'fleet-jobs' | 'fleet-spares' | 'master-list';
@@ -191,59 +186,23 @@ const PAGE_MARKERS_BY_TEMPLATE: Record<VesselTemplateType, PageMarkers> = {
   stores: STORES_PAGE_MARKERS,
 };
 
+// Helper to get Vessel Entry Id from vessel master entry
+const getVesselEntryId = (entry: any): string => {
+  return String(entry.vuid || entry.vesselId || '');
+};
+
+// Helper to get vessel name from vessel master entry
+const getVesselName = (entry: any): string => {
+  return String(entry.vessel || entry.vesselName || entry.name || '');
+};
+
 export default function BulkDataImport() {
-  const { data: vessels = [] } = useVessels();
-  const { toast } = useToast();
+  const { data: vesselMasterEntries = [] } = useExternalVessels();
   const [isFleetMode, setIsFleetMode] = useState(false);
   const [selectedVesselTemplate, setSelectedVesselTemplate] = useState<VesselTemplateType>('machinery');
   const [selectedFleetTemplate, setSelectedFleetTemplate] = useState<FleetTemplateType>('maker-list');
   const [selectedVessel, setSelectedVessel] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('upload');
-  
-  const [isCreateVesselOpen, setIsCreateVesselOpen] = useState(false);
-  const [newVesselId, setNewVesselId] = useState('');
-  const [newVesselName, setNewVesselName] = useState('');
-
-  const createVesselMutation = useMutation({
-    mutationFn: async (data: { id: string; name: string; code: string }) => {
-      const response = await apiRequest('POST', '/technical/api/vessels', data);
-      return response.json();
-    },
-    onSuccess: (vessel) => {
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/vessels'] });
-      setSelectedVessel(vessel.id);
-      setNewVesselId('');
-      setNewVesselName('');
-      setIsCreateVesselOpen(false);
-      toast({
-        title: "Vessel Created",
-        description: `${vessel.name} (${vessel.id}) has been created successfully.`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error Creating Vessel",
-        description: error.message || "Failed to create vessel",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCreateVessel = () => {
-    if (!newVesselId.trim() || !newVesselName.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter both vessel code and name.",
-        variant: "destructive",
-      });
-      return;
-    }
-    createVesselMutation.mutate({
-      id: newVesselId.trim().toUpperCase(),
-      name: newVesselName.trim(),
-      code: newVesselId.trim().toUpperCase(),
-    });
-  };
 
   const vesselTemplates = [
     { id: 'machinery' as VesselTemplateType, number: 1, name: 'Machinery Components' },
@@ -324,79 +283,19 @@ export default function BulkDataImport() {
                       <SelectValue placeholder="Choose vessel..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {vessels.map((vessel) => (
-                        <SelectItem key={vessel.id} value={vessel.id} data-testid={`vessel-${vessel.id}`}>
-                          {vessel.id} - {vessel.name}
-                        </SelectItem>
-                      ))}
+                      {vesselMasterEntries
+                        .filter((entry: any) => getVesselEntryId(entry))
+                        .map((entry: any) => {
+                          const entryId = getVesselEntryId(entry);
+                          const vesselName = getVesselName(entry);
+                          return (
+                            <SelectItem key={entryId} value={entryId} data-testid={`vessel-${entryId}`}>
+                              {vesselName}
+                            </SelectItem>
+                          );
+                        })}
                     </SelectContent>
                   </Select>
-                  
-                  {/* Create Vessel Dialog */}
-                  <Dialog open={isCreateVesselOpen} onOpenChange={setIsCreateVesselOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="gap-1"
-                        data-testid={currentMarkers.newVesselButton}
-                      >
-                        <Plus className="h-4 w-4" />
-                        New Vessel
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create New Vessel</DialogTitle>
-                        <DialogDescription>
-                          Enter the vessel code and name to create a new vessel.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="vessel-code">Vessel Code</Label>
-                          <Input
-                            id="vessel-code"
-                            placeholder="e.g., V001"
-                            value={newVesselId}
-                            onChange={(e) => setNewVesselId(e.target.value)}
-                            data-testid="input-vessel-code"
-                            autoComplete="off"
-                          />
-                          <p className="text-xs text-gray-500">
-                            Unique identifier for the vessel (e.g., V001, V002)
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="vessel-name">Vessel Name</Label>
-                          <Input
-                            id="vessel-name"
-                            placeholder="e.g., MV Pacific Star"
-                            value={newVesselName}
-                            onChange={(e) => setNewVesselName(e.target.value)}
-                            data-testid="input-vessel-name"
-                            autoComplete="off"
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setIsCreateVesselOpen(false)}
-                          data-testid="button-cancel-create-vessel"
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={handleCreateVessel}
-                          disabled={createVesselMutation.isPending}
-                          data-testid="button-confirm-create-vessel"
-                        >
-                          {createVesselMutation.isPending ? 'Creating...' : 'Create Vessel'}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
                 </div>
               </>
             )}
