@@ -1104,15 +1104,16 @@ const Spares: React.FC = () => {
 
   // Helper function to check if a component matches selection (including children)
   const isComponentMatch = (spare: any, selectedId: string): boolean => {
-    // Check primary componentCode
-    const spareCode = spare.componentCode || spare.componentId || '';
+    // Check primary componentCode (try both camelCase and snake_case)
+    const spareCode = spare.componentCode || spare.component_code || spare.componentId || '';
     if (spareCode === selectedId) return true;
     if (typeof spareCode === 'string' && spareCode.startsWith(selectedId + '.')) return true;
     
     // Check linkedComponents array for multi-linked spares
     const linkedComponents = spare.linkedComponents || [];
     for (const linked of linkedComponents) {
-      const linkedCode = linked?.componentCode;
+      // API may return snake_case (component_code) or camelCase (componentCode)
+      const linkedCode = linked?.componentCode || linked?.component_code;
       if (!linkedCode || typeof linkedCode !== 'string') continue;
       if (linkedCode === selectedId) return true;
       if (linkedCode.startsWith(selectedId + '.')) return true;
