@@ -1327,12 +1327,15 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
     queryKey: ['/technical/api/components'],
   });
   
-  const getActualComponentId = (code: string): string | undefined => {
-    const comp = allComponents.find((c: any) => (c.componentCode || c.code) === code);
+  const getActualComponentId = (code: string, targetVesselId: string): string | undefined => {
+    const comp = allComponents.find((c: any) => 
+      ((c.componentCode || c.code) === code) && 
+      ((c.vesselId || c.vesselCode) === targetVesselId)
+    );
     return comp?.id;
   };
   
-  const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code) : undefined;
+  const selectedActualId = selectedComponent ? getActualComponentId(selectedComponent.code, vesselId) : undefined;
   
   const { data: sparesWithInventory = [], isLoading: sparesLoading } = useQuery<SpareWithInventoryData[]>({
     queryKey: ['/technical/api/inventory/spares-by-component', selectedActualId],
