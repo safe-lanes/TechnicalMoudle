@@ -1106,6 +1106,18 @@ const Spares: React.FC = () => {
   const isComponentMatch = (spare: any, selectedId: string): boolean => {
     // Check primary componentCode (try both camelCase and snake_case)
     const spareCode = spare.componentCode || spare.component_code || spare.componentId || '';
+    
+    // Debug logging for first few spares
+    if (spare.partCode?.includes('05484') || spare.partCode?.includes('05485')) {
+      console.log('[SPARE_MATCH]', {
+        partCode: spare.partCode,
+        spareCode,
+        selectedId,
+        linkedComponents: spare.linkedComponents,
+        match: spareCode === selectedId || spareCode.startsWith(selectedId + '.')
+      });
+    }
+    
     if (spareCode === selectedId) return true;
     if (typeof spareCode === 'string' && spareCode.startsWith(selectedId + '.')) return true;
     
@@ -1125,6 +1137,12 @@ const Spares: React.FC = () => {
   // Filter spares based on all criteria
   const filteredSpares = useMemo(() => {
     let filtered = sparesData;
+    
+    console.log('[SPARES_FILTER] Starting filter:', { 
+      total: sparesData.length, 
+      selectedComponentId,
+      sampleSpare: sparesData[0] ? { partCode: sparesData[0].partCode, componentCode: sparesData[0].componentCode } : null
+    });
 
     // Filter by selected component (including children)
     if (selectedComponentId) {
