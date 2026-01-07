@@ -931,33 +931,14 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     enabled: !!vesselId,
   });
   
-  // Get all components to find children (also filtered by vessel)
-  const { data: allComponents = [] } = useQuery<any[]>({
-    queryKey: [`/technical/api/components?vesselId=${vesselId}`],
-    enabled: !!vesselId,
-  });
-  
-  // Find all child component codes recursively
-  const getAllChildCodes = (parentCode: string): string[] => {
-    const children = allComponents.filter(c => c.parentId === parentCode);
-    const childCodes = children.map(c => c.componentCode);
-    const descendantCodes = children.flatMap(c => getAllChildCodes(c.componentCode));
-    return [...childCodes, ...descendantCodes];
-  };
-  
-  // Get component codes to include (parent + all children)
-  const relevantComponentCodes = [componentCode, ...getAllChildCodes(componentCode)];
-  
-  // Filter jobs for this component AND all its children
-  // MANY-TO-MANY: Use linkedComponentCodes array (from junction table) instead of deprecated componentCode
+  // Filter jobs ONLY for this exact component (no child inheritance)
+  // MANY-TO-MANY: Use linkedComponentCodes array (from junction table) plus deprecated componentCode for backwards compatibility
   const jobs = allJobs.filter(job => {
     const linkedCodes: string[] = job.linkedComponentCodes || [];
-    // Include the deprecated componentCode as fallback for backwards compatibility
-    const allJobCodes = job.componentCode && !linkedCodes.includes(job.componentCode) 
-      ? [...linkedCodes, job.componentCode] 
-      : linkedCodes;
-    // Check if any of the job's linked component codes match our relevant codes
-    return allJobCodes.some(code => relevantComponentCodes.includes(code));
+    // Always include the deprecated componentCode as fallback for backwards compatibility
+    const allJobCodes = job.componentCode ? [...linkedCodes, job.componentCode] : linkedCodes;
+    // Check if any of the job's linked component codes match EXACTLY this component code
+    return allJobCodes.includes(componentCode);
   });
   
   // Check URL parameter to navigate to job page when returning from Maintenance Records
