@@ -94,6 +94,31 @@ export async function ensureMaintenanceHistoryImmutability(): Promise<void> {
   }
 }
 
+/**
+ * Run index migrations to update unique constraints to include vessel_id.
+ * This ensures each vessel has independent records with the same codes.
+ */
+async function runIndexMigrations(db: any): Promise<void> {
+  console.log('🔄 Running index migrations...');
+  
+  try {
+    // Migration: Update spares unique constraint to include vessel_id
+    // Drop old constraint (without vessel_id) and create new index (with vessel_id)
+    await db.execute(sql`ALTER TABLE spares DROP CONSTRAINT IF EXISTS unique_fleet_part_code`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
+    
+    // Migration: Update work_orders unique constraint to include vessel_id
+    // Drop old constraint (without vessel_id) and create new index (with vessel_id)
+    await db.execute(sql`ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS unique_fleet_job_code`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_job_code_vessel ON work_orders(fleet_job_code, data_scope, vessel_id)`);
+    
+    console.log('✅ Index migrations completed - unique constraints now include vessel_id');
+  } catch (error: any) {
+    console.error('⚠️ Index migration warning:', error.message);
+    // Don't throw - these are non-critical migrations that might already be applied
+  }
+}
+
 export async function initializeDatabase() {
   try {
     // Lazy load database client using resolver
@@ -116,9 +141,13 @@ export async function initializeDatabase() {
     const tableNames = (tablesQuery.rows as any[]).map(r => r.table_name);
     console.log(`📊 Found ${tableNames.length} existing tables:`, tableNames);
     
-    // If tables already exist, we're done
+    // If tables already exist, run migrations and return
     if (tableNames.length > 0 && tableNames.includes('users')) {
       console.log('✅ Database already initialized');
+      
+      // Run index migrations to update unique constraints to include vessel_id
+      await runIndexMigrations(db);
+      
       return true;
     }
     
@@ -307,7 +336,7 @@ export async function initializeDatabase() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_spare_code ON spares(vessel_id, component_spare_code)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_spare_data_scope ON spares(data_scope)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_spare_fleet_equipment ON spares(data_scope, fleet_equipment_code)`);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code ON spares(fleet_part_code, data_scope)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_fleet_part_code_vessel ON spares(fleet_part_code, data_scope, vessel_id)`);
     
     // 5. Defects table
     await db.execute(sql`

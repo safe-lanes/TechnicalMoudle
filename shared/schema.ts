@@ -423,7 +423,7 @@ export const spares = pgTable("spares", {
   componentSpareCodeIdx: index("idx_spare_code").on(table.vesselId, table.componentSpareCode),
   dataScopeIdx: index("idx_spare_data_scope").on(table.dataScope),
   fleetEquipmentCodeIdx: index("idx_spare_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
-  fleetPartCodeUniqueIdx: unique("unique_fleet_part_code").on(table.fleetPartCode, table.dataScope),
+  fleetPartCodeUniqueIdx: unique("unique_fleet_part_code_vessel").on(table.fleetPartCode, table.dataScope, table.vesselId),
 }));
 
 export const insertSpareSchema = createInsertSchema(spares).omit({
@@ -917,7 +917,7 @@ export const workOrders = pgTable("work_orders", {
   templateCodeIdx: index("idx_wo_template").on(table.templateCode),
   dataScopeIdx: index("idx_wo_data_scope").on(table.dataScope),
   fleetEquipmentCodeIdx: index("idx_wo_fleet_equipment").on(table.dataScope, table.fleetEquipmentCode),
-  fleetJobCodeUniqueIdx: unique("unique_fleet_job_code").on(table.fleetJobCode, table.dataScope),
+  fleetJobCodeUniqueIdx: unique("unique_fleet_job_code_vessel").on(table.fleetJobCode, table.dataScope, table.vesselId),
   // Index for cycle-based duplicate protection (job_id + cycle_due)
   jobIdCycleRhIdx: index("idx_wo_job_cycle_rh").on(table.jobId, table.cycleDueRhSnapshot),
   jobIdCycleDateIdx: index("idx_wo_job_cycle_date").on(table.jobId, table.cycleDueDateSnapshot),
