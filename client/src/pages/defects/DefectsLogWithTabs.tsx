@@ -106,33 +106,21 @@ const HtmlTextCellRenderer = (params: ICellRendererParams) => {
   const plainText = stripHtmlTags(params.value);
   
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div 
-            className="line-clamp-2 text-[13px] text-[#4f5863] cursor-default leading-tight py-1"
-            style={{ 
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'normal',
-              wordBreak: 'break-word'
-            }}
-          >
-            {plainText}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent 
-          side="bottom" 
-          sideOffset={5}
-          className="max-w-[400px] whitespace-pre-wrap text-sm z-[9999]"
-        >
-          <p>{plainText}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div 
+      className="line-clamp-2 text-[13px] text-[#4f5863] cursor-default leading-tight py-1"
+      title={plainText}
+      style={{ 
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'normal',
+        wordBreak: 'break-word'
+      }}
+    >
+      {plainText}
+    </div>
   );
 };
 
