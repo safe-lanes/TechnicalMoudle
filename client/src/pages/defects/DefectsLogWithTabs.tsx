@@ -333,7 +333,7 @@ export default function DefectsLogWithTabs() {
       {/* Header and Filters Container */}
       <div className="pt-2 px-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2 gap-4">
+        <div className="flex items-center justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
           <div className="flex items-center gap-3">
             <Button
