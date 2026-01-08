@@ -93,6 +93,48 @@ const CategoryCellRenderer = (params: ICellRendererParams) => {
   );
 };
 
+const stripHtmlTags = (html: string | null | undefined): string => {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+};
+
+const HtmlTextCellRenderer = (params: ICellRendererParams) => {
+  if (!params.colDef) return null;
+  
+  const plainText = stripHtmlTags(params.value);
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div 
+            className="line-clamp-2 text-[13px] text-[#4f5863] cursor-default leading-tight py-1"
+            style={{ 
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'normal',
+              wordBreak: 'break-word'
+            }}
+          >
+            {plainText}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="max-w-[400px] whitespace-pre-wrap text-sm"
+        >
+          <p>{plainText}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
   if (!params.colDef || !params.data) return null;
   
@@ -311,7 +353,9 @@ export default function DefectsLogWithTabs() {
       headerName: 'Description',
       field: 'description',
       flex: 1.5,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellRenderer: HtmlTextCellRenderer,
+      autoHeight: true,
+      wrapText: true,
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true
@@ -320,7 +364,9 @@ export default function DefectsLogWithTabs() {
       headerName: 'Action Taken / Requested',
       field: 'actionTakenRequested',
       flex: 1.5,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      cellRenderer: HtmlTextCellRenderer,
+      autoHeight: true,
+      wrapText: true,
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true
