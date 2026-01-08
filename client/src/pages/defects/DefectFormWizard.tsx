@@ -382,8 +382,9 @@ export default function DefectFormWizard({
 
   return (
     <div className="flex flex-col min-h-full bg-[#f5f5f5]">
-      {/* Top Bar - Buttons only on right - matching Near Miss */}
-      <div className="h-16 px-8 flex items-center justify-end bg-white border-b border-gray-200">
+      {/* Fixed Header - Title on left, buttons on right */}
+      <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200 sticky top-0 z-50">
+        <h1 className="text-lg font-semibold text-gray-900">{getTitle()}</h1>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -419,11 +420,11 @@ export default function DefectFormWizard({
 
       {/* Main layout with sidebar and content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Title and all steps */}
-        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-8">
-          {/* Defect Report Title in Sidebar */}
-          <div className="px-6 py-4 mb-2">
-            <h1 className="text-xl font-semibold text-gray-900">{getTitle()}</h1>
+        {/* Left Sidebar - Title and Steps */}
+        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-4">
+          {/* Sidebar Title */}
+          <div className="px-6 py-3 mb-2">
+            <h2 className="text-base font-semibold text-gray-900">{getTitle()}</h2>
           </div>
 
           {/* Step 1 */}
