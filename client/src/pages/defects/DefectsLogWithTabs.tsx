@@ -31,7 +31,7 @@ import {
 import { useLocation } from "wouter";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
-import NewDefectModal from "./NewDefectModal";
+import DefectModal from "./DefectModal";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -65,6 +65,14 @@ export default function DefectsLogWithTabs() {
     linkedDefects: []
   });
   const [newDefectModalOpen, setNewDefectModalOpen] = useState(false);
+  const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
+  const [editModal, setEditModal] = useState<{ open: boolean; defectId: string | null }>({ 
+    open: false, 
+    defectId: null 
+  });
 
   // Query for defects
   const { data: activeDefects = [], isLoading: isLoadingActive } = useQuery({
@@ -290,14 +298,14 @@ export default function DefectsLogWithTabs() {
   
   // Action handlers
   const handleView = (defectId: string) => {
-    setLocation(`/defects/view/${defectId}`);
+    setViewModal({ open: true, defectId });
   };
   
   const handleEdit = (defectId: string) => {
     if (!canEdit()) {
       return; // Could show a toast here for insufficient permissions
     }
-    setLocation(`/defects/edit/${defectId}`);
+    setEditModal({ open: true, defectId });
   };
   
   const handleAddNote = (defectId: string) => {
@@ -796,13 +804,37 @@ export default function DefectsLogWithTabs() {
         />
       )}
 
-      <NewDefectModal
-        isOpen={newDefectModalOpen}
+      <DefectModal
+        open={newDefectModalOpen}
         onClose={() => {
           setNewDefectModalOpen(false);
           queryClient.invalidateQueries({ queryKey: ['defects'] });
         }}
+        mode="new"
       />
+
+      {viewModal.defectId && (
+        <DefectModal
+          open={viewModal.open}
+          onClose={() => {
+            setViewModal({ open: false, defectId: null });
+          }}
+          defectId={viewModal.defectId}
+          mode="view"
+        />
+      )}
+
+      {editModal.defectId && (
+        <DefectModal
+          open={editModal.open}
+          onClose={() => {
+            setEditModal({ open: false, defectId: null });
+            queryClient.invalidateQueries({ queryKey: ['defects'] });
+          }}
+          defectId={editModal.defectId}
+          mode="edit"
+        />
+      )}
     </div>
   );
 }

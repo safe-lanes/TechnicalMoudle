@@ -28,8 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import DefectFormExact from "./DefectFormExact";
-import ViewDefectModal from "./ViewDefectModal";
-import EditDefectModal from "./EditDefectModal";
+import DefectModal from "./DefectModal";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import DefectFormWizard from "./DefectFormWizard";
@@ -528,18 +527,20 @@ export default function DefectsLog() {
       
       {/* Modals */}
       {viewModal.defectId && (
-        <ViewDefectModal
+        <DefectModal
           open={viewModal.open}
           onClose={() => setViewModal({ open: false, defectId: null })}
           defectId={viewModal.defectId}
+          mode="view"
         />
       )}
       
       {editModal.defectId && (
-        <EditDefectModal
+        <DefectModal
           open={editModal.open}
           onClose={() => setEditModal({ open: false, defectId: null })}
           defectId={editModal.defectId}
+          mode="edit"
         />
       )}
       
