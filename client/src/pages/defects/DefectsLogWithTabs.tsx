@@ -108,7 +108,6 @@ const HtmlTextCellRenderer = (params: ICellRendererParams) => {
   return (
     <div 
       className="line-clamp-2 text-[13px] text-[#4f5863] cursor-default leading-tight py-1"
-      title={plainText}
       style={{ 
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -356,7 +355,8 @@ export default function DefectsLogWithTabs() {
       wrapText: true,
       filter: 'agTextColumnFilter',
       sortable: true,
-      resizable: true
+      resizable: true,
+      tooltipValueGetter: (params) => stripHtmlTags(params.value)
     },
     {
       headerName: 'Action Taken / Requested',
@@ -367,7 +367,8 @@ export default function DefectsLogWithTabs() {
       wrapText: true,
       filter: 'agTextColumnFilter',
       sortable: true,
-      resizable: true
+      resizable: true,
+      tooltipValueGetter: (params) => stripHtmlTags(params.value)
     },
     {
       headerName: 'Target Date',

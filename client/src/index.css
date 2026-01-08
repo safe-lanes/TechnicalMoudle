@@ -74,6 +74,21 @@
   padding-bottom: 4px;
 }
 
+/* AG Grid Tooltip styling - match table text size */
+.ag-tooltip {
+  font-size: 13px !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  background-color: #1f2937 !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  max-width: 400px !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  line-height: 1.4 !important;
+  z-index: 99999 !important;
+}
+
 /* Compact wrapped text in cells */
 .ag-theme-alpine .ag-cell-wrapper {
   line-height: 1.3;
