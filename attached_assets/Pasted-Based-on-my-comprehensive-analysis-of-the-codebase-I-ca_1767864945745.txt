@@ -1,0 +1,78 @@
+Based on my comprehensive analysis of the codebase, I can now provide you with a detailed analysis of the work order creation flow during job bulk upload.
+Analysis: Missing Work Order Insert on Job Bulk Upload
+1. Code Path for Work Order Creation During Bulk Job Upload
+Key Finding: Work orders are NOT directly created during job bulk upload.
+The bulk upload flow in server/routes/bulk.ts (lines 4402-4833) only:
+Creates/updates jobs via storage.createJob() or storage.updateJob()
+Creates job-component links via storage.createJobComponentLink()
+Does NOT call any work order creation function
+Work orders are generated separately by the JobDueScannerService (server/services/jobDueScanner.ts), which runs:
+On scheduler startup (immediate scan)
+Periodically every 1 minute via setInterval
+Through manual trigger via API
+2. Work Order Generation Triggers
+There are 3 triggers for work order creation:
+Trigger	Service	When It Runs
+Trigger 1: RH-based	JobDueScannerService.processRunningHoursJobs()	Scheduled scan (1 min interval)
+Trigger 2: Calendar-based	WorkOrderService.autoGenerateWorkOrdersFromJobs()	Scheduled scan (1 min interval)
+Trigger 3: Manual	JobDueScannerService.generateWorkOrderForJob()	User clicks "Generate WO" button
+3. Mandatory Conditions for Work Order Generation
+For Calendar-based Jobs (Trigger 2):
+1. job.maintenanceBasis === 'Calendar'2. job.isActive !== false3. job.nextDueDate exists and is valid4. TODAY >= GENERATE_DATE (where GENERATE_DATE = DUE_DATE - lead_time_days)5. NO blocking work order exists for this job (status: Due, Overdue, Pending Approval, Postponed, etc.)6. NO work order exists for the same cycle (jobNo + dueDateStr)7. componentCode exists
+For Running Hours-based Jobs (Trigger 1):
+1. job.maintenanceBasis === 'Running Hours'2. job.isActive !== false3. job.intervalRunningHour > 04. component.rhCounterType === 'MASTER' or 'INHERITED'5. RH_effective_current >= RH_generate (where RH_generate = RH_due - lead_time_rh)6. NO blocking work order exists for this job7. NO work order exists for the same cycle (jobNo + rhDue)8. componentCode exists
+4. All Skip Paths (Reasons WO Creation Is Skipped)
+#	Skip Condition	Log Message
+1	job.nextDueDate is null/invalid	Silent skip
+2	today < generateDate (not yet time)	Silent skip
+3	Active WO exists for job (by jobId)	Silent skip
+4	Active WO exists for job (by jobNo fallback)	Silent skip
+5	WO already exists for this cycle (cycleKey)	Silent skip
+6	componentCode is missing	⚠️ No component code for calendar job {jobNo}
+7	PMS Vessel Settings not configured	Uses 0 lead time (may affect timing)
+8	RH counter type is not MASTER/INHERITED	Silent skip
+9	Effective RH < generate threshold	Silent skip
+5. Bulk Upload vs Manual Job Creation
+Aspect	Bulk Upload	Manual Creation
+Job Created By	storage.createJob()	jobService.createJob()
+Work Order Created	NO - relies on scheduler	NO - relies on scheduler
+nextDueDate Calculation	Done inline in bulk.ts	Done in jobService.createJob()
+Trigger for WO	JobDueScanner periodic scan	Same - JobDueScanner
+Both paths use the same WO generation logic - the JobDueScannerService scans all jobs periodically.
+6. Most Likely Root Causes for DEV-Only Failure
+🔴 Primary Suspect: JobDueScannerService Not Running on DEV
+The scanner starts via jobDueScanner.start() which must be called in the server initialization. If:
+The scanner is not started on DEV
+The scanner interval is different (or never runs)
+The scanner encounters an error and stops
+Then work orders will never be generated even though jobs are created correctly.
+Check: Look for [JobDueScanner] Starting scheduler in DEV logs.
+🟡 Secondary Suspect: PMS Vessel Settings Missing on DEV
+// workOrderService.ts line 286-288const settings = await storage.getPmsVesselSettings(vId);settingsCache.set(vId, settings || null);return settings || null;
+If pms_vessel_settings table has no record for the vessel on DEV:
+Lead time defaults to 0 (not necessarily a problem)
+But this could affect timing calculations
+Check: Verify pms_vessel_settings table has records for the vessel on DEV.
+🟡 Tertiary Suspect: Date/Timezone Differences
+// workOrderService.ts line 309-310const today = new Date();today.setHours(0, 0, 0, 0); // Normalize to start of day
+If DEV server is in a different timezone:
+new Date() could yield a different date
+Jobs that are "due today" locally might not be "due" on DEV server time
+🟡 Quaternary Suspect: nextDueDate Not Calculated/Stored
+During bulk upload, nextDueDate is calculated inline:
+// bulk.ts line 4457-4460if (maintenanceBasis === 'Calendar' && lastDoneDate && frequencyValue && frequencyUnit) {  nextDueDate = calculateNextDueDate(lastDoneDate, frequencyValue, frequencyUnit);}
+If any of these are missing/invalid:
+lastDoneDate is null or invalid format
+frequencyValue is null or 0
+frequencyUnit is null or invalid
+Then nextDueDate will be null and the job will be skipped during WO generation.
+Summary
+Location	Issue
+server/routes/bulk.ts	Creates jobs only, does NOT create work orders
+server/services/jobDueScanner.ts	Creates work orders via periodic scan
+Most likely cause	JobDueScanner not running or not started on DEV
+Proposed Fix Approach (Pending Your Confirmation)
+Verify JobDueScanner is starting on DEV - Check server initialization code and logs
+Add explicit logging to bulk upload route to confirm jobs have valid nextDueDate after creation
+Optional Enhancement: Add a synchronous work order generation call at the end of job bulk upload (not just relying on the periodic scanner)
+Would you like me to proceed with any of these investigation/fix approaches?
