@@ -494,8 +494,11 @@ export default function DefectFormWizard({
                   <h2 className="text-lg font-bold text-[#1976d2]">Reporting</h2>
                   <p className="text-sm text-cyan-600 mt-1">Part A - Describe what happened</p>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 flex items-center gap-2">
                   <span className="font-normal">Report ID :</span>
+                  <span className="font-semibold text-gray-800" data-testid="text-report-id">
+                    {currentDefect?.id || (mode === 'new' ? 'Auto-generated on save' : '')}
+                  </span>
                 </div>
               </div>
 
