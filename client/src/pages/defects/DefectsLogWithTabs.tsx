@@ -329,9 +329,9 @@ export default function DefectsLogWithTabs() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-6 py-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-6 pt-2 pb-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 gap-4">
+      <div className="flex items-center justify-between mb-2 gap-4">
         <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
         <div className="flex items-center gap-3">
           <Button
