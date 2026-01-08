@@ -365,8 +365,8 @@ export default function DefectsLogWithTabs() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="pt-2 px-4">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="pt-2 px-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-4 gap-4">
           <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
           <div className="flex items-center gap-3">
@@ -483,37 +483,43 @@ export default function DefectsLogWithTabs() {
         )}
       </div>
 
-      <div className="px-4">
+      <div className="px-4 flex-1 flex flex-col min-h-0">
         {isLoading ? (
           <div className="text-center py-8 text-gray-500">Loading defects...</div>
         ) : (
           <>
-            <AgGridTable
-              rowData={defects}
-              columnDefs={columnDefs}
-              onGridReady={onGridReady}
-              enableSideBar={true}
-              enableStatusBar={true}
-              enableRowGrouping={true}
-              autoHeight={true}
-              maxHeight="calc(100vh - 280px)"
-              context={{
-                handleViewClick,
-                handleEditClick,
-                handleLinkClick,
-                handleDeleteClick,
-                canEdit,
-                canLink
-              }}
-            />
+            <div className="flex-1 min-h-0">
+              <AgGridTable
+                rowData={defects}
+                columnDefs={columnDefs}
+                onGridReady={onGridReady}
+                enableSideBar={true}
+                enableStatusBar={true}
+                enableRowGrouping={true}
+                height="100%"
+                gridOptions={{
+                  domLayout: 'normal'
+                }}
+                context={{
+                  handleViewClick,
+                  handleEditClick,
+                  handleLinkClick,
+                  handleDeleteClick,
+                  canEdit,
+                  canLink
+                }}
+              />
+            </div>
             
-            <AgGridTableActions
-              gridApi={gridApi}
-              exportFilename="defects_log"
-              showExportButtons={true}
-              showFilterButtons={true}
-              showGroupButtons={true}
-            />
+            <div className="flex-shrink-0 py-2">
+              <AgGridTableActions
+                gridApi={gridApi}
+                exportFilename="defects_log"
+                showExportButtons={true}
+                showFilterButtons={true}
+                showGroupButtons={true}
+              />
+            </div>
           </>
         )}
       </div>
