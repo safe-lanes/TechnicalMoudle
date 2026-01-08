@@ -50,6 +50,7 @@ interface ComponentNode {
   id: string;
   code: string;
   name: string;
+  actualId?: string; // The actual database UUID for API calls
   children?: ComponentNode[];
   isExpanded?: boolean;
   critical?: boolean;
@@ -2049,6 +2050,7 @@ const Components: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["A", "B", "C", "D", "E", "F", "G", "H"]));
   const [isComponentFormOpen, setIsComponentFormOpen] = useState(false);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
+  const [editingComponentCode, setEditingComponentCode] = useState<string | null>(null);
   const [showReviewDrawer, setShowReviewDrawer] = useState(false);
   const [showModifySubmitFooter, setShowModifySubmitFooter] = useState(false);
   const [modifiedComponentData, setModifiedComponentData] = useState<any>(null);
@@ -2113,8 +2115,9 @@ const Components: React.FC = () => {
       }
       const node: ComponentNode = {
         ...comp,  // Include all component data FIRST
-        id: code,  // Override with componentCode
+        id: code,  // Override with componentCode for tree display
         code: code,  // Override with componentCode
+        actualId: comp.id,  // Preserve the actual database UUID for API calls
         name: comp.name,
         critical: comp.critical === "Yes" || comp.critical === true,  // Normalize to boolean
         children: []
@@ -2629,13 +2632,13 @@ const Components: React.FC = () => {
       reason: 'Component modification request',  // Required field
       requestedByUserId: 'current_user',  // Required field
       targetType: 'component',
-      targetId: selectedComponent.id,
+      targetId: selectedComponent.actualId || selectedComponent.id,  // Use actual database ID
       snapshotBeforeJson: {
         displayKey: selectedComponent.code,
         displayName: selectedComponent.name,
         displayPath: `${selectedComponent.code} ${selectedComponent.name}`,
         fields: {
-          id: selectedComponent.id,
+          id: selectedComponent.actualId || selectedComponent.id,  // Use actual database ID
           code: selectedComponent.code,
           name: selectedComponent.name,
           maker: "",
@@ -2697,11 +2700,13 @@ const Components: React.FC = () => {
         onBack={() => {
           setShowAddEditFullPage(false);
           setEditingComponentId(null);
+          setEditingComponentCode(null);
         }}
         componentId={editingComponentId}
+        componentCode={editingComponentCode}
         parentComponent={!editingComponentId && selectedComponent ? {
           code: selectedComponent.code,
-          id: selectedComponent.id,
+          id: selectedComponent.actualId || selectedComponent.id,
           name: selectedComponent.name
         } : undefined}
       />
@@ -2766,6 +2771,7 @@ const Components: React.FC = () => {
               className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
               onClick={() => {
                 setEditingComponentId(null);
+                setEditingComponentCode(null);
                 setShowAddEditFullPage(true);
               }}
               data-testid="B5"
@@ -2852,7 +2858,9 @@ const Components: React.FC = () => {
                       variant="outline"
                       className="text-[#52baf3] border-[#52baf3] hover:bg-[#52baf3] hover:text-white"
                       onClick={() => {
-                        setEditingComponentId(selectedComponent.id);
+                        // Use actualId (database UUID) for API calls, and code for tree selection
+                        setEditingComponentId(selectedComponent.actualId || selectedComponent.id);
+                        setEditingComponentCode(selectedComponent.code);
                         setShowAddEditFullPage(true);
                       }}
                       data-testid="B7.2"
@@ -3026,6 +3034,7 @@ const Components: React.FC = () => {
           onClose={() => {
             setIsComponentFormOpen(false);
             setEditingComponentId(null);
+            setEditingComponentCode(null);
             // If in change mode and closing without submitting, go back to ModifyPMS
             if (isChangeMode) {
               exitChangeRequestMode();
@@ -3036,7 +3045,7 @@ const Components: React.FC = () => {
           componentId={editingComponentId}
           parentComponent={!editingComponentId && selectedComponent ? { 
             code: selectedComponent.code, 
-            id: selectedComponent.id, 
+            id: selectedComponent.actualId || selectedComponent.id, 
             name: selectedComponent.name 
           } : undefined}
         />
@@ -3048,7 +3057,7 @@ const Components: React.FC = () => {
           isOpen={showReviewDrawer}
           onClose={() => setShowReviewDrawer(false)}
           targetType="component"
-          targetId={selectedComponent.id}
+          targetId={selectedComponent.actualId || selectedComponent.id}
         />
       )}
       

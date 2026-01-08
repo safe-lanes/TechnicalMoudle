@@ -29,13 +29,15 @@ interface ComponentNode {
 
 interface ComponentRegisterAddEditProps {
   onBack: () => void;
-  componentId?: string | null;
+  componentId?: string | null;  // Database UUID for API calls
+  componentCode?: string | null; // Component code for tree selection
   parentComponent?: { code: string; id: string; name: string } | null;
 }
 
 export default function ComponentRegisterAddEdit({
   onBack,
   componentId,
+  componentCode: propComponentCode,
   parentComponent,
 }: ComponentRegisterAddEditProps) {
   const { toast } = useToast();
@@ -54,12 +56,16 @@ export default function ComponentRegisterAddEdit({
   
   const isEditMode = isEditModeFromProp || (!!selectedComponentId && !isMainCategoryCheck(selectedComponentId));
 
-  // Initialize selectedTreeNode from parentComponent prop if provided
+  // Initialize selectedTreeNode from propComponentCode (for editing) or parentComponent (for adding)
   useEffect(() => {
-    if (parentComponent?.code && !componentId) {
+    if (propComponentCode && componentId) {
+      // Editing mode - select the component being edited
+      setSelectedTreeNode(propComponentCode);
+    } else if (parentComponent?.code && !componentId) {
+      // Adding mode - select the parent
       setSelectedTreeNode(parentComponent.code);
     }
-  }, [parentComponent?.code, componentId]);
+  }, [propComponentCode, parentComponent?.code, componentId]);
 
   const [componentData, setComponentData] = useState({
     // Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code
@@ -411,7 +417,35 @@ export default function ComponentRegisterAddEdit({
         rhCounterSource: comp.rhCounterSource || "",
         lastUpdated: comp.lastUpdated || comp.rhLastUpdated || "",
       });
-      setSelectedTreeNode(comp.id);
+      // Use propComponentCode if provided (passed from parent), otherwise use fetched comp.componentCode
+      const compCode = propComponentCode || comp.componentCode || comp.id;
+      setSelectedTreeNode(compCode);
+      
+      // Auto-expand parent nodes by traversing the parent chain
+      const partsToExpand = new Set<string>();
+      
+      // Traverse parent chain using parentId from database
+      // Find all ancestors by walking through components
+      let currentParentId = comp.parentId;
+      const visitedParents = new Set<string>();
+      while (currentParentId && !visitedParents.has(currentParentId)) {
+        visitedParents.add(currentParentId);
+        partsToExpand.add(currentParentId);
+        // Find the parent component to get its parentId
+        const parentComp = components.find((c: any) => 
+          c.componentCode === currentParentId || c.id === currentParentId
+        );
+        currentParentId = parentComp?.parentId || null;
+      }
+      
+      // Always ensure the main category (1-8) is expanded
+      // Main categories are single digit codes that match the first digit of component codes
+      const mainCategory = compCode.match(/^([1-8])/)?.[1];
+      if (mainCategory) {
+        partsToExpand.add(mainCategory);
+      }
+      
+      setExpandedNodes(prev => new Set([...Array.from(prev), ...Array.from(partsToExpand)]));
 
       const componentJobs = allJobs.filter(j => j.componentCode === comp.componentCode);
       setWorkOrders(componentJobs.map(job => ({
@@ -433,7 +467,7 @@ export default function ComponentRegisterAddEdit({
         location: spare.location || "Store Room A",
       })));
     }
-  }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId]);
+  }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId, propComponentCode, components]);
 
   // Auto-update eqptSystemCategory when componentCode changes
   useEffect(() => {
