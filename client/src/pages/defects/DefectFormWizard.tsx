@@ -58,13 +58,15 @@ interface DefectFormWizardProps {
   mode?: 'view' | 'edit' | 'new'; // Form mode
   initialStep?: 1 | 2 | 3; // Which step to start on
   onCompleted?: () => void; // Callback when form is submitted successfully
+  onBack?: () => void; // Callback for back button (used in modal context)
 }
 
 export default function DefectFormWizard({ 
   defect, 
   mode = 'new', 
   initialStep = 1,
-  onCompleted 
+  onCompleted,
+  onBack
 }: DefectFormWizardProps = {}) {
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
@@ -363,7 +365,7 @@ export default function DefectFormWizard({
           </div>
           <p className="text-gray-800 font-medium mb-2">Failed to load defect</p>
           <p className="text-gray-600 mb-4">The defect could not be found or an error occurred.</p>
-          <Button onClick={() => setLocation("/defects/active")} className="bg-[#1976d2] hover:bg-[#1565c0]">
+          <Button onClick={() => onBack ? onBack() : setLocation("/defects/active")} className="bg-[#1976d2] hover:bg-[#1565c0]">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Defects
           </Button>
@@ -379,13 +381,13 @@ export default function DefectFormWizard({
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#f5f5f5]">
+    <div className="flex flex-col min-h-full bg-[#f5f5f5]">
       {/* Top Bar - Buttons only on right - matching Near Miss */}
       <div className="h-16 px-8 flex items-center justify-end bg-white border-b border-gray-200">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setLocation("/defects/active")}
+            onClick={() => onBack ? onBack() : setLocation("/defects/active")}
             className="text-gray-700 border-gray-300 h-9"
             data-testid="button-back-top"
           >

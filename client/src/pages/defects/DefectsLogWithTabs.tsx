@@ -31,6 +31,7 @@ import {
 import { useLocation } from "wouter";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
+import NewDefectModal from "./NewDefectModal";
 import { cn } from "@/lib/utils";
 import type { Defect } from "@shared/schema";
 
@@ -63,6 +64,7 @@ export default function DefectsLogWithTabs() {
     defectId: null,
     linkedDefects: []
   });
+  const [newDefectModalOpen, setNewDefectModalOpen] = useState(false);
 
   // Query for defects
   const { data: activeDefects = [], isLoading: isLoadingActive } = useQuery({
@@ -343,12 +345,15 @@ export default function DefectsLogWithTabs() {
                 Filters
               </div>
             </Button>
-            <Link href="/defects/new">
-              <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" data-testid="button-new-defect">
-                <Plus className="h-4 w-4 mr-1" />
-                New Defect
-              </Button>
-            </Link>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white" 
+              size="sm" 
+              data-testid="button-new-defect"
+              onClick={() => setNewDefectModalOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Defect
+            </Button>
           </div>
         </div>
       </div>
@@ -790,6 +795,14 @@ export default function DefectsLogWithTabs() {
           currentLinkedDefects={linkModal.linkedDefects}
         />
       )}
+
+      <NewDefectModal
+        isOpen={newDefectModalOpen}
+        onClose={() => {
+          setNewDefectModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['defects'] });
+        }}
+      />
     </div>
   );
 }
