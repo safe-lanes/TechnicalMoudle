@@ -329,36 +329,38 @@ export default function DefectsLogWithTabs() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-6 pt-2 pb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2 gap-4">
-        <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
-            data-testid="button-toggle-filters"
-          >
-            <Filter className="h-4 w-4" />
-            Filters
-          </Button>
-          <Button 
-            className="bg-green-600 hover:bg-green-700 text-white h-8" 
-            size="sm" 
-            data-testid="button-new-defect"
-            onClick={() => setNewDefectModalOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New Defect
-          </Button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header and Filters Container */}
+      <div className="pt-2 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2 gap-4">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-toggle-filters"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white h-8" 
+              size="sm" 
+              data-testid="button-new-defect"
+              onClick={() => setNewDefectModalOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Defect
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Collapsible Filter Controls */}
-      {showFilters && (
-        <div className="flex flex-wrap gap-2 mb-4 p-4 pl-0 bg-transparent rounded-lg">
+        {/* Collapsible Filter Controls */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-2 mb-4 bg-transparent rounded-lg">
           {/* Period */}
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-[#8798ad]" />
@@ -459,12 +461,13 @@ export default function DefectsLogWithTabs() {
             className="h-8 px-4 text-xs"
           >
             Clear
-          </Button>
-        </div>
-      )}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Main Content with Tabs */}
-      <div className="p-6">
+      <div className="px-4">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-4">
             <TabsTrigger value="active" className="flex items-center gap-2">
