@@ -464,7 +464,8 @@ export default function ComponentRegisterAddEdit({
         partName: spare.name || spare.description,
         min: spare.minQuantity || 1,
         critical: spare.critical ? "Yes" : "No",
-        location: spare.location || "Store Room A",
+        location: spare.location || "",
+        location2: spare.location2 || "",
       })));
     }
   }, [existingComponent, isLoadingComponent, isEditMode, allJobs, allSpares, componentId, propComponentCode, components]);
@@ -1002,7 +1003,7 @@ export default function ComponentRegisterAddEdit({
             </SelectTrigger>
             <SelectContent>
               {vessels.map(v => (
-                <SelectItem key={v.id} value={v.id}>{v.id}</SelectItem>
+                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1354,7 +1355,7 @@ export default function ComponentRegisterAddEdit({
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">B. Running Hours & Condition Monitoring</h3>
                 <div className="border rounded overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-teal-500">
+                    <thead className="bg-[#52baf3]">
                       <tr>
                         <th className="text-left px-3 py-2 font-medium text-white">RH Counter Type</th>
                         <th className="text-left px-3 py-2 font-medium text-white">RH Counter Source</th>
@@ -1410,7 +1411,7 @@ export default function ComponentRegisterAddEdit({
 
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">C. Work Orders</h3>
+                  <h3 className="text-sm font-semibold text-gray-700">C. Jobs</h3>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1545,7 +1546,8 @@ export default function ComponentRegisterAddEdit({
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Part Name</th>
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Min</th>
                         <th className="text-left px-3 py-2 font-medium text-gray-600">Critical</th>
-                        <th className="text-left px-3 py-2 font-medium text-gray-600">Location</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Location A</th>
+                        <th className="text-left px-3 py-2 font-medium text-gray-600">Location B</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1574,10 +1576,13 @@ export default function ComponentRegisterAddEdit({
                           <td className="px-3 py-2">
                             <Input value={spare.location || ""} className="h-7 text-xs" />
                           </td>
+                          <td className="px-3 py-2">
+                            <Input value={spare.location2 || ""} className="h-7 text-xs" />
+                          </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
+                          <td colSpan={6} className="px-3 py-4 text-center text-gray-400">
                             No spares linked
                           </td>
                         </tr>
