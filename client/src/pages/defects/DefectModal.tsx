@@ -68,9 +68,10 @@ export default function DefectModal({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="w-[85vw] max-w-none h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b shrink-0">
+        {/* Hidden header for accessibility - visible header is in DefectFormWizard */}
+        <DialogHeader className="sr-only">
           <DialogTitle>{getTitle()}</DialogTitle>
-          <DialogDescription className="sr-only">
+          <DialogDescription>
             {getDescription()}
           </DialogDescription>
         </DialogHeader>

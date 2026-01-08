@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Plus, Edit, Trash2, ArrowLeft, Eye } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, ArrowLeft, Eye, X } from "lucide-react";
 import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -415,18 +415,23 @@ export default function DefectFormWizard({
               SAVE
             </Button>
           )}
+          {/* Close button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onBack ? onBack() : setLocation("/defects/active")}
+            className="text-gray-500 hover:text-gray-700 h-9 w-9"
+            data-testid="button-close"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
       {/* Main layout with sidebar and content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - Title and Steps */}
-        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-4">
-          {/* Sidebar Title */}
-          <div className="px-6 py-3 mb-2">
-            <h2 className="text-base font-semibold text-gray-900">{getTitle()}</h2>
-          </div>
-
+        {/* Left Sidebar - Steps only */}
+        <div className="w-52 bg-[#f5f5f5] border-r border-gray-200 flex flex-col pt-6">
           {/* Step 1 */}
           <div 
             onClick={() => setCurrentStep(1)} 
