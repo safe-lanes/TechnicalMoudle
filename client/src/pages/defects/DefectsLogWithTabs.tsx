@@ -342,12 +342,6 @@ export default function DefectsLogWithTabs() {
 
           <div className="flex items-center space-x-3">
             <Button variant="outline" size="sm" className="text-gray-600">
-              All Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
-              My Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 border border-gray-400"></div>
                 Filters
