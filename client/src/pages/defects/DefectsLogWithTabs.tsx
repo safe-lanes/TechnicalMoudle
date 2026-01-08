@@ -123,6 +123,28 @@ const HtmlTextCellRenderer = (params: ICellRendererParams) => {
   );
 };
 
+const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
+  if (!params.value) return null;
+  
+  try {
+    const date = new Date(params.value);
+    if (isNaN(date.getTime())) return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    
+    return (
+      <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
+        <span>{day} {month}</span>
+        <span>{year}</span>
+      </div>
+    );
+  } catch {
+    return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
+  }
+};
+
 const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
   if (!params.colDef || !params.data) return null;
   
@@ -330,8 +352,8 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Issue Date',
       field: 'issueDate',
-      flex: 0.8,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true
@@ -373,8 +395,8 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Target Date',
       field: 'targetCloseDate',
-      flex: 0.8,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true
@@ -382,8 +404,8 @@ export default function DefectsLogWithTabs() {
     {
       headerName: 'Date Compl.',
       field: 'dateCompleted',
-      flex: 0.8,
-      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
       filter: 'agDateColumnFilter',
       sortable: true,
       resizable: true
