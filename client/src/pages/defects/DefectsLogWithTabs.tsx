@@ -19,7 +19,8 @@ import {
   Link as LinkIcon, 
   Check, 
   Search, 
-  Plus 
+  Plus,
+  Filter
 } from "lucide-react";
 import { Link } from "wouter";
 import { 
@@ -73,6 +74,7 @@ export default function DefectsLogWithTabs() {
     open: false, 
     defectId: null 
   });
+  const [showFilters, setShowFilters] = useState(true);
 
   // Query for defects
   const { data: activeDefects = [], isLoading: isLoadingActive } = useQuery({
@@ -327,144 +329,139 @@ export default function DefectsLogWithTabs() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-6 py-4">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <div className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center">
-                <div className="w-3 h-3 bg-gray-600 rounded"></div>
-              </div>
-              Defects log
-            </h1>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" className="text-gray-600">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 border border-gray-400"></div>
-                Filters
-              </div>
-            </Button>
-            <Button 
-              className="bg-green-600 hover:bg-green-700 text-white" 
-              size="sm" 
-              data-testid="button-new-defect"
-              onClick={() => setNewDefectModalOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New Defect
-            </Button>
-          </div>
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <h1 className="text-2xl font-bold text-black dark:text-white">Defects log</h1>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+            data-testid="button-toggle-filters"
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+          </Button>
+          <Button 
+            className="bg-green-600 hover:bg-green-700 text-white h-8" 
+            size="sm" 
+            data-testid="button-new-defect"
+            onClick={() => setNewDefectModalOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New Defect
+          </Button>
         </div>
       </div>
 
-      {/* Filter Controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Period */}
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
-              <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-24 h-8 text-xs">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Collapsible Filter Controls */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-2 mb-4 p-4 pl-0 bg-transparent rounded-lg">
+          {/* Period */}
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-[#8798ad]" />
+            <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
+              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Search */}
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8798ad]" />
             <Input
               placeholder="Search Defect"
               value={filters.search || ""}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-36 h-8 text-xs"
+              className="w-[180px] h-8 text-xs pl-8 text-[#8798ad]"
             />
-
-            {/* Vessel */}
-            <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
-              <SelectTrigger className="w-24 h-8 text-xs">
-                <SelectValue placeholder="Vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="V001">Vessel 1</SelectItem>
-                <SelectItem value="V002">Vessel 2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Fleet */}
-            <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="w-20 h-8 text-xs">
-                <SelectValue placeholder="Fleet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleet1">Fleet 1</SelectItem>
-                <SelectItem value="fleet2">Fleet 2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Add Group */}
-            <Select value={filters.addGroup} onValueChange={(value) => handleFilterChange('addGroup', value)}>
-              <SelectTrigger className="w-28 h-8 text-xs">
-                <SelectValue placeholder="Add Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="department">Department</SelectItem>
-                <SelectItem value="priority">Priority</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Due/Overdue - only show for Active tab */}
-            {activeTab === 'active' && (
-              <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-                <SelectTrigger className="w-28 h-8 text-xs">
-                  <SelectValue placeholder="Due / Overdue" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Type */}
-            <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="w-20 h-8 text-xs">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Defect">Defect</SelectItem>
-                <SelectItem value="COC">COC</SelectItem>
-                <SelectItem value="Observation">Observation</SelectItem>
-                <SelectItem value="NCR">NCR</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Apply/Clear buttons */}
-            <Button 
-              onClick={handleApplyFilters}
-              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs"
-            >
-              Apply
-            </Button>
-            <Button 
-              onClick={handleClearFilters}
-              variant="outline" 
-              className="h-8 px-4 text-xs"
-            >
-              Clear
-            </Button>
           </div>
+
+          {/* Vessel */}
+          <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
+            <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectValue placeholder="Vessel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="V001">Vessel 1</SelectItem>
+              <SelectItem value="V002">Vessel 2</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Fleet */}
+          <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
+            <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectValue placeholder="Fleet" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fleet1">Fleet 1</SelectItem>
+              <SelectItem value="fleet2">Fleet 2</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Add Group */}
+          <Select value={filters.addGroup} onValueChange={(value) => handleFilterChange('addGroup', value)}>
+            <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectValue placeholder="Add Group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="department">Department</SelectItem>
+              <SelectItem value="priority">Priority</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Due/Overdue - only show for Active tab */}
+          {activeTab === 'active' && (
+            <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
+              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+                <SelectValue placeholder="Due / Overdue" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="due">Due</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Type */}
+          <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
+            <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Defect">Defect</SelectItem>
+              <SelectItem value="COC">COC</SelectItem>
+              <SelectItem value="Observation">Observation</SelectItem>
+              <SelectItem value="NCR">NCR</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Apply/Clear buttons */}
+          <Button 
+            onClick={handleApplyFilters}
+            className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs"
+          >
+            Apply
+          </Button>
+          <Button 
+            onClick={handleClearFilters}
+            variant="ghost" 
+            className="h-8 px-4 text-xs"
+          >
+            Clear
+          </Button>
         </div>
-      </div>
+      )}
 
       {/* Main Content with Tabs */}
       <div className="p-6">
