@@ -20,6 +20,7 @@ import {
   XCircle
 } from "lucide-react";
 import { isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
+import { useVessels } from "@/hooks/useVessels";
 import { formatForDisplay, parseDate } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
 import {
@@ -91,6 +92,8 @@ export default function DefectsDashboard() {
     queryKey: ['/technical/api/defects?includeClosedDefects=true'],
   });
 
+  const { data: masterVessels = [], isLoading: isLoadingVessels } = useVessels();
+
   const getDateRangeStart = () => {
     const now = new Date();
     switch (dateRange) {
@@ -150,7 +153,9 @@ export default function DefectsDashboard() {
     ? Math.round((kpis.totalResolved / (kpis.totalActive + kpis.totalResolved)) * 100)
     : 0;
 
-  const vessels = Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean);
+  const vessels = masterVessels.length > 0 
+    ? masterVessels 
+    : Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean).map(id => ({ id, name: id, code: id }));
 
   const statusData = [
     { name: 'Open', value: filteredDefects.filter(d => d.status === 'Open').length, color: '#ef4444' },
@@ -162,9 +167,9 @@ export default function DefectsDashboard() {
   ].filter(s => s.value > 0);
 
   const vesselData = vessels.map(vessel => ({
-    vessel,
-    active: filteredDefects.filter(d => d.vesselId === vessel && ACTIVE_STATUSES.includes(d.status || '')).length,
-    closed: filteredDefects.filter(d => d.vesselId === vessel && RESOLVED_STATUSES.includes(d.status || '')).length
+    vessel: vessel.name || vessel.id,
+    active: filteredDefects.filter(d => d.vesselId === vessel.id && ACTIVE_STATUSES.includes(d.status || '')).length,
+    closed: filteredDefects.filter(d => d.vesselId === vessel.id && RESOLVED_STATUSES.includes(d.status || '')).length
   }));
 
   const recentDefects = [...activeDefects]
@@ -227,8 +232,8 @@ export default function DefectsDashboard() {
                 <SelectContent>
                   <SelectItem value="all">All Vessels</SelectItem>
                   {vessels.map(vessel => (
-                    <SelectItem key={vessel} value={vessel}>
-                      {vessel}
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name || vessel.id}
                     </SelectItem>
                   ))}
                 </SelectContent>
