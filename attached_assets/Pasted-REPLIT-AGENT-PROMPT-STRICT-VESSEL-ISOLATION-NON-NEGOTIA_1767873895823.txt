@@ -1,0 +1,65 @@
+REPLIT AGENT PROMPT — “STRICT VESSEL ISOLATION” (NON-NEGOTIABLE)
+
+Objective
+Implement strict vessel-wise separation across the entire app. Every vessel must behave like a completely independent workspace. Data must never mix between vessels. All calculations, dashboards, lists, and records must run independently per vessel.
+
+Core Rule (apply everywhere)
+Every record that is vessel-specific MUST be stored and retrieved under exactly one vessel. Every read/write must use the currently selected Active Vessel. If Active Vessel is not set, block operations.
+
+UI / Active Vessel
+1) Add an “Active Vessel” selector that is clearly visible on all vessel-based screens.
+2) If Active Vessel is not selected:
+   - show blank state “Select a vessel to view data”
+   - disable Save / Submit / Generate / Approve / Calculate / Export / Import actions
+
+Data Separation (no mixing)
+3) Every vessel-specific item (crew, work orders, components, jobs, inventory, purchase, alerts, reports, training, documents, etc.) must always be tied to ONE vessel.
+4) Never store vessel-specific records in a shared/global list without vessel separation.
+5) On vessel switch:
+   - immediately clear all currently loaded lists/details from memory/state
+   - reload only data for the newly selected vessel
+
+Filtering Rules (reads)
+6) Every list/table/search must automatically filter by Active Vessel.
+7) Search results must never show records from other vessels.
+8) If a record belongs to Vessel A and user is currently on Vessel B, that record must be invisible and not editable.
+
+Write Rules (create/update/delete)
+9) Create: new records must automatically inherit the Active Vessel assignment.
+10) Update/Delete: before applying changes, verify the record belongs to Active Vessel.
+    - If it doesn’t, block the action and show error: “This record belongs to a different vessel.”
+
+Calculations / Dashboards
+11) All calculations (due jobs, KPIs, compliance %, inventory totals, WO counts, alerts, etc.) must be computed ONLY from the selected vessel’s data.
+12) If caching exists, cache keys MUST include Active Vessel so Vessel A results can’t appear in Vessel B.
+
+Bulk Upload / Import
+13) Bulk upload must force vessel assignment:
+    - Either user must select Active Vessel before upload,
+    - OR import file must include a vessel identifier per row.
+14) Any row without vessel assignment must be rejected with a clear error.
+
+Copy / Templates (only if explicitly requested)
+15) If there is a “Copy from Vessel X to Vessel Y” feature:
+    - perform a deep copy (duplicate data)
+    - no shared references or automatic syncing between vessels after copy
+
+Hard Safety Checks (must add)
+16) Add validation checks on every backend route and every frontend data load:
+    - Active Vessel required
+    - record belongs to Active Vessel required
+17) Add automated tests / sanity checks:
+    - create Vessel A and Vessel B
+    - create data in A, confirm B shows none
+    - run calculations in A and B, confirm they are independent
+    - reload app, confirm separation persists
+
+Important
+Treat “vessel separation” as a security boundary: do not rely only on UI filtering. Enforce it at the backend/data layer too. If any route can return cross-vessel data, it’s a bug.
+
+Deliverable
+Implement the above and confirm:
+- which screens were updated
+- where Active Vessel is enforced
+- how you prevent cross-vessel reads/writes
+- that calculations are vessel-scoped
