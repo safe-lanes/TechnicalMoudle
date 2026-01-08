@@ -125,7 +125,8 @@ const HtmlTextCellRenderer = (params: ICellRendererParams) => {
           </div>
         </TooltipTrigger>
         <TooltipContent 
-          side="top" 
+          side="bottom" 
+          sideOffset={5}
           className="max-w-[400px] whitespace-pre-wrap text-sm z-[9999]"
         >
           <p>{plainText}</p>
