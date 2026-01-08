@@ -37,6 +37,7 @@ export default function DefectModal({
 
   const handleCompleted = () => {
     queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+    queryClient.invalidateQueries({ queryKey: ['defects'] });
     onClose();
   };
 
