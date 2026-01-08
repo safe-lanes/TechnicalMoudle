@@ -60,6 +60,7 @@ export const vessels = pgTable("vessels", {
   imoNumber: text("imo_number"), // IMO number if applicable
   vesselType: text("vessel_type"), // e.g., Tanker, Bulk Carrier, Container
   flag: text("flag"), // Flag state
+  vesselSequence: integer("vessel_sequence"), // Numeric sequence for vessel (1, 2, 3... for defect IDs)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -73,110 +74,22 @@ export const insertVesselSchema = createInsertSchema(vessels).omit({
 export type InsertVessel = z.infer<typeof insertVesselSchema>;
 export type Vessel = typeof vessels.$inferSelect;
 
-// ============================================================================
-// EXTERNAL MASTER DATA TABLES (Synced from external API via Admin → Data Masters)
-// ============================================================================
+// Defect Sequences Table - Tracks defect ID counters per vessel per year
+export const defectSequences = pgTable("defect_sequences", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(),
+  year: integer("year").notNull(), // 2-digit year stored as 4-digit (e.g., 2026)
+  lastSequence: integer("last_sequence").notNull().default(0), // Last used sequence number
+}, (table) => ({
+  uniqueVesselYear: index("idx_defect_seq_vessel_year").on(table.vesselId, table.year),
+}));
 
-// Vessel Types Master - External vessel type classifications
-export const vesselTypes = pgTable("vessel_types", {
-  id: text("id").primaryKey(), // Entry Id from external API (vtuid)
-  name: text("name").notNull(), // Vessel type name
-  classification: text("classification"), // Classification (Tanker, Oil, Gas, etc.)
-  syncedAt: timestamp("synced_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+export const insertDefectSequenceSchema = createInsertSchema(defectSequences).omit({
+  id: true,
 });
 
-export const insertVesselTypeSchema = createInsertSchema(vesselTypes).omit({
-  syncedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertVesselType = z.infer<typeof insertVesselTypeSchema>;
-export type VesselType = typeof vesselTypes.$inferSelect;
-
-// Additional Groups Master - External group classifications
-export const additionalGroups = pgTable("additional_groups", {
-  id: text("id").primaryKey(), // Entry Id from external API
-  name: text("name").notNull(), // Group name
-  description: text("description"), // Group description or vessels list
-  syncedAt: timestamp("synced_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertAdditionalGroupSchema = createInsertSchema(additionalGroups).omit({
-  syncedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertAdditionalGroup = z.infer<typeof insertAdditionalGroupSchema>;
-export type AdditionalGroup = typeof additionalGroups.$inferSelect;
-
-// Ports Master - External port registry
-export const ports = pgTable("ports", {
-  id: text("id").primaryKey(), // Entry Id from external API (puid)
-  name: text("name").notNull(), // Port name
-  country: text("country"), // Country name
-  syncedAt: timestamp("synced_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertPortSchema = createInsertSchema(ports).omit({
-  syncedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertPort = z.infer<typeof insertPortSchema>;
-export type Port = typeof ports.$inferSelect;
-
-// Fleet Groups Master - External fleet group classifications
-export const fleetGroups = pgTable("fleet_groups", {
-  id: text("id").primaryKey(), // Entry Id from external API (fleet_group_id)
-  name: text("name").notNull(), // Fleet group name
-  description: text("description"), // Description or vessels list
-  syncedAt: timestamp("synced_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertFleetGroupSchema = createInsertSchema(fleetGroups).omit({
-  syncedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertFleetGroup = z.infer<typeof insertFleetGroupSchema>;
-export type FleetGroup = typeof fleetGroups.$inferSelect;
-
-// Master Users - External user registry (separate from internal auth users)
-export const masterUsers = pgTable("master_users", {
-  id: text("id").primaryKey(), // Entry Id from external API (uuid)
-  fullName: text("full_name").notNull(), // User's full name
-  role: text("role"), // Role name
-  designation: text("designation"), // Job title/position
-  userType: text("user_type"), // User type classification
-  department: text("department"), // Department name
-  email: text("email"), // Email address
-  syncedAt: timestamp("synced_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertMasterUserSchema = createInsertSchema(masterUsers).omit({
-  syncedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertMasterUser = z.infer<typeof insertMasterUserSchema>;
-export type MasterUser = typeof masterUsers.$inferSelect;
-
-// ============================================================================
+export type InsertDefectSequence = z.infer<typeof insertDefectSequenceSchema>;
+export type DefectSequence = typeof defectSequences.$inferSelect;
 
 // Running Hours Audit Table
 export const runningHoursAudit = pgTable("running_hours_audit", {

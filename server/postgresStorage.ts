@@ -25,6 +25,7 @@ import {
   defects,
   defectActions,
   defectAttachments,
+  defectSequences,
   recurringDefects,
   recurringDefectLinks,
   alertPolicies,
@@ -2634,7 +2635,83 @@ export class PostgresStorage {
 
   async createDefect(defect: InsertDefect): Promise<Defect> {
     const db = await getDb();
-    const id = `DEF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Generate semantic defect ID: D{VesselCode}-{YY}-{Seq}
+    // Example: D019-26-0023 (19th vessel, 2026, 23rd defect)
+    const vesselId = defect.vesselId;
+    const currentYear = new Date().getFullYear();
+    const yearShort = currentYear % 100; // 2026 -> 26
+    
+    // Get vessel sequence number (based on creation order)
+    // First try from vessels table
+    const vesselResult = await db.select({ vesselSequence: vessels.vesselSequence })
+      .from(vessels)
+      .where(eq(vessels.id, vesselId));
+    
+    let vesselSeq = vesselResult[0]?.vesselSequence;
+    
+    // If vessel exists but doesn't have a sequence yet, assign one
+    if (vesselResult.length > 0 && !vesselSeq) {
+      const maxSeqResult = await db.select({ max: sql<number>`COALESCE(MAX(vessel_sequence), 0)` })
+        .from(vessels);
+      vesselSeq = (maxSeqResult[0]?.max || 0) + 1;
+      await db.update(vessels)
+        .set({ vesselSequence: vesselSeq })
+        .where(eq(vessels.id, vesselId));
+    }
+    
+    // If vessel doesn't exist in vessels table, derive sequence from defect_sequences or defects
+    // This handles legacy data where vessel records may not exist
+    if (!vesselSeq) {
+      // Check if this vessel already has any defect sequences
+      const existingVesselSeqs = await db.execute(sql`
+        SELECT DISTINCT vessel_id FROM defect_sequences ORDER BY vessel_id
+      `);
+      const vesselIds = (existingVesselSeqs.rows as any[]).map(r => r.vessel_id);
+      const existingIndex = vesselIds.indexOf(vesselId);
+      
+      if (existingIndex >= 0) {
+        vesselSeq = existingIndex + 1;
+      } else {
+        // New vessel - assign next available sequence
+        vesselSeq = vesselIds.length + 1;
+      }
+    }
+    
+    // Get or create defect sequence for this vessel/year
+    const existingSeq = await db.select()
+      .from(defectSequences)
+      .where(and(
+        eq(defectSequences.vesselId, vesselId),
+        eq(defectSequences.year, currentYear)
+      ));
+    
+    let nextSeq: number;
+    if (existingSeq.length === 0) {
+      // Create new sequence for this vessel/year starting at 1
+      await db.insert(defectSequences).values({
+        vesselId,
+        year: currentYear,
+        lastSequence: 1,
+      });
+      nextSeq = 1;
+    } else {
+      // Increment existing sequence
+      nextSeq = existingSeq[0].lastSequence + 1;
+      await db.update(defectSequences)
+        .set({ lastSequence: nextSeq })
+        .where(and(
+          eq(defectSequences.vesselId, vesselId),
+          eq(defectSequences.year, currentYear)
+        ));
+    }
+    
+    // Format: D{VesselCode 3 digits}-{Year 2 digits}-{Seq 4 digits}
+    const vesselCode = String(vesselSeq).padStart(3, '0');
+    const yearCode = String(yearShort).padStart(2, '0');
+    const seqCode = String(nextSeq).padStart(4, '0');
+    const id = `D${vesselCode}-${yearCode}-${seqCode}`;
+    
     const result = await db.insert(defects).values({
       ...defect,
       id,
