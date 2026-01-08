@@ -255,7 +255,16 @@ export default function DefectsLogWithTabs() {
       
       const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch defects');
-      return response.json();
+      const data = await response.json();
+      
+      // Transform data to include first action's description in actionTakenRequested
+      return data.map((defect: Defect) => ({
+        ...defect,
+        actionTakenRequested: defect.actionTakenRequested || 
+          (defect.actions && defect.actions.length > 0 
+            ? defect.actions[0].actionDescription 
+            : '')
+      }));
     },
   });
 
