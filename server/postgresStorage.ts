@@ -1029,6 +1029,8 @@ export class PostgresStorage {
 
     // Cascade update to all INHERITED components
     // Update BOTH rhCurrentInheritedCached (RH config system) AND currentCumulativeRH (legacy field used by WO status calculation)
+    // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
+    const masterComponentCode = component.componentCode || '';
     const inheritedResult = await db.update(components)
       .set({
         rhCurrentInheritedCached: params.newRHValue.toString(),
@@ -1038,8 +1040,12 @@ export class PostgresStorage {
         updatedAt: now,
       })
       .where(and(
-        eq(components.rhMasterComponentId, params.componentId),
-        eq(components.rhCounterType, 'INHERITED')
+        eq(components.rhCounterType, 'INHERITED'),
+        or(
+          eq(components.rhMasterComponentId, params.componentId),
+          eq(components.rhMasterComponentId, masterComponentCode),
+          eq(components.rhCounterSource, masterComponentCode)
+        )
       ))
       .returning();
 
@@ -1091,6 +1097,8 @@ export class PostgresStorage {
       }
 
       // Cascade to all INHERITED components
+      // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
+      const masterComponentCode = component.componentCode || '';
       const inheritedResult = await db.update(components)
         .set({
           rhCurrentInheritedCached: rhValueStr,
@@ -1100,8 +1108,12 @@ export class PostgresStorage {
           updatedAt: now,
         })
         .where(and(
-          eq(components.rhMasterComponentId, params.componentId),
-          eq(components.rhCounterType, 'INHERITED')
+          eq(components.rhCounterType, 'INHERITED'),
+          or(
+            eq(components.rhMasterComponentId, params.componentId),
+            eq(components.rhMasterComponentId, masterComponentCode),
+            eq(components.rhCounterSource, masterComponentCode)
+          )
         ))
         .returning();
 

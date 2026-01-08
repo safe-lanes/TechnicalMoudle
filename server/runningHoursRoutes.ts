@@ -402,4 +402,60 @@ export function registerRunningHoursRoutes(app: Express) {
       res.status(500).json({ error: "Failed to fetch inherited components" });
     }
   });
+
+  // One-time propagation: Cascade current RH values from all MASTER components to their INHERITED children
+  // This is used to fix existing data where inheritance was not working
+  app.post("/technical/api/running-hours/propagate-all", async (req, res) => {
+    try {
+      const vesselId = (req.query.vesselId as string) || '743ef9d1-841a-11ed-aa7c-7003bca91a86';
+      const userId = (req.body.userId as string) || 'system';
+      
+      // Get all MASTER components for the vessel
+      const allComponents = await storage.getComponents(vesselId);
+      const masterComponents = allComponents.filter(c => c.rhCounterType === 'MASTER');
+      
+      let totalMastersProcessed = 0;
+      let totalInheritedUpdated = 0;
+      const results: { masterCode: string; masterName: string; rhValue: string; inheritedUpdated: number }[] = [];
+      
+      for (const master of masterComponents) {
+        const currentRH = parseFloat(master.currentCumulativeRH || master.rhCurrentMaster || '0');
+        
+        // Only process masters that have RH > 0 (have actual running hours to propagate)
+        if (currentRH > 0) {
+          try {
+            const result = await storage.updateMasterRunningHours({
+              componentId: master.id,
+              newRHValue: currentRH,
+              updateSource: 'AUTOMATION',
+              userId: userId,
+              comments: 'One-time propagation to fix inherited components'
+            });
+            
+            totalMastersProcessed++;
+            totalInheritedUpdated += result.inheritedUpdated;
+            results.push({
+              masterCode: master.componentCode || '',
+              masterName: master.name || '',
+              rhValue: currentRH.toString(),
+              inheritedUpdated: result.inheritedUpdated
+            });
+          } catch (err) {
+            console.error(`Failed to propagate RH for master ${master.componentCode}:`, err);
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: `Propagated RH values from ${totalMastersProcessed} MASTER components to ${totalInheritedUpdated} INHERITED components`,
+        totalMastersProcessed,
+        totalInheritedUpdated,
+        details: results
+      });
+    } catch (error: any) {
+      console.error("Error propagating RH values:", error);
+      res.status(500).json({ error: "Failed to propagate running hours" });
+    }
+  });
 }
