@@ -1018,19 +1018,6 @@ export default function ComponentRegisterAddEdit({
             data-testid="input-search-components"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Criticality</span>
-          <Select value={criticalityFilter} onValueChange={setCriticalityFilter}>
-            <SelectTrigger className="w-24 h-8" data-testid="select-criticality">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="non-critical">Non-Critical</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
         <Button
           onClick={handleSave}
           disabled={isSaving}
@@ -1052,15 +1039,6 @@ export default function ComponentRegisterAddEdit({
             ) : (
               componentTree.map(node => renderTreeNode(node))
             )}
-          </div>
-          <div className="p-2 bg-sky-600">
-            <Input
-              value={componentData.componentCode}
-              onChange={(e) => handleFieldChange('componentCode', e.target.value)}
-              placeholder="Component Code"
-              className="h-7 text-xs bg-sky-100 border-sky-300"
-              data-testid="input-component-code-bottom"
-            />
           </div>
         </div>
 
