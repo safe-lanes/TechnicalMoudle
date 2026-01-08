@@ -130,14 +130,24 @@ export interface ActiveWOBlockingSets {
  * Returns two sets:
  * - byJobId: Uses direct jobId field (preferred, reliable)
  * - byJobNo: Uses extracted jobNo from workOrderNo (fallback for legacy records)
+ *            Note: byJobNo now includes vesselId prefix for vessel-scoping: `${vesselId}|${jobNo}`
+ * 
+ * @param workOrders - Array of work orders to process
+ * @param vesselId - Optional vessel ID to filter work orders (if provided, only includes WOs for that vessel)
  */
 export function buildJobsWithActiveWOSet(
-  workOrders: Array<{ status: string; jobId?: string | null; workOrderNo?: string }>
+  workOrders: Array<{ status: string; jobId?: string | null; workOrderNo?: string; vesselId?: string | null }>,
+  vesselId?: string
 ): ActiveWOBlockingSets {
   const byJobId = new Set<string>();
   const byJobNo = new Set<string>();
   
   workOrders.forEach(wo => {
+    // If vesselId filter is provided, only include WOs for that vessel
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    
     if (isBlockingStatus(wo.status)) {
       // Primary: Use jobId directly (reliable, no parsing needed)
       if (wo.jobId) {
@@ -145,9 +155,11 @@ export function buildJobsWithActiveWOSet(
       }
       
       // Fallback: Extract jobNo from workOrderNo (for legacy records without jobId)
+      // Include vesselId in key for vessel-scoping
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        byJobNo.add(jobNo);
+        const woVesselId = wo.vesselId || 'unknown';
+        byJobNo.add(`${woVesselId}|${jobNo}`);
       }
     }
   });
@@ -157,13 +169,17 @@ export function buildJobsWithActiveWOSet(
 
 /**
  * Build a map of existing cycle-based work orders for RH jobs
- * Key: `${jobNo}|${cycleDueRh}`
+ * Key: `${vesselId}|${jobNo}|${cycleDueRh}` (vessel-scoped to prevent cross-vessel blocking)
  * 
  * IMPORTANT: Includes ALL work orders (active AND completed) because a completed
  * WO still represents that cycle being satisfied. Only excludes cancelled/rejected.
+ * 
+ * @param workOrders - Array of work orders to process
+ * @param vesselId - Optional vessel ID to filter work orders (if provided, only includes WOs for that vessel)
  */
-export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueRhSnapshot?: string | null }>(
-  workOrders: T[]
+export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueRhSnapshot?: string | null; vesselId?: string | null }>(
+  workOrders: T[],
+  vesselId?: string
 ): Map<string, T> {
   const cycleMap = new Map<string, T>();
   
@@ -174,10 +190,17 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
       return;
     }
     
+    // If vesselId filter is provided, only include WOs for that vessel
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    
     if (wo.cycleDueRhSnapshot) {
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        const cycleKey = `${jobNo}|${wo.cycleDueRhSnapshot}`;
+        // Include vesselId in cycle key to make it vessel-scoped
+        const woVesselId = wo.vesselId || 'unknown';
+        const cycleKey = `${woVesselId}|${jobNo}|${wo.cycleDueRhSnapshot}`;
         cycleMap.set(cycleKey, wo);
       }
     }
@@ -188,13 +211,17 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
 
 /**
  * Build a map of existing cycle-based work orders for Calendar jobs
- * Key: `${jobNo}|${cycleDueDate}`
+ * Key: `${vesselId}|${jobNo}|${cycleDueDate}` (vessel-scoped to prevent cross-vessel blocking)
  * 
  * IMPORTANT: Includes ALL work orders (active AND completed) because a completed
  * WO still represents that cycle being satisfied. Only excludes cancelled/rejected.
+ * 
+ * @param workOrders - Array of work orders to process
+ * @param vesselId - Optional vessel ID to filter work orders (if provided, only includes WOs for that vessel)
  */
-export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueDateSnapshot?: string | null }>(
-  workOrders: T[]
+export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueDateSnapshot?: string | null; vesselId?: string | null }>(
+  workOrders: T[],
+  vesselId?: string
 ): Map<string, T> {
   const cycleMap = new Map<string, T>();
   
@@ -205,10 +232,17 @@ export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?
       return;
     }
     
+    // If vesselId filter is provided, only include WOs for that vessel
+    if (vesselId && wo.vesselId !== vesselId) {
+      return;
+    }
+    
     if (wo.cycleDueDateSnapshot) {
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        const cycleKey = `${jobNo}|${wo.cycleDueDateSnapshot}`;
+        // Include vesselId in cycle key to make it vessel-scoped
+        const woVesselId = wo.vesselId || 'unknown';
+        const cycleKey = `${woVesselId}|${jobNo}|${wo.cycleDueDateSnapshot}`;
         cycleMap.set(cycleKey, wo);
       }
     }

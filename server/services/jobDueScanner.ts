@@ -169,15 +169,18 @@ export class JobDueScannerService {
     };
 
     // Get all work orders to check for duplicates
+    // Note: We fetch all WOs but use vessel-scoped keys for proper cross-vessel handling
     const allWorkOrders = await storage.getWorkOrders();
     
     // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
     // Uses both jobId (primary) and jobNo (fallback) for comprehensive blocking
+    // Note: byJobNo is now vessel-scoped with key format: `${vesselId}|${jobNo}`
     const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
     
-    // CYCLE UNIQUENESS: Build a map by (jobNo + cycleDueRh) for cycle-level check
+    // CYCLE UNIQUENESS: Build a map by (vesselId + jobNo + cycleDueRh) for cycle-level check
     // Uses case-insensitive status matching via isBlockingStatus()
+    // Key format is now: `${vesselId}|${jobNo}|${cycleDueRh}` for vessel-scoped uniqueness
     const existingCycleWOs = buildRhCycleWOMap(allWorkOrders);
     
     // Cache for components - will fetch lazily per vessel
@@ -240,13 +243,15 @@ export class JobDueScannerService {
 
       // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
       // Primary check: by jobId (reliable, direct field match)
-      // Fallback check: by jobNo (for legacy WOs without jobId)
-      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(job.jobNo)) {
+      // Fallback check: by jobNo (for legacy WOs without jobId) - now vessel-scoped
+      const vesselScopedJobNo = `${job.vesselId || 'unknown'}|${job.jobNo}`;
+      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(vesselScopedJobNo)) {
         continue; // Already has an active WO - skip
       }
 
-      // CYCLE UNIQUENESS CHECK: Each RH cycle is uniquely identified by (jobNo + RH_due)
-      const cycleKey = `${job.jobNo}|${rhDue}`;
+      // CYCLE UNIQUENESS CHECK: Each RH cycle is uniquely identified by (vesselId + jobNo + RH_due)
+      // Vessel-scoped to prevent cross-vessel blocking
+      const cycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${rhDue}`;
       if (existingCycleWOs.has(cycleKey)) {
         // WO already exists for this cycle - skip
         continue;
@@ -307,9 +312,10 @@ export class JobDueScannerService {
       generated++;
       
       // Add to sets to prevent duplicate generation in same run
+      // cycleKey is already vessel-scoped: `${vesselId}|${jobNo}|${rhDue}`
       existingCycleWOs.set(cycleKey, workOrderData as any);
       activeWOSets.byJobId.add(job.id);
-      activeWOSets.byJobNo.add(job.jobNo);
+      activeWOSets.byJobNo.add(vesselScopedJobNo);
       
       const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
       console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);

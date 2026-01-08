@@ -289,16 +289,19 @@ export class WorkOrderService {
     };
     
     // Get all work orders to check for duplicates
+    // Note: We fetch WOs for the specified vessel (or all) but use vessel-scoped keys
     const allWorkOrders = await this.getWorkOrders(vesselId);
     
     // JOB-LEVEL LOCK: Build sets of jobs that already have an active WO
     // Rule: "one active WO per job at a time" - prevents ANY duplicate regardless of cycle
     // Uses both jobId (primary) and jobNo (fallback) for comprehensive blocking
-    const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders);
+    // Note: byJobNo is now vessel-scoped with key format: `${vesselId}|${jobNo}`
+    const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders, vesselId);
     
-    // CYCLE UNIQUENESS: Also build a map by (jobNo + cycleDueDate) for cycle-level check
+    // CYCLE UNIQUENESS: Also build a map by (vesselId + jobNo + cycleDueDate) for cycle-level check
     // Uses case-insensitive status matching via isBlockingStatus()
-    const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders);
+    // Key format is now: `${vesselId}|${jobNo}|${cycleDueDate}` for vessel-scoped uniqueness
+    const existingCycleWOs = buildCalendarCycleWOMap(allWorkOrders, vesselId);
     
     const results = {
       checked: calendarJobs.length,
@@ -330,16 +333,18 @@ export class WorkOrderService {
       
       // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
       // Primary check: by jobId (reliable, direct field match)
-      // Fallback check: by jobNo (for legacy WOs without jobId)
-      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(job.jobNo)) {
+      // Fallback check: by jobNo (for legacy WOs without jobId) - now vessel-scoped
+      const vesselScopedJobNo = `${job.vesselId || 'unknown'}|${job.jobNo}`;
+      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(vesselScopedJobNo)) {
         continue; // Already has an active WO - skip
       }
       
       // Normalize due date for cycle key (ISO date string YYYY-MM-DD)
       const dueDateStr = dueDate.toISOString().split('T')[0];
       
-      // CYCLE UNIQUENESS CHECK: Each calendar cycle is uniquely identified by (jobNo + DUE_DATE)
-      const cycleKey = `${job.jobNo}|${dueDateStr}`;
+      // CYCLE UNIQUENESS CHECK: Each calendar cycle is uniquely identified by (vesselId + jobNo + DUE_DATE)
+      // Vessel-scoped to prevent cross-vessel blocking
+      const cycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${dueDateStr}`;
       if (existingCycleWOs.has(cycleKey)) {
         // WO already exists for this cycle - skip
         continue;
@@ -400,9 +405,10 @@ export class WorkOrderService {
       results.workOrders.push(createdWO);
       
       // Add to sets to prevent duplicate generation in same run
+      // cycleKey is already vessel-scoped: `${vesselId}|${jobNo}|${dueDateStr}`
       existingCycleWOs.set(cycleKey, workOrderData as any);
       activeWOSets.byJobId.add(job.id);
-      activeWOSets.byJobNo.add(job.jobNo);
+      activeWOSets.byJobNo.add(vesselScopedJobNo);
       
       const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
       console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
