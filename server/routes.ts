@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from "@shared/schema";
@@ -7036,6 +7037,265 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         error: "Status sync failed: " + error.message 
+      });
+    }
+  });
+
+  // ========================================
+  // EXTERNAL MASTER DATA SYNC ENDPOINT
+  // ========================================
+  
+  // Sync All - Fetches external master data and upserts to local tables
+  // Used by Admin → Data Masters screen
+  // Protected by PMS Admin role requirement
+  app.post("/technical/api/admin/sync-masters", requirePMSAdmin, async (req, res) => {
+    try {
+      console.log("🔄 Starting master data sync...");
+      
+      const domain = req.body.domain || 'rsms';
+      const BASE_URL = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata";
+      
+      const stats = {
+        vessels: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+        vesselTypes: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+        additionalGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+        ports: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+        users: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+        fleetGroups: { inserted: 0, updated: 0, skipped: 0, errors: [] as string[] },
+      };
+      
+      // Helper to fetch from external API
+      const fetchExternal = async (endpoint: string, key: string) => {
+        const response = await fetch(`${BASE_URL}/${endpoint}?domain=${domain}`);
+        if (!response.ok) throw new Error(`Failed to fetch ${endpoint}: ${response.status}`);
+        const data = await response.json();
+        return data[key] || [];
+      };
+      
+      // Helper to get Entry ID from various field names
+      const getEntryId = (entry: any, idFields: string[]): string | null => {
+        for (const field of idFields) {
+          if (entry[field] !== undefined && entry[field] !== null) {
+            return String(entry[field]);
+          }
+        }
+        return null;
+      };
+      
+      // Helper to get field value from various field names
+      const getFieldValue = (entry: any, fields: string[]): string | null => {
+        for (const field of fields) {
+          if (entry[field] !== undefined && entry[field] !== null) {
+            return String(entry[field]);
+          }
+        }
+        return null;
+      };
+      
+      // Get database pool for raw queries
+      const pool = await getPool();
+      
+      // 1. Sync Vessels
+      console.log("📦 Syncing Vessel Master...");
+      const vessels = await fetchExternal('vessels', 'vessels');
+      for (const v of vessels) {
+        try {
+          const entryId = getEntryId(v, ['vuid', 'vesselId']);
+          if (!entryId) {
+            stats.vessels.skipped++;
+            continue;
+          }
+          const name = getFieldValue(v, ['vessel', 'vesselName', 'name']) || 'Unknown';
+          const imoNumber = getFieldValue(v, ['imo_number', 'imoNumber', 'imo_no', 'imo']);
+          const vesselType = getFieldValue(v, ['vessel_type_name', 'vesselTypeName', 'vessel_type', 'vesselType', 'type']);
+          
+          // Upsert vessel using raw SQL
+          await pool.query(`
+            INSERT INTO vessels (id, name, code, imo_number, vessel_type, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              code = EXCLUDED.code,
+              imo_number = EXCLUDED.imo_number,
+              vessel_type = EXCLUDED.vessel_type,
+              is_active = true,
+              updated_at = NOW()
+          `, [entryId, name, entryId, imoNumber, vesselType]);
+          stats.vessels.updated++;
+        } catch (e: any) {
+          stats.vessels.errors.push(`Vessel ${v.vuid || v.vesselId}: ${e.message}`);
+        }
+      }
+      
+      // 2. Sync Vessel Types
+      console.log("📦 Syncing Vessel Types...");
+      const vesselTypes = await fetchExternal('vesseltypes', 'vesseltypes');
+      for (const vt of vesselTypes) {
+        try {
+          const entryId = getEntryId(vt, ['vtuid', 'id', 'vesselTypeId']);
+          if (!entryId) {
+            stats.vesselTypes.skipped++;
+            continue;
+          }
+          const name = getFieldValue(vt, ['vesselType', 'vesselTypeName', 'name', 'type_name']) || 'Unknown';
+          
+          // Build classification string from flags
+          const classifications: string[] = [];
+          if (vt.tanker === 1) classifications.push('Tanker');
+          if (vt.oilTanker === 1) classifications.push('Oil');
+          if (vt.gasTanker === 1) classifications.push('Gas');
+          if (vt.chemicalTanker === 1) classifications.push('Chemical');
+          if (vt.dry === 1) classifications.push('Dry');
+          if (vt.container === 1) classifications.push('Container');
+          const classification = classifications.length > 0 ? classifications.join(', ') : null;
+          
+          await pool.query(`
+            INSERT INTO vessel_types (id, name, classification, synced_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              classification = EXCLUDED.classification,
+              synced_at = NOW(),
+              updated_at = NOW()
+          `, [entryId, name, classification]);
+          stats.vesselTypes.updated++;
+        } catch (e: any) {
+          stats.vesselTypes.errors.push(`VesselType ${vt.vtuid}: ${e.message}`);
+        }
+      }
+      
+      // 3. Sync Additional Groups
+      console.log("📦 Syncing Additional Groups...");
+      const additionalGroups = await fetchExternal('additionalgroups', 'additionalGroups');
+      for (const ag of additionalGroups) {
+        try {
+          const entryId = getEntryId(ag, ['id', 'groupId', 'additional_group_id']);
+          if (!entryId) {
+            stats.additionalGroups.skipped++;
+            continue;
+          }
+          const name = getFieldValue(ag, ['group_name', 'groupName', 'name', 'additional_group_name']) || 'Unknown';
+          const description = getFieldValue(ag, ['vessels', 'group_description', 'desc']);
+          
+          await pool.query(`
+            INSERT INTO additional_groups (id, name, description, synced_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              description = EXCLUDED.description,
+              synced_at = NOW(),
+              updated_at = NOW()
+          `, [entryId, name, description]);
+          stats.additionalGroups.updated++;
+        } catch (e: any) {
+          stats.additionalGroups.errors.push(`AdditionalGroup ${ag.id}: ${e.message}`);
+        }
+      }
+      
+      // 4. Sync Ports
+      console.log("📦 Syncing Ports...");
+      const ports = await fetchExternal('ports', 'ports');
+      for (const p of ports) {
+        try {
+          const entryId = getEntryId(p, ['puid', 'id', 'portId']);
+          if (!entryId) {
+            stats.ports.skipped++;
+            continue;
+          }
+          const name = getFieldValue(p, ['port_name', 'portName', 'name']) || 'Unknown';
+          const country = getFieldValue(p, ['country_name', 'countryName', 'country']);
+          
+          await pool.query(`
+            INSERT INTO ports (id, name, country, synced_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              country = EXCLUDED.country,
+              synced_at = NOW(),
+              updated_at = NOW()
+          `, [entryId, name, country]);
+          stats.ports.updated++;
+        } catch (e: any) {
+          stats.ports.errors.push(`Port ${p.puid}: ${e.message}`);
+        }
+      }
+      
+      // 5. Sync Users (to master_users table)
+      console.log("📦 Syncing Users...");
+      const users = await fetchExternal('users', 'users');
+      for (const u of users) {
+        try {
+          const entryId = getEntryId(u, ['uuid', 'id', 'userId']);
+          if (!entryId) {
+            stats.users.skipped++;
+            continue;
+          }
+          const fullName = getFieldValue(u, ['fullname', 'userName', 'name', 'username', 'full_name']) || 'Unknown';
+          const role = getFieldValue(u, ['role', 'role_name', 'roleName', 'user_role']);
+          const designation = getFieldValue(u, ['designation', 'position', 'title', 'job_title']);
+          const userType = getFieldValue(u, ['user_type', 'userType', 'type']);
+          const department = getFieldValue(u, ['department', 'department_name', 'dept']);
+          const email = getFieldValue(u, ['email', 'email_address', 'user_email']);
+          
+          await pool.query(`
+            INSERT INTO master_users (id, full_name, role, designation, user_type, department, email, synced_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              full_name = EXCLUDED.full_name,
+              role = EXCLUDED.role,
+              designation = EXCLUDED.designation,
+              user_type = EXCLUDED.user_type,
+              department = EXCLUDED.department,
+              email = EXCLUDED.email,
+              synced_at = NOW(),
+              updated_at = NOW()
+          `, [entryId, fullName, role, designation, userType, department, email]);
+          stats.users.updated++;
+        } catch (e: any) {
+          stats.users.errors.push(`User ${u.uuid}: ${e.message}`);
+        }
+      }
+      
+      // 6. Sync Fleet Groups
+      console.log("📦 Syncing Fleet Groups...");
+      const fleetGroups = await fetchExternal('fleetgroups', 'fleetGroups');
+      for (const fg of fleetGroups) {
+        try {
+          const entryId = getEntryId(fg, ['fleet_group_id', 'id', 'fleetGroupId']);
+          if (!entryId) {
+            stats.fleetGroups.skipped++;
+            continue;
+          }
+          const name = getFieldValue(fg, ['fleet_group_name', 'fleetGroupName', 'name', 'group_name']) || 'Unknown';
+          const description = getFieldValue(fg, ['vessels', 'fleet_group_description', 'desc']);
+          
+          await pool.query(`
+            INSERT INTO fleet_groups (id, name, description, synced_at, updated_at)
+            VALUES ($1, $2, $3, NOW(), NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              name = EXCLUDED.name,
+              description = EXCLUDED.description,
+              synced_at = NOW(),
+              updated_at = NOW()
+          `, [entryId, name, description]);
+          stats.fleetGroups.updated++;
+        } catch (e: any) {
+          stats.fleetGroups.errors.push(`FleetGroup ${fg.fleet_group_id}: ${e.message}`);
+        }
+      }
+      
+      console.log("✅ Master data sync completed:", stats);
+      
+      res.json({
+        success: true,
+        message: "Master data sync completed successfully",
+        statistics: stats
+      });
+    } catch (error: any) {
+      console.error("❌ Master data sync failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Master data sync failed: " + error.message 
       });
     }
   });

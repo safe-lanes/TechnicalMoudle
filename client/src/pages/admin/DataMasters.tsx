@@ -1,8 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   useExternalNationalities,
   useExternalVessels,
@@ -162,6 +166,38 @@ const masterTypes: MasterType[] = [
 export default function DataMasters() {
   const [selectedMaster, setSelectedMaster] = useState<string>("vessel");
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
+
+  // Sync All mutation - calls backend to sync external master data
+  // apiRequest throws on non-OK responses, so errors are caught by onError handler
+  const syncMastersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/technical/api/admin/sync-masters", {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const stats = data.statistics;
+      const totalUpdated = 
+        (stats.vessels?.updated || 0) + (stats.vessels?.inserted || 0) +
+        (stats.vesselTypes?.updated || 0) + (stats.vesselTypes?.inserted || 0) +
+        (stats.additionalGroups?.updated || 0) + (stats.additionalGroups?.inserted || 0) +
+        (stats.ports?.updated || 0) + (stats.ports?.inserted || 0) +
+        (stats.users?.updated || 0) + (stats.users?.inserted || 0) +
+        (stats.fleetGroups?.updated || 0) + (stats.fleetGroups?.inserted || 0);
+      
+      toast({
+        title: "Master data sync completed successfully",
+        description: `${totalUpdated} records synchronized across all masters.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Sync failed",
+        description: error.message,
+      });
+    },
+  });
 
   const nationalitiesQuery = useExternalNationalities({ enabled: selectedMaster === "nationality" });
   const vesselsQuery = useExternalVessels({ enabled: selectedMaster === "vessel" });
@@ -249,8 +285,26 @@ export default function DataMasters() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">Data Masters</h1>
+        <Button
+          onClick={() => syncMastersMutation.mutate()}
+          disabled={syncMastersMutation.isPending}
+          className="bg-[#52baf3] hover:bg-[#3da8e0]"
+          data-testid="btn-sync-all"
+        >
+          {syncMastersMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Syncing...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Sync All
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="relative max-w-sm mb-6">
