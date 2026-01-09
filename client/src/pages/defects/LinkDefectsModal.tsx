@@ -115,8 +115,8 @@ export default function LinkDefectsModal({ open, onClose, defectId, currentLinke
   };
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="max-w-3xl" onInteractOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+      <DialogContent className="max-w-3xl">
         <button 
           className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 focus:outline-none"
           onClick={handleClose}
