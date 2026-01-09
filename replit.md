@@ -38,6 +38,9 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Part A Immutability**: Work Order Part A is read-only for existing work orders.
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
+## Checkpoints
+- **Alpha** (Jan 9, 2026 - commit b6b32f5): RH cascade fix complete. All three RH update paths now consistently match inherited components by UUID, component code, and rhCounterSource field. Verified: 601.001 (1000h→98 components), 651.001 (500h→68 components), 652.001 (450h→68 components).
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`
