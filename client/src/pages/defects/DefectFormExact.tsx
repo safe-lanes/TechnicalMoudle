@@ -419,27 +419,30 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("VESSEL", form.watch("vesselName") || "")
                         ) : (
-                          <Select 
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              const vessel = vessels.find(v => v.id === value);
-                              if (vessel) {
-                                form.setValue("vesselName", vessel.name);
-                              }
-                            }} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-vessel">
-                                <SelectValue placeholder="VESSEL" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {vessels.map(vessel => (
-                                <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">VESSEL</label>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const vessel = vessels.find(v => v.id === value);
+                                if (vessel) {
+                                  form.setValue("vesselName", vessel.name);
+                                }
+                              }} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-vessel">
+                                  <SelectValue placeholder="Select vessel" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {vessels.map(vessel => (
+                                  <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -453,20 +456,23 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("SOURCE", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-source">
-                                <SelectValue placeholder="SOURCE" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="SIRE">SIRE</SelectItem>
-                              <SelectItem value="PSC">PSC</SelectItem>
-                              <SelectItem value="Internal">Internal</SelectItem>
-                              <SelectItem value="Class">Class</SelectItem>
-                              <SelectItem value="External">External</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">SOURCE</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-source">
+                                  <SelectValue placeholder="Select source" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="SIRE">SIRE</SelectItem>
+                                <SelectItem value="PSC">PSC</SelectItem>
+                                <SelectItem value="Internal">Internal</SelectItem>
+                                <SelectItem value="Class">Class</SelectItem>
+                                <SelectItem value="External">External</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -480,18 +486,21 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("DEFECT CATEGORY", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-defect-category">
-                                <SelectValue placeholder="DEFECT CATEGORY" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Minor">Minor</SelectItem>
-                              <SelectItem value="Major">Major</SelectItem>
-                              <SelectItem value="Catastrophic">Catastrophic</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">DEFECT CATEGORY</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-defect-category">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Minor">Minor</SelectItem>
+                                <SelectItem value="Major">Major</SelectItem>
+                                <SelectItem value="Catastrophic">Catastrophic</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -505,18 +514,21 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("DEFECT TYPE", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-defect-type">
-                                <SelectValue placeholder="DEFECT TYPE" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Routine">Routine</SelectItem>
-                              <SelectItem value="Corrective">Corrective</SelectItem>
-                              <SelectItem value="Emergency">Emergency</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">DEFECT TYPE</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-defect-type">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Routine">Routine</SelectItem>
+                                <SelectItem value="Corrective">Corrective</SelectItem>
+                                <SelectItem value="Emergency">Emergency</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -531,33 +543,41 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("RAISED BY", `${form.watch("raisedByRank")} - ${field.value}`)
                         ) : (
-                          <Select 
-                            onValueChange={(value) => {
-                              const [rank, ...nameParts] = value.split(" - ");
-                              const name = nameParts.join(" - ");
-                              field.onChange(name);
-                              form.setValue("raisedByRank", rank);
-                              form.setValue("raisedById", value);
-                            }} 
-                            defaultValue={`${form.watch("raisedByRank")} - ${field.value}`}
-                          >
-                            <FormControl>
-                              <SelectTrigger 
-                                data-testid="select-raised-by"
-                                title="Auto-selected from login. Change if reporting on behalf of another crew member."
-                              >
-                                <SelectValue placeholder="RAISED BY" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Master - System User">Master - System User</SelectItem>
-                              <SelectItem value="Chief Engineer - John Mathews">Chief Engineer - John Mathews</SelectItem>
-                              <SelectItem value="2nd Officer - Rahul Verma">2nd Officer - Rahul Verma</SelectItem>
-                              <SelectItem value="AB - Suresh Kumar">AB - Suresh Kumar</SelectItem>
-                              <SelectItem value="Chief Officer - Mike Anderson">Chief Officer - Mike Anderson</SelectItem>
-                              <SelectItem value="2E - David Smith">2E - David Smith</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label 
+                              className="text-xs font-medium text-gray-700"
+                              title="Auto-selected from login. Change if reporting on behalf of another crew member."
+                            >
+                              RAISED BY
+                            </label>
+                            <Select 
+                              onValueChange={(value) => {
+                                const [rank, ...nameParts] = value.split(" - ");
+                                const name = nameParts.join(" - ");
+                                field.onChange(name);
+                                form.setValue("raisedByRank", rank);
+                                form.setValue("raisedById", value);
+                              }} 
+                              defaultValue={`${form.watch("raisedByRank")} - ${field.value}`}
+                            >
+                              <FormControl>
+                                <SelectTrigger 
+                                  data-testid="select-raised-by"
+                                  title="Auto-selected from login. Change if reporting on behalf of another crew member."
+                                >
+                                  <SelectValue placeholder="Select person" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Master - System User">Master - System User</SelectItem>
+                                <SelectItem value="Chief Engineer - John Mathews">Chief Engineer - John Mathews</SelectItem>
+                                <SelectItem value="2nd Officer - Rahul Verma">2nd Officer - Rahul Verma</SelectItem>
+                                <SelectItem value="AB - Suresh Kumar">AB - Suresh Kumar</SelectItem>
+                                <SelectItem value="Chief Officer - Mike Anderson">Chief Officer - Mike Anderson</SelectItem>
+                                <SelectItem value="2E - David Smith">2E - David Smith</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -701,19 +721,22 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("CATEGORY", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-equipment-category">
-                                <SelectValue placeholder="CATEGORY" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Deck">Deck</SelectItem>
-                              <SelectItem value="Navigation">Navigation</SelectItem>
-                              <SelectItem value="Machinery">Machinery</SelectItem>
-                              <SelectItem value="Safety">Safety</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">CATEGORY</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-equipment-category">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Deck">Deck</SelectItem>
+                                <SelectItem value="Navigation">Navigation</SelectItem>
+                                <SelectItem value="Machinery">Machinery</SelectItem>
+                                <SelectItem value="Safety">Safety</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -727,19 +750,22 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("TYPE", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-equipment-type">
-                                <SelectValue placeholder="TYPE" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Pump">Pump</SelectItem>
-                              <SelectItem value="Valve">Valve</SelectItem>
-                              <SelectItem value="Motor">Motor</SelectItem>
-                              <SelectItem value="Sensor">Sensor</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">TYPE</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-equipment-type">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Pump">Pump</SelectItem>
+                                <SelectItem value="Valve">Valve</SelectItem>
+                                <SelectItem value="Motor">Motor</SelectItem>
+                                <SelectItem value="Sensor">Sensor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -753,19 +779,22 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("MAKE", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-equipment-make">
-                                <SelectValue placeholder="MAKE" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Wartsila">Wartsila</SelectItem>
-                              <SelectItem value="MAN">MAN</SelectItem>
-                              <SelectItem value="Caterpillar">Caterpillar</SelectItem>
-                              <SelectItem value="ABB">ABB</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">MAKE</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-equipment-make">
+                                  <SelectValue placeholder="Select make" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Wartsila">Wartsila</SelectItem>
+                                <SelectItem value="MAN">MAN</SelectItem>
+                                <SelectItem value="Caterpillar">Caterpillar</SelectItem>
+                                <SelectItem value="ABB">ABB</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
@@ -779,19 +808,22 @@ export default function DefectFormExact({ onClose, defect, mode = 'new' }: Defec
                         {isViewMode ? (
                           renderReadOnlyField("MODEL", field.value || "")
                         ) : (
-                          <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-equipment-model">
-                                <SelectValue placeholder="MODEL" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="W32">W32</SelectItem>
-                              <SelectItem value="6L20">6L20</SelectItem>
-                              <SelectItem value="3508">3508</SelectItem>
-                              <SelectItem value="VFD">VFD</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-700">MODEL</label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-equipment-model">
+                                  <SelectValue placeholder="Select model" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="W32">W32</SelectItem>
+                                <SelectItem value="6L20">6L20</SelectItem>
+                                <SelectItem value="3508">3508</SelectItem>
+                                <SelectItem value="VFD">VFD</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                       </FormItem>
                     )}
