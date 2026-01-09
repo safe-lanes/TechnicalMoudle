@@ -56,6 +56,7 @@ export default function RecurringDefects() {
   const [selectedForNotify, setSelectedForNotify] = useState<RecurringDefect | null>(null);
   const [capaDescription, setCapaDescription] = useState("");
   const [notifyMessage, setNotifyMessage] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const { toast } = useToast();
 
   // Export data functionality
@@ -162,7 +163,8 @@ export default function RecurringDefects() {
   // Fleet notification handler
   const handleNotifyFleet = (recurring: RecurringDefect) => {
     setSelectedForNotify(recurring);
-    setNotifyMessage(`FLEET ADVISORY: Recurring Equipment Issue\n\nEquipment: ${formatEquipmentKey(recurring.equipmentKey)}\n\nSummary:\nWe have identified a recurring defect pattern affecting ${recurring.vesselsAffected} vessel(s) with ${recurring.occurrenceCount} total occurrences.\n\nAffected Vessels:\n${recurring.vesselNames}\n\nLast Occurrence: ${recurring.lastOccurrenceDate ? new Date(recurring.lastOccurrenceDate).toLocaleDateString() : 'N/A'}\n\nRecommended Actions:\n1. Inspect similar equipment on your vessel\n2. Review maintenance procedures\n3. Report any similar issues immediately\n4. Implement preventive maintenance as advised\n\n${recurring.hasCoc ? '⚠️ CRITICAL: This is a Condition of Class (CoC) issue requiring immediate attention.' : ''}\n\nFor technical support, contact: [Department/Contact]\n\nThis is an automated notification from the PMS Recurring Defects System.`);
+    const vesselNames = (recurring as any).vesselNames || `${recurring.vesselsAffected} vessel(s)`;
+    setNotifyMessage(`FLEET ADVISORY: Recurring Equipment Issue\n\nEquipment: ${formatEquipmentKey(recurring.equipmentKey)}\n\nSummary:\nWe have identified a recurring defect pattern affecting ${recurring.vesselsAffected} vessel(s) with ${recurring.occurrenceCount} total occurrences.\n\nAffected Vessels:\n${vesselNames}\n\nLast Occurrence: ${recurring.lastOccurrenceDate ? new Date(recurring.lastOccurrenceDate).toLocaleDateString() : 'N/A'}\n\nRecommended Actions:\n1. Inspect similar equipment on your vessel\n2. Review maintenance procedures\n3. Report any similar issues immediately\n4. Implement preventive maintenance as advised\n\n${recurring.hasCoc ? '⚠️ CRITICAL: This is a Condition of Class (CoC) issue requiring immediate attention.' : ''}\n\nFor technical support, contact: [Department/Contact]\n\nThis is an automated notification from the PMS Recurring Defects System.`);
     setShowNotifyDialog(true);
   };
 
@@ -178,147 +180,103 @@ export default function RecurringDefects() {
     }
   };
 
-  const renderStatsCards = () => (
-    <div className="grid grid-cols-4 gap-4 mb-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Recurring</p>
-              <p className="text-2xl font-bold">{(recurringDefects || []).length}</p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-orange-500" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">With Open Defects</p>
-              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.openCount > 0).length}</p>
-            </div>
-            <Clock className="h-8 w-8 text-blue-500" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">CoC Related</p>
-              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.hasCoc).length}</p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-red-500" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Multi-Vessel</p>
-              <p className="text-2xl font-bold">{(recurringDefects || []).filter(r => r.vesselsAffected > 1).length}</p>
-            </div>
-            <Users className="h-8 w-8 text-green-500" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderFilters = () => (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Filter className="h-5 w-5" />
-          Filters
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-6 gap-4">
-          <div>
-            <Label htmlFor="window">Time Window</Label>
-            <Select value={windowMonths} onValueChange={setWindowMonths}>
-              <SelectTrigger id="window" data-testid="select-window">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="6">6 Months</SelectItem>
-                <SelectItem value="12">12 Months</SelectItem>
-                <SelectItem value="24">2 Years</SelectItem>
-                <SelectItem value="36">3 Years</SelectItem>
-                <SelectItem value="48">4 Years</SelectItem>
-                <SelectItem value="60">5 Years</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <Label htmlFor="occurrences">Min Occurrences</Label>
-            <Select value={minOccurrences} onValueChange={setMinOccurrences}>
-              <SelectTrigger id="occurrences" data-testid="select-occurrences">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2">≥ 2</SelectItem>
-                <SelectItem value="3">≥ 3</SelectItem>
-                <SelectItem value="5">≥ 5</SelectItem>
-                <SelectItem value="10">≥ 10</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <Label htmlFor="department">Department</Label>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger id="department" data-testid="select-department">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="deck">Deck</SelectItem>
-                <SelectItem value="engine">Engine</SelectItem>
-                <SelectItem value="navigation">Navigation</SelectItem>
-                <SelectItem value="safety">Safety</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex items-center space-x-2 pt-6">
-            <Checkbox
-              id="coc-only"
-              checked={cocOnly}
-              onCheckedChange={(checked) => setCocOnly(checked as boolean)}
-              data-testid="checkbox-coc"
-            />
-            <Label htmlFor="coc-only">CoC Only</Label>
-          </div>
-          
-          <div className="col-span-2">
-            <Label htmlFor="search">Search Equipment</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="search"
-                placeholder="Search by equipment..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-                data-testid="input-search"
-              />
-            </div>
-          </div>
+  const renderFiltersBar = () => (
+    <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-gray-50 border-b">
+      <div className="flex items-center gap-2">
+        <Label htmlFor="window" className="text-sm whitespace-nowrap">Time Window</Label>
+        <Select value={windowMonths} onValueChange={setWindowMonths}>
+          <SelectTrigger id="window" className="w-[120px]" data-testid="select-window">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="6">6 Months</SelectItem>
+            <SelectItem value="12">12 Months</SelectItem>
+            <SelectItem value="24">2 Years</SelectItem>
+            <SelectItem value="36">3 Years</SelectItem>
+            <SelectItem value="48">4 Years</SelectItem>
+            <SelectItem value="60">5 Years</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Label htmlFor="occurrences" className="text-sm whitespace-nowrap">Min Occurrences</Label>
+        <Select value={minOccurrences} onValueChange={setMinOccurrences}>
+          <SelectTrigger id="occurrences" className="w-[100px]" data-testid="select-occurrences">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2">≥ 2</SelectItem>
+            <SelectItem value="3">≥ 3</SelectItem>
+            <SelectItem value="5">≥ 5</SelectItem>
+            <SelectItem value="10">≥ 10</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Label htmlFor="department" className="text-sm whitespace-nowrap">Department</Label>
+        <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+          <SelectTrigger id="department" className="w-[140px]" data-testid="select-department">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            <SelectItem value="deck">Deck</SelectItem>
+            <SelectItem value="engine">Engine</SelectItem>
+            <SelectItem value="navigation">Navigation</SelectItem>
+            <SelectItem value="safety">Safety</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="coc-only"
+          checked={cocOnly}
+          onCheckedChange={(checked) => setCocOnly(checked as boolean)}
+          data-testid="checkbox-coc"
+        />
+        <Label htmlFor="coc-only" className="text-sm">CoC Only</Label>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="search"
+            placeholder="Search equipment..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 w-[180px]"
+            data-testid="input-search"
+          />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setWindowMonths("12");
+          setMinOccurrences("2");
+          setSelectedDepartment("all");
+          setCocOnly(false);
+          setSearchTerm("");
+        }}
+        data-testid="button-clear-filters"
+      >
+        Clear
+      </Button>
+    </div>
   );
 
   const renderVesselTable = () => {
     // Group recurring defects by vessel
     const vesselGroups = filteredDefects.reduce((groups, recurring) => {
-      const vessels = recurring.vesselNames?.split(',') || [];
-      vessels.forEach(vessel => {
+      const vesselNamesStr = (recurring as any).vesselNames || '';
+      const vessels: string[] = vesselNamesStr ? vesselNamesStr.split(',') : [];
+      vessels.forEach((vessel: string) => {
         const vesselName = vessel.trim();
         if (!groups[vesselName]) {
           groups[vesselName] = [];
@@ -569,27 +527,32 @@ export default function RecurringDefects() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Recurring Defects</h1>
-          <p className="text-muted-foreground mt-1">
-            Two or more defects for the same equipment within the selected period
-          </p>
+    <div>
+      <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b">
+        <h1 className="text-2xl font-bold">Recurring Defects</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            data-testid="button-export-all"
+            onClick={() => exportData('recurring_defects_all', recurringDefects)}
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Export All
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            data-testid="button-toggle-filters"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </Button>
         </div>
-        <Button 
-          variant="outline" 
-          data-testid="button-export-all"
-          onClick={() => exportData('recurring_defects_all', recurringDefects)}
-        >
-          <FileDown className="h-4 w-4 mr-2" />
-          Export All
-        </Button>
       </div>
 
-      {renderStatsCards()}
-      {renderFilters()}
+      {showFilters && renderFiltersBar()}
 
+      <div className="p-6">
       <Card>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <CardHeader>
@@ -644,6 +607,7 @@ export default function RecurringDefects() {
           </CardContent>
         </Tabs>
       </Card>
+      </div>
 
       {renderDrillDownPanel()}
 
