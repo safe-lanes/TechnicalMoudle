@@ -6,6 +6,25 @@ interface UseExternalDataOptions {
   enabled?: boolean;
 }
 
+export const useLocalVessels = (options?: UseExternalDataOptions) => {
+  return useQuery({
+    queryKey: ['/technical/api/vessels'],
+    queryFn: async () => {
+      const response = await fetch('/technical/api/vessels', {
+        method: 'GET',
+        headers: { 'accept': 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`Failed to fetch vessels: ${response.status}`);
+      const data = await response.json();
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    enabled: options?.enabled ?? true,
+  });
+};
+
 export const useExternalNationalities = (options?: UseExternalDataOptions) => {
   return useQuery({
     queryKey: ['/technical/api/external/nationalities'],

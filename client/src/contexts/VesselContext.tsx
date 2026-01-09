@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useExternalVessels } from '@/hooks/useExternalMasterData';
+import { useLocalVessels } from '@/hooks/useExternalMasterData';
 
 interface Vessel {
   id: string;
@@ -16,30 +16,19 @@ interface VesselContextType {
 
 export const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
-// Helper to get Vessel Entry Id from vessel master entry
-const getVesselEntryId = (entry: any): string => {
-  return String(entry.vuid || entry.vesselId || '');
-};
-
-// Helper to get vessel name from vessel master entry
-const getVesselName = (entry: any): string => {
-  return String(entry.vessel || entry.vesselName || entry.name || '');
-};
-
 export const VesselProvider = ({ children }: { children: ReactNode }) => {
   const [vesselId, setVesselIdState] = useState<string>(() => {
     return localStorage.getItem('selectedVesselId') || '';
   });
 
-  const { data: vesselMasterEntries = [], isLoading } = useExternalVessels();
+  const { data: vesselEntries = [], isLoading } = useLocalVessels();
   
-  // Transform Vessel Master entries to standard Vessel format
-  const vessels: Vessel[] = vesselMasterEntries
-    .filter((entry: any) => getVesselEntryId(entry))
+  const vessels: Vessel[] = vesselEntries
+    .filter((entry: any) => entry.id)
     .map((entry: any) => ({
-      id: getVesselEntryId(entry),
-      name: getVesselName(entry),
-      code: getVesselEntryId(entry),
+      id: String(entry.id),
+      name: String(entry.name || ''),
+      code: String(entry.code || entry.id),
     }));
 
   useEffect(() => {
