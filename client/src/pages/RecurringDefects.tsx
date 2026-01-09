@@ -181,7 +181,7 @@ export default function RecurringDefects() {
   };
 
   const renderFiltersBar = () => (
-    <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-gray-50 border-b">
+    <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-gray-50">
       <div className="flex items-center gap-2">
         <Label htmlFor="window" className="text-sm whitespace-nowrap">Time Window</Label>
         <Select value={windowMonths} onValueChange={setWindowMonths}>
@@ -528,7 +528,7 @@ export default function RecurringDefects() {
 
   return (
     <div>
-      <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b">
+      <div className="flex justify-between items-center px-6 py-4 bg-gray-50">
         <h1 className="text-2xl font-bold">Recurring Defects</h1>
         <div className="flex items-center gap-2">
           <Button 
