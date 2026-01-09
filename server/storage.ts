@@ -263,7 +263,8 @@ export interface IStorage {
   getMasterComponents(vesselId: string): Promise<Component[]>;
   
   // Get all INHERITED components linked to a specific MASTER
-  getInheritedComponents(masterComponentId: string): Promise<Component[]>;
+  // vesselId parameter enforces vessel isolation to prevent cross-vessel RH aggregation
+  getInheritedComponents(masterComponentId: string, vesselId?: string): Promise<Component[]>;
   
   // Update RH counter type configuration for a component
   updateRHConfig(params: {

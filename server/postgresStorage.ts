@@ -890,10 +890,12 @@ export class PostgresStorage {
   }
 
   // Get all INHERITED components linked to a specific MASTER
-  async getInheritedComponents(masterComponentId: string): Promise<Component[]> {
+  // IMPORTANT: vesselId parameter enforces vessel isolation to prevent cross-vessel aggregation
+  // If vesselId cannot be determined, returns empty array to prevent cross-vessel data leaks
+  async getInheritedComponents(masterComponentId: string, vesselId?: string): Promise<Component[]> {
     const db = await getDb();
     
-    // First try to get the master component to find its component code
+    // First try to get the master component to find its component code and vesselId
     let masterComponent = await this.getComponent(masterComponentId);
     
     // If not found by ID, try finding by component code
@@ -906,14 +908,25 @@ export class PostgresStorage {
     
     const masterComponentCode = masterComponent?.componentCode || masterComponentId;
     const masterComponentFullId = masterComponent?.id || masterComponentId;
+    // Use provided vesselId, or derive from master component for vessel isolation
+    const effectiveVesselId = vesselId || masterComponent?.vesselId;
+    
+    // CRITICAL SAFEGUARD: If we cannot determine the vesselId, return empty array
+    // This prevents cross-vessel data leakage when master lookup fails (e.g., legacy/deleted records)
+    if (!effectiveVesselId) {
+      console.warn(`⚠️ [getInheritedComponents] Cannot determine vesselId for master "${masterComponentId}" - returning empty to prevent cross-vessel leak`);
+      return [];
+    }
     
     // Match inherited components that reference:
     // 1. The exact master component ID (e.g., "V015-601.001")
     // 2. The master's component code (e.g., "601.001") - for legacy data compatibility
     // 3. The original masterComponentId parameter (in case it's a code, not ID)
+    // 4. MUST be in the same vessel as the master component (ALWAYS enforced)
     return await db.select().from(components)
       .where(and(
         eq(components.rhCounterType, 'INHERITED'),
+        eq(components.vesselId, effectiveVesselId),
         or(
           eq(components.rhMasterComponentId, masterComponentFullId),
           eq(components.rhMasterComponentId, masterComponentCode),
@@ -1028,10 +1041,23 @@ export class PostgresStorage {
       throw new Error(`Failed to update MASTER component ${params.componentId}`);
     }
 
-    // Cascade update to all INHERITED components
+    // Cascade update to all INHERITED components IN THE SAME VESSEL
     // Update BOTH rhCurrentInheritedCached (RH config system) AND currentCumulativeRH (legacy field used by WO status calculation)
     // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
+    // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
     const masterComponentCode = component.componentCode || '';
+    const masterVesselId = component.vesselId;
+    
+    // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
+    if (!masterVesselId) {
+      console.warn(`⚠️ [updateMasterRunningHours] Cannot determine vesselId for master "${params.componentId}" - skipping cascade to prevent cross-vessel leak`);
+      return {
+        masterUpdated: masterResult[0],
+        inheritedUpdated: 0,
+      };
+    }
+    
+    // Cascade to inherited components in the same vessel
     const inheritedResult = await db.update(components)
       .set({
         rhCurrentInheritedCached: params.newRHValue.toString(),
@@ -1042,6 +1068,7 @@ export class PostgresStorage {
       })
       .where(and(
         eq(components.rhCounterType, 'INHERITED'),
+        eq(components.vesselId, masterVesselId),
         or(
           eq(components.rhMasterComponentId, params.componentId),
           eq(components.rhMasterComponentId, masterComponentCode),
@@ -1097,9 +1124,19 @@ export class PostgresStorage {
         throw new Error(`Failed to update MASTER component ${params.componentId}`);
       }
 
-      // Cascade to all INHERITED components
+      // Cascade to all INHERITED components IN THE SAME VESSEL
       // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
+      // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
       const masterComponentCode = component.componentCode || '';
+      const masterVesselId = component.vesselId;
+      
+      // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
+      if (!masterVesselId) {
+        console.warn(`⚠️ [setComponentRunningHours] Cannot determine vesselId for master "${params.componentId}" - skipping cascade to prevent cross-vessel leak`);
+        return { component: result[0], inheritedUpdated: 0 };
+      }
+      
+      // Cascade to inherited components in the same vessel
       const inheritedResult = await db.update(components)
         .set({
           rhCurrentInheritedCached: rhValueStr,
@@ -1110,6 +1147,7 @@ export class PostgresStorage {
         })
         .where(and(
           eq(components.rhCounterType, 'INHERITED'),
+          eq(components.vesselId, masterVesselId),
           or(
             eq(components.rhMasterComponentId, params.componentId),
             eq(components.rhMasterComponentId, masterComponentCode),
@@ -4231,56 +4269,66 @@ export class PostgresStorage {
       updatedComponents++;
       auditsCreated++;
       
-      // If parent is MASTER, also update all INHERITED components that reference this master
+      // If parent is MASTER, also update all INHERITED components that reference this master IN THE SAME VESSEL
       // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId/rhCounterSource)
+      // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
       if (parent.rhCounterType === 'MASTER') {
         const masterComponentCode = parent.componentCode || '';
-        const inheritedComponents = await db.select().from(components)
-          .where(and(
-            eq(components.rhCounterType, 'INHERITED'),
-            or(
-              eq(components.rhMasterComponentId, parentComponentId),
-              eq(components.rhMasterComponentId, masterComponentCode),
-              eq(components.rhCounterSource, masterComponentCode)
-            )
-          ));
+        const masterVesselId = parent.vesselId;
         
-        // Calculate the delta from master's change
-        const delta = newRH - currentRH;
+        // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
+        if (!masterVesselId) {
+          console.warn(`⚠️ [updateRunningHoursBulk] Cannot determine vesselId for master "${parentComponentId}" - skipping inherited cascade to prevent cross-vessel leak`);
+        } else {
+          // Cascade to inherited components in the same vessel only
+          const inheritedComponents = await db.select().from(components)
+            .where(and(
+              eq(components.rhCounterType, 'INHERITED'),
+              eq(components.vesselId, masterVesselId),
+              or(
+                eq(components.rhMasterComponentId, parentComponentId),
+                eq(components.rhMasterComponentId, masterComponentCode),
+                eq(components.rhCounterSource, masterComponentCode)
+              )
+            ));
         
-        for (const inherited of inheritedComponents) {
-          // Get inherited component's current individual RH
-          const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
-          // Apply delta to their individual running hours (they maintain their own offset)
-          const newInheritedRH = inheritedCurrentRH + delta;
+          // Calculate the delta from master's change
+          const delta = newRH - currentRH;
           
-          await db.update(components)
-            .set({
-              rhCurrentInheritedCached: newRH.toString(), // Cache master's absolute value for reference
-              rhInheritedUpdatedAt: now,
-              currentCumulativeRH: newInheritedRH.toString(), // Their individual RH + delta
-              lastUpdated: dateUpdated,
-              updatedAt: now
-            })
-            .where(eq(components.id, inherited.id));
-          
-          // Log audit for inherited component
-          await db.insert(runningHoursAudit).values({
-            vesselId: inherited.vesselId || 'unknown',
-            componentId: inherited.id,
-            previousRH: inheritedCurrentRH.toString(),
-            newRH: newInheritedRH.toString(),
-            cumulativeRH: newInheritedRH.toString(),
-            dateUpdatedLocal: dateUpdated,
-            dateUpdatedTZ: 'UTC',
-            enteredAtUTC: now,
-            userId: 'system',
-            source: 'inherited_cascade',
-            comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
-          });
-          
-          updatedComponents++;
-          auditsCreated++;
+          for (const inherited of inheritedComponents) {
+            // Get inherited component's current individual RH
+            const inheritedCurrentRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+            // Apply delta to their individual running hours (they maintain their own offset)
+            const newInheritedRH = inheritedCurrentRH + delta;
+            
+            await db.update(components)
+              .set({
+                rhCurrentInheritedCached: newRH.toString(), // Cache master's absolute value for reference
+                rhInheritedUpdatedAt: now,
+                currentCumulativeRH: newInheritedRH.toString(), // Their individual RH + delta
+                lastUpdated: dateUpdated,
+                updatedAt: now
+              })
+              .where(eq(components.id, inherited.id));
+            
+            // Log audit for inherited component
+            await db.insert(runningHoursAudit).values({
+              vesselId: inherited.vesselId || 'unknown',
+              componentId: inherited.id,
+              previousRH: inheritedCurrentRH.toString(),
+              newRH: newInheritedRH.toString(),
+              cumulativeRH: newInheritedRH.toString(),
+              dateUpdatedLocal: dateUpdated,
+              dateUpdatedTZ: 'UTC',
+              enteredAtUTC: now,
+              userId: 'system',
+              source: 'inherited_cascade',
+              comments: `Inherited delta ${delta} from MASTER ${parent.componentCode || parent.name}`,
+            });
+            
+            updatedComponents++;
+            auditsCreated++;
+          }
         }
       }
     }

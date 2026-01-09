@@ -311,8 +311,8 @@ class MemStorage {
     return components;
   }
 
-  async getInheritedComponents(masterComponentId: string): Promise<any[]> {
-    // First get the master component to find its component code
+  async getInheritedComponents(masterComponentId: string, vesselId?: string): Promise<any[]> {
+    // First get the master component to find its component code and vesselId
     let masterComponent = await this.getComponent(masterComponentId);
     
     // If not found by ID, try finding by component code
@@ -323,16 +323,36 @@ class MemStorage {
     
     const masterComponentCode = masterComponent?.componentCode || masterComponentId;
     const masterComponentFullId = masterComponent?.id || masterComponentId;
+    // Use provided vesselId, or derive from master component for vessel isolation
+    const effectiveVesselId = vesselId || masterComponent?.vesselId;
+    
+    // CRITICAL SAFEGUARD: If we cannot determine the vesselId, return empty array
+    // This prevents cross-vessel data leakage when master lookup fails (e.g., legacy/deleted records)
+    if (!effectiveVesselId) {
+      console.warn(`⚠️ [getInheritedComponents] Cannot determine vesselId for master "${masterComponentId}" - returning empty to prevent cross-vessel leak`);
+      return [];
+    }
     
     // Match inherited components that reference:
     // 1. The exact master component ID (e.g., "V015-601.001")
     // 2. The master's component code (e.g., "601.001") - for legacy data compatibility
     // 3. The original masterComponentId parameter (in case it's a code, not ID)
+    // 4. MUST be in the same vessel as the master component (ALWAYS enforced)
     return toArray(this.data.components).filter(
-      (c: any) => c.rhCounterType === 'INHERITED' && 
-        (c.rhMasterComponentId === masterComponentFullId || 
-         c.rhMasterComponentId === masterComponentCode ||
-         c.rhMasterComponentId === masterComponentId)
+      (c: any) => {
+        // Must be INHERITED type
+        if (c.rhCounterType !== 'INHERITED') return false;
+        
+        // CRITICAL: Must be in same vessel (always enforced)
+        if (c.vesselId !== effectiveVesselId) return false;
+        
+        // Must reference the master component
+        const matchesMaster = c.rhMasterComponentId === masterComponentFullId || 
+                              c.rhMasterComponentId === masterComponentCode ||
+                              c.rhMasterComponentId === masterComponentId;
+        
+        return matchesMaster;
+      }
     );
   }
 
