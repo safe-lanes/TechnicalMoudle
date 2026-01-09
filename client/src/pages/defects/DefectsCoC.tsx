@@ -1,13 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, Clock, Eye, Edit, Paperclip, Link, Plus, Shield } from "lucide-react";
+import { 
+  AlertTriangle, 
+  CheckCircle, 
+  Clock, 
+  Eye, 
+  Edit, 
+  Paperclip, 
+  Link as LinkIcon, 
+  Plus, 
+  Filter,
+  Search
+} from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import DefectFormExact from "./DefectFormExact";
 import DefectFormWizard from "./DefectFormWizard";
 import AddNoteModal from "./AddNoteModal";
@@ -15,6 +31,8 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
+import AgGridTable from "@/components/AgGrid/AgGridTable";
+import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
 
 interface DefectsFilters {
   period?: string;
@@ -25,12 +43,209 @@ interface DefectsFilters {
   status?: string;
 }
 
+const stripHtmlTags = (html: string | null | undefined): string => {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+};
+
+const HtmlTextCellRenderer = (params: ICellRendererParams) => {
+  if (!params.colDef) return null;
+  
+  const plainText = stripHtmlTags(params.value);
+  
+  return (
+    <div 
+      className="line-clamp-2 text-[13px] text-[#4f5863] cursor-default leading-tight py-1"
+      style={{ 
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'normal',
+        wordBreak: 'break-word'
+      }}
+    >
+      {plainText}
+    </div>
+  );
+};
+
+const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
+  if (!params.value) return null;
+  
+  try {
+    const date = new Date(params.value);
+    if (isNaN(date.getTime())) return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    
+    return (
+      <div className="flex flex-col justify-center text-[13px] text-[#4f5863] leading-tight">
+        <span>{day} {month}</span>
+        <span>{year}</span>
+      </div>
+    );
+  } catch {
+    return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
+  }
+};
+
+const StatusCellRenderer = (params: ICellRendererParams) => {
+  if (!params.colDef || !params.data) return null;
+  
+  const status = params.value || 'Open';
+  const critical = params.data.critical;
+  
+  if (status === "Closed") {
+    return (
+      <div className="flex items-center justify-center">
+        <CheckCircle className="h-4 w-4 text-green-600" />
+      </div>
+    );
+  }
+  if (critical) {
+    return (
+      <div className="flex items-center justify-center">
+        <AlertTriangle className="h-4 w-4 text-red-600" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-center">
+      <Clock className="h-4 w-4 text-amber-600" />
+    </div>
+  );
+};
+
+const CategoryCellRenderer = (params: ICellRendererParams) => {
+  if (!params.colDef || !params.data) return null;
+  
+  const category = params.value || 'Defect';
+  
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[13px] text-[#4f5863]">{category}</span>
+      <Badge className="bg-blue-100 text-blue-700 text-[10px] py-0 px-1">
+        CoC
+      </Badge>
+    </div>
+  );
+};
+
+interface ActionsCellContext {
+  handleViewClick: (data: Defect) => void;
+  handleEditClick: (data: Defect) => void;
+  handleNoteClick: (data: Defect) => void;
+  handleLinkClick: (data: Defect) => void;
+  handleCloseClick: (data: Defect) => void;
+}
+
+const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
+  if (!params.colDef || !params.data) return null;
+  
+  const defect = params.data as Defect;
+  const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+  const { handleViewClick, handleEditClick, handleNoteClick, handleLinkClick, handleCloseClick } = params.context;
+  
+  return (
+    <div className="flex gap-1 justify-center items-center">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-6 w-6"
+              onClick={() => handleViewClick(defect)}
+              data-testid={`button-view-coc-${defect.id}`}
+            >
+              <Eye className="h-4 w-4 text-gray-500" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>View</p></TooltipContent>
+        </Tooltip>
+        
+        {isActiveDefect && (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-6 w-6"
+                  onClick={() => handleEditClick(defect)}
+                  data-testid={`button-edit-coc-${defect.id}`}
+                >
+                  <Edit className="h-4 w-4 text-gray-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Edit</p></TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-6 w-6"
+                  onClick={() => handleNoteClick(defect)}
+                  data-testid={`button-note-coc-${defect.id}`}
+                >
+                  <Paperclip className="h-4 w-4 text-gray-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Add Note</p></TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-6 w-6"
+                  onClick={() => handleLinkClick(defect)}
+                  data-testid={`button-link-coc-${defect.id}`}
+                >
+                  <LinkIcon className="h-4 w-4 text-gray-500" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Link Defects</p></TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-6 w-6"
+                  onClick={() => handleCloseClick(defect)}
+                  data-testid={`button-close-coc-${defect.id}`}
+                >
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Close/Complete</p></TooltipContent>
+            </Tooltip>
+          </>
+        )}
+      </TooltipProvider>
+    </div>
+  );
+};
+
 export default function DefectsCoC() {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
+  const [showFilters, setShowFilters] = useState(false);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
+  const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
     open: false, 
     defect: null 
@@ -43,13 +258,12 @@ export default function DefectsCoC() {
     queryKey: ['/technical/api/defects', { ...filters, is_coc: true }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('is_coc', 'true'); // Filter for CoC defects only
+      params.append('is_coc', 'true');
       
       if (filters.vesselId) params.append('vesselId', filters.vesselId);
       if (filters.search) params.append('search', filters.search);
       if (filters.period) params.append('period', filters.period);
       if (filters.fleet) params.append('fleet', filters.fleet);
-      // Only send dueOverdue when filtering active defects
       if (filters.dueOverdue && filters.status === 'active') params.append('dueOverdue', filters.dueOverdue);
       
       const response = await fetch(`/technical/api/defects?${params}`);
@@ -65,57 +279,14 @@ export default function DefectsCoC() {
     } else if (filters.status === 'resolved') {
       return ['Closed', 'Cancelled'].includes(defect.status);
     }
-    return true; // 'all' shows everything
+    return true;
   });
 
-  // Check if resolved items may be included (for column display)
   const includesResolved = filters.status === 'resolved' || filters.status === 'all';
-
-  const getStatusBadge = (status: string, critical: boolean) => {
-    const statusColors: Record<string, string> = {
-      'Open': 'bg-red-100 text-red-700',
-      'Pending': 'bg-yellow-100 text-yellow-700',
-      'In-Progress': 'bg-blue-100 text-blue-700',
-      'Awaiting Parts': 'bg-orange-100 text-orange-700',
-      'Deferred': 'bg-gray-100 text-gray-700',
-      'Closed': 'bg-green-100 text-green-700',
-      'Cancelled': 'bg-gray-100 text-gray-700',
-    };
-    
-    return (
-      <Badge className={cn('text-xs', statusColors[status] || 'bg-gray-100 text-gray-700')}>
-        {status}
-      </Badge>
-    );
-  };
-
-  const getDaysOverdue = (targetDate: string | null) => {
-    if (!targetDate) return null;
-    const target = new Date(targetDate);
-    const today = new Date();
-    const diffTime = today.getTime() - target.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getCompletionStatus = (targetDate: string | null, dateCompleted: string | null) => {
-    if (!targetDate || !dateCompleted) return null;
-    const target = new Date(targetDate);
-    const completed = new Date(dateCompleted);
-    const diffTime = completed.getTime() - target.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays <= 0) {
-      return <span className="text-green-600 text-xs">On Time</span>;
-    } else {
-      return <span className="text-red-600 text-xs">Late ({diffDays} days)</span>;
-    }
-  };
 
   const handleFilterChange = (key: keyof DefectsFilters, value: any) => {
     setFilters(prev => {
       const newFilters = { ...prev, [key]: value };
-      // Clear dueOverdue when changing status away from 'active'
       if (key === 'status' && value !== 'active') {
         delete newFilters.dueOverdue;
       }
@@ -127,17 +298,17 @@ export default function DefectsCoC() {
     setFilters({ status: 'active' });
   };
 
-  const handleViewDefect = (defect: Defect) => {
+  const handleViewDefect = useCallback((defect: Defect) => {
     setSelectedDefect(defect);
     setDefectFormMode('view');
     setShowNewDefectForm(true);
-  };
+  }, []);
 
-  const handleEditDefect = (defect: Defect) => {
+  const handleEditDefect = useCallback((defect: Defect) => {
     setSelectedDefect(defect);
     setDefectFormMode('edit');
     setShowNewDefectForm(true);
-  };
+  }, []);
 
   const handleNewDefect = () => {
     setSelectedDefect(null);
@@ -145,77 +316,199 @@ export default function DefectsCoC() {
     setShowNewDefectForm(true);
   };
 
-  const handleCloseDefect = (defectId: string) => {
-    // Find the defect in the current list
-    const defect = defects.find((d: Defect) => d.id === defectId);
-    if (defect) {
-      setCloseModal({ open: true, defect });
+  const handleNoteClick = useCallback((defect: Defect) => {
+    setAddNoteModal({ open: true, defectId: defect.id });
+  }, []);
+
+  const handleLinkClick = useCallback((defect: Defect) => {
+    setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] });
+  }, []);
+
+  const handleCloseClick = useCallback((defect: Defect) => {
+    setCloseModal({ open: true, defect });
+  }, []);
+
+  const onGridReady = useCallback((event: GridReadyEvent) => {
+    setGridApi(event.api);
+    event.api.sizeColumnsToFit();
+  }, []);
+
+  useEffect(() => {
+    if (!gridApi) return;
+    const handleResize = () => {
+      setTimeout(() => {
+        gridApi.sizeColumnsToFit();
+      }, 100);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [gridApi]);
+
+  const columnDefs: ColDef[] = [
+    {
+      headerName: 'ID',
+      field: 'id',
+      flex: 0.8,
+      cellStyle: { fontSize: '13px', color: '#2563eb' },
+      filter: 'agTextColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Vessel',
+      field: 'vesselName',
+      flex: 0.7,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agSetColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Issue Date',
+      field: 'issueDate',
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Category',
+      field: 'category',
+      flex: 0.8,
+      cellRenderer: CategoryCellRenderer,
+      filter: 'agSetColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Description',
+      field: 'description',
+      flex: 1.5,
+      cellRenderer: HtmlTextCellRenderer,
+      autoHeight: true,
+      wrapText: true,
+      filter: 'agTextColumnFilter',
+      sortable: true,
+      resizable: true,
+      tooltipValueGetter: (params) => stripHtmlTags(params.value)
+    },
+    {
+      headerName: 'Action Taken / Requested',
+      field: 'actionTakenRequested',
+      flex: 1.5,
+      cellRenderer: HtmlTextCellRenderer,
+      autoHeight: true,
+      wrapText: true,
+      filter: 'agTextColumnFilter',
+      sortable: true,
+      resizable: true,
+      tooltipValueGetter: (params) => stripHtmlTags(params.value)
+    },
+    {
+      headerName: 'Target Date',
+      field: 'targetCloseDate',
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    ...(includesResolved ? [{
+      headerName: 'Date Compl.',
+      field: 'dateCompleted',
+      flex: 0.6,
+      cellRenderer: TwoLineDateCellRenderer,
+      filter: 'agDateColumnFilter',
+      sortable: true,
+      resizable: true
+    }] : []),
+    {
+      headerName: 'Status',
+      field: 'status',
+      flex: 0.5,
+      cellRenderer: StatusCellRenderer,
+      cellClass: 'flex items-center justify-center',
+      filter: 'agSetColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Actions',
+      field: 'actions',
+      flex: 0.9,
+      cellRenderer: ActionsCellRenderer,
+      sortable: false,
+      filter: false,
+      cellClass: 'flex items-center justify-center'
     }
+  ];
+
+  const invalidateCoCQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const queryKey = query.queryKey;
+        return Array.isArray(queryKey) && 
+               queryKey[0] === '/technical/api/defects' && 
+               queryKey[1] && 
+               typeof queryKey[1] === 'object' && 
+               'is_coc' in queryKey[1];
+      }
+    });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-blue-600" />
-                Condition of Class (CoC) Defects
-              </h1>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-green-600 hover:bg-green-700 text-white" 
-                    size="sm" 
-                    data-testid="button-new-coc-defect"
-                    onClick={handleNewDefect}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New CoC Defect
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-                  <DefectFormExact 
-                    onClose={() => {
-                      setShowNewDefectForm(false);
-                      setSelectedDefect(null);
-                      // Invalidate both general and CoC-specific queries
-                      queryClient.invalidateQueries({ queryKey: ['/technical/api/defects'] });
-                      queryClient.invalidateQueries({ 
-                        predicate: (query) => {
-                          const queryKey = query.queryKey;
-                          return Array.isArray(queryKey) && 
-                                 queryKey[0] === '/technical/api/defects' && 
-                                 queryKey[1] && 
-                                 typeof queryKey[1] === 'object' && 
-                                 'is_coc' in queryKey[1];
-                        }
-                      });
-                    }}
-                    defect={selectedDefect}
-                    mode={defectFormMode}
-                  />
-                </DialogContent>
-              </Dialog>
-            </div>
+      <div className="pt-2 px-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Condition of Class (CoC) Defects</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-toggle-coc-filters"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+            </Button>
+            <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
+              <DialogTrigger asChild>
+                <Button 
+                  className="bg-green-600 hover:bg-green-700 text-white h-8" 
+                  size="sm" 
+                  data-testid="button-new-coc-defect"
+                  onClick={handleNewDefect}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New CoC Defect
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+                <DefectFormExact 
+                  onClose={() => {
+                    setShowNewDefectForm(false);
+                    setSelectedDefect(null);
+                    invalidateCoCQueries();
+                  }}
+                  defect={selectedDefect}
+                  mode={defectFormMode}
+                />
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-      </div>
 
-      {/* Filter Controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Period */}
+        {/* Collapsible Filters */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-2 mb-4 bg-transparent rounded-lg">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
+              <Clock className="h-4 w-4 text-[#8798ad]" />
               <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-24 h-8 text-xs">
+                <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,17 +520,18 @@ export default function DefectsCoC() {
               </Select>
             </div>
 
-            {/* Search */}
-            <Input
-              placeholder="Search CoC Defect"
-              value={filters.search || ""}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-36 h-8 text-xs"
-            />
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8798ad]" />
+              <Input
+                placeholder="Search CoC Defect"
+                value={filters.search || ""}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-[160px] h-8 text-xs pl-8 text-[#8798ad]"
+              />
+            </div>
 
-            {/* Vessel */}
             <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
-              <SelectTrigger className="w-24 h-8 text-xs">
+              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
                 <SelectValue placeholder="Vessel" />
               </SelectTrigger>
               <SelectContent>
@@ -246,9 +540,8 @@ export default function DefectsCoC() {
               </SelectContent>
             </Select>
 
-            {/* Fleet */}
             <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="w-20 h-8 text-xs">
+              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
                 <SelectValue placeholder="Fleet" />
               </SelectTrigger>
               <SelectContent>
@@ -257,9 +550,8 @@ export default function DefectsCoC() {
               </SelectContent>
             </Select>
 
-            {/* Status Filter */}
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger className="w-28 h-8 text-xs">
+              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -269,10 +561,9 @@ export default function DefectsCoC() {
               </SelectContent>
             </Select>
 
-            {/* Due/Overdue - Only show for Active filter */}
             {filters.status === 'active' && (
               <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-                <SelectTrigger className="w-28 h-8 text-xs">
+                <SelectTrigger className="w-[130px] h-8 text-xs text-[#8798ad]">
                   <SelectValue placeholder="Due / Overdue" />
                 </SelectTrigger>
                 <SelectContent>
@@ -282,191 +573,43 @@ export default function DefectsCoC() {
                 </SelectContent>
               </Select>
             )}
-          </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs px-3">
-              Apply
-            </Button>
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 text-xs px-3"
               onClick={handleClearFilters}
+              variant="ghost" 
+              className="h-8 px-4 text-xs"
             >
               Clear
             </Button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="p-6">
+      {/* AG Grid Table */}
+      <div className="px-4 flex-1 flex flex-col min-h-0">
         {isLoading ? (
-          <div className="text-center py-12 text-gray-500">Loading CoC defects...</div>
-        ) : defects.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-            <Shield className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">
-              No {filters.status === 'resolved' ? 'resolved' : filters.status === 'all' ? '' : 'active'} CoC defects found
-            </p>
-            <div className="flex gap-2 justify-center">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleClearFilters}
-              >
-                Clear Filters
-              </Button>
-              <Button 
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => setShowNewDefectForm(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New CoC Defect
-              </Button>
-            </div>
-          </div>
+          <div className="text-center py-8 text-gray-500">Loading CoC defects...</div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="w-24">ID</TableHead>
-                  <TableHead className="w-32">Vessel</TableHead>
-                  <TableHead className="w-28">Issue Date</TableHead>
-                  <TableHead className="w-24">Category</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Action Taken/Requested</TableHead>
-                  <TableHead className="w-28">Target Date</TableHead>
-                  {includesResolved && (
-                    <TableHead className="w-32">Date Completed</TableHead>
-                  )}
-                  <TableHead className="w-24">Status</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {defects.map((defect: Defect) => {
-                  const daysOverdue = getDaysOverdue(defect.targetCloseDate);
-                  const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
-                  const isOverdue = isActiveDefect && daysOverdue !== null && daysOverdue > 0;
-                  
-                  return (
-                    <TableRow key={defect.id} className={isOverdue ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium text-xs">
-                        <div className="flex items-center gap-2">
-                          {defect.critical && <AlertTriangle className="h-3 w-3 text-red-600" />}
-                          {defect.id}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs">{defect.vesselName}</TableCell>
-                      <TableCell className="text-xs">{defect.issueDate}</TableCell>
-                      <TableCell className="text-xs">
-                        <div className="flex items-center gap-2">
-                          {defect.category}
-                          <Badge className="bg-blue-100 text-blue-700 text-xs py-0 px-1">
-                            CoC
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs max-w-xs truncate">{defect.description}</TableCell>
-                      <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
-                      <TableCell className="text-xs">
-                        <div className="flex items-center gap-1">
-                          {defect.targetCloseDate}
-                          {isOverdue && (
-                            <span className="text-red-600 text-xs" title={`Overdue by ${daysOverdue} days`}>
-                              <Clock className="h-3 w-3" />
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      {includesResolved && (
-                        <TableCell className="text-xs">
-                          <div className="flex flex-col">
-                            <span>{defect.dateCompleted || '-'}</span>
-                            {defect.dateCompleted && getCompletionStatus(defect.targetCloseDate, defect.dateCompleted)}
-                          </div>
-                        </TableCell>
-                      )}
-                      <TableCell>{getStatusBadge(defect.status, defect.critical)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 w-7 p-0"
-                            title="View"
-                            onClick={() => handleViewDefect(defect)}
-                            data-testid={`button-view-coc-${defect.id}`}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          {isActiveDefect && (
-                            <>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0"
-                                title="Edit"
-                                onClick={() => handleEditDefect(defect)}
-                                data-testid={`button-edit-coc-${defect.id}`}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0"
-                                title="Add Note"
-                                onClick={() => setAddNoteModal({ open: true, defectId: defect.id })}
-                                data-testid={`button-note-coc-${defect.id}`}
-                              >
-                                <Paperclip className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0"
-                                title="Link"
-                                onClick={() => setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] })}
-                                data-testid={`button-link-coc-${defect.id}`}
-                              >
-                                <Link className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 w-7 p-0 text-green-600"
-                                title="Close/Complete"
-                                onClick={() => handleCloseDefect(defect.id)}
-                                data-testid={`button-close-coc-${defect.id}`}
-                              >
-                                <CheckCircle className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            {/* Pagination */}
-            <div className="px-4 py-3 border-t bg-gray-50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-700">
-                  Showing {defects.length} CoC defects
-                </span>
-                <span className="text-xs text-gray-500">
-                  Page 1 of 1
-                </span>
-              </div>
-            </div>
+          <div className="flex-1 min-h-0">
+            <AgGridTable
+              rowData={defects}
+              columnDefs={columnDefs}
+              onGridReady={onGridReady}
+              enableSideBar={true}
+              enableStatusBar={true}
+              enableRowGrouping={true}
+              height="100%"
+              gridOptions={{
+                domLayout: 'normal'
+              }}
+              context={{
+                handleViewClick: handleViewDefect,
+                handleEditClick: handleEditDefect,
+                handleNoteClick,
+                handleLinkClick,
+                handleCloseClick
+              }}
+            />
           </div>
         )}
       </div>
@@ -478,17 +621,7 @@ export default function DefectsCoC() {
           onOpenChange={(open) => {
             if (!open) {
               setCloseModal({ open: false, defect: null });
-              // Refresh the CoC-specific query to ensure the page updates
-              queryClient.invalidateQueries({ 
-                predicate: (query) => {
-                  const queryKey = query.queryKey;
-                  return Array.isArray(queryKey) && 
-                         queryKey[0] === '/technical/api/defects' && 
-                         queryKey[1] && 
-                         typeof queryKey[1] === 'object' && 
-                         'is_coc' in queryKey[1];
-                }
-              });
+              invalidateCoCQueries();
             }
           }}
         >
@@ -499,17 +632,7 @@ export default function DefectsCoC() {
               initialStep={3}
               onCompleted={() => {
                 setCloseModal({ open: false, defect: null });
-                // Refresh the CoC-specific query
-                queryClient.invalidateQueries({ 
-                  predicate: (query) => {
-                    const queryKey = query.queryKey;
-                    return Array.isArray(queryKey) && 
-                           queryKey[0] === '/technical/api/defects' && 
-                           queryKey[1] && 
-                           typeof queryKey[1] === 'object' && 
-                           'is_coc' in queryKey[1];
-                  }
-                });
+                invalidateCoCQueries();
               }}
             />
           </DialogContent>
