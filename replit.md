@@ -39,6 +39,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
 ## Checkpoints
+- **Gamma** (Jan 9, 2026 - commit 10e2609): Legacy WO protection hardened. Legacy fallback now checks by both jobId AND vessel-scoped jobNo. Cycle maps index both component-aware keys and legacy keys (empty componentCode) to prevent same-cycle regeneration on historical data.
 - **Beta** (Jan 9, 2026 - commit ab3be09): Multi-component job WO generation fix. Jobs linked to multiple components via job_component_links now generate separate work orders for each linked component. Duplicate prevention checks jobId + componentCode with null normalization for backwards compatibility. Vessel-scoped component lookup prevents cross-vessel misassociation.
 - **Alpha** (Jan 9, 2026 - commit b6b32f5): RH cascade fix complete. All three RH update paths now consistently match inherited components by UUID, component code, and rhCounterSource field. Verified: 601.001 (1000h→98 components), 651.001 (500h→68 components), 652.001 (450h→68 components).
 
