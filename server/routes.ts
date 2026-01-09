@@ -5511,24 +5511,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Seed recurring defects test data
     app.post("/dev/seed/recurring-defects", async (req, res) => {
       try {
-        const seedData = getSeedDefectsData();
+        // Fetch real vessels from external API
+        const EXTERNAL_API_URL = "https://dev.sl-sail.com/b/api/v1/crewmasterdata/getallmasterdata";
+        const domain = req.query.domain || 'rsms';
+        let externalVessels: Array<{ vuid: string; vessel: string; imo_number?: string; vessel_type_name?: string }> = [];
+        
+        try {
+          const apiResponse = await fetch(`${EXTERNAL_API_URL}/vessels?domain=${domain}`, {
+            method: 'GET',
+            headers: { 'accept': '*/*' }
+          });
+          if (apiResponse.ok) {
+            const apiData = await apiResponse.json();
+            externalVessels = apiData.vessels || [];
+          }
+        } catch (apiError) {
+          console.log("Could not fetch external vessels, using fallback names");
+        }
+        
+        // Get vessel names from external API, or use fallback if API unavailable
+        const vesselNames = externalVessels.length > 0 
+          ? externalVessels.slice(0, 5).map(v => v.vessel)
+          : ['Vessel 1', 'Vessel 2', 'Vessel 3', 'Vessel 4', 'Vessel 5'];
+        
+        const seedData = getSeedDefectsData(vesselNames);
         let created = 0;
         let updated = 0;
         
         for (const seedDefect of seedData) {
-          // Check if vessel exists, create if not
-          let vesselId = await storage.getVesselIdByName(seedDefect.vesselName);
-          if (!vesselId) {
-            // Create vessel with a simple ID and code
-            vesselId = seedDefect.vesselName.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-            const vesselCode = seedDefect.vesselName.split(' ').pop()?.substring(0, 3).toUpperCase() || 'VES';
-            await storage.createVessel({
-              id: vesselId,
-              name: seedDefect.vesselName,
-              code: vesselCode,
-              vesselType: 'Container'
-            });
-          }
+          // For external vessels, use vuid as vesselId; don't create local vessels
+          let vesselId = seedDefect.vesselId || seedDefect.vesselName.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
           
           // Convert dates from YYYY-MM-DD to DD-MM-YYYY for storage
           const convertDate = (dateStr: string) => {
@@ -7879,10 +7891,11 @@ function generateCSVContent(reportId: string, data: any, template?: any): Buffer
   return Buffer.from(csvContent, 'utf-8');
 }
 
-// Helper function to get seed defects data (returns empty array - no test data)
+// Helper function to get seed defects data using real vessel names from external API
 interface SeedDefect {
   seedId: string;
   vesselName: string;
+  vesselId?: string;
   issuedDate: string;
   targetDate: string;
   status: string;
@@ -7902,12 +7915,19 @@ interface SeedDefect {
   dateCompleted?: string;
 }
 
-function getSeedDefectsData(): SeedDefect[] {
+function getSeedDefectsData(vesselNames: string[]): SeedDefect[] {
+  // Use provided vessel names from external API (or fallback)
+  const vessel1 = vesselNames[0] || 'Vessel 1';
+  const vessel2 = vesselNames[1] || 'Vessel 2';
+  const vessel3 = vesselNames[2] || 'Vessel 3';
+  const vessel4 = vesselNames[3] || 'Vessel 4';
+  const vessel5 = vesselNames[4] || 'Vessel 5';
+  
   return [
     // Equipment Group A: Main Engine Fuel Pump - 4 occurrences across 2 vessels (recurring)
     {
       seedId: 'RD-A-001',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-03-15',
       targetDate: '2025-04-15',
       status: 'closed',
@@ -7928,7 +7948,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-A-002',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-06-20',
       targetDate: '2025-07-20',
       status: 'open',
@@ -7948,7 +7968,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-A-003',
-      vesselName: 'MV Atlantic Voyager',
+      vesselName: vessel2,
       issuedDate: '2025-04-01',
       targetDate: '2025-05-01',
       status: 'closed',
@@ -7969,7 +7989,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-A-004',
-      vesselName: 'MV Atlantic Voyager',
+      vesselName: vessel2,
       issuedDate: '2025-09-10',
       targetDate: '2025-10-10',
       status: 'open',
@@ -7991,7 +8011,7 @@ function getSeedDefectsData(): SeedDefect[] {
     // Equipment Group B: Navigation Radar - 3 occurrences across 3 vessels (recurring)
     {
       seedId: 'RD-B-001',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-02-10',
       targetDate: '2025-03-10',
       status: 'closed',
@@ -8012,7 +8032,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-B-002',
-      vesselName: 'MV Indian Ocean',
+      vesselName: vessel3,
       issuedDate: '2025-05-15',
       targetDate: '2025-06-15',
       status: 'open',
@@ -8032,7 +8052,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-B-003',
-      vesselName: 'MV Atlantic Voyager',
+      vesselName: vessel2,
       issuedDate: '2025-08-20',
       targetDate: '2025-09-20',
       status: 'open',
@@ -8054,7 +8074,7 @@ function getSeedDefectsData(): SeedDefect[] {
     // Equipment Group C: Lifeboat Davit - 2 occurrences (minimum recurring)
     {
       seedId: 'RD-C-001',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-01-20',
       targetDate: '2025-02-20',
       status: 'closed',
@@ -8075,7 +8095,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-C-002',
-      vesselName: 'MV Atlantic Voyager',
+      vesselName: vessel2,
       issuedDate: '2025-07-05',
       targetDate: '2025-08-05',
       status: 'open',
@@ -8097,7 +8117,7 @@ function getSeedDefectsData(): SeedDefect[] {
     // Equipment Group D: Steering Gear - 3 occurrences (recurring with CoC)
     {
       seedId: 'RD-D-001',
-      vesselName: 'MV Indian Ocean',
+      vesselName: vessel3,
       issuedDate: '2025-03-01',
       targetDate: '2025-04-01',
       status: 'closed',
@@ -8118,7 +8138,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-D-002',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-06-15',
       targetDate: '2025-07-15',
       status: 'open',
@@ -8138,7 +8158,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-D-003',
-      vesselName: 'MV Atlantic Voyager',
+      vesselName: vessel2,
       issuedDate: '2025-10-01',
       targetDate: '2025-11-01',
       status: 'open',
@@ -8160,7 +8180,7 @@ function getSeedDefectsData(): SeedDefect[] {
     // Equipment Group E: Cargo Hold Ventilation - 2 occurrences
     {
       seedId: 'RD-E-001',
-      vesselName: 'MV Indian Ocean',
+      vesselName: vessel3,
       issuedDate: '2025-04-10',
       targetDate: '2025-05-10',
       status: 'closed',
@@ -8181,7 +8201,7 @@ function getSeedDefectsData(): SeedDefect[] {
     },
     {
       seedId: 'RD-E-002',
-      vesselName: 'MV Pacific Star',
+      vesselName: vessel1,
       issuedDate: '2025-08-25',
       targetDate: '2025-09-25',
       status: 'open',
@@ -8203,7 +8223,7 @@ function getSeedDefectsData(): SeedDefect[] {
     // Single defects (not recurring - for variety)
     {
       seedId: 'RD-F-001',
-      vesselName: 'MV Indian Ocean',
+      vesselName: vessel3,
       issuedDate: '2025-09-01',
       targetDate: '2025-10-01',
       status: 'open',
