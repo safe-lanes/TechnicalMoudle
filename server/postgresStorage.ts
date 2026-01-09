@@ -4155,11 +4155,17 @@ export class PostgresStorage {
       auditsCreated++;
       
       // If parent is MASTER, also update all INHERITED components that reference this master
+      // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId/rhCounterSource)
       if (parent.rhCounterType === 'MASTER') {
+        const masterComponentCode = parent.componentCode || '';
         const inheritedComponents = await db.select().from(components)
           .where(and(
-            eq(components.rhMasterComponentId, parentComponentId),
-            eq(components.rhCounterType, 'INHERITED')
+            eq(components.rhCounterType, 'INHERITED'),
+            or(
+              eq(components.rhMasterComponentId, parentComponentId),
+              eq(components.rhMasterComponentId, masterComponentCode),
+              eq(components.rhCounterSource, masterComponentCode)
+            )
           ));
         
         // Calculate the delta from master's change
