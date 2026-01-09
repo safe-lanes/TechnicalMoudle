@@ -71,13 +71,23 @@ export function registerRunningHoursRoutes(app: Express) {
       const children = allComponents.filter(c => c.parentId === parentCode);
       
       // Format response with RH data for each child
-      const childrenWithRH = children.map(child => ({
-        id: child.id,
-        componentCode: child.componentCode || '',
-        name: child.name || '',
-        currentCumulativeRH: child.currentCumulativeRH || '0.00',
-        lastUpdated: child.lastUpdated || child.updatedAt || '-'
-      }));
+      // For INHERITED components, use rhCurrentInheritedCached as the display value (vessel-isolated)
+      const childrenWithRH = children.map(child => {
+        const isInherited = child.rhCounterType === 'INHERITED';
+        // Display value: use rhCurrentInheritedCached for inherited components, currentCumulativeRH for others
+        const displayRH = isInherited 
+          ? (child.rhCurrentInheritedCached || child.currentCumulativeRH || '0.00')
+          : (child.currentCumulativeRH || '0.00');
+        
+        return {
+          id: child.id,
+          componentCode: child.componentCode || '',
+          name: child.name || '',
+          currentCumulativeRH: displayRH,
+          rhCounterType: child.rhCounterType || 'NOT_RH_DRIVEN',
+          lastUpdated: child.lastUpdated || child.updatedAt || '-'
+        };
+      });
       
       // Sort by component code
       childrenWithRH.sort((a, b) => a.componentCode.localeCompare(b.componentCode));

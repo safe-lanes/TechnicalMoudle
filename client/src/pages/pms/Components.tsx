@@ -722,7 +722,12 @@ const RunningHoursConditionSection: React.FC<{ selectedComponent: ComponentNode 
     : (runningHoursData && typeof runningHoursData === 'object' ? runningHoursData : null);
   
   // Components show their OWN RH value (maintained independently)
+  // For INHERITED components, use rhCurrentInheritedCached which is vessel-isolated
   const getDisplayRH = (comp: any) => {
+    const isInherited = comp?.rhCounterType === 'INHERITED';
+    if (isInherited) {
+      return comp?.rhCurrentInheritedCached || comp?.currentCumulativeRH || comp?.runningHours || "0";
+    }
     return comp?.currentCumulativeRH || comp?.runningHours || "0";
   };
   

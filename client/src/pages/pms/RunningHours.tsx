@@ -23,6 +23,7 @@ interface ChildRHData {
   componentCode: string;
   name: string;
   currentCumulativeRH: string;
+  rhCounterType?: string;
   lastUpdated: string;
 }
 
