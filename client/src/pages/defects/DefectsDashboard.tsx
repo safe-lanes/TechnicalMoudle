@@ -9,15 +9,14 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  RefreshCw,
   Ship,
   Calendar,
   Shield,
+  Filter,
   Activity,
   AlertCircle,
   FileText,
-  WrenchIcon,
-  XCircle
+  Loader2
 } from "lucide-react";
 import { isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
 import { useVessels } from "@/hooks/useVessels";
@@ -86,7 +85,7 @@ const KPICard = ({ title, value, icon: Icon, color, change, changeType, subtitle
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
   const [dateRange, setDateRange] = useState("thisyear");
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [showFilters, setShowFilters] = useState(false);
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
     queryKey: ['/technical/api/defects?includeClosedDefects=true'],
@@ -179,9 +178,9 @@ export default function DefectsDashboard() {
     })
     .slice(0, 5);
 
-  const handleRefresh = () => {
-    refetch();
-    setLastRefresh(new Date());
+  const handleClearFilters = () => {
+    setSelectedVessel('all');
+    setDateRange('thisyear');
   };
 
   const navigateToDefectLog = (filter?: string) => {
@@ -197,37 +196,33 @@ export default function DefectsDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <WrenchIcon className="h-8 w-8 text-blue-500" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Defects Dashboard</h1>
-              <p className="text-sm text-gray-500">Overview of maintenance defects and issues</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className="text-green-600">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              System Active
-            </Badge>
-            <div className="text-sm text-gray-500">
-              Last updated: {format(lastRefresh, 'HH:mm:ss')}
-            </div>
-            <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
-              <RefreshCw className="h-4 w-4" />
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Header */}
+      <div className="pt-2 px-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <h1 className="text-2xl font-bold text-black dark:text-white">Defects Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8 gap-2 bg-white dark:bg-gray-800 text-[#0f172a] dark:text-white border-gray-300 dark:border-gray-600"
+              data-testid="button-toggle-dashboard-filters"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Ship className="h-4 w-4 text-gray-500" />
+        {/* Collapsible Filters */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-2 mb-4 bg-transparent rounded-lg">
+            <div className="flex items-center gap-2">
+              <Ship className="h-4 w-4 text-[#8798ad]" />
               <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-                <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue placeholder="Select vessel" />
+                <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]" data-testid="select-vessel">
+                  <SelectValue placeholder="Vessel" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Vessels</SelectItem>
@@ -240,11 +235,11 @@ export default function DefectsDashboard() {
               </Select>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[#8798ad]" />
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-48" data-testid="select-date-range">
-                  <SelectValue placeholder="Select date range" />
+                <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]" data-testid="select-date-range">
+                  <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="last7days">Last 7 Days</SelectItem>
@@ -255,25 +250,21 @@ export default function DefectsDashboard() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {(selectedVessel !== 'all' || dateRange !== 'thisyear') && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedVessel('all');
-                setDateRange('thisyear');
-              }}
-              className="flex items-center space-x-2"
+            <Button 
+              onClick={handleClearFilters}
+              variant="ghost" 
+              className="h-8 px-4 text-xs"
               data-testid="button-clear-filters"
             >
-              <XCircle className="h-4 w-4" />
-              <span>Clear Filters</span>
+              Clear
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Dashboard Content */}
+      <div className="px-4 flex-1 overflow-y-auto space-y-6">
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
@@ -453,7 +444,7 @@ export default function DefectsDashboard() {
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
-              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
             </div>
           ) : recentDefects.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-400">
@@ -535,6 +526,7 @@ export default function DefectsDashboard() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
