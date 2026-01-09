@@ -169,15 +169,18 @@ export function buildJobsWithActiveWOSet(
 
 /**
  * Build a map of existing cycle-based work orders for RH jobs
- * Key: `${vesselId}|${jobNo}|${cycleDueRh}` (vessel-scoped to prevent cross-vessel blocking)
+ * Key: `${vesselId}|${jobNo}|${componentCode}|${cycleDueRh}` (vessel + component scoped)
  * 
  * IMPORTANT: Includes ALL work orders (active AND completed) because a completed
  * WO still represents that cycle being satisfied. Only excludes cancelled/rejected.
  * 
+ * FIX: Now includes componentCode in the key to support multi-component jobs where
+ * each linked component should have its own work order per cycle.
+ * 
  * @param workOrders - Array of work orders to process
  * @param vesselId - Optional vessel ID to filter work orders (if provided, only includes WOs for that vessel)
  */
-export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueRhSnapshot?: string | null; vesselId?: string | null }>(
+export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueRhSnapshot?: string | null; vesselId?: string | null; componentCode?: string | null }>(
   workOrders: T[],
   vesselId?: string
 ): Map<string, T> {
@@ -198,10 +201,19 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
     if (wo.cycleDueRhSnapshot) {
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        // Include vesselId in cycle key to make it vessel-scoped
         const woVesselId = wo.vesselId || 'unknown';
-        const cycleKey = `${woVesselId}|${jobNo}|${wo.cycleDueRhSnapshot}`;
+        const compCode = wo.componentCode || '';
+        
+        // Include vesselId AND componentCode in cycle key to support multi-component jobs
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueRhSnapshot}`;
         cycleMap.set(cycleKey, wo);
+        
+        // LEGACY SUPPORT: Also index under 'unknown' componentCode for legacy WOs without componentCode
+        // This allows modern component-specific lookups to still find legacy entries
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueRhSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
       }
     }
   });
@@ -211,15 +223,18 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
 
 /**
  * Build a map of existing cycle-based work orders for Calendar jobs
- * Key: `${vesselId}|${jobNo}|${cycleDueDate}` (vessel-scoped to prevent cross-vessel blocking)
+ * Key: `${vesselId}|${jobNo}|${componentCode}|${cycleDueDate}` (vessel + component scoped)
  * 
  * IMPORTANT: Includes ALL work orders (active AND completed) because a completed
  * WO still represents that cycle being satisfied. Only excludes cancelled/rejected.
  * 
+ * FIX: Now includes componentCode in the key to support multi-component jobs where
+ * each linked component should have its own work order per cycle.
+ * 
  * @param workOrders - Array of work orders to process
  * @param vesselId - Optional vessel ID to filter work orders (if provided, only includes WOs for that vessel)
  */
-export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueDateSnapshot?: string | null; vesselId?: string | null }>(
+export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?: string; cycleDueDateSnapshot?: string | null; vesselId?: string | null; componentCode?: string | null }>(
   workOrders: T[],
   vesselId?: string
 ): Map<string, T> {
@@ -240,10 +255,18 @@ export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?
     if (wo.cycleDueDateSnapshot) {
       const jobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
       if (jobNo) {
-        // Include vesselId in cycle key to make it vessel-scoped
         const woVesselId = wo.vesselId || 'unknown';
-        const cycleKey = `${woVesselId}|${jobNo}|${wo.cycleDueDateSnapshot}`;
+        const compCode = wo.componentCode || '';
+        
+        // Include vesselId AND componentCode in cycle key to support multi-component jobs
+        const cycleKey = `${woVesselId}|${jobNo}|${compCode}|${wo.cycleDueDateSnapshot}`;
         cycleMap.set(cycleKey, wo);
+        
+        // LEGACY SUPPORT: Also index under 'unknown' componentCode for legacy WOs without componentCode
+        if (!compCode) {
+          const legacyCycleKey = `${woVesselId}|${jobNo}|unknown|${wo.cycleDueDateSnapshot}`;
+          cycleMap.set(legacyCycleKey, wo);
+        }
       }
     }
   });

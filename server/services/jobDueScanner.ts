@@ -241,86 +241,129 @@ export class JobDueScannerService {
         continue; // Not yet time to generate
       }
 
-      // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
-      // Primary check: by jobId (reliable, direct field match)
-      // Fallback check: by jobNo (for legacy WOs without jobId) - now vessel-scoped
-      const vesselScopedJobNo = `${job.vesselId || 'unknown'}|${job.jobNo}`;
-      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(vesselScopedJobNo)) {
-        continue; // Already has an active WO - skip
-      }
-
-      // CYCLE UNIQUENESS CHECK: Each RH cycle is uniquely identified by (vesselId + jobNo + RH_due)
-      // Vessel-scoped to prevent cross-vessel blocking
-      const cycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${rhDue}`;
-      if (existingCycleWOs.has(cycleKey)) {
-        // WO already exists for this cycle - skip
+      // LEGACY FALLBACK: Check if job has any active WO with NULL/empty componentCode
+      // If so, block ALL generation for this job to protect legacy data
+      // Check by both jobId AND jobNo (vessel-scoped) to catch legacy WOs without jobId
+      const legacyBlockingWO = allWorkOrders.find(wo => {
+        if (!isBlockingStatus(wo.status)) return false;
+        if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
+        
+        // Match by jobId (modern WOs)
+        if (wo.jobId === job.id) return true;
+        
+        // Match by vessel-scoped jobNo (legacy WOs without jobId)
+        const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo);
+        if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
+        
+        return false;
+      });
+      
+      if (legacyBlockingWO) {
+        // Legacy WO exists without component code - block entire job
         continue;
       }
-
-      // All checks passed - generate the WO
-      // Get componentCode - fallback to component record if not on job
-      let componentCode = job.componentCode;
-      if (!componentCode && job.componentId) {
-        const component = await storage.getComponent(job.componentId);
-        componentCode = component?.componentCode || '';
+      
+      // All RH timing checks passed - now get ALL linked components for this job
+      // FIX: Get linked components from job_component_links table (many-to-many relationship)
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
+      
+      // If no linked components found, fall back to job's primary component
+      if (linkedComponents.length === 0 && job.componentId) {
+        linkedComponents.push({
+          componentId: job.componentId,
+          componentCode: job.componentCode || component.componentCode || '',
+          componentName: job.componentName || component.name || ''
+        });
       }
-      if (!componentCode) {
-        console.warn(`⚠️ No component code for RH job ${job.jobNo} - skipping WO generation`);
+      
+      if (linkedComponents.length === 0) {
+        console.warn(`⚠️ No linked components for RH job ${job.jobNo} - skipping WO generation`);
         continue;
       }
-      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
       
-      const workOrderData: InsertWorkOrder = {
-        vesselId: job.vesselId,
-        component: job.componentName,
-        componentCode: componentCode, // Use resolved componentCode
-        jobId: job.id, // Link to job for cycle tracking
-        workOrderNo: workOrderNo,
-        templateCode: workOrderNo,
-        jobTitle: job.jobTitle,
-        assignedTo: job.assignedTo || 'Unassigned',
-        dueDate: undefined, // RH-based jobs don't have calendar due date
-        nextDueReading: String(rhDue), // Store the due RH value
-        currentReading: String(rhEffectiveCurrent), // Store current RH at generation time
-        status: 'Due', // Start as Due since trigger condition is met
-        taskType: job.maintenanceType,
-        maintenanceBasis: job.maintenanceBasis,
-        frequencyValue: job.frequencyValue?.toString(),
-        frequencyUnit: job.frequencyUnit,
-        intervalRunningHour: job.intervalRunningHour,
-        jobPriority: job.jobPriority,
-        classRelated: job.classRelated,
-        briefWorkDescription: job.briefWorkDescription,
-        department: job.department,
-        requiredSpareParts: job.requiredSpareParts || [],
-        requiredTools: job.requiredTools || [],
-        safetyRequirements: job.safetyRequirements || {
-          ppeRequirements: [],
-          permitRequirements: [],
-          otherRequirements: []
-        },
-        // === RH CYCLE SNAPSHOTS (TRIGGER 1) ===
-        driverType: 'RH',
-        cycleDueRhSnapshot: String(rhDue),
-        generateRhSnapshot: String(rhGenerate),
-        dueRhSnapshot: String(rhDue),
-        effectiveRhAtGeneration: String(rhEffectiveCurrent),
-        rhLastDoneSnapshot: String(rhLastDone),
-      };
-      
-      await workOrderService.createWorkOrder(workOrderData);
-      generated++;
-      
-      // Add to sets to prevent duplicate generation in same run
-      // cycleKey is already vessel-scoped: `${vesselId}|${jobNo}|${rhDue}`
-      existingCycleWOs.set(cycleKey, workOrderData as any);
-      activeWOSets.byJobId.add(job.id);
-      activeWOSets.byJobNo.add(vesselScopedJobNo);
-      
-      const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
-      console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
-      console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${leadTimeRH}`);
-      console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+      // Generate a work order for EACH linked component
+      for (const linkedComponent of linkedComponents) {
+        const componentCode = linkedComponent.componentCode;
+        const componentName = linkedComponent.componentName;
+        
+        if (!componentCode) {
+          console.warn(`⚠️ No component code for linked component of RH job ${job.jobNo} - skipping`);
+          continue;
+        }
+        
+        // COMPONENT-LEVEL CHECK: Check if WO already exists for this job + component combination
+        const existingWOForComponent = allWorkOrders.find(wo => 
+          wo.jobId === job.id &&
+          wo.componentCode === componentCode &&
+          isBlockingStatus(wo.status)
+        );
+        
+        if (existingWOForComponent) {
+          continue; // Already has an active WO for this component - skip
+        }
+        
+        // Component-specific cycle key for RH: `${vesselId}|${jobNo}|${componentCode}|${rhDue}`
+        const componentCycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${componentCode}|${rhDue}`;
+        if (existingCycleWOs.has(componentCycleKey)) {
+          continue; // WO already exists for this component's cycle - skip
+        }
+        
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+        
+        const workOrderData: InsertWorkOrder = {
+          vesselId: job.vesselId,
+          component: componentName,
+          componentCode: componentCode, // Use linked component's code
+          jobId: job.id, // Link to job for cycle tracking
+          workOrderNo: workOrderNo,
+          templateCode: workOrderNo,
+          jobTitle: job.jobTitle,
+          assignedTo: job.assignedTo || 'Unassigned',
+          dueDate: undefined, // RH-based jobs don't have calendar due date
+          nextDueReading: String(rhDue), // Store the due RH value
+          currentReading: String(rhEffectiveCurrent), // Store current RH at generation time
+          status: 'Due', // Start as Due since trigger condition is met
+          taskType: job.maintenanceType,
+          maintenanceBasis: job.maintenanceBasis,
+          frequencyValue: job.frequencyValue?.toString(),
+          frequencyUnit: job.frequencyUnit,
+          intervalRunningHour: job.intervalRunningHour,
+          jobPriority: job.jobPriority,
+          classRelated: job.classRelated,
+          briefWorkDescription: job.briefWorkDescription,
+          department: job.department,
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || {
+            ppeRequirements: [],
+            permitRequirements: [],
+            otherRequirements: []
+          },
+          // === RH CYCLE SNAPSHOTS (TRIGGER 1) ===
+          driverType: 'RH',
+          cycleDueRhSnapshot: String(rhDue),
+          generateRhSnapshot: String(rhGenerate),
+          dueRhSnapshot: String(rhDue),
+          effectiveRhAtGeneration: String(rhEffectiveCurrent),
+          rhLastDoneSnapshot: String(rhLastDone),
+        };
+        
+        try {
+          const createdWO = await workOrderService.createWorkOrder(workOrderData);
+          generated++;
+          
+          // Add to maps AND allWorkOrders to prevent duplicate generation in same run
+          existingCycleWOs.set(componentCycleKey, createdWO as any);
+          allWorkOrders.push(createdWO); // Keep in-memory array in sync for subsequent checks
+          
+          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+          console.log(`✅ [RH Trigger 1] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode}`);
+          console.log(`   RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${leadTimeRH}`);
+          console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+        } catch (error: any) {
+          console.warn(`⚠️ Failed to create WO for RH job ${job.jobNo} + component ${componentCode}: ${error.message}`);
+        }
+      }
     }
 
     // Log settings used for transparency
