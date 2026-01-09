@@ -22,15 +22,15 @@ interface DefectsFilters {
   vesselId?: string;
   fleet?: string;
   dueOverdue?: string;
+  status?: string;
 }
 
 export default function DefectsCoC() {
   const { toast } = useToast();
-  const [filters, setFilters] = useState<DefectsFilters>({});
+  const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
-  const [activeTab, setActiveTab] = useState("Active");
   const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
     open: false, 
     defect: null 
@@ -49,7 +49,8 @@ export default function DefectsCoC() {
       if (filters.search) params.append('search', filters.search);
       if (filters.period) params.append('period', filters.period);
       if (filters.fleet) params.append('fleet', filters.fleet);
-      if (filters.dueOverdue) params.append('dueOverdue', filters.dueOverdue);
+      // Only send dueOverdue when filtering active defects
+      if (filters.dueOverdue && filters.status === 'active') params.append('dueOverdue', filters.dueOverdue);
       
       const response = await fetch(`/technical/api/defects?${params}`);
       if (!response.ok) throw new Error('Failed to fetch CoC defects');
@@ -57,22 +58,18 @@ export default function DefectsCoC() {
     },
   });
 
-  // Filter defects based on active/resolved tab
+  // Filter defects based on status filter
   const defects = allDefects.filter((defect: Defect) => {
-    if (activeTab === "Active") {
+    if (!filters.status || filters.status === 'active') {
       return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
-    } else {
+    } else if (filters.status === 'resolved') {
       return ['Closed', 'Cancelled'].includes(defect.status);
     }
+    return true; // 'all' shows everything
   });
 
-  // Calculate counts for tabs
-  const activeCount = allDefects.filter((d: Defect) => 
-    ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(d.status)
-  ).length;
-  const resolvedCount = allDefects.filter((d: Defect) => 
-    ['Closed', 'Cancelled'].includes(d.status)
-  ).length;
+  // Check if resolved items may be included (for column display)
+  const includesResolved = filters.status === 'resolved' || filters.status === 'all';
 
   const getStatusBadge = (status: string, critical: boolean) => {
     const statusColors: Record<string, string> = {
@@ -116,11 +113,18 @@ export default function DefectsCoC() {
   };
 
   const handleFilterChange = (key: keyof DefectsFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => {
+      const newFilters = { ...prev, [key]: value };
+      // Clear dueOverdue when changing status away from 'active'
+      if (key === 'status' && value !== 'active') {
+        delete newFilters.dueOverdue;
+      }
+      return newFilters;
+    });
   };
 
   const handleClearFilters = () => {
-    setFilters({});
+    setFilters({ status: 'active' });
   };
 
   const handleViewDefect = (defect: Defect) => {
@@ -151,7 +155,7 @@ export default function DefectsCoC() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with CoC Badge */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -159,19 +163,10 @@ export default function DefectsCoC() {
               <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-blue-600" />
                 Condition of Class (CoC) Defects
-                <Badge className="bg-blue-100 text-blue-700">
-                  Classification Required
-                </Badge>
               </h1>
             </div>
 
             <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" className="text-gray-600">
-                All Vessel
-              </Button>
-              <Button variant="outline" size="sm" className="text-gray-600">
-                My Vessel
-              </Button>
               <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
                 <DialogTrigger asChild>
                   <Button 
@@ -209,34 +204,6 @@ export default function DefectsCoC() {
               </Dialog>
             </div>
           </div>
-        </div>
-        
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1 px-6 pb-2">
-          <button
-            onClick={() => setActiveTab("Active")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-t-lg transition-colors",
-              activeTab === "Active" 
-                ? "bg-blue-600 text-white" 
-                : "text-gray-600 hover:text-gray-900"
-            )}
-            data-testid="tab-active-coc"
-          >
-            Active CoC ({activeCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("Resolved")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-t-lg transition-colors",
-              activeTab === "Resolved" 
-                ? "bg-green-600 text-white" 
-                : "text-gray-600 hover:text-gray-900"
-            )}
-            data-testid="tab-resolved-coc"
-          >
-            Resolved CoC ({resolvedCount})
-          </button>
         </div>
       </div>
 
@@ -290,8 +257,20 @@ export default function DefectsCoC() {
               </SelectContent>
             </Select>
 
-            {/* Due/Overdue - Only show for Active tab */}
-            {activeTab === "Active" && (
+            {/* Status Filter */}
+            <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
+              <SelectTrigger className="w-28 h-8 text-xs">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Due/Overdue - Only show for Active filter */}
+            {filters.status === 'active' && (
               <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
                 <SelectTrigger className="w-28 h-8 text-xs">
                   <SelectValue placeholder="Due / Overdue" />
@@ -329,7 +308,7 @@ export default function DefectsCoC() {
           <div className="text-center py-12 bg-white rounded-lg shadow-sm">
             <Shield className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 mb-4">
-              No {activeTab.toLowerCase()} CoC defects found
+              No {filters.status === 'resolved' ? 'resolved' : filters.status === 'all' ? '' : 'active'} CoC defects found
             </p>
             <div className="flex gap-2 justify-center">
               <Button 
@@ -361,7 +340,7 @@ export default function DefectsCoC() {
                   <TableHead>Description</TableHead>
                   <TableHead>Action Taken/Requested</TableHead>
                   <TableHead className="w-28">Target Date</TableHead>
-                  {activeTab === "Resolved" && (
+                  {includesResolved && (
                     <TableHead className="w-32">Date Completed</TableHead>
                   )}
                   <TableHead className="w-24">Status</TableHead>
@@ -371,7 +350,8 @@ export default function DefectsCoC() {
               <TableBody>
                 {defects.map((defect: Defect) => {
                   const daysOverdue = getDaysOverdue(defect.targetCloseDate);
-                  const isOverdue = activeTab === "Active" && daysOverdue !== null && daysOverdue > 0;
+                  const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+                  const isOverdue = isActiveDefect && daysOverdue !== null && daysOverdue > 0;
                   
                   return (
                     <TableRow key={defect.id} className={isOverdue ? 'bg-red-50' : ''}>
@@ -403,11 +383,11 @@ export default function DefectsCoC() {
                           )}
                         </div>
                       </TableCell>
-                      {activeTab === "Resolved" && (
+                      {includesResolved && (
                         <TableCell className="text-xs">
                           <div className="flex flex-col">
-                            <span>{defect.dateCompleted}</span>
-                            {getCompletionStatus(defect.targetCloseDate, defect.dateCompleted)}
+                            <span>{defect.dateCompleted || '-'}</span>
+                            {defect.dateCompleted && getCompletionStatus(defect.targetCloseDate, defect.dateCompleted)}
                           </div>
                         </TableCell>
                       )}
@@ -424,7 +404,7 @@ export default function DefectsCoC() {
                           >
                             <Eye className="h-3 w-3" />
                           </Button>
-                          {activeTab === "Active" && (
+                          {isActiveDefect && (
                             <>
                               <Button 
                                 variant="ghost" 
