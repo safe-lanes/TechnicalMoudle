@@ -4565,9 +4565,32 @@ export class PostgresStorage {
     const woCount = existingWOs.length + 1;
     const workOrderNo = `${job.jobNo}.WO-${year}-${String(woCount).padStart(3, '0')}`;
     
-    // Use activeComponentCode if provided (for multi-linked jobs), otherwise fall back to job's componentCode
-    // This ensures the work order is bound to the correct component context
-    const effectiveComponentCode = activeComponentCode || job.componentCode;
+    // FIX: Resolve component details from activeComponentCode if provided
+    // This ensures WO is bound to the correct component context for multi-linked jobs
+    let effectiveComponentCode = activeComponentCode || job.componentCode;
+    let effectiveComponentName = job.componentName || '';
+    
+    // If activeComponentCode is provided, look up the correct component details
+    // IMPORTANT: Scope by vesselId to avoid matching wrong component in multi-vessel setup
+    if (activeComponentCode && job.vesselId) {
+      const componentResult = await db.select().from(components)
+        .where(and(
+          eq(components.componentCode, activeComponentCode),
+          eq(components.vesselId, job.vesselId)
+        ))
+        .limit(1);
+      if (componentResult.length > 0) {
+        effectiveComponentName = componentResult[0].name || effectiveComponentName;
+      }
+    } else if (activeComponentCode) {
+      // Fallback without vessel scope if vesselId is not available
+      const componentResult = await db.select().from(components)
+        .where(eq(components.componentCode, activeComponentCode))
+        .limit(1);
+      if (componentResult.length > 0) {
+        effectiveComponentName = componentResult[0].name || effectiveComponentName;
+      }
+    }
     
     // Create the work order
     const newWorkOrder: InsertWorkOrder = {
@@ -4578,8 +4601,7 @@ export class PostgresStorage {
       templateCode: workOrderNo,
       jobId: job.id,
       jobTitle: job.jobTitle,
-      componentId: job.componentId,
-      component: job.componentName || '',
+      component: effectiveComponentName,
       componentCode: effectiveComponentCode,
       status: 'Active',
       dueDate: job.nextDueDate || new Date().toISOString().split('T')[0],

@@ -183,19 +183,30 @@ export class WorkOrderService {
       throw new Error('Job title is required');
     }
 
-    // DUPLICATE PREVENTION: Check if there's already an active work order for this job
+    // DUPLICATE PREVENTION: Check if there's already an active work order for this job + component combination
     // This is a safeguard in addition to the database partial unique index
     // Uses isBlockingStatus() for consistent status matching across all code paths
+    // FIX: Check by jobId + componentCode to allow one WO per linked component (not just per job)
+    // NOTE: If componentCode is null/undefined, fall back to job-level check for backwards compatibility
     if (workOrderData.jobId) {
       const existingWOs = await storage.getWorkOrders(workOrderData.vesselId);
-      const existingActiveWO = existingWOs.find(wo => 
-        wo.jobId === workOrderData.jobId &&
-        isBlockingStatus(wo.status)  // Includes: Due, Overdue, Pending Approval, Postponed, Due (Grace P), Active, etc.
-      );
+      const newComponentCode = workOrderData.componentCode || null;
+      
+      const existingActiveWO = existingWOs.find(wo => {
+        if (wo.jobId !== workOrderData.jobId) return false;
+        if (!isBlockingStatus(wo.status)) return false;
+        
+        // Normalize componentCode: treat null, undefined, and empty string as equivalent
+        const existingComponentCode = wo.componentCode || null;
+        
+        // If new WO has componentCode, match exactly (including both being null)
+        // This allows multiple WOs for same job if they have DIFFERENT componentCodes
+        return existingComponentCode === newComponentCode;
+      });
       
       if (existingActiveWO) {
-        console.warn(`⚠️ [Duplicate Prevention] Active work order already exists for job ${workOrderData.jobId}: ${existingActiveWO.workOrderNo} (status: ${existingActiveWO.status})`);
-        throw new Error(`Work Order already exists for this job: ${existingActiveWO.workOrderNo}. Only one active work order is allowed per job.`);
+        console.warn(`⚠️ [Duplicate Prevention] Active work order already exists for job ${workOrderData.jobId} + component ${workOrderData.componentCode}: ${existingActiveWO.workOrderNo} (status: ${existingActiveWO.status})`);
+        throw new Error(`Work Order already exists for this job and component: ${existingActiveWO.workOrderNo}. Only one active work order is allowed per job-component combination.`);
       }
     }
 
@@ -331,89 +342,115 @@ export class WorkOrderService {
         continue; // Not yet time to generate
       }
       
-      // JOB-LEVEL LOCK CHECK: Only one active WO per job at a time
-      // Primary check: by jobId (reliable, direct field match)
-      // Fallback check: by jobNo (for legacy WOs without jobId) - now vessel-scoped
-      const vesselScopedJobNo = `${job.vesselId || 'unknown'}|${job.jobNo}`;
-      if (activeWOSets.byJobId.has(job.id) || activeWOSets.byJobNo.has(vesselScopedJobNo)) {
-        continue; // Already has an active WO - skip
-      }
-      
       // Normalize due date for cycle key (ISO date string YYYY-MM-DD)
       const dueDateStr = dueDate.toISOString().split('T')[0];
-      
-      // CYCLE UNIQUENESS CHECK: Each calendar cycle is uniquely identified by (vesselId + jobNo + DUE_DATE)
-      // Vessel-scoped to prevent cross-vessel blocking
-      const cycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${dueDateStr}`;
-      if (existingCycleWOs.has(cycleKey)) {
-        // WO already exists for this cycle - skip
-        continue;
-      }
-      
-      // All checks passed - generate the WO
-      // Get componentCode - fallback to component record if not on job
-      let componentCode = job.componentCode;
-      if (!componentCode && job.componentId) {
-        const component = await storage.getComponent(job.componentId);
-        componentCode = component?.componentCode || '';
-      }
-      if (!componentCode) {
-        console.warn(`⚠️ No component code for calendar job ${job.jobNo} - skipping WO generation`);
-        continue;
-      }
-      const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
       
       // Calculate generate date string for snapshot
       const generateDateStr = generateDate.toISOString().split('T')[0];
       
-      const workOrderData: InsertWorkOrder = {
-        vesselId: job.vesselId,
-        component: job.componentName,
-        componentCode: componentCode, // Use resolved componentCode
-        jobId: job.id, // Link to job for cycle tracking
-        workOrderNo: workOrderNo,
-        templateCode: workOrderNo,
-        jobTitle: job.jobTitle,
-        assignedTo: job.assignedTo || 'Unassigned',
-        dueDate: job.nextDueDate,
-        status: 'Due', // Start as Due since trigger condition is met
-        taskType: job.maintenanceType,
-        maintenanceBasis: job.maintenanceBasis,
-        frequencyValue: job.frequencyValue?.toString(),
-        frequencyUnit: job.frequencyUnit,
-        jobPriority: job.jobPriority,
-        classRelated: job.classRelated,
-        briefWorkDescription: job.briefWorkDescription,
-        department: job.department,
-        requiredSpareParts: job.requiredSpareParts || [],
-        requiredTools: job.requiredTools || [],
-        safetyRequirements: job.safetyRequirements || {
-          ppeRequirements: [],
-          permitRequirements: [],
-          otherRequirements: []
-        },
-        // === CALENDAR CYCLE SNAPSHOTS (TRIGGER 2) ===
-        driverType: 'CALENDAR',
-        cycleDueDateSnapshot: dueDateStr,
-        generateDateSnapshot: generateDateStr,
-        dueDateSnapshot: dueDateStr,
-        lastDoneDateSnapshot: job.lastDoneDate || null,
-      };
+      // FIX: Get ALL linked components for this job (many-to-many relationship)
+      // Each linked component should get its own work order
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
       
-      const createdWO = await this.createWorkOrder(workOrderData);
-      results.generated++;
-      results.workOrders.push(createdWO);
+      // If no linked components found, fall back to job's primary component
+      if (linkedComponents.length === 0 && job.componentId) {
+        const primaryComponent = await storage.getComponent(job.componentId);
+        if (primaryComponent) {
+          linkedComponents.push({
+            componentId: primaryComponent.id,
+            componentCode: primaryComponent.componentCode || '',
+            componentName: primaryComponent.name || ''
+          });
+        }
+      }
       
-      // Add to sets to prevent duplicate generation in same run
-      // cycleKey is already vessel-scoped: `${vesselId}|${jobNo}|${dueDateStr}`
-      existingCycleWOs.set(cycleKey, workOrderData as any);
-      activeWOSets.byJobId.add(job.id);
-      activeWOSets.byJobNo.add(vesselScopedJobNo);
+      if (linkedComponents.length === 0) {
+        console.warn(`⚠️ No linked components for calendar job ${job.jobNo} - skipping WO generation`);
+        continue;
+      }
       
-      const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
-      console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo}`);
-      console.log(`   last_done=${job.lastDoneDate || 'N/A'}, LT=${leadTimeDays} days`);
-      console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
+      // Generate a work order for EACH linked component
+      for (const linkedComponent of linkedComponents) {
+        const componentCode = linkedComponent.componentCode;
+        const componentName = linkedComponent.componentName;
+        const componentId = linkedComponent.componentId;
+        
+        if (!componentCode) {
+          console.warn(`⚠️ No component code for linked component ${componentId} of job ${job.jobNo} - skipping`);
+          continue;
+        }
+        
+        // COMPONENT-LEVEL CYCLE CHECK: Each component should have its own WO per cycle
+        // Key format: `${vesselId}|${jobNo}|${componentCode}|${dueDateStr}`
+        const componentCycleKey = `${job.vesselId || 'unknown'}|${job.jobNo}|${componentCode}|${dueDateStr}`;
+        
+        // Check if WO already exists for this job + component + cycle
+        const existingWOForComponent = allWorkOrders.find(wo => 
+          wo.jobId === job.id &&
+          wo.componentCode === componentCode &&
+          isBlockingStatus(wo.status)
+        );
+        
+        if (existingWOForComponent) {
+          continue; // Already has an active WO for this component - skip
+        }
+        
+        // Check cycle map for this specific component
+        if (existingCycleWOs.has(componentCycleKey)) {
+          continue; // WO already exists for this component's cycle - skip
+        }
+        
+        const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+        
+        const workOrderData: InsertWorkOrder = {
+          vesselId: job.vesselId,
+          component: componentName,
+          componentCode: componentCode,
+          jobId: job.id,
+          workOrderNo: workOrderNo,
+          templateCode: workOrderNo,
+          jobTitle: job.jobTitle,
+          assignedTo: job.assignedTo || 'Unassigned',
+          dueDate: job.nextDueDate,
+          status: 'Due',
+          taskType: job.maintenanceType,
+          maintenanceBasis: job.maintenanceBasis,
+          frequencyValue: job.frequencyValue?.toString(),
+          frequencyUnit: job.frequencyUnit,
+          jobPriority: job.jobPriority,
+          classRelated: job.classRelated,
+          briefWorkDescription: job.briefWorkDescription,
+          department: job.department,
+          requiredSpareParts: job.requiredSpareParts || [],
+          requiredTools: job.requiredTools || [],
+          safetyRequirements: job.safetyRequirements || {
+            ppeRequirements: [],
+            permitRequirements: [],
+            otherRequirements: []
+          },
+          driverType: 'CALENDAR',
+          cycleDueDateSnapshot: dueDateStr,
+          generateDateSnapshot: generateDateStr,
+          dueDateSnapshot: dueDateStr,
+          lastDoneDateSnapshot: job.lastDoneDate || null,
+        };
+        
+        try {
+          const createdWO = await this.createWorkOrder(workOrderData);
+          results.generated++;
+          results.workOrders.push(createdWO);
+          
+          // Add to map to prevent duplicate generation in same run
+          existingCycleWOs.set(componentCycleKey, workOrderData as any);
+          
+          const priorityLabel = isJobCritical(job) ? 'Critical' : 'Non-Critical';
+          console.log(`✅ [Calendar Trigger 2] Auto-generated WO ${workOrderNo} for ${priorityLabel} job ${job.jobNo} -> component ${componentCode}`);
+          console.log(`   last_done=${job.lastDoneDate || 'N/A'}, LT=${leadTimeDays} days`);
+          console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}, Today=${today.toISOString().split('T')[0]}`);
+        } catch (error: any) {
+          console.warn(`⚠️ Failed to create WO for job ${job.jobNo} + component ${componentCode}: ${error.message}`);
+        }
+      }
     }
     
     // Log settings used for transparency
