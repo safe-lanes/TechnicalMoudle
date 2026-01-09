@@ -2042,190 +2042,6 @@ const RequisitionsSection: React.FC<{ selectedComponent: ComponentNode | null }>
   );
 };
 
-interface CombinedJobsDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  selectedComponents: Array<{ code: string; name: string }>;
-  vesselId: string;
-}
-
-const CombinedJobsDialog: React.FC<CombinedJobsDialogProps> = ({
-  isOpen,
-  onClose,
-  selectedComponents,
-  vesselId
-}) => {
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const componentCodes = selectedComponents.map(c => c.code);
-
-  const { data: allJobs = [], isLoading } = useQuery<any[]>({
-    queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
-    enabled: isOpen && !!vesselId,
-  });
-
-  const filteredJobs = allJobs.filter(job => {
-    const linkedCodes: string[] = job.linkedComponentCodes || [];
-    const allJobCodes = job.componentCode ? [...linkedCodes, job.componentCode] : linkedCodes;
-    return componentCodes.some(code => allJobCodes.includes(code));
-  }).map(job => {
-    const linkedCodes: string[] = job.linkedComponentCodes || [];
-    const allJobCodes = job.componentCode ? [...linkedCodes, job.componentCode] : linkedCodes;
-    const matchingComponent = selectedComponents.find(c => allJobCodes.includes(c.code));
-    return {
-      ...job,
-      displayComponentCode: matchingComponent?.code || job.componentCode,
-      displayComponentName: matchingComponent?.name || job.componentName
-    };
-  });
-
-  const generateWOMutation = useMutation({
-    mutationFn: async ({ jobId, reason, activeComponentCode }: { jobId: string; reason: string; activeComponentCode: string }) => {
-      const response = await fetch(`/technical/api/jobs/${jobId}/generate-wo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, activeComponentCode })
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate work order');
-      }
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Work Order Created",
-        description: `Work order ${data.workOrderNo} has been created successfully.`
-      });
-      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
-      queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/technical/api/jobs')
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate work order",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleRowClick = (job: any) => {
-    setLocation(`/pms/job/${job.id}?activeComponentCode=${encodeURIComponent(job.displayComponentCode)}`);
-    onClose();
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
-            Jobs for Selected Components
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2">
-            {selectedComponents.map(comp => (
-              <Badge key={comp.code} variant="outline" className="text-xs">
-                {comp.code} {comp.name}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-500">Loading jobs...</div>
-          ) : filteredJobs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No jobs found for the selected components
-            </div>
-          ) : (
-            <table className="w-full text-sm border-collapse" data-testid="table-combined-jobs">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b-2 border-gray-200">
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Job Code</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Job Title</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Component</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Task Type</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Frequency</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Last Done</th>
-                  <th className="text-left py-3 px-3 font-semibold text-gray-700">Next Due</th>
-                  <th className="text-center py-3 px-3 font-semibold text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredJobs.map((job, index) => (
-                  <tr 
-                    key={`${job.id}-${index}`}
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleRowClick(job)}
-                    data-testid={`combined-job-row-${job.jobNo}`}
-                  >
-                    <td className="py-3 px-3 text-gray-900 font-medium">{job.jobNo}</td>
-                    <td className="py-3 px-3 text-gray-900">{job.jobTitle}</td>
-                    <td className="py-3 px-3">
-                      <Badge variant="secondary" className="text-xs">
-                        {job.displayComponentCode}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 text-gray-900">{job.maintenanceType}</td>
-                    <td className="py-3 px-3 text-gray-900">
-                      {job.maintenanceBasis === 'Running Hours' 
-                        ? `${job.intervalRunningHour || 0} RH` 
-                        : `${job.frequencyValue} ${job.frequencyUnit}`}
-                    </td>
-                    <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
-                    <td className="py-3 px-3 text-gray-900">
-                      {job.maintenanceBasis === 'Running Hours' 
-                        ? (() => {
-                            const frequency = parseFloat(job.intervalRunningHour || '0');
-                            const currentRH = parseFloat(job.componentCurrentRH || '0');
-                            const lastDoneRH = parseFloat(job.lastDoneRH || '0');
-                            const remainingRH = frequency - (currentRH - lastDoneRH);
-                            return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
-                          })()
-                        : formatProfessionalDate(job.nextDueDate) || '-'}
-                    </td>
-                    <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => generateWOMutation.mutate({
-                          jobId: job.id,
-                          reason: 'Planning',
-                          activeComponentCode: job.displayComponentCode
-                        })}
-                        disabled={generateWOMutation.isPending}
-                        className="text-xs"
-                        data-testid={`btn-generate-wo-combined-${job.jobNo}`}
-                      >
-                        {generateWOMutation.isPending ? '...' : 'Generate WO'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="mt-4 pt-4 border-t flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            {filteredJobs.length} job(s) found for {selectedComponents.length} component(s)
-          </div>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 const Components: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [criticalFilter, setCriticalFilter] = useState("all");
@@ -2240,10 +2056,6 @@ const Components: React.FC = () => {
   const [modifiedComponentData, setModifiedComponentData] = useState<any>(null);
   const [originalComponentData, setOriginalComponentData] = useState<any>(null);
   const [showAddEditFullPage, setShowAddEditFullPage] = useState(false);
-  
-  // Multi-component selection for viewing combined jobs
-  const [selectedComponents, setSelectedComponents] = useState<Set<string>>(new Set());
-  const [showCombinedJobsDialog, setShowCombinedJobsDialog] = useState(false);
   
   // Preview changes mode state
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -2682,41 +2494,6 @@ const Components: React.FC = () => {
     });
   };
 
-  // Toggle component selection for multi-component jobs view
-  const toggleComponentSelection = (componentCode: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedComponents(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(componentCode)) {
-        newSet.delete(componentCode);
-      } else {
-        newSet.add(componentCode);
-      }
-      return newSet;
-    });
-  };
-
-  // Get component node by code from tree - resolves componentTreeData inside the function for robustness
-  const getComponentNodeByCode = React.useCallback((code: string, nodes?: ComponentNode[]): ComponentNode | null => {
-    const searchNodes = nodes ?? componentTreeData;
-    for (const node of searchNodes) {
-      if (node.code === code) return node;
-      if (node.children) {
-        const found = getComponentNodeByCode(code, node.children);
-        if (found) return found;
-      }
-    }
-    return null;
-  }, [componentTreeData]);
-
-  // Get selected component details for display - memoized to depend on tree and selection
-  const selectedComponentDetails = React.useMemo(() => {
-    return Array.from(selectedComponents).map(code => {
-      const node = getComponentNodeByCode(code);
-      return node ? { code: node.code, name: node.name } : { code, name: code };
-    });
-  }, [selectedComponents, getComponentNodeByCode]);
-
   const renderComponentTree = (nodes: ComponentNode[], level: number = 0) => {
     const getTreeNodeMarker = (nodeLevel: number) => {
       if (nodeLevel === 0) return "B6.1";
@@ -2730,15 +2507,13 @@ const Components: React.FC = () => {
       const isExpanded = expandedNodes.has(node.id);
       const isSelected = selectedComponent?.id === node.id;
       const markerLevel = getTreeNodeMarker(level);
-      const isMainCategory = /^[1-8]$/.test(node.code);
-      const isChecked = selectedComponents.has(node.code);
 
       return (
         <div key={node.id} data-testid={markerLevel}>
           <div
             className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
               isSelected ? "bg-blue-50" : ""
-            } ${isChecked ? "bg-green-50" : ""}`}
+            }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
               setSelectedComponent(node);
@@ -2751,16 +2526,6 @@ const Components: React.FC = () => {
             }}
           >
             <Marker id={markerLevel} />
-            {!isMainCategory && (
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={() => {}}
-                onClick={(e) => toggleComponentSelection(node.code, e)}
-                className="mr-2 h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                data-testid={`checkbox-component-${node.code}`}
-              />
-            )}
             <button
               className="mr-2 flex-shrink-0"
               onClick={(e) => {
@@ -3066,47 +2831,10 @@ const Components: React.FC = () => {
         {/* Left Panel - Component Tree (30%) */}
         <div className="w-[30%]" data-testid="B6">
           <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
-            <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex-1 overflow-auto">
+              <div className="bg-[#52baf3] text-white px-4 py-2 font-semibold text-sm flex items-center gap-2">
                 <Marker id="B6" /> COMPONENTS
               </div>
-              {selectedComponents.size > 0 && (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded">
-                  {selectedComponents.size} selected
-                </span>
-              )}
-            </div>
-            {selectedComponents.size > 0 && (
-              <div className="p-2 border-b border-gray-200 bg-green-50">
-                {selectedComponents.size >= 2 && (
-                  <Button
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => setShowCombinedJobsDialog(true)}
-                    data-testid="btn-view-combined-jobs"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    View Jobs for Selected ({selectedComponents.size})
-                  </Button>
-                )}
-                {selectedComponents.size === 1 && (
-                  <div className="text-xs text-gray-600 text-center mb-1">
-                    Select one more component to view combined jobs
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full mt-1 text-gray-600 hover:text-gray-800"
-                  onClick={() => setSelectedComponents(new Set())}
-                  data-testid="btn-clear-selection"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear Selection
-                </Button>
-              </div>
-            )}
-            <div className="flex-1 overflow-auto">
               <div>
                 {renderComponentTree(filteredComponentTree)}
               </div>
@@ -3372,14 +3100,6 @@ const Components: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Combined Jobs Dialog for Multiple Selected Components */}
-      <CombinedJobsDialog
-        isOpen={showCombinedJobsDialog}
-        onClose={() => setShowCombinedJobsDialog(false)}
-        selectedComponents={selectedComponentDetails}
-        vesselId={vesselId}
-      />
     </div>
   );
 };
