@@ -192,7 +192,7 @@ export default function DefectFormWizard({
     setIsRootCauseModalOpen(false);
   };
 
-  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false) => {
+  const saveDefect = async (data: DefectFormData, showToast = true, navigate = false): Promise<boolean> => {
     try {
       const submitData: any = {
         ...data,
@@ -219,8 +219,10 @@ export default function DefectFormWizard({
       } else if (navigate) {
         setLocation("/defects/active");
       }
+      return true;
     } catch (error) {
       toast({ title: "Error saving defect", variant: "destructive" });
+      return false;
     }
   };
 
@@ -228,12 +230,13 @@ export default function DefectFormWizard({
     await saveDefect(data, true, true);
   };
 
-  const handleStepSubmit = async (stepNumber: number) => {
+  const handleStepSubmit = async (stepNumber: number): Promise<boolean> => {
     const data = form.getValues();
-    await saveDefect(data, true, false);
-    if (stepNumber < 3) {
+    const success = await saveDefect(data, true, false);
+    if (success && stepNumber < 3) {
       toast({ title: `Step ${stepNumber} saved. You can continue to the next step.` });
     }
+    return success;
   };
 
   const openAddActionModal = () => {
@@ -862,6 +865,25 @@ export default function DefectFormWizard({
                       )}
                     />
                   </div>
+
+                  {/* Submit Button for Part A */}
+                  {!isViewMode && (
+                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const success = await handleStepSubmit(1);
+                          if (success) {
+                            setCurrentStep(2);
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                        data-testid="button-submit-part-a"
+                      >
+                        Submit & Continue
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1143,6 +1165,25 @@ export default function DefectFormWizard({
                       </div>
                     )}
                   </div>
+
+                  {/* Submit Button for Part B */}
+                  {!isViewMode && (
+                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const success = await handleStepSubmit(2);
+                          if (success) {
+                            setCurrentStep(3);
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                        data-testid="button-submit-part-b"
+                      >
+                        Submit & Continue
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1225,6 +1266,20 @@ export default function DefectFormWizard({
                       disabled={isViewMode}
                     />
                   </div>
+
+                  {/* Submit Button for Part C */}
+                  {!isViewMode && (
+                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        onClick={form.handleSubmit(onSubmit)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                        data-testid="button-submit-part-c"
+                      >
+                        Submit & Close
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
