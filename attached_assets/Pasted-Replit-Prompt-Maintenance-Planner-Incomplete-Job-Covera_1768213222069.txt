@@ -1,0 +1,79 @@
+Replit Prompt — Maintenance Planner Incomplete Job Coverage (Multi-Component Jobs)
+Context (Must Be Assumed)
+This prompt is a continuation of the completed Maintenance Planner analysis
+Vessel-wise isolation rules remain mandatory
+Replit must not re-analyse unrelated parts
+No code examples
+No DB inspection
+Focus only on why Planner shows limited data and how logic must change
+🎯 Problem Statement
+The Maintenance Planner currently brings limited job data.
+Although jobs may legitimately be duplicated, the same job can be distributed across multiple components within the same vessel, and ALL such jobs must appear in the Planner.
+At present:
+Only a subset of jobs appears
+Jobs linked to multiple components are partially or incorrectly represented
+📌 Required Behaviour (Business Rule)
+For a given vessel, the Maintenance Planner must show
+ALL jobs, even if:
+The same job definition appears multiple times
+The job is linked to multiple components
+The job number is the same but component association differs
+🔍 What Replit Must Analyse Now
+1. Job Uniqueness Assumption
+Analyse whether the planner:
+Treats jobId or jobNo as globally unique
+Collapses jobs assuming one job → one component
+Identify where logic:
+Deduplicates jobs incorrectly
+Drops valid job-component combinations
+2. Job ↔ Component Relationship Handling
+Analyse how the planner currently determines:
+Which component a job belongs to
+Identify whether:
+Only job.componentId or job.componentCode is used
+Many-to-many relationships are ignored or partially handled
+Explicitly evaluate the impact of:
+Deprecated direct references
+Missing or unused jobComponentLinks
+3. Data Reduction Points
+Identify stages where job data is:
+Filtered
+Mapped
+Reduced
+Grouped
+Determine whether:
+Grouping logic removes duplicate jobs
+Planner UI assumes one row per job instead of one row per job–component pair
+4. Vessel-wise Correctness
+Confirm that:
+Duplicate jobs across different components of the same vessel are valid
+Duplicate job numbers must not be treated as conflicts
+Identify incorrect assumptions such as:
+Job number uniqueness within a vessel
+Job ID implying single component association
+🧠 Logical Gap to Explicitly Address
+Replit must explain why the current logic only brings limited jobs, specifically:
+Whether the planner:
+Selects only the first matching component
+Overwrites job entries during mapping
+Uses a structure that enforces uniqueness unintentionally
+🚫 What Replit Must NOT Do
+❌ Do NOT jump directly to implementation
+❌ Do NOT propose SQL or schema changes
+❌ Do NOT remove vessel-wise isolation
+❌ Do NOT assume jobs are single-component entities
+📄 Expected Output
+Replit must provide:
+Clear explanation of why multi-component jobs are missing
+Exact logical point(s) where job data is being reduced
+Correct logical model describing how Maintenance Planner should treat jobs
+Job ≠ unique planner row
+Job + Component = planner unit
+Final corrected data-fetching logic (conceptual, no code) that ensures:
+All jobs for a vessel are included
+All component-linked instances are represented
+🧠 Final Instruction (Critical)
+A job may be duplicated by design.
+Do not treat duplication as an error.
+Treat Job + Component + Vessel as the true planner entity.
+ 
