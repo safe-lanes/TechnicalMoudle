@@ -127,7 +127,18 @@ const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
   if (!params.value) return null;
   
   try {
-    const date = new Date(params.value);
+    let date: Date;
+    const value = String(params.value);
+    
+    // Handle DD-MM-YYYY format (e.g., "25-08-2025")
+    const ddmmyyyyMatch = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (ddmmyyyyMatch) {
+      const [, day, month, year] = ddmmyyyyMatch;
+      date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    } else {
+      date = new Date(value);
+    }
+    
     if (isNaN(date.getTime())) return <span className="text-[13px] text-[#4f5863]">{params.value}</span>;
     
     const day = date.getDate().toString().padStart(2, '0');
