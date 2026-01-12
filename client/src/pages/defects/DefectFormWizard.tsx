@@ -999,23 +999,23 @@ export default function DefectFormWizard({
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
                 
                 <div className="space-y-8">
-                  {/* Cause Analysis */}
+                  {/* B1. Cause Analysis */}
                   <div className="space-y-6">
-                    <h3 className="text-sm font-semibold text-gray-800">Cause Analysis</h3>
+                    <h3 className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>B1. Cause Analysis</h3>
                     
                     {/* Immediate Cause */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-blue-600">Immediate Cause</h4>
+                      <div className="flex items-center justify-end">
                         <Button 
                           type="button"
                           variant="outline" 
                           size="sm" 
-                          className="text-blue-600 border-blue-600 hover:bg-blue-50" 
+                          className="text-gray-600 border-gray-300 hover:bg-gray-50" 
                           data-testid="button-select-immediate"
                           onClick={handleImmediateCauseSelect}
                           disabled={isViewMode}
                         >
+                          <Plus className="h-4 w-4 mr-1" />
                           Select
                         </Button>
                       </div>
@@ -1056,17 +1056,17 @@ export default function DefectFormWizard({
 
                     {/* Root Cause */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-blue-600">Root Cause</h4>
+                      <div className="flex items-center justify-end">
                         <Button 
                           type="button"
                           variant="outline" 
                           size="sm" 
-                          className="text-blue-600 border-blue-600 hover:bg-blue-50" 
+                          className="text-gray-600 border-gray-300 hover:bg-gray-50" 
                           data-testid="button-select-root"
                           onClick={handleRootCauseSelect}
                           disabled={isViewMode}
                         >
+                          <Plus className="h-4 w-4 mr-1" />
                           Select
                         </Button>
                       </div>
@@ -1105,12 +1105,12 @@ export default function DefectFormWizard({
                       </div>
                     </div>
 
-                    {/* VIQ Section */}
+                    {/* B2. SIRE & SFI Ref */}
                     <div className="space-y-3">
-                      <h4 className="text-sm font-semibold text-blue-600">VIQ Reference</h4>
+                      <h3 className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>B2. SIRE & SFI Ref</h3>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="flex flex-col">
-                          <label className="text-sm text-gray-600 mb-1.5">VIQ Version</label>
+                          <label className="text-sm text-gray-600 mb-1.5">SIRE Version</label>
                           <Controller
                             name="viqVersion"
                             control={form.control}
@@ -1128,7 +1128,7 @@ export default function DefectFormWizard({
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="text-sm text-gray-600 mb-1.5">VIQ Reference</label>
+                          <label className="text-sm text-gray-600 mb-1.5">SIRE Reference</label>
                           <Controller
                             name="viqRef"
                             control={form.control}
@@ -1157,7 +1157,7 @@ export default function DefectFormWizard({
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="text-sm text-gray-600 mb-1.5">Chapter</label>
+                          <label className="text-sm text-gray-600 mb-1.5">SFI Code Reference</label>
                           <Controller
                             name="viqChapter"
                             control={form.control}
@@ -1196,7 +1196,7 @@ export default function DefectFormWizard({
                           type="button"
                           variant="outline" 
                           size="sm" 
-                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                          className="text-gray-600 border-gray-300 hover:bg-gray-50"
                           onClick={openAddActionModal}
                           data-testid="button-add-action"
                         >
