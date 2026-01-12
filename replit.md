@@ -39,6 +39,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
 ## Recent Changes
+- **Component RH Update on WO Approval** (Jan 12, 2026): Fixed bug where component running hours were not updating when RH-based work orders were approved. The PATCH endpoint now updates component RH using centralized `setComponentRunningHours()` with case-insensitive counter type handling and proper INHERITED→MASTER cascade fallback.
 - **Maintenance History Viewer** (Jan 12, 2026): Clicking a maintenance history record now displays the exact same work order form UI in a sliding panel with embedded read-only mode. All mutation handlers are guarded to prevent modifications.
 
 ## Checkpoints
