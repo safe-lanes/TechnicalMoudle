@@ -2546,7 +2546,7 @@ export class PostgresStorage {
     place?: string,
     dateLocal?: string,
     tz?: string
-  ): Promise<StoresItem> {
+  ): Promise<{ item: StoresItem; isTransfer: boolean }> {
     const db = await getDb();
     const item = await this.getStoresItem(id);
     if (!item) {
@@ -2562,7 +2562,7 @@ export class PostgresStorage {
     const deltaB = newLocB - oldLocB;
     
     if (deltaA === 0 && deltaB === 0) {
-      return item;
+      return { item, isTransfer: false };
     }
     
     const newTotalRob = newLocA + newLocB;
@@ -2577,50 +2577,60 @@ export class PostgresStorage {
       .where(eq(storesItems.id, id))
       .returning();
 
-    const transferQty = Math.abs(deltaA);
-    const fromLocation = deltaA < 0 ? 'A' : 'B';
-    const toLocation = deltaA < 0 ? 'B' : 'A';
-    const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
+    // Only create transfer ledger entries if this is a true transfer
+    // (deltaA == -deltaB means total ROB unchanged, stock moved between locations)
+    const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && deltaA === -deltaB;
+    
+    if (isTrueTransfer) {
+      const transferQty = Math.abs(deltaA);
+      const fromLocation = deltaA < 0 ? 'A' : 'B';
+      const toLocation = deltaA < 0 ? 'B' : 'A';
+      const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
 
-    await db.insert(storesLedger).values({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: id,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType: 'TRANSFER_OUT',
-      qtyChangeBase: String(-transferQty),
-      qtyDisplay: String(-transferQty),
-      robAfterBase: String(newTotalRob),
-      dateLocal: dateLocal || new Date().toISOString(),
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place || `Location ${fromLocation}`,
-      userId: userId,
-      remarks: transferRemarks,
-    });
+      await db.insert(storesLedger).values({
+        vesselId: item.vesselId,
+        section: item.itemType,
+        itemId: id,
+        partCode: item.itemCode,
+        itemName: item.itemName,
+        uom: item.uom,
+        eventType: 'TRANSFER_OUT',
+        qtyChangeBase: String(-transferQty),
+        qtyDisplay: String(-transferQty),
+        robAfterBase: String(newTotalRob),
+        dateLocal: dateLocal || new Date().toISOString(),
+        tz: tz || 'UTC',
+        timestampUTC: new Date(),
+        place: place || `Location ${fromLocation}`,
+        userId: userId,
+        remarks: transferRemarks,
+      });
 
-    await db.insert(storesLedger).values({
-      vesselId: item.vesselId,
-      section: item.itemType,
-      itemId: id,
-      partCode: item.itemCode,
-      itemName: item.itemName,
-      uom: item.uom,
-      eventType: 'TRANSFER_IN',
-      qtyChangeBase: String(transferQty),
-      qtyDisplay: String(transferQty),
-      robAfterBase: String(newTotalRob),
-      dateLocal: dateLocal || new Date().toISOString(),
-      tz: tz || 'UTC',
-      timestampUTC: new Date(),
-      place: place || `Location ${toLocation}`,
-      userId: userId,
-      remarks: transferRemarks,
-    });
-
-    return updated[0];
+      await db.insert(storesLedger).values({
+        vesselId: item.vesselId,
+        section: item.itemType,
+        itemId: id,
+        partCode: item.itemCode,
+        itemName: item.itemName,
+        uom: item.uom,
+        eventType: 'TRANSFER_IN',
+        qtyChangeBase: String(transferQty),
+        qtyDisplay: String(transferQty),
+        robAfterBase: String(newTotalRob),
+        dateLocal: dateLocal || new Date().toISOString(),
+        tz: tz || 'UTC',
+        timestampUTC: new Date(),
+        place: place || `Location ${toLocation}`,
+        userId: userId,
+        remarks: transferRemarks,
+      });
+      
+      return { item: updated[0], isTransfer: true };
+    }
+    
+    // Not a true transfer (single location change or net adjustment)
+    // Just update without ledger entry - this is an adjustment, not a transfer
+    return { item: updated[0], isTransfer: false };
   }
 
   // ============= MODULE 8: STORES LEDGER =============

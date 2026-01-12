@@ -5279,8 +5279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const newLocA = robLocationA !== undefined ? robLocationA : currentItem.robLocationA;
         const newLocB = robLocationB !== undefined ? robLocationB : currentItem.robLocationB;
         
-        // Use transfer method which creates ledger history
-        const item = await storage.transferStoresItemLocation(
+        // Use transfer method which creates ledger history for true transfers
+        const result = await storage.transferStoresItemLocation(
           itemId,
           newLocA,
           newLocB,
@@ -5290,7 +5290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateLocal,
           tz
         );
-        return res.json(item);
+        return res.json(result.item);
       }
       
       // For non-location updates, use regular update (no history needed)

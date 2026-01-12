@@ -606,7 +606,7 @@ export interface IStorage {
   deleteStoresItem(id: number): Promise<void>;
   consumeStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   receiveStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
-  transferStoresItemLocation(id: number, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
+  transferStoresItemLocation(id: number, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;
   getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
   getStoresItemHistory(itemId: number): Promise<StoresLedger[]>;
   
