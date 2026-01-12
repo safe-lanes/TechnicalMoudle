@@ -1697,7 +1697,7 @@ const Stores: React.FC = () => {
 
       {/* Receive Item Modal */}
       <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Receive {receivingItem?.itemName}</DialogTitle>
           </DialogHeader>
@@ -1805,7 +1805,7 @@ const Stores: React.FC = () => {
 
       {/* Consume Item Modal */}
       <Dialog open={isConsumeModalOpen} onOpenChange={setIsConsumeModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Consume {consumingItem?.itemName}</DialogTitle>
           </DialogHeader>
