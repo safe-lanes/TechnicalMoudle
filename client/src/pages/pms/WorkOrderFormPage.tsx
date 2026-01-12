@@ -54,17 +54,24 @@ export interface HistoryWorkOrderPayload {
 
 interface WorkOrderFormPageProps {
   mode?: 'template' | 'execution' | 'history' | 'new';
+  embedded?: boolean;
+  workOrderIdOverride?: string;
+  onClose?: () => void;
 }
 
 const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
-  mode = 'execution'
+  mode = 'execution',
+  embedded = false,
+  workOrderIdOverride,
+  onClose
 }) => {
   const { toast } = useToast();
   const { vesselId: contextVesselId } = useVessel();
   const [location, navigate] = useLocation();
   const [, params] = useRoute("/pms/work-order/:id");
   const [, newParams] = useRoute("/pms/work-order/new/:componentId");
-  const workOrderId = params?.id;
+  const workOrderIdFromUrl = params?.id;
+  const workOrderId = workOrderIdOverride || workOrderIdFromUrl;
   const componentIdFromUrl = newParams?.componentId;
   
   // Determine if this is a "new job" creation flow (Add Job button)
@@ -286,7 +293,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const context = workOrderContext as any;
   const isPartAReadOnly = isNewJobCreation ? false : (resolvedMode === 'template' || !!workOrderId);
   
-  const isReadOnly = false; // General read-only flag (not currently used)
+  const isReadOnly = embedded; // Read-only in embedded mode for maintenance history viewing
 
   const [templateData, setTemplateData] = useState({
     woTitle: "",
@@ -658,6 +665,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddSparePart = () => {
+    if (isReadOnly) return;
     const newPart = { partNo: "", description: "", quantityRequired: "", remarks: "" };
     setTemplateData(prev => ({
       ...prev,
@@ -716,6 +724,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteSparePart = (index: number) => {
+    if (isReadOnly) return;
     setTemplateData(prev => ({
       ...prev,
       requiredSpareParts: prev.requiredSpareParts.filter((_, i) => i !== index)
@@ -723,6 +732,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddTool = () => {
+    if (isReadOnly) return;
     const newTool = { toolName: "", quantity: "", remarks: "" };
     setTemplateData(prev => ({
       ...prev,
@@ -781,6 +791,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteTool = (index: number) => {
+    if (isReadOnly) return;
     setTemplateData(prev => ({
       ...prev,
       requiredTools: prev.requiredTools.filter((_, i) => i !== index)
@@ -788,6 +799,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddSafetyRequirement = (category: 'ppeRequirements' | 'permitRequirements' | 'otherRequirements') => {
+    if (isReadOnly) return;
     if (!newSafetyRequirement.trim()) return;
     
     setTemplateData(prev => ({
@@ -802,6 +814,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteSafetyRequirement = (category: 'ppeRequirements' | 'permitRequirements' | 'otherRequirements', index: number) => {
+    if (isReadOnly) return;
     setTemplateData(prev => ({
       ...prev,
       safetyRequirements: {
@@ -812,10 +825,12 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleUploadDocument = async (documentType: string, fileInputRef: React.RefObject<HTMLInputElement>) => {
+    if (isReadOnly) return;
     fileInputRef.current?.click();
   };
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
+    if (isReadOnly) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -890,6 +905,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteDocumentClick = (documentType: string) => {
+    if (isReadOnly) return;
     const document = executionData.uploadedDocuments.find(doc => doc.type === documentType);
     if (!document) return;
 
@@ -898,6 +914,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteDocumentConfirm = async () => {
+    if (isReadOnly) return;
     if (!documentToDelete) return;
 
     try {
@@ -937,6 +954,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleAddConsumedSparePart = () => {
+    if (isReadOnly) return;
     const newPart = { partNo: "", description: "", quantityConsumed: "", location: "" as const, locationId: null, comments: "" };
     setExecutionData(prev => ({
       ...prev,
@@ -987,6 +1005,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleDeleteConsumedSparePart = (index: number) => {
+    if (isReadOnly) return;
     setExecutionData(prev => ({
       ...prev,
       consumedSpareParts: prev.consumedSpareParts.filter((_, i) => i !== index)
@@ -994,6 +1013,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleSave = async () => {
+    if (embedded) return;
     try {
       // Validate frequency value before saving using the normalization helper
       const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
@@ -1227,6 +1247,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   // Save handler for creating a new job template (Add Job flow)
   const handleSaveNewJob = async () => {
+    if (embedded) return;
     try {
       // Validate required fields for new job
       if (!templateData.woTitle?.trim()) {
@@ -1321,6 +1342,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
   // Approver actions
   const handleApprove = async () => {
+    if (embedded) return;
     if (!workOrderId) return;
     
     setIsProcessingApproval(true);
@@ -1361,6 +1383,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleReject = async () => {
+    if (embedded) return;
     if (!workOrderId) return;
     
     if (!rejectionComments.trim()) {
@@ -1410,11 +1433,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   };
 
   const handleBack = () => {
-    navigate("/pms/work-orders");
+    if (embedded && onClose) {
+      onClose();
+    } else {
+      navigate("/pms/work-orders");
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Read-only mode banner for embedded viewing - scrolls with content */}
+      {isReadOnly && (
+        <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+          <span className="text-sm text-amber-800 font-medium">
+            Read-only view of completed work order
+          </span>
+          <Button
+            onClick={onClose}
+            size="sm"
+            variant="outline"
+            className="border-amber-600 text-amber-700 hover:bg-amber-100"
+          >
+            Close Viewer
+          </Button>
+        </div>
+      )}
       {/* Top Header Bar - Professional maritime header with logo and actions */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
@@ -3127,8 +3170,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </div>
           </SectionBlock>
 
-          {/* Approval Section - Only visible for Pending Approval work orders */}
-          {currentWorkOrderStatus === 'Pending Approval' && (
+          {/* Approval Section - Only visible for Pending Approval work orders, hidden in embedded mode */}
+          {!embedded && currentWorkOrderStatus === 'Pending Approval' && (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mt-4" data-testid="WOF.B5.1"><Marker id="WOF.B5.1" />
               <div className="space-y-4">
                 {/* Rejection Comments */}
@@ -3171,8 +3214,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             </>
           )}
 
-          {/* Save Button at Bottom - Hidden for Pending Approval and Completed work orders (completed WOs are immutable records) */}
-          {currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (
+          {/* Save Button at Bottom - Hidden for Pending Approval, Completed work orders, and embedded mode */}
+          {!embedded && currentWorkOrderStatus !== 'Pending Approval' && currentWorkOrderStatus !== 'Completed' && (
             <div className="flex justify-end mt-6 pb-6" data-testid="WOF6"><Marker id="WOF6" />
               <Button
                 onClick={isNewJobCreation ? handleSaveNewJob : handleSave}
