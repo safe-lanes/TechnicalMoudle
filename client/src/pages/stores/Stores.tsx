@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Edit, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, Plus, Minus, Archive, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
+import { Search, Edit2, Clock, Trash2, FileSpreadsheet, X, MessageSquare, Calendar, PlusCircle, MinusCircle, Download, AlertCircle, CheckCircle, HelpCircle, MapPin, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -335,6 +335,10 @@ const Stores: React.FC = () => {
     ihmPresence: 'Unknown' as 'Unknown' | 'Present' | 'Not Present',
     ihmEvidenceType: 'None' as 'None' | 'MD' | 'SDoC' | 'Test'
   });
+  
+  // Combined consume/receive selection modal (matches Spares workflow)
+  const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
   
   // Receive modal state
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
@@ -749,6 +753,12 @@ const Stores: React.FC = () => {
     toast({ title: "Success", description: "Item updated successfully" });
   };
   
+  // Open combined consume/receive selection modal (matches Spares workflow)
+  const openConsumeReceiveModal = (item: StoreItem) => {
+    setSelectedItem(item);
+    setIsConsumeReceiveModalOpen(true);
+  };
+  
   // Handle Receive
   const openReceiveModal = (item: StoreItem) => {
     setReceivingItem(item);
@@ -762,7 +772,7 @@ const Stores: React.FC = () => {
     setIsReceiveModalOpen(true);
   };
   
-  const saveReceive = () => {
+  const saveReceive = async () => {
     if (!receivingItem) return;
     
     const quantity = parseInt(receiveForm.quantity);
@@ -776,32 +786,31 @@ const Stores: React.FC = () => {
       return;
     }
     
-    const newRob = receivingItem.rob + quantity;
-    
-    const updatedItems = items.map(item => {
-      if (item.id === receivingItem.id) {
-        return {
-          ...item,
-          rob: newRob
-        };
-      }
-      return item;
-    });
-    
-    // Add to history
-    addToHistory(
-      receivingItem,
-      'RECEIVE',
-      quantity,
-      newRob,
-      receiveForm.place,
-      receiveForm.supplierPO,
-      receiveForm.remarks
-    );
-    
-    setItems(updatedItems);
-    setIsReceiveModalOpen(false);
-    toast({ title: "Success", description: `Received ${quantity} ${receivingItem.uom || 'units'}` });
+    try {
+      await apiRequest(`/technical/api/stores/${vesselId}/batch-receive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{
+            itemId: receivingItem.id,
+            quantity: quantity,
+            location: 'A',
+            notes: receiveForm.remarks || undefined,
+            place: receiveForm.place || undefined,
+            dateLocal: receiveForm.dateLocal
+          }],
+          purchaseOrderRef: receiveForm.supplierPO || undefined
+        }),
+      });
+      
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
+      setIsReceiveModalOpen(false);
+      toast({ title: "Success", description: `Received ${quantity} ${receivingItem.uom || 'units'}` });
+    } catch (error: any) {
+      console.error('Failed to receive item:', error);
+      toast({ title: "Error", description: error.message || "Failed to receive item", variant: "destructive" });
+    }
   };
   
   // Handle Consume
@@ -816,7 +825,7 @@ const Stores: React.FC = () => {
     setIsConsumeModalOpen(true);
   };
   
-  const saveConsume = () => {
+  const saveConsume = async () => {
     if (!consumingItem) return;
     
     const quantity = parseInt(consumeForm.quantity);
@@ -835,34 +844,29 @@ const Stores: React.FC = () => {
       return;
     }
     
-    const newRob = consumingItem.rob - quantity;
-    const newStock = calculateStockStatus(newRob, consumingItem.min);
-    
-    const updatedItems = items.map(item => {
-      if (item.id === consumingItem.id) {
-        return {
-          ...item,
-          rob: newRob,
-          stock: newStock
-        };
-      }
-      return item;
-    });
-    
-    // Add to history
-    addToHistory(
-      consumingItem,
-      'CONSUME',
-      -quantity,
-      newRob,
-      '',
-      consumeForm.workOrder,
-      consumeForm.remarks
-    );
-    
-    setItems(updatedItems);
-    setIsConsumeModalOpen(false);
-    toast({ title: "Success", description: `Consumed ${quantity} ${consumingItem.uom || 'units'}` });
+    try {
+      await apiRequest(`/technical/api/stores/${vesselId}/batch-consume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{
+            itemId: consumingItem.id,
+            quantity: quantity,
+            location: 'A',
+            notes: `${consumeForm.workOrder ? `WO: ${consumeForm.workOrder}. ` : ''}${consumeForm.remarks || ''}`.trim() || undefined,
+            dateLocal: consumeForm.dateLocal
+          }]
+        }),
+      });
+      
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
+      setIsConsumeModalOpen(false);
+      toast({ title: "Success", description: `Consumed ${quantity} ${consumingItem.uom || 'units'}` });
+    } catch (error: any) {
+      console.error('Failed to consume item:', error);
+      toast({ title: "Error", description: error.message || "Failed to consume item", variant: "destructive" });
+    }
   };
   
   // Handle Archive
@@ -889,6 +893,24 @@ const Stores: React.FC = () => {
       
       setItems(updatedItems);
       toast({ title: "Success", description: "Item archived" });
+    }
+  };
+  
+  // Handle Delete (using apiRequest for consistency with Spares pattern)
+  const handleDelete = async (item: StoreItem) => {
+    if (confirm(`Delete ${item.itemName}? This action cannot be undone.`)) {
+      try {
+        await apiRequest(`/technical/api/stores/item/${item.id}`, {
+          method: 'DELETE',
+        });
+        
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+        queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
+        toast({ title: "Success", description: "Item deleted" });
+      } catch (error) {
+        console.error('Failed to delete item:', error);
+        toast({ title: "Error", description: "Failed to delete item", variant: "destructive" });
+      }
     }
   };
 
@@ -1220,13 +1242,13 @@ const Stores: React.FC = () => {
                     {item.stock}
                   </span>
                 </div>
-                {/* Location Dropdown */}
+                {/* Location Dropdown - matches Spares format "@ X / Y" */}
                 <div className="relative" data-testid={index === 0 ? getMarkerId(activeTab, "27") : undefined}>
                   {index === 0 && <Marker id={getMarkerId(activeTab, "27")} />}
                   {(() => {
                     const robA = item.robLocationA ?? 0;
                     const robB = item.robLocationB ?? 0;
-                    const locationDisplay = `${robA + robB}...`;
+                    const locationDisplay = `@ ${robA} / ${robB}`;
                     const isDropdownOpen = openLocationDropdown === item.id;
                     
                     return (
@@ -1350,43 +1372,31 @@ const Stores: React.FC = () => {
                     data-testid={index === 0 ? getMarkerId(activeTab, "29") : `button-edit-${item.id}`}
                   >
                     {index === 0 && <Marker id={getMarkerId(activeTab, "29")} />}
-                    <Edit className="h-3.5 w-3.5 text-gray-500" />
+                    <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => openConsumeModal(item)}
-                    aria-label="Consume Item"
-                    title="Consume"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-${item.id}`}
+                    onClick={() => openConsumeReceiveModal(item)}
+                    aria-label="Consume/Receive"
+                    title="Consume/Receive"
+                    data-testid={index === 0 ? getMarkerId(activeTab, "30") : `button-consume-receive-${item.id}`}
                   >
                     {index === 0 && <Marker id={getMarkerId(activeTab, "30")} />}
-                    <Minus className="h-3.5 w-3.5 text-gray-500" />
+                    <PlusCircle className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => openReceiveModal(item)}
-                    aria-label="Receive Item"
-                    title="Receive"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-receive-${item.id}`}
+                    onClick={() => handleDelete(item)}
+                    aria-label="Delete Item"
+                    title="Delete"
+                    data-testid={index === 0 ? getMarkerId(activeTab, "31") : `button-delete-${item.id}`}
                   >
                     {index === 0 && <Marker id={getMarkerId(activeTab, "31")} />}
-                    <Plus className="h-3.5 w-3.5 text-gray-500" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 w-7 p-0 hover:bg-gray-100"
-                    onClick={() => handleArchive(item)}
-                    aria-label="Archive Item"
-                    title="Archive"
-                    data-testid={index === 0 ? getMarkerId(activeTab, "32") : `button-archive-${item.id}`}
-                  >
-                    {index === 0 && <Marker id={getMarkerId(activeTab, "32")} />}
-                    <Archive className="h-3.5 w-3.5 text-gray-400" />
+                    <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 </div>
               </div>
@@ -1573,6 +1583,56 @@ const Stores: React.FC = () => {
             ) : (
               <Button onClick={saveEditItem}>Save Changes</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Combined Consume/Receive Selection Modal (matches Spares workflow) */}
+      <Dialog open={isConsumeReceiveModalOpen} onOpenChange={setIsConsumeReceiveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Consume or Receive Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Item: {selectedItem?.itemCode} - {selectedItem?.itemName}</Label>
+              <p className="text-sm text-gray-500">Current ROB: {selectedItem?.rob}</p>
+            </div>
+            <div className="flex gap-4">
+              <Button
+                onClick={() => {
+                  setIsConsumeReceiveModalOpen(false);
+                  if (selectedItem) {
+                    openConsumeModal(selectedItem);
+                  }
+                }}
+                variant="destructive"
+                className="flex-1"
+                disabled={!selectedItem || selectedItem.rob === 0}
+                title={selectedItem?.rob === 0 ? "No stock available to consume" : "Consume item"}
+              >
+                <MinusCircle className="h-4 w-4 mr-2" />
+                Consume
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsConsumeReceiveModalOpen(false);
+                  if (selectedItem) {
+                    openReceiveModal(selectedItem);
+                  }
+                }}
+                variant="default"
+                className="flex-1"
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Receive
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConsumeReceiveModalOpen(false)}>
+              Cancel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
