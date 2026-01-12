@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -70,7 +70,7 @@ export default function DefectFormWizard({
   const { data: vessels = [] } = useVessels();
   const [, setLocation] = useLocation();
   const params = useParams();
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialStep);
+  const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C'>('A');
   const [actions, setActions] = useState<Action[]>([]);
   const [isImmediateCauseModalOpen, setIsImmediateCauseModalOpen] = useState(false);
   const [isRootCauseModalOpen, setIsRootCauseModalOpen] = useState(false);
@@ -78,6 +78,12 @@ export default function DefectFormWizard({
   const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  
+  // Section refs for scroll tracking
+  const partARef = useRef<HTMLDivElement>(null);
+  const partBRef = useRef<HTMLDivElement>(null);
+  const partCRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const generateReference = () => {
     const now = new Date();
@@ -233,8 +239,9 @@ export default function DefectFormWizard({
   const handleStepSubmit = async (stepNumber: number): Promise<boolean> => {
     const data = form.getValues();
     const success = await saveDefect(data, true, false);
-    if (success && stepNumber < 3) {
-      toast({ title: `Step ${stepNumber} saved. You can continue to the next step.` });
+    if (success) {
+      const partLabel = stepNumber === 1 ? 'A' : stepNumber === 2 ? 'B' : 'C';
+      toast({ title: `Part ${partLabel} submitted successfully.` });
     }
     return success;
   };
@@ -341,10 +348,42 @@ export default function DefectFormWizard({
   };
 
   const steps = [
-    { id: 1, label: 'A', name: 'Reporting' },
-    { id: 2, label: 'B', name: 'Analysis & Actions' },
-    { id: 3, label: 'C', name: 'Closeout' },
+    { id: 1, label: 'A', name: 'Reporting', ref: partARef },
+    { id: 2, label: 'B', name: 'Analysis & Actions', ref: partBRef },
+    { id: 3, label: 'C', name: 'Closeout', ref: partCRef },
   ];
+
+  // IntersectionObserver for scroll-based section highlighting
+  useEffect(() => {
+    const observerOptions = {
+      root: scrollContainerRef.current,
+      rootMargin: '-20% 0px -60% 0px',
+      threshold: 0
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const sectionId = entry.target.getAttribute('data-section');
+          if (sectionId === 'A' || sectionId === 'B' || sectionId === 'C') {
+            setActiveSection(sectionId);
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    if (partARef.current) observer.observe(partARef.current);
+    if (partBRef.current) observer.observe(partBRef.current);
+    if (partCRef.current) observer.observe(partCRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col">
@@ -391,17 +430,17 @@ export default function DefectFormWizard({
           {steps.map((step) => (
             <div 
               key={step.id}
-              onClick={() => setCurrentStep(step.id as 1 | 2 | 3)} 
+              onClick={() => scrollToSection(step.ref)} 
               className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50"
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                currentStep === step.id 
+                activeSection === step.label 
                   ? 'bg-blue-600 text-white' 
                   : 'border-2 border-gray-300 text-gray-500 bg-white'
               }`}>
                 {step.label}
               </div>
-              <span className={`text-sm font-medium ${currentStep === step.id ? 'text-blue-600' : 'text-gray-600'}`}>
+              <span className={`text-sm font-medium ${activeSection === step.label ? 'text-blue-600' : 'text-gray-600'}`}>
                 {step.name}
               </span>
             </div>
@@ -409,12 +448,11 @@ export default function DefectFormWizard({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-100 p-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A: Reporting */}
-            {currentStep === 1 && (
-              <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6">
+            <div ref={partARef} data-section="A" className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 scroll-mt-6">
                 <div className="flex items-start justify-between mb-2">
                   <h2 className="text-xl font-semibold text-[#1e3a5f]">Part A: Reporting</h2>
                   <div className="text-sm text-gray-600">
@@ -871,26 +909,19 @@ export default function DefectFormWizard({
                     <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
                       <Button
                         type="button"
-                        onClick={async () => {
-                          const success = await handleStepSubmit(1);
-                          if (success) {
-                            setCurrentStep(2);
-                          }
-                        }}
+                        onClick={() => handleStepSubmit(1)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                         data-testid="button-submit-part-a"
                       >
-                        Submit & Continue
+                        Submit
                       </Button>
                     </div>
                   )}
                 </div>
               </div>
-            )}
 
             {/* Part B: Analysis & Actions */}
-            {currentStep === 2 && (
-              <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6">
+            <div ref={partBRef} data-section="B" className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 scroll-mt-6">
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Part B: Analysis & Actions</h2>
                 <p className="text-sm text-gray-500 mt-1">Cause analysis and corrective actions</p>
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
@@ -1171,26 +1202,19 @@ export default function DefectFormWizard({
                     <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
                       <Button
                         type="button"
-                        onClick={async () => {
-                          const success = await handleStepSubmit(2);
-                          if (success) {
-                            setCurrentStep(3);
-                          }
-                        }}
+                        onClick={() => handleStepSubmit(2)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                         data-testid="button-submit-part-b"
                       >
-                        Submit & Continue
+                        Submit
                       </Button>
                     </div>
                   )}
                 </div>
               </div>
-            )}
 
             {/* Part C: Closeout */}
-            {currentStep === 3 && (
-              <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-6">
+            <div ref={partCRef} data-section="C" className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 scroll-mt-6">
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Part C: Closeout</h2>
                 <p className="text-sm text-gray-500 mt-1">Completion and approval</p>
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
@@ -1276,13 +1300,12 @@ export default function DefectFormWizard({
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6"
                         data-testid="button-submit-part-c"
                       >
-                        Submit & Close
+                        Submit
                       </Button>
                     </div>
                   )}
                 </div>
               </div>
-            )}
 
           </div>
         </div>
