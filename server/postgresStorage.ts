@@ -2537,6 +2537,92 @@ export class PostgresStorage {
     return updated[0];
   }
 
+  async transferStoresItemLocation(
+    id: number,
+    newRobLocationA: string,
+    newRobLocationB: string,
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await getDb();
+    const item = await this.getStoresItem(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    
+    const oldLocA = Number(item.robLocationA || 0);
+    const oldLocB = Number(item.robLocationB || 0);
+    const newLocA = Number(newRobLocationA || 0);
+    const newLocB = Number(newRobLocationB || 0);
+    
+    const deltaA = newLocA - oldLocA;
+    const deltaB = newLocB - oldLocB;
+    
+    if (deltaA === 0 && deltaB === 0) {
+      return item;
+    }
+    
+    const newTotalRob = newLocA + newLocB;
+    
+    const updated = await db.update(storesItems)
+      .set({
+        rob: String(newTotalRob),
+        robLocationA: String(newLocA),
+        robLocationB: String(newLocB),
+        updatedAt: new Date()
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    const transferQty = Math.abs(deltaA);
+    const fromLocation = deltaA < 0 ? 'A' : 'B';
+    const toLocation = deltaA < 0 ? 'B' : 'A';
+    const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
+
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'TRANSFER_OUT',
+      qtyChangeBase: String(-transferQty),
+      qtyDisplay: String(-transferQty),
+      robAfterBase: String(newTotalRob),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || `Location ${fromLocation}`,
+      userId: userId,
+      remarks: transferRemarks,
+    });
+
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'TRANSFER_IN',
+      qtyChangeBase: String(transferQty),
+      qtyDisplay: String(transferQty),
+      robAfterBase: String(newTotalRob),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || `Location ${toLocation}`,
+      userId: userId,
+      remarks: transferRemarks,
+    });
+
+    return updated[0];
+  }
+
   // ============= MODULE 8: STORES LEDGER =============
 
   async getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]> {

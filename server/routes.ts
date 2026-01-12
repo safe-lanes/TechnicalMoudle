@@ -5261,15 +5261,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PATCH endpoint for partial updates (location ROB updates)
-  app.patch("/technical/api/stores/:vesselId/:id", async (req, res) => {
+  // Now routes location changes through transfer method to create history
+  app.patch("/technical/api/stores/:vesselId/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
-      const { robLocationA, robLocationB, rob } = req.body;
+      const { robLocationA, robLocationB, rob, remarks, place, dateLocal, tz } = req.body;
+      const userId = req.user?.id?.toString() || 'System';
       
-      // Build update object with only provided fields
+      // Check if location ROB values are being changed - route to transfer method
+      if (robLocationA !== undefined || robLocationB !== undefined) {
+        // Get current item to determine if this is a location transfer
+        const currentItem = await storage.getStoresItem(itemId);
+        if (!currentItem) {
+          return res.status(404).json({ error: "Stores item not found" });
+        }
+        
+        const newLocA = robLocationA !== undefined ? robLocationA : currentItem.robLocationA;
+        const newLocB = robLocationB !== undefined ? robLocationB : currentItem.robLocationB;
+        
+        // Use transfer method which creates ledger history
+        const item = await storage.transferStoresItemLocation(
+          itemId,
+          newLocA,
+          newLocB,
+          userId,
+          remarks,
+          place,
+          dateLocal,
+          tz
+        );
+        return res.json(item);
+      }
+      
+      // For non-location updates, use regular update (no history needed)
       const updateData: any = {};
-      if (robLocationA !== undefined) updateData.robLocationA = robLocationA;
-      if (robLocationB !== undefined) updateData.robLocationB = robLocationB;
       if (rob !== undefined) updateData.rob = rob;
       
       const item = await storage.updateStoresItem(itemId, updateData);
