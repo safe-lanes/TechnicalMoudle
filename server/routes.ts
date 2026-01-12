@@ -2716,6 +2716,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
                     }
                     await storage.updateJob(job.id, rhUpdates);
+                    
+                    // UPDATE COMPONENT RUNNING HOURS on work order approval
+                    // For INHERITED components, update the MASTER component which will cascade
+                    // For MASTER components, update directly
+                    try {
+                      const counterType = (component.rhCounterType || '').toUpperCase();
+                      const isInherited = counterType === 'INHERITED';
+                      const isMaster = counterType === 'MASTER';
+                      
+                      if (isInherited) {
+                        // Find and update the master component
+                        // First try by rhMasterComponentId, then fall back to rhCounterSource
+                        let masterComponent = null;
+                        if (component.rhMasterComponentId) {
+                          masterComponent = await storage.getComponent(component.rhMasterComponentId);
+                        }
+                        if (!masterComponent && component.rhCounterSource) {
+                          masterComponent = await storage.getComponentByCode(component.rhCounterSource, freshWorkOrder.vesselId);
+                        }
+                        if (masterComponent) {
+                          await storage.setComponentRunningHours({
+                            componentId: masterComponent.id,
+                            newRHValue: currentRH,
+                            updateSource: 'WO_COMPLETION',
+                            userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
+                            lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
+                          });
+                          console.log(`✅ Updated MASTER component ${masterComponent.componentCode} RH to ${currentRH} (cascades to inherited)`);
+                        } else {
+                          console.warn(`⚠️ Could not find master component for inherited component ${component.componentCode}`);
+                          // Fallback: update the inherited component directly if master not found
+                          await storage.setComponentRunningHours({
+                            componentId: component.id,
+                            newRHValue: currentRH,
+                            updateSource: 'WO_COMPLETION',
+                            userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
+                            lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
+                          });
+                          console.log(`✅ Updated INHERITED component ${component.componentCode} RH to ${currentRH} (master not found, direct update)`);
+                        }
+                      } else if (isMaster || !counterType) {
+                        // Update the component directly (MASTER or NOT_RH_DRIVEN or legacy/untyped)
+                        await storage.setComponentRunningHours({
+                          componentId: component.id,
+                          newRHValue: currentRH,
+                          updateSource: 'WO_COMPLETION',
+                          userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
+                          lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
+                        });
+                        console.log(`✅ Updated component ${component.componentCode} RH to ${currentRH}`);
+                      }
+                    } catch (rhUpdateError) {
+                      console.error(`Failed to update component running hours:`, rhUpdateError);
+                    }
                   }
                 }
               }

@@ -295,6 +295,7 @@ export interface IStorage {
     newRHValue: number;
     updateSource: 'MANUAL' | 'IMPORT' | 'AUTOMATION' | 'BULK_IMPORT' | 'WO_COMPLETION';
     userId: string;
+    lastUpdatedDate?: string;
   }): Promise<{
     component: Component;
     inheritedUpdated: number;
