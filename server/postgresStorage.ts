@@ -2399,20 +2399,67 @@ export class PostgresStorage {
     return result[0];
   }
 
-  async createStoresItem(item: InsertStoresItem): Promise<StoresItem> {
+  async createStoresItem(item: InsertStoresItem, userId?: string): Promise<StoresItem> {
     const db = await getDb();
+    const robLocationA = Number(item.robLocationA || 0);
+    const robLocationB = Number(item.robLocationB || 0);
+    
+    // Validate numeric inputs - reject NaN
+    if (isNaN(robLocationA) || robLocationA < 0) {
+      throw new Error('robLocationA must be a valid non-negative number');
+    }
+    if (isNaN(robLocationB) || robLocationB < 0) {
+      throw new Error('robLocationB must be a valid non-negative number');
+    }
+    
+    const totalRob = robLocationA + robLocationB;
+    
     const result = await db.insert(storesItems).values({
       ...item,
-      rob: item.rob || '0',
-      robLocationA: item.robLocationA || '0',
-      robLocationB: item.robLocationB || '0',
+      rob: String(totalRob),
+      robLocationA: String(robLocationA),
+      robLocationB: String(robLocationB),
       min: item.min || '0',
     }).returning();
-    return result[0];
+    
+    const created = result[0];
+    
+    // Create initial ledger entry if starting with non-zero ROB
+    if (totalRob > 0) {
+      await db.insert(storesLedger).values({
+        vesselId: created.vesselId,
+        section: created.itemType,
+        itemId: created.id,
+        partCode: created.itemCode,
+        itemName: created.itemName,
+        uom: created.uom,
+        eventType: 'INITIAL',
+        qtyChangeBase: String(totalRob),
+        qtyDisplay: String(totalRob),
+        robAfterBase: String(totalRob),
+        dateLocal: new Date().toISOString(),
+        tz: 'UTC',
+        timestampUTC: new Date(),
+        place: `Location A: ${robLocationA}, Location B: ${robLocationB}`,
+        userId: userId || 'System',
+        remarks: 'Initial stock on item creation',
+      });
+    }
+    
+    return created;
   }
 
   async updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem> {
     const db = await getDb();
+    
+    // Block direct ROB updates - these must go through dedicated methods
+    // (consumeStoresItem, receiveStoresItem, transferStoresItemLocation, adjustStoresItem)
+    const blockedFields = ['rob', 'robLocationA', 'robLocationB'];
+    const attemptedRobUpdate = blockedFields.some(field => field in data && data[field as keyof StoresItem] !== undefined);
+    if (attemptedRobUpdate) {
+      throw new Error('Direct ROB updates are not allowed. Use consume, receive, transfer, or adjust methods to modify stock quantities.');
+    }
+    
     const result = await db.update(storesItems)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(storesItems.id, id))
@@ -2558,6 +2605,14 @@ export class PostgresStorage {
     const newLocA = Number(newRobLocationA || 0);
     const newLocB = Number(newRobLocationB || 0);
     
+    // Validate numeric inputs - reject NaN
+    if (isNaN(newLocA) || newLocA < 0) {
+      throw new Error('robLocationA must be a valid non-negative number');
+    }
+    if (isNaN(newLocB) || newLocB < 0) {
+      throw new Error('robLocationB must be a valid non-negative number');
+    }
+    
     const deltaA = newLocA - oldLocA;
     const deltaB = newLocB - oldLocB;
     
@@ -2628,9 +2683,108 @@ export class PostgresStorage {
       return { item: updated[0], isTransfer: true };
     }
     
-    // Not a true transfer (single location change or net adjustment)
-    // Just update without ledger entry - this is an adjustment, not a transfer
+    // Not a true transfer - create ADJUSTMENT ledger entry
+    // This handles: single location changes, net ROB increases/decreases
+    const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
+    const adjustmentRemarks = remarks || (netChange >= 0 
+      ? `Adjustment: +${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`
+      : `Adjustment: ${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`);
+    
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'ADJUSTMENT',
+      qtyChangeBase: String(netChange),
+      qtyDisplay: String(netChange),
+      robAfterBase: String(newTotalRob),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place,
+      userId: userId,
+      remarks: adjustmentRemarks,
+    });
+    
     return { item: updated[0], isTransfer: false };
+  }
+
+  async adjustStoresItem(
+    id: number,
+    newRob: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<StoresItem> {
+    const db = await getDb();
+    const item = await this.getStoresItem(id);
+    if (!item) {
+      throw new Error(`Stores item with id ${id} not found`);
+    }
+    
+    // Validate numeric input - reject NaN
+    if (isNaN(newRob) || newRob < 0) {
+      throw new Error('newRob must be a valid non-negative number');
+    }
+    
+    const oldLocA = Number(item.robLocationA || 0);
+    const oldLocB = Number(item.robLocationB || 0);
+    const oldTotal = oldLocA + oldLocB;
+    
+    let newLocA = oldLocA;
+    let newLocB = oldLocB;
+    
+    if (location === 'A') {
+      newLocA = newRob;
+    } else {
+      newLocB = newRob;
+    }
+    
+    const newTotal = newLocA + newLocB;
+    const netChange = newTotal - oldTotal;
+    
+    if (netChange === 0) {
+      return item;
+    }
+    
+    const updated = await db.update(storesItems)
+      .set({
+        rob: String(newTotal),
+        robLocationA: String(newLocA),
+        robLocationB: String(newLocB),
+        updatedAt: new Date()
+      })
+      .where(eq(storesItems.id, id))
+      .returning();
+
+    const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
+    
+    await db.insert(storesLedger).values({
+      vesselId: item.vesselId,
+      section: item.itemType,
+      itemId: id,
+      partCode: item.itemCode,
+      itemName: item.itemName,
+      uom: item.uom,
+      eventType: 'ADJUSTMENT',
+      qtyChangeBase: String(netChange),
+      qtyDisplay: String(netChange),
+      robAfterBase: String(newTotal),
+      dateLocal: dateLocal || new Date().toISOString(),
+      tz: tz || 'UTC',
+      timestampUTC: new Date(),
+      place: place || `Location ${location}`,
+      userId: userId,
+      remarks: adjustmentRemarks,
+    });
+
+    return updated[0];
   }
 
   // ============= MODULE 8: STORES LEDGER =============

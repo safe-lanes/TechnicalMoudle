@@ -5242,8 +5242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/stores/:vesselId/create", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { vesselId } = req.params;
+      const userId = req.user?.id?.toString() || 'System';
       const itemData = { ...req.body, vesselId };
-      const item = await storage.createStoresItem(itemData);
+      const item = await storage.createStoresItem(itemData, userId);
       res.json(item);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to create stores item" });
@@ -5253,10 +5254,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/technical/api/stores/item/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const itemId = parseInt(req.params.id);
-      const item = await storage.updateStoresItem(itemId, req.body);
+      // Strip ROB fields - these must go through dedicated methods
+      const { rob, robLocationA, robLocationB, ...safeData } = req.body;
+      const item = await storage.updateStoresItem(itemId, safeData);
       res.json(item);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to update stores item" });
+    }
+  });
+  
+  // Adjustment endpoint for manual inventory corrections
+  app.post("/technical/api/stores/item/:id/adjust", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      const { newRob, location, remarks, place, dateLocal, tz } = req.body;
+      const userId = req.user?.id?.toString() || 'System';
+      
+      if (newRob === undefined || newRob < 0) {
+        return res.status(400).json({ error: "Valid newRob value (>= 0) is required" });
+      }
+      if (!location || !['A', 'B'].includes(location)) {
+        return res.status(400).json({ error: "Location must be 'A' or 'B'" });
+      }
+      
+      const item = await storage.adjustStoresItem(
+        itemId,
+        Number(newRob),
+        location as 'A' | 'B',
+        userId,
+        remarks,
+        place,
+        dateLocal,
+        tz
+      );
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to adjust stores item" });
     }
   });
   
@@ -5270,14 +5303,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if location ROB values are being changed - route to transfer method
       if (robLocationA !== undefined || robLocationB !== undefined) {
+        // Validate numeric inputs
+        if (robLocationA !== undefined && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
+          return res.status(400).json({ error: "robLocationA must be a valid non-negative number" });
+        }
+        if (robLocationB !== undefined && (isNaN(Number(robLocationB)) || Number(robLocationB) < 0)) {
+          return res.status(400).json({ error: "robLocationB must be a valid non-negative number" });
+        }
+        
         // Get current item to determine if this is a location transfer
         const currentItem = await storage.getStoresItem(itemId);
         if (!currentItem) {
           return res.status(404).json({ error: "Stores item not found" });
         }
         
-        const newLocA = robLocationA !== undefined ? robLocationA : currentItem.robLocationA;
-        const newLocB = robLocationB !== undefined ? robLocationB : currentItem.robLocationB;
+        const newLocA = robLocationA !== undefined ? String(Number(robLocationA)) : currentItem.robLocationA;
+        const newLocB = robLocationB !== undefined ? String(Number(robLocationB)) : currentItem.robLocationB;
         
         // Use transfer method which creates ledger history for true transfers
         const result = await storage.transferStoresItemLocation(
@@ -5293,12 +5334,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(result.item);
       }
       
-      // For non-location updates, use regular update (no history needed)
-      const updateData: any = {};
-      if (rob !== undefined) updateData.rob = rob;
+      // Direct ROB updates without location specification are not allowed
+      // All stock changes must go through consume, receive, transfer, or adjust methods
+      if (rob !== undefined) {
+        return res.status(400).json({ 
+          error: "Direct ROB updates are not allowed. Use location-specific updates (robLocationA/robLocationB) or consume/receive endpoints." 
+        });
+      }
       
-      const item = await storage.updateStoresItem(itemId, updateData);
-      res.json(item);
+      // Handle non-ROB updates (itemName, uom, etc.) through regular update
+      const { robLocationA: _a, robLocationB: _b, rob: _r, remarks: _rm, place: _p, dateLocal: _d, tz: _t, ...otherUpdates } = req.body;
+      if (Object.keys(otherUpdates).length > 0) {
+        const item = await storage.updateStoresItem(itemId, otherUpdates);
+        return res.json(item);
+      }
+      
+      // No valid update fields provided
+      return res.status(400).json({ error: "No valid update fields provided" });
     } catch (error: any) {
       console.error("Error updating stores item:", error);
       res.status(500).json({ error: error.message || "Failed to update stores item" });

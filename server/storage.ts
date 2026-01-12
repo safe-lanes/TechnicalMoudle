@@ -601,12 +601,13 @@ export interface IStorage {
   // Stores methods - ZERO PMS linkages (no componentId, workOrderId, jobId)
   getStoresItems(vesselId: string, itemType?: string): Promise<StoresItem[]>;
   getStoresItem(id: number): Promise<StoresItem | undefined>;
-  createStoresItem(item: InsertStoresItem): Promise<StoresItem>;
+  createStoresItem(item: InsertStoresItem, userId?: string): Promise<StoresItem>;
   updateStoresItem(id: number, data: Partial<StoresItem>): Promise<StoresItem>;
   deleteStoresItem(id: number): Promise<void>;
   consumeStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   receiveStoresItem(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, ref?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   transferStoresItemLocation(id: number, newRobLocationA: string, newRobLocationB: string, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<{ item: StoresItem; isTransfer: boolean }>;
+  adjustStoresItem(id: number, newRob: number, location: 'A' | 'B', userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<StoresItem>;
   getStoresTransactionHistory(vesselId: string, itemType?: string): Promise<StoresLedger[]>;
   getStoresItemHistory(itemId: number): Promise<StoresLedger[]>;
   
