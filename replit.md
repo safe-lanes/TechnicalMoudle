@@ -38,6 +38,9 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Part A Immutability**: Work Order Part A is read-only for existing work orders.
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
+## Recent Changes
+- **Maintenance History Viewer** (Jan 12, 2026): Clicking a maintenance history record now displays the exact same work order form UI in a sliding panel with embedded read-only mode. All mutation handlers are guarded to prevent modifications.
+
 ## Checkpoints
 - **Eta** (Jan 9, 2026 - commit 15666f3): Parent-child RH consistency remediation. Fixed 102 inherited components on Vessel 2 where child RH exceeded same-vessel parent RH (historical cross-vessel corruption). All inherited components now correctly match their same-vessel parent's running hours.
 - **Zeta** (Jan 9, 2026 - commit 84be7ad): RH display fix for inherited components. Backend `/running-hours/children` endpoint and frontend Components page now display `rhCurrentInheritedCached` (vessel-isolated value) for INHERITED components instead of `currentCumulativeRH`. One-time data remediation synced 49 corrupted inherited component records.
