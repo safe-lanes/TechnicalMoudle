@@ -1143,7 +1143,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
         }
         
         if (runningHoursValue && workOrderContext && (workOrderContext as any).component) {
-          const { component, parentComponent } = workOrderContext as any;
+          const { component, rhMasterComponent } = workOrderContext as any;
           const newRunningHours = parseInt(runningHoursValue);
           
           if (isNaN(newRunningHours)) {
@@ -1155,13 +1155,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
             return;
           }
           
-          if (parentComponent && newRunningHours > parentComponent.currentCumulativeRH) {
-            toast({
-              title: "Validation Error",
-              description: `Running hours (${newRunningHours}) cannot exceed parent component's running hours (${parentComponent.currentCumulativeRH}). Please update parent running hours first.`,
-              variant: "destructive",
-            });
-            return;
+          // For INHERITED components, validate RH against master component
+          // Inherited components can NEVER have RH greater than their master component
+          const counterType = (component.rhCounterType || '').toUpperCase();
+          if (counterType === 'INHERITED' && rhMasterComponent) {
+            const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH);
+            if (!isNaN(masterRH) && newRunningHours > masterRH) {
+              toast({
+                title: "Running Hours Exceeds Master",
+                description: `Running hours (${newRunningHours}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours in the Running Hours module first.`,
+                variant: "destructive",
+              });
+              return;
+            }
           }
           
           if (newRunningHours < component.currentCumulativeRH) {

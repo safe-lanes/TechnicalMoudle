@@ -2168,6 +2168,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parentComponent = await storage.getComponent(component.parentId);
       }
       
+      // Get RH master component for INHERITED components (different from hierarchical parent)
+      // This is used for running hours validation - inherited components cannot exceed master RH
+      let rhMasterComponent = null;
+      const counterType = (component.rhCounterType || '').toUpperCase();
+      if (counterType === 'INHERITED') {
+        // Try by rhMasterComponentId first, then fall back to rhCounterSource
+        if (component.rhMasterComponentId) {
+          rhMasterComponent = await storage.getComponent(component.rhMasterComponentId);
+        }
+        if (!rhMasterComponent && component.rhCounterSource && workOrder.vesselId) {
+          rhMasterComponent = await storage.getComponentByCode(component.rhCounterSource, workOrder.vesselId);
+        }
+      }
+      
       // Get latest running hours audit for this component
       const audits = await storage.getRunningHoursAudits(workOrder.component);
       const latestAudit = audits.length > 0 ? audits[0] : null;
@@ -2326,13 +2340,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: component.name,
           parentId: component.parentId,
           currentCumulativeRH: component.currentCumulativeRH,
-          lastUpdated: latestAudit?.dateUpdatedLocal || component.lastUpdated
+          lastUpdated: latestAudit?.dateUpdatedLocal || component.lastUpdated,
+          rhCounterType: component.rhCounterType,
+          rhCounterSource: component.rhCounterSource
         },
         parentComponent: parentComponent ? {
           id: parentComponent.id,
           componentCode: parentComponent.componentCode,
           name: parentComponent.name,
           currentCumulativeRH: parentComponent.currentCumulativeRH
+        } : null,
+        // RH Master component for INHERITED components (used for validation)
+        // Inherited components cannot have RH greater than their master component
+        rhMasterComponent: rhMasterComponent ? {
+          id: rhMasterComponent.id,
+          componentCode: rhMasterComponent.componentCode,
+          name: rhMasterComponent.name,
+          currentCumulativeRH: rhMasterComponent.currentCumulativeRH || rhMasterComponent.rhCurrentMaster
         } : null,
         maintenanceBasis: workOrder.maintenanceBasis || job?.maintenanceBasis
       });
@@ -2599,6 +2623,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('📝 Cleaned update data keys:', Object.keys(updateData));
       
+      // VALIDATION: For INHERITED components, check that RH doesn't exceed master component RH
+      // This is a backend safety check - frontend also validates but this is the final gate
+      if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
+        const runningHours = existingWO.runningHours || updateData.runningHours;
+        if (runningHours) {
+          // Find the component
+          let componentForValidation = await storage.getComponent(existingWO.component);
+          if (!componentForValidation && existingWO.componentCode && existingWO.vesselId) {
+            componentForValidation = await storage.getComponentByCode(existingWO.componentCode, existingWO.vesselId);
+          }
+          
+          if (componentForValidation) {
+            const counterType = (componentForValidation.rhCounterType || '').toUpperCase();
+            if (counterType === 'INHERITED') {
+              // Find master component
+              let rhMasterComponent = null;
+              if (componentForValidation.rhMasterComponentId) {
+                rhMasterComponent = await storage.getComponent(componentForValidation.rhMasterComponentId);
+              }
+              if (!rhMasterComponent && componentForValidation.rhCounterSource && existingWO.vesselId) {
+                rhMasterComponent = await storage.getComponentByCode(componentForValidation.rhCounterSource, existingWO.vesselId);
+              }
+              
+              if (rhMasterComponent) {
+                const enteredRH = parseFloat(runningHours);
+                const masterRH = parseFloat(rhMasterComponent.currentCumulativeRH || rhMasterComponent.rhCurrentMaster || '0');
+                
+                if (!isNaN(enteredRH) && !isNaN(masterRH) && enteredRH > masterRH) {
+                  console.error(`❌ RH validation failed: Entered RH (${enteredRH}) exceeds master component ${rhMasterComponent.componentCode} RH (${masterRH})`);
+                  return res.status(400).json({
+                    error: `Running hours (${enteredRH}) cannot exceed master component "${rhMasterComponent.name}" (${rhMasterComponent.componentCode}) running hours of ${masterRH}. Please update the master component's running hours first.`,
+                    code: 'RH_EXCEEDS_MASTER'
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+      
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
       
       // When work order is being approved/completed, create maintenance history and update job
@@ -2732,46 +2796,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await storage.updateJob(job.id, rhUpdates);
                     
                     // UPDATE COMPONENT RUNNING HOURS on work order approval
-                    // For INHERITED components, update the MASTER component which will cascade
-                    // For MASTER components, update directly
+                    // IMPORTANT: For INHERITED components, we update the component's OWN record only
+                    // We NEVER update the master component from a child - master RH is only updated 
+                    // via the Running Hours sub-module which then cascades down to inherited components
                     try {
                       const counterType = (component.rhCounterType || '').toUpperCase();
                       const isInherited = counterType === 'INHERITED';
                       const isMaster = counterType === 'MASTER';
                       
                       if (isInherited) {
-                        // Find and update the master component
-                        // First try by rhMasterComponentId, then fall back to rhCounterSource
-                        let masterComponent = null;
-                        if (component.rhMasterComponentId) {
-                          masterComponent = await storage.getComponent(component.rhMasterComponentId);
-                        }
-                        if (!masterComponent && component.rhCounterSource) {
-                          masterComponent = await storage.getComponentByCode(component.rhCounterSource, freshWorkOrder.vesselId);
-                        }
-                        if (masterComponent) {
-                          await storage.setComponentRunningHours({
-                            componentId: masterComponent.id,
-                            newRHValue: currentRH,
-                            updateSource: 'WO_COMPLETION',
-                            userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
-                            lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
-                          });
-                          console.log(`✅ Updated MASTER component ${masterComponent.componentCode} RH to ${currentRH} (cascades to inherited)`);
-                        } else {
-                          console.warn(`⚠️ Could not find master component for inherited component ${component.componentCode}`);
-                          // Fallback: update the inherited component directly if master not found
-                          await storage.setComponentRunningHours({
-                            componentId: component.id,
-                            newRHValue: currentRH,
-                            updateSource: 'WO_COMPLETION',
-                            userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
-                            lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
-                          });
-                          console.log(`✅ Updated INHERITED component ${component.componentCode} RH to ${currentRH} (master not found, direct update)`);
-                        }
+                        // For INHERITED components: Update only the component's own running hours record
+                        // This reflects in Section B of the component view
+                        // The master component RH should ONLY be updated via Running Hours module
+                        await storage.setComponentRunningHours({
+                          componentId: component.id,
+                          newRHValue: currentRH,
+                          updateSource: 'WO_COMPLETION',
+                          userId: freshWorkOrder.performedBy || freshWorkOrder.approver || 'System',
+                          lastUpdatedDate: dateOfCompletion || new Date().toISOString().split('T')[0]
+                        });
+                        console.log(`✅ Updated INHERITED component ${component.componentCode} RH to ${currentRH} (Section B update only, master unchanged)`);
                       } else if (isMaster || !counterType) {
-                        // Update the component directly (MASTER or NOT_RH_DRIVEN or legacy/untyped)
+                        // For MASTER or untyped components: Update the component directly
                         await storage.setComponentRunningHours({
                           componentId: component.id,
                           newRHValue: currentRH,
