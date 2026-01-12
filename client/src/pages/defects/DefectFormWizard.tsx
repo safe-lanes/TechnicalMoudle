@@ -466,7 +466,12 @@ export default function DefectFormWizard({
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
                 
                 <div className="space-y-6">
-                  <h3 className="text-sm font-semibold text-gray-800">Details</h3>
+                  {/* Column Headers */}
+                  <div className="grid grid-cols-3 gap-x-6">
+                    <div className="text-sm font-semibold text-gray-800">Basic</div>
+                    <div className="text-sm font-semibold text-gray-800">Equipment / Hardware</div>
+                    <div className="text-sm font-semibold text-gray-800">Timeline</div>
+                  </div>
                   
                   <div className="grid grid-cols-3 gap-x-6 gap-y-4">
                     {/* Row 1: Vessel, Category, Date Observed */}
@@ -587,7 +592,7 @@ export default function DefectFormWizard({
                       />
                     </div>
 
-                    {/* Row 3: Defect Category, Make, Date Registered in System (SAL) */}
+                    {/* Row 3: Defect Category, Make, Date Registered in System (SAIL) */}
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Defect Category</label>
                       <Controller
@@ -641,7 +646,7 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Date Registered in System (SAL)</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Date Registered in System (SAIL)</label>
                       <Input 
                         {...form.register("dateRegisteredInSystem")} 
                         type="date"
@@ -725,15 +730,37 @@ export default function DefectFormWizard({
                       />
                     </div>
 
-                    {/* Row 5: Responsible Role, CoC Checkbox, Date Closed */}
+                    {/* Row 5: Raised By, CoC Checkbox, Date Closed */}
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Responsible Role</label>
-                      <Input 
-                        {...form.register("responsibleDept")} 
-                        data-testid="input-responsible-role"
-                        className="h-10 text-sm border-gray-300"
-                        placeholder="e.g., Chief Engineer"
-                        disabled={isViewMode}
+                      <label className="text-sm text-gray-600 mb-1.5">Raised By</label>
+                      <Controller
+                        name="raisedByName"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select 
+                            onValueChange={(value) => {
+                              const [rank, ...nameParts] = value.split(" - ");
+                              const name = nameParts.join(" - ");
+                              field.onChange(name);
+                              form.setValue("raisedByRank", rank);
+                              form.setValue("raisedById", value);
+                            }} 
+                            value={form.watch("raisedByRank") && field.value ? `${form.watch("raisedByRank")} - ${field.value}` : ""}
+                            disabled={isViewMode}
+                          >
+                            <SelectTrigger data-testid="select-raised-by" className="h-10 text-sm border-gray-300">
+                              <SelectValue placeholder="Select person" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Master - System User">Master - System User</SelectItem>
+                              <SelectItem value="Chief Engineer - John Mathews">Chief Engineer - John Mathews</SelectItem>
+                              <SelectItem value="2nd Officer - Rahul Verma">2nd Officer - Rahul Verma</SelectItem>
+                              <SelectItem value="AB - Suresh Kumar">AB - Suresh Kumar</SelectItem>
+                              <SelectItem value="Chief Officer - Mike Anderson">Chief Officer - Mike Anderson</SelectItem>
+                              <SelectItem value="2E - David Smith">2E - David Smith</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       />
                     </div>
 
