@@ -221,29 +221,40 @@ const Stores: React.FC = () => {
   });
 
   // Map history API data to StoresHistoryItem format
+  // Uses storesLedger schema fields: itemId, eventType, timestampUTC, qtyChangeBase, robAfterBase, userId, remarks, ref, itemName, partCode
+  const formatEventType = (eventType: string): string => {
+    const eventMap: Record<string, string> = {
+      'CONSUME': 'Consume',
+      'RECEIVE': 'Receive',
+      'ADJUST': 'Adjust',
+      'TRANSFER_IN': 'Transfer In',
+      'TRANSFER_OUT': 'Transfer Out',
+      'ARCHIVE': 'Archive',
+      'CREATE': 'Create'
+    };
+    return eventMap[eventType?.toUpperCase()] || eventType || 'Unknown';
+  };
+  
   const historyItems: StoresHistoryItem[] = useMemo(() => {
     if (!historyData || historyData.length === 0) return [];
     
     return historyData.map((entry: any) => {
-      const storeItem = storesData.find((item: any) => item.id === entry.storesItemId);
       return {
         id: entry.id,
-        dateLocal: entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '',
-        eventType: entry.transactionType === 'issue' ? 'Consume' : 
-                   entry.transactionType === 'receive' ? 'Receive' : 
-                   entry.transactionType || 'Unknown',
-        itemName: storeItem?.itemName || `Item #${entry.storesItemId}`,
-        partCode: storeItem?.itemCode || '',
-        uom: storeItem?.uom || '',
-        qtyChange: entry.transactionType === 'issue' ? -Number(entry.quantity) : Number(entry.quantity),
-        robAfter: Number(entry.robAfter) || 0,
+        dateLocal: entry.dateLocal || (entry.timestampUTC ? new Date(entry.timestampUTC).toLocaleString() : ''),
+        eventType: formatEventType(entry.eventType),
+        itemName: entry.itemName || `Item #${entry.itemId}`,
+        partCode: entry.partCode || '',
+        uom: entry.uom || '',
+        qtyChange: Number(entry.qtyChangeBase) || 0,
+        robAfter: Number(entry.robAfterBase) || 0,
         place: entry.place || '',
-        userId: entry.createdBy || 'System',
-        remarks: entry.reason || '',
-        ref: entry.purchaseOrderRef || '',
+        userId: entry.userId || 'System',
+        remarks: entry.remarks || '',
+        ref: entry.ref || '',
       };
     }).sort((a: StoresHistoryItem, b: StoresHistoryItem) => b.id - a.id);
-  }, [historyData, storesData]);
+  }, [historyData]);
 
   // History filters
   const [historyDateFrom, setHistoryDateFrom] = useState("");
@@ -831,7 +842,8 @@ const Stores: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       setIsReceiveModalOpen(false);
-      toast({ title: "Success", description: `Received ${quantity} ${receivingItem.uom || 'units'}` });
+      const locationName = receiveForm.location === "A" ? locationNames.locationA : locationNames.locationB;
+      toast({ title: "Inventory Updated", description: `+${quantity} to ${locationName}` });
     } catch (error: any) {
       console.error('Failed to receive item:', error);
       toast({ title: "Error", description: error.message || "Failed to receive item", variant: "destructive" });
@@ -893,7 +905,8 @@ const Stores: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       setIsConsumeModalOpen(false);
-      toast({ title: "Success", description: `Consumed ${quantity} ${consumingItem.uom || 'units'}` });
+      const locationName = consumeForm.location === "A" ? locationNames.locationA : locationNames.locationB;
+      toast({ title: "Inventory Updated", description: `-${quantity} from ${locationName}` });
     } catch (error: any) {
       console.error('Failed to consume item:', error);
       toast({ title: "Error", description: error.message || "Failed to consume item", variant: "destructive" });
