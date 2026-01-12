@@ -468,9 +468,9 @@ export default function DefectFormWizard({
                 <div className="space-y-6">
                   {/* Column Headers */}
                   <div className="grid grid-cols-3 gap-x-6">
-                    <div className="text-sm font-semibold text-gray-800">Basic</div>
-                    <div className="text-sm font-semibold text-gray-800">Equipment / Hardware</div>
-                    <div className="text-sm font-semibold text-gray-800">Timeline</div>
+                    <div className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>Basic</div>
+                    <div className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>Equipment / Hardware</div>
+                    <div className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>Timeline</div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-x-6 gap-y-4">
@@ -646,7 +646,7 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Date Registered in System (SAIL)</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Date Registered in System</label>
                       <Input 
                         {...form.register("dateRegisteredInSystem")} 
                         type="date"
@@ -777,14 +777,9 @@ export default function DefectFormWizard({
                               data-testid="checkbox-coc"
                               disabled={isViewMode}
                             />
-                            <div>
-                              <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
-                                Condition of Class (CoC)
-                              </Label>
-                              <p className="text-xs text-gray-500">
-                                Only if the Defect is Class Related
-                              </p>
-                            </div>
+                            <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
+                              Condition of Class (CoC)
+                            </Label>
                           </div>
                         )}
                       />
