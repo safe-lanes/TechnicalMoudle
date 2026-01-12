@@ -914,6 +914,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const componentMap = new Map(components.map(c => [c.id, c]));
       const componentCodeMap = new Map(components.map(c => [c.componentCode, c]));
 
+      // Fetch job-component links (many-to-many relationships)
+      // This is the PRIMARY source of truth for which components each job is linked to
+      const jobComponentLinks = await storage.getJobComponentLinks(vesselId as string);
+      
+      // Build a map of jobId -> array of linked componentIds
+      const jobToComponentsMap = new Map<string, Set<string>>();
+      for (const link of jobComponentLinks) {
+        if (!jobToComponentsMap.has(link.jobId)) {
+          jobToComponentsMap.set(link.jobId, new Set());
+        }
+        jobToComponentsMap.get(link.jobId)!.add(link.componentId);
+      }
+
       // Fetch all work orders to check for open WOs
       const allWorkOrders = await storage.getWorkOrders(vesselId as string);
       
@@ -924,11 +937,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       today.setHours(0, 0, 0, 0);
 
       // Process each job and compute planning data
+      // IMPORTANT: A job can be linked to MULTIPLE components via jobComponentLinks
+      // Each job-component pair is a separate planner row
       const plannerItems: any[] = [];
 
+      // Build list of job-component pairs to process
+      // Each pair represents one planner row
+      interface JobComponentPair {
+        job: typeof activeJobs[0];
+        componentId: string;
+        component: typeof components[0] | undefined;
+      }
+      
+      const jobComponentPairs: JobComponentPair[] = [];
+      
       for (const job of activeJobs) {
-        // Get component data
-        const component = componentMap.get(job.componentId) || componentCodeMap.get(job.componentCode);
+        const linkedComponentIds = jobToComponentsMap.get(job.id);
+        
+        if (linkedComponentIds && linkedComponentIds.size > 0) {
+          // Job has entries in jobComponentLinks - use those (many-to-many)
+          for (const componentId of linkedComponentIds) {
+            const component = componentMap.get(componentId);
+            jobComponentPairs.push({ job, componentId, component });
+          }
+        } else {
+          // Fallback: Use deprecated componentId/componentCode fields (backward compatibility)
+          const component = componentMap.get(job.componentId) || componentCodeMap.get(job.componentCode);
+          if (component) {
+            jobComponentPairs.push({ job, componentId: component.id, component });
+          } else if (job.componentId || job.componentCode) {
+            // Job references a component that doesn't exist - still include for visibility
+            jobComponentPairs.push({ job, componentId: job.componentId || '', component: undefined });
+          }
+        }
+      }
+
+      // Now process each job-component pair
+      for (const { job, componentId, component } of jobComponentPairs) {
         
         // Determine job type (Calendar vs Running Hours)
         const isCalendarJob = job.maintenanceBasis === 'Calendar' || job.frequencyType === 'Calendar';
@@ -1070,15 +1115,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           else spareStatus = 'OK';
         }
 
-        // Build planner item
+        // Build planner item using the component from the job-component pair
+        // This ensures multi-component jobs appear as separate rows
         plannerItems.push({
           jobId: job.id,
           jobCode: job.jobNo,
           jobTitle: job.jobTitle,
           jobType: isCalendarJob ? 'CALENDAR' : 'RH',
-          componentId: job.componentId,
-          componentCode: job.componentCode,
-          componentName: job.componentName,
+          componentId: componentId,
+          componentCode: component?.componentCode || job.componentCode || '',
+          componentName: component?.name || job.componentName || '',
           department: job.department || component?.department || 'N/A',
           assignedRank: job.assignedTo || 'Unassigned',
           criticalFlag: job.criticality === 'Yes' || job.jobPriority === 'Critical' || component?.critical || false,
