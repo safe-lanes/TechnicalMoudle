@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, ChevronRight, ChevronDown, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, ChevronUp, ChevronLeft, Edit2, FileText, ArrowLeft, Plus, Check, Package, X, AlertCircle, CheckCircle, HelpCircle, File, FileImage, FileCheck, Upload, Download, Lock, Wrench, User, ClipboardList, MessageSquare, MapPin, Pencil, Expand, Minimize2 } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -932,6 +932,12 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const { toast } = useToast();
   const { vesselId } = useVessel();
   
+  // Pagination state
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const COLLAPSED_ROWS = 2;
+  const ROWS_PER_PAGE = 10;
+  
   // Fetch jobs filtered by vesselId at the database level
   const { data: allJobs = [], isLoading } = useQuery<any[]>({
     queryKey: [`/technical/api/jobs?vesselId=${vesselId}`],
@@ -947,6 +953,13 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
     // Check if any of the job's linked component codes match EXACTLY this component code
     return allJobCodes.includes(componentCode);
   });
+  
+  // Calculate visible jobs based on expand state and pagination
+  const totalJobs = jobs.length;
+  const totalPages = Math.ceil(totalJobs / ROWS_PER_PAGE);
+  const visibleJobs = isTableExpanded 
+    ? jobs.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
+    : jobs.slice(0, COLLAPSED_ROWS);
   
   // Check URL parameter to navigate to job page when returning from Maintenance Records
   React.useEffect(() => {
@@ -1043,7 +1056,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
                 </td>
               </tr>
             ) : (
-              jobs.map((job, index) => (
+              visibleJobs.map((job, index) => (
                 <JobRow 
                   key={index}
                   job={job}
@@ -1055,6 +1068,60 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
             )}
           </tbody>
         </table>
+        
+        {/* Expand/Collapse and Pagination Controls */}
+        {totalJobs > COLLAPSED_ROWS && (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsTableExpanded(!isTableExpanded);
+                setCurrentPage(1);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800"
+              data-testid="btn-expand-jobs"
+            >
+              {isTableExpanded ? (
+                <>
+                  <Minimize2 className="h-3 w-3 mr-1" />
+                  Collapse ({totalJobs} total)
+                </>
+              ) : (
+                <>
+                  <Expand className="h-3 w-3 mr-1" />
+                  Show All ({totalJobs} jobs)
+                </>
+              )}
+            </Button>
+            
+            {isTableExpanded && totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="btn-prev-page-jobs"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="btn-next-page-jobs"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -1062,6 +1129,12 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
 
 const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  
+  // Pagination state
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const COLLAPSED_ROWS = 2;
+  const ROWS_PER_PAGE = 10;
   
   // Fetch maintenance history for the selected component
   // NOTE: Must use actualId (database UUID) not id (tree node code) for API calls
@@ -1071,6 +1144,13 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
     queryKey: [`/technical/api/component-maintenance-history/${componentDbId}`],
     enabled: !!componentDbId,
   });
+  
+  // Calculate visible records based on expand state and pagination
+  const totalRecords = maintenanceHistory.length;
+  const totalPages = Math.ceil(totalRecords / ROWS_PER_PAGE);
+  const visibleRecords = isTableExpanded 
+    ? maintenanceHistory.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
+    : maintenanceHistory.slice(0, COLLAPSED_ROWS);
 
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view maintenance history</div>;
@@ -1119,7 +1199,7 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
             </tr>
           </thead>
           <tbody>
-            {maintenanceHistory.map((record, index) => (
+            {visibleRecords.map((record, index) => (
               <tr 
                 key={index} 
                 className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
@@ -1148,6 +1228,60 @@ const MaintenanceHistorySection: React.FC<{ selectedComponent: ComponentNode | n
             ))}
           </tbody>
         </table>
+        
+        {/* Expand/Collapse and Pagination Controls */}
+        {totalRecords > COLLAPSED_ROWS && (
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsTableExpanded(!isTableExpanded);
+                setCurrentPage(1);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800"
+              data-testid="btn-expand-history"
+            >
+              {isTableExpanded ? (
+                <>
+                  <Minimize2 className="h-3 w-3 mr-1" />
+                  Collapse ({totalRecords} total)
+                </>
+              ) : (
+                <>
+                  <Expand className="h-3 w-3 mr-1" />
+                  Show All ({totalRecords} records)
+                </>
+              )}
+            </Button>
+            
+            {isTableExpanded && totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="btn-prev-page-history"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="btn-next-page-history"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Instruction hint */}
@@ -1188,6 +1322,12 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const [editingLocationB, setEditingLocationB] = useState('');
   const [spareDetailsOpen, setSpareDetailsOpen] = useState(false);
   const [selectedSpareDetails, setSelectedSpareDetails] = useState<SpareWithInventoryData | null>(null);
+  
+  // Pagination state
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const COLLAPSED_ROWS = 2;
+  const ROWS_PER_PAGE = 10;
   
   const vesselId = selectedComponent?.vesselId || selectedComponent?.vesselCode || 'V001';
   
@@ -1290,6 +1430,13 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
   const handleFieldChange = (index: number, field: string, value: string) => {
   };
   
+  // Calculate visible spares based on expand state and pagination
+  const totalSpares = sparesWithInventory.length;
+  const totalPages = Math.ceil(totalSpares / ROWS_PER_PAGE);
+  const visibleSpares = isTableExpanded 
+    ? sparesWithInventory.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
+    : sparesWithInventory.slice(0, COLLAPSED_ROWS);
+  
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view associated spares</div>;
   }
@@ -1299,6 +1446,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
       {sparesLoading ? (
         <div className="py-8 text-center text-gray-500">Loading spares...</div>
       ) : (
+      <>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200">
@@ -1325,7 +1473,7 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                 <p className="text-xs text-gray-500 mt-2">Navigate to the Spares module to manage spare parts inventory</p>
               </td>
             </tr>
-          ) : sparesWithInventory.map((spareData, index) => {
+          ) : visibleSpares.map((spareData, index) => {
             const spare = spareData.spare;
             const isCritical = spare.critical === 'Critical' || spare.critical === 'Yes' || spare.criticality === 'Yes';
             return (
@@ -1418,11 +1566,11 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
                 <td className="py-3 px-3 text-center" data-testid={index === 0 ? "B7.E.17" : undefined}>
                   {index === 0 && <Marker id="B7.E.17" />}
                   {spare.ihmPresence === 'YES' ? (
-                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" title="IHM Present" />
+                    <span title="IHM Present"><AlertCircle className="h-4 w-4 text-red-500 mx-auto" /></span>
                   ) : spare.ihmPresence === 'NO' ? (
-                    <CheckCircle className="h-4 w-4 text-green-500 mx-auto" title="No IHM" />
+                    <span title="No IHM"><CheckCircle className="h-4 w-4 text-green-500 mx-auto" /></span>
                   ) : (
-                    <HelpCircle className="h-4 w-4 text-gray-400 mx-auto" title="IHM Unknown" />
+                    <span title="IHM Unknown"><HelpCircle className="h-4 w-4 text-gray-400 mx-auto" /></span>
                   )}
                 </td>
               )}
@@ -1435,6 +1583,61 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
           )})}
         </tbody>
       </table>
+      
+      {/* Expand/Collapse and Pagination Controls */}
+      {totalSpares > COLLAPSED_ROWS && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setIsTableExpanded(!isTableExpanded);
+              setCurrentPage(1);
+            }}
+            className="text-xs text-blue-600 hover:text-blue-800"
+            data-testid="btn-expand-spares"
+          >
+            {isTableExpanded ? (
+              <>
+                <Minimize2 className="h-3 w-3 mr-1" />
+                Collapse ({totalSpares} total)
+              </>
+            ) : (
+              <>
+                <Expand className="h-3 w-3 mr-1" />
+                Show All ({totalSpares} spares)
+              </>
+            )}
+          </Button>
+          
+          {isTableExpanded && totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                data-testid="btn-prev-page-spares"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                data-testid="btn-next-page-spares"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      </>
       )}
       
       {/* Edit Location Names Dialog */}
@@ -1651,6 +1854,12 @@ const SparesSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ 
 const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | null }> = ({ selectedComponent }) => {
   const { canViewDocument, canDownloadDocument } = useAuth();
   
+  // Pagination state
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const COLLAPSED_ROWS = 2;
+  const ROWS_PER_PAGE = 10;
+  
   // Fetch documents for the selected component
   const { data: documents = [], isLoading } = useQuery<any[]>({
     queryKey: [`/technical/api/component-documents/${selectedComponent?.id}`],
@@ -1666,6 +1875,16 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
     }
   };
   
+  // Filter documents based on role permissions
+  const viewableDocuments = documents.filter(doc => canViewDocument(doc));
+  
+  // Calculate visible documents based on expand state and pagination
+  const totalDocs = viewableDocuments.length;
+  const totalPages = Math.ceil(totalDocs / ROWS_PER_PAGE);
+  const visibleDocs = isTableExpanded 
+    ? viewableDocuments.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE)
+    : viewableDocuments.slice(0, COLLAPSED_ROWS);
+  
   if (!selectedComponent) {
     return <div className="text-sm text-gray-500">Select a component to view documents</div>;
   }
@@ -1673,9 +1892,6 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
   if (isLoading) {
     return <div className="text-sm text-gray-500">Loading documents...</div>;
   }
-  
-  // Filter documents based on role permissions
-  const viewableDocuments = documents.filter(doc => canViewDocument(doc));
   
   if (viewableDocuments.length === 0) {
     return (
@@ -1707,7 +1923,7 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
       </div>
       
       <div className="grid grid-cols-2 gap-3">
-        {viewableDocuments.map((doc, index) => {
+        {visibleDocs.map((doc, index) => {
           const IconComponent = getFileTypeIcon(doc.fileType);
           const hasDownloadAccess = canDownloadDocument(doc);
           
@@ -1757,8 +1973,62 @@ const DrawingsAndManualsSection: React.FC<{ selectedComponent: ComponentNode | n
         })}
       </div>
       
+      {/* Expand/Collapse and Pagination Controls */}
+      {totalDocs > COLLAPSED_ROWS && (
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setIsTableExpanded(!isTableExpanded);
+              setCurrentPage(1);
+            }}
+            className="text-xs text-blue-600 hover:text-blue-800"
+            data-testid="btn-expand-documents"
+          >
+            {isTableExpanded ? (
+              <>
+                <Minimize2 className="h-3 w-3 mr-1" />
+                Collapse ({totalDocs} total)
+              </>
+            ) : (
+              <>
+                <Expand className="h-3 w-3 mr-1" />
+                Show All ({totalDocs} documents)
+              </>
+            )}
+          </Button>
+          
+          {isTableExpanded && totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                data-testid="btn-prev-page-documents"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                data-testid="btn-next-page-documents"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700" data-testid="B7.F.6">
-        <Marker id="B7.F.6" /> 💡 Document access is controlled by role-based permissions
+        <Marker id="B7.F.6" /> Document access is controlled by role-based permissions
       </div>
     </div>
   );
