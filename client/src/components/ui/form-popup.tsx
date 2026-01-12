@@ -5,6 +5,49 @@ import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface FormPopupProps {
+  title: string;
+  onBack: () => void;
+  onSaveDraft?: () => void;
+  children: React.ReactNode;
+}
+
+export function FormPopup({ title, onBack, onSaveDraft, children }: FormPopupProps) {
+  return (
+    <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-md text-gray-600"
+            data-testid="button-back"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+        </div>
+        {onSaveDraft && (
+          <button
+            onClick={onSaveDraft}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-md hover:bg-blue-600"
+            data-testid="button-save-draft"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            Save Draft
+          </button>
+        )}
+      </header>
+      <div className="flex-1 overflow-hidden flex">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+interface StandardFormPopupProps {
   children: React.ReactNode
   className?: string
   onClose?: () => void
@@ -12,23 +55,9 @@ interface FormPopupProps {
   isOpen?: boolean
 }
 
-/**
- * StandardFormPopup - A reusable component for consistent form popup spacing
- * 
- * Features:
- * - Equal spacing on all sides (1rem padding)
- * - Consistent modal height calculation
- * - Responsive design
- * - Standard close button behavior
- * 
- * Usage:
- * <StandardFormPopup title="Form Title" onClose={handleClose}>
- *   <FormContent />
- * </StandardFormPopup>
- */
 export const StandardFormPopup = React.forwardRef<
   HTMLDivElement,
-  FormPopupProps
+  StandardFormPopupProps
 >(({ className, children, onClose, title, isOpen = true, ...props }, ref) => {
   if (!isOpen) return null;
 
@@ -65,9 +94,6 @@ export const StandardFormPopup = React.forwardRef<
 })
 StandardFormPopup.displayName = "StandardFormPopup"
 
-/**
- * FormPopupOverlay - A standalone overlay component for custom implementations
- */
 export const FormPopupOverlay = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -83,9 +109,6 @@ export const FormPopupOverlay = React.forwardRef<
 ))
 FormPopupOverlay.displayName = "FormPopupOverlay"
 
-/**
- * FormPopupContent - A content wrapper with consistent spacing
- */
 export const FormPopupContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -100,9 +123,3 @@ export const FormPopupContent = React.forwardRef<
   />
 ))
 FormPopupContent.displayName = "FormPopupContent"
-
-export {
-  StandardFormPopup as FormPopup,
-  FormPopupOverlay,
-  FormPopupContent,
-}
