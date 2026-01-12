@@ -286,18 +286,47 @@ const Stores: React.FC = () => {
     const locations = editingLocations[itemId];
     if (!locations) return;
     
-    const robA = parseInt(locations.locationA) || 0;
-    const robB = parseInt(locations.locationB) || 0;
+    const newRobA = parseInt(locations.locationA) || 0;
+    const newRobB = parseInt(locations.locationB) || 0;
+    
+    // Get original values from items
+    const originalItem = items.find(i => i.id === itemId);
+    if (!originalItem) return;
+    
+    const oldRobA = originalItem.robLocationA ?? 0;
+    const oldRobB = originalItem.robLocationB ?? 0;
+    
+    // Check if ROB changed
+    const robChanged = newRobA !== oldRobA || newRobB !== oldRobB;
+    
+    // If no ROB change, just save location names
+    if (!robChanged) {
+      if (locations.nameA || locations.nameB) {
+        try {
+          await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              locationAName: locations.nameA || locationNames.locationA || 'Location A',
+              locationBName: locations.nameB || locationNames.locationB || 'Location B'
+            }),
+          });
+          queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
+        } catch (error) {
+          console.error('Failed to save location names:', error);
+        }
+      }
+      return;
+    }
     
     try {
-      // Save ROB quantities to store item
-      await fetch(`/technical/api/stores/${vesselId}/${itemId}`, {
+      // Use PATCH endpoint which routes location changes through ledger-aware transferStoresItemLocation
+      await apiRequest(`/technical/api/stores/${vesselId}/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          robLocationA: robA,
-          robLocationB: robB,
-          rob: robA + robB
+        body: JSON.stringify({
+          robLocationA: newRobA,
+          robLocationB: newRobB
         }),
       });
       
@@ -315,10 +344,11 @@ const Stores: React.FC = () => {
       }
       
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
       toast({ title: "Saved", description: "Location settings updated" });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save location:', error);
-      toast({ title: "Error", description: "Failed to save location settings", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to save location settings", variant: "destructive" });
     }
   };
   
@@ -347,12 +377,14 @@ const Stores: React.FC = () => {
   const [consumingItem, setConsumingItem] = useState<StoreItem | null>(null);
   const [consumeForm, setConsumeForm] = useState({
     quantity: "",
+    location: "A" as "A" | "B",
     dateLocal: new Date().toISOString().split('T')[0],
     workOrder: "",
     remarks: ""
   });
   const [receiveForm, setReceiveForm] = useState({
     quantity: "",
+    location: "A" as "A" | "B",
     dateLocal: new Date().toISOString().split('T')[0],
     place: "",
     supplierPO: "",
@@ -764,6 +796,7 @@ const Stores: React.FC = () => {
     setReceivingItem(item);
     setReceiveForm({
       quantity: "",
+      location: "A",
       dateLocal: new Date().toISOString().split('T')[0],
       place: "",
       supplierPO: "",
@@ -794,7 +827,7 @@ const Stores: React.FC = () => {
           items: [{
             itemId: receivingItem.id,
             quantity: quantity,
-            location: 'A',
+            location: receiveForm.location,
             notes: receiveForm.remarks || undefined,
             place: receiveForm.place || undefined,
             dateLocal: receiveForm.dateLocal
@@ -818,11 +851,18 @@ const Stores: React.FC = () => {
     setConsumingItem(item);
     setConsumeForm({
       quantity: "",
+      location: "A",
       dateLocal: new Date().toISOString().split('T')[0],
       workOrder: "",
       remarks: ""
     });
     setIsConsumeModalOpen(true);
+  };
+  
+  // Helper to get stock at selected location
+  const getLocationStock = (item: StoreItem | null, location: "A" | "B"): number => {
+    if (!item) return 0;
+    return location === "A" ? (item.robLocationA ?? 0) : (item.robLocationB ?? 0);
   };
   
   const saveConsume = async () => {
@@ -839,8 +879,11 @@ const Stores: React.FC = () => {
       return;
     }
     
-    if (quantity > consumingItem.rob) {
-      toast({ title: "Error", description: "Insufficient stock. Cannot consume more than available ROB", variant: "destructive" });
+    // Validate per-location stock
+    const locationStock = getLocationStock(consumingItem, consumeForm.location);
+    const locationName = consumeForm.location === "A" ? locationNames.locationA : locationNames.locationB;
+    if (quantity > locationStock) {
+      toast({ title: "Error", description: `Insufficient stock at ${locationName}. Available: ${locationStock}`, variant: "destructive" });
       return;
     }
     
@@ -852,7 +895,7 @@ const Stores: React.FC = () => {
           items: [{
             itemId: consumingItem.id,
             quantity: quantity,
-            location: 'A',
+            location: consumeForm.location,
             notes: `${consumeForm.workOrder ? `WO: ${consumeForm.workOrder}. ` : ''}${consumeForm.remarks || ''}`.trim() || undefined,
             dateLocal: consumeForm.dateLocal
           }]
@@ -1645,6 +1688,21 @@ const Stores: React.FC = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
+              <Label htmlFor="receive-location">Receive to Location</Label>
+              <Select 
+                value={receiveForm.location} 
+                onValueChange={(val) => setReceiveForm({...receiveForm, location: val as "A" | "B"})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">{locationNames.locationA} (Current: {receivingItem?.robLocationA ?? 0})</SelectItem>
+                  <SelectItem value="B">{locationNames.locationB} (Current: {receivingItem?.robLocationB ?? 0})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="quantity">
                 Quantity to Receive ({receivingItem?.uom || 'units'})
               </Label>
@@ -1744,6 +1802,21 @@ const Stores: React.FC = () => {
               </div>
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="consume-location">Consume from Location</Label>
+              <Select 
+                value={consumeForm.location} 
+                onValueChange={(val) => setConsumeForm({...consumeForm, location: val as "A" | "B"})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">{locationNames.locationA} (Available: {consumingItem?.robLocationA ?? 0})</SelectItem>
+                  <SelectItem value="B">{locationNames.locationB} (Available: {consumingItem?.robLocationB ?? 0})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="consume-quantity">
                 Quantity to Consume ({consumingItem?.uom || 'units'})
               </Label>
@@ -1751,13 +1824,13 @@ const Stores: React.FC = () => {
                 id="consume-quantity"
                 type="number"
                 min="1"
-                max={consumingItem?.rob}
+                max={getLocationStock(consumingItem, consumeForm.location)}
                 value={consumeForm.quantity}
                 onChange={(e) => setConsumeForm({...consumeForm, quantity: e.target.value})}
-                placeholder={`Max: ${consumingItem?.rob}`}
+                placeholder={`Max: ${getLocationStock(consumingItem, consumeForm.location)}`}
               />
-              {consumeForm.quantity && parseInt(consumeForm.quantity) > (consumingItem?.rob || 0) && (
-                <p className="text-xs text-red-600">Cannot consume more than available stock</p>
+              {consumeForm.quantity && parseInt(consumeForm.quantity) > getLocationStock(consumingItem, consumeForm.location) && (
+                <p className="text-xs text-red-600">Cannot consume more than available stock at selected location ({getLocationStock(consumingItem, consumeForm.location)} available)</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -1812,7 +1885,7 @@ const Stores: React.FC = () => {
             </Button>
             <Button 
               onClick={saveConsume}
-              disabled={!consumeForm.quantity || parseInt(consumeForm.quantity) > (consumingItem?.rob || 0)}
+              disabled={!consumeForm.quantity || parseInt(consumeForm.quantity) > getLocationStock(consumingItem, consumeForm.location)}
             >
               Consume
             </Button>
