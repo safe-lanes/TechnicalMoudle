@@ -426,7 +426,7 @@ export default function DefectFormWizard({
       {/* Main layout with sidebar and content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Steps */}
-        <div className="w-48 bg-white border-r border-gray-200 flex flex-col pt-6 shrink-0">
+        <div className="w-48 bg-gray-50 flex flex-col pt-6 shrink-0">
           {steps.map((step) => (
             <div 
               key={step.id}
@@ -448,7 +448,7 @@ export default function DefectFormWizard({
         </div>
 
         {/* Main Content Area */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-100 p-6">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-gray-50 p-6">
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Part A: Reporting */}
