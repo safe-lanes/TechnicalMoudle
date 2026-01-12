@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, Plus, Edit, Trash2, Eye, X } from "lucide-react";
 import { insertDefectSchema } from "@shared/schema";
@@ -765,24 +766,51 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col justify-end">
-                      <Controller
-                        name="is_coc"
-                        control={form.control}
-                        render={({ field }) => (
-                          <div className="flex items-start gap-2 h-10 items-center">
-                            <Checkbox
-                              id="coc"
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="checkbox-coc"
-                              disabled={isViewMode}
-                            />
-                            <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
-                              Condition of Class (CoC)
-                            </Label>
-                          </div>
-                        )}
-                      />
+                      <div className="flex items-center gap-6 h-10">
+                        <Controller
+                          name="is_coc"
+                          control={form.control}
+                          render={({ field }) => (
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id="coc"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-coc"
+                                disabled={isViewMode}
+                              />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
+                                    CoC
+                                  </Label>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Condition of Class</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          )}
+                        />
+                        <Controller
+                          name="critical"
+                          control={form.control}
+                          render={({ field }) => (
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id="critical"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-critical-eqpt"
+                                disabled={isViewMode}
+                              />
+                              <Label htmlFor="critical" className="text-sm font-normal cursor-pointer text-gray-700">
+                                Critical Eqpt.
+                              </Label>
+                            </div>
+                          )}
+                        />
+                      </div>
                     </div>
 
                     <div className="flex flex-col">
