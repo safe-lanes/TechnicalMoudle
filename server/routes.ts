@@ -2724,15 +2724,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let component = await storage.getComponent(freshWorkOrder.component);
           
           if (!component && freshWorkOrder.componentCode && freshWorkOrder.vesselId) {
-            component = await storage.getComponentByCode(freshWorkOrder.componentCode, freshWorkOrder.vesselId);
+            const componentByCode = await storage.getComponentByCode(freshWorkOrder.componentCode, freshWorkOrder.vesselId);
+            if (componentByCode) {
+              // VALIDATION: Ensure component name matches to prevent wrong component linkage
+              if (componentByCode.name === freshWorkOrder.component) {
+                component = componentByCode;
+              } else {
+                console.warn(`⚠️ Component code ${freshWorkOrder.componentCode} found but name mismatch: "${componentByCode.name}" vs "${freshWorkOrder.component}". Will try name lookup.`);
+              }
+            }
           }
           
           if (!component && freshWorkOrder.vesselId) {
             const vesselComponents = await storage.getComponents(freshWorkOrder.vesselId);
-            component = vesselComponents.find(c => 
-              c.name === freshWorkOrder.component || 
-              c.componentCode === freshWorkOrder.componentCode
-            );
+            // Prioritize exact name match first
+            component = vesselComponents.find(c => c.name === freshWorkOrder.component);
+            // If no name match, try component code match
+            if (!component) {
+              component = vesselComponents.find(c => c.componentCode === freshWorkOrder.componentCode);
+            }
           }
           
           if (component) {
@@ -2921,19 +2931,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!component && workOrder.componentCode && workOrder.vesselId) {
         // Try lookup by component code
-        component = await storage.getComponentByCode(workOrder.componentCode, workOrder.vesselId);
-        if (component) {
-          console.log(`📋 Found component by code ${workOrder.componentCode} for vessel ${workOrder.vesselId}`);
+        const componentByCode = await storage.getComponentByCode(workOrder.componentCode, workOrder.vesselId);
+        if (componentByCode) {
+          // VALIDATION: Ensure component name matches to prevent wrong component linkage
+          // This handles cases where componentCode in work order may be incorrect
+          if (componentByCode.name === workOrder.component) {
+            component = componentByCode;
+            console.log(`📋 Found component by code ${workOrder.componentCode} for vessel ${workOrder.vesselId}`);
+          } else {
+            console.warn(`⚠️ Component code ${workOrder.componentCode} found but name mismatch: "${componentByCode.name}" vs "${workOrder.component}". Will try name lookup.`);
+          }
         }
       }
       
       if (!component && workOrder.vesselId) {
-        // Fallback: Search by component name
+        // Fallback: Search by component name (more reliable than code when there's a mismatch)
         const vesselComponents = await storage.getComponents(workOrder.vesselId);
-        component = vesselComponents.find(c => 
-          c.name === workOrder.component || 
-          c.componentCode === workOrder.componentCode
-        );
+        // Prioritize exact name match first
+        component = vesselComponents.find(c => c.name === workOrder.component);
+        // If no name match, try component code match
+        if (!component) {
+          component = vesselComponents.find(c => c.componentCode === workOrder.componentCode);
+        }
         if (component) {
           console.log(`📋 Found component by name/code match: ${component.name}`);
         }
