@@ -669,6 +669,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: "Jobs can only be assigned to sub-components. Parent components cannot have jobs directly assigned to them. Please select a sub-component." 
           });
         }
+        
+        // AUTO-CORRECT: Use component's actual code from database, not passed-in value
+        if (component.componentCode) {
+          if (jobData.componentCode && jobData.componentCode !== component.componentCode) {
+            console.warn(`⚠️ AUTO-CORRECTING job componentCode mismatch: passed "${jobData.componentCode}" but component "${component.name}" has code "${component.componentCode}"`);
+          }
+          jobData = { ...jobData, componentCode: component.componentCode };
+          console.log(`✅ Auto-resolved job componentCode: ${component.componentCode} for component "${component.name}"`);
+        }
       }
       
       // Auto-generate job number if not provided (format: MKR-XX-NNNNN)
@@ -2417,6 +2426,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       let workOrderData = insertWorkOrderSchema.parse(req.body);
       
+      // AUTO-CORRECT: Fetch correct componentCode from database based on component name
+      // This prevents data corruption from incorrect componentCode being passed in
+      if (workOrderData.component && workOrderData.vesselId) {
+        const vesselComponents = await storage.getComponents(workOrderData.vesselId);
+        const matchedComponent = vesselComponents.find(c => c.name === workOrderData.component);
+        if (matchedComponent) {
+          if (workOrderData.componentCode && workOrderData.componentCode !== matchedComponent.componentCode) {
+            console.warn(`⚠️ AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${workOrderData.component}" has code "${matchedComponent.componentCode}"`);
+          }
+          workOrderData = {
+            ...workOrderData,
+            componentCode: matchedComponent.componentCode
+          };
+          console.log(`✅ Auto-resolved componentCode: ${matchedComponent.componentCode} for component "${workOrderData.component}"`);
+        }
+      }
+      
       // Convert ISO date (YYYY-MM-DD) to DD-MM-YYYY if provided by frontend
       if (workOrderData.dueDate && workOrderData.dueDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const [year, month, day] = workOrderData.dueDate.split('-');
@@ -2615,7 +2641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Use a more permissive update approach - accept any partial data
       // The storage layer will handle what fields to actually update
-      const updateData = { ...req.body };
+      let updateData = { ...req.body };
       
       // Remove any undefined values
       Object.keys(updateData).forEach(key => {
@@ -2623,6 +2649,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           delete updateData[key];
         }
       });
+      
+      // AUTO-CORRECT: Fetch correct componentCode from database based on component name
+      // This prevents data corruption from incorrect componentCode being passed in
+      const componentName = updateData.component || existingWO.component;
+      const vesselId = updateData.vesselId || existingWO.vesselId;
+      if (componentName && vesselId) {
+        const vesselComponents = await storage.getComponents(vesselId);
+        const matchedComponent = vesselComponents.find(c => c.name === componentName);
+        if (matchedComponent) {
+          const currentCode = updateData.componentCode || existingWO.componentCode;
+          if (currentCode && currentCode !== matchedComponent.componentCode) {
+            console.warn(`⚠️ AUTO-CORRECTING WO PATCH componentCode mismatch: current "${currentCode}" but component "${componentName}" has code "${matchedComponent.componentCode}"`);
+          }
+          updateData.componentCode = matchedComponent.componentCode;
+          console.log(`✅ Auto-resolved componentCode in PATCH: ${matchedComponent.componentCode} for component "${componentName}"`);
+        }
+      }
       
       // SAFEGUARD: If completion data is provided without explicit status,
       // automatically set status to 'Pending Approval' to enforce approval workflow
