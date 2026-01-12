@@ -1,0 +1,19 @@
+{
+  "id": "06cb40d3-0c03-482f-9950-321412b81250",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "743feb08-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-12T06:37:09.086Z",
+  "completedAt": "2026-01-12T06:37:09.197Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Chemicals.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1768199829196_Stores_-_Chemicals.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}
