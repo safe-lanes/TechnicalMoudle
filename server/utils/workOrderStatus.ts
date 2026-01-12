@@ -39,12 +39,12 @@ const BLOCKING_STATUSES_EXACT = new Set([
 
 /**
  * Statuses that indicate a WO is completed/finalized and should not block new WO
+ * NOTE: 'rejected' is intentionally EXCLUDED - rejected WOs are editable and can be resubmitted
  */
 const COMPLETED_STATUSES_EXACT = new Set([
   'completed',
   'closed',
   'approved',
-  'rejected',
   'cancelled',
   'canceled',
 ]);

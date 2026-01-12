@@ -2573,6 +2573,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // REJECTED WO RESUBMISSION: When a rejected WO is saved with updates, 
+      // automatically transition to 'Pending Approval' for re-approval workflow
+      const isRejectedWO = existingWO.status?.toLowerCase() === 'rejected';
+      if (isRejectedWO && !hasExplicitStatus) {
+        updateData.status = 'Pending Approval';
+        // Clear previous rejection data
+        updateData.rejectionComments = null;
+        updateData.rejectionDate = null;
+        updateData.approvalAction = null;
+        // Update submittedDate for the new submission
+        updateData.submittedDate = new Date().toISOString();
+        console.log('📝 Rejected WO resubmitted - transitioning to Pending Approval');
+      }
+      
       // AUDIT TRAIL: Capture submittedDate whenever status changes to 'Pending Approval'
       // or when an approval action (submitted/approved) is taken
       const isSubmissionAction = updateData.approvalAction === 'submitted' || 
