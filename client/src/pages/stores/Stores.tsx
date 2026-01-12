@@ -352,10 +352,26 @@ const Stores: React.FC = () => {
       
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
-      toast({ title: "Saved", description: "Location settings updated" });
+      
+      // Calculate delta for toast message
+      const deltaA = newRobA - oldRobA;
+      const deltaB = newRobB - oldRobB;
+      const locAName = locations.nameA || locationNames.locationA || 'Location A';
+      const locBName = locations.nameB || locationNames.locationB || 'Location B';
+      
+      let description = '';
+      if (deltaA !== 0 && deltaB !== 0) {
+        description = `${deltaA > 0 ? '+' : ''}${deltaA} ${locAName}, ${deltaB > 0 ? '+' : ''}${deltaB} ${locBName}`;
+      } else if (deltaA !== 0) {
+        description = `${deltaA > 0 ? '+' : ''}${deltaA} ${locAName}`;
+      } else if (deltaB !== 0) {
+        description = `${deltaB > 0 ? '+' : ''}${deltaB} ${locBName}`;
+      }
+      
+      toast({ title: "Inventory Updated", description });
     } catch (error: any) {
       console.error('Failed to save location:', error);
-      toast({ title: "Error", description: error.message || "Failed to save location settings", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to update inventory", variant: "destructive" });
     }
   };
   
