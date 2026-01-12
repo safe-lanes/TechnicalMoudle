@@ -2426,20 +2426,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       let workOrderData = insertWorkOrderSchema.parse(req.body);
       
-      // AUTO-CORRECT: Fetch correct componentCode from database based on component name
+      // AUTO-CORRECT: Fetch correct componentCode from database
       // This prevents data corruption from incorrect componentCode being passed in
-      if (workOrderData.component && workOrderData.vesselId) {
-        const vesselComponents = await storage.getComponents(workOrderData.vesselId);
-        const matchedComponent = vesselComponents.find(c => c.name === workOrderData.component);
-        if (matchedComponent) {
-          if (workOrderData.componentCode && workOrderData.componentCode !== matchedComponent.componentCode) {
-            console.warn(`⚠️ AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${workOrderData.component}" has code "${matchedComponent.componentCode}"`);
+      // workOrderData.component could be either a component ID or a component name
+      if (workOrderData.vesselId && (workOrderData.component || workOrderData.componentCode)) {
+        let resolvedComponent = null;
+        
+        // Try 1: Look up by ID (if component field contains an ID)
+        if (workOrderData.component) {
+          resolvedComponent = await storage.getComponent(workOrderData.component);
+        }
+        
+        // Try 2: Look up by componentCode
+        if (!resolvedComponent && workOrderData.componentCode) {
+          resolvedComponent = await storage.getComponentByCode(workOrderData.componentCode, workOrderData.vesselId);
+        }
+        
+        // Try 3: Look up by name (if component field contains a name, not ID)
+        if (!resolvedComponent && workOrderData.component) {
+          const vesselComponents = await storage.getComponents(workOrderData.vesselId);
+          resolvedComponent = vesselComponents.find(c => c.name === workOrderData.component);
+        }
+        
+        if (resolvedComponent) {
+          if (workOrderData.componentCode && workOrderData.componentCode !== resolvedComponent.componentCode) {
+            console.warn(`⚠️ AUTO-CORRECTING componentCode mismatch: passed "${workOrderData.componentCode}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
           }
+          // Only update componentCode - preserve the original component field (could be ID or name)
           workOrderData = {
             ...workOrderData,
-            componentCode: matchedComponent.componentCode
+            componentCode: resolvedComponent.componentCode
           };
-          console.log(`✅ Auto-resolved componentCode: ${matchedComponent.componentCode} for component "${workOrderData.component}"`);
+          console.log(`✅ Auto-resolved componentCode: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
         }
       }
       
@@ -2650,20 +2668,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      // AUTO-CORRECT: Fetch correct componentCode from database based on component name
+      // AUTO-CORRECT: Fetch correct componentCode from database
       // This prevents data corruption from incorrect componentCode being passed in
-      const componentName = updateData.component || existingWO.component;
+      // component field could be either a component ID or a component name
+      const componentRef = updateData.component || existingWO.component;
+      const componentCodeRef = updateData.componentCode || existingWO.componentCode;
       const vesselId = updateData.vesselId || existingWO.vesselId;
-      if (componentName && vesselId) {
-        const vesselComponents = await storage.getComponents(vesselId);
-        const matchedComponent = vesselComponents.find(c => c.name === componentName);
-        if (matchedComponent) {
-          const currentCode = updateData.componentCode || existingWO.componentCode;
-          if (currentCode && currentCode !== matchedComponent.componentCode) {
-            console.warn(`⚠️ AUTO-CORRECTING WO PATCH componentCode mismatch: current "${currentCode}" but component "${componentName}" has code "${matchedComponent.componentCode}"`);
+      if (vesselId && (componentRef || componentCodeRef)) {
+        let resolvedComponent = null;
+        
+        // Try 1: Look up by ID (if component field contains an ID)
+        if (componentRef) {
+          resolvedComponent = await storage.getComponent(componentRef);
+        }
+        
+        // Try 2: Look up by componentCode
+        if (!resolvedComponent && componentCodeRef) {
+          resolvedComponent = await storage.getComponentByCode(componentCodeRef, vesselId);
+        }
+        
+        // Try 3: Look up by name (if component field contains a name, not ID)
+        if (!resolvedComponent && componentRef) {
+          const vesselComponents = await storage.getComponents(vesselId);
+          resolvedComponent = vesselComponents.find(c => c.name === componentRef);
+        }
+        
+        if (resolvedComponent) {
+          if (componentCodeRef && componentCodeRef !== resolvedComponent.componentCode) {
+            console.warn(`⚠️ AUTO-CORRECTING WO PATCH componentCode mismatch: current "${componentCodeRef}" but component "${resolvedComponent.name}" has code "${resolvedComponent.componentCode}"`);
           }
-          updateData.componentCode = matchedComponent.componentCode;
-          console.log(`✅ Auto-resolved componentCode in PATCH: ${matchedComponent.componentCode} for component "${componentName}"`);
+          // Only update componentCode - preserve the original component field (could be ID or name)
+          updateData.componentCode = resolvedComponent.componentCode;
+          console.log(`✅ Auto-resolved componentCode in PATCH: ${resolvedComponent.componentCode} for component "${resolvedComponent.name}"`);
         }
       }
       
