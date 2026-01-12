@@ -1085,6 +1085,10 @@ export const defects = pgTable("defects", {
   reportReferenceNo: text("report_reference_no"),
   reportDate: text("report_date"), // ISO format YYYY-MM-DD
   
+  // New date tracking fields
+  dateReportedToOffice: text("date_reported_to_office"), // ISO format YYYY-MM-DD
+  dateRegisteredInSystem: text("date_registered_in_system"), // ISO format YYYY-MM-DD (SAL)
+  
   // 8. Vessel Location (At Port / At Sea)
   vesselLocationType: text("vessel_location_type"), // 'atPort' | 'atSea'
   portName: text("port_name"), // When vesselLocationType is 'atPort'

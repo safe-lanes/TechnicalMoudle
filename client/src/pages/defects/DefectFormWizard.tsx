@@ -469,7 +469,7 @@ export default function DefectFormWizard({
                   <h3 className="text-sm font-semibold text-gray-800">Details</h3>
                   
                   <div className="grid grid-cols-3 gap-x-6 gap-y-4">
-                    {/* Row 1 */}
+                    {/* Row 1: Vessel, Category, Date Observed */}
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Vessel<span className="text-red-500">*</span></label>
                       <Controller
@@ -521,28 +521,17 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Date Issued<span className="text-red-500">*</span></label>
+                      <label className="text-sm text-gray-600 mb-1.5">Date Observed<span className="text-red-500">*</span></label>
                       <Input 
                         {...form.register("issueDate")} 
                         type="date"
-                        data-testid="input-date-issued"
+                        data-testid="input-date-observed"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
                       />
                     </div>
 
-                    {/* Row 2 */}
-                    <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Date Closed</label>
-                      <Input 
-                        value={dateCompletedValue || ""}
-                        type="date"
-                        className="h-10 text-sm border-gray-300 bg-gray-50"
-                        disabled
-                        readOnly
-                      />
-                    </div>
-
+                    {/* Row 2: Source, Type, Date Reported to Office */}
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Source</label>
                       <Controller
@@ -587,18 +576,18 @@ export default function DefectFormWizard({
                       />
                     </div>
 
-                    {/* Row 3 */}
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Target Date</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Date Reported to Office</label>
                       <Input 
-                        {...form.register("targetCloseDate")} 
+                        {...form.register("dateReportedToOffice")} 
                         type="date"
-                        data-testid="input-target-date"
+                        data-testid="input-date-reported-office"
                         className="h-10 text-sm border-gray-300"
                         disabled={isViewMode}
                       />
                     </div>
 
+                    {/* Row 3: Defect Category, Make, Date Registered in System (SAL) */}
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Defect Category</label>
                       <Controller
@@ -651,18 +640,18 @@ export default function DefectFormWizard({
                       />
                     </div>
 
-                    {/* Row 4 */}
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Responsible Role</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Date Registered in System (SAL)</label>
                       <Input 
-                        {...form.register("responsibleDept")} 
-                        data-testid="input-responsible-role"
+                        {...form.register("dateRegisteredInSystem")} 
+                        type="date"
+                        data-testid="input-date-registered-system"
                         className="h-10 text-sm border-gray-300"
-                        placeholder="e.g., Chief Engineer"
                         disabled={isViewMode}
                       />
                     </div>
 
+                    {/* Row 4: Defect Type, Model, Target Date */}
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Defect Type</label>
                       <Controller
@@ -725,26 +714,47 @@ export default function DefectFormWizard({
                       />
                     </div>
 
-                    {/* CoC Checkbox */}
-                    <div className="col-span-3 pt-2">
+                    <div className="flex flex-col">
+                      <label className="text-sm text-gray-600 mb-1.5">Target Date</label>
+                      <Input 
+                        {...form.register("targetCloseDate")} 
+                        type="date"
+                        data-testid="input-target-date"
+                        className="h-10 text-sm border-gray-300"
+                        disabled={isViewMode}
+                      />
+                    </div>
+
+                    {/* Row 5: Responsible Role, CoC Checkbox, Date Closed */}
+                    <div className="flex flex-col">
+                      <label className="text-sm text-gray-600 mb-1.5">Responsible Role</label>
+                      <Input 
+                        {...form.register("responsibleDept")} 
+                        data-testid="input-responsible-role"
+                        className="h-10 text-sm border-gray-300"
+                        placeholder="e.g., Chief Engineer"
+                        disabled={isViewMode}
+                      />
+                    </div>
+
+                    <div className="flex flex-col justify-end">
                       <Controller
                         name="is_coc"
                         control={form.control}
                         render={({ field }) => (
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-2 h-10 items-center">
                             <Checkbox
                               id="coc"
                               checked={field.value}
                               onCheckedChange={field.onChange}
                               data-testid="checkbox-coc"
-                              className="mt-0.5"
                               disabled={isViewMode}
                             />
                             <div>
                               <Label htmlFor="coc" className="text-sm font-normal cursor-pointer text-gray-700">
                                 Condition of Class (CoC)
                               </Label>
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs text-gray-500">
                                 Only if the Defect is Class Related
                               </p>
                             </div>
@@ -752,10 +762,22 @@ export default function DefectFormWizard({
                         )}
                       />
                     </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-sm text-gray-600 mb-1.5">Date Closed</label>
+                      <Input 
+                        value={dateCompletedValue || ""}
+                        type="date"
+                        data-testid="input-date-closed"
+                        className="h-10 text-sm border-gray-300 bg-gray-50"
+                        disabled
+                        readOnly
+                      />
+                    </div>
                   </div>
 
-                  {/* Vessel Location Section */}
-                  <div className="space-y-4 bg-gray-50 p-4 rounded-md border border-gray-200 mt-6">
+                  {/* Vessel Location Section - Hidden for now */}
+                  {false && <div className="space-y-4 bg-gray-50 p-4 rounded-md border border-gray-200 mt-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-semibold text-gray-700">Vessel Location</h3>
@@ -882,7 +904,7 @@ export default function DefectFormWizard({
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div>}
 
                   {/* Description */}
                   <div className="space-y-2 mt-6">
