@@ -321,13 +321,9 @@ const Stores: React.FC = () => {
     
     try {
       // Use PATCH endpoint which routes location changes through ledger-aware transferStoresItemLocation
-      await apiRequest(`/technical/api/stores/${vesselId}/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          robLocationA: newRobA,
-          robLocationB: newRobB
-        }),
+      await apiRequest('PATCH', `/technical/api/stores/${vesselId}/${itemId}`, {
+        robLocationA: newRobA,
+        robLocationB: newRobB
       });
       
       // Save location names to vessel settings if they were edited
@@ -820,20 +816,16 @@ const Stores: React.FC = () => {
     }
     
     try {
-      await apiRequest(`/technical/api/stores/${vesselId}/batch-receive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [{
-            itemId: receivingItem.id,
-            quantity: quantity,
-            location: receiveForm.location,
-            notes: receiveForm.remarks || undefined,
-            place: receiveForm.place || undefined,
-            dateLocal: receiveForm.dateLocal
-          }],
-          purchaseOrderRef: receiveForm.supplierPO || undefined
-        }),
+      await apiRequest('POST', `/technical/api/stores/${vesselId}/batch-receive`, {
+        items: [{
+          itemId: receivingItem.id,
+          quantity: quantity,
+          location: receiveForm.location,
+          notes: receiveForm.remarks || undefined,
+          place: receiveForm.place || undefined,
+          dateLocal: receiveForm.dateLocal
+        }],
+        purchaseOrderRef: receiveForm.supplierPO || undefined
       });
       
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
@@ -888,18 +880,14 @@ const Stores: React.FC = () => {
     }
     
     try {
-      await apiRequest(`/technical/api/stores/${vesselId}/batch-consume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [{
-            itemId: consumingItem.id,
-            quantity: quantity,
-            location: consumeForm.location,
-            notes: `${consumeForm.workOrder ? `WO: ${consumeForm.workOrder}. ` : ''}${consumeForm.remarks || ''}`.trim() || undefined,
-            dateLocal: consumeForm.dateLocal
-          }]
-        }),
+      await apiRequest('POST', `/technical/api/stores/${vesselId}/batch-consume`, {
+        items: [{
+          itemId: consumingItem.id,
+          quantity: quantity,
+          location: consumeForm.location,
+          notes: `${consumeForm.workOrder ? `WO: ${consumeForm.workOrder}. ` : ''}${consumeForm.remarks || ''}`.trim() || undefined,
+          dateLocal: consumeForm.dateLocal
+        }]
       });
       
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
@@ -943,9 +931,7 @@ const Stores: React.FC = () => {
   const handleDelete = async (item: StoreItem) => {
     if (confirm(`Delete ${item.itemName}? This action cannot be undone.`)) {
       try {
-        await apiRequest(`/technical/api/stores/item/${item.id}`, {
-          method: 'DELETE',
-        });
+        await apiRequest('DELETE', `/technical/api/stores/item/${item.id}`);
         
         queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
         queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}/history`, activeTab] });
