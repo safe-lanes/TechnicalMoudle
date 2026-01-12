@@ -39,6 +39,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
 ## Recent Changes
+- **Stores ROB Location Transfer History** (Jan 12, 2026): Fixed missing history when transferring stock between Location A and Location B in the Stores module. New `transferStoresItemLocation()` method creates TRANSFER_OUT/TRANSFER_IN ledger entries for true transfers (where deltaA == -deltaB). Single-location adjustments and net ROB changes update without creating misleading transfer entries.
 - **Components Pagination** (Jan 12, 2026): Added expand/collapse pagination to sections C (Jobs), D (Maintenance History), E (Spares), and F (Documents) in the Components submodule. Default view shows 2 rows; clicking expand reveals all data with pagination (10 rows per page). Uses consistent Button sizing with size="icon" for pagination controls.
 - **Component RH Update on WO Approval** (Jan 12, 2026): Fixed bug where component running hours were not updating when RH-based work orders were approved. The PATCH endpoint now updates component RH using centralized `setComponentRunningHours()` with case-insensitive counter type handling and proper INHERITED→MASTER cascade fallback.
 - **Maintenance History Viewer** (Jan 12, 2026): Clicking a maintenance history record now displays the exact same work order form UI in a sliding panel with embedded read-only mode. All mutation handlers are guarded to prevent modifications.
