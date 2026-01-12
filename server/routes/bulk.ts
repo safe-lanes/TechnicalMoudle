@@ -440,6 +440,35 @@ const COLUMN_MAPPINGS: { [key: string]: { [variant: string]: string } } = {
   }
 };
 
+// Helper to check if row has explicit parent from any header variant
+// Returns the explicit parent code if provided by user, null if auto-derived should be used
+// NOTE: This must be defined before normalizeColumnNames as it's called from there
+function getExplicitParentFromRowEarly(row: any): string | null {
+  // Check all known header variants for Parent Component Code
+  const parentVariants = [
+    'Parent Component Code',
+    'Parent ID',
+    'Parent Component',
+    'parent component code',
+    'ParentComponentCode',
+    'parentId',
+    'Parent Code',
+    'parentCode',
+    'PARENT COMPONENT CODE',
+    'Parent_Component_Code',
+    'parentcomponentcode',
+    'parent_component_code'
+  ];
+  
+  for (const variant of parentVariants) {
+    const value = row[variant];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  return null;
+}
+
 /**
  * Normalize column names in data array to expected format
  */
@@ -475,6 +504,17 @@ function normalizeColumnNames(data: any[], type: string): any[] {
       const normalizedCol = columnMap[originalCol] || originalCol;
       normalizedRow[normalizedCol] = value;
     }
+    
+    // For components, detect explicit parent from the raw row BEFORE normalization
+    // and set __meta flag that survives through all subsequent transformations
+    if (type === 'components') {
+      const explicitParent = getExplicitParentFromRowEarly(row);
+      normalizedRow['__meta'] = {
+        explicitParentProvided: !!explicitParent,
+        originalExplicitParent: explicitParent
+      };
+    }
+    
     return normalizedRow;
   });
 }
@@ -571,6 +611,34 @@ function validateSFICode(sfiCode: string): boolean {
   const cleanCode = stripSFISuffix(sfiCode);
   const pattern = /^\d{1,3}(\.\d{1,3})*$/;
   return pattern.test(cleanCode);
+}
+
+// Helper to check if row has explicit parent from any header variant
+// Returns the explicit parent code if provided by user, null if auto-derived should be used
+function getExplicitParentFromRow(row: any): string | null {
+  // Check all known header variants for Parent Component Code
+  const parentVariants = [
+    'Parent Component Code',
+    'Parent ID',
+    'Parent Component',
+    'parent component code',
+    'ParentComponentCode',
+    'parentId',
+    'Parent Code',
+    'parentCode',
+    'PARENT COMPONENT CODE',
+    'Parent_Component_Code',
+    'parentcomponentcode',
+    'parent_component_code'
+  ];
+  
+  for (const variant of parentVariants) {
+    const value = row[variant];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  return null;
 }
 
 // UOM list
@@ -2708,11 +2776,22 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
             errors.push(`Row ${rowNum}: Component Code '${codeStr}' already exists in vessel '${vesselId}'. Cannot add duplicate component.`);
           }
           
-          // Auto-calculate Parent Component Code from Component Code
-          const parentCode = getParentSFICode(codeStr);
-          if (parentCode && !row['Parent Component Code']) {
-            normalized['Parent Component Code'] = parentCode;
+          // Check if user explicitly provided a Parent Component Code in the Excel file
+          // Use centralized helper that checks all header variants
+          const explicitParent = getExplicitParentFromRow(row);
+          
+          if (explicitParent) {
+            // User explicitly provided parent - use their value
+            normalized['Parent Component Code'] = explicitParent;
+          } else {
+            // Auto-calculate Parent Component Code from Component Code
+            const parentCode = getParentSFICode(codeStr);
+            if (parentCode) {
+              normalized['Parent Component Code'] = parentCode;
+            }
           }
+          // NOTE: __meta is set at the END of the component validation block
+          // to ensure it survives all field copy operations
           
           // Auto-calculate Component Category from first digit
           const firstDigit = parseInt(codeStr.charAt(0));
@@ -2813,15 +2892,23 @@ async function validateData(type: string, data: any[], mode: string, vesselId?: 
         }
       });
 
-      // Copy Parent Component Code if provided
-      if (row['Parent Component Code'] && !normalized['Parent Component Code']) {
-        normalized['Parent Component Code'] = String(row['Parent Component Code']).trim();
-      }
+      // Note: Parent Component Code is now handled by the centralized logic above
+      // using getExplicitParentFromRow() which checks all header variants
+      // No additional copy needed here - metadata is already properly set
 
       // Copy Component Category if provided
       if (row['Component Category'] && !normalized['Component Category']) {
         normalized['Component Category'] = String(row['Component Category']).trim();
       }
+      
+      // FINAL STEP: Ensure __meta is set at the END of component validation
+      // This prevents any previous operations from overwriting or losing the metadata
+      // Even if validation failed, we still need the metadata for proper parent handling
+      const explicitParentFinal = getExplicitParentFromRow(row) || (row['__meta']?.originalExplicitParent);
+      normalized['__meta'] = {
+        explicitParentProvided: !!explicitParentFinal,
+        originalExplicitParent: explicitParentFinal || null
+      };
     } else if (type === 'spares') {
       // Validate Vessel Code matches selected vesselId
       if (vesselId && row['Vessel Code']) {
@@ -3545,11 +3632,41 @@ async function performImport(
     
     // First, ensure all intermediate parent nodes exist
     // For each component, create parent hierarchy if missing
+    // BUT: Skip automatic parent inference if an EXPLICIT Parent Component Code is provided
+    // HOWEVER: Still create the explicit parent itself if it's missing from both DB and this upload file
     const parentsToCreate = new Set<string>();
+    const explicitParentsNeeded = new Set<string>(); // Track explicit parents that need creation
+    const componentCodesInUpload = new Set(data.map(row => 
+      String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim()
+    ));
     
     for (const row of data) {
       const componentCode = String(row['Component Code'] || row['Generated Code'] || row['Original SFI Code']).trim();
       
+      // Check if user explicitly provided Parent Component Code in the Excel file
+      const meta = row['__meta'] || {};
+      const explicitParentProvided = meta.explicitParentProvided === true;
+      const explicitParentCode = meta.originalExplicitParent;
+      
+      if (explicitParentProvided && explicitParentCode) {
+        // User explicitly provided Parent Component Code in the Excel file
+        // Do NOT auto-create intermediate parents from code structure (e.g., don't create 721.801 for 721.801.01)
+        // BUT: Still ensure the explicit parent exists - either in DB, in this upload, or needs creation
+        const parentInDb = existingComponentsMap.get(explicitParentCode);
+        const parentInUpload = componentCodesInUpload.has(explicitParentCode);
+        
+        if (!parentInDb && !parentInUpload) {
+          // Explicit parent is missing from both DB and upload file
+          // We need to create it as a placeholder
+          explicitParentsNeeded.add(explicitParentCode);
+          console.log(`📋 Explicit parent ${explicitParentCode} for ${componentCode} needs creation`);
+        }
+        
+        // Skip the automatic code-based parent inference for this component
+        continue;
+      }
+      
+      // No explicit parent provided - use automatic code-based hierarchy inference
       // For hierarchy building, use the Original SFI Code (without suffixes like (1), (2), etc.)
       // Generated Code may have suffixes for uniqueness, but hierarchy is based on the base SFI code
       const originalSFICode = String(row['Original SFI Code'] || row['Component Code'] || row['Generated Code']).trim();
@@ -3566,6 +3683,14 @@ async function performImport(
         }
         // Move up one level by trimming the current code
         currentCode = getParentSFICode(currentCode);
+      }
+    }
+    
+    // Also add any explicit parents that need creation to the set
+    // These are parents explicitly referenced by user but not in DB or upload file
+    for (const explicitParent of explicitParentsNeeded) {
+      if (!existingComponentsMap.get(explicitParent)) {
+        parentsToCreate.add(explicitParent);
       }
     }
     
@@ -3621,14 +3746,36 @@ async function performImport(
       }
     }
     
-    // Step 3: Sort components by SFI hierarchy depth (parents before children)
-    // e.g., "6" before "61" before "612.005"
+    // Step 3: Sort components to ensure parents are created before children
+    // Priority: 1) Rows that are referenced as explicit parents by other rows
+    //           2) Lower hierarchy depth (parents before children based on code structure)
+    
+    // Build a set of component codes that are referenced as explicit parents
+    const explicitParentCodes = new Set<string>();
+    for (const row of data) {
+      const meta = row['__meta'] || {};
+      // Use the stored original explicit parent from metadata (survives all transformations)
+      if (meta.explicitParentProvided && meta.originalExplicitParent) {
+        explicitParentCodes.add(String(meta.originalExplicitParent).trim());
+      }
+    }
+    
     const sortedData = [...data].sort((a, b) => {
       const aCode = String(a['Component Code'] || a['Generated Code'] || a['Original SFI Code'] || '').trim();
       const bCode = String(b['Component Code'] || b['Generated Code'] || b['Original SFI Code'] || '').trim();
+      
+      // Prioritize rows whose codes are referenced as explicit parents
+      const aIsExplicitParent = explicitParentCodes.has(aCode) ? 0 : 1;
+      const bIsExplicitParent = explicitParentCodes.has(bCode) ? 0 : 1;
+      
+      if (aIsExplicitParent !== bIsExplicitParent) {
+        return aIsExplicitParent - bIsExplicitParent; // Explicit parents first
+      }
+      
+      // Then sort by hierarchy depth (lower depth = parents first)
       const aDepth = (aCode.match(/\./g) || []).length;
       const bDepth = (bCode.match(/\./g) || []).length;
-      return aDepth - bDepth; // Lower depth (parents) first
+      return aDepth - bDepth;
     });
 
     // Step 4: Process each data row individually with authoritative state capture
