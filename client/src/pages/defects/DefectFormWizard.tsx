@@ -564,7 +564,7 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Type</label>
+                      <label className="text-sm text-gray-600 mb-1.5">Component</label>
                       <Controller
                         name="priority"
                         control={form.control}
