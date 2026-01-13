@@ -1275,6 +1275,33 @@ class MemStorage {
     );
     this.saveData();
   }
+
+  // Component-specific tracking updates (prevents data mixing between components sharing the same job)
+  async updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
+    lastDoneDate?: string;
+    nextDueDate?: string;
+    lastDoneRH?: string;
+    nextDueRH?: string;
+    updatedAt?: Date;
+  }): Promise<any | null> {
+    if (!this.data.jobComponentLinks) return null;
+    const link = this.data.jobComponentLinks.find(
+      (l: any) => l.jobId === jobId && l.componentId === componentId
+    );
+    if (!link) return null;
+    
+    Object.assign(link, updates);
+    this.saveData();
+    return link;
+  }
+
+  async getJobComponentLinkWithTracking(jobId: string, componentId: string): Promise<any | null> {
+    if (!this.data.jobComponentLinks) return null;
+    const link = this.data.jobComponentLinks.find(
+      (l: any) => l.jobId === jobId && l.componentId === componentId
+    );
+    return link || null;
+  }
 }
 
 export const memStorage = new MemStorage();

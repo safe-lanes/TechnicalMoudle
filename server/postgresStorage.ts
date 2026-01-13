@@ -5305,6 +5305,35 @@ export class PostgresStorage {
     }));
   }
 
+  // Component-specific tracking updates (prevents data mixing between components sharing the same job)
+  async updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
+    lastDoneDate?: string;
+    nextDueDate?: string;
+    lastDoneRH?: string;
+    nextDueRH?: string;
+    updatedAt?: Date;
+  }): Promise<JobComponentLink | null> {
+    const db = await getDb();
+    const result = await db.update(jobComponentLinks)
+      .set(updates)
+      .where(and(
+        eq(jobComponentLinks.jobId, jobId),
+        eq(jobComponentLinks.componentId, componentId)
+      ))
+      .returning();
+    return result[0] || null;
+  }
+
+  async getJobComponentLinkWithTracking(jobId: string, componentId: string): Promise<JobComponentLink | null> {
+    const db = await getDb();
+    const result = await db.select().from(jobComponentLinks)
+      .where(and(
+        eq(jobComponentLinks.jobId, jobId),
+        eq(jobComponentLinks.componentId, componentId)
+      ));
+    return result[0] || null;
+  }
+
   // ============= INVENTORY MANAGEMENT: SPARE LOCATION STOCK =============
 
   async getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]> {

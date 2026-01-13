@@ -776,6 +776,15 @@ export interface IStorage {
   deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
   getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
   getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
+  // Component-specific tracking updates (prevents data mixing between components)
+  updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
+    lastDoneDate?: string;
+    nextDueDate?: string;
+    lastDoneRH?: string;
+    nextDueRH?: string;
+    updatedAt?: Date;
+  }): Promise<JobComponentLink | null>;
+  getJobComponentLinkWithTracking(jobId: string, componentId: string): Promise<JobComponentLink | null>;
   
   // Spare Location Stock Methods
   getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;

@@ -404,12 +404,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // PERFORMANCE OPTIMIZATION: Batch fetch all job-component links
       // This avoids N+1 queries when hydrating each job
       let jobLinksMap = new Map<string, string[]>();
+      // NEW: Also track component-specific tracking data for date overrides
+      let jobLinkTrackingMap = new Map<string, any>(); // key: "jobId:componentId" -> link with tracking fields
+      
       if (vesselId) {
         const allLinks = await storage.getJobComponentLinks(vesselId);
         for (const link of allLinks) {
           const existing = jobLinksMap.get(link.jobId) || [];
           existing.push(link.componentCode);
           jobLinksMap.set(link.jobId, existing);
+          // Store component-specific tracking data
+          jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
         }
       } else if (jobs.length > 0) {
         // Fallback: fetch links for each unique vesselId found in jobs
@@ -420,6 +425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const existing = jobLinksMap.get(link.jobId) || [];
             existing.push(link.componentCode);
             jobLinksMap.set(link.jobId, existing);
+            // Store component-specific tracking data
+            jobLinkTrackingMap.set(`${link.jobId}:${link.componentId}`, link);
           }
         }
       }
@@ -446,6 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hydrate jobs with:
       // 1. linkedComponentCodes from junction table (for M:N display)
       // 2. Running Hours jobs with component's current RH for remaining RH calculation
+      // 3. Component-specific tracking dates (lastDoneDate, nextDueDate, etc.) when componentId is specified
       const hydratedJobs = await Promise.all(jobs.map(async (job) => {
         // MANY-TO-MANY: Get all linked component codes from batched map
         const linkedComponentCodes = jobLinksMap.get(job.id) || [];
@@ -459,6 +467,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...job,
           linkedComponentCodes, // Array of all linked component codes
         };
+        
+        // COMPONENT-SPECIFIC TRACKING: Override global job dates with component-specific dates
+        // This prevents data mixing between components sharing the same job
+        if (componentId) {
+          const linkKey = `${job.id}:${componentId}`;
+          const componentLink = jobLinkTrackingMap.get(linkKey);
+          if (componentLink) {
+            // Override with component-specific dates if they exist
+            if (componentLink.lastDoneDate) {
+              hydratedJob.lastDoneDate = componentLink.lastDoneDate;
+            }
+            if (componentLink.nextDueDate) {
+              hydratedJob.nextDueDate = componentLink.nextDueDate;
+            }
+            if (componentLink.lastDoneRH) {
+              hydratedJob.lastDoneRH = componentLink.lastDoneRH;
+            }
+            if (componentLink.nextDueRH) {
+              hydratedJob.nextDueRH = componentLink.nextDueRH;
+            }
+          }
+        }
         
         if (job.maintenanceBasis === 'Running Hours' && job.componentId) {
           const component = await getComponentCached(job.componentId);
@@ -3404,12 +3434,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (job) {
-          const updates: any = {};
+          const jobUpdates: any = {};
+          const linkUpdates: any = { updatedAt: new Date() };
+          
+          // Get the specific work order component ID to update the correct link
+          const woComponentId = workOrder.componentId || component.id;
           
           // Calendar-based job cycle update
           if (workOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
             const { calculateNextDueDate } = await import('@shared/dateUtils');
-            updates.lastDoneDate = dateOfCompletion;
+            linkUpdates.lastDoneDate = dateOfCompletion;
+            jobUpdates.lastDoneDate = dateOfCompletion; // Keep global job record for backward compatibility
             
             // Recalculate nextDueDate based on lastDoneDate + interval
             if (job.frequencyValue && job.frequencyUnit) {
@@ -3420,12 +3455,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
               
               if (nextDue) {
-                updates.nextDueDate = nextDue;
+                linkUpdates.nextDueDate = nextDue;
+                jobUpdates.nextDueDate = nextDue;
                 console.log(`✅ Auto-calculated next due date for job ${job.jobNo}: ${nextDue} (last done: ${dateOfCompletion}, interval: ${job.frequencyValue} ${job.frequencyUnit})`);
               }
             }
             
-            await storage.updateJob(job.id, updates);
+            // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
+            if (woComponentId) {
+              await storage.updateJobComponentLinkTracking(job.id, woComponentId, linkUpdates);
+              console.log(`✅ Updated component-specific tracking for job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
+            }
+            
+            // Also update global job record for backward compatibility (SECONDARY)
+            await storage.updateJob(job.id, jobUpdates);
             console.log(`✅ Updated calendar job ${job.jobNo} with lastDoneDate: ${dateOfCompletion}`);
           }
           
@@ -3433,18 +3476,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (workOrder.maintenanceBasis === 'Running Hours' && runningHours) {
             const currentRH = parseInt(runningHours);
             if (!isNaN(currentRH)) {
-              updates.lastDoneRH = currentRH;
+              linkUpdates.lastDoneRH = currentRH.toString();
+              jobUpdates.lastDoneRH = currentRH;
               
               // Recalculate nextDueRH based on lastDoneRH + interval
               // Use intervalRunningHour first (dedicated RH field), fallback to frequencyValue
               const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
               if (rhInterval && !isNaN(rhInterval)) {
                 const nextDueRH = currentRH + rhInterval;
-                updates.nextDueRH = nextDueRH;
+                linkUpdates.nextDueRH = nextDueRH.toString();
+                jobUpdates.nextDueRH = nextDueRH;
                 console.log(`✅ Auto-calculated next due RH for job ${job.jobNo}: ${nextDueRH} (last done: ${currentRH}, interval: ${rhInterval} hours)`);
               }
               
-              await storage.updateJob(job.id, updates);
+              // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
+              if (woComponentId) {
+                await storage.updateJobComponentLinkTracking(job.id, woComponentId, linkUpdates);
+                console.log(`✅ Updated component-specific RH tracking for job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
+              }
+              
+              // Also update global job record for backward compatibility (SECONDARY)
+              await storage.updateJob(job.id, jobUpdates);
               console.log(`✅ Updated RH job ${job.jobNo} with lastDoneRH: ${currentRH}`);
             }
           }
@@ -8115,6 +8167,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (err) {
       console.error('⚠️ Error during job nextDueDate/nextDueRH backfill:', err);
+    }
+  })();
+  
+  // STARTUP MIGRATION: Copy job tracking data to component-specific records in jobComponentLinks
+  // This is a one-time migration to prevent data mixing between components sharing the same job
+  (async () => {
+    try {
+      const { calculateNextDueDate, normalizeDateToDDMMMYYYY } = await import("@shared/dateUtils");
+      const allJobs = await storage.getJobs();
+      let migratedCount = 0;
+      
+      for (const job of allJobs) {
+        // Only process jobs that have tracking data to migrate
+        const hasCalendarTracking = job.lastDoneDate || job.nextDueDate;
+        const hasRHTracking = job.lastDoneRH || job.nextDueRH;
+        if (!hasCalendarTracking && !hasRHTracking) continue;
+        
+        // Get all component links for this job
+        const links = await storage.getJobComponentLinksByJob(job.id);
+        
+        for (const link of links) {
+          // Only update links that don't already have component-specific tracking
+          if (link.lastDoneDate || link.nextDueDate || link.lastDoneRH || link.nextDueRH) {
+            continue; // Already has component-specific data, skip
+          }
+          
+          // Copy job-level tracking to component-specific tracking
+          const updates: any = { updatedAt: new Date() };
+          if (job.lastDoneDate) updates.lastDoneDate = job.lastDoneDate;
+          if (job.nextDueDate) updates.nextDueDate = job.nextDueDate;
+          if (job.lastDoneRH) updates.lastDoneRH = job.lastDoneRH;
+          if (job.nextDueRH) updates.nextDueRH = job.nextDueRH;
+          
+          await storage.updateJobComponentLinkTracking(job.id, link.componentId, updates);
+          migratedCount++;
+        }
+      }
+      
+      if (migratedCount > 0) {
+        console.log(`✅ Migrated ${migratedCount} job-component links with component-specific tracking data`);
+      } else {
+        console.log('✅ Component-specific tracking migration check complete - no migrations needed');
+      }
+    } catch (err) {
+      console.error('⚠️ Error during component-specific tracking migration:', err);
     }
   })();
   
