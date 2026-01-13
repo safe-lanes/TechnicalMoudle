@@ -2196,6 +2196,7 @@ export type SpareWithInventory = {
 
 // B7) JOB_COMPONENT_LINKS - Many-to-many linking between jobs and components
 // Allows same job to be shared across multiple components
+// IMPORTANT: Contains component-specific tracking fields to prevent data mixing between components
 export const jobComponentLinks = pgTable("job_component_links", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   vesselId: text("vessel_id").notNull(),
@@ -2204,6 +2205,12 @@ export const jobComponentLinks = pgTable("job_component_links", {
   componentCode: text("component_code"), // Denormalized for faster lookups
   linkedBy: text("linked_by").notNull(),
   linkedAt: timestamp("linked_at").notNull().defaultNow(),
+  // Component-specific tracking fields (isolated per component, not shared)
+  lastDoneDate: text("last_done_date"), // Last completion date for THIS component (DD-MMM-YYYY format)
+  nextDueDate: text("next_due_date"), // Calculated next due date for THIS component
+  lastDoneRH: text("last_done_rh"), // Last completion running hours for THIS component
+  nextDueRH: text("next_due_rh"), // Calculated next due RH for THIS component
+  updatedAt: timestamp("updated_at"),
 }, (table) => ({
   jobIdIdx: index("idx_job_component_link_job").on(table.jobId),
   componentIdIdx: index("idx_job_component_link_component").on(table.componentId),
@@ -2214,6 +2221,7 @@ export const jobComponentLinks = pgTable("job_component_links", {
 export const insertJobComponentLinkSchema = createInsertSchema(jobComponentLinks).omit({
   id: true,
   linkedAt: true,
+  updatedAt: true,
 });
 
 export type InsertJobComponentLink = z.infer<typeof insertJobComponentLinkSchema>;
