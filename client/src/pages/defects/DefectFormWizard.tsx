@@ -23,6 +23,7 @@ import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { useVessels } from "@/hooks/useVessels";
+import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -1106,9 +1107,9 @@ export default function DefectFormWizard({
                       </div>
                     </div>
 
-                    {/* B2. SIRE & SFI Ref */}
+                    {/* B2. SIRE Reference */}
                     <div className="space-y-3">
-                      <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B2. SIRE & SFI Ref</h3>
+                      <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B2. SIRE Reference</h3>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="flex flex-col">
                           <label className="text-sm text-gray-600 mb-1.5">SIRE Version</label>
@@ -1158,30 +1159,45 @@ export default function DefectFormWizard({
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="text-sm text-gray-600 mb-1.5">SFI Code Reference</label>
+                          <label className="text-sm text-gray-600 mb-1.5">SIRE Hardware Class</label>
                           <Controller
-                            name="viqChapter"
+                            name="sireHardwareLevel3"
                             control={form.control}
-                            render={({ field }) => (
-                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                                <SelectTrigger data-testid="select-viq-chapter" className="h-10 text-sm border-gray-300">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">1 - General Information</SelectItem>
-                                  <SelectItem value="2">2 - Certification and Documentation</SelectItem>
-                                  <SelectItem value="3">3 - Crew Management</SelectItem>
-                                  <SelectItem value="4">4 - Navigation and Communications</SelectItem>
-                                  <SelectItem value="5">5 - Safety Management</SelectItem>
-                                  <SelectItem value="6">6 - Pollution Prevention</SelectItem>
-                                  <SelectItem value="7">7 - Maritime Security</SelectItem>
-                                  <SelectItem value="8">8 - Cargo and Ballast Systems</SelectItem>
-                                  <SelectItem value="9">9 - Mooring and Anchoring</SelectItem>
-                                  <SelectItem value="10">10 - Engine and Steering Compartments</SelectItem>
-                                  <SelectItem value="11">11 - General Appearance and Condition</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
+                            render={({ field }) => {
+                              const selectedClass = sireHardwareClasses.find(item => item.level3 === field.value);
+                              return (
+                                <Select 
+                                  onValueChange={(id) => {
+                                    const hardwareClass = findHardwareClassById(id);
+                                    if (hardwareClass) {
+                                      form.setValue('sireHardwareLevel1', hardwareClass.level1);
+                                      form.setValue('sireHardwareLevel2', hardwareClass.level2);
+                                      form.setValue('sireHardwareLevel3', hardwareClass.level3);
+                                    }
+                                  }} 
+                                  value={selectedClass?.id || ""} 
+                                  disabled={isViewMode}
+                                >
+                                  <SelectTrigger data-testid="select-sire-hardware-class" className="h-10 text-sm border-gray-300">
+                                    <SelectValue placeholder="Select hardware class">
+                                      {field.value || "Select hardware class"}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent className="max-h-[400px]">
+                                    {sireHardwareClasses.map((item) => (
+                                      <SelectItem 
+                                        key={item.id} 
+                                        value={item.id}
+                                        className="text-xs"
+                                      >
+                                        <span className="text-gray-400 text-xs">{item.level1} &gt; {item.level2} &gt; </span>
+                                        <span className="font-medium">{item.level3}</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              );
+                            }}
                           />
                         </div>
                       </div>

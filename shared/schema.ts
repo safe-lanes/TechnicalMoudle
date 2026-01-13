@@ -1039,7 +1039,10 @@ export const defects = pgTable("defects", {
   viqRef: text("viq_ref"), // VIQ REF (e.g., 1.1, 2.3, 5.12)
   viqChapter: text("viq_chapter"), // VIQ Chapter (e.g., General Information, Safety Management)
   viqSection: text("viq_section"), // VIQ Section (detailed section within chapter)
-  sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference
+  sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference (legacy)
+  sireHardwareLevel1: text("sire_hardware_level1"), // SIRE Hardware Class Level 1 (e.g., HULL, SHIP EQUIPMENT)
+  sireHardwareLevel2: text("sire_hardware_level2"), // SIRE Hardware Class Level 2 (e.g., Tanks, Navigation Equipment)
+  sireHardwareLevel3: text("sire_hardware_level3"), // SIRE Hardware Class Level 3 (user selection, e.g., Engine Room Tanks)
   immediateCause: json("immediate_cause"), // Structured immediate cause with unsafe acts and conditions
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
   rootCause: json("root_cause"), // Structured root cause with individual and system factors
