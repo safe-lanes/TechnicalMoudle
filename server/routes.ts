@@ -2708,6 +2708,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
       const hasExplicitStatus = updateData.status !== undefined;
       
+      // CRITICAL FIX: Map dateOfCompletion from frontend form to dateCompleted for database persistence
+      // The form sends dateOfCompletion but the database schema uses dateCompleted
+      // Without this mapping, the completion date entered in Part B is lost and approval falls back to today's date
+      if (updateData.dateOfCompletion && !updateData.dateCompleted) {
+        updateData.dateCompleted = updateData.dateOfCompletion;
+        console.log(`📅 Mapped dateOfCompletion (${updateData.dateOfCompletion}) to dateCompleted for persistence`);
+      }
+      // Also ensure completionDateTime is properly set if we have dateOfCompletion
+      if (updateData.dateOfCompletion && !updateData.completionDateTime) {
+        updateData.completionDateTime = updateData.dateOfCompletion;
+      }
+      
       if (hasCompletionData && !hasExplicitStatus) {
         // Get current work order to check current status
         const currentWorkOrder = await storage.getWorkOrder(req.params.id);
@@ -2832,7 +2844,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (existingHistory) {
                 console.log(`⚠️ Maintenance history already exists for work order ${freshWorkOrder.id}, skipping duplicate creation`);
               } else {
-                const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted || new Date().toISOString();
+                // CRITICAL: Use completion date from form (dateOfCompletion/dateCompleted), not approval date
+                // Priority: dateOfCompletion (form field) > dateCompleted > completionDateTime > fallback
+                const dateOfCompletion = freshWorkOrder.dateOfCompletion || freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateOfCompletion || updateData.dateCompleted || new Date().toISOString();
                 const normalizeToISO = (isoDate: string | undefined): string => {
                   if (!isoDate) return new Date().toISOString().split('T')[0];
                   const date = new Date(isoDate);
@@ -2899,7 +2913,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               if (job) {
-                const dateOfCompletion = freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateCompleted;
+                // CRITICAL: Use completion date from form (dateOfCompletion/dateCompleted), not approval date
+                const dateOfCompletion = freshWorkOrder.dateOfCompletion || freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateOfCompletion || updateData.dateCompleted;
                 const runningHours = freshWorkOrder.runningHours;
                 
                 // Handle Calendar-based jobs
