@@ -1044,6 +1044,7 @@ export const defects = pgTable("defects", {
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
   rootCause: json("root_cause"), // Structured root cause with individual and system factors
   rootCauseExplanation: text("root_cause_explanation"), // Further explanation
+  riskLevel: text("risk_level"), // 'Low' | 'Medium' | 'High' - Risk assessment
   holdReason: text("hold_reason"), // For On Hold status
   nextReviewDate: text("next_review_date"), // ISO format YYYY-MM-DD
   

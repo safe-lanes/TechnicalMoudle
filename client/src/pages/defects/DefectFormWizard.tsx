@@ -125,6 +125,7 @@ export default function DefectFormWizard({
       immediateCauseExplanation: "",
       rootCause: "",
       rootCauseExplanation: "",
+      riskLevel: "",
       vesselLocationType: "atPort",
     },
   });
@@ -1001,7 +1002,7 @@ export default function DefectFormWizard({
                 <div className="space-y-8">
                   {/* B1. Cause Analysis */}
                   <div className="space-y-6">
-                    <h3 className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>B1. Cause Analysis</h3>
+                    <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B1. Cause Analysis</h3>
                     
                     {/* Immediate Cause */}
                     <div className="space-y-3">
@@ -1107,7 +1108,7 @@ export default function DefectFormWizard({
 
                     {/* B2. SIRE & SFI Ref */}
                     <div className="space-y-3">
-                      <h3 className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>B2. SIRE & SFI Ref</h3>
+                      <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B2. SIRE & SFI Ref</h3>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="flex flex-col">
                           <label className="text-sm text-gray-600 mb-1.5">SIRE Version</label>
@@ -1187,10 +1188,47 @@ export default function DefectFormWizard({
                     </div>
                   </div>
 
-                  {/* Actions Table */}
-                  <div className="space-y-4 pt-6 border-t border-gray-200">
+                  {/* B3. Risk */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B3. Risk</h3>
+                    <div className="flex flex-col w-48">
+                      <label className="text-sm text-gray-600 mb-1.5">Risk Level</label>
+                      <Controller
+                        name="riskLevel"
+                        control={form.control}
+                        render={({ field }) => {
+                          const getRiskColor = (value: string) => {
+                            switch (value) {
+                              case 'Low': return 'bg-green-500 text-white border-green-500';
+                              case 'Medium': return 'bg-orange-500 text-white border-orange-500';
+                              case 'High': return 'bg-red-500 text-white border-red-500';
+                              default: return 'bg-white text-gray-900 border-gray-300';
+                            }
+                          };
+                          return (
+                            <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                              <SelectTrigger 
+                                data-testid="select-risk-level" 
+                                className={`h-10 text-sm ${getRiskColor(field.value || '')}`}
+                              >
+                                <SelectValue placeholder="Select risk" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Low">Low</SelectItem>
+                                <SelectItem value="Medium">Medium</SelectItem>
+                                <SelectItem value="High">High</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          );
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* B4. Actions Table */}
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Actions</h3>
+                      <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B4. Actions</h3>
                       {!isViewMode && (
                         <Button 
                           type="button"
