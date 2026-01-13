@@ -770,12 +770,15 @@ export interface IStorage {
   
   // Job-Component Link Methods (many-to-many for shared jobs)
   getJobComponentLinks(vesselId: string): Promise<JobComponentLink[]>;
+  getAllJobComponentLinks(): Promise<JobComponentLink[]>;
   getJobComponentLinksByJob(jobId: string): Promise<JobComponentLink[]>;
   getJobComponentLinksByComponent(componentId: string): Promise<JobComponentLink[]>;
   createJobComponentLink(link: InsertJobComponentLink): Promise<JobComponentLink>;
   deleteJobComponentLink(jobId: string, componentId: string): Promise<void>;
   getLinkedComponentsForJob(jobId: string): Promise<Array<{ componentId: string; componentCode: string; componentName: string }>>;
   getLinkedJobsForComponent(componentId: string): Promise<Array<{ jobId: string; jobNo: string; jobTitle: string }>>;
+  // Get maintenance history for a specific job-component pair
+  getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]>;
   // Component-specific tracking updates (prevents data mixing between components)
   updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
     lastDoneDate?: string;

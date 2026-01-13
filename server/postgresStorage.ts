@@ -5242,6 +5242,46 @@ export class PostgresStorage {
       .where(eq(jobComponentLinks.vesselId, vesselId));
   }
 
+  async getAllJobComponentLinks(): Promise<JobComponentLink[]> {
+    const db = await getDb();
+    return await db.select().from(jobComponentLinks);
+  }
+
+  async getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]> {
+    const db = await getDb();
+    
+    // First try to match by jobId directly
+    let results = await db.select().from(componentMaintenanceHistory)
+      .where(and(
+        eq(componentMaintenanceHistory.jobId, jobId),
+        eq(componentMaintenanceHistory.componentCode, componentCode)
+      ))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+    
+    if (results.length > 0) return results;
+    
+    // Fallback: Match by jobNo in work_order_no (for legacy records without jobId)
+    // WO format: "MKR-IN-00063-601.004.03-2026-001" -> jobNo is "MKR-IN-00063"
+    const job = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (job.length === 0 || !job[0].jobNo) return [];
+    
+    const jobNo = job[0].jobNo;
+    
+    // Get all maintenance history for this component, then filter by jobNo match
+    const allRecords = await db.select().from(componentMaintenanceHistory)
+      .where(eq(componentMaintenanceHistory.componentCode, componentCode))
+      .orderBy(desc(componentMaintenanceHistory.dateCompleted));
+    
+    // Filter records where work_order_no starts with the jobNo
+    return allRecords.filter(record => {
+      if (!record.workOrderNo) return false;
+      // Work order format: "JOBNO-COMPCODE-YEAR-SEQ" 
+      // e.g., "MKR-IN-00063-601.004.03-2026-001"
+      // JobNo is at the start, before the component code
+      return record.workOrderNo.startsWith(jobNo + '-');
+    });
+  }
+
   async getJobComponentLinksByJob(jobId: string): Promise<JobComponentLink[]> {
     const db = await getDb();
     return await db.select().from(jobComponentLinks)

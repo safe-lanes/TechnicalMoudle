@@ -1237,6 +1237,46 @@ class MemStorage {
     return links.filter((link: any) => jobIds.has(link.jobId));
   }
 
+  async getAllJobComponentLinks(): Promise<any[]> {
+    if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
+    return toArray(this.data.jobComponentLinks);
+  }
+
+  async getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]> {
+    if (!this.data.componentMaintenanceHistory) return [];
+    
+    // First try to match by jobId directly
+    let results = toArray(this.data.componentMaintenanceHistory)
+      .filter((h: any) => h.jobId === jobId && h.componentCode === componentCode)
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.dateCompleted || 0).getTime();
+        const dateB = new Date(b.dateCompleted || 0).getTime();
+        return dateB - dateA; // DESC order
+      });
+    
+    if (results.length > 0) return results;
+    
+    // Fallback: Match by jobNo in work_order_no (for legacy records without jobId)
+    // WO format: "MKR-IN-00063-601.004.03-2026-001" -> jobNo is "MKR-IN-00063"
+    const job = toArray(this.data.jobs).find((j: any) => j.id === jobId);
+    if (!job || !job.jobNo) return [];
+    
+    const jobNo = job.jobNo;
+    
+    // Get all maintenance history for this component, then filter by jobNo match
+    return toArray(this.data.componentMaintenanceHistory)
+      .filter((record: any) => {
+        if (!record.workOrderNo || record.componentCode !== componentCode) return false;
+        // Work order format: "JOBNO-COMPCODE-YEAR-SEQ"
+        return record.workOrderNo.startsWith(jobNo + '-');
+      })
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.dateCompleted || 0).getTime();
+        const dateB = new Date(b.dateCompleted || 0).getTime();
+        return dateB - dateA; // DESC order
+      });
+  }
+
   async getJobComponentLinksByJob(jobId: string): Promise<any[]> {
     if (!this.data.jobComponentLinks) this.data.jobComponentLinks = [];
     return toArray(this.data.jobComponentLinks).filter((link: any) => link.jobId === jobId);

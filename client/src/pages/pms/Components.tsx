@@ -801,6 +801,13 @@ const JobRow: React.FC<{
 }> = ({ job, onRowClick, toast, activeComponentCode }) => {
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
+  // Get component-specific tracking data for THIS component (prevents data mixing between components)
+  const componentTracking = job.componentTracking?.[activeComponentCode] || {};
+  const effectiveLastDoneDate = componentTracking.lastDoneDate || job.lastDoneDate;
+  const effectiveNextDueDate = componentTracking.nextDueDate || job.nextDueDate;
+  const effectiveLastDoneRH = componentTracking.lastDoneRH || job.lastDoneRH;
+  const effectiveNextDueRH = componentTracking.nextDueRH || job.nextDueRH;
+
   const generateWOMutation = useMutation({
     mutationFn: async (reason: 'Planning' | 'Breakdown' | 'Other') => {
       const response = await fetch(`/technical/api/jobs/${job.id}/generate-wo`, {
@@ -858,18 +865,18 @@ const JobRow: React.FC<{
             ? `${job.intervalRunningHour || 0} RH` 
             : `${job.frequencyValue} ${job.frequencyUnit}`}
         </td>
-        <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(job.lastDoneDate) || '-'}</td>
+        <td className="py-3 px-3 text-gray-900">{formatProfessionalDate(effectiveLastDoneDate) || '-'}</td>
         <td className="py-3 px-3 text-gray-900">
           {job.maintenanceBasis === 'Running Hours' 
             ? (() => {
                 // Calculate remaining RH: Frequency - (Current RH - Last Done RH)
                 const frequency = parseFloat(job.intervalRunningHour || '0');
                 const currentRH = parseFloat(job.componentCurrentRH || '0');
-                const lastDoneRH = parseFloat(job.lastDoneRH || '0');
+                const lastDoneRH = parseFloat(effectiveLastDoneRH || '0');
                 const remainingRH = frequency - (currentRH - lastDoneRH);
                 return remainingRH > 0 ? `${remainingRH.toFixed(0)} RH` : 'Due';
               })()
-            : formatProfessionalDate(job.nextDueDate) || '-'}
+            : formatProfessionalDate(effectiveNextDueDate) || '-'}
         </td>
         <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
           <Button
