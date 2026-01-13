@@ -2708,16 +2708,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasCompletionData = !!(updateData.completionDateTime || updateData.dateOfCompletion);
       const hasExplicitStatus = updateData.status !== undefined;
       
-      // CRITICAL FIX: Map dateOfCompletion from frontend form to dateCompleted for database persistence
-      // The form sends dateOfCompletion but the database schema uses dateCompleted
-      // Without this mapping, the completion date entered in Part B is lost and approval falls back to today's date
-      if (updateData.dateOfCompletion && !updateData.dateCompleted) {
-        updateData.dateCompleted = updateData.dateOfCompletion;
-        console.log(`📅 Mapped dateOfCompletion (${updateData.dateOfCompletion}) to dateCompleted for persistence`);
-      }
-      // Also ensure completionDateTime is properly set if we have dateOfCompletion
-      if (updateData.dateOfCompletion && !updateData.completionDateTime) {
-        updateData.completionDateTime = updateData.dateOfCompletion;
+      // CRITICAL FIX: Map dateOfCompletion from frontend form to completionDateTime for database persistence
+      // The form sends dateOfCompletion but the database schema uses completionDateTime (completion_date_time)
+      // completionDateTime is the authoritative source for Next Due calculation during Pending to Completion
+      
+      // Helper: Normalize date formats (DD-MM-YYYY, DD/MM/YYYY) to ISO (YYYY-MM-DD)
+      const normalizeDateToISO = (dateStr: string | undefined | null): string | null => {
+        if (!dateStr) return null;
+        
+        // Already ISO format (YYYY-MM-DD)
+        if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+          return dateStr.split('T')[0]; // Strip time if present
+        }
+        
+        // DD-MM-YYYY or DD/MM/YYYY format
+        const ddmmyyyyMatch = dateStr.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+        if (ddmmyyyyMatch) {
+          const [, day, month, year] = ddmmyyyyMatch;
+          return `${year}-${month}-${day}`;
+        }
+        
+        // Try parsing as Date object (fallback)
+        const parsed = new Date(dateStr);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().split('T')[0];
+        }
+        
+        console.warn(`⚠️ Could not normalize date format: ${dateStr}`);
+        return null;
+      };
+      
+      // Map dateOfCompletion to completionDateTime (primary) and dateCompleted (secondary)
+      // ALWAYS overwrite completionDateTime when form provides dateOfCompletion to ensure Part B date is persisted
+      if (updateData.dateOfCompletion) {
+        const normalizedDate = normalizeDateToISO(updateData.dateOfCompletion);
+        if (normalizedDate) {
+          // Use full ISO timestamp format for database storage
+          const isoTimestamp = `${normalizedDate}T00:00:00.000Z`;
+          
+          // IMPORTANT: Do NOT mutate dateOfCompletion - keep original format for UI stability
+          // Only set completionDateTime and dateCompleted for database persistence
+          
+          // completionDateTime is the authoritative field for Pending to Completion stage
+          updateData.completionDateTime = isoTimestamp;
+          console.log(`📅 Mapped dateOfCompletion "${updateData.dateOfCompletion}" to completionDateTime: ${isoTimestamp}`);
+          
+          // Also set dateCompleted with ISO timestamp format for backward compatibility
+          updateData.dateCompleted = isoTimestamp;
+        }
       }
       
       if (hasCompletionData && !hasExplicitStatus) {
@@ -2806,10 +2844,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
         console.log('📋 Work order approved - creating maintenance history and updating job cycle dates');
         
-        // Fetch fresh work order data to get all execution fields
-        const freshWorkOrder = await storage.getWorkOrder(req.params.id);
+        // Use the RETURNED workOrder from updateWorkOrder - this is guaranteed to have persisted data
+        // This avoids race conditions from re-fetching in high-load scenarios
+        const freshWorkOrder = workOrder;
         if (!freshWorkOrder) {
-          console.error('Failed to refetch work order for completion processing');
+          console.error('Failed to get work order for completion processing');
         } else {
           // Find the component for maintenance history
           let component = await storage.getComponent(freshWorkOrder.component);
@@ -2844,38 +2883,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (existingHistory) {
                 console.log(`⚠️ Maintenance history already exists for work order ${freshWorkOrder.id}, skipping duplicate creation`);
               } else {
-                // CRITICAL: Use completion date from form (dateOfCompletion/dateCompleted), not approval date
-                // Priority: dateOfCompletion (form field) > dateCompleted > completionDateTime > fallback
-                const dateOfCompletion = freshWorkOrder.dateOfCompletion || freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateOfCompletion || updateData.dateCompleted || new Date().toISOString();
-                const normalizeToISO = (isoDate: string | undefined): string => {
-                  if (!isoDate) return new Date().toISOString().split('T')[0];
-                  const date = new Date(isoDate);
-                  return date.toISOString().split('T')[0];
+                // CRITICAL: For Pending to Completion stage, completionDateTime is the authoritative source
+                // Priority: completionDateTime (DB column) > dateCompleted > fallback to today
+                // Note: dateOfCompletion from form was already mapped to completionDateTime in PATCH handler
+                
+                // Helper to normalize any date format to ISO (YYYY-MM-DD)
+                // Accepts: ISO (YYYY-MM-DD), DD-MM-YYYY, DD/MM/YYYY, and legacy formats (13 Jan 2026)
+                // Returns null on failure instead of throwing to allow graceful handling
+                const normalizeToISO = (dateStr: string): string | null => {
+                  // Already ISO format (YYYY-MM-DD or full ISO timestamp)
+                  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+                    return dateStr.split('T')[0];
+                  }
+                  
+                  // DD-MM-YYYY or DD/MM/YYYY format
+                  const ddmmyyyyMatch = dateStr.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+                  if (ddmmyyyyMatch) {
+                    const [, day, month, year] = ddmmyyyyMatch;
+                    return `${year}-${month}-${day}`;
+                  }
+                  
+                  // Try Date parsing for legacy formats (e.g., "13 Jan 2026", "January 13, 2026")
+                  const parsed = new Date(dateStr);
+                  if (!isNaN(parsed.getTime())) {
+                    return parsed.toISOString().split('T')[0];
+                  }
+                  
+                  // Return null on parse failure - caller should handle gracefully
+                  console.error(`❌ Cannot parse date: ${dateStr}. Expected YYYY-MM-DD or DD-MM-YYYY format.`);
+                  return null;
                 };
                 
-                // Use stored execution data from work order (populated during Part B save)
-                const historyPayload = {
-                  componentId: component.id,
-                  componentCode: freshWorkOrder.componentCode || component.componentCode,
-                  vesselCode: freshWorkOrder.vesselId,
-                  workOrderId: freshWorkOrder.id,
-                  workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
-                  jobTitle: freshWorkOrder.jobTitle,
-                  maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
-                  dateCompleted: normalizeToISO(dateOfCompletion),
-                  runningHoursAtCompletion: freshWorkOrder.runningHours || null,
-                  performedBy: freshWorkOrder.performedBy || freshWorkOrder.executionAssignedTo || 'Unknown',
-                  approvedBy: freshWorkOrder.approver || null,
-                  approvalDate: normalizeToISO(dateOfCompletion),
-                  status: 'Approved' as const,
-                  workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
-                  sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
-                  remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
-                  isComponentReplaced: false
-                };
-                
-                await storage.createComponentMaintenanceHistory(historyPayload);
-                console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+                // completionDateTime is authoritative for Pending to Completion stage
+                // Priority: 1. Persisted freshWorkOrder data (from returned updateWorkOrder result)
+                //           2. updateData fallback (safe - we just set this from the form before storage call)
+                const rawCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
+                if (!rawCompletionDate) {
+                  console.error(`❌ No completion date found for work order ${freshWorkOrder.id}. Maintenance history creation skipped.`);
+                  // Don't throw - skip maintenance history but continue with approval
+                } else {
+                  const dateOfCompletion = normalizeToISO(rawCompletionDate);
+                  if (!dateOfCompletion) {
+                    console.error(`❌ Invalid completion date format for work order ${freshWorkOrder.id}: ${rawCompletionDate}. Maintenance history creation skipped.`);
+                    // Don't throw - skip maintenance history but continue with approval
+                  } else {
+                    console.log(`📅 Using completion date for maintenance history: ${dateOfCompletion} (raw: ${rawCompletionDate})`);
+                    
+                    // Use stored execution data from work order (populated during Part B save)
+                    const historyPayload = {
+                      componentId: component.id,
+                      componentCode: freshWorkOrder.componentCode || component.componentCode,
+                      vesselCode: freshWorkOrder.vesselId,
+                      workOrderId: freshWorkOrder.id,
+                      workOrderNo: freshWorkOrder.workOrderNo || `WO-${freshWorkOrder.id}`,
+                      jobTitle: freshWorkOrder.jobTitle,
+                      maintenanceType: freshWorkOrder.maintenanceType || freshWorkOrder.taskType || 'Servicing',
+                      dateCompleted: dateOfCompletion,
+                      runningHoursAtCompletion: freshWorkOrder.runningHours || null,
+                      performedBy: freshWorkOrder.performedBy || freshWorkOrder.executionAssignedTo || 'Unknown',
+                      approvedBy: freshWorkOrder.approver || null,
+                      approvalDate: dateOfCompletion,
+                      status: 'Approved' as const,
+                      workDescription: freshWorkOrder.workCarriedOut || freshWorkOrder.briefWorkDescription || null,
+                      sparesUsed: freshWorkOrder.consumedSpareParts ? JSON.stringify(freshWorkOrder.consumedSpareParts) : null,
+                      remarks: freshWorkOrder.remarks || freshWorkOrder.jobExperienceNotes || null,
+                      isComponentReplaced: false
+                    };
+                    
+                    await storage.createComponentMaintenanceHistory(historyPayload);
+                    console.log(`✅ Created maintenance history for work order ${freshWorkOrder.id} (componentId: ${component.id})`);
+                  }
+                }
               }
             } catch (historyError) {
               console.error('Failed to create maintenance history record:', historyError);
@@ -2913,9 +2991,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               if (job) {
-                // CRITICAL: Use completion date from form (dateOfCompletion/dateCompleted), not approval date
-                const dateOfCompletion = freshWorkOrder.dateOfCompletion || freshWorkOrder.dateCompleted || freshWorkOrder.completionDateTime || updateData.dateOfCompletion || updateData.dateCompleted;
+                // CRITICAL: For Pending to Completion, completionDateTime is authoritative for Next Due calculation
+                // Priority: 1. Persisted freshWorkOrder data (preferred)
+                //           2. updateData fallback (safe - we just set this from the form before storage call)
+                const rawJobCompletionDate = freshWorkOrder.completionDateTime || freshWorkOrder.dateCompleted || updateData.completionDateTime;
                 const runningHours = freshWorkOrder.runningHours;
+                
+                // Normalize date to ISO format for job updates
+                const normalizeJobDate = (dateStr: string | undefined | null): string | null => {
+                  if (!dateStr) return null;
+                  // Already ISO
+                  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.split('T')[0];
+                  // DD-MM-YYYY
+                  const match = dateStr.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+                  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+                  const parsed = new Date(dateStr);
+                  return !isNaN(parsed.getTime()) ? parsed.toISOString().split('T')[0] : null;
+                };
+                
+                const dateOfCompletion = normalizeJobDate(rawJobCompletionDate);
+                console.log(`📅 Using completion date for job update: ${dateOfCompletion} (raw: ${rawJobCompletionDate})`);
                 
                 // Handle Calendar-based jobs
                 if (freshWorkOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
