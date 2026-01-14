@@ -922,7 +922,8 @@ export class PostgresStorage {
     // 1. The exact master component ID (e.g., "V015-601.001")
     // 2. The master's component code (e.g., "601.001") - for legacy data compatibility
     // 3. The original masterComponentId parameter (in case it's a code, not ID)
-    // 4. MUST be in the same vessel as the master component (ALWAYS enforced)
+    // 4. rhCounterSource field (legacy data may use this instead of rhMasterComponentId)
+    // 5. MUST be in the same vessel as the master component (ALWAYS enforced)
     return await db.select().from(components)
       .where(and(
         eq(components.rhCounterType, 'INHERITED'),
@@ -930,7 +931,8 @@ export class PostgresStorage {
         or(
           eq(components.rhMasterComponentId, masterComponentFullId),
           eq(components.rhMasterComponentId, masterComponentCode),
-          eq(components.rhMasterComponentId, masterComponentId)
+          eq(components.rhMasterComponentId, masterComponentId),
+          eq(components.rhCounterSource, masterComponentCode)
         )
       ));
   }
@@ -1004,6 +1006,7 @@ export class PostgresStorage {
   }
 
   // Update MASTER running hours with automatic cascade to INHERITED components
+  // DELTA-BASED: Inherited components receive the change amount, not the absolute value
   async updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -1023,6 +1026,10 @@ export class PostgresStorage {
       throw new Error(`Component ${params.componentId} is not a MASTER counter type. Cannot update RH directly.`);
     }
 
+    // Calculate delta: difference between new and old master RH value
+    const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+    const delta = params.newRHValue - previousMasterRH;
+
     // Update the MASTER component - update both rhCurrentMaster and currentCumulativeRH for compatibility
     const masterResult = await db.update(components)
       .set({
@@ -1041,9 +1048,6 @@ export class PostgresStorage {
       throw new Error(`Failed to update MASTER component ${params.componentId}`);
     }
 
-    // Cascade update to all INHERITED components IN THE SAME VESSEL
-    // Update BOTH rhCurrentInheritedCached (RH config system) AND currentCumulativeRH (legacy field used by WO status calculation)
-    // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
     // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
     const masterComponentCode = component.componentCode || '';
     const masterVesselId = component.vesselId;
@@ -1057,34 +1061,40 @@ export class PostgresStorage {
       };
     }
     
-    // Cascade to inherited components in the same vessel
-    const inheritedResult = await db.update(components)
-      .set({
-        rhCurrentInheritedCached: params.newRHValue.toString(),
-        currentCumulativeRH: params.newRHValue.toString(),
-        rhInheritedUpdatedAt: now,
-        lastUpdated: now.toISOString(),
-        updatedAt: now,
-      })
-      .where(and(
-        eq(components.rhCounterType, 'INHERITED'),
-        eq(components.vesselId, masterVesselId),
-        or(
-          eq(components.rhMasterComponentId, params.componentId),
-          eq(components.rhMasterComponentId, masterComponentCode),
-          eq(components.rhCounterSource, masterComponentCode)
-        )
-      ))
-      .returning();
+    // Get all inherited components linked to this master
+    const inheritedComponents = await this.getInheritedComponents(params.componentId, masterVesselId);
+    
+    // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
+    // rhCurrentInheritedCached stores the master's absolute value (for display/config)
+    // currentCumulativeRH tracks the child's individual running hours (delta-based)
+    let inheritedUpdated = 0;
+    for (const inherited of inheritedComponents) {
+      // Get child's current actual running hours (use currentCumulativeRH as the source of truth)
+      const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+      const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
+      
+      await db.update(components)
+        .set({
+          rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+          currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
+          rhInheritedUpdatedAt: now,
+          lastUpdated: now.toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(components.id, inherited.id));
+      
+      inheritedUpdated++;
+    }
 
     return {
       masterUpdated: masterResult[0],
-      inheritedUpdated: inheritedResult.length,
+      inheritedUpdated,
     };
   }
 
   // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
   // This is the SINGLE SOURCE OF TRUTH for all running hours updates
+  // DELTA-BASED: Inherited components receive the change amount, not the absolute value
   async setComponentRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -1106,6 +1116,10 @@ export class PostgresStorage {
     let inheritedUpdated = 0;
 
     if (component.rhCounterType === 'MASTER') {
+      // Calculate delta: difference between new and old master RH value
+      const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+      const delta = params.newRHValue - previousMasterRH;
+
       // For MASTER components: update rhCurrentMaster AND currentCumulativeRH, then cascade
       const result = await db.update(components)
         .set({
@@ -1124,10 +1138,7 @@ export class PostgresStorage {
         throw new Error(`Failed to update MASTER component ${params.componentId}`);
       }
 
-      // Cascade to all INHERITED components IN THE SAME VESSEL
-      // Match by BOTH component ID and component code (legacy data uses component code in rhMasterComponentId)
       // CRITICAL: Filter by vesselId to prevent cross-vessel RH aggregation
-      const masterComponentCode = component.componentCode || '';
       const masterVesselId = component.vesselId;
       
       // CRITICAL SAFEGUARD: Skip cascade if vesselId cannot be determined
@@ -1136,35 +1147,37 @@ export class PostgresStorage {
         return { component: result[0], inheritedUpdated: 0 };
       }
       
-      // Cascade to inherited components in the same vessel
-      const inheritedResult = await db.update(components)
-        .set({
-          rhCurrentInheritedCached: rhValueStr,
-          currentCumulativeRH: rhValueStr,
-          rhInheritedUpdatedAt: now,
-          lastUpdated: lastUpdatedValue,
-          updatedAt: now,
-        })
-        .where(and(
-          eq(components.rhCounterType, 'INHERITED'),
-          eq(components.vesselId, masterVesselId),
-          or(
-            eq(components.rhMasterComponentId, params.componentId),
-            eq(components.rhMasterComponentId, masterComponentCode),
-            eq(components.rhCounterSource, masterComponentCode)
-          )
-        ))
-        .returning();
+      // Get all inherited components linked to this master
+      const inheritedComponents = await this.getInheritedComponents(params.componentId, masterVesselId);
+      
+      // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
+      // rhCurrentInheritedCached stores the master's absolute value (for display/config)
+      // currentCumulativeRH tracks the child's individual running hours (delta-based)
+      for (const inherited of inheritedComponents) {
+        const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+        const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
+        
+        await db.update(components)
+          .set({
+            rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+            currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
+            rhInheritedUpdatedAt: now,
+            lastUpdated: lastUpdatedValue,
+            updatedAt: now,
+          })
+          .where(eq(components.id, inherited.id));
+        
+        inheritedUpdated++;
+      }
 
-      inheritedUpdated = inheritedResult.length;
       return { component: result[0], inheritedUpdated };
 
     } else if (component.rhCounterType === 'INHERITED') {
-      // For INHERITED components: update rhCurrentInheritedCached AND currentCumulativeRH
-      // Note: This is typically only used for component replacement scenarios (reset to 0)
+      // For INHERITED components: only update currentCumulativeRH (child's actual hours)
+      // Do NOT update rhCurrentInheritedCached as it stores the master's value
+      // This is typically used for component replacement scenarios (reset to 0) or manual adjustments
       const result = await db.update(components)
         .set({
-          rhCurrentInheritedCached: rhValueStr,
           currentCumulativeRH: rhValueStr,
           rhInheritedUpdatedAt: now,
           lastUpdated: lastUpdatedValue,

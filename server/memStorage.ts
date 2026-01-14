@@ -394,6 +394,8 @@ class MemStorage {
     return this.updateComponent(params.componentId, updateData);
   }
 
+  // Update MASTER running hours with automatic cascade to INHERITED components
+  // DELTA-BASED: Inherited components receive the change amount, not the absolute value
   async updateMasterRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -406,6 +408,10 @@ class MemStorage {
       throw new Error(`Component ${params.componentId} is not a MASTER counter type`);
     }
 
+    // Calculate delta: difference between new and old master RH value
+    const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+    const delta = params.newRHValue - previousMasterRH;
+
     const now = new Date().toISOString();
     // Update both rhCurrentMaster and currentCumulativeRH for compatibility
     const masterUpdated = await this.updateComponent(params.componentId, {
@@ -417,14 +423,18 @@ class MemStorage {
       lastUpdated: now,
     });
 
-    // Cascade to inherited components
-    // Update BOTH rhCurrentInheritedCached (RH config) AND currentCumulativeRH (legacy field used by WO status)
+    // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
+    // rhCurrentInheritedCached stores the master's absolute value (for display/config)
+    // currentCumulativeRH tracks the child's individual running hours (delta-based)
     const inheritedComponents = await this.getInheritedComponents(params.componentId);
     let inheritedUpdated = 0;
     for (const inherited of inheritedComponents) {
+      const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+      const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
+      
       await this.updateComponent(inherited.id, {
-        rhCurrentInheritedCached: params.newRHValue.toString(),
-        currentCumulativeRH: params.newRHValue.toString(),
+        rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+        currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
         rhInheritedUpdatedAt: now,
         lastUpdated: now,
       });
@@ -436,6 +446,7 @@ class MemStorage {
 
   // CENTRALIZED RH UPDATE: Set running hours for any component with automatic field sync
   // This is the SINGLE SOURCE OF TRUTH for all running hours updates
+  // DELTA-BASED: Inherited components receive the change amount, not the absolute value
   async setComponentRunningHours(params: {
     componentId: string;
     newRHValue: number;
@@ -454,6 +465,10 @@ class MemStorage {
     let inheritedUpdated = 0;
 
     if (component.rhCounterType === 'MASTER') {
+      // Calculate delta: difference between new and old master RH value
+      const previousMasterRH = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+      const delta = params.newRHValue - previousMasterRH;
+
       // For MASTER: update both RH fields and cascade to inherited
       const updated = await this.updateComponent(params.componentId, {
         rhCurrentMaster: rhValueStr,
@@ -464,12 +479,17 @@ class MemStorage {
         lastUpdated: lastUpdatedValue,
       });
 
-      // Cascade to inherited components
+      // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
+      // rhCurrentInheritedCached stores the master's absolute value (for display/config)
+      // currentCumulativeRH tracks the child's individual running hours (delta-based)
       const inheritedComponents = await this.getInheritedComponents(params.componentId);
       for (const inherited of inheritedComponents) {
+        const currentChildRH = parseFloat(inherited.currentCumulativeRH || inherited.rhCurrentInheritedCached || '0');
+        const newChildRH = Math.max(0, currentChildRH + delta); // Apply delta, ensure non-negative
+        
         await this.updateComponent(inherited.id, {
-          rhCurrentInheritedCached: rhValueStr,
-          currentCumulativeRH: rhValueStr,
+          rhCurrentInheritedCached: params.newRHValue.toString(), // Cache master's absolute value
+          currentCumulativeRH: newChildRH.toString(), // Child's actual RH with delta applied
           rhInheritedUpdatedAt: now,
           lastUpdated: lastUpdatedValue,
         });
@@ -478,9 +498,9 @@ class MemStorage {
       return { component: updated, inheritedUpdated };
 
     } else if (component.rhCounterType === 'INHERITED') {
-      // For INHERITED: update both RH fields
+      // For INHERITED: only update currentCumulativeRH (child's actual hours)
+      // Do NOT update rhCurrentInheritedCached as it stores the master's value
       const updated = await this.updateComponent(params.componentId, {
-        rhCurrentInheritedCached: rhValueStr,
         currentCumulativeRH: rhValueStr,
         rhInheritedUpdatedAt: now,
         lastUpdated: lastUpdatedValue,

@@ -81,8 +81,9 @@ export function registerRunningHoursRoutes(app: Express) {
       
       // Format response with RH data for each child
       const childrenWithRH = children.map(child => {
-        // Display value: use rhCurrentInheritedCached for inherited components
-        const displayRH = child.rhCurrentInheritedCached || child.currentCumulativeRH || '0.00';
+        // Display value: use currentCumulativeRH for the child's actual running hours
+        // rhCurrentInheritedCached stores the master's value, currentCumulativeRH tracks child's individual hours
+        const displayRH = child.currentCumulativeRH || child.rhCurrentInheritedCached || '0.00';
         
         return {
           id: child.id,
@@ -139,10 +140,10 @@ export function registerRunningHoursRoutes(app: Express) {
       const previousRH = component.currentCumulativeRH || '0.00';
       const newRHFormatted = newRHValue.toFixed(2);
       
-      // Update component RH
+      // Update component RH - only update currentCumulativeRH (child's actual hours)
+      // Do NOT update rhCurrentInheritedCached as it stores the master's value
       await storage.updateComponent(componentId, {
         currentCumulativeRH: newRHFormatted,
-        rhCurrentInheritedCached: newRHFormatted,
         runningHours: newRHFormatted,
         lastUpdated: new Date().toISOString()
       });
