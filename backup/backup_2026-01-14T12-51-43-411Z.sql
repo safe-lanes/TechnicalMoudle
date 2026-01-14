@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gwl22PSMJ6pIh0MoBxfRHcNsoj45GR2Jk6mWs4pF8zIaP29qJOUB0qYr3nCjutL
+\restrict tbPFQC8sSjLPwTt6oU38EBk0t3QPsK17HsIBrFVxV8bO80aDIPPddVahtqJ1rzl
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -909,7 +909,17 @@ CREATE TABLE public.defects (
     audit_trail json DEFAULT '[]'::json,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    date_reported_to_office text
+    date_reported_to_office text,
+    sire_hardware_id text,
+    sire_hardware_level1 text,
+    sire_hardware_level2 text,
+    sire_hardware_level3 text,
+    component_hardware_id text,
+    component_hardware_level1 text,
+    component_hardware_level2 text,
+    component_hardware_level3 text,
+    risk_level text,
+    date_registered_in_system text
 );
 
 
@@ -3598,7 +3608,7 @@ COPY public.defect_sequences (id, vessel_id, year, last_sequence) FROM stdin;
 -- Data for Name: defects; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.defects (id, vessel_id, vessel_name, issue_date, category, defect_type, description, description_html, description_text, action_taken_requested, target_close_date, date_completed, status, priority, critical, is_coc, severity, source, equipment_category, equipment_type, equipment_make, equipment_model, equipment_serial_no, equipment_location, equipment_system, component_id, purchase_order_ref, responsible_dept, verified_date, defect_category, viq_version, viq_ref, viq_chapter, viq_section, sfi_code_ref, immediate_cause, immediate_cause_explanation, root_cause, root_cause_explanation, hold_reason, next_review_date, seed_id, equipment_key, raised_by_id, raised_by_name, raised_by_rank, operating_condition, location_text, occurrence_type, responsible_role, responsible_role_id, is_deferred, defer_reason, defer_new_target_date, defer_approval_required, report_to_third_party, class_report, flag_report, port_report, report_reference_no, report_date, vessel_location_type, port_name, latitude, longitude, vessel_location_detail, reported_by, assigned_to, reviewed_by, closed_by, closed_on, closure_comment, closure_files, linked_defects, notes, actions, attachments, audit_trail, created_at, updated_at, date_reported_to_office) FROM stdin;
+COPY public.defects (id, vessel_id, vessel_name, issue_date, category, defect_type, description, description_html, description_text, action_taken_requested, target_close_date, date_completed, status, priority, critical, is_coc, severity, source, equipment_category, equipment_type, equipment_make, equipment_model, equipment_serial_no, equipment_location, equipment_system, component_id, purchase_order_ref, responsible_dept, verified_date, defect_category, viq_version, viq_ref, viq_chapter, viq_section, sfi_code_ref, immediate_cause, immediate_cause_explanation, root_cause, root_cause_explanation, hold_reason, next_review_date, seed_id, equipment_key, raised_by_id, raised_by_name, raised_by_rank, operating_condition, location_text, occurrence_type, responsible_role, responsible_role_id, is_deferred, defer_reason, defer_new_target_date, defer_approval_required, report_to_third_party, class_report, flag_report, port_report, report_reference_no, report_date, vessel_location_type, port_name, latitude, longitude, vessel_location_detail, reported_by, assigned_to, reviewed_by, closed_by, closed_on, closure_comment, closure_files, linked_defects, notes, actions, attachments, audit_trail, created_at, updated_at, date_reported_to_office, sire_hardware_id, sire_hardware_level1, sire_hardware_level2, sire_hardware_level3, component_hardware_id, component_hardware_level1, component_hardware_level2, component_hardware_level3, risk_level, date_registered_in_system) FROM stdin;
 \.
 
 
@@ -13025,7 +13035,6 @@ COPY public.job_component_links (id, vessel_id, job_id, component_id, component_
 973	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821011-i37mig0ih	COMP-1768302796418-t95ppz4tr	601.026.06	system-bulk-import	2026-01-13 11:13:41.078388	\N	\N	\N	\N	\N
 974	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821083-dgudefc3o	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.08692	\N	\N	\N	\N	\N
 975	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821089-heq3mp0hb	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.093753	\N	\N	\N	\N	\N
-976	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821095-vx4l9n0s4	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.099248	\N	\N	\N	\N	\N
 977	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821101-bynonx1q0	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.104928	\N	\N	\N	\N	\N
 978	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821107-2aqegqcgy	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.111552	\N	\N	\N	\N	\N
 979	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821114-c613jtj4i	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.14107	\N	\N	\N	\N	\N
@@ -13057,6 +13066,7 @@ COPY public.job_component_links (id, vessel_id, job_id, component_id, component_
 1006	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821295-w2s43kach	COMP-1768302796524-grpn6iang	651.004.05	system-bulk-import	2026-01-13 11:13:41.322499	\N	\N	\N	\N	\N
 1007	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821295-w2s43kach	COMP-1768302796529-upgpg23yb	651.004.06	system-bulk-import	2026-01-13 11:13:41.329158	\N	\N	\N	\N	\N
 1008	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821335-29obprfnu	COMP-1768302796533-mjuxao3j5	651.007.01	system-bulk-import	2026-01-13 11:13:41.339349	\N	\N	\N	\N	\N
+976	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821095-vx4l9n0s4	COMP-1768302796142-u7kcq21vp	601.053	system-bulk-import	2026-01-13 11:13:41.099248	2026-01-01	\N	2015.00	4015	2026-01-14 11:31:32.578
 1009	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821335-29obprfnu	COMP-1768302796535-aq7xqvi1r	651.007.02	system-bulk-import	2026-01-13 11:13:41.342774	\N	\N	\N	\N	\N
 1010	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821335-29obprfnu	COMP-1768302796540-9shusalto	651.007.03	system-bulk-import	2026-01-13 11:13:41.349419	\N	\N	\N	\N	\N
 1011	743feb08-841a-11ed-aa7c-7003bca91a86	JOB-1768302821335-29obprfnu	COMP-1768302796543-ghx61ro33	651.007.04	system-bulk-import	2026-01-13 11:13:41.355475	\N	\N	\N	\N	\N
@@ -13318,7 +13328,6 @@ COPY public.job_component_links (id, vessel_id, job_id, component_id, component_
 1266	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697574-5699bmaja	COMP-1768374768201-mvmpi8w24	601.026.06	system-bulk-import	2026-01-14 07:28:17.577568	\N	\N	\N	\N	\N
 1267	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697579-gjp16ylta	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.583022	\N	\N	\N	\N	\N
 1268	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697585-z6leju6xr	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.588573	\N	\N	\N	\N	\N
-1269	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697590-j5wqgs5qj	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.593941	\N	\N	\N	\N	\N
 1270	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697596-xmq9a3h97	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.599718	\N	\N	\N	\N	\N
 1271	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697601-freker4a1	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.604691	\N	\N	\N	\N	\N
 1272	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697606-ji0v6o8wq	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.610217	\N	\N	\N	\N	\N
@@ -13328,6 +13337,7 @@ COPY public.job_component_links (id, vessel_id, job_id, component_id, component_
 1276	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697629-njv3hbmjn	COMP-1768374768204-bxjta0rjx	601.066.01	system-bulk-import	2026-01-14 07:28:17.633017	\N	\N	\N	\N	\N
 1277	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697635-a4fcv6moo	COMP-1768374768207-d3i05019v	601.066.02	system-bulk-import	2026-01-14 07:28:17.639211	\N	\N	\N	\N	\N
 1278	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697641-9ro3dhhfo	COMP-1768374768210-pv86y7jsq	601.066.03	system-bulk-import	2026-01-14 07:28:17.645239	\N	\N	\N	\N	\N
+1269	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697590-j5wqgs5qj	COMP-1768374767834-dbncpiany	601.053	system-bulk-import	2026-01-14 07:28:17.593941	2026-01-01	\N	2015.00	4015	2026-01-14 11:31:33.326
 1279	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697647-x4f6dmknx	COMP-1768374768213-mhhjqq443	601.066.04	system-bulk-import	2026-01-14 07:28:17.651824	\N	\N	\N	\N	\N
 1280	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697655-5q8kd9vp1	COMP-1768374768216-m2muvqs0s	601.066.05	system-bulk-import	2026-01-14 07:28:17.659737	\N	\N	\N	\N	\N
 1281	7440571a-841a-11ed-aa7c-7003bca91a86	JOB-1768375697662-ii0y0011s	COMP-1768374768219-f5y8ppktt	601.066.06	system-bulk-import	2026-01-14 07:28:17.669727	\N	\N	\N	\N	\N
@@ -13646,7 +13656,7 @@ COPY public.job_component_links (id, vessel_id, job_id, component_id, component_
 1592	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233974-3tzq4qcw4	COMP-1768381196932-n9drya7xu	651.004.05	system-bulk-import	2026-01-14 09:00:33.978517	\N	\N	\N	\N	\N
 1593	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233982-nj9zei7yi	COMP-1768381196935-olqrhg3y5	651.004.06	system-bulk-import	2026-01-14 09:00:33.98543	\N	\N	\N	\N	\N
 1594	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233987-0wr5815pu	COMP-1768381196939-s3rpw4o84	651.007.01	system-bulk-import	2026-01-14 09:00:33.991022	\N	\N	\N	\N	\N
-1562	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233793-zkta1z6fn	COMP-1768381196489-2rdqnj0rs	601.053	system-bulk-import	2026-01-14 09:00:33.797844	\N	\N	2015	4015	2026-01-14 11:17:33.992
+1562	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233793-zkta1z6fn	COMP-1768381196489-2rdqnj0rs	601.053	system-bulk-import	2026-01-14 09:00:33.797844	2026-01-01	\N	2015.00	4015	2026-01-14 11:31:34.067
 1595	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233993-vw6osebo2	COMP-1768381196942-jnukgkt5l	651.007.02	system-bulk-import	2026-01-14 09:00:33.996942	\N	\N	\N	\N	\N
 1596	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381233999-i0d6ew6eq	COMP-1768381196947-x3f7o0ej2	651.007.03	system-bulk-import	2026-01-14 09:00:34.004924	\N	\N	\N	\N	\N
 1597	744535d0-841a-11ed-aa7c-7003bca91a86	JOB-1768381234007-fj09branb	COMP-1768381196951-kb9uiez5s	651.007.04	system-bulk-import	2026-01-14 09:00:34.011121	\N	\N	\N	\N	\N
@@ -24934,6 +24944,9 @@ COPY public.schema_migrations (id, name, description, applied_at) FROM stdin;
 001_date_reported_to_office	Add date_reported_to_office column to defects	Adds the date_reported_to_office column to the defects table for tracking when defects are reported to office	2026-01-14 11:31:10.140295
 002_equipment_categories_table	Create equipment_categories table	Creates the equipment_categories table for admin-managed equipment categorization	2026-01-14 11:31:10.156335
 003_equipment_categories_defaults	Seed default equipment categories	Inserts default equipment categories if table is empty	2026-01-14 11:31:10.165158
+004_sire_hardware_columns	Add SIRE hardware columns to defects	Adds the SIRE hardware class columns to the defects table for SIRE 2.0 Annex 1 categorization	2026-01-14 11:32:35.339203
+005_component_hardware_columns	Add component hardware columns to defects	Adds component SIRE hardware class columns for Part A of the defect form	2026-01-14 11:32:35.348727
+006_defect_additional_columns	Add remaining missing defect columns	Adds risk_level, date_registered_in_system, and other missing columns to defects table	2026-01-14 11:34:17.646511
 \.
 
 
@@ -55134,5 +55147,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gwl22PSMJ6pIh0MoBxfRHcNsoj45GR2Jk6mWs4pF8zIaP29qJOUB0qYr3nCjutL
+\unrestrict tbPFQC8sSjLPwTt6oU38EBk0t3QPsK17HsIBrFVxV8bO80aDIPPddVahtqJ1rzl
 

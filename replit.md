@@ -6,7 +6,7 @@ This project is a full-stack Technical Module for a maritime Planned Maintenance
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-**Critical Development Rule**: Whenever adding new database columns for any feature update, change, or addition, ALWAYS add a corresponding migration to `server/migrations.ts`. This ensures schema changes are tracked and can be applied automatically to any environment.
+**Critical Development Rule**: Whenever adding new database columns for any feature update, change, or addition, ALWAYS add a corresponding migration file to the `migrations/` folder. This ensures schema changes are tracked and can be applied automatically to any environment.
 
 ## System Architecture
 The application employs a modern full-stack architecture with a mobile-first, responsive design. The frontend is developed using React (TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, Wouter), while the backend is powered by Express.js (TypeScript). PostgreSQL serves as the primary data store.

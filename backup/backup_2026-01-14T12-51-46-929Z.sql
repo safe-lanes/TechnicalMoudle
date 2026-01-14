@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tJ9XQwVF6lyfq2YzFh02rICxqed0yfiQ7XPYdtSpi8RP0qKaKRHIqFndWcqeyac
+\restrict lMOK4HVHZj0SXomKeYmX7eRhKqQ8lxLGp4c9F9JVxEkfGpaGcbXJ9VC0mjozUxB
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -909,7 +909,17 @@ CREATE TABLE public.defects (
     audit_trail json DEFAULT '[]'::json,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    date_reported_to_office text
+    date_reported_to_office text,
+    sire_hardware_id text,
+    sire_hardware_level1 text,
+    sire_hardware_level2 text,
+    sire_hardware_level3 text,
+    component_hardware_id text,
+    component_hardware_level1 text,
+    component_hardware_level2 text,
+    component_hardware_level3 text,
+    risk_level text,
+    date_registered_in_system text
 );
 
 
@@ -3598,7 +3608,7 @@ COPY public.defect_sequences (id, vessel_id, year, last_sequence) FROM stdin;
 -- Data for Name: defects; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.defects (id, vessel_id, vessel_name, issue_date, category, defect_type, description, description_html, description_text, action_taken_requested, target_close_date, date_completed, status, priority, critical, is_coc, severity, source, equipment_category, equipment_type, equipment_make, equipment_model, equipment_serial_no, equipment_location, equipment_system, component_id, purchase_order_ref, responsible_dept, verified_date, defect_category, viq_version, viq_ref, viq_chapter, viq_section, sfi_code_ref, immediate_cause, immediate_cause_explanation, root_cause, root_cause_explanation, hold_reason, next_review_date, seed_id, equipment_key, raised_by_id, raised_by_name, raised_by_rank, operating_condition, location_text, occurrence_type, responsible_role, responsible_role_id, is_deferred, defer_reason, defer_new_target_date, defer_approval_required, report_to_third_party, class_report, flag_report, port_report, report_reference_no, report_date, vessel_location_type, port_name, latitude, longitude, vessel_location_detail, reported_by, assigned_to, reviewed_by, closed_by, closed_on, closure_comment, closure_files, linked_defects, notes, actions, attachments, audit_trail, created_at, updated_at, date_reported_to_office) FROM stdin;
+COPY public.defects (id, vessel_id, vessel_name, issue_date, category, defect_type, description, description_html, description_text, action_taken_requested, target_close_date, date_completed, status, priority, critical, is_coc, severity, source, equipment_category, equipment_type, equipment_make, equipment_model, equipment_serial_no, equipment_location, equipment_system, component_id, purchase_order_ref, responsible_dept, verified_date, defect_category, viq_version, viq_ref, viq_chapter, viq_section, sfi_code_ref, immediate_cause, immediate_cause_explanation, root_cause, root_cause_explanation, hold_reason, next_review_date, seed_id, equipment_key, raised_by_id, raised_by_name, raised_by_rank, operating_condition, location_text, occurrence_type, responsible_role, responsible_role_id, is_deferred, defer_reason, defer_new_target_date, defer_approval_required, report_to_third_party, class_report, flag_report, port_report, report_reference_no, report_date, vessel_location_type, port_name, latitude, longitude, vessel_location_detail, reported_by, assigned_to, reviewed_by, closed_by, closed_on, closure_comment, closure_files, linked_defects, notes, actions, attachments, audit_trail, created_at, updated_at, date_reported_to_office, sire_hardware_id, sire_hardware_level1, sire_hardware_level2, sire_hardware_level3, component_hardware_id, component_hardware_level1, component_hardware_level2, component_hardware_level3, risk_level, date_registered_in_system) FROM stdin;
 \.
 
 
@@ -24934,6 +24944,9 @@ COPY public.schema_migrations (id, name, description, applied_at) FROM stdin;
 001_date_reported_to_office	Add date_reported_to_office column to defects	Adds the date_reported_to_office column to the defects table for tracking when defects are reported to office	2026-01-14 11:31:10.140295
 002_equipment_categories_table	Create equipment_categories table	Creates the equipment_categories table for admin-managed equipment categorization	2026-01-14 11:31:10.156335
 003_equipment_categories_defaults	Seed default equipment categories	Inserts default equipment categories if table is empty	2026-01-14 11:31:10.165158
+004_sire_hardware_columns	Add SIRE hardware columns to defects	Adds the SIRE hardware class columns to the defects table for SIRE 2.0 Annex 1 categorization	2026-01-14 11:32:35.339203
+005_component_hardware_columns	Add component hardware columns to defects	Adds component SIRE hardware class columns for Part A of the defect form	2026-01-14 11:32:35.348727
+006_defect_additional_columns	Add remaining missing defect columns	Adds risk_level, date_registered_in_system, and other missing columns to defects table	2026-01-14 11:34:17.646511
 \.
 
 
@@ -55134,5 +55147,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tJ9XQwVF6lyfq2YzFh02rICxqed0yfiQ7XPYdtSpi8RP0qKaKRHIqFndWcqeyac
+\unrestrict lMOK4HVHZj0SXomKeYmX7eRhKqQ8lxLGp4c9F9JVxEkfGpaGcbXJ9VC0mjozUxB
 
