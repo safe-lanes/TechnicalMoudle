@@ -4522,6 +4522,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!name?.trim()) {
         return res.status(400).json({ error: "Category name is required" });
       }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
       const [category] = await db.insert(equipmentCategories).values({
         name: name.trim(),
         sortOrder,
@@ -4542,7 +4545,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { db } = getPostgresClient();
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid category ID" });
+      }
       const { name, sortOrder, isActive } = req.body;
+      if (name !== undefined && !name.trim()) {
+        return res.status(400).json({ error: "Category name cannot be empty" });
+      }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name.trim();
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;

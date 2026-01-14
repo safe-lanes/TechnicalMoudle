@@ -72,6 +72,11 @@ export default function DefectFormWizard({
 }: DefectFormWizardProps = {}) {
   const { toast } = useToast();
   const { data: vessels = [] } = useVessels();
+  
+  // Fetch equipment categories from database
+  const { data: equipmentCategories = [] } = useQuery<{ id: number; name: string; sortOrder: number }[]>({
+    queryKey: ['/technical/api/equipment-categories'],
+  });
   const [, setLocation] = useLocation();
   const params = useParams();
   const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C'>('A');
@@ -117,6 +122,7 @@ export default function DefectFormWizard({
       vesselName: "MV SEAFARER",
       issueDate: new Date().toISOString().split('T')[0],
       category: "Defect",
+      equipmentCategory: "",
       status: "Open",
       priority: "Medium",
       critical: false,
@@ -513,17 +519,17 @@ export default function DefectFormWizard({
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Category</label>
                       <Controller
-                        name="category"
+                        name="equipmentCategory"
                         control={form.control}
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                            <SelectTrigger data-testid="select-category" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                            <SelectTrigger data-testid="select-equipment-category" className="h-10 text-sm border-gray-300">
+                              <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Defect">Defect</SelectItem>
-                              <SelectItem value="Incident">Incident</SelectItem>
-                              <SelectItem value="Observation">Observation</SelectItem>
+                              {equipmentCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}

@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Search, Loader2, RefreshCw } from "lucide-react";
+import { Search, Loader2, RefreshCw, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   useExternalNationalities,
   useExternalVessels,
@@ -33,6 +34,7 @@ interface MasterType {
   name: string;
   idFields: string[];
   columns: ColumnDef[];
+  isEditable?: boolean;
 }
 
 const masterTypes: MasterType[] = [
@@ -106,6 +108,16 @@ const masterTypes: MasterType[] = [
       { header: "Description", fields: ["vessels", "fleet_group_description", "desc"] },
     ],
   },
+  {
+    id: "equipmentCategory",
+    name: "Equipment Category",
+    idFields: ["id"],
+    columns: [
+      { header: "Category Name", fields: ["name"] },
+      { header: "Sort Order", fields: ["sortOrder"] },
+    ],
+    isEditable: true,
+  },
    // {
   //   id: "licenseDce",
   //   name: "License & DCE Master",
@@ -166,7 +178,61 @@ const masterTypes: MasterType[] = [
 export default function DataMasters() {
   const [selectedMaster, setSelectedMaster] = useState<string>("vessel");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<{ id?: number; name: string; sortOrder: number } | null>(null);
   const { toast } = useToast();
+
+  // Equipment Categories - local editable master
+  const equipmentCategoriesQuery = useQuery<{ id: number; name: string; sortOrder: number; isActive: boolean }[]>({
+    queryKey: ['/technical/api/equipment-categories'],
+    enabled: selectedMaster === "equipmentCategory",
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async (data: { name: string; sortOrder: number }) => {
+      const res = await apiRequest("POST", "/technical/api/equipment-categories", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/equipment-categories'] });
+      toast({ title: "Category created successfully" });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to create category", description: error.message });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; name: string; sortOrder: number }) => {
+      const res = await apiRequest("PATCH", `/technical/api/equipment-categories/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/equipment-categories'] });
+      toast({ title: "Category updated successfully" });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to update category", description: error.message });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/technical/api/equipment-categories/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/equipment-categories'] });
+      toast({ title: "Category deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to delete category", description: error.message });
+    },
+  });
 
   // Sync All mutation - calls backend to sync external master data
   // apiRequest throws on non-OK responses, so errors are caught by onError handler
@@ -227,6 +293,7 @@ export default function DataMasters() {
     crewPool: { data: crewPoolsQuery.data || [], isLoading: crewPoolsQuery.isLoading, error: crewPoolsQuery.error },
     appraisalType: { data: appraisalTypesQuery.data || [], isLoading: appraisalTypesQuery.isLoading, error: appraisalTypesQuery.error },
     users: { data: usersQuery.data || [], isLoading: usersQuery.isLoading, error: usersQuery.error },
+    equipmentCategory: { data: equipmentCategoriesQuery.data || [], isLoading: equipmentCategoriesQuery.isLoading, error: equipmentCategoriesQuery.error },
   };
 
   const currentMaster = masterTypes.find(m => m.id === selectedMaster);
@@ -351,6 +418,23 @@ export default function DataMasters() {
         </div>
 
         <div className="flex-1 min-w-0 bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {/* Add button for editable masters */}
+          {currentMaster?.isEditable && (
+            <div className="px-4 py-3 border-b border-gray-200 flex justify-end">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingEntry({ name: '', sortOrder: (entries.length + 1) * 10 });
+                  setIsEditDialogOpen(true);
+                }}
+                className="bg-[#52baf3] hover:bg-[#3da8e0]"
+                data-testid="btn-add-category"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Category
+              </Button>
+            </div>
+          )}
           <div className="bg-[#52baf3] text-white">
             <div
               className="font-medium text-sm"
@@ -388,7 +472,39 @@ export default function DataMasters() {
                     </div>
                   ))}
                   <div className="px-4 py-3">
-                    <span className="text-gray-400 text-sm">External</span>
+                    {currentMaster?.isEditable ? (
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingEntry({ 
+                              id: entry.id, 
+                              name: entry.name, 
+                              sortOrder: entry.sortOrder 
+                            });
+                            setIsEditDialogOpen(true);
+                          }}
+                          data-testid={`btn-edit-${entry.id}`}
+                        >
+                          <Pencil className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm(`Delete "${entry.name}"?`)) {
+                              deleteCategoryMutation.mutate(entry.id);
+                            }
+                          }}
+                          data-testid={`btn-delete-${entry.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">External</span>
+                    )}
                   </div>
                 </div>
               ))
@@ -400,6 +516,61 @@ export default function DataMasters() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Edit/Create Dialog for Equipment Category */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingEntry?.id ? 'Edit Category' : 'Add New Category'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Category Name</label>
+              <Input
+                value={editingEntry?.name || ''}
+                onChange={(e) => setEditingEntry(prev => prev ? { ...prev, name: e.target.value } : null)}
+                placeholder="Enter category name"
+                data-testid="input-category-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Sort Order</label>
+              <Input
+                type="number"
+                value={editingEntry?.sortOrder || 0}
+                onChange={(e) => setEditingEntry(prev => prev ? { ...prev, sortOrder: parseInt(e.target.value) || 0 } : null)}
+                placeholder="Display order"
+                data-testid="input-sort-order"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setEditingEntry(null); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!editingEntry?.name?.trim()) {
+                  toast({ variant: "destructive", title: "Category name is required" });
+                  return;
+                }
+                if (editingEntry.id) {
+                  updateCategoryMutation.mutate({ id: editingEntry.id, name: editingEntry.name, sortOrder: editingEntry.sortOrder });
+                } else {
+                  createCategoryMutation.mutate({ name: editingEntry.name, sortOrder: editingEntry.sortOrder });
+                }
+              }}
+              disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
+              className="bg-[#52baf3] hover:bg-[#3da8e0]"
+              data-testid="btn-save-category"
+            >
+              {(createCategoryMutation.isPending || updateCategoryMutation.isPending) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
