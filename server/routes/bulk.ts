@@ -4550,9 +4550,25 @@ async function performImport(
     // Import jobs using storage layer
     console.log(`🚀 Starting jobs import: ${data.length} rows, mode: ${mode}, vesselId: ${vesselId}`);
     
-    // Step 1: Prefetch all existing jobs by job numbers for performance
-    const allJobNos = data.map(row => row['Job Code'] ? String(row['Job Code']).trim() : null).filter(Boolean) as string[];
-    const jobsByJobNo = await storage.getJobsByJobNos(allJobNos, vesselId);
+    // FIX: Job uniqueness is determined by composite key: vesselId + componentCode + jobNo
+    // This allows the same jobNo to exist for different components within the same vessel
+    // Helper function to generate composite unique key
+    const getJobUniqueKey = (vesselIdVal: string, componentCodeVal: string, jobNoVal: string): string => {
+      return `${vesselIdVal}::${componentCodeVal}::${jobNoVal}`;
+    };
+    
+    // Step 1: Prefetch all existing jobs for this vessel to build composite key map
+    // NOTE: We fetch all jobs for the vessel rather than filtering by jobNo alone,
+    // because the same jobNo can exist across different components
+    const allExistingJobs = await storage.getJobs(vesselId);
+    const jobsByCompositeKey = new Map<string, any>();
+    for (const job of allExistingJobs) {
+      if (job.jobNo && job.componentCode) {
+        const key = getJobUniqueKey(job.vesselId || vesselId || '', job.componentCode, job.jobNo);
+        jobsByCompositeKey.set(key, job);
+      }
+    }
+    console.log(`📦 Prefetched ${allExistingJobs.length} existing jobs for composite key matching`);
     
     // Step 1.5: Prefetch all existing components by codes for performance
     const allComponentCodes = data.map(row => String(row['Component Code']).trim());
@@ -4790,15 +4806,19 @@ async function performImport(
         jobData.jobNo = String(row['Job Code']).trim();
       }
       
-      // Check if job already exists by job number (using prefetched map)
-      const existingJob = jobsByJobNo.get(jobData.jobNo);
+      // FIX: Check if job already exists using composite key (vesselId + componentCode + jobNo)
+      // This allows the same jobNo to exist for different components
+      const compositeKey = getJobUniqueKey(canonicalVesselId, componentCode, jobData.jobNo);
+      const existingJob = jobsByCompositeKey.get(compositeKey);
       
       if (mode === 'add') {
         if (!existingJob) {
           // For NEW jobs: include deprecated component fields for backwards compatibility
           const newJobData = { ...jobData, ...componentFields };
           const createdJob = await storage.createJob(newJobData);
-          jobsByJobNo.set(createdJob.jobNo, createdJob);
+          // FIX: Store in map using composite key
+          const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
+          jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
           
           // MANY-TO-MANY: Always create job-component link for the new job
@@ -4811,7 +4831,7 @@ async function performImport(
               linkedBy: 'system-bulk-import',
             });
             result.jobComponentLinksCreated++;
-            console.log(`🔗 Created job ${createdJob.jobNo} and linked to component ${componentCode}`);
+            console.log(`🔗 Created job ${createdJob.jobNo} for component ${componentCode}`);
           } catch (linkError: any) {
             console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
           }
@@ -4822,33 +4842,9 @@ async function performImport(
             await trackChange(importHistoryId, 'created', 'job', createdJob.id, null, canonicalJob);
           }
         } else {
-          // MANY-TO-MANY SUPPORT: Job Code exists - check if we need to link to this component
-          try {
-            // Check if link already exists before creating
-            const existingLinks = await storage.getJobComponentLinksByJob(existingJob.id);
-            const linkAlreadyExists = existingLinks.some(link => link.componentId === component.id);
-            
-            if (!linkAlreadyExists) {
-              await storage.createJobComponentLink({
-                vesselId: canonicalVesselId,
-                jobId: existingJob.id,
-                componentId: component.id,
-                componentCode: componentCode,
-                linkedBy: 'system-bulk-import',
-              });
-              result.jobComponentLinksCreated++;
-              console.log(`🔗 Linked job ${jobData.jobNo} to additional component ${componentCode}`);
-              
-              // Count as an update since we modified the job's relationships
-              result.updated++;
-            } else {
-              console.log(`⏭️ Job ${jobData.jobNo} already linked to component ${componentCode}, skipping`);
-              result.skipped++;
-            }
-          } catch (linkError: any) {
-            console.warn(`⚠️ Failed to create job-component link for ${jobData.jobNo} -> ${componentCode}: ${linkError.message}`);
-            result.skipped++;
-          }
+          // Job with same vesselId + componentCode + jobNo already exists - skip duplicate
+          console.log(`⏭️ Job ${jobData.jobNo} already exists for component ${componentCode}, skipping`);
+          result.skipped++;
         }
       } else if (mode === 'update') {
         if (existingJob) {
@@ -4874,7 +4870,9 @@ async function performImport(
           
           const previousSnapshot = createRecordSnapshot(existingJob);
           const updatedJob = await storage.updateJob(existingJob.id, jobData);
-          jobsByJobNo.set(updatedJob.jobNo, updatedJob);
+          // FIX: Store in map using composite key
+          const updateKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
+          jobsByCompositeKey.set(updateKey, updatedJob);
           result.updated++;
           
           // Track job update with canonical state (refetch for accuracy)
@@ -4905,10 +4903,12 @@ async function performImport(
               console.log(`🔗 Linked job ${jobData.jobNo} to component ${componentCode} (upsert mode)`);
             }
             
-            // Update the job master record with latest data (regardless of component)
+            // Update the job master record with latest data
             const previousSnapshot = createRecordSnapshot(existingJob);
             const updatedJob = await storage.updateJob(existingJob.id, jobData);
-            jobsByJobNo.set(updatedJob.jobNo, updatedJob);
+            // FIX: Store in map using composite key
+            const upsertKey = getJobUniqueKey(canonicalVesselId, componentCode, updatedJob.jobNo);
+            jobsByCompositeKey.set(upsertKey, updatedJob);
             result.updated++;
             
             // Track job update with canonical state (refetch for accuracy)
@@ -4924,7 +4924,9 @@ async function performImport(
           // For NEW jobs (upsert creates): include deprecated component fields for backwards compatibility
           const newJobData = { ...jobData, ...componentFields };
           const createdJob = await storage.createJob(newJobData);
-          jobsByJobNo.set(createdJob.jobNo, createdJob);
+          // FIX: Store in map using composite key
+          const newKey = getJobUniqueKey(canonicalVesselId, componentCode, createdJob.jobNo);
+          jobsByCompositeKey.set(newKey, createdJob);
           result.created++;
           
           // MANY-TO-MANY: Always create job-component link for the new job
@@ -4937,7 +4939,7 @@ async function performImport(
               linkedBy: 'system-bulk-import',
             });
             result.jobComponentLinksCreated++;
-            console.log(`🔗 Created job ${createdJob.jobNo} and linked to component ${componentCode}`);
+            console.log(`🔗 Created job ${createdJob.jobNo} for component ${componentCode}`);
           } catch (linkError: any) {
             console.warn(`⚠️ Job created but failed to create job-component link: ${linkError.message}`);
           }
@@ -4952,26 +4954,36 @@ async function performImport(
     }
     
     // Step 3: Archive missing jobs if requested
+    // FIX: Archive logic also uses composite key (vesselId + componentCode + jobNo) for consistency
     if (archiveMissing) {
-      const importedJobNos = new Set(
-        data
-          .map(row => row['Job Code'] ? String(row['Job Code']).trim() : null)
-          .filter(Boolean) as string[]
-      );
+      // Build set of imported composite keys from Excel data
+      const importedCompositeKeys = new Set<string>();
+      for (const row of data) {
+        const rowJobCode = row['Job Code'] ? String(row['Job Code']).trim() : null;
+        const rowComponentCode = row['Component Code'] ? String(row['Component Code']).trim() : null;
+        if (rowJobCode && rowComponentCode) {
+          const key = getJobUniqueKey(vesselId || '', rowComponentCode, rowJobCode);
+          importedCompositeKeys.add(key);
+        }
+      }
+      
       const allVesselJobs = await storage.getJobs(vesselId);
       
       for (const job of allVesselJobs) {
-        if (job.jobNo && !importedJobNos.has(job.jobNo)) {
-          const previousSnapshot = createRecordSnapshot(job);
-          const archivedJob = await storage.archiveJob(job.id);
-          result.archived++;
-          
-          // Track job archive with authoritative before/after snapshots
-          if (importHistoryId) {
-            await trackChange(importHistoryId, 'archived', 'job', job.id, job, archivedJob);
+        if (job.jobNo && job.componentCode) {
+          const jobKey = getJobUniqueKey(job.vesselId || vesselId || '', job.componentCode, job.jobNo);
+          if (!importedCompositeKeys.has(jobKey)) {
+            const previousSnapshot = createRecordSnapshot(job);
+            const archivedJob = await storage.archiveJob(job.id);
+            result.archived++;
+            
+            // Track job archive with authoritative before/after snapshots
+            if (importHistoryId) {
+              await trackChange(importHistoryId, 'archived', 'job', job.id, job, archivedJob);
+            }
+            
+            console.log(`📦 Archived job: ${job.jobNo} for component ${job.componentCode}`);
           }
-          
-          console.log(`📦 Archived job: ${job.jobNo}`);
         }
       }
     }
