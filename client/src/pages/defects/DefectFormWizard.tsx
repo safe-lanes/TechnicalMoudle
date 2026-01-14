@@ -24,6 +24,7 @@ import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
+import { defectSources, findSourceById } from "@/data/defectSources";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 
 const defectFormSchema = insertDefectSchema.extend({
@@ -549,15 +550,12 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-source" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select source" />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Crew Report">Crew Report</SelectItem>
-                              <SelectItem value="Inspection">Inspection</SelectItem>
-                              <SelectItem value="External Audit">External Audit</SelectItem>
-                              <SelectItem value="Internal Audit">Internal Audit</SelectItem>
-                              <SelectItem value="PSC">PSC</SelectItem>
-                              <SelectItem value="Vetting">Vetting</SelectItem>
+                            <SelectContent className="max-h-[300px]">
+                              {defectSources.map((source) => (
+                                <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}
