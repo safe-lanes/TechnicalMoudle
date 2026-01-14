@@ -2235,3 +2235,22 @@ export const insertJobComponentLinkSchema = createInsertSchema(jobComponentLinks
 
 export type InsertJobComponentLink = z.infer<typeof insertJobComponentLinkSchema>;
 export type JobComponentLink = typeof jobComponentLinks.$inferSelect;
+
+// Equipment Categories - Customizable master data for defect equipment classification
+export const equipmentCategories = pgTable("equipment_categories", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  name: text("name").notNull().unique(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertEquipmentCategorySchema = createInsertSchema(equipmentCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEquipmentCategory = z.infer<typeof insertEquipmentCategorySchema>;
+export type EquipmentCategory = typeof equipmentCategories.$inferSelect;

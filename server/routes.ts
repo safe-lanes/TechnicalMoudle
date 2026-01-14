@@ -4,7 +4,9 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories } from "@shared/schema";
+import { getPostgresClient } from "./postgresClient";
+import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
 import { shouldGenerateWorkOrder } from "@shared/dateUtils";
@@ -4499,6 +4501,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // ===== EQUIPMENT CATEGORIES API =====
+  // Get all equipment categories
+  app.get("/technical/api/equipment-categories", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const categories = await db.select().from(equipmentCategories).orderBy(equipmentCategories.sortOrder);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching equipment categories:", error);
+      res.status(500).json({ error: "Failed to fetch equipment categories" });
+    }
+  });
+
+  // Create equipment category
+  app.post("/technical/api/equipment-categories", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const { name, sortOrder = 0, isActive = true } = req.body;
+      if (!name?.trim()) {
+        return res.status(400).json({ error: "Category name is required" });
+      }
+      const [category] = await db.insert(equipmentCategories).values({
+        name: name.trim(),
+        sortOrder,
+        isActive,
+      }).returning();
+      res.status(201).json(category);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Category with this name already exists" });
+      }
+      console.error("Error creating equipment category:", error);
+      res.status(500).json({ error: "Failed to create equipment category" });
+    }
+  });
+
+  // Update equipment category
+  app.patch("/technical/api/equipment-categories/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      const { name, sortOrder, isActive } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name.trim();
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const [category] = await db.update(equipmentCategories)
+        .set(updates)
+        .where(eq(equipmentCategories.id, id))
+        .returning();
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Category with this name already exists" });
+      }
+      console.error("Error updating equipment category:", error);
+      res.status(500).json({ error: "Failed to update equipment category" });
+    }
+  });
+
+  // Delete equipment category
+  app.delete("/technical/api/equipment-categories/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(equipmentCategories)
+        .where(eq(equipmentCategories.id, id))
+        .returning();
+      if (!deleted) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting equipment category:", error);
+      res.status(500).json({ error: "Failed to delete equipment category" });
+    }
+  });
+
   // Running hours routes...
   
   // Get running hours audits for a specific component
