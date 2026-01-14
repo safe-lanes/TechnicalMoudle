@@ -1,20 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { sireHardwareClasses } from "@/data/sireHardwareClasses";
 
 interface SireHardwareClassComboboxProps {
@@ -35,9 +29,23 @@ export function SireHardwareClassCombobox({
   testId = "combobox-sire-hardware-class",
 }: SireHardwareClassComboboxProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredItems = useMemo(() => {
+    if (!search.trim()) return sireHardwareClasses;
+    const searchLower = search.toLowerCase().trim();
+    return sireHardwareClasses.filter((item) => 
+      item.level1.toLowerCase().includes(searchLower) ||
+      item.level2.toLowerCase().includes(searchLower) ||
+      item.level3.toLowerCase().includes(searchLower)
+    );
+  }, [search]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSearch("");
+    }}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -54,38 +62,56 @@ export function SireHardwareClassCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search hardware class..." />
-          <CommandList>
-            <CommandEmpty>No hardware class found.</CommandEmpty>
-            <CommandGroup className="max-h-[300px] overflow-auto">
-              {sireHardwareClasses.map((item) => (
-                <CommandItem
-                  key={item.id}
-                  value={`${item.level1} ${item.level2} ${item.level3}`}
-                  onSelect={() => {
-                    onSelect(item.id, item.level1, item.level2, item.level3);
-                    setOpen(false);
-                  }}
-                  className="cursor-pointer"
-                >
-                  <Check
+        <div className="flex flex-col">
+          <div className="p-2 border-b">
+            <Input
+              placeholder="Search hardware class..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9"
+              autoFocus
+              data-testid={`${testId}-search`}
+            />
+          </div>
+          <ScrollArea className="h-[300px]">
+            {filteredItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No hardware class found.
+              </div>
+            ) : (
+              <div className="p-1">
+                {filteredItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      onSelect(item.id, item.level1, item.level2, item.level3);
+                      setOpen(false);
+                      setSearch("");
+                    }}
                     className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedId === item.id ? "opacity-100" : "opacity-0"
+                      "flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer hover-elevate",
+                      selectedId === item.id && "bg-accent"
                     )}
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-xs text-gray-400">
-                      {item.level1} &gt; {item.level2}
-                    </span>
-                    <span className="font-medium">{item.level3}</span>
+                    data-testid={`${testId}-option-${item.id}`}
+                  >
+                    <Check
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        selectedId === item.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs text-muted-foreground truncate">
+                        {item.level1} &gt; {item.level2}
+                      </span>
+                      <span className="font-medium truncate">{item.level3}</span>
+                    </div>
                   </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
