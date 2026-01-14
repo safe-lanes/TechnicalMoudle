@@ -163,14 +163,20 @@ const Dashboard = () => {
   };
 
   // Work Order KPIs with computed status
+  // Updated to match new tab semantics:
+  // - Overdue: includes both 'Overdue' (breach) and 'Due (Grace P)' (within tolerance)
+  // - Due: only items within warning window (≤30 days / ≤720 RH) but NOT past due
+  // - Planned: includes 'Active' and 'Postponed' items
   const workOrderKPIs = useMemo(() => {
     const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
     
+    // Overdue includes both breach items and grace period items
     const overdue = safeWOs.filter(wo => 
-      (wo as any).computedStatus === 'Overdue' && !wo.isExecution
+      ((wo as any).computedStatus === 'Overdue' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
     );
+    // Due only includes items within warning window, NOT past due
     const due = safeWOs.filter(wo => 
-      ((wo as any).computedStatus === 'Due' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
+      (wo as any).computedStatus === 'Due' && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo => 
       (wo as any).computedStatus === 'Pending Approval'
@@ -178,8 +184,9 @@ const Dashboard = () => {
     const completed = safeWOs.filter(wo => 
       (wo as any).computedStatus === 'Completed'
     );
-    const active = safeWOs.filter(wo => 
-      (wo as any).computedStatus === 'Active' && !wo.isExecution
+    // Planned includes Active and Postponed items
+    const planned = safeWOs.filter(wo => 
+      ((wo as any).computedStatus === 'Active' || (wo as any).computedStatus === 'Postponed') && !wo.isExecution
     );
 
     return {
@@ -191,7 +198,7 @@ const Dashboard = () => {
       pendingApproval: pendingApproval.length,
       pendingApprovalList: pendingApproval.slice(0, 5),
       completed: completed.length,
-      active: active.length
+      active: planned.length  // Keep 'active' property name for backwards compatibility
     };
   }, [workOrdersData]);
 
@@ -526,7 +533,7 @@ const Dashboard = () => {
 
           <Card 
             className="cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-l-gray-400"
-            onClick={() => navigateToWorkOrders('Active')}
+            onClick={() => navigateToWorkOrders('Planned')}
             data-testid="card-total-wo"
           >
             <CardHeader className="pb-2">
@@ -573,7 +580,7 @@ const Dashboard = () => {
                           else if (status === 'Due') navigateToWorkOrders('Due');
                           else if (status === 'Pending Approval') navigateToWorkOrders('Pending Approval');
                           else if (status === 'Completed') navigateToWorkOrders('Completed');
-                          else navigateToWorkOrders('Active');
+                          else navigateToWorkOrders('Planned');
                         }
                       }
                     } as any],
@@ -618,7 +625,7 @@ const Dashboard = () => {
                         nodeClick: (event: any) => {
                           const status = event.datum.status;
                           if (status === 'Outstanding') {
-                            navigateToWorkOrders('Active');
+                            navigateToWorkOrders('Planned');
                           } else {
                             navigateToWorkOrders('Completed');
                           }

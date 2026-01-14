@@ -68,9 +68,10 @@ const WorkOrders: React.FC = () => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
     if (savedTab) {
       sessionStorage.removeItem('workOrdersActiveTab');
-      return savedTab;
+      // Handle legacy "Active" tab name - map to "Planned"
+      return savedTab === "Active" ? "Planned" : savedTab;
     }
-    return "Active";
+    return "Planned";
   });
   const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
   const [unplannedWorkOrderFormOpen, setUnplannedWorkOrderFormOpen] = useState(false);
@@ -163,22 +164,28 @@ const WorkOrders: React.FC = () => {
   const safeWorkOrdersList = (workOrdersList || []).filter(wo => wo !== null && wo !== undefined);
   
   // Use computedStatus for tab counts (automatic status calculation)
-  // Active tab only shows work orders with Active status (Postponed goes to Due tab)
+  // Planned tab shows work orders with Active status (not yet in warning window) + Postponed items
+  // Due tab shows only items within warning window (≤30 days / ≤720 RH) but NOT past due
+  // Overdue tab shows both Grace P (within tolerance) and Overdue (breach) items
   const tabs = [
-    { id: "Active", label: "Active", count: safeWorkOrdersList.filter(wo => {
+    { id: "Planned", label: "Planned", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
-      // Use same fallback logic as the filter to ensure count matches displayed items
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      return effectiveStatus === "Active";
+      return effectiveStatus === "Active" || effectiveStatus === "Postponed";
     }).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
-      // Use same fallback logic as the filter to ensure count matches displayed items
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)" || effectiveStatus === "Postponed";
+      // Only show items within warning window, NOT past due (Grace P or Overdue)
+      return effectiveStatus === "Due";
+    }).length },
+    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
+      if (wo.isExecution) return false;
+      const effectiveStatus = wo.computedStatus || wo.status || 'Active';
+      // Include both Grace P (within tolerance) and Overdue (breach)
+      return effectiveStatus === "Due (Grace P)" || effectiveStatus === "Overdue";
     }).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
-    { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => !wo.isExecution && wo.computedStatus === "Overdue").length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Completed").length }
   ];
 
@@ -193,6 +200,7 @@ const WorkOrders: React.FC = () => {
       case "due soon":
         return "bg-amber-100 text-amber-800";
       case "due (grace p)":
+      case "grace p":
         return "bg-orange-100 text-orange-800";
       case "overdue":
         return "bg-red-100 text-red-800";
@@ -216,20 +224,19 @@ const WorkOrders: React.FC = () => {
     // Ensure computedStatus is always defined (defensive check)
     const effectiveStatus = wo.computedStatus || wo.status || 'Active';
     
-    if (activeTab === "Active") {
-      // Show templates with Active status only, plus rejected executions
+    if (activeTab === "Planned") {
+      // Planned tab: Show templates with Active status + Postponed items, plus rejected executions
       if (wo.isExecution && effectiveStatus !== "Rejected") return false;
-      // Exclude statuses that have their own dedicated tabs (Postponed goes to Due tab)
-      if (effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)" || 
-          effectiveStatus === "Overdue" || effectiveStatus === "Pending Approval" || 
-          effectiveStatus === "Completed" || effectiveStatus === "Postponed") return false;
+      // Only show Active and Postponed statuses in Planned tab
+      if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed" && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Due") {
       if (wo.isExecution) return false;
-      // Due tab includes Due, Due (Grace P), and Postponed statuses
-      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)" && effectiveStatus !== "Postponed") return false;
+      // Due tab: Only items within warning window (≤30 days / ≤720 RH) but NOT past due
+      if (effectiveStatus !== "Due") return false;
     } else if (activeTab === "Overdue") {
       if (wo.isExecution) return false;
-      if (effectiveStatus !== "Overdue") return false;
+      // Overdue tab: Both Grace P (within tolerance) and Overdue (breach)
+      if (effectiveStatus !== "Due (Grace P)" && effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
       if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {
@@ -625,7 +632,10 @@ const WorkOrders: React.FC = () => {
                 <td className="py-3 px-4" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
-                    {workOrder.computedStatus || workOrder.status || 'Active'}
+                    {/* Display "Grace P" instead of "Due (Grace P)" for cleaner badge label */}
+                    {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
+                      ? 'Grace P' 
+                      : (workOrder.computedStatus || workOrder.status || 'Active')}
                   </span>
                 </td>
                 {activeTab !== "Pending Approval" && (
