@@ -5346,17 +5346,22 @@ export class PostgresStorage {
   }
 
   // Component-specific tracking updates (prevents data mixing between components sharing the same job)
-  async updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
+  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
+  async updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, updates: {
     lastDoneDate?: string;
     nextDueDate?: string;
     lastDoneRH?: string;
     nextDueRH?: string;
     updatedAt?: Date;
   }): Promise<JobComponentLink | null> {
+    if (!vesselId) {
+      throw new Error('vesselId is required for updateJobComponentLinkTracking to ensure vessel isolation');
+    }
     const db = await getDb();
     const result = await db.update(jobComponentLinks)
       .set(updates)
       .where(and(
+        eq(jobComponentLinks.vesselId, vesselId),
         eq(jobComponentLinks.jobId, jobId),
         eq(jobComponentLinks.componentId, componentId)
       ))
@@ -5364,10 +5369,15 @@ export class PostgresStorage {
     return result[0] || null;
   }
 
-  async getJobComponentLinkWithTracking(jobId: string, componentId: string): Promise<JobComponentLink | null> {
+  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
+  async getJobComponentLinkWithTracking(vesselId: string, jobId: string, componentId: string): Promise<JobComponentLink | null> {
+    if (!vesselId) {
+      throw new Error('vesselId is required for getJobComponentLinkWithTracking to ensure vessel isolation');
+    }
     const db = await getDb();
     const result = await db.select().from(jobComponentLinks)
       .where(and(
+        eq(jobComponentLinks.vesselId, vesselId),
         eq(jobComponentLinks.jobId, jobId),
         eq(jobComponentLinks.componentId, componentId)
       ));

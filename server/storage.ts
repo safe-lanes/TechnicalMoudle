@@ -780,14 +780,16 @@ export interface IStorage {
   // Get maintenance history for a specific job-component pair
   getMaintenanceHistoryByJobAndComponent(jobId: string, componentCode: string): Promise<any[]>;
   // Component-specific tracking updates (prevents data mixing between components)
-  updateJobComponentLinkTracking(jobId: string, componentId: string, updates: {
+  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
+  updateJobComponentLinkTracking(vesselId: string, jobId: string, componentId: string, updates: {
     lastDoneDate?: string;
     nextDueDate?: string;
     lastDoneRH?: string;
     nextDueRH?: string;
     updatedAt?: Date;
   }): Promise<JobComponentLink | null>;
-  getJobComponentLinkWithTracking(jobId: string, componentId: string): Promise<JobComponentLink | null>;
+  // VESSEL ISOLATION: vesselId is REQUIRED to prevent cross-vessel data contamination
+  getJobComponentLinkWithTracking(vesselId: string, jobId: string, componentId: string): Promise<JobComponentLink | null>;
   
   // Spare Location Stock Methods
   getSpareLocationStock(spareId: number): Promise<SpareLocationStock[]>;

@@ -3488,9 +3488,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
-            if (woComponentId) {
-              await storage.updateJobComponentLinkTracking(job.id, woComponentId, linkUpdates);
-              console.log(`✅ Updated component-specific tracking for job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
+            // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
+            const updateVesselId = workOrder.vesselId || job.vesselId;
+            if (woComponentId && updateVesselId) {
+              await storage.updateJobComponentLinkTracking(updateVesselId, job.id, woComponentId, linkUpdates);
+              console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneDate: ${dateOfCompletion}`);
             }
             
             // Also update global job record for backward compatibility (SECONDARY)
@@ -3516,9 +3518,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
-              if (woComponentId) {
-                await storage.updateJobComponentLinkTracking(job.id, woComponentId, linkUpdates);
-                console.log(`✅ Updated component-specific RH tracking for job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
+              // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
+              const rhUpdateVesselId = workOrder.vesselId || job.vesselId;
+              if (woComponentId && rhUpdateVesselId) {
+                await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, woComponentId, linkUpdates);
+                console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${woComponentId} with lastDoneRH: ${currentRH}`);
               }
               
               // Also update global job record for backward compatibility (SECONDARY)
@@ -8262,9 +8266,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        if (needsUpdate) {
+        if (needsUpdate && link.vesselId) {
           updates.updatedAt = new Date();
-          await storage.updateJobComponentLinkTracking(link.jobId, link.componentId, updates);
+          // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
+          await storage.updateJobComponentLinkTracking(link.vesselId, link.jobId, link.componentId, updates);
           updatedCount++;
         }
       }
