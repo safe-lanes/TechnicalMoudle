@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -4730,6 +4730,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting defect category:", error);
       res.status(500).json({ error: "Failed to delete defect category" });
+    }
+  });
+
+  // ===== DEFECT TYPES API =====
+  // Get all defect types
+  app.get("/technical/api/defect-types", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const types = await db.select().from(defectTypes).orderBy(defectTypes.sortOrder);
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching defect types:", error);
+      res.status(500).json({ error: "Failed to fetch defect types" });
+    }
+  });
+
+  // Create defect type
+  app.post("/technical/api/defect-types", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const { name, sortOrder = 0, isActive = true } = req.body;
+      if (!name?.trim()) {
+        return res.status(400).json({ error: "Defect type name is required" });
+      }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
+      const [defectType] = await db.insert(defectTypes).values({
+        name: name.trim(),
+        sortOrder,
+        isActive,
+      }).returning();
+      res.status(201).json(defectType);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Defect type with this name already exists" });
+      }
+      console.error("Error creating defect type:", error);
+      res.status(500).json({ error: "Failed to create defect type" });
+    }
+  });
+
+  // Update defect type
+  app.patch("/technical/api/defect-types/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid defect type ID" });
+      }
+      const { name, sortOrder, isActive } = req.body;
+      if (name !== undefined && !name.trim()) {
+        return res.status(400).json({ error: "Defect type name cannot be empty" });
+      }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name.trim();
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const [defectType] = await db.update(defectTypes)
+        .set(updates)
+        .where(eq(defectTypes.id, id))
+        .returning();
+      if (!defectType) {
+        return res.status(404).json({ error: "Defect type not found" });
+      }
+      res.json(defectType);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Defect type with this name already exists" });
+      }
+      console.error("Error updating defect type:", error);
+      res.status(500).json({ error: "Failed to update defect type" });
+    }
+  });
+
+  // Delete defect type
+  app.delete("/technical/api/defect-types/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(defectTypes)
+        .where(eq(defectTypes.id, id))
+        .returning();
+      if (!deleted) {
+        return res.status(404).json({ error: "Defect type not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting defect type:", error);
+      res.status(500).json({ error: "Failed to delete defect type" });
     }
   });
 

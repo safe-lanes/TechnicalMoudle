@@ -128,6 +128,56 @@ const migrations: Migration[] = [
       ) AS defaults(name, sort_order)
       WHERE NOT EXISTS (SELECT 1 FROM defect_categories LIMIT 1)
     `
+  },
+  {
+    id: '009_defect_types_table',
+    name: 'Create defect_types table',
+    description: 'Creates the defect_types table for admin-managed defect type classification',
+    sql: `
+      CREATE TABLE IF NOT EXISTS defect_types (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+  },
+  {
+    id: '010_defect_types_defaults',
+    name: 'Seed default defect types',
+    description: 'Inserts default defect types if table is empty',
+    sql: `
+      INSERT INTO defect_types (name, sort_order)
+      SELECT name, sort_order FROM (VALUES
+        ('Corrosion / Erosion', 1),
+        ('Crack / Fracture / Structural Deformation', 2),
+        ('Bearing / Shaft / Gear Failure', 3),
+        ('Pump / Compressor / Turbine Malfunction', 4),
+        ('Valve / Seal / Gasket Leak', 5),
+        ('Electrical Short / Open Circuit / Ground Fault', 6),
+        ('Control System / Automation Failure', 7),
+        ('Sensor / Instrumentation Fault', 8),
+        ('Navigation / Communication System Fault', 9),
+        ('Safety Equipment Deficiency (Fire / Lifeboat / Alarm)', 10),
+        ('Ballast / Cargo / Tank System Defect', 11),
+        ('Steering / Rudder / Propulsion System Defect', 12),
+        ('Mooring / Deck Equipment Failure', 13),
+        ('Environmental Compliance Issue (BWM / SOx / OWS)', 14),
+        ('Non-Conformity / Certification Lapse', 15),
+        ('Inspection / Test Failure', 16),
+        ('Software / Firmware / Interface Error', 17),
+        ('Recurring Fault (same equipment/system)', 18),
+        ('Operational / Human Error Induced Defect', 19),
+        ('Documentation / Record-Keeping Defect', 20),
+        ('Wear / Fatigue – Non-critical', 21),
+        ('Survey Condition of Class Item', 22),
+        ('Spare / Stock-Out / BOM Defect', 23),
+        ('Other / Miscellaneous', 24)
+      ) AS defaults(name, sort_order)
+      WHERE NOT EXISTS (SELECT 1 FROM defect_types LIMIT 1)
+    `
   }
 ];
 

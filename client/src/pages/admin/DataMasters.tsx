@@ -128,6 +128,16 @@ const masterTypes: MasterType[] = [
     ],
     isEditable: true,
   },
+  {
+    id: "defectType",
+    name: "Defect Type",
+    idFields: ["id"],
+    columns: [
+      { header: "Type Name", fields: ["name"] },
+      { header: "Sort Order", fields: ["sortOrder"] },
+    ],
+    isEditable: true,
+  },
    // {
   //   id: "licenseDce",
   //   name: "License & DCE Master",
@@ -296,6 +306,58 @@ export default function DataMasters() {
     },
   });
 
+  // Defect Types - local editable master
+  const defectTypesQuery = useQuery<{ id: number; name: string; sortOrder: number; isActive: boolean }[]>({
+    queryKey: ['/technical/api/defect-types'],
+    enabled: selectedMaster === "defectType",
+  });
+
+  const createDefectTypeMutation = useMutation({
+    mutationFn: async (data: { name: string; sortOrder: number }) => {
+      const res = await apiRequest("POST", "/technical/api/defect-types", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defect-types'] });
+      toast({ title: "Defect type created successfully" });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to create defect type", description: error.message });
+    },
+  });
+
+  const updateDefectTypeMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; name: string; sortOrder: number }) => {
+      const res = await apiRequest("PATCH", `/technical/api/defect-types/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defect-types'] });
+      toast({ title: "Defect type updated successfully" });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to update defect type", description: error.message });
+    },
+  });
+
+  const deleteDefectTypeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/technical/api/defect-types/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/defect-types'] });
+      toast({ title: "Defect type deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to delete defect type", description: error.message });
+    },
+  });
+
   // Sync All mutation - calls backend to sync external master data
   // apiRequest throws on non-OK responses, so errors are caught by onError handler
   const syncMastersMutation = useMutation({
@@ -357,6 +419,7 @@ export default function DataMasters() {
     users: { data: usersQuery.data || [], isLoading: usersQuery.isLoading, error: usersQuery.error },
     equipmentCategory: { data: equipmentCategoriesQuery.data || [], isLoading: equipmentCategoriesQuery.isLoading, error: equipmentCategoriesQuery.error },
     defectCategory: { data: defectCategoriesQuery.data || [], isLoading: defectCategoriesQuery.isLoading, error: defectCategoriesQuery.error },
+    defectType: { data: defectTypesQuery.data || [], isLoading: defectTypesQuery.isLoading, error: defectTypesQuery.error },
   };
 
   const currentMaster = masterTypes.find(m => m.id === selectedMaster);
@@ -557,7 +620,9 @@ export default function DataMasters() {
                           variant="ghost"
                           onClick={() => {
                             if (confirm(`Delete "${entry.name}"?`)) {
-                              if (selectedMaster === 'defectCategory') {
+                              if (selectedMaster === 'defectType') {
+                                deleteDefectTypeMutation.mutate(entry.id);
+                              } else if (selectedMaster === 'defectCategory') {
                                 deleteDefectCategoryMutation.mutate(entry.id);
                               } else {
                                 deleteCategoryMutation.mutate(entry.id);
@@ -588,11 +653,11 @@ export default function DataMasters() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingEntry?.id ? 'Edit Category' : 'Add New Category'}</DialogTitle>
+            <DialogTitle>{editingEntry?.id ? `Edit ${currentMaster?.name || 'Entry'}` : `Add New ${currentMaster?.name || 'Entry'}`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Category Name</label>
+              <label className="text-sm font-medium text-gray-700">{selectedMaster === 'defectType' ? 'Type Name' : 'Category Name'}</label>
               <Input
                 value={editingEntry?.name || ''}
                 onChange={(e) => setEditingEntry(prev => prev ? { ...prev, name: e.target.value } : null)}
@@ -618,10 +683,16 @@ export default function DataMasters() {
             <Button
               onClick={() => {
                 if (!editingEntry?.name?.trim()) {
-                  toast({ variant: "destructive", title: "Category name is required" });
+                  toast({ variant: "destructive", title: "Name is required" });
                   return;
                 }
-                if (selectedMaster === 'defectCategory') {
+                if (selectedMaster === 'defectType') {
+                  if (editingEntry.id) {
+                    updateDefectTypeMutation.mutate({ id: editingEntry.id, name: editingEntry.name, sortOrder: editingEntry.sortOrder });
+                  } else {
+                    createDefectTypeMutation.mutate({ name: editingEntry.name, sortOrder: editingEntry.sortOrder });
+                  }
+                } else if (selectedMaster === 'defectCategory') {
                   if (editingEntry.id) {
                     updateDefectCategoryMutation.mutate({ id: editingEntry.id, name: editingEntry.name, sortOrder: editingEntry.sortOrder });
                   } else {
@@ -635,11 +706,11 @@ export default function DataMasters() {
                   }
                 }
               }}
-              disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending || createDefectCategoryMutation.isPending || updateDefectCategoryMutation.isPending}
+              disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending || createDefectCategoryMutation.isPending || updateDefectCategoryMutation.isPending || createDefectTypeMutation.isPending || updateDefectTypeMutation.isPending}
               className="bg-[#52baf3] hover:bg-[#3da8e0]"
               data-testid="btn-save-category"
             >
-              {(createCategoryMutation.isPending || updateCategoryMutation.isPending || createDefectCategoryMutation.isPending || updateDefectCategoryMutation.isPending) ? (
+              {(createCategoryMutation.isPending || updateCategoryMutation.isPending || createDefectCategoryMutation.isPending || updateDefectCategoryMutation.isPending || createDefectTypeMutation.isPending || updateDefectTypeMutation.isPending) ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : 'Save'}
             </Button>

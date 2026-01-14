@@ -82,6 +82,11 @@ export default function DefectFormWizard({
   const { data: defectCategoriesData = [] } = useQuery<{ id: number; name: string; sortOrder: number }[]>({
     queryKey: ['/technical/api/defect-categories'],
   });
+  
+  // Fetch defect types from database
+  const { data: defectTypesData = [] } = useQuery<{ id: number; name: string; sortOrder: number }[]>({
+    queryKey: ['/technical/api/defect-types'],
+  });
   const [, setLocation] = useLocation();
   const params = useParams();
   const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C'>('A');
@@ -669,33 +674,12 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-type" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select defect type" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Corrosion / Erosion">Corrosion / Erosion</SelectItem>
-                              <SelectItem value="Crack / Fracture / Structural Deformation">Crack / Fracture / Structural Deformation</SelectItem>
-                              <SelectItem value="Bearing / Shaft / Gear Failure">Bearing / Shaft / Gear Failure</SelectItem>
-                              <SelectItem value="Pump / Compressor / Turbine Malfunction">Pump / Compressor / Turbine Malfunction</SelectItem>
-                              <SelectItem value="Valve / Seal / Gasket Leak">Valve / Seal / Gasket Leak</SelectItem>
-                              <SelectItem value="Electrical Short / Open Circuit / Ground Fault">Electrical Short / Open Circuit / Ground Fault</SelectItem>
-                              <SelectItem value="Control System / Automation Failure">Control System / Automation Failure</SelectItem>
-                              <SelectItem value="Sensor / Instrumentation Fault">Sensor / Instrumentation Fault</SelectItem>
-                              <SelectItem value="Navigation / Communication System Fault">Navigation / Communication System Fault</SelectItem>
-                              <SelectItem value="Safety Equipment Deficiency (Fire / Lifeboat / Alarm)">Safety Equipment Deficiency</SelectItem>
-                              <SelectItem value="Ballast / Cargo / Tank System Defect">Ballast / Cargo / Tank System Defect</SelectItem>
-                              <SelectItem value="Steering / Rudder / Propulsion System Defect">Steering / Rudder / Propulsion System Defect</SelectItem>
-                              <SelectItem value="Mooring / Deck Equipment Failure">Mooring / Deck Equipment Failure</SelectItem>
-                              <SelectItem value="Environmental Compliance Issue (BWM / SOx / OWS)">Environmental Compliance Issue</SelectItem>
-                              <SelectItem value="Non-Conformity / Certification Lapse">Non-Conformity / Certification Lapse</SelectItem>
-                              <SelectItem value="Inspection / Test Failure">Inspection / Test Failure</SelectItem>
-                              <SelectItem value="Software / Firmware / Interface Error">Software / Firmware / Interface Error</SelectItem>
-                              <SelectItem value="Recurring Fault (same equipment/system)">Recurring Fault</SelectItem>
-                              <SelectItem value="Operational / Human Error Induced Defect">Operational / Human Error Induced Defect</SelectItem>
-                              <SelectItem value="Documentation / Record-Keeping Defect">Documentation / Record-Keeping Defect</SelectItem>
-                              <SelectItem value="Wear / Fatigue – Non-critical">Wear / Fatigue – Non-critical</SelectItem>
-                              <SelectItem value="Survey Condition of Class Item">Survey Condition of Class Item</SelectItem>
-                              <SelectItem value="Spare / Stock-Out / BOM Defect">Spare / Stock-Out / BOM Defect</SelectItem>
-                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
+                              {defectTypesData.map((type) => (
+                                <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}
