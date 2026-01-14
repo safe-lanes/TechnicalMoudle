@@ -3072,15 +3072,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (freshWorkOrder.maintenanceBasis === 'Calendar' && dateOfCompletion) {
                   const { calculateNextDueDate } = await import('@shared/dateUtils');
                   const calendarUpdates: any = { lastDoneDate: dateOfCompletion };
+                  const linkUpdates: any = { lastDoneDate: dateOfCompletion, updatedAt: new Date() };
                   
                   if (job.frequencyValue && job.frequencyUnit) {
                     const nextDue = calculateNextDueDate(dateOfCompletion, job.frequencyValue, job.frequencyUnit);
                     if (nextDue) {
                       calendarUpdates.nextDueDate = nextDue;
+                      linkUpdates.nextDueDate = nextDue;
                       console.log(`✅ Updated job ${job.jobNo} nextDueDate: ${nextDue}`);
                     }
                   }
                   
+                  // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
+                  // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
+                  const updateVesselId = freshWorkOrder.vesselId || job.vesselId;
+                  if (component.id && updateVesselId) {
+                    await storage.updateJobComponentLinkTracking(updateVesselId, job.id, component.id, linkUpdates);
+                    console.log(`✅ Updated component-specific tracking for vessel ${updateVesselId}, job ${job.jobNo} + component ${component.id} with lastDoneDate: ${dateOfCompletion}`);
+                  }
+                  
+                  // Also update global job record for backward compatibility (SECONDARY)
                   await storage.updateJob(job.id, calendarUpdates);
                 }
                 
@@ -3089,11 +3100,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const currentRH = parseInt(runningHours);
                   if (!isNaN(currentRH)) {
                     const rhUpdates: any = { lastDoneRH: currentRH };
+                    const rhLinkUpdates: any = { lastDoneRH: currentRH.toString(), updatedAt: new Date() };
                     const rhInterval = job.intervalRunningHour || (job.frequencyValue ? parseInt(job.frequencyValue) : null);
                     if (rhInterval && !isNaN(rhInterval)) {
                       rhUpdates.nextDueRH = currentRH + rhInterval;
+                      rhLinkUpdates.nextDueRH = (currentRH + rhInterval).toString();
                       console.log(`✅ Updated job ${job.jobNo} nextDueRH: ${rhUpdates.nextDueRH}`);
                     }
+                    
+                    // Update component-specific tracking in jobComponentLinks (PRIMARY source of truth)
+                    // VESSEL ISOLATION: Pass vesselId to ensure updates are vessel-scoped
+                    const rhUpdateVesselId = freshWorkOrder.vesselId || job.vesselId;
+                    if (component.id && rhUpdateVesselId) {
+                      await storage.updateJobComponentLinkTracking(rhUpdateVesselId, job.id, component.id, rhLinkUpdates);
+                      console.log(`✅ Updated component-specific RH tracking for vessel ${rhUpdateVesselId}, job ${job.jobNo} + component ${component.id} with lastDoneRH: ${currentRH}`);
+                    }
+                    
+                    // Also update global job record for backward compatibility (SECONDARY)
                     await storage.updateJob(job.id, rhUpdates);
                     
                     // UPDATE COMPONENT RUNNING HOURS on work order approval
