@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export function SireHardwareClassCombobox({
 }: SireHardwareClassComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
 
   const filteredItems = useMemo(() => {
     if (!search.trim()) return sireHardwareClasses;
@@ -39,6 +40,14 @@ export function SireHardwareClassCombobox({
       item.level3.toLowerCase().includes(searchLower)
     );
   }, [search]);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target) {
+      target.scrollTop += e.deltaY;
+      e.stopPropagation();
+    }
+  }, []);
 
   return (
     <Popover open={open} onOpenChange={(isOpen) => {
@@ -60,7 +69,11 @@ export function SireHardwareClassCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[500px] p-0" align="start">
+      <PopoverContent 
+        className="w-[500px] p-0" 
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="flex flex-col">
           <div className="p-2 border-b">
             <Input
@@ -72,7 +85,16 @@ export function SireHardwareClassCombobox({
               data-testid={`${testId}-search`}
             />
           </div>
-          <div className="max-h-[300px] overflow-y-auto">
+          <div 
+            ref={listRef}
+            onWheel={handleWheel}
+            className="overflow-y-scroll overscroll-contain"
+            style={{ 
+              maxHeight: '300px',
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+            }}
+          >
             {filteredItems.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No hardware class found.
