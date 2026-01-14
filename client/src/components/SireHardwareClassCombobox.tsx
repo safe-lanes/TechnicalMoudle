@@ -8,7 +8,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { sireHardwareClasses } from "@/data/sireHardwareClasses";
 
 interface SireHardwareClassComboboxProps {
@@ -61,7 +60,7 @@ export function SireHardwareClassCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-[500px] p-0" align="start">
         <div className="flex flex-col">
           <div className="p-2 border-b">
             <Input
@@ -73,7 +72,7 @@ export function SireHardwareClassCombobox({
               data-testid={`${testId}-search`}
             />
           </div>
-          <ScrollArea className="h-[300px]">
+          <div className="max-h-[300px] overflow-y-auto">
             {filteredItems.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No hardware class found.
@@ -100,17 +99,17 @@ export function SireHardwareClassCombobox({
                         selectedId === item.id ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs text-muted-foreground truncate">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-xs text-muted-foreground">
                         {item.level1} &gt; {item.level2}
                       </span>
-                      <span className="font-medium truncate">{item.level3}</span>
+                      <span className="font-medium">{item.level3}</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
