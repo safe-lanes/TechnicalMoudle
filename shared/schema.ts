@@ -1040,9 +1040,14 @@ export const defects = pgTable("defects", {
   viqChapter: text("viq_chapter"), // VIQ Chapter (e.g., General Information, Safety Management)
   viqSection: text("viq_section"), // VIQ Section (detailed section within chapter)
   sfiCodeRef: text("sfi_code_ref"), // SFI Code Reference (legacy)
+  sireHardwareId: text("sire_hardware_id"), // SIRE Hardware Class unique ID (e.g., SHC001)
   sireHardwareLevel1: text("sire_hardware_level1"), // SIRE Hardware Class Level 1 (e.g., HULL, SHIP EQUIPMENT)
   sireHardwareLevel2: text("sire_hardware_level2"), // SIRE Hardware Class Level 2 (e.g., Tanks, Navigation Equipment)
   sireHardwareLevel3: text("sire_hardware_level3"), // SIRE Hardware Class Level 3 (user selection, e.g., Engine Room Tanks)
+  componentHardwareId: text("component_hardware_id"), // Part A Component unique ID (temporary: same as SIRE Hardware until PMS integration)
+  componentHardwareLevel1: text("component_hardware_level1"), // Part A Component Level 1 (temporary: same as SIRE Hardware until PMS integration)
+  componentHardwareLevel2: text("component_hardware_level2"), // Part A Component Level 2
+  componentHardwareLevel3: text("component_hardware_level3"), // Part A Component Level 3 (user selection)
   immediateCause: json("immediate_cause"), // Structured immediate cause with unsafe acts and conditions
   immediateCauseExplanation: text("immediate_cause_explanation"), // Further explanation
   rootCause: json("root_cause"), // Structured root cause with individual and system factors

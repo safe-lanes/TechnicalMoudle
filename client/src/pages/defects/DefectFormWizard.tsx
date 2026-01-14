@@ -24,6 +24,7 @@ import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
 import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
+import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -566,20 +567,22 @@ export default function DefectFormWizard({
                     <div className="flex flex-col">
                       <label className="text-sm text-gray-600 mb-1.5">Component</label>
                       <Controller
-                        name="priority"
+                        name="componentHardwareId"
                         control={form.control}
                         render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                            <SelectTrigger data-testid="select-priority" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Low">Low</SelectItem>
-                              <SelectItem value="Medium">Medium</SelectItem>
-                              <SelectItem value="High">High</SelectItem>
-                              <SelectItem value="Critical">Critical</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <SireHardwareClassCombobox
+                            selectedId={field.value || ""}
+                            displayValue={form.watch('componentHardwareLevel3') || ""}
+                            onSelect={(id, level1, level2, level3) => {
+                              form.setValue('componentHardwareId', id);
+                              form.setValue('componentHardwareLevel1', level1);
+                              form.setValue('componentHardwareLevel2', level2);
+                              form.setValue('componentHardwareLevel3', level3);
+                            }}
+                            disabled={isViewMode}
+                            placeholder="Select component"
+                            testId="combobox-component"
+                          />
                         )}
                       />
                     </div>
@@ -1161,43 +1164,23 @@ export default function DefectFormWizard({
                         <div className="flex flex-col">
                           <label className="text-sm text-gray-600 mb-1.5">SIRE Hardware Class</label>
                           <Controller
-                            name="sireHardwareLevel3"
+                            name="sireHardwareId"
                             control={form.control}
-                            render={({ field }) => {
-                              const selectedClass = sireHardwareClasses.find(item => item.level3 === field.value);
-                              return (
-                                <Select 
-                                  onValueChange={(id) => {
-                                    const hardwareClass = findHardwareClassById(id);
-                                    if (hardwareClass) {
-                                      form.setValue('sireHardwareLevel1', hardwareClass.level1);
-                                      form.setValue('sireHardwareLevel2', hardwareClass.level2);
-                                      form.setValue('sireHardwareLevel3', hardwareClass.level3);
-                                    }
-                                  }} 
-                                  value={selectedClass?.id || ""} 
-                                  disabled={isViewMode}
-                                >
-                                  <SelectTrigger data-testid="select-sire-hardware-class" className="h-10 text-sm border-gray-300">
-                                    <SelectValue placeholder="Select hardware class">
-                                      {field.value || "Select hardware class"}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent className="max-h-[400px]">
-                                    {sireHardwareClasses.map((item) => (
-                                      <SelectItem 
-                                        key={item.id} 
-                                        value={item.id}
-                                        className="text-xs"
-                                      >
-                                        <span className="text-gray-400 text-xs">{item.level1} &gt; {item.level2} &gt; </span>
-                                        <span className="font-medium">{item.level3}</span>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              );
-                            }}
+                            render={({ field }) => (
+                              <SireHardwareClassCombobox
+                                selectedId={field.value || ""}
+                                displayValue={form.watch('sireHardwareLevel3') || ""}
+                                onSelect={(id, level1, level2, level3) => {
+                                  form.setValue('sireHardwareId', id);
+                                  form.setValue('sireHardwareLevel1', level1);
+                                  form.setValue('sireHardwareLevel2', level2);
+                                  form.setValue('sireHardwareLevel3', level3);
+                                }}
+                                disabled={isViewMode}
+                                placeholder="Select hardware class"
+                                testId="combobox-sire-hardware-class"
+                              />
+                            )}
                           />
                         </div>
                       </div>
