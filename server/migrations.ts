@@ -15,53 +15,121 @@ interface Migration {
   sql: string;
 }
 
-function loadMigrationsFromFolder(): Migration[] {
-  const migrationsDir = path.join(process.cwd(), 'migrations');
-  
-  if (!fs.existsSync(migrationsDir)) {
-    console.log('⚠️  No migrations folder found at project root');
-    return [];
+const migrations: Migration[] = [
+  {
+    id: '001_date_reported_to_office',
+    name: 'Add date_reported_to_office column to defects',
+    description: 'Adds the date_reported_to_office column to the defects table for tracking when defects are reported to office',
+    sql: `ALTER TABLE defects ADD COLUMN IF NOT EXISTS date_reported_to_office TEXT`
+  },
+  {
+    id: '002_equipment_categories_table',
+    name: 'Create equipment_categories table',
+    description: 'Creates the equipment_categories table for admin-managed equipment categorization',
+    sql: `
+      CREATE TABLE IF NOT EXISTS equipment_categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        sort_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+  },
+  {
+    id: '003_equipment_categories_defaults',
+    name: 'Seed default equipment categories',
+    description: 'Inserts default equipment categories if table is empty',
+    sql: `
+      INSERT INTO equipment_categories (name, sort_order)
+      SELECT name, sort_order FROM (VALUES
+        ('Hull', 1),
+        ('Cargo & Tank Cleaning', 2),
+        ('Navigation', 3),
+        ('Communication', 4),
+        ('Anchoring & Mooring', 5),
+        ('Safety - LSA FFA Emg Med', 6),
+        ('Machinery Spaces', 7),
+        ('Electrical', 8),
+        ('Other', 9)
+      ) AS defaults(name, sort_order)
+      WHERE NOT EXISTS (SELECT 1 FROM equipment_categories LIMIT 1)
+    `
+  },
+  {
+    id: '004_sire_hardware_columns',
+    name: 'Add SIRE hardware columns to defects',
+    description: 'Adds the SIRE hardware class columns to the defects table for SIRE 2.0 Annex 1 categorization',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS sire_hardware_id TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS sire_hardware_level1 TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS sire_hardware_level2 TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS sire_hardware_level3 TEXT
+    `
+  },
+  {
+    id: '005_component_hardware_columns',
+    name: 'Add component hardware columns to defects',
+    description: 'Adds component SIRE hardware class columns for Part A of the defect form',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS component_hardware_id TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS component_hardware_level1 TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS component_hardware_level2 TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS component_hardware_level3 TEXT
+    `
+  },
+  {
+    id: '006_defect_additional_columns',
+    name: 'Add remaining missing defect columns',
+    description: 'Adds risk_level, date_registered_in_system, and other missing columns to defects table',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS risk_level TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS date_registered_in_system TEXT
+    `
+  },
+  {
+    id: '007_defect_categories_table',
+    name: 'Create defect_categories table',
+    description: 'Creates the defect_categories table for admin-managed defect type categorization',
+    sql: `
+      CREATE TABLE IF NOT EXISTS defect_categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+  },
+  {
+    id: '008_defect_categories_defaults',
+    name: 'Seed default defect categories',
+    description: 'Inserts default defect categories if table is empty',
+    sql: `
+      INSERT INTO defect_categories (name, sort_order)
+      SELECT name, sort_order FROM (VALUES
+        ('Hull / Structural Integrity', 1),
+        ('Machinery Failure (Main & Auxiliary)', 2),
+        ('Electrical / Electronic Systems', 3),
+        ('Navigation & Communication Equipment', 4),
+        ('Safety & Emergency Systems (Fire, Lifesaving, Alarms)', 5),
+        ('Ballast / Cargo / Tank Systems', 6),
+        ('Environmental / Pollution Control (e.g., BWM, SOx, OWS)', 7),
+        ('Steering / Rudder / Propulsion Systems', 8),
+        ('Deck Equipment & Mooring Systems', 9),
+        ('Condition of Class (CoC) Related', 10),
+        ('Survey / Certification Deficiencies', 11),
+        ('Wear & Tear / Corrosion / Fatigue', 12),
+        ('Human-/Operational Error (not equipment fault)', 13),
+        ('Other / Miscellaneous', 14)
+      ) AS defaults(name, sort_order)
+      WHERE NOT EXISTS (SELECT 1 FROM defect_categories LIMIT 1)
+    `
   }
-  
-  const files = fs.readdirSync(migrationsDir)
-    .filter(f => f.endsWith('.sql'))
-    .sort();
-  
-  const migrations: Migration[] = [];
-  
-  for (const file of files) {
-    const filePath = path.join(migrationsDir, file);
-    const content = fs.readFileSync(filePath, 'utf-8');
-    
-    const id = file.replace('.sql', '');
-    
-    let name = id;
-    let description = '';
-    
-    const lines = content.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('-- Migration:')) {
-        name = line.replace('-- Migration:', '').trim();
-      } else if (line.startsWith('-- Description:')) {
-        description = line.replace('-- Description:', '').trim();
-      }
-    }
-    
-    const sqlContent = lines
-      .filter(line => !line.startsWith('--'))
-      .join('\n')
-      .trim();
-    
-    migrations.push({
-      id,
-      name,
-      description,
-      sql: sqlContent
-    });
-  }
-  
-  return migrations;
-}
+];
 
 export async function createDatabaseBackup(): Promise<string | null> {
   console.log('📦 Creating database backup...');
@@ -118,8 +186,7 @@ async function cleanupOldBackups(backupDir: string, keepCount: number): Promise<
         console.log(`🗑️  Deleted old backup: ${file.name}`);
       }
     }
-  } catch (error: any) {
-    console.error('⚠️  Failed to cleanup old backups:', error.message);
+  } catch (error) {
   }
 }
 
@@ -162,15 +229,6 @@ export async function runMigrations(): Promise<{ applied: number; skipped: numbe
     console.log('⏭️  Skipping migrations - DATABASE_URL not configured');
     return { applied: 0, skipped: 0 };
   }
-  
-  const migrations = loadMigrationsFromFolder();
-  
-  if (migrations.length === 0) {
-    console.log('⏭️  No migrations found in migrations/ folder');
-    return { applied: 0, skipped: 0 };
-  }
-  
-  console.log(`📂 Found ${migrations.length} migration files in migrations/ folder`);
   
   const { db } = postgres;
   let applied = 0;

@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -4636,6 +4636,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting equipment category:", error);
       res.status(500).json({ error: "Failed to delete equipment category" });
+    }
+  });
+
+  // ===== DEFECT CATEGORIES API =====
+  // Get all defect categories
+  app.get("/technical/api/defect-categories", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const categories = await db.select().from(defectCategories).orderBy(defectCategories.sortOrder);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching defect categories:", error);
+      res.status(500).json({ error: "Failed to fetch defect categories" });
+    }
+  });
+
+  // Create defect category
+  app.post("/technical/api/defect-categories", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const { name, sortOrder = 0, isActive = true } = req.body;
+      if (!name?.trim()) {
+        return res.status(400).json({ error: "Category name is required" });
+      }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
+      const [category] = await db.insert(defectCategories).values({
+        name: name.trim(),
+        sortOrder,
+        isActive,
+      }).returning();
+      res.status(201).json(category);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Category with this name already exists" });
+      }
+      console.error("Error creating defect category:", error);
+      res.status(500).json({ error: "Failed to create defect category" });
+    }
+  });
+
+  // Update defect category
+  app.patch("/technical/api/defect-categories/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid category ID" });
+      }
+      const { name, sortOrder, isActive } = req.body;
+      if (name !== undefined && !name.trim()) {
+        return res.status(400).json({ error: "Category name cannot be empty" });
+      }
+      if (sortOrder !== undefined && typeof sortOrder !== 'number') {
+        return res.status(400).json({ error: "Sort order must be a number" });
+      }
+      const updates: any = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name.trim();
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const [category] = await db.update(defectCategories)
+        .set(updates)
+        .where(eq(defectCategories.id, id))
+        .returning();
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "Category with this name already exists" });
+      }
+      console.error("Error updating defect category:", error);
+      res.status(500).json({ error: "Failed to update defect category" });
+    }
+  });
+
+  // Delete defect category
+  app.delete("/technical/api/defect-categories/:id", async (req, res) => {
+    try {
+      const { db } = getPostgresClient();
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(defectCategories)
+        .where(eq(defectCategories.id, id))
+        .returning();
+      if (!deleted) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting defect category:", error);
+      res.status(500).json({ error: "Failed to delete defect category" });
     }
   });
 

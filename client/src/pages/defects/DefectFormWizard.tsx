@@ -77,6 +77,11 @@ export default function DefectFormWizard({
   const { data: equipmentCategories = [] } = useQuery<{ id: number; name: string; sortOrder: number }[]>({
     queryKey: ['/technical/api/equipment-categories'],
   });
+  
+  // Fetch defect categories from database
+  const { data: defectCategoriesData = [] } = useQuery<{ id: number; name: string; sortOrder: number }[]>({
+    queryKey: ['/technical/api/defect-categories'],
+  });
   const [, setLocation] = useLocation();
   const params = useParams();
   const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C'>('A');
@@ -611,23 +616,12 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-category" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select defect category" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Hull / Structural Integrity">Hull / Structural Integrity</SelectItem>
-                              <SelectItem value="Machinery Failure (Main & Auxiliary)">Machinery Failure (Main & Auxiliary)</SelectItem>
-                              <SelectItem value="Electrical / Electronic Systems">Electrical / Electronic Systems</SelectItem>
-                              <SelectItem value="Navigation & Communication Equipment">Navigation & Communication Equipment</SelectItem>
-                              <SelectItem value="Safety & Emergency Systems (Fire, Lifesaving, Alarms)">Safety & Emergency Systems</SelectItem>
-                              <SelectItem value="Ballast / Cargo / Tank Systems">Ballast / Cargo / Tank Systems</SelectItem>
-                              <SelectItem value="Environmental / Pollution Control (e.g., BWM, SOx, OWS)">Environmental / Pollution Control</SelectItem>
-                              <SelectItem value="Steering / Rudder / Propulsion Systems">Steering / Rudder / Propulsion Systems</SelectItem>
-                              <SelectItem value="Deck Equipment & Mooring Systems">Deck Equipment & Mooring Systems</SelectItem>
-                              <SelectItem value="Condition of Class (CoC) Related">Condition of Class (CoC) Related</SelectItem>
-                              <SelectItem value="Survey / Certification Deficiencies">Survey / Certification Deficiencies</SelectItem>
-                              <SelectItem value="Wear & Tear / Corrosion / Fatigue">Wear & Tear / Corrosion / Fatigue</SelectItem>
-                              <SelectItem value="Human-/Operational Error (not equipment fault)">Human-/Operational Error</SelectItem>
-                              <SelectItem value="Other / Miscellaneous">Other / Miscellaneous</SelectItem>
+                              {defectCategoriesData.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}
