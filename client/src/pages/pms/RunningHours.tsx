@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, FileSpreadsheet, Calendar, Users, Settings } from "lucide-react";
+import { Search, FileSpreadsheet, Calendar, Users, Settings, Pencil } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -36,6 +36,7 @@ interface RunningHoursData {
   runningHours: string;
   lastUpdated: string;
   utilizationRate?: number | null;
+  inheritedCount?: number;
 }
 
 const RunningHours = () => {
@@ -73,6 +74,11 @@ const RunningHours = () => {
   // Child RH popup state
   const [isChildRHOpen, setIsChildRHOpen] = useState(false);
   const [selectedParentForChildRH, setSelectedParentForChildRH] = useState<RunningHoursData | null>(null);
+  
+  // Child RH edit state
+  const [editingChildId, setEditingChildId] = useState<string | null>(null);
+  const [editingChildRH, setEditingChildRH] = useState<string>("");
+  const [editingChildComments, setEditingChildComments] = useState<string>("");
   
   const { toast } = useToast();
   const { vesselId } = useVessel(); // Get vessel ID from context
@@ -116,7 +122,8 @@ const RunningHours = () => {
     componentCategory: parent.category || '',
     runningHours: `${parseFloat(parent.currentCumulativeRH || '0').toLocaleString()} hrs`,
     lastUpdated: formatProfessionalDateTime(parent.latestUpdate || parent.lastUpdated),
-    utilizationRate: null
+    utilizationRate: null,
+    inheritedCount: parent.inheritedCount || 0
   })) : [];
 
   // Cascade update mutation
@@ -182,6 +189,66 @@ const RunningHours = () => {
       });
     },
   });
+
+  // Mutation for updating individual child component RH
+  const updateChildRHMutation = useMutation({
+    mutationFn: async (data: { componentId: string; newRHValue: number; comments?: string }) => {
+      return await apiRequest('PUT', `/technical/api/running-hours/child/${data.componentId}`, {
+        newRHValue: data.newRHValue,
+        comments: data.comments || ''
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/running-hours/children'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/components'], refetchType: 'all' });
+      toast({ title: "Success", description: "Child running hours updated successfully" });
+      setEditingChildId(null);
+      setEditingChildRH("");
+      setEditingChildComments("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update child running hours",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Start editing a child component
+  const startEditingChild = (child: ChildRHData) => {
+    setEditingChildId(child.id);
+    setEditingChildRH(child.currentCumulativeRH || "0");
+    setEditingChildComments("");
+  };
+
+  // Cancel editing
+  const cancelEditingChild = () => {
+    setEditingChildId(null);
+    setEditingChildRH("");
+    setEditingChildComments("");
+  };
+
+  // Save child RH edit
+  const saveChildRHEdit = () => {
+    if (!editingChildId) return;
+    
+    const newValue = parseFloat(editingChildRH.replace(/,/g, ''));
+    if (isNaN(newValue) || newValue < 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid positive number for running hours",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    updateChildRHMutation.mutate({
+      componentId: editingChildId,
+      newRHValue: newValue,
+      comments: editingChildComments
+    });
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -468,13 +535,14 @@ const RunningHours = () => {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {/* Table Header */}
         <div className="bg-[#52baf3] text-white px-4 py-3">
-          <div className="grid grid-cols-8 gap-4 text-sm font-medium">
+          <div className="grid grid-cols-9 gap-4 text-sm font-medium">
             <div data-testid="D6"><Marker id="D6" />Component Name</div>
             <div data-testid="D7"><Marker id="D7" />Component Code</div>
             <div data-testid="D8"><Marker id="D8" />Component Category</div>
             <div data-testid="D9"><Marker id="D9" />Running Hours</div>
             <div data-testid="D10"><Marker id="D10" />Last Updated</div>
             <div data-testid="D11"><Marker id="D11" />Utilization Rate</div>
+            <div data-testid="D22">Inherited RH</div>
             <div className="col-span-2" data-testid="D12"><Marker id="D12" />Update RH</div>
           </div>
         </div>
@@ -508,7 +576,7 @@ const RunningHours = () => {
             
             return filteredData.map((item, index) => (
               <div key={item.id} className="px-4 py-3 hover:bg-gray-50">
-              <div className="grid grid-cols-8 gap-4 text-sm items-center">
+              <div className="grid grid-cols-9 gap-4 text-sm items-center">
                 <div className="text-gray-900" data-testid={index === 0 ? "D13" : undefined}>{index === 0 && <Marker id="D13" />}{item.component}</div>
                 <div data-testid={index === 0 ? "D14" : undefined}>
                   {index === 0 && <Marker id="D14" />}
@@ -534,6 +602,23 @@ const RunningHours = () => {
                 <div className="text-gray-700" title="Computed from last 30 days of RH entries" data-testid={index === 0 ? "D18" : undefined}>
                   {index === 0 && <Marker id="D18" />}{item.utilizationRate !== null ? `${item.utilizationRate} hrs/day` : "—"}
                 </div>
+                <div className="flex items-center gap-2">
+                  {item.inheritedCount && item.inheritedCount > 0 ? (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                      onClick={() => openChildRHPopup(item)}
+                      title="View Inherited Components"
+                      data-testid={index === 0 ? "D23" : `button-inherited-rh-${item.id}`}
+                    >
+                      <Users className="h-4 w-4 mr-1" />
+                      <span className="text-xs font-medium">{item.inheritedCount}</span>
+                    </Button>
+                  ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                  )}
+                </div>
                 <div className="col-span-2 flex gap-2">
                   <Button 
                     variant="outline" 
@@ -544,16 +629,6 @@ const RunningHours = () => {
                     data-testid={index === 0 ? "D19" : `button-update-rh-${item.id}`}
                   >
                     {index === 0 && <Marker id="D19" />}<Settings className="h-4 w-4 text-gray-600" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 w-8 p-0"
-                    onClick={() => openChildRHPopup(item)}
-                    title="View Children Running Hours"
-                    data-testid={index === 0 ? "D20" : `button-view-children-rh-${item.id}`}
-                  >
-                    {index === 0 && <Marker id="D20" />}<Users className="h-4 w-4 text-blue-600" />
                   </Button>
                 </div>
               </div>
@@ -834,43 +909,118 @@ const RunningHours = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Child RH Popup - Read-only view of children's running hours */}
-      <Dialog open={isChildRHOpen} onOpenChange={setIsChildRHOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Child RH Popup - View and edit children's running hours */}
+      <Dialog open={isChildRHOpen} onOpenChange={(open) => {
+        if (!open) {
+          cancelEditingChild();
+        }
+        setIsChildRHOpen(open);
+      }}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-[#52baf3] border-b border-[#52baf3] pb-2">
-              Child Components — {selectedParentForChildRH?.component}
+              Inherited Components — {selectedParentForChildRH?.component}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
             {isLoadingChildren ? (
-              <div className="text-center text-gray-500 py-8">Loading children data...</div>
+              <div className="text-center text-gray-500 py-8">Loading inherited components...</div>
             ) : childrenRHData?.children && childrenRHData.children.length > 0 ? (
               <div className="space-y-2">
                 <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>Delta Propagation:</strong> When parent RH is updated, the delta (change) is added to each child's 
-                    independent running hours. Children maintain their own RH values.
+                    <strong>Inherited Running Hours:</strong> These components inherit running hours from the master component. 
+                    Click the pencil icon to edit individual component running hours.
                   </p>
                 </div>
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-100 px-4 py-2 grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                  <div className="bg-gray-100 px-4 py-2 grid grid-cols-[1fr_auto_100px_120px_60px] gap-4 text-sm font-medium text-gray-700">
                     <div>Component Name</div>
                     <div>Component Code</div>
                     <div className="text-right">Running Hours</div>
                     <div>Last Updated</div>
+                    <div className="text-center">Edit</div>
                   </div>
-                  <div className="divide-y">
+                  <div className="divide-y max-h-[400px] overflow-y-auto">
                     {childrenRHData.children.map((child) => (
-                      <div key={child.id} className="px-4 py-3 grid grid-cols-4 gap-4 text-sm hover:bg-gray-50">
-                        <div className="text-gray-900">{child.name}</div>
-                        <div className="text-gray-600">{child.componentCode}</div>
-                        <div className="text-right font-medium text-gray-900">
-                          {parseFloat(child.currentCumulativeRH || '0').toLocaleString()} hrs
-                        </div>
-                        <div className="text-gray-600">
-                          {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
-                        </div>
+                      <div key={child.id} className="px-4 py-3 hover:bg-gray-50">
+                        {editingChildId === child.id ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-[1fr_auto_100px_120px_60px] gap-4 text-sm items-center">
+                              <div className="text-gray-900 font-medium">{child.name}</div>
+                              <div className="text-gray-600">{child.componentCode}</div>
+                              <div>
+                                <Input 
+                                  type="number"
+                                  value={editingChildRH}
+                                  onChange={(e) => setEditingChildRH(e.target.value)}
+                                  className="h-8 text-sm text-right"
+                                  placeholder="0"
+                                  data-testid={`input-edit-child-rh-${child.id}`}
+                                />
+                              </div>
+                              <div className="text-gray-600 text-xs">
+                                {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
+                              </div>
+                              <div className="flex gap-1 justify-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
+                                  onClick={saveChildRHEdit}
+                                  disabled={updateChildRHMutation.isPending}
+                                  title="Save"
+                                  data-testid={`button-save-child-rh-${child.id}`}
+                                >
+                                  {updateChildRHMutation.isPending ? "..." : "✓"}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  onClick={cancelEditingChild}
+                                  title="Cancel"
+                                  data-testid={`button-cancel-child-rh-${child.id}`}
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="pl-0">
+                              <Input 
+                                type="text"
+                                value={editingChildComments}
+                                onChange={(e) => setEditingChildComments(e.target.value)}
+                                className="h-8 text-sm"
+                                placeholder="Comments (optional)"
+                                data-testid={`input-edit-child-comments-${child.id}`}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-[1fr_auto_100px_120px_60px] gap-4 text-sm items-center">
+                            <div className="text-gray-900">{child.name}</div>
+                            <div className="text-gray-600">{child.componentCode}</div>
+                            <div className="text-right font-medium text-gray-900">
+                              {parseFloat(child.currentCumulativeRH || '0').toLocaleString()} hrs
+                            </div>
+                            <div className="text-gray-600 text-xs">
+                              {child.lastUpdated !== '-' ? formatProfessionalDateTime(child.lastUpdated) : '-'}
+                            </div>
+                            <div className="flex justify-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                                onClick={() => startEditingChild(child)}
+                                title="Edit Running Hours"
+                                data-testid={`button-edit-child-rh-${child.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -878,12 +1028,15 @@ const RunningHours = () => {
               </div>
             ) : (
               <div className="text-center text-gray-500 py-8">
-                No child components found for this parent.
+                No inherited components found for this master component.
               </div>
             )}
           </div>
           <div className="flex justify-end pt-4 border-t">
-            <Button variant="outline" onClick={() => setIsChildRHOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              cancelEditingChild();
+              setIsChildRHOpen(false);
+            }}>
               Close
             </Button>
           </div>

@@ -31,13 +31,23 @@ export function registerRunningHoursRoutes(app: Express) {
         component => component.rhCounterType === 'MASTER'
       );
 
-      // Format response with RH data
-      const parents = masterComponents.map(component => ({
-        ...component,
-        sfiCode: component.componentCode || '',
-        latestUpdate: component.rhMasterUpdatedAt || component.lastUpdated || component.updatedAt || new Date().toISOString(),
-        currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00'
-      }));
+      // Format response with RH data and count inherited children
+      const parents = masterComponents.map(component => {
+        // Count children (components whose rhMasterComponentId matches this component's id or code)
+        const inheritedCount = allComponents.filter(c => 
+          c.rhCounterType === 'INHERITED' && 
+          (c.rhMasterComponentId === component.id || 
+           c.rhMasterComponentId === component.componentCode)
+        ).length;
+        
+        return {
+          ...component,
+          sfiCode: component.componentCode || '',
+          latestUpdate: component.rhMasterUpdatedAt || component.lastUpdated || component.updatedAt || new Date().toISOString(),
+          currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00',
+          inheritedCount: inheritedCount
+        };
+      });
       
       // Sort by component code for consistent ordering
       parents.sort((a, b) => (a.componentCode || '').localeCompare(b.componentCode || ''));
@@ -51,8 +61,8 @@ export function registerRunningHoursRoutes(app: Express) {
     }
   });
   
-  // Get children RH values for a parent component (read-only popup)
-  // Shows all children with their individual RH values - maintained independently via delta propagation
+  // Get children RH values for a parent component (inherited components popup)
+  // Shows all INHERITED components linked to this MASTER component
   app.get("/technical/api/running-hours/children/:parentCode", async (req, res) => {
     try {
       const { parentCode } = req.params;
@@ -61,30 +71,29 @@ export function registerRunningHoursRoutes(app: Express) {
       // Get all components for the vessel
       const allComponents = await storage.getComponents(vesselId);
       
-      // Find the parent component
-      const parent = allComponents.find(c => c.componentCode === parentCode);
+      // Find the parent component by code or id
+      const parent = allComponents.find(c => c.componentCode === parentCode || c.id === parentCode);
       if (!parent) {
         return res.status(404).json({ error: "Parent component not found" });
       }
       
-      // Get all children of this parent (parentId contains component code)
-      const children = allComponents.filter(c => c.parentId === parentCode);
+      // Get all INHERITED components linked to this MASTER via rhMasterComponentId
+      const children = allComponents.filter(c => 
+        c.rhCounterType === 'INHERITED' && 
+        (c.rhMasterComponentId === parent.id || c.rhMasterComponentId === parent.componentCode)
+      );
       
       // Format response with RH data for each child
-      // For INHERITED components, use rhCurrentInheritedCached as the display value (vessel-isolated)
       const childrenWithRH = children.map(child => {
-        const isInherited = child.rhCounterType === 'INHERITED';
-        // Display value: use rhCurrentInheritedCached for inherited components, currentCumulativeRH for others
-        const displayRH = isInherited 
-          ? (child.rhCurrentInheritedCached || child.currentCumulativeRH || '0.00')
-          : (child.currentCumulativeRH || '0.00');
+        // Display value: use rhCurrentInheritedCached for inherited components
+        const displayRH = child.rhCurrentInheritedCached || child.currentCumulativeRH || '0.00';
         
         return {
           id: child.id,
           componentCode: child.componentCode || '',
           name: child.name || '',
           currentCumulativeRH: displayRH,
-          rhCounterType: child.rhCounterType || 'NOT_RH_DRIVEN',
+          rhCounterType: child.rhCounterType || 'INHERITED',
           lastUpdated: child.lastUpdated || child.updatedAt || '-'
         };
       });
@@ -106,6 +115,71 @@ export function registerRunningHoursRoutes(app: Express) {
     }
   });
   
+  // Update individual child (INHERITED) component running hours
+  app.put("/technical/api/running-hours/child/:componentId", async (req, res) => {
+    try {
+      const { componentId } = req.params;
+      const { newRHValue, comments, userId } = req.body;
+      
+      // Validate newRHValue
+      if (typeof newRHValue !== 'number' || newRHValue < 0) {
+        return res.status(400).json({ error: "newRHValue must be a non-negative number" });
+      }
+      
+      // Get the component
+      const component = await storage.getComponent(componentId);
+      if (!component) {
+        return res.status(404).json({ error: "Component not found" });
+      }
+      
+      // Only allow updating INHERITED components via this endpoint
+      // MASTER components should be updated via the cascade endpoint
+      if (component.rhCounterType === 'MASTER') {
+        return res.status(400).json({ 
+          error: "Cannot update MASTER component via this endpoint. Use the Update RH button instead." 
+        });
+      }
+      
+      const previousRH = component.currentCumulativeRH || '0.00';
+      const newRHFormatted = newRHValue.toFixed(2);
+      
+      // Update component RH
+      await storage.updateComponent(componentId, {
+        currentCumulativeRH: newRHFormatted,
+        rhCurrentInheritedCached: newRHFormatted,
+        runningHours: newRHFormatted,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      // Create audit entry for the update
+      await storage.createRunningHoursAudit({
+        vesselId: component.vesselId || '',
+        componentId: componentId,
+        previousRH: previousRH,
+        newRH: newRHFormatted,
+        cumulativeRH: newRHFormatted,
+        dateUpdatedLocal: new Date().toISOString().split('T')[0],
+        dateUpdatedTZ: 'UTC',
+        enteredAtUTC: new Date(),
+        userId: userId || 'system',
+        source: 'manual',
+        notes: comments || 'Manual update of child component RH',
+        meterReplaced: false,
+        version: 1
+      });
+      
+      res.json({
+        success: true,
+        message: `Running hours updated to ${newRHFormatted} for ${component.name}`,
+        previousRH,
+        newRH: newRHFormatted
+      });
+    } catch (error: any) {
+      console.error("Error updating child RH:", error);
+      res.status(500).json({ error: "Failed to update child running hours" });
+    }
+  });
+
   // Reset child RH to 0 (component replacement scenario)
   // After reset, child will continue receiving delta propagation from parent
   app.post("/technical/api/running-hours/reset-child/:componentId", async (req, res) => {
@@ -126,7 +200,7 @@ export function registerRunningHoursRoutes(app: Express) {
         currentCumulativeRH: '0.00',
         runningHours: '0.00',
         lastUpdated: new Date().toISOString()
-      }, userId || 'system');
+      });
       
       // Create audit entry for the reset
       await storage.createRunningHoursAudit({
