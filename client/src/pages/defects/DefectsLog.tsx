@@ -247,11 +247,12 @@ export default function DefectsLog() {
             />
 
             {/* Vessel */}
-            <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
-              <SelectTrigger className="w-24 h-8 text-xs">
+            <Select value={filters.vesselId || "all"} onValueChange={(value) => handleFilterChange('vesselId', value === "all" ? "" : value)}>
+              <SelectTrigger className="w-32 h-8 text-xs">
                 <SelectValue placeholder="Vessel" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Vessels</SelectItem>
                 {vessels.map((vessel: any) => (
                   <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
                 ))}

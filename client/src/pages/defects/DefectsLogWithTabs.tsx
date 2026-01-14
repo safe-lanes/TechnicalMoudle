@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLocation } from "wouter";
+import { useVessels } from "@/hooks/useVessels";
 import LinkDefectsModal from "./LinkDefectsModal";
 import DefectModal from "./DefectModal";
 import { cn } from "@/lib/utils";
@@ -241,6 +242,7 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsLogWithTabs() {
   const [, setLocation] = useLocation();
+  const { data: vessels = [] } = useVessels();
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   
@@ -497,13 +499,15 @@ export default function DefectsLogWithTabs() {
               />
             </div>
 
-            <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
+            <Select value={filters.vesselId || "all"} onValueChange={(value) => handleFilterChange('vesselId', value === "all" ? "" : value)}>
               <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
                 <SelectValue placeholder="Vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="V001">Vessel 1</SelectItem>
-                <SelectItem value="V002">Vessel 2</SelectItem>
+                <SelectItem value="all">All Vessels</SelectItem>
+                {vessels.map((vessel: any) => (
+                  <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
