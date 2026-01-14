@@ -1,0 +1,17 @@
+{
+  "id": "5aa81c93-484d-4dc4-9be0-89fd72f4f9d2",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "7440571a-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-14T07:13:09.704Z",
+  "completedAt": "2026-01-14T07:13:09.721Z",
+  "status": "failed",
+  "created": 0,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "jobs_template Test Vessel_01 Rev_01 3.xlsx",
+  "storedFilePath": null,
+  "errorReport": null
+}
