@@ -22,6 +22,12 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **PMS Dashboard**: Provides analytics and data visualizations, including an "Outstanding Tasks" pie chart.
 - **PMS Submodules**: Offers comprehensive CRUD functionalities for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
+- **Work Order Tab Structure**: Tabs are organized as follows:
+  - **Planned**: Jobs on schedule, not yet in warning window (>30 days / >720 RH away). Includes Postponed items.
+  - **Due**: Jobs approaching due or at due point (≤30 days / ≤720 RH remaining, up to due date). Does NOT include past-due items.
+  - **Overdue**: Past-due jobs. Includes both "Grace P" (orange badge, within tolerance) and "Overdue" (red badge, breach).
+  - **Pending Approval**: Work completed by crew, awaiting approver sign-off.
+  - **Completed**: Approved/closed records (locked for audit).
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
 - **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7.
 - **Spares Module**: Comprehensive inventory management with many-to-many linking between spares and components, location-based stock tracking, and a full audit trail.
