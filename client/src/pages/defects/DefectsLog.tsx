@@ -34,6 +34,7 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { formatForDisplay } from "@/lib/dateUtils";
+import { useVessels } from "@/hooks/useVessels";
 import type { Defect } from "@shared/schema";
 
 interface DefectsFilters {
@@ -51,6 +52,7 @@ interface DefectsFilters {
 const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
 
 export default function DefectsLog() {
+  const { data: vessels = [] } = useVessels();
   const [filters, setFilters] = useState<DefectsFilters>({
     includeClosedDefects: false,
   });
@@ -250,8 +252,9 @@ export default function DefectsLog() {
                 <SelectValue placeholder="Vessel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="V001">Vessel 1</SelectItem>
-                <SelectItem value="V002">Vessel 2</SelectItem>
+                {vessels.map((vessel: any) => (
+                  <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
