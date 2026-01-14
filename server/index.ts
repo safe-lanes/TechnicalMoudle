@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initStorage } from "./storage";
 import { initializeDatabase } from "./initDb";
+import { runBackupAndMigrations } from "./migrations";
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -41,6 +42,9 @@ app.use((req, res, next) => {
 (async () => {
   // Initialize PostgreSQL-only storage (file-based storage has been removed)
   await initStorage();
+  
+  // Run database backup and schema migrations (idempotent - skips if already applied)
+  await runBackupAndMigrations();
   
   // Run database migrations (adds new columns, tables, updates data format)
   await initializeDatabase();
