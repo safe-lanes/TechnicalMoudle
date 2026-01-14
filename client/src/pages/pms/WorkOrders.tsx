@@ -176,14 +176,14 @@ const WorkOrders: React.FC = () => {
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      // Only show items within warning window, NOT past due (Grace P or Overdue)
-      return effectiveStatus === "Due";
+      // Due tab: items within warning window + Grace P (past due but within tolerance)
+      return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
     }).length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
       if (wo.isExecution) return false;
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
-      // Include both Grace P (within tolerance) and Overdue (breach)
-      return effectiveStatus === "Due (Grace P)" || effectiveStatus === "Overdue";
+      // Overdue tab: only breach items (past tolerance/grace period)
+      return effectiveStatus === "Overdue";
     }).length },
     { id: "Pending Approval", label: "Pending Approval", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Pending Approval").length },
     { id: "Completed", label: "Completed", count: safeWorkOrdersList.filter(wo => wo.computedStatus === "Completed").length }
@@ -231,12 +231,12 @@ const WorkOrders: React.FC = () => {
       if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed" && effectiveStatus !== "Rejected") return false;
     } else if (activeTab === "Due") {
       if (wo.isExecution) return false;
-      // Due tab: Only items within warning window (≤30 days / ≤720 RH) but NOT past due
-      if (effectiveStatus !== "Due") return false;
+      // Due tab: items within warning window + Grace P (past due but within tolerance)
+      if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
       if (wo.isExecution) return false;
-      // Overdue tab: Both Grace P (within tolerance) and Overdue (breach)
-      if (effectiveStatus !== "Due (Grace P)" && effectiveStatus !== "Overdue") return false;
+      // Overdue tab: only breach items (past tolerance/grace period)
+      if (effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
       if (effectiveStatus !== "Completed") return false;
     } else if (activeTab === "Pending Approval") {

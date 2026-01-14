@@ -24,8 +24,8 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Work Order Tab Structure**: Tabs are organized as follows:
   - **Planned**: Jobs on schedule, not yet in warning window (>30 days / >720 RH away). Includes Postponed items.
-  - **Due**: Jobs approaching due or at due point (≤30 days / ≤720 RH remaining, up to due date). Does NOT include past-due items.
-  - **Overdue**: Past-due jobs. Includes both "Grace P" (orange badge, within tolerance) and "Overdue" (red badge, breach).
+  - **Due**: Jobs within warning window (≤30 days / ≤720 RH remaining) + Grace P items (past due but within tolerance, orange badge).
+  - **Overdue**: Only breach items (past tolerance/grace period, red badge).
   - **Pending Approval**: Work completed by crew, awaiting approver sign-off.
   - **Completed**: Approved/closed records (locked for audit).
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.

@@ -164,19 +164,19 @@ const Dashboard = () => {
 
   // Work Order KPIs with computed status
   // Updated to match new tab semantics:
-  // - Overdue: includes both 'Overdue' (breach) and 'Due (Grace P)' (within tolerance)
-  // - Due: only items within warning window (≤30 days / ≤720 RH) but NOT past due
+  // - Due: items within warning window + Grace P (past due but within tolerance)
+  // - Overdue: only breach items (past tolerance/grace period)
   // - Planned: includes 'Active' and 'Postponed' items
   const workOrderKPIs = useMemo(() => {
     const safeWOs = workOrdersData.filter(wo => wo !== null && wo !== undefined);
     
-    // Overdue includes both breach items and grace period items
-    const overdue = safeWOs.filter(wo => 
-      ((wo as any).computedStatus === 'Overdue' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
-    );
-    // Due only includes items within warning window, NOT past due
+    // Due includes warning window items + grace period items
     const due = safeWOs.filter(wo => 
-      (wo as any).computedStatus === 'Due' && !wo.isExecution
+      ((wo as any).computedStatus === 'Due' || (wo as any).computedStatus === 'Due (Grace P)') && !wo.isExecution
+    );
+    // Overdue only includes breach items (past tolerance/grace period)
+    const overdue = safeWOs.filter(wo => 
+      (wo as any).computedStatus === 'Overdue' && !wo.isExecution
     );
     const pendingApproval = safeWOs.filter(wo => 
       (wo as any).computedStatus === 'Pending Approval'
