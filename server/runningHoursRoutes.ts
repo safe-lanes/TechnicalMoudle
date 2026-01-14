@@ -31,23 +31,22 @@ export function registerRunningHoursRoutes(app: Express) {
         component => component.rhCounterType === 'MASTER'
       );
 
-      // Format response with RH data and count inherited children
-      const parents = masterComponents.map(component => {
-        // Count children (components whose rhMasterComponentId matches this component's id or code)
-        const inheritedCount = allComponents.filter(c => 
-          c.rhCounterType === 'INHERITED' && 
-          (c.rhMasterComponentId === component.id || 
-           c.rhMasterComponentId === component.componentCode)
-        ).length;
-        
-        return {
-          ...component,
-          sfiCode: component.componentCode || '',
-          latestUpdate: component.rhMasterUpdatedAt || component.lastUpdated || component.updatedAt || new Date().toISOString(),
-          currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00',
-          inheritedCount: inheritedCount
-        };
-      });
+      // Format response with RH data and count inherited children using storage layer
+      const parentsWithCounts = await Promise.all(
+        masterComponents.map(async (component) => {
+          // Use storage layer method which handles all ID formats (composite, code, uuid)
+          const inheritedComponents = await storage.getInheritedComponents(component.id, vesselId);
+          
+          return {
+            ...component,
+            sfiCode: component.componentCode || '',
+            latestUpdate: component.rhMasterUpdatedAt || component.lastUpdated || component.updatedAt || new Date().toISOString(),
+            currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00',
+            inheritedCount: inheritedComponents.length
+          };
+        })
+      );
+      const parents = parentsWithCounts;
       
       // Sort by component code for consistent ordering
       parents.sort((a, b) => (a.componentCode || '').localeCompare(b.componentCode || ''));
@@ -68,7 +67,7 @@ export function registerRunningHoursRoutes(app: Express) {
       const { parentCode } = req.params;
       const vesselId = (req.query.vesselId as string) || 'V001';
       
-      // Get all components for the vessel
+      // Get all components for the vessel to find parent
       const allComponents = await storage.getComponents(vesselId);
       
       // Find the parent component by code or id
@@ -77,11 +76,8 @@ export function registerRunningHoursRoutes(app: Express) {
         return res.status(404).json({ error: "Parent component not found" });
       }
       
-      // Get all INHERITED components linked to this MASTER via rhMasterComponentId
-      const children = allComponents.filter(c => 
-        c.rhCounterType === 'INHERITED' && 
-        (c.rhMasterComponentId === parent.id || c.rhMasterComponentId === parent.componentCode)
-      );
+      // Use storage layer method which handles all ID formats (composite, code, uuid)
+      const children = await storage.getInheritedComponents(parent.id, vesselId);
       
       // Format response with RH data for each child
       const childrenWithRH = children.map(child => {
