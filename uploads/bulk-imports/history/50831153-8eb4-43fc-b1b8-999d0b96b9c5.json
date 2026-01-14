@@ -1,0 +1,19 @@
+{
+  "id": "50831153-8eb4-43fc-b1b8-999d0b96b9c5",
+  "type": "stores",
+  "mode": "upsert",
+  "vesselId": "744535d0-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-14T09:16:31.491Z",
+  "completedAt": "2026-01-14T09:16:31.665Z",
+  "status": "complete",
+  "created": 10,
+  "updated": 0,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "Stores - Lubes.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/stores/1768382191664_Stores_-_Lubes.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

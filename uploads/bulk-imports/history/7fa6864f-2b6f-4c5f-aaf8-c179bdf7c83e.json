@@ -1,0 +1,19 @@
+{
+  "id": "7fa6864f-2b6f-4c5f-aaf8-c179bdf7c83e",
+  "type": "spares",
+  "mode": "upsert",
+  "vesselId": "744535d0-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-14T09:14:57.433Z",
+  "completedAt": "2026-01-14T09:16:04.787Z",
+  "status": "complete",
+  "created": 1113,
+  "updated": 2268,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "spares_templaten - Test Vessel_01 Rev_01.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/spares/1768382164786_spares_templaten_-_Test_Vessel_01_Rev_01.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 3381
+}
