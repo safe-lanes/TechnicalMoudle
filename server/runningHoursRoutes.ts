@@ -40,7 +40,7 @@ export function registerRunningHoursRoutes(app: Express) {
           return {
             ...component,
             sfiCode: component.componentCode || '',
-            latestUpdate: component.rhMasterUpdatedAt || component.lastUpdated || component.updatedAt || new Date().toISOString(),
+            latestUpdate: component.lastUpdated || component.rhMasterUpdatedAt || component.updatedAt || new Date().toISOString(),
             currentCumulativeRH: component.rhCurrentMaster || component.currentCumulativeRH || '0.00',
             inheritedCount: inheritedComponents.length
           };
