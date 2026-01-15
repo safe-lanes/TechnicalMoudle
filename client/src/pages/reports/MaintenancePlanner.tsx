@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useVessel } from "@/contexts/VesselContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -214,14 +214,16 @@ export default function MaintenancePlanner() {
 
   // Reset to page 1 when filters change (tracked via queryParams)
   const queryParamsString = JSON.stringify(queryParams);
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [queryParamsString]);
 
-  // Ensure current page is valid
-  if (currentPage > totalPages && totalPages > 0) {
-    setCurrentPage(totalPages);
-  }
+  // Ensure current page is valid when data shrinks
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Export mutation
   const exportMutation = useMutation({
