@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Plus, Edit, Trash2, Eye, X } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, Eye, X, Paperclip } from "lucide-react";
 import { insertDefectSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import ImmediateCauseModal from "@/components/ImmediateCauseModal";
 import RootCauseModal from "@/components/RootCauseModal";
 import AddActionModal from "@/components/AddActionModal";
+import { FileAttachmentDialog, FileAttachment } from "@/components/FileAttachmentDialog";
 import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
@@ -97,6 +98,8 @@ export default function DefectFormWizard({
   const [isViewMode, setIsViewMode] = useState(mode === 'view');
   const [editingAction, setEditingAction] = useState<Action | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
   
   // Section refs for scroll tracking
   const partARef = useRef<HTMLDivElement>(null);
@@ -1307,94 +1310,168 @@ export default function DefectFormWizard({
             {/* Part C: Closeout */}
             <div ref={partCRef} data-section="C" className="bg-white border border-gray-200 shadow-sm rounded-lg p-6 scroll-mt-6">
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Part C: Closeout</h2>
-                <p className="text-sm text-gray-500 mt-1">Completion and approval</p>
+                <p className="text-sm text-gray-500 mt-1">Completion and Verification</p>
                 <div className="h-0.5 bg-blue-500 mt-3 mb-6" />
                 
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Date Completed</label>
-                      <Input 
-                        {...form.register("dateCompleted")} 
-                        type="date"
-                        data-testid="input-date-completed"
-                        className="h-10 text-sm border-gray-300"
-                        disabled={isViewMode}
-                      />
+                <div className="space-y-8">
+                  {/* C1. Closeout Section */}
+                  <div className="space-y-6">
+                    <h3 className="text-base font-semibold text-[#1e3a5f]">C1. Closeout</h3>
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="flex items-center gap-3">
+                        <Controller
+                          name="confirmCompleted"
+                          control={form.control}
+                          render={({ field }) => (
+                            <Checkbox
+                              id="confirm-completed"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              disabled={isViewMode}
+                              data-testid="checkbox-confirm-completed"
+                            />
+                          )}
+                        />
+                        <Label htmlFor="confirm-completed" className="text-sm text-gray-700">Confirm Completed</Label>
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Date Completed</label>
+                        <Input 
+                          {...form.register("dateCompleted")} 
+                          type="date"
+                          data-testid="input-date-completed"
+                          className="h-10 text-sm border-gray-300"
+                          disabled={isViewMode}
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Verified Date</label>
-                      <Input 
-                        {...form.register("verifiedDate")} 
-                        type="date"
-                        data-testid="input-verified-date"
-                        className="h-10 text-sm border-gray-300"
-                        disabled={isViewMode}
-                      />
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Closed By (Name)</label>
+                        <Input 
+                          {...form.register("closedByName")} 
+                          data-testid="input-closed-by-name"
+                          className="h-10 text-sm border-gray-300"
+                          placeholder="Enter name"
+                          disabled={isViewMode}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Closed By (Rank)</label>
+                        <Input 
+                          {...form.register("closedByRank")} 
+                          data-testid="input-closed-by-rank"
+                          className="h-10 text-sm border-gray-300"
+                          placeholder="Enter rank"
+                          disabled={isViewMode}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-800">Attachments</h3>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600 mb-1">Drop files here or click to upload</p>
-                      <p className="text-xs text-gray-500 mb-3">PDF, JPG, PNG up to 10MB</p>
-                      <input
-                        type="file"
-                        id="file-upload"
-                        multiple
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-gray-300"
-                        data-testid="button-upload-attachment"
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                        disabled={isViewMode}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Browse Files
-                      </Button>
-                    </div>
-                    {attachments.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs text-gray-600">Selected files:</p>
-                        {attachments.map((file, index) => (
-                          <p key={index} className="text-xs text-gray-500">• {file.name}</p>
-                        ))}
+                    {/* Attachments Button and Submit Button for C1 */}
+                    {!isViewMode && (
+                      <div className="flex justify-end items-center gap-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsAttachmentDialogOpen(true)}
+                          disabled={isViewMode}
+                          data-testid="button-attachments"
+                          className="border-gray-300"
+                        >
+                          <Paperclip className="h-4 w-4 mr-2" />
+                          Attachment(s)
+                          {fileAttachments.length > 0 && (
+                            <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                              {fileAttachments.length}
+                            </span>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => handleStepSubmit(3)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                          data-testid="button-submit-c1"
+                        >
+                          Submit
+                        </Button>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-col">
-                    <label className="text-sm text-gray-600 mb-1.5">Closed By</label>
-                    <Input 
-                      {...form.register("closedBy")} 
-                      data-testid="input-closed-by"
-                      className="h-10 text-sm border-gray-300"
-                      placeholder="Name & Rank"
-                      disabled={isViewMode}
-                    />
-                  </div>
-
-                  {/* Submit Button for Part C */}
-                  {!isViewMode && (
-                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
-                      <Button
-                        type="button"
-                        onClick={form.handleSubmit(onSubmit)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6"
-                        data-testid="button-submit-part-c"
-                      >
-                        Submit
-                      </Button>
+                  {/* C2. Verification Section */}
+                  <div className="space-y-6 pt-4">
+                    <h3 className="text-base font-semibold text-[#1e3a5f]">C2. Verification</h3>
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="flex items-center gap-3">
+                        <Controller
+                          name="verified"
+                          control={form.control}
+                          render={({ field }) => (
+                            <Checkbox
+                              id="verified"
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                              disabled={isViewMode}
+                              data-testid="checkbox-verified"
+                            />
+                          )}
+                        />
+                        <Label htmlFor="verified" className="text-sm text-gray-700">Verified</Label>
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Date Verified</label>
+                        <Input 
+                          {...form.register("dateVerified")} 
+                          type="date"
+                          data-testid="input-date-verified"
+                          className="h-10 text-sm border-gray-300"
+                          disabled={isViewMode}
+                        />
+                      </div>
                     </div>
-                  )}
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Verified By (Name)</label>
+                        <Input 
+                          {...form.register("verifiedByName")} 
+                          data-testid="input-verified-by-name"
+                          className="h-10 text-sm border-gray-300"
+                          placeholder="Enter name"
+                          disabled={isViewMode}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Verified By (Office Position)</label>
+                        <Input 
+                          {...form.register("verifiedByOfficePosition")} 
+                          data-testid="input-verified-by-office-position"
+                          className="h-10 text-sm border-gray-300"
+                          placeholder="Enter office position"
+                          disabled={isViewMode}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Submit Button for C2 */}
+                    {!isViewMode && (
+                      <div className="flex justify-end pt-4">
+                        <Button
+                          type="button"
+                          onClick={form.handleSubmit(onSubmit)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                          data-testid="button-submit-c2"
+                        >
+                          Submit
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1422,6 +1499,15 @@ export default function DefectFormWizard({
         onOpenChange={setIsAddActionModalOpen}
         onSave={handleSaveAction}
         initialData={editingAction}
+      />
+
+      <FileAttachmentDialog
+        open={isAttachmentDialogOpen}
+        onOpenChange={setIsAttachmentDialogOpen}
+        attachments={fileAttachments}
+        onAttachmentsChange={setFileAttachments}
+        title="Manage Attachments"
+        itemName="Defect Report"
       />
     </div>
   );
