@@ -1113,9 +1113,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else if (isRHJob) {
           // Find parent component for RH
+          // FIXED: Use componentMap (by ID) instead of componentCodeMap (by code)
+          // since parentId contains an ID, not a component code
           let parentComponent = component;
           if (component?.parentId) {
-            parentComponent = componentCodeMap.get(component.parentId) || component;
+            parentComponent = componentMap.get(component.parentId) || component;
           }
           
           parentRH = parseFloat(parentComponent?.currentCumulativeRH || '0') || 0;
