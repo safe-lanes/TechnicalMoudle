@@ -255,6 +255,10 @@ const Spares: React.FC = () => {
     const locations = editingLocations[spareId];
     const original = originalLocationValues[spareId];
     if (!locations) return;
+
+    // Find the spare to check current names
+    const spare = sparesData.find((s: Spare) => s.id === spareId);
+    if (!spare) return;
     
     const newRobA = parseInt(locations.locationA) || 0;
     const newRobB = parseInt(locations.locationB) || 0;
@@ -326,30 +330,33 @@ const Spares: React.FC = () => {
       }
     }
     
-    // Save location names to vessel settings if they were edited
-    let nameUpdateSuccess = true;
-    if (locations.nameA || locations.nameB) {
+    // Save spare-specific location names if they were edited
+    if (locations.nameA !== (spare.location || locationNames.locationA) || 
+        locations.nameB !== (spare.location2 || locationNames.locationB)) {
       attemptCount++;
       try {
-        const res = await fetch(`/technical/api/vessel-location-names/${vesselId}`, {
-          method: 'PUT',
+        const res = await fetch(`/technical/api/spares/${vesselId}/${spareId}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            locationAName: locations.nameA || locationNames.locationA || 'Location A',
-            locationBName: locations.nameB || locationNames.locationB || 'Location B'
+            location: locations.nameA,
+            location2: locations.nameB
           }),
         });
         if (!res.ok) {
-          errors.push('Failed to save location names');
-          nameUpdateSuccess = false;
+          errors.push('Failed to save spare location names');
         } else {
           successCount++;
-          queryClient.invalidateQueries({ queryKey: [`/technical/api/vessel-location-names/${vesselId}`] });
         }
       } catch (e: any) {
-        errors.push(`Location names: ${e.message || 'Network error'}`);
-        nameUpdateSuccess = false;
+        errors.push(`Spare location names: ${e.message || 'Network error'}`);
       }
+    }
+    
+    // Save location names to vessel settings if they were edited (as default names for the vessel)
+    if (locations.nameA && locations.nameB) {
+      // Logic for saving vessel-wide defaults if needed, 
+      // but the priority is the spare-specific ones updated above
     }
     
     // Always invalidate cache to reflect any partial changes
