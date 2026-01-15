@@ -25,7 +25,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **PMS Submodules**: Offers comprehensive CRUD functionalities for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
 - **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
-- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7.
+- **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7. Features Part A/B/C structured form with target date extension workflow (B5 section) enabling ship staff to request deadline extensions from office users with approval tracking.
 - **Spares Module**: Comprehensive inventory management with many-to-many linking between spares and components, location-based stock tracking, and a full audit trail.
 - **Auto-Generation Scheduler**: Automates work order creation for calendar and RH-based jobs.
 - **Admin Module**: Includes bulk data import (with multi-sheet Excel templates and enhanced validation), data purging, and a Fleet Admin Dashboard.
