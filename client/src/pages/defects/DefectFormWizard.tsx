@@ -27,6 +27,7 @@ import { useVessels } from "@/hooks/useVessels";
 import { sireHardwareClasses, findHardwareClassById } from "@/data/sireHardwareClasses";
 import { defectSources, findSourceById } from "@/data/defectSources";
 import { SireHardwareClassCombobox } from "@/components/SireHardwareClassCombobox";
+import { useAuth } from "@/contexts/AuthContext";
 
 const defectFormSchema = insertDefectSchema.extend({
   critical: z.boolean().optional(),
@@ -72,6 +73,7 @@ export default function DefectFormWizard({
   onBack
 }: DefectFormWizardProps = {}) {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const { data: vessels = [] } = useVessels();
   
   // Fetch equipment categories from database
@@ -447,6 +449,26 @@ export default function DefectFormWizard({
 
     return () => observer.disconnect();
   }, []);
+
+  // C2 Verification auto-fill: When verified checkbox is checked by Office user
+  const verifiedValue = form.watch('verified');
+  useEffect(() => {
+    if (verifiedValue && currentUser?.role === 'Office') {
+      // Auto-fill today's date (user can change it)
+      const today = new Date().toISOString().split('T')[0];
+      form.setValue('dateVerified', today);
+      
+      // Auto-fill verified by name from session
+      if (currentUser?.fullName) {
+        form.setValue('verifiedByName', currentUser.fullName);
+      }
+      
+      // Auto-fill verified by office position from session (crewDesignation)
+      if ((currentUser as any)?.crewDesignation) {
+        form.setValue('verifiedByOfficePosition', (currentUser as any).crewDesignation);
+      }
+    }
+  }, [verifiedValue, currentUser, form]);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
