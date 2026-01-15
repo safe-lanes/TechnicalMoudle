@@ -1953,7 +1953,7 @@ const Stores: React.FC = () => {
               </div>
 
               {/* Table Headers */}
-              <div className="grid grid-cols-9 gap-3 bg-gray-50 p-3 rounded-t text-sm font-medium text-gray-600 border">
+              <div className="grid grid-cols-11 gap-2 bg-gray-50 p-3 rounded-t text-sm font-medium text-gray-600 border">
                 <div>
                   {activeTab === "lubes" ? "Lube Grade" : 
                    activeTab === "chemicals" ? "Chem Code" : "Item Code"}
@@ -1967,7 +1967,15 @@ const Stores: React.FC = () => {
                    activeTab === "chemicals" ? "Application Area" : "Category"}
                 </div>
                 <div>UOM</div>
-                <div>ROB</div>
+                <div className="text-center">
+                  <div>ROB</div>
+                  <div className="text-[10px] text-blue-600 font-semibold truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
+                </div>
+                <div className="text-center">
+                  <div>ROB</div>
+                  <div className="text-[10px] text-blue-600 font-semibold truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
+                </div>
+                <div>Total ROB</div>
                 <div>Consumed</div>
                 <div>Received</div>
                 <div>New ROB</div>
@@ -1981,14 +1989,24 @@ const Stores: React.FC = () => {
                   const received = bulkUpdateData[item.id]?.received || 0;
                   const newRob = item.rob - consumed + received;
                   const hasError = newRob < 0 || (received > 0 && !bulkUpdateData[item.id]?.receivedDate);
+                  const robA = item.robLocationA ?? 0;
+                  const robB = item.robLocationB ?? 0;
                   
                   return (
-                    <div key={item.id} className={`grid grid-cols-9 gap-3 p-3 border-b ${hasError ? 'bg-red-50' : 'bg-white'} items-center`}>
+                    <div key={item.id} className={`grid grid-cols-11 gap-2 p-3 border-b ${hasError ? 'bg-red-50' : 'bg-white'} items-center`}>
                       <div className="text-gray-900 text-sm">{item.itemCode}</div>
-                      <div className="text-gray-900 text-sm">{item.itemName}</div>
+                      <div className="text-gray-900 text-sm truncate" title={item.itemName}>{item.itemName}</div>
                       <div className="text-gray-700 text-sm">{item.storesCategory}</div>
                       <div className="text-gray-700 text-sm">{item.uom || "-"}</div>
-                      <div className="text-gray-700 text-sm">{item.rob}</div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
+                        <div className="text-gray-700 text-sm font-medium">{robA}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
+                        <div className="text-gray-700 text-sm font-medium">{robB}</div>
+                      </div>
+                      <div className="text-gray-700 text-sm font-medium">{item.rob}</div>
                       <div>
                         <Input 
                           type="number" 
