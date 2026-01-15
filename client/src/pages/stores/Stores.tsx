@@ -128,6 +128,7 @@ const Stores: React.FC = () => {
   const [stockFilter, setStockFilter] = useState("");
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
+  const [bulkSearchQuery, setBulkSearchQuery] = useState("");
   const [placeReceived, setPlaceReceived] = useState("");
   const [dateReceived, setDateReceived] = useState("");
   const [items, setItems] = useState<StoreItem[]>([]);
@@ -459,6 +460,17 @@ const Stores: React.FC = () => {
       return matchesTab && matchesSearch && matchesCategory && matchesStock;
     });
   }, [activeTab, searchTerm, categoryFilter, stockFilter, items]);
+
+  // Filter items for bulk update modal search
+  const bulkModalFilteredItems = useMemo(() => {
+    if (!bulkSearchQuery.trim()) return filteredItems;
+    const query = bulkSearchQuery.toLowerCase();
+    return filteredItems.filter(item => 
+      item.itemCode.toLowerCase().includes(query) ||
+      item.itemName.toLowerCase().includes(query) ||
+      item.storesCategory.toLowerCase().includes(query)
+    );
+  }, [filteredItems, bulkSearchQuery]);
 
   const getStockColor = (stock: string) => {
     if (stock === "Low") return "bg-yellow-100 text-yellow-800";
@@ -1927,28 +1939,76 @@ const Stores: React.FC = () => {
 
             {/* Modal Body */}
             <div className="p-6">
-              {/* Place Received and Date Fields */}
-              <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded border">
+              {/* Search bar and item count */}
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="text-sm text-gray-500">
+                  Updating {filteredItems.length} item(s) {bulkSearchQuery && `(showing ${bulkModalFilteredItems.length} filtered)`}
+                </div>
+                <div className="flex-1 max-w-md">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      type="text"
+                      placeholder="Search by item code, name, category..."
+                      value={bulkSearchQuery}
+                      onChange={(e) => setBulkSearchQuery(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-bulk-search"
+                    />
+                    {bulkSearchQuery && (
+                      <button 
+                        onClick={() => setBulkSearchQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Place Received, Date, and Comments Fields */}
+              <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded border">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Place Received</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Place Received (Apply to all)</label>
                   <Input 
                     placeholder="Enter place received" 
                     value={placeReceived}
                     onChange={(e) => setPlaceReceived(e.target.value)}
                     className="text-sm"
+                    data-testid="input-bulk-received-place"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date (Apply to all)</label>
                   <div className="relative">
                     <Input 
                       type="date" 
                       value={dateReceived}
                       onChange={(e) => setDateReceived(e.target.value)}
                       className="text-sm pr-10"
+                      data-testid="input-bulk-received-date"
                     />
                     <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Comments (Apply to all)</label>
+                  <Input 
+                    placeholder="Enter comments" 
+                    className="text-sm"
+                    data-testid="input-bulk-comments"
+                    onChange={(e) => {
+                      const comments = e.target.value;
+                      setBulkUpdateData(prev => {
+                        const updated = { ...prev };
+                        Object.keys(updated).forEach(id => {
+                          updated[Number(id)] = { ...updated[Number(id)], comments: comments };
+                        });
+                        return updated;
+                      });
+                    }}
+                  />
                 </div>
               </div>
 
@@ -1969,11 +2029,13 @@ const Stores: React.FC = () => {
                 <div>UOM</div>
                 <div className="text-center">
                   <div>ROB</div>
-                  <div className="text-[10px] text-blue-600 font-semibold truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
+                  <div className="text-[10px] text-blue-600 font-semibold" data-testid="label-rob-location-a">Location A</div>
+                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
                 </div>
                 <div className="text-center">
                   <div>ROB</div>
-                  <div className="text-[10px] text-blue-600 font-semibold truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
+                  <div className="text-[10px] text-blue-600 font-semibold" data-testid="label-rob-location-b">Location B</div>
+                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
                 </div>
                 <div>Total ROB</div>
                 <div>Consumed</div>
@@ -1984,7 +2046,7 @@ const Stores: React.FC = () => {
 
               {/* Table Body */}
               <div className="border border-t-0 rounded-b max-h-[400px] overflow-y-auto">
-                {filteredItems.map((item) => {
+                {bulkModalFilteredItems.map((item) => {
                   const consumed = bulkUpdateData[item.id]?.consumed || 0;
                   const received = bulkUpdateData[item.id]?.received || 0;
                   const newRob = item.rob - consumed + received;
@@ -1999,10 +2061,12 @@ const Stores: React.FC = () => {
                       <div className="text-gray-700 text-sm">{item.storesCategory}</div>
                       <div className="text-gray-700 text-sm">{item.uom || "-"}</div>
                       <div className="text-center">
+                        <div className="text-[10px] text-blue-600 font-semibold">Location A</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
                         <div className="text-gray-700 text-sm font-medium">{robA}</div>
                       </div>
                       <div className="text-center">
+                        <div className="text-[10px] text-blue-600 font-semibold">Location B</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
                         <div className="text-gray-700 text-sm font-medium">{robB}</div>
                       </div>
