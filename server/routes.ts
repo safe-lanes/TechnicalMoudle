@@ -5059,9 +5059,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update spare
   app.patch("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
+      console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
       const spare = await storage.updateSpare(parseInt(req.params.id), req.body);
+      console.log('[PATCH Spare] Result - location:', spare.location, 'location2:', spare.location2);
       res.json(spare);
     } catch (error: any) {
+      console.error('[PATCH Spare] Error:', error.message);
       if (error.message?.includes('not found')) {
         return res.status(404).json({ error: error.message });
       }
