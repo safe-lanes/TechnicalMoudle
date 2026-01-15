@@ -1320,9 +1320,26 @@ export default function DefectFormWizard({
                     )}
                   </div>
 
-                  {/* Submit Button for Part B */}
+                  {/* Attachments Button and Submit Button for Part B */}
                   {!isViewMode && (
-                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
+                    <div className="flex justify-end items-center gap-3 pt-6 mt-6 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAttachmentDialogOpen(true)}
+                        disabled={isViewMode}
+                        data-testid="button-attachments"
+                        className="border-gray-300"
+                      >
+                        <Paperclip className="h-4 w-4 mr-2" />
+                        Attachment(s)
+                        {fileAttachments.length > 0 && (
+                          <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                            {fileAttachments.length}
+                          </span>
+                        )}
+                      </Button>
                       <Button
                         type="button"
                         onClick={() => handleStepSubmit(2)}
@@ -1399,26 +1416,9 @@ export default function DefectFormWizard({
                       </div>
                     </div>
 
-                    {/* Attachments Button and Submit Button for C1 */}
+                    {/* Submit Button for C1 */}
                     {!isViewMode && (
-                      <div className="flex justify-end items-center gap-3 pt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsAttachmentDialogOpen(true)}
-                          disabled={isViewMode}
-                          data-testid="button-attachments"
-                          className="border-gray-300"
-                        >
-                          <Paperclip className="h-4 w-4 mr-2" />
-                          Attachment(s)
-                          {fileAttachments.length > 0 && (
-                            <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                              {fileAttachments.length}
-                            </span>
-                          )}
-                        </Button>
+                      <div className="flex justify-end pt-4">
                         <Button
                           type="button"
                           onClick={() => handleStepSubmit(3)}
