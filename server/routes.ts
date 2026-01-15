@@ -5439,6 +5439,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= SPARES BULK UPDATE (Location-specific) =============
+  app.post("/technical/api/spares/bulk-update", async (req, res) => {
+    try {
+      const { vesselId, tz, rows } = req.body;
+      
+      if (!vesselId || !rows || !Array.isArray(rows)) {
+        return res.status(400).json({
+          success: false,
+          error: 'vesselId and rows are required'
+        });
+      }
+      
+      const results: Array<{
+        componentSpareId: number;
+        success: boolean;
+        message?: string;
+        robAfter?: number;
+      }> = [];
+      
+      for (const row of rows) {
+        const { 
+          componentSpareId, 
+          consumedA = 0, 
+          consumedB = 0, 
+          receivedA = 0, 
+          receivedB = 0,
+          receivedDate,
+          receivedPlace,
+          dateLocal,
+          remarks,
+          userId = 'user'
+        } = row;
+        
+        try {
+          let totalChange = 0;
+          const errors: string[] = [];
+          
+          // Consume from Location A
+          if (consumedA > 0) {
+            try {
+              await storage.consumeSpareFromLocation(
+                componentSpareId,
+                consumedA,
+                'A',
+                userId,
+                remarks,
+                undefined // workOrderRef
+              );
+              totalChange -= consumedA;
+            } catch (e: any) {
+              errors.push(`Consume A: ${e.message}`);
+            }
+          }
+          
+          // Consume from Location B
+          if (consumedB > 0) {
+            try {
+              await storage.consumeSpareFromLocation(
+                componentSpareId,
+                consumedB,
+                'B',
+                userId,
+                remarks,
+                undefined // workOrderRef
+              );
+              totalChange -= consumedB;
+            } catch (e: any) {
+              errors.push(`Consume B: ${e.message}`);
+            }
+          }
+          
+          // Receive to Location A
+          if (receivedA > 0) {
+            try {
+              await storage.receiveSpareToLocation(
+                componentSpareId,
+                receivedA,
+                'A',
+                userId,
+                remarks,
+                receivedPlace,
+                receivedDate || dateLocal
+              );
+              totalChange += receivedA;
+            } catch (e: any) {
+              errors.push(`Receive A: ${e.message}`);
+            }
+          }
+          
+          // Receive to Location B
+          if (receivedB > 0) {
+            try {
+              await storage.receiveSpareToLocation(
+                componentSpareId,
+                receivedB,
+                'B',
+                userId,
+                remarks,
+                receivedPlace,
+                receivedDate || dateLocal
+              );
+              totalChange += receivedB;
+            } catch (e: any) {
+              errors.push(`Receive B: ${e.message}`);
+            }
+          }
+          
+          // Get the updated spare to get the new ROB
+          const spare = await storage.getSpare(componentSpareId);
+          
+          if (errors.length > 0) {
+            results.push({
+              componentSpareId,
+              success: false,
+              message: errors.join('; '),
+              robAfter: spare?.rob
+            });
+          } else {
+            results.push({
+              componentSpareId,
+              success: true,
+              robAfter: spare?.rob
+            });
+          }
+        } catch (error: any) {
+          results.push({
+            componentSpareId,
+            success: false,
+            message: error.message || 'Unknown error'
+          });
+        }
+      }
+      
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error in bulk update:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to perform bulk update'
+      });
+    }
+  });
+
   // ============= INVENTORY MANAGEMENT: LOCATIONS =============
   
   app.get("/technical/api/inventory/locations/:vesselId", async (req, res) => {

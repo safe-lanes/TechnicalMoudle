@@ -152,7 +152,8 @@ const Spares: React.FC = () => {
   // Form states
   const [consumeForm, setConsumeForm] = useState({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
   const [receiveForm, setReceiveForm] = useState({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
-  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
+  const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
+  const [bulkSearchQuery, setBulkSearchQuery] = useState("");
   const [addSpareForm, setAddSpareForm] = useState({
     partCode: "",
     partName: "",
@@ -1005,8 +1006,10 @@ const Spares: React.FC = () => {
   const bulkUpdateMutation = useMutation({
     mutationFn: async (data: { vesselId: string, tz: string, rows: Array<{
       componentSpareId: number,
-      consumed: number,
-      received: number,
+      consumedA: number,
+      consumedB: number,
+      receivedA: number,
+      receivedB: number,
       receivedDate?: string,
       receivedPlace?: string,
       dateLocal?: string,
@@ -1502,17 +1505,31 @@ const Spares: React.FC = () => {
       return;
     }
     setIsBulkUpdateModalOpen(true);
-    // Initialize bulk update data
-    const initialData: {[key: number]: {consumed: number, received: number, receivedDate?: string, receivedPlace?: string, comments?: string}} = {};
+    setBulkSearchQuery("");
+    // Initialize bulk update data with location-specific fields
+    const initialData: {[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}} = {};
     filteredSpares.forEach((spare: Spare) => {
-      initialData[spare.id] = { consumed: 0, received: 0 };
+      initialData[spare.id] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
     });
     setBulkUpdateData(initialData);
   };
 
+  // Filter spares for bulk update modal based on search
+  const bulkModalFilteredSpares = filteredSpares.filter((spare: Spare) => {
+    if (!bulkSearchQuery.trim()) return true;
+    const query = bulkSearchQuery.toLowerCase();
+    return (
+      spare.partCode?.toLowerCase().includes(query) ||
+      spare.partName?.toLowerCase().includes(query) ||
+      spare.componentCode?.toLowerCase().includes(query) ||
+      spare.componentName?.toLowerCase().includes(query) ||
+      spare.partNumber?.toLowerCase().includes(query)
+    );
+  });
+
   // Handle bulk update input changes
-  const handleBulkUpdateChange = (spareId: number, field: 'consumed' | 'received' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
-    if (field === 'consumed' || field === 'received') {
+  const handleBulkUpdateChange = (spareId: number, field: 'consumedA' | 'consumedB' | 'receivedA' | 'receivedB' | 'receivedDate' | 'receivedPlace' | 'comments', value: string | number) => {
+    if (field === 'consumedA' || field === 'consumedB' || field === 'receivedA' || field === 'receivedB') {
       const numValue = parseInt(value as string) || 0;
       setBulkUpdateData(prev => ({
         ...prev,
@@ -1577,11 +1594,15 @@ const Spares: React.FC = () => {
       const spare = sparesData.find((s: Spare) => s.id === parseInt(id));
       if (!spare) return false;
       
-      const newROB = spare.rob - (data.consumed || 0) + (data.received || 0);
-      if (newROB < 0) return true;
+      const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
+      const totalReceived = (data.receivedA || 0) + (data.receivedB || 0);
+      
+      // Check per-location stock
+      if ((data.consumedA || 0) > (spare.robLocationA ?? 0)) return true;
+      if ((data.consumedB || 0) > (spare.robLocationB ?? 0)) return true;
       
       // Check if received date is required when receiving
-      if (data.received > 0 && !data.receivedDate) return true;
+      if (totalReceived > 0 && !data.receivedDate) return true;
       
       return false;
     });
@@ -1592,14 +1613,16 @@ const Spares: React.FC = () => {
     }
     
     const rows = Object.entries(bulkUpdateData)
-      .filter(([_, data]) => data.consumed > 0 || data.received > 0)
+      .filter(([_, data]) => (data.consumedA || 0) > 0 || (data.consumedB || 0) > 0 || (data.receivedA || 0) > 0 || (data.receivedB || 0) > 0)
       .map(([id, data]) => ({
         componentSpareId: parseInt(id),
-        consumed: data.consumed || 0,
-        received: data.received || 0,
-        receivedDate: data.received > 0 ? data.receivedDate : undefined,
+        consumedA: data.consumedA || 0,
+        consumedB: data.consumedB || 0,
+        receivedA: data.receivedA || 0,
+        receivedB: data.receivedB || 0,
+        receivedDate: ((data.receivedA || 0) > 0 || (data.receivedB || 0) > 0) ? data.receivedDate : undefined,
         receivedPlace: data.receivedPlace || undefined,
-        dateLocal: data.consumed > 0 ? new Date().toISOString().split('T')[0] : undefined,
+        dateLocal: new Date().toISOString().split('T')[0],
         remarks: data.comments || undefined,
         userId: 'user'
       }));
@@ -2133,22 +2156,47 @@ const Spares: React.FC = () => {
       </div>
       {/* Bulk Update Modal */}
       <Dialog open={isBulkUpdateModalOpen} onOpenChange={setIsBulkUpdateModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Update Spares</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm text-gray-500">
-              Updating {filteredSpares.length} spare(s)
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-gray-500">
+                Updating {filteredSpares.length} spare(s) {bulkSearchQuery && `(showing ${bulkModalFilteredSpares.length} filtered)`}
+              </div>
+              {/* Smart Search Bar */}
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="text"
+                    placeholder="Search by part code, name, component..."
+                    value={bulkSearchQuery}
+                    onChange={(e) => setBulkSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-bulk-search"
+                  />
+                  {bulkSearchQuery && (
+                    <button 
+                      onClick={() => setBulkSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             
             {/* Common fields for all spares */}
-            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <div>
                 <Label htmlFor="bulk-received-date">Received Date (Apply to all)</Label>
                 <Input
                   id="bulk-received-date"
                   type="date"
+                  data-testid="input-bulk-received-date"
                   onChange={(e) => {
                     const date = e.target.value;
                     setBulkUpdateData(prev => {
@@ -2167,6 +2215,7 @@ const Spares: React.FC = () => {
                   id="bulk-received-place"
                   type="text"
                   placeholder="e.g., Singapore Port"
+                  data-testid="input-bulk-received-place"
                   onChange={(e) => {
                     const place = e.target.value;
                     setBulkUpdateData(prev => {
@@ -2185,6 +2234,7 @@ const Spares: React.FC = () => {
                   id="bulk-comments"
                   type="text"
                   placeholder="Enter comments"
+                  data-testid="input-bulk-comments"
                   onChange={(e) => {
                     const comments = e.target.value;
                     setBulkUpdateData(prev => {
@@ -2200,82 +2250,143 @@ const Spares: React.FC = () => {
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium">Part Code</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium">Part Name</th>
-                    <th className="px-4 py-2 text-center text-sm font-medium">ROB</th>
-                    <th className="px-4 py-2 text-center text-sm font-medium">Consumed</th>
-                    <th className="px-4 py-2 text-center text-sm font-medium">Received</th>
-                    <th className="px-4 py-2 text-center text-sm font-medium">New ROB</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSpares.map((spare: Spare) => {
-                    const consumed = bulkUpdateData[spare.id]?.consumed || 0;
-                    const received = bulkUpdateData[spare.id]?.received || 0;
-                    const newROB = spare.rob - consumed + received;
-                    const hasInsufficientStock = newROB < 0;
-                    const needsReceivedDate = received > 0 && !bulkUpdateData[spare.id]?.receivedDate;
-                    const hasError = hasInsufficientStock || needsReceivedDate;
-                    
-                    return (
-                      <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50' : ''}`}>
-                        <td className="px-4 py-2 text-sm">{spare.partCode}</td>
-                        <td className="px-4 py-2 text-sm">{spare.partName}</td>
-                        <td className="px-4 py-2 text-center text-sm">{spare.rob}</td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            max={spare.rob}
-                            value={bulkUpdateData[spare.id]?.consumed || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'consumed', e.target.value)}
-                            className={`w-20 mx-auto ${hasInsufficientStock ? 'border-red-500' : ''}`}
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={bulkUpdateData[spare.id]?.received || ""}
-                            onChange={(e) => handleBulkUpdateChange(spare.id, 'received', e.target.value)}
-                            className="w-20 mx-auto"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-center">
-                          <div className={`text-sm font-medium ${hasInsufficientStock ? 'text-red-600' : ''}`}>
-                            {newROB}
-                            {hasInsufficientStock && (
-                              <div className="text-xs text-red-600">Insufficient stock</div>
-                            )}
-                            {needsReceivedDate && (
-                              <div className="text-xs text-red-600">Date required</div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Part Code</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Part Name</th>
+                      <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
+                        <div className="text-center">ROB</div>
+                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
+                          <span className="w-12 text-center">{locationNames.locationA}</span>
+                          <span className="w-12 text-center">{locationNames.locationB}</span>
+                        </div>
+                      </th>
+                      <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
+                        <div className="text-center text-orange-600">Consumed</div>
+                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
+                          <span className="w-14 text-center">{locationNames.locationA}</span>
+                          <span className="w-14 text-center">{locationNames.locationB}</span>
+                        </div>
+                      </th>
+                      <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
+                        <div className="text-center text-green-600">Received</div>
+                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
+                          <span className="w-14 text-center">{locationNames.locationA}</span>
+                          <span className="w-14 text-center">{locationNames.locationB}</span>
+                        </div>
+                      </th>
+                      <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkModalFilteredSpares.map((spare: Spare) => {
+                      const consumedA = bulkUpdateData[spare.id]?.consumedA || 0;
+                      const consumedB = bulkUpdateData[spare.id]?.consumedB || 0;
+                      const receivedA = bulkUpdateData[spare.id]?.receivedA || 0;
+                      const receivedB = bulkUpdateData[spare.id]?.receivedB || 0;
+                      const robA = spare.robLocationA ?? 0;
+                      const robB = spare.robLocationB ?? 0;
+                      const newRobA = robA - consumedA + receivedA;
+                      const newRobB = robB - consumedB + receivedB;
+                      const newROB = newRobA + newRobB;
+                      const hasInsufficientStockA = consumedA > robA;
+                      const hasInsufficientStockB = consumedB > robB;
+                      const totalReceived = receivedA + receivedB;
+                      const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.id]?.receivedDate;
+                      const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
+                      
+                      return (
+                        <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                          <td className="px-3 py-2 text-sm">{spare.partCode}</td>
+                          <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
+                          <td className="px-2 py-2 text-center text-xs text-gray-600">{robA}</td>
+                          <td className="px-2 py-2 text-center text-xs text-gray-600">{robB}</td>
+                          <td className="px-1 py-2 border-l">
+                            <Input
+                              type="number"
+                              min="0"
+                              max={robA}
+                              value={bulkUpdateData[spare.id]?.consumedA || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
+                              className={`w-14 h-8 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                              data-testid={`input-consume-a-${spare.id}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              max={robB}
+                              value={bulkUpdateData[spare.id]?.consumedB || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
+                              className={`w-14 h-8 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                              data-testid={`input-consume-b-${spare.id}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 border-l">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={bulkUpdateData[spare.id]?.receivedA || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
+                              className="w-14 h-8 text-sm text-center"
+                              data-testid={`input-receive-a-${spare.id}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={bulkUpdateData[spare.id]?.receivedB || ""}
+                              onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
+                              className="w-14 h-8 text-sm text-center"
+                              data-testid={`input-receive-b-${spare.id}`}
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-center border-l">
+                            <div className={`text-sm font-medium ${hasError ? 'text-red-600' : ''}`}>
+                              {newROB}
+                              {(hasInsufficientStockA || hasInsufficientStockB) && (
+                                <div className="text-[10px] text-red-600">Insufficient</div>
+                              )}
+                              {needsReceivedDate && (
+                                <div className="text-[10px] text-red-600">Date required</div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {bulkModalFilteredSpares.length === 0 && bulkSearchQuery && (
+                <div className="p-8 text-center text-gray-500">
+                  No spares found matching "{bulkSearchQuery}"
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsBulkUpdateModalOpen(false)}>
+            <Button variant="outline" onClick={() => setIsBulkUpdateModalOpen(false)} data-testid="button-bulk-cancel">
               Cancel
             </Button>
             <Button 
-              onClick={saveBulkUpdates} 
+              onClick={saveBulkUpdates}
+              data-testid="button-bulk-save"
               disabled={bulkUpdateMutation.isPending || (() => {
                 // Check for validation errors
                 return Object.entries(bulkUpdateData).some(([id, data]) => {
-                  const spare = filteredSpares.find((s: Spare) => s.id === parseInt(id));
+                  const spare = sparesData.find((s: Spare) => s.id === parseInt(id));
                   if (!spare) return false;
-                  const newROB = spare.rob - (data.consumed || 0) + (data.received || 0);
-                  if (newROB < 0) return true;
-                  if (data.received > 0 && !data.receivedDate) return true;
+                  // Check per-location stock
+                  if ((data.consumedA || 0) > (spare.robLocationA ?? 0)) return true;
+                  if ((data.consumedB || 0) > (spare.robLocationB ?? 0)) return true;
+                  // Check received date requirement
+                  const totalReceived = (data.receivedA || 0) + (data.receivedB || 0);
+                  if (totalReceived > 0 && !data.receivedDate) return true;
                   return false;
                 });
               })()}
