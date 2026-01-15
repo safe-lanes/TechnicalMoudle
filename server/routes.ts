@@ -1051,14 +1051,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (jobTypeFilter === 'CALENDAR' && !isCalendarJob) continue;
         if (jobTypeFilter === 'RH' && !isRHJob) continue;
 
-        // Apply department filter
-        if (department && department !== 'all' && job.department !== department) continue;
+        // Apply department filter - check both job.department and component.department
+        if (department && department !== 'all') {
+          const jobDept = job.department || component?.department || '';
+          if (jobDept !== department) continue;
+        }
 
-        // Apply rank filter
+        // Apply rank filter - use exact match (case-insensitive) instead of substring includes
         if (ranks) {
           const rankList = (ranks as string).split(',').map(r => r.trim().toLowerCase());
-          const assignedRank = (job.assignedTo || '').toLowerCase();
-          if (rankList.length > 0 && !rankList.some(r => assignedRank.includes(r))) continue;
+          const assignedRank = (job.assignedTo || '').trim().toLowerCase();
+          // FIXED: Use exact match instead of substring includes to prevent "AB" matching "Cable"
+          if (rankList.length > 0 && !rankList.some(r => r === assignedRank)) continue;
         }
 
         // Apply criticality filter
@@ -1148,17 +1152,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Skip if not overdue and includeOverdue is true but no date/RH filter applied
+        // FIXED: Actually skip overdue items when includeOverdue is false
         if (includeOverdue !== 'true' && status === 'OVERDUE') {
-          // Include overdue by default unless explicitly filtered out
+          continue;
         }
 
-        // Find open work order for this job
-        const openWO = allWorkOrders.find(wo => 
-          wo.jobId === job.id && 
+        // Find work orders for this job - include both open AND completed WOs
+        // Priority: open WO > most recent completed WO
+        const jobWOs = allWorkOrders.filter(wo => wo.jobId === job.id);
+        const openWO = jobWOs.find(wo => 
           wo.status !== 'Completed' && 
           wo.status !== 'Rejected'
         );
+        // If no open WO, find the most recent completed or rejected one
+        const completedWO = !openWO ? jobWOs.find(wo => 
+          wo.status === 'Completed' || wo.status === 'Rejected'
+        ) : null;
+        const relevantWO = openWO || completedWO;
 
         // Calculate spare status
         let spareStatus: 'OK' | 'LOW' | 'ZERO' | 'NOT_SET' = 'NOT_SET';
@@ -1203,9 +1213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           remainingHours: remainingHours,
           parentRH: parentRH,
           status: status,
-          woId: openWO?.id || null,
-          woNo: openWO?.workOrderNo || null,
-          woStatus: openWO?.status || null,
+          woId: relevantWO?.id || null,
+          woNo: relevantWO?.workOrderNo || null,
+          woStatus: relevantWO?.status || null,
           spareStatus: spareStatus,
           frequencyValue: job.frequencyValue,
           frequencyUnit: job.frequencyUnit,
