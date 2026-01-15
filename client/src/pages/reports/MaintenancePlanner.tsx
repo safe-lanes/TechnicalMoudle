@@ -56,6 +56,10 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Loader2,
 } from "lucide-react";
 import { addDays, addMonths } from "date-fns";
@@ -139,6 +143,10 @@ export default function MaintenancePlanner() {
   const [showFilters, setShowFilters] = useState(true);
   const [expandedSummary, setExpandedSummary] = useState(true);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   // Build query params
   // FIXED: Only send calendar params for CALENDAR type, only RH params for RH type
   const queryParams = useMemo(() => {
@@ -191,6 +199,29 @@ export default function MaintenancePlanner() {
     enabled: !!vesselId,
     staleTime: 60000,
   });
+
+  // Reset to page 1 when data changes (filters change)
+  const totalJobs = data?.jobs?.length || 0;
+  const totalPages = Math.ceil(totalJobs / pageSize);
+  
+  // Calculate paginated jobs
+  const paginatedJobs = useMemo(() => {
+    if (!data?.jobs) return [];
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return data.jobs.slice(startIndex, endIndex);
+  }, [data?.jobs, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change (tracked via queryParams)
+  const queryParamsString = JSON.stringify(queryParams);
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [queryParamsString]);
+
+  // Ensure current page is valid
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
 
   // Export mutation
   const exportMutation = useMutation({
@@ -653,6 +684,7 @@ export default function MaintenancePlanner() {
                 No maintenance jobs found matching the current filters.
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -672,9 +704,9 @@ export default function MaintenancePlanner() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.jobs.map((job, index) => (
+                    {paginatedJobs.map((job, index) => (
                       <TableRow
-                        key={job.jobId}
+                        key={`${job.jobId}-${job.componentId}`}
                         className={
                           job.status === "OVERDUE"
                             ? "bg-red-50"
@@ -810,6 +842,92 @@ export default function MaintenancePlanner() {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 0 && (
+                <div className="flex items-center justify-between px-2 py-4 border-t">
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                      Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalJobs)} of {totalJobs} jobs
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="pageSize" className="text-sm text-gray-600">Rows per page:</Label>
+                      <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                        <SelectTrigger className="w-20 h-8" data-testid="select-page-size">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0"
+                      data-testid="button-first-page"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0"
+                      data-testid="button-prev-page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-1 mx-2">
+                      <span className="text-sm text-gray-600">Page</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={currentPage}
+                        onChange={(e) => {
+                          const page = parseInt(e.target.value);
+                          if (page >= 1 && page <= totalPages) {
+                            setCurrentPage(page);
+                          }
+                        }}
+                        className="w-14 h-8 text-center"
+                        data-testid="input-page-number"
+                      />
+                      <span className="text-sm text-gray-600">of {totalPages}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0"
+                      data-testid="button-next-page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0"
+                      data-testid="button-last-page"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </CardContent>
         </Card>
