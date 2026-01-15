@@ -211,14 +211,16 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   // the work order needs approval before it can be marked as Completed
   if (status === 'Pending Approval') return 'Pending Approval';
   
-  // Templates: check for completion (only after Pending Approval check)
+  // Check for manual postponed or rejected status BEFORE completion check
+  // CRITICAL: Rejected work orders may have completionDateTime set from when user filled Part B
+  // but they should still appear as Rejected (in Planned tab), not Completed
+  if (status === 'Postponed') return 'Postponed';
+  if (status === 'Rejected') return 'Rejected';
+  
+  // Templates: check for completion (only after Pending Approval and Rejected checks)
   if (completionDateTime || status === 'Completed') {
     return 'Completed';
   }
-  
-  // Check for manual postponed or rejected status
-  if (status === 'Postponed') return 'Postponed';
-  if (status === 'Rejected') return 'Rejected';
   
   // Branch based on maintenance basis for spec-compliant status calculation
   if (maintenanceBasis === 'Running Hours') {
