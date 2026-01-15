@@ -847,9 +847,13 @@ const Spares: React.FC = () => {
     enabled: !!vesselId
   });
   
+  // Get actual location names - prefer spare-specific names, then vessel settings, then defaults
+  // Find the first spare with location names defined to use as reference
+  const firstSpareWithLocations = (sparesData as Spare[])?.find(s => s.location || s.location2);
+  
   const locationNames = {
-    locationA: locationNamesData?.locationAName || 'Location A',
-    locationB: locationNamesData?.locationBName || 'Location B'
+    locationA: firstSpareWithLocations?.location || locationNamesData?.locationAName || 'Location A',
+    locationB: firstSpareWithLocations?.location2 || locationNamesData?.locationBName || 'Location B'
   };
 
   // Consume spare mutation (location-aware)
