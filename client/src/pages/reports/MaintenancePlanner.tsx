@@ -124,7 +124,7 @@ const RANKS = [
 const DEPARTMENTS = ["Engine", "Deck", "Electrical", "Catering", "Safety"];
 
 export default function MaintenancePlanner() {
-  const { vesselId } = useVessel();
+  const { vesselId, setVesselId, vessels } = useVessel();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -140,9 +140,10 @@ export default function MaintenancePlanner() {
   const [expandedSummary, setExpandedSummary] = useState(true);
 
   // Build query params
+  // FIXED: Only send calendar params for CALENDAR type, only RH params for RH type
   const queryParams = useMemo(() => {
     const params: Record<string, string> = {
-      vesselId: vesselId || "V001",
+      vesselId: vesselId || "",
       includeOverdue: includeOverdue ? "true" : "false",
     };
 
@@ -150,12 +151,16 @@ export default function MaintenancePlanner() {
       params.jobType = jobType;
     }
 
+    // FIXED: Only apply date window filter for CALENDAR and BOTH job types
     if (jobType === "CALENDAR" || jobType === "BOTH") {
       const today = new Date();
+      params.fromDate = today.toISOString().split("T")[0];
       params.toDate = addDays(today, parseInt(dateWindow)).toISOString().split("T")[0];
     }
 
+    // FIXED: Only apply RH window filter for RH and BOTH job types
     if (jobType === "RH" || jobType === "BOTH") {
+      params.remainingHoursMin = "0";
       params.remainingHoursMax = rhWindow;
     }
 
@@ -250,6 +255,30 @@ export default function MaintenancePlanner() {
     }
   };
 
+  // Get WO status badge with proper styling based on status
+  const getWOStatusBadge = (woStatus: string | null) => {
+    if (!woStatus) return null;
+    
+    switch (woStatus) {
+      case "Completed":
+        return <Badge className="bg-green-500 text-white text-xs">{woStatus}</Badge>;
+      case "In Progress":
+        return <Badge className="bg-blue-500 text-white text-xs">{woStatus}</Badge>;
+      case "Pending":
+      case "Open":
+        return <Badge className="bg-yellow-500 text-white text-xs">{woStatus}</Badge>;
+      case "Rejected":
+        return <Badge variant="destructive" className="text-xs">{woStatus}</Badge>;
+      case "Due (Grace P)":
+      case "Due (No Grace P)":
+        return <Badge className="bg-orange-500 text-white text-xs">{woStatus}</Badge>;
+      case "Overdue":
+        return <Badge variant="destructive" className="text-xs">{woStatus}</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs">{woStatus}</Badge>;
+    }
+  };
+
   const toggleRank = (rank: string) => {
     setSelectedRanks((prev) =>
       prev.includes(rank) ? prev.filter((r) => r !== rank) : [...prev, rank]
@@ -293,11 +322,24 @@ export default function MaintenancePlanner() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900" data-testid="G21.1"><Marker id="G21.1" />Maintenance Planner</h1>
               <p className="text-sm text-gray-500" data-testid="G21.2">
-                <Marker id="G21.2" />Planning view for {vesselId}
+                <Marker id="G21.2" />Planning view for {vessels.find(v => v.id === vesselId)?.name || vesselId}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Vessel Selector */}
+            <Select value={vesselId} onValueChange={setVesselId}>
+              <SelectTrigger className="w-48" data-testid="select-vessel">
+                <SelectValue placeholder="Select Vessel" />
+              </SelectTrigger>
+              <SelectContent>
+                {vessels.map(vessel => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {vessel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -721,12 +763,10 @@ export default function MaintenancePlanner() {
                           {job.woNo ? (
                             <div>
                               <div className="font-mono text-xs">{job.woNo}</div>
-                              <Badge variant="outline" className="text-xs mt-1">
-                                {job.woStatus}
-                              </Badge>
+                              {getWOStatusBadge(job.woStatus)}
                             </div>
                           ) : (
-                            <span className="text-gray-400">No WO</span>
+                            <Badge variant="outline" className="text-xs text-gray-400">Not Generated</Badge>
                           )}
                         </TableCell>
                         <TableCell>
