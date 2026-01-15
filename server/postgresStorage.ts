@@ -4944,14 +4944,20 @@ export class PostgresStorage {
     }
     
     const job = jobResult[0];
-    const today = new Date();
-    const year = today.getFullYear();
     
-    // Generate work order number using the correct field name (workOrderNo matches schema)
-    const existingWOs = await db.select().from(workOrders)
-      .where(eq(workOrders.jobId, jobId));
-    const woCount = existingWOs.length + 1;
-    const workOrderNo = `${job.jobNo}.WO-${year}-${String(woCount).padStart(3, '0')}`;
+    // Determine the component code to use for WO number generation
+    // Priority: activeComponentCode (from Section C context) > job.componentCode
+    const componentCodeForWO = activeComponentCode || job.componentCode;
+    
+    if (!componentCodeForWO) {
+      throw new Error(`Component code is required for work order generation. Job: ${jobId}`);
+    }
+    
+    // Import and use the spec-compliant work order numbering utility
+    // Format: {job_no}-{component_code}-{year}-{auto_increment}
+    // Example: MKR-IN-00041-702.005.01-2026-001
+    const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
+    const workOrderNo = await generatePlannedWorkOrderNumber(this, job.jobNo, componentCodeForWO, job.vesselId || undefined);
     
     // FIX: Resolve component details from activeComponentCode if provided
     // This ensures WO is bound to the correct component context for multi-linked jobs
