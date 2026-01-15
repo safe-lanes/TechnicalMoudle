@@ -100,6 +100,8 @@ export default function DefectFormWizard({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
   const [isAttachmentDialogOpen, setIsAttachmentDialogOpen] = useState(false);
+  const [partAAttachments, setPartAAttachments] = useState<FileAttachment[]>([]);
+  const [isPartAAttachmentDialogOpen, setIsPartAAttachmentDialogOpen] = useState(false);
   
   // Section refs for scroll tracking
   const partARef = useRef<HTMLDivElement>(null);
@@ -177,6 +179,14 @@ export default function DefectFormWizard({
       if (currentDefect.actions && Array.isArray(currentDefect.actions)) {
         setActions(currentDefect.actions);
       }
+      
+      if (currentDefect.partAAttachments && Array.isArray(currentDefect.partAAttachments)) {
+        setPartAAttachments(currentDefect.partAAttachments);
+      }
+      
+      if (currentDefect.attachments && Array.isArray(currentDefect.attachments)) {
+        setFileAttachments(currentDefect.attachments);
+      }
     }
   }, [currentDefect]);
 
@@ -228,6 +238,8 @@ export default function DefectFormWizard({
         ...data,
         actions: actions,
         reference: defectId,
+        partAAttachments: partAAttachments,
+        attachments: fileAttachments,
       };
       
       if (currentDefect?.id) {
@@ -966,9 +978,26 @@ export default function DefectFormWizard({
                     />
                   </div>
 
-                  {/* Submit Button for Part A */}
+                  {/* Attachments Button and Submit Button for Part A */}
                   {!isViewMode && (
-                    <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
+                    <div className="flex justify-end items-center gap-3 pt-6 mt-6 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsPartAAttachmentDialogOpen(true)}
+                        disabled={isViewMode}
+                        data-testid="button-part-a-attachments"
+                        className="border-gray-300"
+                      >
+                        <Paperclip className="h-4 w-4 mr-2" />
+                        Attachment(s)
+                        {partAAttachments.length > 0 && (
+                          <span className="ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                            {partAAttachments.length}
+                          </span>
+                        )}
+                      </Button>
                       <Button
                         type="button"
                         onClick={() => handleStepSubmit(1)}
@@ -1506,8 +1535,17 @@ export default function DefectFormWizard({
         onOpenChange={setIsAttachmentDialogOpen}
         attachments={fileAttachments}
         onAttachmentsChange={setFileAttachments}
-        title="Manage Attachments"
-        itemName="Defect Report"
+        title="C1 Attachments - Rectification Documentation"
+        itemName="Rectification"
+      />
+
+      <FileAttachmentDialog
+        open={isPartAAttachmentDialogOpen}
+        onOpenChange={setIsPartAAttachmentDialogOpen}
+        attachments={partAAttachments}
+        onAttachmentsChange={setPartAAttachments}
+        title="Part A Attachments - Defect Photos"
+        itemName="Defect Photo"
       />
     </div>
   );
