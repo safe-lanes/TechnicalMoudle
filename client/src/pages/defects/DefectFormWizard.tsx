@@ -103,6 +103,37 @@ export default function DefectFormWizard({
   const [partAAttachments, setPartAAttachments] = useState<FileAttachment[]>([]);
   const [isPartAAttachmentDialogOpen, setIsPartAAttachmentDialogOpen] = useState(false);
   
+  // B5 Target Date Extension state
+  const [showExtensionForm, setShowExtensionForm] = useState(false);
+  const [targetDateExtensions, setTargetDateExtensions] = useState<Array<{
+    id: string;
+    existingTargetDate: string;
+    newTargetDate: string;
+    reasonForExtension: string;
+    submitForApprovalTo: string;
+    submitForApprovalToName: string;
+    status: 'Requested' | 'Approved' | 'Rejected';
+    approved?: boolean;
+    approvalDate: string;
+    approverComments: string;
+    electronicConfirmation?: string;
+    requestedAt: string;
+  }>>([]);
+  const [currentExtension, setCurrentExtension] = useState({
+    newTargetDate: '',
+    reasonForExtension: '',
+    submitForApprovalTo: '',
+    approved: undefined as boolean | undefined,
+    approvalDate: '',
+    approverComments: ''
+  });
+  
+  // Fetch office users for approval dropdown
+  const { data: officeUsers = [] } = useQuery<{ id: number; fullName: string; role: string }[]>({
+    queryKey: ['/technical/api/users'],
+    select: (data) => data.filter(user => user.role === 'Office' || user.role === 'PMS Admin'),
+  });
+  
   // Section refs for scroll tracking
   const partARef = useRef<HTMLDivElement>(null);
   const partBRef = useRef<HTMLDivElement>(null);
@@ -723,7 +754,14 @@ export default function DefectFormWizard({
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-sm text-gray-600 mb-1.5">Target Date</label>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <label className="text-sm text-gray-600">Target Date</label>
+                        {targetDateExtensions.some(ext => ext.status === 'Approved') && (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800" data-testid="badge-extended">
+                            Extended
+                          </span>
+                        )}
+                      </div>
                       <Input 
                         {...form.register("targetCloseDate")} 
                         type="date"
@@ -1316,6 +1354,219 @@ export default function DefectFormWizard({
                     ) : (
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                         <p className="text-gray-500 text-sm">No actions added yet</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* B5. Target Date Extension */}
+                  <div className="space-y-4 pt-6">
+                    <div className="flex items-center justify-center">
+                      {!showExtensionForm && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowExtensionForm(true)}
+                          disabled={isViewMode}
+                          data-testid="button-extend-target-date"
+                          className="border-gray-300"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Extend Target Date
+                        </Button>
+                      )}
+                    </div>
+
+                    {showExtensionForm && (
+                      <div className="border border-amber-300 rounded-lg p-6 bg-amber-50/30 space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B5. Target Date Extension</h3>
+                          {targetDateExtensions.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Status:</span>
+                              <span className={`text-sm font-medium ${
+                                targetDateExtensions[targetDateExtensions.length - 1]?.status === 'Approved' 
+                                  ? 'text-green-600' 
+                                  : targetDateExtensions[targetDateExtensions.length - 1]?.status === 'Rejected'
+                                    ? 'text-red-600'
+                                    : 'text-amber-600'
+                              }`}>
+                                {targetDateExtensions[targetDateExtensions.length - 1]?.status?.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="flex flex-col">
+                            <label className="text-sm text-gray-600 mb-1.5">Existing Target Date (Auto filled)</label>
+                            <Input 
+                              type="date"
+                              value={form.watch('targetCloseDate') || ''}
+                              disabled
+                              data-testid="input-existing-target-date"
+                              className="h-10 text-sm border-gray-300 bg-gray-100"
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm text-gray-600 mb-1.5">New Target Date</label>
+                            <Input 
+                              type="date"
+                              value={currentExtension.newTargetDate}
+                              onChange={(e) => setCurrentExtension(prev => ({ ...prev, newTargetDate: e.target.value }))}
+                              disabled={isViewMode}
+                              data-testid="input-new-target-date"
+                              className="h-10 text-sm border-gray-300"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="flex flex-col">
+                            <label className="text-sm text-gray-600 mb-1.5">Reason for Extension</label>
+                            <Textarea 
+                              value={currentExtension.reasonForExtension}
+                              onChange={(e) => setCurrentExtension(prev => ({ ...prev, reasonForExtension: e.target.value }))}
+                              disabled={isViewMode}
+                              data-testid="input-reason-for-extension"
+                              className="text-sm border-gray-300 min-h-[80px]"
+                              placeholder="Enter reason for extension..."
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm text-gray-600 mb-1.5">Submit for Approval to:</label>
+                            <Select
+                              value={currentExtension.submitForApprovalTo}
+                              onValueChange={(value) => setCurrentExtension(prev => ({ ...prev, submitForApprovalTo: value }))}
+                              disabled={isViewMode}
+                            >
+                              <SelectTrigger data-testid="select-approval-to" className="h-10 text-sm border-gray-300">
+                                <SelectValue placeholder="Select approver" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {officeUsers.map((user) => (
+                                  <SelectItem key={user.id} value={user.id.toString()}>
+                                    {user.fullName} ({user.role})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="flex items-center gap-6">
+                            <span className="text-sm text-gray-600">Approved?</span>
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="approved"
+                                  checked={currentExtension.approved === true}
+                                  onChange={() => setCurrentExtension(prev => ({ ...prev, approved: true }))}
+                                  disabled={isViewMode}
+                                  className="w-4 h-4 text-blue-600"
+                                  data-testid="radio-approved-yes"
+                                />
+                                <span className="text-sm">Yes</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="approved"
+                                  checked={currentExtension.approved === false}
+                                  onChange={() => setCurrentExtension(prev => ({ ...prev, approved: false }))}
+                                  disabled={isViewMode}
+                                  className="w-4 h-4 text-blue-600"
+                                  data-testid="radio-approved-no"
+                                />
+                                <span className="text-sm">No</span>
+                              </label>
+                            </div>
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm text-gray-600 mb-1.5">Approval Date</label>
+                            <Input 
+                              type="date"
+                              value={currentExtension.approvalDate}
+                              onChange={(e) => setCurrentExtension(prev => ({ ...prev, approvalDate: e.target.value }))}
+                              disabled={isViewMode}
+                              data-testid="input-approval-date"
+                              className="h-10 text-sm border-gray-300"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-sm text-gray-600 mb-1.5">Approver Comments (if any):</label>
+                          <Textarea 
+                            value={currentExtension.approverComments}
+                            onChange={(e) => setCurrentExtension(prev => ({ ...prev, approverComments: e.target.value }))}
+                            disabled={isViewMode}
+                            data-testid="input-approver-comments"
+                            className="text-sm border-gray-300 min-h-[60px]"
+                            placeholder="Enter approver comments..."
+                          />
+                        </div>
+
+                        {targetDateExtensions.length > 0 && targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <span>Electronic Confirmation (System Generated):</span>
+                            <span className="italic text-gray-800">
+                              {targetDateExtensions[targetDateExtensions.length - 1]?.electronicConfirmation}
+                            </span>
+                          </div>
+                        )}
+
+                        {!isViewMode && (
+                          <div className="flex justify-end pt-2">
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                const existingTargetDate = form.getValues('targetCloseDate') || '';
+                                const approverUser = officeUsers.find(u => u.id.toString() === currentExtension.submitForApprovalTo);
+                                const newExtension = {
+                                  id: `EXT-${Date.now()}`,
+                                  existingTargetDate,
+                                  newTargetDate: currentExtension.newTargetDate,
+                                  reasonForExtension: currentExtension.reasonForExtension,
+                                  submitForApprovalTo: currentExtension.submitForApprovalTo,
+                                  submitForApprovalToName: approverUser?.fullName || '',
+                                  status: (currentExtension.approved === true ? 'Approved' : currentExtension.approved === false ? 'Rejected' : 'Requested') as 'Requested' | 'Approved' | 'Rejected',
+                                  approved: currentExtension.approved,
+                                  approvalDate: currentExtension.approvalDate,
+                                  approverComments: currentExtension.approverComments,
+                                  electronicConfirmation: currentExtension.approved !== undefined 
+                                    ? `Approved by System User on ${new Date().toLocaleDateString()}` 
+                                    : undefined,
+                                  requestedAt: new Date().toISOString(),
+                                };
+                                
+                                setTargetDateExtensions(prev => [...prev, newExtension]);
+                                
+                                if (newExtension.status === 'Approved' && newExtension.newTargetDate) {
+                                  form.setValue('targetCloseDate', newExtension.newTargetDate);
+                                }
+                                
+                                setCurrentExtension({
+                                  newTargetDate: '',
+                                  reasonForExtension: '',
+                                  submitForApprovalTo: '',
+                                  approved: undefined,
+                                  approvalDate: '',
+                                  approverComments: ''
+                                });
+                                
+                                toast({ title: newExtension.status === 'Requested' ? "Extension request submitted" : `Extension ${newExtension.status.toLowerCase()}` });
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                              data-testid="button-submit-extension"
+                              disabled={!currentExtension.newTargetDate || !currentExtension.reasonForExtension}
+                            >
+                              Submit
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
