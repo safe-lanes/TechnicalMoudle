@@ -239,11 +239,14 @@ const Spares: React.FC = () => {
       ...prev,
       [spare.id]: { locationA: origA, locationB: origB }
     }));
+    // Initialize with both stock values AND location names from the spare record
     setEditingLocations(prev => ({
       ...prev,
       [spare.id]: {
         locationA: String(origA),
-        locationB: String(origB)
+        locationB: String(origB),
+        nameA: spare.location || locationNames.locationA,
+        nameB: spare.location2 || locationNames.locationB
       }
     }));
   };
