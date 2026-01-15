@@ -1922,6 +1922,7 @@ const Spares: React.FC = () => {
                               <div className="space-y-3">
                                 <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
                                 <div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
                                   <Input
                                     type="text"
                                     value={editingLocations[spare.id]?.nameA || locationNames.locationA || 'Location A'}
@@ -1947,6 +1948,7 @@ const Spares: React.FC = () => {
                                   />
                                 </div>
                                 <div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
                                   <Input
                                     type="text"
                                     value={editingLocations[spare.id]?.nameB || locationNames.locationB || 'Location B'}
@@ -2265,23 +2267,41 @@ const Spares: React.FC = () => {
                       <th className="px-3 py-2 text-left text-xs font-medium">Part Name</th>
                       <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
                         <div className="text-center">ROB</div>
-                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
-                          <span className="w-12 text-center">{locationNames.locationA}</span>
-                          <span className="w-12 text-center">{locationNames.locationB}</span>
+                        <div className="flex justify-center gap-2 text-[10px] mt-1">
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
+                          </div>
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
+                          </div>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                         <div className="text-center text-orange-600">Consumed</div>
-                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
-                          <span className="w-14 text-center">{locationNames.locationA}</span>
-                          <span className="w-14 text-center">{locationNames.locationB}</span>
+                        <div className="flex justify-center gap-2 text-[10px] mt-1">
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
+                          </div>
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
+                          </div>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                         <div className="text-center text-green-600">Received</div>
-                        <div className="flex justify-center gap-2 text-[10px] text-gray-500 mt-1">
-                          <span className="w-14 text-center">{locationNames.locationA}</span>
-                          <span className="w-14 text-center">{locationNames.locationB}</span>
+                        <div className="flex justify-center gap-2 text-[10px] mt-1">
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
+                          </div>
+                          <div className="w-16 text-center">
+                            <div className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</div>
+                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
+                          </div>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>

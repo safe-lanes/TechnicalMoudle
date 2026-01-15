@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YrfVEakb8t2qEcP6MHB3xD9Ane2m9mZ4zuorNB3dBbK1KxaJKhOKVrMoklAMOzy
+\restrict fXQudEuIYqEzyFzbB5i3VFjLbnGafIS9rLe6k9YjZhD0hz6hwlvyk8OBYmzzvBw
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -14987,7 +14987,7 @@ f13ffd04-c094-46e4-8250-9dcbf6e74be8	Nilesh Kumar	Sail Admin	Office User	Office	
 
 COPY public.pms_vessel_settings (id, vessel_id, calendar_lead_days_critical, calendar_lead_days_non_critical, calendar_grace_mode, calendar_grace_days, rh_lead_hours_critical, rh_lead_hours_non_critical, rh_grace_hours, location_a_name, location_b_name, updated_by, created_at, updated_at) FROM stdin;
 1	743ef9d1-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	Location A	Location B	admin	2026-01-13 11:12:59.433147	2026-01-13 11:12:59.433147
-2	744535d0-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	3rd deck box 8	Location B	admin	2026-01-14 09:06:21.867	2026-01-15 09:32:08.014
+2	744535d0-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	AAA-BBB-CCC	CCC-BB-XXX	admin	2026-01-14 09:06:21.867	2026-01-15 10:47:22.819
 \.
 
 
@@ -55292,5 +55292,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YrfVEakb8t2qEcP6MHB3xD9Ane2m9mZ4zuorNB3dBbK1KxaJKhOKVrMoklAMOzy
+\unrestrict fXQudEuIYqEzyFzbB5i3VFjLbnGafIS9rLe6k9YjZhD0hz6hwlvyk8OBYmzzvBw
 
