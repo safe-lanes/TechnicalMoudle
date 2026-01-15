@@ -229,15 +229,17 @@ const Spares: React.FC = () => {
     };
   }, [openLocationDropdown, editingLocations]);
   
-  const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number}}>({});
+  const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number, nameA: string, nameB: string}}>({});
   
   const handleOpenLocationDropdown = (spare: Spare) => {
     setOpenLocationDropdown(spare.id);
     const origA = spare.robLocationA ?? 0;
     const origB = spare.robLocationB ?? 0;
+    const origNameA = spare.location || locationNames.locationA || 'Location A';
+    const origNameB = spare.location2 || locationNames.locationB || 'Location B';
     setOriginalLocationValues(prev => ({
       ...prev,
-      [spare.id]: { locationA: origA, locationB: origB }
+      [spare.id]: { locationA: origA, locationB: origB, nameA: origNameA, nameB: origNameB }
     }));
     // Initialize with both stock values AND location names from the spare record
     setEditingLocations(prev => ({
@@ -331,10 +333,15 @@ const Spares: React.FC = () => {
     }
     
     // Save spare-specific location names if they were edited
-    if (locations.nameA !== (spare.location || locationNames.locationA) || 
-        locations.nameB !== (spare.location2 || locationNames.locationB)) {
+    const origNameA = original?.nameA || spare.location || locationNames.locationA || 'Location A';
+    const origNameB = original?.nameB || spare.location2 || locationNames.locationB || 'Location B';
+    const nameAChanged = locations.nameA !== origNameA;
+    const nameBChanged = locations.nameB !== origNameB;
+    
+    if (nameAChanged || nameBChanged) {
       attemptCount++;
       try {
+        console.log('[Save Location] Updating spare location names:', { spareId, nameA: locations.nameA, nameB: locations.nameB });
         const res = await fetch(`/technical/api/spares/${vesselId}/${spareId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -344,19 +351,17 @@ const Spares: React.FC = () => {
           }),
         });
         if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error('[Save Location] PATCH failed:', errData);
           errors.push('Failed to save spare location names');
         } else {
+          console.log('[Save Location] PATCH successful');
           successCount++;
         }
       } catch (e: any) {
+        console.error('[Save Location] PATCH error:', e);
         errors.push(`Spare location names: ${e.message || 'Network error'}`);
       }
-    }
-    
-    // Save location names to vessel settings if they were edited (as default names for the vessel)
-    if (locations.nameA && locations.nameB) {
-      // Logic for saving vessel-wide defaults if needed, 
-      // but the priority is the spare-specific ones updated above
     }
     
     // Always invalidate cache to reflect any partial changes
@@ -364,7 +369,7 @@ const Spares: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
     
     const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
-    const hadNameChanges = !!(locations.nameA || locations.nameB);
+    const hadNameChanges = nameAChanged || nameBChanged;
     
     if (errors.length === 0 && attemptCount > 0) {
       if (hadInventoryChanges) {
