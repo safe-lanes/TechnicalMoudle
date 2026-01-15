@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mjVO5yepc0JmIm3L9289u1NQtlnf2kreQ9MfH4a0AkLpwlBzs1hGtletrydYrMi
+\restrict ZiPLiYNZ2o5aIipXqms7AqHyItfaMJtVV4ACrCgKh5uuNxvt75WFgoaPwpid4YY
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -3562,7 +3562,6 @@ COMP-1768381197214-tycbruo6a	702.005.AA	FO Separators	702.005	702.005.02	FO Sepa
 COMP-1768381197217-idtf1cbjq	702.010.AA	Do Separator Booster Pumps	702.010	702.010.01	DO Separator Booster Pumps No.01	7 Systems for Machinery Main Components	NO MANUFACTURER	MKR-000012	GP30G	MKR-999999-GP30G	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	702.010	\N	\N	0.00	\N	\N	\N	NOT RH DRIVEN	\N	\N	\N	\N	\N	\N	\N	\N	2026-01-14 08:59:57.218577	2026-01-14 08:59:57.218577
 COMP-1768381197221-rqebi13x1	702.010.AA	Do Separator Booster Pumps	702.010	702.010.02	DO Separator Booster Pumps No.02	7 Systems for Machinery Main Components	NO MANUFACTURER	MKR-000012	GP30G	MKR-999999-GP30G	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	702.010	\N	\N	0.00	\N	\N	\N	NOT RH DRIVEN	\N	\N	\N	\N	\N	\N	\N	\N	2026-01-14 08:59:57.222022	2026-01-14 08:59:57.222022
 COMP-1768381197224-7g3ls2mb4	702.005.AA	FO Separators	712.011	712.011.01	LO Separators No.01	7 Systems for Machinery Main Components	Mitsubishi Kakoki Kaisha, Ltd.	MKR-000015	SJ30G	MKR-000015-SJ30G	712005	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9600l/h	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	712.011	\N	\N	0.00	\N	\N	\N	MASTER	SELF	\N	\N	2026-01-14 08:59:57.224	\N	IMPORT	\N	\N	2026-01-14 08:59:57.225441	2026-01-14 08:59:57.225441
-COMP-1768381197227-hvez0e4rh	702.005.AA	FO Separators	712.011	712.011.02	LO Separators No.02	7 Systems for Machinery Main Components	Mitsubishi Kakoki Kaisha, Ltd.	MKR-000015	SJ30G	MKR-000015-SJ30G	712006	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9600l/h	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	712.011	\N	\N	0.00	\N	\N	\N	MASTER	SELF	\N	\N	2026-01-14 08:59:57.227	\N	IMPORT	\N	\N	2026-01-14 08:59:57.228096	2026-01-14 08:59:57.228096
 COMP-1768381197230-5fgeseek9	712.013.AA	LO Separator Booster Pumps	712.013	712.013.01	LO Separator Booster Pumps No.01	7 Systems for Machinery Main Components	Heishin Pump Works Co Ltd	MKR-000017	MAU-4032-1	MKR-000017-MAU-4032-1	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	712.013	\N	\N	0.00	\N	\N	\N	NOT RH DRIVEN	\N	\N	\N	\N	\N	\N	\N	\N	2026-01-14 08:59:57.231423	2026-01-14 08:59:57.231423
 COMP-1768381197234-x8yzl8lr0	712.013.AA	LO Separator Booster Pumps	712.013	712.013.02	LO Separator Booster Pumps No.02	7 Systems for Machinery Main Components	Heishin Pump Works Co Ltd	MKR-000017	MAU-4032-1	MKR-000017-MAU-4032-1	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	712.013	\N	\N	0.00	\N	\N	\N	NOT RH DRIVEN	\N	\N	\N	\N	\N	\N	\N	\N	2026-01-14 08:59:57.234655	2026-01-14 08:59:57.234655
 COMP-1768381197237-nng7v75d9	721.801.AA	El. Motor, Main SW Cooling Pumps	721.001.01	721.801.01	El. Motor, Main Sw Cooling Pumps No.01	7 Systems for Machinery Main Components	NO MANUFACTURER	MKR-000012	NULL	MKR-999999-NULL	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	721.001.01	\N	\N	0.00	\N	\N	\N	NOT RH DRIVEN	\N	\N	\N	\N	\N	\N	\N	\N	2026-01-14 08:59:57.237654	2026-01-14 08:59:57.237654
@@ -3572,6 +3571,7 @@ COMP-1768381197246-9yggskmit	721.003.AA	Aux. SW Cooling Pumps	721.003	721.003.02
 COMP-1768381196649-b9uti3hpx	554.003.AA	Compressors W/Drive Unit	554.003	554.003.02	Compressors W/Drive Unit No.02	5 Equipment for Crew & Passengers	Ushio Reinetsu Co Ltd	MKR-000007	FAD-2MSYM	MKR-000007-FAD-2MSYM	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	Technical Information\r\n===================\r\nMfg Model: FAD-2MSYM\r\nMfg Type: Semi Hermatic Type\r\nCylinder bore: 50mm\r\nStroke: 40mm\r\nRev: 1750min-1	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	5 Equipment for Crew & Passengers	f	\N	554.003	\N	\N	15010.00	2026-01-11	\N	\N	MASTER	SELF	\N	15010.00	2026-01-14 09:04:11.057	Chief Engineer	WO_COMPLETION	\N	\N	2026-01-14 08:59:56.650462	2026-01-14 09:04:11.057
 COMP-1768381196674-f47p8fcg3	601.002.AA	ME Cylinder Covers W/Valves	601.002	601.002.05	ME Cylinder Covers W/Valves No.05	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.002	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	4000.00	2026-01-14 09:23:46.218	2026-01-14 08:59:56.67572	2026-01-14 09:23:46.218
 COMP-1768381196708-7j3xrblfs	601.004.AA	ME Pistons, Piston Rods	601.004	601.004.02	ME Pistons, Piston Rods No.02	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.004	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	4000.00	2026-01-14 09:23:46.218	2026-01-14 08:59:56.709734	2026-01-14 09:23:46.218
+COMP-1768381197227-hvez0e4rh	702.005.AA	FO Separators	712.011	712.011.02	LO Separators No.02	7 Systems for Machinery Main Components	Mitsubishi Kakoki Kaisha, Ltd.	MKR-000015	SJ30G	MKR-000015-SJ30G	712006	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9600l/h	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	7 Systems for Machinery Main Components	f	\N	712.011	\N	\N	1501.00	02 Jan 2026 05:30	\N	\N	MASTER	SELF	\N	1501.00	2026-01-15 11:05:51.854	\N	MANUAL	\N	\N	2026-01-14 08:59:57.228096	2026-01-15 11:05:51.854
 COMP-1768381196467-0yhg06u8p	601.001.AA	Main Diesel Engine, Compl.	601	601.001	Main Diesel Engine, Compl.	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	751666	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9267 KW	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	MASTER	\N	\N	4000.00	2026-01-14 09:23:46.218	\N	MANUAL	\N	\N	2026-01-14 08:59:56.468548	2026-01-14 09:23:46.218
 COMP-1768381196743-5l07m79uk	601.005.AA	ME Connecting Rods, Crosshead, Guides	601.005	601.005.04	ME Connecting Rods, Crosshead, Guides No.04	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.005	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	4000.00	2026-01-14 09:23:46.218	2026-01-14 08:59:56.744129	2026-01-14 09:23:46.218
 COMP-1768381196786-y689i6p6n	601.007.AA	ME Main Bearings, Journals	601.007	601.007.08	ME Main Bearings, Journals No.08	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.007	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	4000.00	2026-01-14 09:23:46.218	2026-01-14 08:59:56.787074	2026-01-14 09:23:46.218
@@ -14987,7 +14987,7 @@ f13ffd04-c094-46e4-8250-9dcbf6e74be8	Nilesh Kumar	Sail Admin	Office User	Office	
 
 COPY public.pms_vessel_settings (id, vessel_id, calendar_lead_days_critical, calendar_lead_days_non_critical, calendar_grace_mode, calendar_grace_days, rh_lead_hours_critical, rh_lead_hours_non_critical, rh_grace_hours, location_a_name, location_b_name, updated_by, created_at, updated_at) FROM stdin;
 1	743ef9d1-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	Location A	Location B	admin	2026-01-13 11:12:59.433147	2026-01-13 11:12:59.433147
-2	744535d0-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	3rd deck box 8	Location B	admin	2026-01-14 09:06:21.867	2026-01-15 09:32:08.014
+2	744535d0-841a-11ed-aa7c-7003bca91a86	7	14	COMPANY_STANDARD	7	50	100	168	AAA-BBB-CCC	CCC-BB-XXX	admin	2026-01-14 09:06:21.867	2026-01-15 11:15:58.545
 \.
 
 
@@ -25038,6 +25038,7 @@ COPY public.running_hours_audit (id, vessel_id, component_id, previous_rh, new_r
 1124	743feb08-841a-11ed-aa7c-7003bca91a86	COMP-1768302796442-cznrf1yff	6000.00	6000.00	6000.00	01 Jan 2026 05:30	UTC	2026-01-15 08:58:22.356	system	inherited_cascade	\N	f	\N	\N	1
 1125	743feb08-841a-11ed-aa7c-7003bca91a86	COMP-1768302796445-d8rlsn86y	6000.00	6000.00	6000.00	01 Jan 2026 05:30	UTC	2026-01-15 08:58:22.356	system	inherited_cascade	\N	f	\N	\N	1
 1126	743feb08-841a-11ed-aa7c-7003bca91a86	COMP-1768302796101-1tz7ds77b	0.00	1500.00	1500.00	01 Jan 2026 05:30	UTC	2026-01-15 09:04:43.753	system	cascade	\N	f	\N	\N	1
+1127	744535d0-841a-11ed-aa7c-7003bca91a86	COMP-1768381197227-hvez0e4rh	0.00	1501.00	1501.00	02 Jan 2026 05:30	UTC	2026-01-15 11:05:51.854	system	cascade	\N	f	\N	\N	1
 \.
 
 
@@ -53277,7 +53278,7 @@ SELECT pg_catalog.setval('public.recurring_defects_id_seq', 1, false);
 -- Name: running_hours_audit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.running_hours_audit_id_seq', 1126, true);
+SELECT pg_catalog.setval('public.running_hours_audit_id_seq', 1127, true);
 
 
 --
@@ -53312,7 +53313,7 @@ SELECT pg_catalog.setval('public.spares_history_id_seq', 5, true);
 -- Name: spares_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.spares_id_seq', 6682, true);
+SELECT pg_catalog.setval('public.spares_id_seq', 6685, true);
 
 
 --
@@ -55292,5 +55293,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mjVO5yepc0JmIm3L9289u1NQtlnf2kreQ9MfH4a0AkLpwlBzs1hGtletrydYrMi
+\unrestrict ZiPLiYNZ2o5aIipXqms7AqHyItfaMJtVV4ACrCgKh5uuNxvt75WFgoaPwpid4YY
 

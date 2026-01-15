@@ -2267,41 +2267,23 @@ const Spares: React.FC = () => {
                       <th className="px-3 py-2 text-left text-xs font-medium">Part Name</th>
                       <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
                         <div className="text-center">ROB</div>
-                        <div className="flex justify-center gap-2 text-[10px] mt-1">
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
-                          </div>
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
-                          </div>
+                        <div className="flex justify-center gap-4 text-[10px] mt-1">
+                          <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</span>
+                          <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</span>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                         <div className="text-center text-orange-600">Consumed</div>
-                        <div className="flex justify-center gap-2 text-[10px] mt-1">
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
-                          </div>
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
-                          </div>
+                        <div className="flex justify-center gap-4 text-[10px] mt-1">
+                          <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</span>
+                          <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</span>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                         <div className="text-center text-green-600">Received</div>
-                        <div className="flex justify-center gap-2 text-[10px] mt-1">
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationA}</div>
-                          </div>
-                          <div className="w-16 text-center">
-                            <div className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</div>
-                            <div className="text-gray-500 truncate">{locationNames.locationB}</div>
-                          </div>
+                        <div className="flex justify-center gap-4 text-[10px] mt-1">
+                          <span className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</span>
+                          <span className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</span>
                         </div>
                       </th>
                       <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
@@ -2324,51 +2306,68 @@ const Spares: React.FC = () => {
                       const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.id]?.receivedDate;
                       const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
                       
+                      // Get spare-specific location names with fallbacks
+                      const spareLocA = spare.location || locationNamesData?.locationAName || 'Location A';
+                      const spareLocB = spare.location2 || locationNamesData?.locationBName || 'Location B';
+                      
                       return (
                         <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                           <td className="px-3 py-2 text-sm">{spare.partCode}</td>
                           <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={spare.partName}>{spare.partName}</td>
-                          <td className="px-2 py-2 text-center text-xs text-gray-600">{robA}</td>
-                          <td className="px-2 py-2 text-center text-xs text-gray-600">{robB}</td>
+                          {/* ROB cells with location names */}
+                          <td className="px-2 py-2 text-center">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={spareLocA}>{spareLocA}</div>
+                            <div className="text-xs text-gray-600 font-medium">{robA}</div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={spareLocB}>{spareLocB}</div>
+                            <div className="text-xs text-gray-600 font-medium">{robB}</div>
+                          </td>
+                          {/* Consumed cells with location names */}
                           <td className="px-1 py-2 border-l">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
                             <Input
                               type="number"
                               min="0"
                               max={robA}
                               value={bulkUpdateData[spare.id]?.consumedA || ""}
                               onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedA', e.target.value)}
-                              className={`w-14 h-8 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                              className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
                               data-testid={`input-consume-a-${spare.id}`}
                             />
                           </td>
                           <td className="px-1 py-2">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
                             <Input
                               type="number"
                               min="0"
                               max={robB}
                               value={bulkUpdateData[spare.id]?.consumedB || ""}
                               onChange={(e) => handleBulkUpdateChange(spare.id, 'consumedB', e.target.value)}
-                              className={`w-14 h-8 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                              className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
                               data-testid={`input-consume-b-${spare.id}`}
                             />
                           </td>
+                          {/* Received cells with location names */}
                           <td className="px-1 py-2 border-l">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocA}>{spareLocA}</div>
                             <Input
                               type="number"
                               min="0"
                               value={bulkUpdateData[spare.id]?.receivedA || ""}
                               onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedA', e.target.value)}
-                              className="w-14 h-8 text-sm text-center"
+                              className="w-14 h-7 text-sm text-center"
                               data-testid={`input-receive-a-${spare.id}`}
                             />
                           </td>
                           <td className="px-1 py-2">
+                            <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={spareLocB}>{spareLocB}</div>
                             <Input
                               type="number"
                               min="0"
                               value={bulkUpdateData[spare.id]?.receivedB || ""}
                               onChange={(e) => handleBulkUpdateChange(spare.id, 'receivedB', e.target.value)}
-                              className="w-14 h-8 text-sm text-center"
+                              className="w-14 h-7 text-sm text-center"
                               data-testid={`input-receive-b-${spare.id}`}
                             />
                           </td>
