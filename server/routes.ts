@@ -2830,6 +2830,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // REJECTION WORKFLOW: When status is being set to 'Rejected', clear completion data
+      // This allows the work order to be reworked (Part B can be re-entered)
+      const isBeingRejected = updateData.status?.toLowerCase() === 'rejected';
+      if (isBeingRejected) {
+        // Clear completion data so it doesn't appear in Date Completed column
+        updateData.completionDateTime = null;
+        updateData.dateCompleted = null;
+        updateData.dateOfCompletion = null;
+        // Store rejection date for audit trail
+        updateData.rejectionDate = new Date().toISOString();
+        console.log('📝 Work order rejected - clearing completion data for rework');
+      }
+      
       // REJECTED WO RESUBMISSION: When a rejected WO is saved with updates, 
       // automatically transition to 'Pending Approval' for re-approval workflow
       const isRejectedWO = existingWO.status?.toLowerCase() === 'rejected';

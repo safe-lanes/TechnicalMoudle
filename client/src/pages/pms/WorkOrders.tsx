@@ -640,12 +640,26 @@ const WorkOrders: React.FC = () => {
                 </td>
                 <td className="py-3 px-4" data-testid={index === 0 ? "C29" : undefined}>
                   {index === 0 && <Marker id="C29" />}
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
-                    {/* Display "Grace P" instead of "Due (Grace P)" for cleaner badge label */}
-                    {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
-                      ? 'Grace P' 
-                      : (workOrder.computedStatus || workOrder.status || 'Active')}
-                  </span>
+                  {/* PRIORITY: Show workflow status badges (Rejected, Pending Approval) over computed status */}
+                  {/* This ensures rejected WOs display "Rejected" badge prominently */}
+                  {workOrder.status === 'Rejected' ? (
+                    <div className="flex flex-col gap-1">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor('rejected')}`}>
+                        Rejected
+                      </span>
+                      {/* Show due date status as secondary indicator */}
+                      <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeColor(workOrder.computedStatus || 'Active')}`}>
+                        {workOrder.computedStatus === 'Due (Grace P)' ? 'Grace P' : (workOrder.computedStatus || 'Active')}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(workOrder.computedStatus || workOrder.status || 'Active')}`}>
+                      {/* Display "Grace P" instead of "Due (Grace P)" for cleaner badge label */}
+                      {(workOrder.computedStatus || workOrder.status || 'Active') === 'Due (Grace P)' 
+                        ? 'Grace P' 
+                        : (workOrder.computedStatus || workOrder.status || 'Active')}
+                    </span>
+                  )}
                 </td>
                 {activeTab !== "Pending Approval" && (
                   <td className="py-3 px-4 text-gray-900" data-testid={index === 0 ? "C30" : undefined}>

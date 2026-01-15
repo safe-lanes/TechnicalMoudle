@@ -35,6 +35,7 @@ const BLOCKING_STATUSES_EXACT = new Set([
   'in_progress',
   'inprogress',
   'open',
+  'rejected',  // Rejected WOs block new generation - work needs rework before cycle can advance
 ]);
 
 /**
@@ -187,9 +188,10 @@ export function buildRhCycleWOMap<T extends { status: string; workOrderNo?: stri
   const cycleMap = new Map<string, T>();
   
   workOrders.forEach(wo => {
-    // Skip cancelled/rejected WOs - they don't count as cycle satisfaction
+    // Skip cancelled WOs - they don't count as cycle satisfaction
+    // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
-    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'rejected') {
+    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
     }
     
@@ -241,9 +243,10 @@ export function buildCalendarCycleWOMap<T extends { status: string; workOrderNo?
   const cycleMap = new Map<string, T>();
   
   workOrders.forEach(wo => {
-    // Skip cancelled/rejected WOs - they don't count as cycle satisfaction
+    // Skip cancelled WOs - they don't count as cycle satisfaction
+    // NOTE: Rejected WOs ARE included - they block new WO generation until rework is complete
     const normalizedStatus = wo.status?.toLowerCase().trim() || '';
-    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'rejected') {
+    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return;
     }
     
