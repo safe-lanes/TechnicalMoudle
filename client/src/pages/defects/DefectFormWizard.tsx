@@ -464,8 +464,8 @@ export default function DefectFormWizard({
       }
       
       // Auto-fill verified by office position from session (crewDesignation)
-      if ((currentUser as any)?.crewDesignation) {
-        form.setValue('verifiedByOfficePosition', (currentUser as any).crewDesignation);
+      if (currentUser?.crewDesignation) {
+        form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
       }
     }
   }, [verifiedValue, currentUser, form]);

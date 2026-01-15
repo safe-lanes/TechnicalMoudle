@@ -30,7 +30,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserRole = "Ship" | "Office" | "PMS Admin";
 
-export type PublicUser = Omit<User, "password">;
+export type PublicUser = Omit<User, "password"> & {
+  crewDesignation?: string; // Extended field for crew designation/office position (from external user data)
+};
 
 // Fleets Table - Fleet registry for grouping vessels
 export const fleets = pgTable("fleets", {

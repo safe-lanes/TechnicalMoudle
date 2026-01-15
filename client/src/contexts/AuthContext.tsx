@@ -35,14 +35,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.removeItem("currentUser");
       }
     } else {
+      // Default to Office user for testing C2 Verification auto-fill
+      // Simulating: Munawer A. Modak (UUID: d70fb663-a6b0-4f66-8e42-ca25ff8de235)
       const defaultUser: PublicUser = {
         id: 1,
-        username: "admin",
-        fullName: "PMS Administrator",
-        email: "admin@seafarer.com",
-        role: "PMS Admin",
+        username: "munawer.modak",
+        fullName: "Munawer A. Modak",
+        email: "ayush.agrawal@safe-lanes.com",
+        role: "Office",
         vesselId: null,
+        department: null,
         isActive: true,
+        crewDesignation: "Marine Manager",
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -91,7 +95,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       email: user.email,
       role: user.role,
       vesselId: user.vesselId,
+      department: user.department,
       isActive: user.isActive,
+      crewDesignation: user.crewDesignation,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
