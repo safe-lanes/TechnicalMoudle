@@ -1422,6 +1422,8 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
       
       setCurrentWorkOrderStatus('Rejected');
+      // Invalidate work orders cache so the list shows updated data
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/work-orders'] });
       toast({
         title: "Rejected",
         description: "Work order has been rejected",

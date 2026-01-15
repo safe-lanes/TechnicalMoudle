@@ -200,9 +200,16 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   // Workflow: User fills Part B (sets completionDateTime) → Pending Approval → Approver approves → Completed
   if (isExecution) {
     if (status === 'Pending Approval') return 'Pending Approval';
-    if (status === 'Rejected') return 'Rejected';
-    if (status === 'Approved' || completionDateTime) return 'Completed';
-    return 'Active';
+    // REJECTED: Skip completion check - continue to calculate due date status below
+    // This ensures rejected work orders appear in Due/Overdue/Active tabs based on their due date
+    // The "Rejected" badge is shown in Status column from the database status field
+    if (status === 'Rejected') {
+      // Fall through to due date calculation below
+    } else if (status === 'Approved' || completionDateTime) {
+      return 'Completed';
+    } else {
+      return 'Active';
+    }
   }
   
   // IMPORTANT: Check for Pending Approval BEFORE checking completion
@@ -211,14 +218,15 @@ export function computeWorkOrderStatus(input: WorkOrderStatusInput): ComputedWor
   // the work order needs approval before it can be marked as Completed
   if (status === 'Pending Approval') return 'Pending Approval';
   
-  // Check for manual postponed or rejected status BEFORE completion check
-  // CRITICAL: Rejected work orders may have completionDateTime set from when user filled Part B
-  // but they should still appear as Rejected (in Planned tab), not Completed
+  // Postponed items stay in Planned tab
   if (status === 'Postponed') return 'Postponed';
-  if (status === 'Rejected') return 'Rejected';
   
-  // Templates: check for completion (only after Pending Approval and Rejected checks)
-  if (completionDateTime || status === 'Completed') {
+  // REJECTED: Skip completion check - continue to calculate due date status below
+  // Rejected work orders should appear in Due/Overdue/Active tabs based on their due date
+  // The "Rejected" badge is shown in Status column from the database status field
+  
+  // Templates: check for completion (only after Pending Approval check, skip for Rejected)
+  if (status !== 'Rejected' && (completionDateTime || status === 'Completed')) {
     return 'Completed';
   }
   

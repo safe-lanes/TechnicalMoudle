@@ -174,13 +174,17 @@ const WorkOrders: React.FC = () => {
       return effectiveStatus === "Active" || effectiveStatus === "Postponed";
     }).length },
     { id: "Due", label: "Due", count: safeWorkOrdersList.filter(wo => {
-      if (wo.isExecution) return false;
+      // Allow rejected executions (they need rework), but exclude other executions
+      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedExecution) return false;
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
       // Due tab: items within warning window + Grace P (past due but within tolerance)
       return effectiveStatus === "Due" || effectiveStatus === "Due (Grace P)";
     }).length },
     { id: "Overdue", label: "Overdue", count: safeWorkOrdersList.filter(wo => {
-      if (wo.isExecution) return false;
+      // Allow rejected executions (they need rework), but exclude other executions
+      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedExecution) return false;
       const effectiveStatus = wo.computedStatus || wo.status || 'Active';
       // Overdue tab: only breach items (past tolerance/grace period)
       return effectiveStatus === "Overdue";
@@ -225,16 +229,21 @@ const WorkOrders: React.FC = () => {
     const effectiveStatus = wo.computedStatus || wo.status || 'Active';
     
     if (activeTab === "Planned") {
-      // Planned tab: Show templates with Active status + Postponed items, plus rejected executions
-      if (wo.isExecution && effectiveStatus !== "Rejected") return false;
-      // Only show Active and Postponed statuses in Planned tab
-      if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed" && effectiveStatus !== "Rejected") return false;
-    } else if (activeTab === "Due") {
+      // Planned tab: Show templates with Active status + Postponed items
+      // Note: Rejected work orders now appear in Due/Overdue/Active tabs based on their computed due date status
       if (wo.isExecution) return false;
+      // Only show Active and Postponed statuses in Planned tab
+      if (effectiveStatus !== "Active" && effectiveStatus !== "Postponed") return false;
+    } else if (activeTab === "Due") {
+      // Allow rejected executions (they need rework), but exclude other executions
+      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedExecution) return false;
       // Due tab: items within warning window + Grace P (past due but within tolerance)
       if (effectiveStatus !== "Due" && effectiveStatus !== "Due (Grace P)") return false;
     } else if (activeTab === "Overdue") {
-      if (wo.isExecution) return false;
+      // Allow rejected executions (they need rework), but exclude other executions
+      const isRejectedExecution = wo.isExecution && wo.status === 'Rejected';
+      if (wo.isExecution && !isRejectedExecution) return false;
       // Overdue tab: only breach items (past tolerance/grace period)
       if (effectiveStatus !== "Overdue") return false;
     } else if (activeTab === "Completed") {
