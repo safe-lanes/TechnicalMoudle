@@ -280,6 +280,13 @@ const WorkOrders: React.FC = () => {
       }
     }
     
+    // Rank filter: match against assignedTo field
+    if (selectedRank && selectedRank !== "all") {
+      if (wo.assignedTo?.trim() !== selectedRank) {
+        return false;
+      }
+    }
+    
     return true;
   });
 
@@ -299,6 +306,15 @@ const WorkOrders: React.FC = () => {
     }
   }, [totalPages, currentPage]);
   
+  // Extract unique ranks (assigned_to values) from work orders for dynamic filter
+  const uniqueRanks = useMemo(() => {
+    const ranks = safeWorkOrdersList
+      .map(wo => wo.assignedTo?.trim())
+      .filter((rank): rank is string => !!rank && rank.length > 0);
+    const uniqueSet = Array.from(new Set(ranks));
+    return uniqueSet.sort((a, b) => a.localeCompare(b));
+  }, [safeWorkOrdersList]);
+
   // Get paginated work orders
   const paginatedWorkOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -511,14 +527,17 @@ const WorkOrders: React.FC = () => {
         </Select>
 
         <Select value={selectedRank} onValueChange={setSelectedRank}>
-          <SelectTrigger className="w-32" data-testid="C12">
+          <SelectTrigger className="w-40" data-testid="C12">
             <Marker id="C12" />
             <SelectValue placeholder="All Ranks" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="chief">Chief Engineer</SelectItem>
-            <SelectItem value="2nd">2nd Engineer</SelectItem>
-            <SelectItem value="3rd">3rd Engineer</SelectItem>
+            <SelectItem value="all">All Ranks</SelectItem>
+            {uniqueRanks.map((rank) => (
+              <SelectItem key={rank} value={rank}>
+                {rank}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
