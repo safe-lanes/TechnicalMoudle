@@ -5340,8 +5340,11 @@ async function createWorkOrderFromRow(row: any, templateCode: string, vesselId?:
     }
     workOrderNo = await generatePlannedWorkOrderNumber(storage, jobCode, componentCode, effectiveVesselId);
   } else {
-    // Unplanned work order: use UWO format
-    workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId);
+    // Unplanned work order: use UWO format with componentCode
+    if (!componentCode || !componentCode.trim()) {
+      throw new Error('Component code is required for unplanned work order generation');
+    }
+    workOrderNo = await generateUnplannedWorkOrderNumber(storage, effectiveVesselId, componentCode);
   }
   
   const workOrderData = {

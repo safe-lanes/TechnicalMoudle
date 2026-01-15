@@ -2611,11 +2611,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             workOrderData.vesselId || undefined
           );
         } else {
-          // Unplanned WO requires vesselId
+          // Unplanned WO requires vesselId and componentCode
           const vesselId = workOrderData.vesselId || 'V001';
+          // For unplanned WOs, componentCode is required for the new format
+          // Try to get componentCode from workOrderData or fetch from component record
+          let unplannedComponentCode = workOrderData.componentCode || '';
+          if (!unplannedComponentCode && workOrderData.component) {
+            // Try to find component by name/id
+            const components = await storage.getComponents(vesselId);
+            const matchedComponent = components.find(c => 
+              c.id === workOrderData.component || 
+              c.name === workOrderData.component ||
+              c.componentCode === workOrderData.component
+            );
+            if (matchedComponent?.componentCode) {
+              unplannedComponentCode = matchedComponent.componentCode;
+            }
+          }
+          if (!unplannedComponentCode) {
+            throw new Error('Component code is required for unplanned work order numbering');
+          }
           workOrderData.workOrderNo = await generateUnplannedWorkOrderNumber(
             storage, 
-            vesselId
+            vesselId,
+            unplannedComponentCode
           );
         }
         

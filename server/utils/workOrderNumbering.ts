@@ -6,12 +6,13 @@ import type { IStorage } from '../storage';
  * Planned WO Format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
  * Example: MK-000041-711.001-2025-001
  * 
- * Unplanned WO Format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
- * Example: UWO-VESSEL01-2025-001
+ * Unplanned WO Format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
+ * Example: UWO-702.005.01-2026-001
  * 
  * Running numbers are:
- * - Per vessel
- * - Per job + component combination
+ * - Per vessel (for uniqueness)
+ * - Per component code (for unplanned)
+ * - Per job + component combination (for planned)
  * - Per year
  * - Generated atomically
  * - No duplicates allowed
@@ -67,20 +68,33 @@ export async function generatePlannedWorkOrderNumber(
 
 /**
  * Generate next work order number for an unplanned WO
- * Format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
+ * Format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
+ * Example: UWO-702.005.01-2026-001
+ * 
+ * Numbers are unique per vessel, sequential per year
  */
 export async function generateUnplannedWorkOrderNumber(
   storage: IStorage,
-  vesselId: string
+  vesselId: string,
+  componentCode?: string
 ): Promise<string> {
   const currentYear = new Date().getFullYear();
   
+  // Validate component code is provided for proper format
+  if (!componentCode || !componentCode.trim()) {
+    throw new Error('Component code is required for unplanned work order numbering');
+  }
+  
+  const safeComponentCode = componentCode.trim();
+  
   // Find all unplanned WOs for this vessel in current year
+  // We check all UWO-* patterns to ensure uniqueness across the vessel
   const allWorkOrders = await storage.getWorkOrders(vesselId);
   
+  // Find existing UWOs for this specific component code in current year
   const existingUnplannedWOs = allWorkOrders.filter(wo => {
-    // Match unplanned WO format: UWO-<VESSEL CODE>-<YEAR>-<RUNNING NUMBER>
-    const unplannedPattern = new RegExp(`^UWO-${escapeRegex(vesselId)}-${currentYear}-(\\d+)$`);
+    // Match unplanned WO format: UWO-<COMPONENT_CODE>-<YEAR>-<RUNNING_NUMBER>
+    const unplannedPattern = new RegExp(`^UWO-${escapeRegex(safeComponentCode)}-${currentYear}-(\\d+)$`);
     return unplannedPattern.test(wo.workOrderNo);
   });
   
@@ -99,7 +113,7 @@ export async function generateUnplannedWorkOrderNumber(
   const nextRunningNumber = maxRunningNumber + 1;
   const paddedNumber = nextRunningNumber.toString().padStart(3, '0');
   
-  return `UWO-${vesselId}-${currentYear}-${paddedNumber}`;
+  return `UWO-${safeComponentCode}-${currentYear}-${paddedNumber}`;
 }
 
 /**

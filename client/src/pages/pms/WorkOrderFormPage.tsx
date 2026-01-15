@@ -282,6 +282,9 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [rejectionComments, setRejectionComments] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
   
+  // Track work order type to conditionally skip frequency validation for unplanned WOs
+  const [workOrderType, setWorkOrderType] = useState<'Planned' | 'Unplanned'>('Planned');
+  
   // Determine if Part A should be read-only (immutable)
   // Per PMS business rules: Part A is a "frozen snapshot" of the job template
   // Part A is read-only when:
@@ -537,6 +540,15 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       // Load work order status for approval workflow
       if (context.workOrder?.status) {
         setCurrentWorkOrderStatus(context.workOrder.status);
+      }
+      
+      // Load work order type to conditionally skip frequency validation for unplanned WOs
+      // Check multiple sources: explicit workOrderType field, or infer from WO number prefix (UWO- = Unplanned)
+      if (context.workOrder?.workOrderType) {
+        setWorkOrderType(context.workOrder.workOrderType as 'Planned' | 'Unplanned');
+      } else if (context.workOrder?.workOrderNo?.startsWith('UWO-')) {
+        // Fallback: detect unplanned WO from number format (UWO-{component_code}-{year}-{increment})
+        setWorkOrderType('Unplanned');
       }
       
       // Mark context as loaded once to prevent re-hydration
@@ -1015,25 +1027,31 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const handleSave = async () => {
     if (embedded) return;
     try {
-      // Validate frequency value before saving using the normalization helper
-      const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
-      if (!normalizedFrequency) {
-        toast({
-          title: "Validation Error",
-          description: "Frequency value is required. Please enter a positive whole number (no decimals, negative values, or zero).",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Skip frequency validation for unplanned work orders
+      // Unplanned WOs are single-execution tasks without frequency requirements
+      const isUnplannedWO = workOrderType === 'Unplanned';
       
-      // Validate frequency unit
-      if (!templateData.frequencyUnit || templateData.frequencyUnit.trim() === '') {
-        toast({
-          title: "Validation Error",
-          description: "Frequency unit is required.",
-          variant: "destructive",
-        });
-        return;
+      if (!isUnplannedWO) {
+        // Validate frequency value before saving using the normalization helper
+        const normalizedFrequency = normalizeFrequencyValue(templateData.frequencyValue);
+        if (!normalizedFrequency) {
+          toast({
+            title: "Validation Error",
+            description: "Frequency value is required. Please enter a positive whole number (no decimals, negative values, or zero).",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate frequency unit
+        if (!templateData.frequencyUnit || templateData.frequencyUnit.trim() === '') {
+          toast({
+            title: "Validation Error",
+            description: "Frequency unit is required.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // PHASE 3A: Block submission if inventory data not loaded or failed and spares are being consumed
