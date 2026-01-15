@@ -62,7 +62,6 @@ const WorkOrders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedRank, setSelectedRank] = useState("");
-  const [selectedComponent, setSelectedComponent] = useState("");
   const [selectedCriticality, setSelectedCriticality] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('workOrdersActiveTab');
@@ -291,7 +290,7 @@ const WorkOrders: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedComponent, selectedCriticality, vesselId]);
+  }, [activeTab, searchTerm, selectedPeriod, selectedRank, selectedCriticality, vesselId]);
   
   // Clamp current page when total pages shrinks (e.g., after deletion or filter change)
   useEffect(() => {
@@ -520,18 +519,6 @@ const WorkOrders: React.FC = () => {
             <SelectItem value="chief">Chief Engineer</SelectItem>
             <SelectItem value="2nd">2nd Engineer</SelectItem>
             <SelectItem value="3rd">3rd Engineer</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedComponent} onValueChange={setSelectedComponent}>
-          <SelectTrigger className="w-32" data-testid="C13">
-            <Marker id="C13" />
-            <SelectValue placeholder="Component" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="engine">Main Engine</SelectItem>
-            <SelectItem value="generator">Diesel Generator</SelectItem>
-            <SelectItem value="pump">Pumps</SelectItem>
           </SelectContent>
         </Select>
 
