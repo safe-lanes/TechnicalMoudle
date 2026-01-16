@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,8 +23,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useLocation } from "wouter";
 import { useVessels } from "@/hooks/useVessels";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import LinkDefectsModal from "./LinkDefectsModal";
 import DefectModal from "./DefectModal";
 import { cn } from "@/lib/utils";
@@ -43,15 +55,16 @@ interface DefectsFilters {
   type?: string;
 }
 
-const CURRENT_USER_ROLE = "Admin";
-
 interface ActionsCellContext {
   handleViewClick: (data: Defect) => void;
   handleEditClick: (data: Defect) => void;
   handleLinkClick: (data: Defect) => void;
   handleDeleteClick: (data: Defect) => void;
+  handleVerifyClick: (data: Defect) => void;
   canEdit: () => boolean;
   canLink: () => boolean;
+  canVerify: () => boolean;
+  isVerifying: boolean;
 }
 
 const StatusCellRenderer = (params: ICellRendererParams) => {
@@ -161,7 +174,8 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
   if (!params.colDef || !params.data) return null;
   
   const defect = params.data as Defect;
-  const { handleViewClick, handleEditClick, handleLinkClick, handleDeleteClick, canEdit, canLink } = params.context;
+  const { handleViewClick, handleEditClick, handleLinkClick, handleDeleteClick, handleVerifyClick, canEdit, canLink, canVerify, isVerifying } = params.context;
+  const isVerified = defect.verified === true;
   
   return (
     <div className="flex gap-1 justify-center items-center">
@@ -224,14 +238,16 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
             <Button 
               size="icon" 
               variant="ghost" 
-              className="h-6 w-6"
+              className={cn("h-6 w-6", (!canVerify() || isVerifying) && "opacity-50 cursor-not-allowed")}
+              onClick={() => handleVerifyClick(defect)}
+              disabled={!canVerify() || isVerifying}
               data-testid={`button-verified-${defect.id}`}
             >
-              <CheckCircle className="h-4 w-4 text-gray-400" />
+              <CheckCircle className={cn("h-4 w-4", isVerified ? "text-green-600" : "text-gray-400")} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Verified</p>
+            <p>{isVerifying ? "Processing..." : !canVerify() ? "Verify (No Permission)" : isVerified ? "Verified - Click to remove" : "Click to verify"}</p>
           </TooltipContent>
         </Tooltip>
         
@@ -259,6 +275,8 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 export default function DefectsLogWithTabs() {
   const [, setLocation] = useLocation();
   const { data: vessels = [] } = useVessels();
+  const { currentUser } = useAuth();
+  const { toast } = useToast();
   const [filters, setFilters] = useState<DefectsFilters>({});
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   
@@ -277,6 +295,10 @@ export default function DefectsLogWithTabs() {
     defectId: null 
   });
   const [showFilters, setShowFilters] = useState(true);
+  const [unverifyDialog, setUnverifyDialog] = useState<{ open: boolean; defect: Defect | null }>({
+    open: false,
+    defect: null
+  });
 
   const { data: defects = [], isLoading } = useQuery({
     queryKey: ['defects', 'active', filters],
@@ -316,11 +338,13 @@ export default function DefectsLogWithTabs() {
   };
   
   const canEdit = () => {
-    return ["Master", "Chief Engineer", "Superintendent", "Admin"].includes(CURRENT_USER_ROLE);
+    const role = currentUser?.role || '';
+    return ["Master", "Chief Engineer", "Superintendent", "Admin", "Ship", "Office", "PMS Admin"].includes(role);
   };
   
   const canLink = () => {
-    return ["Chief Engineer", "Superintendent", "Admin"].includes(CURRENT_USER_ROLE);
+    const role = currentUser?.role || '';
+    return ["Chief Engineer", "Superintendent", "Admin", "Office", "PMS Admin"].includes(role);
   };
   
   const handleViewClick = (defect: Defect) => {
@@ -339,6 +363,74 @@ export default function DefectsLogWithTabs() {
   
   const handleDeleteClick = (defect: Defect) => {
     console.log('Delete clicked for defect:', defect.id);
+  };
+  
+  const canVerify = () => {
+    const role = currentUser?.role || '';
+    return ['Office', 'PMS Admin'].includes(role);
+  };
+  
+  const verifyMutation = useMutation({
+    mutationFn: async ({ defectId, verificationData }: { defectId: string; verificationData: Partial<Defect> }) => {
+      const response = await apiRequest('PATCH', `/technical/api/defects/${defectId}`, verificationData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['defects'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update verification status",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const handleVerifyClick = (defect: Defect) => {
+    if (!canVerify()) return;
+    
+    if (defect.verified) {
+      setUnverifyDialog({ open: true, defect });
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      const verificationData = {
+        verified: true,
+        dateVerified: today,
+        verifiedByName: currentUser?.fullName || '',
+        verifiedByOfficePosition: currentUser?.crewDesignation || currentUser?.role || ''
+      };
+      
+      verifyMutation.mutate({ defectId: defect.id, verificationData }, {
+        onSuccess: () => {
+          toast({
+            title: "Verified",
+            description: `Defect ${defect.id} has been verified successfully.`
+          });
+        }
+      });
+    }
+  };
+  
+  const handleConfirmUnverify = () => {
+    if (!unverifyDialog.defect) return;
+    
+    const verificationData = {
+      verified: false,
+      dateVerified: null,
+      verifiedByName: null,
+      verifiedByOfficePosition: null
+    };
+    
+    verifyMutation.mutate({ defectId: unverifyDialog.defect.id, verificationData }, {
+      onSuccess: () => {
+        toast({
+          title: "Verification Removed",
+          description: `Verification record for defect ${unverifyDialog.defect?.id} has been deleted.`
+        });
+        setUnverifyDialog({ open: false, defect: null });
+      }
+    });
   };
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
@@ -603,8 +695,11 @@ export default function DefectsLogWithTabs() {
                   handleEditClick,
                   handleLinkClick,
                   handleDeleteClick,
+                  handleVerifyClick,
                   canEdit,
-                  canLink
+                  canLink,
+                  canVerify,
+                  isVerifying: verifyMutation.isPending
                 }}
               />
             </div>
@@ -665,6 +760,23 @@ export default function DefectsLogWithTabs() {
           mode="edit"
         />
       )}
+
+      <AlertDialog open={unverifyDialog.open} onOpenChange={(open) => !open && !verifyMutation.isPending && setUnverifyDialog({ open: false, defect: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Verification Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove the verification record for defect {unverifyDialog.defect?.id}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={verifyMutation.isPending}>No</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmUnverify} disabled={verifyMutation.isPending}>
+              {verifyMutation.isPending ? "Processing..." : "Yes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
