@@ -15,7 +15,8 @@ import {
   Link as LinkIcon, 
   Plus, 
   Filter,
-  Search
+  Search,
+  X
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -479,36 +480,15 @@ export default function DefectsCoC() {
               <Filter className="h-4 w-4" />
               Filters
             </Button>
-            <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
-              <DialogTrigger asChild>
-                <Button 
-                  className="bg-green-600 hover:bg-green-700 text-white h-8" 
-                  size="sm" 
-                  data-testid="button-new-coc-defect"
-                  onClick={handleNewDefect}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New CoC Defect
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
-                <VisuallyHidden>
-                  <DialogTitle>
-                    {defectFormMode === 'new' ? 'New CoC Defect' : defectFormMode === 'edit' ? 'Edit CoC Defect' : 'View CoC Defect'}
-                  </DialogTitle>
-                </VisuallyHidden>
-                <DefectFormWizard 
-                  defect={selectedDefect}
-                  mode={defectFormMode}
-                  isCoc={true}
-                  onCompleted={() => {
-                    setShowNewDefectForm(false);
-                    setSelectedDefect(null);
-                    invalidateCoCQueries();
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white h-8" 
+              size="sm" 
+              data-testid="button-new-coc-defect"
+              onClick={handleNewDefect}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New CoC Defect
+            </Button>
           </div>
         </div>
 
@@ -669,6 +649,38 @@ export default function DefectsCoC() {
           defectId={linkModal.defectId}
           currentLinkedDefects={linkModal.linkedDefects}
         />
+      )}
+
+      {/* Inline Form Overlay (no Portal) */}
+      {showNewDefectForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/80" 
+            onClick={() => setShowNewDefectForm(false)}
+          />
+          <div className="relative z-[101] w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-background rounded-lg shadow-lg">
+            <button
+              onClick={() => {
+                setShowNewDefectForm(false);
+                setSelectedDefect(null);
+              }}
+              className="absolute right-4 top-4 z-[102] rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+              data-testid="button-close-form"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <DefectFormWizard 
+              defect={selectedDefect}
+              mode={defectFormMode}
+              isCoc={true}
+              onCompleted={() => {
+                setShowNewDefectForm(false);
+                setSelectedDefect(null);
+                invalidateCoCQueries();
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
