@@ -5633,6 +5633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============= SPARES BULK UPDATE (Location-specific) =============
   app.post("/technical/api/spares/bulk-update", async (req, res) => {
     try {
+      console.log('[BULK UPDATE] Request received:', JSON.stringify(req.body, null, 2).substring(0, 500));
       const { vesselId, tz, rows } = req.body;
       
       if (!vesselId || !rows || !Array.isArray(rows)) {
@@ -5641,6 +5642,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: 'vesselId and rows are required'
         });
       }
+      
+      console.log('[BULK UPDATE] Processing', rows.length, 'rows for vessel', vesselId);
       
       const results: Array<{
         componentSpareId: number;
