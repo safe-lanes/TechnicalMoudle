@@ -150,12 +150,17 @@ const CategoryCellRenderer = (params: ICellRendererParams) => {
   if (!params.colDef || !params.data) return null;
   
   const category = params.value || 'Defect';
-  const variant = category === 'COC' ? 'destructive' : 'secondary';
+  const isCoc = params.data.is_coc === true;
   
   return (
-    <Badge variant={variant} className="text-xs">
-      {category}
-    </Badge>
+    <div className="flex items-center gap-1.5">
+      <span className="text-[13px] text-[#4f5863]">{category}</span>
+      {isCoc && (
+        <Badge className="bg-blue-100 text-blue-700 text-[10px] py-0 px-1">
+          CoC
+        </Badge>
+      )}
+    </div>
   );
 };
 
