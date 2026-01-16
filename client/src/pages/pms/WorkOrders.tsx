@@ -287,6 +287,22 @@ const WorkOrders: React.FC = () => {
       }
     }
     
+    // Criticality filter: match against criticality field
+    if (selectedCriticality && selectedCriticality !== "all") {
+      const woCriticality = wo.criticality?.toLowerCase();
+      if (selectedCriticality === "critical") {
+        // "critical" matches "Yes" criticality
+        if (woCriticality !== "yes") {
+          return false;
+        }
+      } else if (selectedCriticality === "non-critical") {
+        // "non-critical" matches "No" criticality or empty/null
+        if (woCriticality === "yes") {
+          return false;
+        }
+      }
+    }
+    
     return true;
   });
 
@@ -547,6 +563,7 @@ const WorkOrders: React.FC = () => {
             <SelectValue placeholder="Criticality" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="critical">Critical</SelectItem>
             <SelectItem value="non-critical">Non-Critical</SelectItem>
           </SelectContent>
