@@ -451,24 +451,26 @@ export default function DefectFormWizard({
   }, []);
 
   // C2 Verification auto-fill: When verified checkbox is checked by Office user
-  const verifiedValue = form.watch('verified');
   useEffect(() => {
-    if (verifiedValue && currentUser?.role === 'Office') {
-      // Auto-fill today's date (user can change it)
-      const today = new Date().toISOString().split('T')[0];
-      form.setValue('dateVerified', today);
-      
-      // Auto-fill verified by name from session
-      if (currentUser?.fullName) {
-        form.setValue('verifiedByName', currentUser.fullName);
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'verified' && value.verified && currentUser?.role === 'Office') {
+        // Auto-fill today's date (user can change it)
+        const today = new Date().toISOString().split('T')[0];
+        form.setValue('dateVerified', today);
+        
+        // Auto-fill verified by name from session
+        if (currentUser?.fullName) {
+          form.setValue('verifiedByName', currentUser.fullName);
+        }
+        
+        // Auto-fill verified by office position from session (crewDesignation)
+        if (currentUser?.crewDesignation) {
+          form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
+        }
       }
-      
-      // Auto-fill verified by office position from session (crewDesignation)
-      if (currentUser?.crewDesignation) {
-        form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
-      }
-    }
-  }, [verifiedValue, currentUser, form]);
+    });
+    return () => subscription.unsubscribe();
+  }, [currentUser, form]);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
