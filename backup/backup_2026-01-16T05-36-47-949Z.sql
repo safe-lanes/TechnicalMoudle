@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zsahIGoSOYgO9IaZE830n67v0cDgFhoggJhxEdcRMa0IFL38p7YozGGI0Kh0hd2
+\restrict B79TxB8HP0aQOw0fNhWmFEShwHWPIBwp1EFKeAQHiWnXbczuKarW6yf6H8iBQcc
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -53484,7 +53484,7 @@ SELECT pg_catalog.setval('public.spares_history_id_seq', 6, true);
 -- Name: spares_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.spares_id_seq', 6689, true);
+SELECT pg_catalog.setval('public.spares_id_seq', 6691, true);
 
 
 --
@@ -55496,5 +55496,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zsahIGoSOYgO9IaZE830n67v0cDgFhoggJhxEdcRMa0IFL38p7YozGGI0Kh0hd2
+\unrestrict B79TxB8HP0aQOw0fNhWmFEShwHWPIBwp1EFKeAQHiWnXbczuKarW6yf6H8iBQcc
 

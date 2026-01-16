@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GkxaocGgurmLpiQXG17H24piuAT7svuAYvbXcPVDkz1PTaBSfFnAbCuQh6JlWhd
+\restrict Q5cbDMmDTgqs6EFkfPuUrYcT6fgtAJewbwHyyoJN3c9T8PpxmdhklQCkBRSuk7A
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -3660,9 +3660,9 @@ COMP-1768381196786-y689i6p6n	601.007.AA	ME Main Bearings, Journals	601.007	601.0
 COMP-1768381196818-2asnwcamf	601.066.AA	ME Indicators	601.066	601.066.01	ME Indicators No.01	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	744535d0-841a-11ed-aa7c-7003bca91a86	f	\N	744535d0-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.066	\N	\N	4000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	4000.00	2026-01-14 09:23:46.218	2026-01-14 08:59:56.819233	2026-01-14 09:23:46.218
 COMP-1768374767818-ckg4kqu6q	601.001.AA	Main Diesel Engine, Compl.	601	601.001	Main Diesel Engine, Compl.	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	751666	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9267 KW	\N	t	7440571a-841a-11ed-aa7c-7003bca91a86	f	\N	7440571a-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601	\N	\N	6050.00	13 Jan 2026 05:30	\N	\N	MASTER	\N	\N	6050.00	2026-01-14 10:03:47.83	\N	MANUAL	\N	\N	2026-01-14 07:12:47.818968	2026-01-14 10:03:47.83
 COMP-1768374768201-mvmpi8w24	601.026.AA	ME HP Fuel Pumps	601.026	601.026.06	ME Hp Fuel Pumps No.06	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	7440571a-841a-11ed-aa7c-7003bca91a86	f	\N	7440571a-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.026	\N	\N	6050.00	13 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	6050.00	2026-01-14 10:03:47.83	2026-01-14 07:12:48.202297	2026-01-14 10:03:47.83
-COMP-1768374767962-b363j8iop	554.003.AA	Compressors W/Drive Unit	554.003	554.003.01	Compressors W/Drive Unit No.01	5 Equipment for Crew & Passengers	Ushio Reinetsu Co Ltd	MKR-000007	FAD-2MSYM	MKR-000007-FAD-2MSYM	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	7440571a-841a-11ed-aa7c-7003bca91a86	f	Technical Information\r\n===================\r\nMfg Model: FAD-2MSYM\r\nMfg Type: Semi Hermatic Type\r\nCylinder bore: 50mm\r\nStroke: 40mm\r\nRev: 1750min-1	7440571a-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	5 Equipment for Crew & Passengers	f	\N	554.003	\N	\N	15025.00	2026-01-04	\N	\N	MASTER	SELF	\N	15025.00	2026-01-15 05:33:16.926	3rd Engineer	WO_COMPLETION	\N	\N	2026-01-14 07:12:47.963577	2026-01-15 05:33:16.926
 COMP-1768302796119-c9p1lpswb	601.001.AA	Main Diesel Engine, Compl.	601	601.001	Main Diesel Engine, Compl.	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	751666	AAA-BBB-CCC	Engine Room	f	f	20-Dec-2015	26-Dec-2015	9267 KW	\N	t	743feb08-841a-11ed-aa7c-7003bca91a86	f	\N	743feb08-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601	\N	\N	6000.00	01 Jan 2026 05:30	\N	\N	MASTER	\N	\N	6000.00	2026-01-15 08:58:22.356	\N	MANUAL	\N	\N	2026-01-13 11:13:16.120618	2026-01-15 08:58:22.356
 COMP-1768302796407-xndiq8ft2	601.026.AA	ME HP Fuel Pumps	601.026	601.026.03	ME Hp Fuel Pumps No.03	6 Machinery Main Components	Kobe Diesel Co Ltd	MKR-000008	6UEC60LA	MKR-000008-6UEC60LA	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	743feb08-841a-11ed-aa7c-7003bca91a86	f	\N	743feb08-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	6 Machinery Main Components	f	\N	601.026	\N	\N	6000.00	01 Jan 2026 05:30	\N	\N	INHERITED	601.001	601.001	\N	\N	\N	\N	6000.00	2026-01-15 08:58:22.356	2026-01-13 11:13:16.408338	2026-01-15 08:58:22.356
+COMP-1768374767962-b363j8iop	554.003.AA	Compressors W/Drive Unit	554.003	554.003.01	Compressors W/Drive Unit No.01	5 Equipment for Crew & Passengers	Ushio Reinetsu Co Ltd	MKR-000007	FAD-2MSYM	MKR-000007-FAD-2MSYM	\N	\N	Engine Room	f	f	20-Dec-2015	26-Dec-2015	\N	\N	t	7440571a-841a-11ed-aa7c-7003bca91a86	f	Technical Information\r\n===================\r\nMfg Model: FAD-2MSYM\r\nMfg Type: Semi Hermatic Type\r\nCylinder bore: 50mm\r\nStroke: 40mm\r\nRev: 1750min-1	7440571a-841a-11ed-aa7c-7003bca91a86	vessel	\N	\N	Engine	Engine	5 Equipment for Crew & Passengers	f	\N	554.003	\N	\N	15035.00	15 Jan 2026 05:30	\N	\N	MASTER	SELF	\N	15035.00	2026-01-16 04:55:18	3rd Engineer	MANUAL	\N	\N	2026-01-14 07:12:47.963577	2026-01-16 04:55:18
 \.
 
 
@@ -25175,6 +25175,8 @@ COPY public.running_hours_audit (id, vessel_id, component_id, previous_rh, new_r
 1125	743feb08-841a-11ed-aa7c-7003bca91a86	COMP-1768302796445-d8rlsn86y	6000.00	6000.00	6000.00	01 Jan 2026 05:30	UTC	2026-01-15 08:58:22.356	system	inherited_cascade	\N	f	\N	\N	1
 1126	743feb08-841a-11ed-aa7c-7003bca91a86	COMP-1768302796101-1tz7ds77b	0.00	1500.00	1500.00	01 Jan 2026 05:30	UTC	2026-01-15 09:04:43.753	system	cascade	\N	f	\N	\N	1
 1127	744535d0-841a-11ed-aa7c-7003bca91a86	COMP-1768381197227-hvez0e4rh	0.00	1501.00	1501.00	02 Jan 2026 05:30	UTC	2026-01-15 11:05:51.854	system	cascade	\N	f	\N	\N	1
+1128	7440571a-841a-11ed-aa7c-7003bca91a86	COMP-1768374767962-b363j8iop	15025.00	15025.00	15025.00	14 Jan 2026 05:30	UTC	2026-01-16 04:54:38.317	system	cascade	\N	f	\N	\N	1
+1129	7440571a-841a-11ed-aa7c-7003bca91a86	COMP-1768374767962-b363j8iop	15025.00	15035.00	15035.00	15 Jan 2026 05:30	UTC	2026-01-16 04:55:18	system	cascade	\N	f	\N	\N	1
 \.
 
 
@@ -53447,7 +53449,7 @@ SELECT pg_catalog.setval('public.recurring_defects_id_seq', 1, false);
 -- Name: running_hours_audit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.running_hours_audit_id_seq', 1127, true);
+SELECT pg_catalog.setval('public.running_hours_audit_id_seq', 1129, true);
 
 
 --
@@ -53482,7 +53484,7 @@ SELECT pg_catalog.setval('public.spares_history_id_seq', 6, true);
 -- Name: spares_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.spares_id_seq', 6688, true);
+SELECT pg_catalog.setval('public.spares_id_seq', 6691, true);
 
 
 --
@@ -55494,5 +55496,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GkxaocGgurmLpiQXG17H24piuAT7svuAYvbXcPVDkz1PTaBSfFnAbCuQh6JlWhd
+\unrestrict Q5cbDMmDTgqs6EFkfPuUrYcT6fgtAJewbwHyyoJN3c9T8PpxmdhklQCkBRSuk7A
 
