@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
-  AlertTriangle, 
   CheckCircle, 
   Clock, 
   Eye, 
@@ -67,29 +66,82 @@ interface ActionsCellContext {
   isVerifying: boolean;
 }
 
+// Helper function to calculate computed status based on defect data
+const getComputedStatus = (defect: any): { label: string; color: string } => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Parse date string to local midnight (handles ISO format YYYY-MM-DD)
+  // Using split to extract parts avoids timezone offset issues with new Date()
+  const parseDate = (dateStr: string | null | undefined): Date | null => {
+    if (!dateStr) return null;
+    // Handle YYYY-MM-DD format by parsing parts to avoid timezone issues
+    const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+    // Fallback for other formats
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+  
+  const dateCompleted = parseDate(defect.dateCompleted);
+  const targetCloseDate = parseDate(defect.targetCloseDate);
+  const hasActions = defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0;
+  const isExtended = defect.isDeferred === true; // Extension/deferment approved
+  
+  // 1. Verified (green) - Final state, always takes precedence
+  if (defect.verified === true) {
+    return { label: 'Verified', color: 'text-green-600' };
+  }
+  
+  // 2. Closed (green) - Completed on or before target date
+  if (dateCompleted && targetCloseDate && dateCompleted <= targetCloseDate) {
+    return { label: 'Closed', color: 'text-green-600' };
+  }
+  
+  // 3. Closed (orange) - Completed after target date
+  if (dateCompleted && targetCloseDate && dateCompleted > targetCloseDate) {
+    return { label: 'Closed', color: 'text-orange-500' };
+  }
+  
+  // 4. Closed (green) - Completed without target date comparison
+  if (dateCompleted) {
+    return { label: 'Closed', color: 'text-green-600' };
+  }
+  
+  // 5. Overdue (red) - Past target date without completion and not extended
+  if (!dateCompleted && targetCloseDate && today > targetCloseDate && !isExtended) {
+    return { label: 'Overdue', color: 'text-red-600' };
+  }
+  
+  // 6. Extended (blue) - Target date extension approved
+  if (isExtended) {
+    return { label: 'Extended', color: 'text-blue-600' };
+  }
+  
+  // 7. In Progress (blue) - Part B submitted (has at least 1 action)
+  if (hasActions) {
+    return { label: 'In Progress', color: 'text-blue-600' };
+  }
+  
+  // 8. Reported (dark grey) - Default state, only Part A submitted
+  return { label: 'Reported', color: 'text-gray-600' };
+};
+
 const StatusCellRenderer = (params: ICellRendererParams) => {
   if (!params.colDef || !params.data) return null;
   
-  const status = params.value || 'Open';
-  const critical = params.data.critical;
+  const { label, color } = getComputedStatus(params.data);
   
-  if (status === "Closed") {
-    return (
-      <div className="flex items-center justify-center">
-        <CheckCircle className="h-4 w-4 text-green-600" />
-      </div>
-    );
-  }
-  if (critical) {
-    return (
-      <div className="flex items-center justify-center">
-        <AlertTriangle className="h-4 w-4 text-red-600" />
-      </div>
-    );
-  }
   return (
     <div className="flex items-center justify-center">
-      <Clock className="h-4 w-4 text-amber-600" />
+      <span className={`text-xs font-medium ${color}`}>{label}</span>
     </div>
   );
 };
