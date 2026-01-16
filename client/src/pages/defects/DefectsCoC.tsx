@@ -299,15 +299,19 @@ export default function DefectsCoC() {
   };
 
   const handleViewDefect = useCallback((defect: Defect) => {
+    console.log('[COC] handleViewDefect called with:', defect.id);
     setSelectedDefect(defect);
     setDefectFormMode('view');
     setShowNewDefectForm(true);
+    console.log('[COC] Dialog should now be open');
   }, []);
 
   const handleEditDefect = useCallback((defect: Defect) => {
+    console.log('[COC] handleEditDefect called with:', defect.id);
     setSelectedDefect(defect);
     setDefectFormMode('edit');
     setShowNewDefectForm(true);
+    console.log('[COC] Dialog should now be open');
   }, []);
 
   const handleNewDefect = () => {
