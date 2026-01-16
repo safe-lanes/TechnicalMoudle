@@ -225,6 +225,22 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
               size="icon" 
               variant="ghost" 
               className="h-6 w-6"
+              data-testid={`button-verified-${defect.id}`}
+            >
+              <CheckCircle className="h-4 w-4 text-gray-400" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Verified</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-6 w-6"
               onClick={() => handleDeleteClick(defect)}
               data-testid={`button-delete-${defect.id}`}
             >
