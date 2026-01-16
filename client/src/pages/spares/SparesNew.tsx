@@ -1149,6 +1149,8 @@ const Spares: React.FC = () => {
 
   // Filter spares based on all criteria
   const filteredSpares = useMemo(() => {
+    // Defensive check: ensure sparesData is an array
+    if (!sparesData || !Array.isArray(sparesData)) return [];
     let filtered = sparesData;
 
     // Filter by selected component (including children)
