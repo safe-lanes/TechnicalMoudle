@@ -310,7 +310,7 @@ export default function DefectsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
+        <Card className="bg-white">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Defects by Status</span>
@@ -348,7 +348,7 @@ export default function DefectsDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Defects by Vessel</span>
@@ -377,7 +377,7 @@ export default function DefectsDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Critical Defects</span>
@@ -429,7 +429,7 @@ export default function DefectsDashboard() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2">
