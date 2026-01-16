@@ -1517,20 +1517,13 @@ const Spares: React.FC = () => {
     }
   };
 
-  // Handle bulk update modal
+  // Handle bulk update - navigate to full-screen page
   const openBulkUpdateModal = () => {
     if (filteredSpares.length === 0) {
       toast({ title: "Info", description: "No spares to update. Please adjust filters.", variant: "default" });
       return;
     }
-    setIsBulkUpdateModalOpen(true);
-    setBulkSearchQuery("");
-    // Initialize bulk update data with location-specific fields
-    const initialData: {[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}} = {};
-    filteredSpares.forEach((spare: Spare) => {
-      initialData[spare.id] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
-    });
-    setBulkUpdateData(initialData);
+    navigate("/spares/bulk-update");
   };
 
   // Filter spares for bulk update modal based on search

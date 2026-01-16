@@ -16,6 +16,8 @@ import DefectFormWizard from "./pages/defects/DefectFormWizard";
 import WorkOrderFormPage from "./pages/pms/WorkOrderFormPage";
 import JobsFormPage from "./pages/pms/JobsFormPage";
 import AddEditFleetComponent from "./pages/admin/AddEditFleetComponent";
+import BulkUpdateSpares from "./pages/spares/BulkUpdateSpares";
+import BulkUpdateStores from "./pages/stores/BulkUpdateStores";
 
 import NotFound from "./pages/not-found";
 
@@ -51,7 +53,9 @@ function App() {
                 <Route path="/pms/modify-pms/jobs" component={TechnicalModule} />
                 <Route path="/pms/:subpage" component={TechnicalModule} />
                 <Route path="/spares" component={TechnicalModule} />
+                <Route path="/spares/bulk-update" component={BulkUpdateSpares} />
                 <Route path="/stores" component={TechnicalModule} />
+                <Route path="/stores/bulk-update" component={BulkUpdateStores} />
                 <Route path="/reports" component={TechnicalModule} />
                 
                 {/* Defect form routes - standalone, no TechnicalModule layout */}

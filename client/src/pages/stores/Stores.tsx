@@ -572,25 +572,9 @@ const Stores: React.FC = () => {
     }
   };
 
+  // Handle bulk update - navigate to full-screen page
   const openBulkUpdateModal = () => {
-    setIsBulkUpdateModalOpen(true);
-    const initialData: typeof bulkUpdateData = {};
-    filteredItems.forEach(item => {
-      initialData[item.id] = {
-        consumed: 0,
-        received: 0,
-        consumedLocationA: 0,
-        consumedLocationB: 0,
-        receivedLocationA: 0,
-        receivedLocationB: 0,
-        receivedDate: dateReceived,
-        receivedPlace: placeReceived,
-        comments: ""
-      };
-    });
-    setBulkUpdateData(initialData);
-    setPlaceReceived("");
-    setDateReceived(new Date().toISOString().split('T')[0]);
+    navigate(`/stores/bulk-update?tab=${activeTab}`);
   };
 
   const saveBulkUpdates = () => {
@@ -1973,36 +1957,33 @@ const Stores: React.FC = () => {
                 </div>
               </div>
 
-              {/* Place Received, Date, and Comments Fields */}
-              <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded border">
+              {/* Received Date, Received Place, and Comments Fields - matches Spares order */}
+              <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Place Received (Apply to all)</label>
+                  <Label htmlFor="bulk-received-date">Received Date (Apply to all)</Label>
                   <Input 
-                    placeholder="Enter place received" 
+                    id="bulk-received-date"
+                    type="date" 
+                    value={dateReceived}
+                    onChange={(e) => setDateReceived(e.target.value)}
+                    data-testid="input-bulk-received-date"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bulk-received-place">Received Place (Apply to all)</Label>
+                  <Input 
+                    id="bulk-received-place"
+                    placeholder="e.g., Singapore Port" 
                     value={placeReceived}
                     onChange={(e) => setPlaceReceived(e.target.value)}
-                    className="text-sm"
                     data-testid="input-bulk-received-place"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date (Apply to all)</label>
-                  <div className="relative">
-                    <Input 
-                      type="date" 
-                      value={dateReceived}
-                      onChange={(e) => setDateReceived(e.target.value)}
-                      className="text-sm pr-10"
-                      data-testid="input-bulk-received-date"
-                    />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Comments (Apply to all)</label>
+                  <Label htmlFor="bulk-comments">Comments (Apply to all)</Label>
                   <Input 
+                    id="bulk-comments"
                     placeholder="Enter comments" 
-                    className="text-sm"
                     data-testid="input-bulk-comments"
                     onChange={(e) => {
                       const comments = e.target.value;
@@ -2018,127 +1999,143 @@ const Stores: React.FC = () => {
                 </div>
               </div>
 
-              {/* Table Headers */}
-              <div className="grid grid-cols-[1fr_1fr_80px_80px_80px_80px_80px_80px_80px] gap-2 bg-gray-50 p-3 rounded-t text-sm font-medium text-gray-600 border">
-                <div>
-                  {activeTab === "lubes" ? "Lube Grade" : 
-                   activeTab === "chemicals" ? "Chem Code" : "Item Code"}
+              {/* Table - matches Spares structure exactly */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium">
+                          {activeTab === "lubes" ? "Lube Grade" : 
+                           activeTab === "chemicals" ? "Chem Code" : "Item Code"}
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium">
+                          {activeTab === "lubes" ? "Lube Type" : 
+                           activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
+                        </th>
+                        <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
+                          <div className="text-center">ROB</div>
+                          <div className="flex justify-center gap-4 text-[10px] mt-1">
+                            <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</span>
+                            <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</span>
+                          </div>
+                        </th>
+                        <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
+                          <div className="text-center text-orange-600">Consumed</div>
+                          <div className="flex justify-center gap-4 text-[10px] mt-1">
+                            <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</span>
+                            <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</span>
+                          </div>
+                        </th>
+                        <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
+                          <div className="text-center text-green-600">Received</div>
+                          <div className="flex justify-center gap-4 text-[10px] mt-1">
+                            <span className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</span>
+                            <span className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</span>
+                          </div>
+                        </th>
+                        <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkModalFilteredItems.map((item) => {
+                        const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
+                        const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
+                        const receivedA = bulkUpdateData[item.id]?.receivedLocationA || 0;
+                        const receivedB = bulkUpdateData[item.id]?.receivedLocationB || 0;
+                        const robA = item.robLocationA ?? 0;
+                        const robB = item.robLocationB ?? 0;
+                        const newRobA = robA - consumedA + receivedA;
+                        const newRobB = robB - consumedB + receivedB;
+                        const newRob = newRobA + newRobB;
+                        const hasInsufficientStockA = consumedA > robA;
+                        const hasInsufficientStockB = consumedB > robB;
+                        const totalReceived = receivedA + receivedB;
+                        const needsReceivedDate = totalReceived > 0 && !dateReceived;
+                        const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
+                        
+                        // Get item-specific location names with fallbacks
+                        const itemLocA = locationNames.locationA || 'Location A';
+                        const itemLocB = locationNames.locationB || 'Location B';
+                        
+                        return (
+                          <tr key={item.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                            <td className="px-3 py-2 text-sm">{item.itemCode}</td>
+                            <td className="px-3 py-2 text-sm max-w-[150px] truncate" title={item.itemName}>{item.itemName}</td>
+                            {/* ROB cells with location names */}
+                            <td className="px-2 py-2 text-center">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={itemLocA}>{itemLocA}</div>
+                              <div className="text-xs text-gray-600 font-medium">{robA}</div>
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[60px]" title={itemLocB}>{itemLocB}</div>
+                              <div className="text-xs text-gray-600 font-medium">{robB}</div>
+                            </td>
+                            {/* Consumed cells with location names */}
+                            <td className="px-1 py-2 border-l">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={itemLocA}>{itemLocA}</div>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                max={robA}
+                                value={bulkUpdateData[item.id]?.consumedLocationA || ""}
+                                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationA', e.target.value)}
+                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockA ? 'border-red-500' : ''}`}
+                                data-testid={`input-consume-a-${item.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={itemLocB}>{itemLocB}</div>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                max={robB}
+                                value={bulkUpdateData[item.id]?.consumedLocationB || ""}
+                                onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationB', e.target.value)}
+                                className={`w-14 h-7 text-sm text-center ${hasInsufficientStockB ? 'border-red-500' : ''}`}
+                                data-testid={`input-consume-b-${item.id}`}
+                              />
+                            </td>
+                            {/* Received cells with location names */}
+                            <td className="px-1 py-2 border-l">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={itemLocA}>{itemLocA}</div>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                value={bulkUpdateData[item.id]?.receivedLocationA || ""}
+                                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationA', e.target.value)}
+                                className="w-14 h-7 text-sm text-center"
+                                data-testid={`input-receive-a-${item.id}`}
+                              />
+                            </td>
+                            <td className="px-1 py-2">
+                              <div className="text-[9px] text-gray-500 truncate max-w-[56px] text-center" title={itemLocB}>{itemLocB}</div>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                value={bulkUpdateData[item.id]?.receivedLocationB || ""}
+                                onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationB', e.target.value)}
+                                className="w-14 h-7 text-sm text-center"
+                                data-testid={`input-receive-b-${item.id}`}
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-center border-l">
+                              <div className={`text-sm font-medium ${hasError ? 'text-red-600' : ''}`}>
+                                {newRob}
+                                {(hasInsufficientStockA || hasInsufficientStockB) && (
+                                  <div className="text-[10px] text-red-600">Insufficient</div>
+                                )}
+                                {needsReceivedDate && (
+                                  <div className="text-[10px] text-red-600">Date required</div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div>
-                  {activeTab === "lubes" ? "Lube Type" : 
-                   activeTab === "chemicals" ? "Chemical Name" : "Item Name"}
-                </div>
-                <div className="text-center">
-                  <div>ROB</div>
-                  <div className="text-[10px] text-green-600 font-semibold" data-testid="label-rob-location-a">Location A</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                </div>
-                <div className="text-center">
-                  <div>ROB</div>
-                  <div className="text-[10px] text-green-600 font-semibold" data-testid="label-rob-location-b">Location B</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-red-600">Consumed</div>
-                  <div className="text-[10px] text-green-600 font-semibold">Location A</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-red-600">Consumed</div>
-                  <div className="text-[10px] text-green-600 font-semibold">Location B</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-green-600">Received</div>
-                  <div className="text-[10px] text-green-600 font-semibold">Location A</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-green-600">Received</div>
-                  <div className="text-[10px] text-green-600 font-semibold">Location B</div>
-                  <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                </div>
-                <div className="text-center">New ROB</div>
-              </div>
-
-              {/* Table Body */}
-              <div className="border border-t-0 rounded-b max-h-[400px] overflow-y-auto">
-                {bulkModalFilteredItems.map((item) => {
-                  const consumedA = bulkUpdateData[item.id]?.consumedLocationA || 0;
-                  const consumedB = bulkUpdateData[item.id]?.consumedLocationB || 0;
-                  const receivedA = bulkUpdateData[item.id]?.receivedLocationA || 0;
-                  const receivedB = bulkUpdateData[item.id]?.receivedLocationB || 0;
-                  const robA = item.robLocationA ?? 0;
-                  const robB = item.robLocationB ?? 0;
-                  const newRobA = robA - consumedA + receivedA;
-                  const newRobB = robB - consumedB + receivedB;
-                  const newRob = newRobA + newRobB;
-                  const hasError = newRobA < 0 || newRobB < 0;
-                  
-                  return (
-                    <div key={item.id} className={`grid grid-cols-[1fr_1fr_80px_80px_80px_80px_80px_80px_80px] gap-2 p-3 border-b ${hasError ? 'bg-red-50' : 'bg-white'} items-center`}>
-                      <div className="text-gray-900 text-sm">{item.itemCode}</div>
-                      <div className="text-gray-900 text-sm truncate" title={item.itemName}>{item.itemName}</div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                        <div className="text-gray-700 text-sm font-medium">{robA}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                        <div className="text-gray-700 text-sm font-medium">{robB}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          max={robA}
-                          className={`text-sm h-8 text-center ${newRobA < 0 ? 'border-red-500' : ''}`}
-                          placeholder="0"
-                          value={consumedA || ''}
-                          onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationA', e.target.value)}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          max={robB}
-                          className={`text-sm h-8 text-center ${newRobB < 0 ? 'border-red-500' : ''}`}
-                          placeholder="0"
-                          value={consumedB || ''}
-                          onChange={(e) => handleBulkUpdateChange(item.id, 'consumedLocationB', e.target.value)}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          className="text-sm h-8 text-center" 
-                          placeholder="0"
-                          value={receivedA || ''}
-                          onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationA', e.target.value)}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          className="text-sm h-8 text-center" 
-                          placeholder="0"
-                          value={receivedB || ''}
-                          onChange={(e) => handleBulkUpdateChange(item.id, 'receivedLocationB', e.target.value)}
-                        />
-                      </div>
-                      <div className={`text-center text-sm font-medium ${newRob < 0 ? 'text-red-600' : newRob < item.min ? 'text-yellow-600' : 'text-gray-900'}`}>
-                        {newRob}
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             </div>
 
