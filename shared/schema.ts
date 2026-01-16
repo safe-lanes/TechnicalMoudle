@@ -1147,6 +1147,16 @@ export const defects = pgTable("defects", {
   closedOn: text("closed_on"), // ISO format YYYY-MM-DD HH:MM:SS
   closureComment: text("closure_comment"),
   closureFiles: text("closure_files").array(), // Array of file URLs
+  
+  // C1 Closeout fields
+  closedOutByName: text("closed_out_by_name"), // Name of person who closed out
+  closedOutByRank: text("closed_out_by_rank"), // Rank of person who closed out
+  
+  // C2 Verification fields
+  verified: boolean("verified").default(false), // Verification checkbox
+  dateVerified: text("date_verified"), // ISO format YYYY-MM-DD
+  verifiedByName: text("verified_by_name"), // Name of verifier
+  verifiedByOfficePosition: text("verified_by_office_position"), // Office position of verifier
   // Linked defects
   linkedDefects: text("linked_defects").array(), // Array of defect IDs
   // Notes
