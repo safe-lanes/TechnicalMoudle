@@ -63,6 +63,7 @@ interface DefectFormWizardProps {
   initialStep?: 1 | 2 | 3;
   onCompleted?: () => void;
   onBack?: () => void;
+  isCoc?: boolean; // Pre-select CoC checkbox when opened from CoC section
 }
 
 export default function DefectFormWizard({ 
@@ -70,7 +71,8 @@ export default function DefectFormWizard({
   mode = 'new', 
   initialStep = 1,
   onCompleted,
-  onBack
+  onBack,
+  isCoc = false
 }: DefectFormWizardProps = {}) {
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -163,6 +165,9 @@ export default function DefectFormWizard({
   
   const currentDefect = defect || fetchedDefect;
   
+  // Compute the correct is_coc default: use existing defect value if available, otherwise use isCoc prop for new defects
+  const defaultIsCoc = currentDefect?.is_coc ?? isCoc;
+  
   const form = useForm<DefectFormData>({
     resolver: zodResolver(defectFormSchema),
     defaultValues: {
@@ -174,7 +179,7 @@ export default function DefectFormWizard({
       status: "Open",
       priority: "Medium",
       critical: false,
-      is_coc: false,
+      is_coc: defaultIsCoc, // Use defect's value if editing, or isCoc prop for new defects
       severity: 1,
       reportedBy: "MASTER",
       description: "",
@@ -207,6 +212,8 @@ export default function DefectFormWizard({
         dateCompleted: currentDefect.dateCompleted || '',
         targetCloseDate: currentDefect.targetCloseDate || '',
         verifiedDate: currentDefect.verifiedDate || '',
+        // Explicitly preserve the defect's is_coc value, don't fall back to isCoc prop for existing defects
+        is_coc: currentDefect.is_coc ?? false,
       });
       
       if (currentDefect.actions && Array.isArray(currentDefect.actions)) {

@@ -24,7 +24,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import DefectFormExact from "./DefectFormExact";
 import DefectFormWizard from "./DefectFormWizard";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
@@ -488,14 +487,15 @@ export default function DefectsCoC() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
-                <DefectFormExact 
-                  onClose={() => {
+                <DefectFormWizard 
+                  defect={selectedDefect}
+                  mode={defectFormMode}
+                  isCoc={true}
+                  onCompleted={() => {
                     setShowNewDefectForm(false);
                     setSelectedDefect(null);
                     invalidateCoCQueries();
                   }}
-                  defect={selectedDefect}
-                  mode={defectFormMode}
                 />
               </DialogContent>
             </Dialog>
