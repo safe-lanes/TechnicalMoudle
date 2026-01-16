@@ -1,0 +1,64 @@
+Replit Analysis & Fix Prompt — Bulk Update Stores (Spare Parity)
+Context
+The Bulk Update Stores screen must function exactly the same as Bulk Update Spares.
+All required data already exists in the Stores table and can be fully derived using the Part Code (Item Code).
+No additional data sources or schema changes are required.
+The goal is UI and behavior parity only, without impacting any existing functionality.
+Shape
+❌ Current Behavior (Stores)
+Bulk Update Stores partially diverges from Bulk Update Spares
+Location A / Location B headers show generic labels instead of configured location names
+Internal binding differs from the Spares bulk update pattern
+Despite this, all required data is already present in the Stores table
+Shape
+✅ Expected Correct Behavior
+Bulk Update Stores must:
+Work identically to Bulk Update Spares
+Use the Stores table as the single data source
+Fetch all required data using Item Code (Part Code equivalent)
+Allowed differences only:
+Spares	Stores
+Part Code	Item Code
+Part Name	Item Name
+Additionally:
+Location A / Location B must display the actual vessel-configured location names
+All other sections and behavior must remain identical to Spares
+Shape
+🧠 Analysis Required (Before Any Fix)
+Replit must analyze first and make no changes.
+Specifically:
+Confirm that:
+All required fields used in Bulk Update Spares exist in the Stores table
+Item Code is sufficient to retrieve all related store data
+Compare:
+Data binding logic in Bulk Update Spares
+Data binding logic in Bulk Update Stores
+Explain:
+Why Stores currently diverges from Spares
+Why generic Location A / B labels are being used
+Validate:
+That aligning Stores with Spares will not affect any other functionality
+That no backend, API, or calculation logic changes are required
+Shape
+🛠️ Fix Requirements (Strict — After Approval Only)
+Replit must:
+Change UI binding only
+Align Bulk Update Stores behavior line-by-line with Bulk Update Spares
+Source data only from the Stores table using Item Code
+Update Location A / B headers to show configured location names
+Ensure:
+No logic changes
+No API changes
+No schema changes
+No validation changes
+No side effects to any other module
+Proceed only after explicit approval (“PROCEED”).
+Shape
+🚫 What Must NOT Be Changed
+❌ Stores table structure
+❌ Store consume / receive logic
+❌ Backend APIs
+❌ Validation rules
+❌ Pagination, filters, or search
+❌ Any behavior in Bulk Update Spares
+❌ Any unrelated PMS module
