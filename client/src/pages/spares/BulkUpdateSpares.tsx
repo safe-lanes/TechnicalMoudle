@@ -36,7 +36,12 @@ export default function BulkUpdateSpares() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { data: sparesData = [], isLoading } = useQuery({
-    queryKey: [`/technical/api/spares/vessel/${vesselId}`],
+    queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId],
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/inventory/spares-with-inventory/${vesselId}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
     enabled: !!vesselId
   });
 
@@ -108,7 +113,7 @@ export default function BulkUpdateSpares() {
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/spares/vessel/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
       toast({ title: "Success", description: "Bulk update completed successfully" });
       setLocation("/spares");
     },

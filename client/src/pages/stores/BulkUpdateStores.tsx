@@ -44,7 +44,12 @@ export default function BulkUpdateStores() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { data: storesData = [], isLoading } = useQuery({
-    queryKey: [`/technical/api/stores/vessel/${vesselId}`],
+    queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`],
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/stores/${vesselId}?itemType=${activeTab}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
     enabled: !!vesselId
   });
 
@@ -131,7 +136,7 @@ export default function BulkUpdateStores() {
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/vessel/${vesselId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
       toast({ title: "Success", description: "Bulk update completed successfully" });
       setLocation("/stores");
     },
