@@ -2078,17 +2078,14 @@ const Stores: React.FC = () => {
                       <div className="text-gray-900 text-sm">{item.itemCode}</div>
                       <div className="text-gray-900 text-sm truncate" title={item.itemName}>{item.itemName}</div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location A</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
                         <div className="text-gray-700 text-sm font-medium">{robA}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location B</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
                         <div className="text-gray-700 text-sm font-medium">{robB}</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location A</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
                         <Input 
                           type="number" 
@@ -2101,7 +2098,6 @@ const Stores: React.FC = () => {
                         />
                       </div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location B</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
                         <Input 
                           type="number" 
@@ -2114,7 +2110,6 @@ const Stores: React.FC = () => {
                         />
                       </div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location A</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationA}>{locationNames.locationA}</div>
                         <Input 
                           type="number" 
@@ -2126,7 +2121,6 @@ const Stores: React.FC = () => {
                         />
                       </div>
                       <div className="text-center">
-                        <div className="text-[10px] text-green-600 font-semibold">Location B</div>
                         <div className="text-[9px] text-gray-500 truncate" title={locationNames.locationB}>{locationNames.locationB}</div>
                         <Input 
                           type="number" 
