@@ -292,7 +292,7 @@ export default function DefectsCoC() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');

@@ -85,7 +85,7 @@ const KPICard = ({ title, value, icon: Icon, color, change, changeType, subtitle
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
   const [dateRange, setDateRange] = useState("thisyear");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
     queryKey: ['/technical/api/defects?includeClosedDefects=true'],
