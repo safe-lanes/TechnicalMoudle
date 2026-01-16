@@ -257,15 +257,9 @@ const RunningHours = () => {
       return;
     }
     
-    // Block zero values for child components - must use parent component reset for renewal
-    if (newValue === 0) {
-      toast({
-        title: "Cannot Set RH to 0",
-        description: "Setting Running Hours to 0 requires using the parent component's renewal/replacement process.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Note: RH = 0 validation popup does NOT apply to inherited components
+    // Inherited components can be edited freely including setting to 0
+    // The zero RH renewal confirmation is only for MASTER components
     
     updateChildRHMutation.mutate({
       componentId: editingChildId,
