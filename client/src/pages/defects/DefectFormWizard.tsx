@@ -373,6 +373,37 @@ export default function DefectFormWizard({
     setIsViewMode(!isViewMode);
   };
 
+  // C2 Verification auto-fill handler for Office users
+  const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
+    const isChecked = checked === true;
+    fieldOnChange(isChecked);
+    
+    console.log('[C2 Auto-fill] Checkbox changed:', { 
+      checked: isChecked, 
+      userRole: currentUser?.role, 
+      userName: currentUser?.fullName,
+      crewDesignation: currentUser?.crewDesignation 
+    });
+    
+    // Auto-fill for Office users when checkbox is checked
+    if (isChecked && currentUser?.role === 'Office') {
+      const today = new Date().toISOString().split('T')[0];
+      console.log('[C2 Auto-fill] Applying auto-fill values:', { 
+        dateVerified: today, 
+        verifiedByName: currentUser.fullName, 
+        verifiedByOfficePosition: currentUser.crewDesignation 
+      });
+      
+      form.setValue('dateVerified', today);
+      if (currentUser?.fullName) {
+        form.setValue('verifiedByName', currentUser.fullName);
+      }
+      if (currentUser?.crewDesignation) {
+        form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
+      }
+    }
+  };
+
   const handleClose = () => {
     if (onBack) {
       onBack();
@@ -1697,20 +1728,7 @@ export default function DefectFormWizard({
                             <Checkbox
                               id="verified"
                               checked={field.value || false}
-                              onCheckedChange={(checked) => {
-                                field.onChange(checked);
-                                // Auto-fill for Office users when checkbox is checked
-                                if (checked && currentUser?.role === 'Office') {
-                                  const today = new Date().toISOString().split('T')[0];
-                                  form.setValue('dateVerified', today);
-                                  if (currentUser?.fullName) {
-                                    form.setValue('verifiedByName', currentUser.fullName);
-                                  }
-                                  if (currentUser?.crewDesignation) {
-                                    form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
-                                  }
-                                }
-                              }}
+                              onCheckedChange={(checked) => handleVerifiedChange(checked, field.onChange)}
                               disabled={isViewMode}
                               data-testid="checkbox-verified"
                             />
