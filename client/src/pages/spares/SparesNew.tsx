@@ -2114,8 +2114,8 @@ const Spares: React.FC = () => {
           ) : (
             <>
               {/* History Table Header */}
-              <div className="bg-gray-100 px-4 py-3 border-b border-gray-200">
-                <div className="grid grid-cols-9 gap-4 text-sm font-semibold text-gray-700">
+              <div className="bg-[#52baf3] px-4 py-3">
+                <div className="grid grid-cols-9 gap-4 text-sm font-medium text-white">
                   <div>Date/Time</div>
                   <div>Part Code</div>
                   <div>Part Name</div>

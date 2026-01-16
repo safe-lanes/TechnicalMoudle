@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 import { FEATURES } from "@/config/features";
 import { useVessels } from "@/hooks/useVessels";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
+import { format } from "date-fns";
 
 // Helper function to get marker prefix based on active tab
 const getMarkerPrefix = (tab: "stores" | "lubes" | "chemicals" | "others") => {
@@ -223,17 +224,32 @@ const Stores: React.FC = () => {
 
   // Map history API data to StoresHistoryItem format
   // Uses storesLedger schema fields: itemId, eventType, timestampUTC, qtyChangeBase, robAfterBase, userId, remarks, ref, itemName, partCode
-  const formatEventType = (eventType: string): string => {
-    const eventMap: Record<string, string> = {
-      'CONSUME': 'Consume',
-      'RECEIVE': 'Receive',
-      'ADJUST': 'Adjust',
-      'TRANSFER_IN': 'Transfer In',
-      'TRANSFER_OUT': 'Transfer Out',
-      'ARCHIVE': 'Archive',
-      'CREATE': 'Create'
-    };
-    return eventMap[eventType?.toUpperCase()] || eventType || 'Unknown';
+  
+  // Helper to format date consistently - show time only if present in source
+  const formatHistoryDate = (dateLocal: string | undefined, timestampUTC: string | undefined): string => {
+    try {
+      // Check if dateLocal is a date-only string (YYYY-MM-DD format)
+      const isDateOnly = dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(dateLocal.trim());
+      
+      if (dateLocal) {
+        // For date-only strings, append T00:00:00 to treat as local time and avoid timezone drift
+        const dateStr = isDateOnly ? `${dateLocal.trim()}T00:00:00` : dateLocal;
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          // Only show time if original data includes time component
+          return isDateOnly ? format(date, 'dd-MMM-yyyy') : format(date, 'dd-MMM-yyyy HH:mm');
+        }
+      }
+      if (timestampUTC) {
+        const date = new Date(timestampUTC);
+        if (!isNaN(date.getTime())) {
+          return format(date, 'dd-MMM-yyyy HH:mm');
+        }
+      }
+      return '-';
+    } catch {
+      return '-';
+    }
   };
   
   const historyItems: StoresHistoryItem[] = useMemo(() => {
@@ -242,8 +258,8 @@ const Stores: React.FC = () => {
     return historyData.map((entry: any) => {
       return {
         id: entry.id,
-        dateLocal: entry.dateLocal || (entry.timestampUTC ? new Date(entry.timestampUTC).toLocaleString() : ''),
-        eventType: formatEventType(entry.eventType),
+        dateLocal: formatHistoryDate(entry.dateLocal, entry.timestampUTC),
+        eventType: entry.eventType?.toUpperCase() || 'UNKNOWN',
         itemName: entry.itemName || `Item #${entry.itemId}`,
         partCode: entry.partCode || '',
         uom: entry.uom || '',
@@ -1496,6 +1512,7 @@ const Stores: React.FC = () => {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       item.eventType === 'RECEIVE' ? 'bg-green-100 text-green-800' :
                       item.eventType === 'CONSUME' ? 'bg-orange-100 text-orange-800' :
+                      item.eventType === 'INITIAL' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {item.eventType}
