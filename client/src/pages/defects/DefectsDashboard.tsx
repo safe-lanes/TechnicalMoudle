@@ -271,7 +271,7 @@ export default function DefectsDashboard() {
           title="Total Active Defects"
           value={kpis.totalActive}
           icon={AlertTriangle}
-          color="bg-red-50 text-red-600 border-red-200"
+          color="bg-white text-red-600 border-gray-200"
           change={kpis.totalActive > 0 ? `${kpis.totalActive} requiring attention` : "All clear"}
           changeType={kpis.totalActive > 0 ? "negative" : "positive"}
           onClick={() => navigateToDefectLog('active')}
@@ -281,7 +281,7 @@ export default function DefectsDashboard() {
           title="Total Resolved"
           value={kpis.totalResolved}
           icon={CheckCircle}
-          color="bg-green-50 text-green-600 border-green-200"
+          color="bg-white text-green-600 border-gray-200"
           change={`${resolutionRate}% resolution rate`}
           changeType="positive"
           onClick={() => navigateToDefectLog('resolved')}
@@ -291,7 +291,7 @@ export default function DefectsDashboard() {
           title="Condition of Class"
           value={kpis.conditionOfClass}
           icon={Shield}
-          color="bg-blue-50 text-blue-600 border-blue-200"
+          color="bg-white text-blue-600 border-gray-200"
           change={kpis.conditionOfClass > 0 ? "Active regulatory items" : "No active CoC items"}
           changeType={kpis.conditionOfClass > 0 ? "negative" : "positive"}
           subtitle="Regulatory compliance"
@@ -302,7 +302,7 @@ export default function DefectsDashboard() {
           title="Overdue Defects"
           value={kpis.overdueDefects}
           icon={Clock}
-          color="bg-orange-50 text-orange-600 border-orange-200"
+          color="bg-white text-orange-600 border-gray-200"
           change={kpis.overdueDefects > 0 ? `${kpis.overdueDefects} past target date` : "All on schedule"}
           changeType={kpis.overdueDefects > 0 ? "negative" : "neutral"}
           onClick={() => navigateToDefectLog('overdue')}
@@ -386,7 +386,7 @@ export default function DefectsDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Shield className="h-5 w-5 text-blue-500" />
                   <div>
@@ -399,7 +399,7 @@ export default function DefectsDashboard() {
                 </Badge>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Clock className="h-5 w-5 text-orange-500" />
                   <div>
@@ -412,7 +412,7 @@ export default function DefectsDashboard() {
                 </Badge>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-500" />
                   <div>
@@ -420,7 +420,7 @@ export default function DefectsDashboard() {
                     <p className="text-sm text-gray-600">Immediate attention</p>
                   </div>
                 </div>
-                <Badge variant={kpis.highPriority > 0 ? "destructive" : "secondary"} className={kpis.highPriority > 0 ? "" : "bg-yellow-100 text-yellow-800"}>
+                <Badge variant={kpis.highPriority > 0 ? "destructive" : "secondary"} className={kpis.highPriority > 0 ? "" : "bg-gray-100 text-gray-800"}>
                   {kpis.highPriority}
                 </Badge>
               </div>
