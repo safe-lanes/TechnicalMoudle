@@ -1,0 +1,87 @@
+Running Hours (RH) Entry Rules (Strict)
+A) General (per Vessel + per Component)
+
+Treat each vessel separately. Running hours and validations must run independently per vessel.
+
+Treat each component separately. RH history is a time-ordered log for that component.
+
+B) Date Rule (No back-dated entries)
+
+When user adds a new RH entry:
+
+System must find the latest RH entry date already saved for that component (in the current RH cycle).
+
+New entry date must be the same as or later than the latest saved entry date.
+
+If user selects a date before the latest saved entry date → block save and show an error.
+
+Error message example:
+“Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (DD-MMM-YYYY).”
+
+Recommendation (to avoid confusion): allow only one RH entry per component per date. If the user tries same date again, treat it as edit/overwrite latest, not a new row.
+
+C) Value Rule (RH must never go backwards)
+
+When user adds a new RH entry:
+
+System must find the latest saved RH value for that component (in the current RH cycle).
+
+New RH value must be ≥ the latest saved RH value.
+
+If user enters a value less than the latest saved value → block save and show an error.
+
+Error message example:
+“Invalid Running Hours. Reading cannot be less than the last saved reading (Last: 100).”
+
+D) Editing Rule (prevent breaking history)
+
+To keep the log correct:
+
+Do not allow editing of older RH entries (past entries).
+
+Allow edit/delete only for the most recent RH entry (latest date entry), because changing old entries can break future validations.
+
+Error message example:
+“Past entries are locked. Only the latest Running Hours entry can be edited.”
+
+Reset Rule (Allowed only on Renewal/Replacement)
+E) RH reset to 0 is allowed only when component is renewed/replaced
+
+RH can be set to 0 only using a dedicated action like:
+“Renew / Replace Component (Reset RH)”
+Not by normal RH entry.
+
+When user performs Reset:
+
+Require Reset Date (mandatory)
+
+Require Reason (Renewed / Replaced / Overhauled with meter reset) (mandatory)
+
+Optional but preferred: Work Order reference, remarks, evidence upload (invoice/job report/class/maker docs).
+
+On successful reset:
+
+Create a new RH entry on the reset date with RH = 0
+
+Start a new RH cycle after reset
+
+After reset, the same rules apply again (date must move forward; RH must be non-decreasing from 0).
+
+Validation for reset date:
+
+Reset date must also follow the same no back-date rule (cannot be earlier than the latest saved RH entry date).
+
+If reset date is earlier → block and show error.
+
+Error message example:
+“Reset date cannot be earlier than the latest RH entry date. Please choose a valid reset date.”
+
+Important (if you are using MASTER / INHERITED RH logic)
+
+If a component is INHERITED (inherits RH from a MASTER component), then:
+
+Disable manual RH entry for that component.
+
+RH values should display as read-only and update automatically from the MASTER.
+
+Only MASTER components should accept RH entries and resets.
