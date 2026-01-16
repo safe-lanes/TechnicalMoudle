@@ -2,8 +2,43 @@ import { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+
+// Client-side only ReactQuill wrapper component
+function RichTextEditor({ value, onChange, modules, className, placeholder, readOnly }: {
+  value: string;
+  onChange: (value: string) => void;
+  modules?: any;
+  className?: string;
+  placeholder?: string;
+  readOnly?: boolean;
+}) {
+  const [QuillComponent, setQuillComponent] = useState<any>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    import('react-quill').then((mod) => {
+      setQuillComponent(() => mod.default);
+    });
+  }, []);
+
+  if (!isMounted || !QuillComponent) {
+    return <div className="h-32 bg-gray-100 rounded animate-pulse flex items-center justify-center text-gray-500">Loading editor...</div>;
+  }
+
+  return (
+    <QuillComponent
+      theme="snow"
+      value={value}
+      onChange={onChange}
+      modules={modules}
+      className={className}
+      placeholder={placeholder}
+      readOnly={readOnly}
+    />
+  );
+}
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1043,8 +1078,7 @@ export default function DefectFormWizard({
                       name="description"
                       control={form.control}
                       render={({ field }) => (
-                        <ReactQuill
-                          theme="snow"
+                        <RichTextEditor
                           value={field.value || ""}
                           onChange={field.onChange}
                           modules={quillModules}
