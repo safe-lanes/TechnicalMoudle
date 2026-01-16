@@ -11,7 +11,6 @@ import {
   Clock, 
   Eye, 
   Edit, 
-  Paperclip, 
   Link as LinkIcon, 
   Plus, 
   Filter,
@@ -27,7 +26,6 @@ import {
 } from "@/components/ui/tooltip";
 import DefectFormWizard from "./DefectFormWizard";
 import DefectModal from "./DefectModal";
-import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -141,7 +139,6 @@ const CategoryCellRenderer = (params: ICellRendererParams) => {
 interface ActionsCellContext {
   handleViewClick: (data: Defect) => void;
   handleEditClick: (data: Defect) => void;
-  handleNoteClick: (data: Defect) => void;
   handleLinkClick: (data: Defect) => void;
   handleCloseClick: (data: Defect) => void;
 }
@@ -151,7 +148,7 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
   
   const defect = params.data as Defect;
   const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
-  const { handleViewClick, handleEditClick, handleNoteClick, handleLinkClick, handleCloseClick } = params.context;
+  const { handleViewClick, handleEditClick, handleLinkClick, handleCloseClick } = params.context;
   
   return (
     <div className="flex gap-1 justify-center items-center">
@@ -186,21 +183,6 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
                 </Button>
               </TooltipTrigger>
               <TooltipContent><p>Edit</p></TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-6 w-6"
-                  onClick={() => handleNoteClick(defect)}
-                  data-testid={`button-note-coc-${defect.id}`}
-                >
-                  <Paperclip className="h-4 w-4 text-gray-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>Add Note</p></TooltipContent>
             </Tooltip>
             
             <Tooltip>
@@ -251,7 +233,6 @@ export default function DefectsCoC() {
     open: false, 
     defect: null 
   });
-  const [addNoteModal, setAddNoteModal] = useState<{ open: boolean; defectId: string | null }>({ open: false, defectId: null });
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
 
   // Get CoC defects only
@@ -320,10 +301,6 @@ export default function DefectsCoC() {
     setDefectFormMode('new');
     setShowNewDefectForm(true);
   };
-
-  const handleNoteClick = useCallback((defect: Defect) => {
-    setAddNoteModal({ open: true, defectId: defect.id });
-  }, []);
 
   const handleLinkClick = useCallback((defect: Defect) => {
     setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] });
@@ -595,7 +572,6 @@ export default function DefectsCoC() {
               context={{
                 handleViewClick: handleViewDefect,
                 handleEditClick: handleEditDefect,
-                handleNoteClick,
                 handleLinkClick,
                 handleCloseClick
               }}
@@ -630,15 +606,6 @@ export default function DefectsCoC() {
             />
           </DialogContent>
         </Dialog>
-      )}
-
-      {/* Add Note Modal */}
-      {addNoteModal.defectId && (
-        <AddNoteModal
-          open={addNoteModal.open}
-          onClose={() => setAddNoteModal({ open: false, defectId: null })}
-          defectId={addNoteModal.defectId}
-        />
       )}
 
       {/* Link Defects Modal */}
