@@ -450,28 +450,6 @@ export default function DefectFormWizard({
     return () => observer.disconnect();
   }, []);
 
-  // C2 Verification auto-fill: When verified checkbox is checked by Office user
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'verified' && value.verified && currentUser?.role === 'Office') {
-        // Auto-fill today's date (user can change it)
-        const today = new Date().toISOString().split('T')[0];
-        form.setValue('dateVerified', today);
-        
-        // Auto-fill verified by name from session
-        if (currentUser?.fullName) {
-          form.setValue('verifiedByName', currentUser.fullName);
-        }
-        
-        // Auto-fill verified by office position from session (crewDesignation)
-        if (currentUser?.crewDesignation) {
-          form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
-        }
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [currentUser, form]);
-
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -1719,7 +1697,20 @@ export default function DefectFormWizard({
                             <Checkbox
                               id="verified"
                               checked={field.value || false}
-                              onCheckedChange={field.onChange}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                // Auto-fill for Office users when checkbox is checked
+                                if (checked && currentUser?.role === 'Office') {
+                                  const today = new Date().toISOString().split('T')[0];
+                                  form.setValue('dateVerified', today);
+                                  if (currentUser?.fullName) {
+                                    form.setValue('verifiedByName', currentUser.fullName);
+                                  }
+                                  if (currentUser?.crewDesignation) {
+                                    form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
+                                  }
+                                }
+                              }}
                               disabled={isViewMode}
                               data-testid="checkbox-verified"
                             />
