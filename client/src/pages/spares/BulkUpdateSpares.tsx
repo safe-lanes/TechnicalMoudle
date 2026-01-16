@@ -61,7 +61,7 @@ export default function BulkUpdateSpares() {
   };
 
   const filteredSpares = useMemo(() => {
-    if (!sparesData) return [];
+    if (!sparesData || !Array.isArray(sparesData)) return [];
     const spares = sparesData as Spare[];
     if (!bulkSearchQuery) return spares;
     
@@ -82,7 +82,8 @@ export default function BulkUpdateSpares() {
 
   useEffect(() => {
     const initialData: {[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number}} = {};
-    (sparesData as Spare[])?.forEach(spare => {
+    const spares = Array.isArray(sparesData) ? sparesData : [];
+    spares.forEach((spare: Spare) => {
       initialData[spare.id] = { consumedA: 0, consumedB: 0, receivedA: 0, receivedB: 0 };
     });
     setBulkUpdateData(initialData);
@@ -123,8 +124,9 @@ export default function BulkUpdateSpares() {
   });
 
   const handleSaveBulkUpdates = async () => {
+    const sparesArray = Array.isArray(sparesData) ? sparesData : [];
     const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
-      const spare = (sparesData as Spare[]).find(s => s.id === Number(id));
+      const spare = sparesArray.find((s: Spare) => s.id === Number(id));
       if (!spare) return false;
       const robA = spare.robLocationA ?? 0;
       const robB = spare.robLocationB ?? 0;

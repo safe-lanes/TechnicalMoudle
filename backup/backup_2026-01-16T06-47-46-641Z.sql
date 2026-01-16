@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iFouHIV5r1Mujb71BP1ZcLh2QJaeMuPFSC8EIbxqHkztXSkz01GTfXyC8UE4vQi
+\restrict PUnA3E1zcRkFhxd1cq0DIILYGLitI8IErNmBnRd364oQbRvsOdg5gzGSs8JGnXK
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -49009,7 +49009,6 @@ COPY public.spares (id, part_code, part_name, component_id, component_code, comp
 3598	MV0001-05255	Plain Washer	COMP-1768302796145-kph21salo	601.059	ME Exhaust Gas Manifolds/Pipes W/Insulation	SP-601.059-255	No	5	2	3	5	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	743feb08-841a-11ed-aa7c-7003bca91a86	f	vessel	601.059.AA	\N	Fig. 171\\171027	PCS	171	\N	CCC-BB-XXX	\N	\N	525	As Per the Manufacture Manuals	\N	Kobe Diesel Co Ltd	MKR-000008	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-13 11:14:12.239547	\N	2026-01-13 11:14:12.239547	\N
 3599	MV0001-05256	Plain Washer	COMP-1768302796145-kph21salo	601.059	ME Exhaust Gas Manifolds/Pipes W/Insulation	SP-601.059-256	No	5	2	3	5	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	743feb08-841a-11ed-aa7c-7003bca91a86	f	vessel	601.059.AA	\N	Fig. 171\\171028	PCS	171	\N	CCC-BB-XXX	\N	\N	526	As Per the Manufacture Manuals	\N	Kobe Diesel Co Ltd	MKR-000008	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-13 11:14:12.258875	\N	2026-01-13 11:14:12.258875	\N
 5109	MV0001-05653	O-Ring	COMP-1768374768219-f5y8ppktt	601.066.06	ME Indicators No.06	SP-601.066.01-653	No	110	102	8	4	\N	\N	\N	\N	\N	2026-01-14	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	601.066.AA	\N	4451-2568-001	PCS	4451-2568	\N	CCC-BB-XXX	\N	\N	1	\N	\N	Kobe Diesel Co Ltd	MKR-000008	\N	Main Engine.Pdf	12	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:14.814818	\N	2026-01-14 09:13:02.907	\N
-6194	MV0001-05625	Gasket	COMP-1768381196480-7gnbnulsz	601.016	ME Tiebolts	SP-601.016-625	No	10	2	8	4	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	744535d0-841a-11ed-aa7c-7003bca91a86	f	vessel	601.016.AA	\N	4451-2566-002	PCS	4451-2566	\N	CCC-BB-XXX	\N	\N	2	\N	\N	Kobe Diesel Co Ltd	MKR-000008	\N	Main Engine.Pdf	12	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 09:15:16.444596	\N	2026-01-14 09:15:16.444596	\N
 3600	MV0001-05257	Packing	COMP-1768302796193-uz4j0v18x	653.001	Aux. Diesel Generator Aggregates, Complete No.03	SP-651.001-257	No	5	2	3	4	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	743feb08-841a-11ed-aa7c-7003bca91a86	f	vessel	651.001.AA	\N	14667318261.3	PCS	\N	\N	CCC-BB-XXX	\N	\N	624	As Per the Manufacture Manuals	Size & Dimension: DIA 127X20MM Material: RUBBER Other Details: No: 33\\For Outlet Of Blower	Yanmar Co., Ltd.	MKR-000011	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-13 11:14:12.279405	\N	2026-01-13 11:14:12.315	\N
 3601	MV0001-05258	Hand Trimmer	COMP-1768302796207-gd8craje0	665.001	Emergency Generator Aggregates, Complete	SP-665.001-258	Yes	5	2	3	4	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	743feb08-841a-11ed-aa7c-7003bca91a86	f	vessel	665.001.AA	\N	Fig. GT134	PCS	GT134	\N	CCC-BB-XXX	\N	\N	\N	As Per the Manufacture Manuals	Size & Dimension: 38X23X16 Other Details: No: 1\\List No: GT134	Mitsui Zosen Machinery Service	MKR-000019	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-13 11:14:12.32978	\N	2026-01-13 11:14:12.32978	\N
 3602	MV0001-05259	Ball Bearing	COMP-1768302796207-gd8craje0	665.001	Emergency Generator Aggregates, Complete	SP-665.001-259	No	5	2	3	4	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	743feb08-841a-11ed-aa7c-7003bca91a86	f	vessel	665.001.AA	\N	051-01049	PCS	GT134	\N	CCC-BB-XXX	\N	\N	1	As Per the Manufacture Manuals	Size & Dimension: DIA 110XDIA 50X37 Other Details: No: 2	Mitsui Zosen Machinery Service	MKR-000019	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-13 11:14:12.355736	\N	2026-01-13 11:14:12.355736	\N
@@ -50366,6 +50365,7 @@ COPY public.spares (id, part_code, part_name, component_id, component_code, comp
 4917	MV0001-05461	Plug	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-461	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\440	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	402	As Per the Manufacture Manuals	Material: STAINLESS STEEL\\SUS304	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.240318	\N	2026-01-14 07:29:02.240318	\N
 4918	MV0001-05462	Bearing	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-462	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\441	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	403	As Per the Manufacture Manuals	Material: NUT STEEL\\SS400	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.260271	\N	2026-01-14 07:29:02.260271	\N
 4919	MV0001-05463	Bearing Washer	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-463	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\443	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	404	As Per the Manufacture Manuals	Material: STEEL\\SS400	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.277664	\N	2026-01-14 07:29:02.277664	\N
+6194	MV0001-05625	Gasket	COMP-1768381196480-7gnbnulsz	601.016	ME Tiebolts	SP-601.016-625	No	8	2	6	4	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	744535d0-841a-11ed-aa7c-7003bca91a86	f	vessel	601.016.AA	\N	4451-2566-002	PCS	4451-2566	\N	CCC-BB-XXX	\N	\N	2	\N	\N	Kobe Diesel Co Ltd	MKR-000008	\N	Main Engine.Pdf	12	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 09:15:16.444596	\N	2026-01-16 06:29:11.646	\N
 4920	MV0001-05464	Snap Ring	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-464	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\445	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	405	As Per the Manufacture Manuals	Material: CARBON TOOL-STEEL\\SK5	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.295607	\N	2026-01-14 07:29:02.295607	\N
 4921	MV0001-05465	Oil Seal	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-465	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\446	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	406	As Per the Manufacture Manuals	Material: COVER BRASS\\C2801P	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.31222	\N	2026-01-14 07:29:02.31222	\N
 4922	MV0001-05466	Oil Seal	COMP-1768374767907-73hq6hda8	801.001	Clean Ballast Pumps	SP-801.001-466	No	5	2	3	10	\N	\N	\N	\N	\N	\N	AAA-BBB-CCC	7440571a-841a-11ed-aa7c-7003bca91a86	f	vessel	801.001.AA	\N	Fig. CM-35002A\\447	PCS	CM-35002A	\N	CCC-BB-XXX	\N	\N	407	As Per the Manufacture Manuals	Material: RUBBER	Shinko Ind Ltd	MKR-000018	\N	\N	\N	\N	t	No	UNKNOWN	\N	\N	\N	\N	2026-01-14 07:29:02.330813	\N	2026-01-14 07:29:02.330813	\N
@@ -52103,6 +52103,7 @@ COPY public.spares_history (id, timestamp_utc, vessel_id, spare_id, part_code, p
 4	2026-01-14 09:13:02.96	7440571a-841a-11ed-aa7c-7003bca91a86	5109	MV0001-05653	O-Ring	COMP-1768374768219-f5y8ppktt	601.066.06	ME Indicators No.06	SP-601.066.01-653	RECEIVE	100	110	user	Quick adjustment via ROB panel (Location A)	\N	2026-01-14	\N	\N
 5	2026-01-14 11:29:03.056	744535d0-841a-11ed-aa7c-7003bca91a86	6146	MV0001-05577	Cylinder Cover Complete	COMP-1768381196679-l0q555jvp	601.002.06	ME Cylinder Covers W/Valves No.06	SP-601.002.01-577	RECEIVE	98	103	user	Quick adjustment via ROB panel (Location A)	\N	2026-01-14	\N	\N
 6	2026-01-15 12:00:21.99	744535d0-841a-11ed-aa7c-7003bca91a86	6222	MV0001-05653	O-Ring	COMP-1768381196844-uzj81swhp	601.066.06	ME Indicators No.06	SP-601.066.01-653	RECEIVE	48	58	user	Quick adjustment via ROB panel (Location A)	\N	2026-01-15	\N	\N
+7	2026-01-16 06:29:11.674	744535d0-841a-11ed-aa7c-7003bca91a86	6194	MV0001-05625	Gasket	COMP-1768381196480-7gnbnulsz	601.016	ME Tiebolts	SP-601.016-625	CONSUME	-2	8	user	Location B	\N	\N	\N	\N
 \.
 
 
@@ -53477,14 +53478,14 @@ SELECT pg_catalog.setval('public.spare_location_stock_id_seq', 13332, true);
 -- Name: spares_history_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.spares_history_id_seq', 6, true);
+SELECT pg_catalog.setval('public.spares_history_id_seq', 7, true);
 
 
 --
 -- Name: spares_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.spares_id_seq', 6693, true);
+SELECT pg_catalog.setval('public.spares_id_seq', 6694, true);
 
 
 --
@@ -55496,5 +55497,5 @@ ALTER TABLE ONLY public.recurring_defect_links
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iFouHIV5r1Mujb71BP1ZcLh2QJaeMuPFSC8EIbxqHkztXSkz01GTfXyC8UE4vQi
+\unrestrict PUnA3E1zcRkFhxd1cq0DIILYGLitI8IErNmBnRd364oQbRvsOdg5gzGSs8JGnXK
 
