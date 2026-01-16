@@ -19,6 +19,7 @@ interface StoreItem {
   min: number;
   stock: string;
   location: string;
+  location2?: string;
   category: "stores" | "lubes" | "chemicals" | "others";
   robLocationA?: number;
   robLocationB?: number;
@@ -81,6 +82,7 @@ export default function BulkUpdateStores() {
       min: parseFloat(item.min) ?? 0,
       stock: 'OK',
       location: item.location || item.locationA || '',
+      location2: item.location2 || item.locationB || '',
       category: item.itemType || 'stores',
       robLocationA: parseFloat(item.robLocationA) || 0,
       robLocationB: parseFloat(item.robLocationB) || 0
@@ -340,22 +342,22 @@ export default function BulkUpdateStores() {
                     <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
                       <div className="text-center">ROB</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                       <div className="text-center text-orange-600">Consumed</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                       <div className="text-center text-green-600">Received</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-received-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-received-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
@@ -378,8 +380,8 @@ export default function BulkUpdateStores() {
                     const needsReceivedDate = totalReceived > 0 && !dateReceived;
                     const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
                     
-                    const itemLocA = locationNames.locationA;
-                    const itemLocB = locationNames.locationB;
+                    const itemLocA = item.location || locationNames.locationA;
+                    const itemLocB = item.location2 || locationNames.locationB;
                     
                     return (
                       <tr key={item.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>

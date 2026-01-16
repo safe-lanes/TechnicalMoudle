@@ -295,22 +295,22 @@ export default function BulkUpdateSpares() {
                     <th className="px-2 py-2 text-center text-xs font-medium" colSpan={2}>
                       <div className="text-center">ROB</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-rob-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                       <div className="text-center text-orange-600">Consumed</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-consumed-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l" colSpan={2}>
                       <div className="text-center text-green-600">Received</div>
                       <div className="flex justify-center gap-4 text-[10px] mt-1">
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-a">Location A</span>
-                        <span className="font-semibold text-blue-600" data-testid="label-received-location-b">Location B</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-received-location-a">{locationNames.locationA}</span>
+                        <span className="font-semibold text-blue-600" data-testid="label-received-location-b">{locationNames.locationB}</span>
                       </div>
                     </th>
                     <th className="px-2 py-2 text-center text-xs font-medium border-l">New ROB</th>
