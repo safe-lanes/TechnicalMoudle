@@ -259,7 +259,7 @@ const Spares: React.FC = () => {
     if (!locations) return;
 
     // Find the spare to check current names
-    const spare = sparesData.find((s: Spare) => s.id === spareId);
+    const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
     if (!spare) return;
     
     const newRobA = parseInt(locations.locationA) || 0;
@@ -467,7 +467,7 @@ const Spares: React.FC = () => {
   const handleQuickAdjust = async (spareId: number, qtyChange: number, eventType: 'CONSUME' | 'RECEIVE') => {
     // Validate stock availability using effective ROB (actual + pending adjustments)
     if (eventType === 'CONSUME') {
-      const spare = sparesData.find((s: Spare) => s.id === spareId);
+      const spare = (Array.isArray(sparesData) ? sparesData : []).find((s: Spare) => s.id === spareId);
       const pendingDelta = pendingAdjustments.get(spareId) || 0;
       const effectiveRob = (spare?.rob || 0) + pendingDelta;
       
@@ -861,7 +861,8 @@ const Spares: React.FC = () => {
   
   // Get actual location names - prefer spare-specific names, then vessel settings, then defaults
   // Find the first spare with location names defined to use as reference
-  const firstSpareWithLocations = (sparesData as Spare[])?.find(s => s.location || s.location2);
+  const sparesArray = Array.isArray(sparesData) ? sparesData : [];
+  const firstSpareWithLocations = sparesArray.find((s: Spare) => s.location || s.location2);
   
   const locationNames = {
     locationA: firstSpareWithLocations?.location || locationNamesData?.locationAName || 'Location A',
@@ -1602,8 +1603,9 @@ const Spares: React.FC = () => {
   // Save bulk updates
   const saveBulkUpdates = () => {
     // Validate all rows first
+    const sparesArrayLocal = Array.isArray(sparesData) ? sparesData : [];
     const hasErrors = Object.entries(bulkUpdateData).some(([id, data]) => {
-      const spare = sparesData.find((s: Spare) => s.id === parseInt(id));
+      const spare = sparesArrayLocal.find((s: Spare) => s.id === parseInt(id));
       if (!spare) return false;
       
       const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
@@ -2409,8 +2411,9 @@ const Spares: React.FC = () => {
               data-testid="button-bulk-save"
               disabled={bulkUpdateMutation.isPending || (() => {
                 // Check for validation errors
+                const sparesArrayInline = Array.isArray(sparesData) ? sparesData : [];
                 return Object.entries(bulkUpdateData).some(([id, data]) => {
-                  const spare = sparesData.find((s: Spare) => s.id === parseInt(id));
+                  const spare = sparesArrayInline.find((s: Spare) => s.id === parseInt(id));
                   if (!spare) return false;
                   // Check per-location stock
                   if ((data.consumedA || 0) > (spare.robLocationA ?? 0)) return true;
