@@ -207,6 +207,7 @@ const Spares: React.FC = () => {
   const [openLocationDropdown, setOpenLocationDropdown] = useState<number | null>(null);
   const [editingLocations, setEditingLocations] = useState<{[key: number]: {locationA: string, locationB: string, nameA?: string, nameB?: string}}>({});
   const locationDropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below');
   
   // Click outside handler for location dropdown
   useEffect(() => {
@@ -231,7 +232,20 @@ const Spares: React.FC = () => {
   
   const [originalLocationValues, setOriginalLocationValues] = useState<{[key: number]: {locationA: number, locationB: number, nameA: string, nameB: string}}>({});
   
-  const handleOpenLocationDropdown = (spare: Spare) => {
+  const handleOpenLocationDropdown = (spare: Spare, event: React.MouseEvent) => {
+    // Calculate if dropdown should open above or below based on viewport position
+    const buttonRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const dropdownHeight = 320; // Approximate height of the dropdown
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - buttonRect.bottom;
+    
+    // If not enough space below, open above
+    if (spaceBelow < dropdownHeight && buttonRect.top > dropdownHeight) {
+      setDropdownPosition('above');
+    } else {
+      setDropdownPosition('below');
+    }
+    
     setOpenLocationDropdown(spare.id);
     const origA = spare.robLocationA ?? 0;
     const origB = spare.robLocationB ?? 0;
@@ -1913,7 +1927,7 @@ const Spares: React.FC = () => {
                         <div className="relative" data-testid={isFirstRow ? "E32" : undefined}>
                           {isFirstRow && <Marker id="E32" />}
                           <button
-                            onClick={() => handleOpenLocationDropdown(spare)}
+                            onClick={(e) => handleOpenLocationDropdown(spare, e)}
                             className="flex items-center gap-1 text-gray-700 hover:text-blue-600 cursor-pointer w-full text-left"
                             data-testid={`button-location-${spare.id}`}
                           >
@@ -1925,7 +1939,9 @@ const Spares: React.FC = () => {
                           {isDropdownOpen && (
                             <div 
                               ref={locationDropdownRef}
-                              className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48"
+                              className={`absolute z-50 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-48 ${
+                                dropdownPosition === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
+                              }`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="space-y-3">
