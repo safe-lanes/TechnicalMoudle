@@ -69,22 +69,23 @@ export default function BulkUpdateStores() {
   };
 
   const items = useMemo(() => {
-    if (!storesData) return [];
-    return (storesData as any[]).filter((item: any) => item.category === activeTab).map((item: any) => ({
+    if (!storesData || !Array.isArray(storesData)) return [];
+    // Backend already filters by itemType via query param, no need to filter again
+    return (storesData as any[]).map((item: any) => ({
       id: item.id,
       itemCode: item.itemCode || '',
       itemName: item.itemName || '',
       storesCategory: item.storesCategory || item.category || '',
       uom: item.uom,
-      rob: (item.robLocationA ?? 0) + (item.robLocationB ?? 0),
-      min: item.min ?? 0,
+      rob: (parseFloat(item.robLocationA) || 0) + (parseFloat(item.robLocationB) || 0),
+      min: parseFloat(item.min) ?? 0,
       stock: 'OK',
-      location: item.location || '',
-      category: item.category || 'stores',
-      robLocationA: item.robLocationA ?? 0,
-      robLocationB: item.robLocationB ?? 0
+      location: item.location || item.locationA || '',
+      category: item.itemType || 'stores',
+      robLocationA: parseFloat(item.robLocationA) || 0,
+      robLocationB: parseFloat(item.robLocationB) || 0
     })) as StoreItem[];
-  }, [storesData, activeTab]);
+  }, [storesData]);
 
   const filteredItems = useMemo(() => {
     if (!bulkSearchQuery) return items;
