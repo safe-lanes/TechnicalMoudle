@@ -373,7 +373,7 @@ export default function DefectFormWizard({
     setIsViewMode(!isViewMode);
   };
 
-  // C2 Verification auto-fill handler for Office users
+  // C2 Verification auto-fill handler for Office and PMS Admin users
   const handleVerifiedChange = (checked: boolean | "indeterminate", fieldOnChange: (value: boolean) => void) => {
     const isChecked = checked === true;
     fieldOnChange(isChecked);
@@ -385,22 +385,22 @@ export default function DefectFormWizard({
       crewDesignation: currentUser?.crewDesignation 
     });
     
-    // Auto-fill for Office users when checkbox is checked
-    if (isChecked && currentUser?.role === 'Office') {
+    // Auto-fill for Office and PMS Admin users when checkbox is checked
+    const canAutoFill = currentUser?.role === 'Office' || currentUser?.role === 'PMS Admin';
+    if (isChecked && canAutoFill) {
       const today = new Date().toISOString().split('T')[0];
       console.log('[C2 Auto-fill] Applying auto-fill values:', { 
         dateVerified: today, 
-        verifiedByName: currentUser.fullName, 
-        verifiedByOfficePosition: currentUser.crewDesignation 
+        verifiedByName: currentUser?.fullName, 
+        verifiedByOfficePosition: currentUser?.crewDesignation || currentUser?.role
       });
       
       form.setValue('dateVerified', today);
       if (currentUser?.fullName) {
         form.setValue('verifiedByName', currentUser.fullName);
       }
-      if (currentUser?.crewDesignation) {
-        form.setValue('verifiedByOfficePosition', currentUser.crewDesignation);
-      }
+      // Use crewDesignation if available, otherwise fall back to role
+      form.setValue('verifiedByOfficePosition', currentUser?.crewDesignation || currentUser?.role || '');
     }
   };
 
