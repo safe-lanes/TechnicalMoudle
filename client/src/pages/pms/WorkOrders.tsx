@@ -374,36 +374,48 @@ const WorkOrders: React.FC = () => {
     const workOrder = safeWorkOrdersList.find(wo => wo.executionId === workOrderId || wo.id === workOrderId);
     if (!workOrder) return;
     
-    // Calculate next due date/reading
+    // Use the actual completion date from the work order (user-entered date when work was completed)
+    // Priority: completionDateTime > dateCompleted > undefined (let backend handle validation)
+    // Keep full ISO timestamp - do not trim to date-only to preserve time information
+    const actualCompletionDate = workOrder.completionDateTime || workOrder.dateCompleted || undefined;
+    
+    // Calculate next due date/reading based on actual completion date
     let nextDueDate = undefined;
     let nextDueReading = undefined;
     
-    if (workOrder.maintenanceBasis === "Calendar") {
-      const completionDate = new Date();
-      const freq = parseInt(workOrder.frequencyValue || "0");
-      if (workOrder.frequencyUnit === "Days") {
-        completionDate.setDate(completionDate.getDate() + freq);
-      } else if (workOrder.frequencyUnit === "Weeks") {
-        completionDate.setDate(completionDate.getDate() + (freq * 7));
-      } else if (workOrder.frequencyUnit === "Months") {
-        completionDate.setMonth(completionDate.getMonth() + freq);
-      } else if (workOrder.frequencyUnit === "Years") {
-        completionDate.setFullYear(completionDate.getFullYear() + freq);
+    if (workOrder.maintenanceBasis === "Calendar" && actualCompletionDate) {
+      const completionDate = new Date(actualCompletionDate);
+      // Validate date is parseable before calculating next due
+      if (!isNaN(completionDate.getTime())) {
+        const freq = parseInt(workOrder.frequencyValue || "0");
+        if (workOrder.frequencyUnit === "Days") {
+          completionDate.setDate(completionDate.getDate() + freq);
+        } else if (workOrder.frequencyUnit === "Weeks") {
+          completionDate.setDate(completionDate.getDate() + (freq * 7));
+        } else if (workOrder.frequencyUnit === "Months") {
+          completionDate.setMonth(completionDate.getMonth() + freq);
+        } else if (workOrder.frequencyUnit === "Years") {
+          completionDate.setFullYear(completionDate.getFullYear() + freq);
+        }
+        nextDueDate = completionDate.toISOString().split('T')[0];
       }
-      nextDueDate = completionDate.toISOString().split('T')[0];
     } else if (workOrder.maintenanceBasis === "Running Hours" && workOrder.currentReading) {
       nextDueReading = (parseInt(workOrder.currentReading) + parseInt(workOrder.frequencyValue || "0")).toString();
     }
     
-    const updateData = {
+    const updateData: Record<string, any> = {
       status: "Approved",
-      dateCompleted: new Date().toISOString().split('T')[0],
       approver: "Current User", // Replace with actual user
       approverRemarks,
       approvalDate: new Date().toISOString(),
       nextDueDate,
       nextDueReading
     };
+    
+    // Only set dateCompleted if we have an actual completion date from the work order
+    if (actualCompletionDate) {
+      updateData.dateCompleted = actualCompletionDate;
+    }
     
     updateWorkOrderMutation.mutate({ id: workOrder.id, data: updateData });
   };

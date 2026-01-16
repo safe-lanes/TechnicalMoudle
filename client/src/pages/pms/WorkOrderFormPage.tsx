@@ -1369,18 +1369,29 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     if (embedded) return;
     if (!workOrderId) return;
     
+    // Use the actual completion date entered by the user (from execution data)
+    // Priority: completionDateTime > dateOfCompletion > undefined (let backend handle)
+    // Keep full ISO timestamp - do not trim to preserve time information
+    const actualCompletionDate = executionData.completionDateTime || executionData.dateOfCompletion || undefined;
+    
     setIsProcessingApproval(true);
     try {
+      const payload: Record<string, any> = {
+        status: 'Completed',
+        approvalAction: 'approved'
+      };
+      
+      // Only set dateCompleted if we have an actual completion date from the form
+      if (actualCompletionDate) {
+        payload.dateCompleted = actualCompletionDate;
+      }
+      
       const response = await fetch(`/technical/api/work-orders/${workOrderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          status: 'Completed',
-          approvalAction: 'approved',
-          dateCompleted: new Date().toISOString()
-        })
+        body: JSON.stringify(payload)
       });
       
       const result = await response.json();
