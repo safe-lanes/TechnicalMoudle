@@ -151,7 +151,6 @@ interface ActionsCellContext {
   handleViewClick: (data: Defect) => void;
   handleEditClick: (data: Defect) => void;
   handleLinkClick: (data: Defect) => void;
-  handleCloseClick: (data: Defect) => void;
   handleVerifyClick: (data: Defect) => void;
   canVerify: () => boolean;
   isVerifying: boolean;
@@ -163,7 +162,7 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
   const defect = params.data as Defect;
   const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
   const isVerified = defect.verified === true;
-  const { handleViewClick, handleEditClick, handleLinkClick, handleCloseClick, handleVerifyClick, canVerify, isVerifying } = params.context;
+  const { handleViewClick, handleEditClick, handleLinkClick, handleVerifyClick, canVerify, isVerifying } = params.context;
   
   return (
     <div className="flex gap-1 justify-center items-center">
@@ -233,20 +232,6 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
               </TooltipContent>
             </Tooltip>
             
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-6 w-6"
-                  onClick={() => handleCloseClick(defect)}
-                  data-testid={`button-close-coc-${defect.id}`}
-                >
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>Close/Complete</p></TooltipContent>
-            </Tooltip>
           </>
         )}
       </TooltipProvider>
@@ -263,10 +248,6 @@ export default function DefectsCoC() {
   const [selectedDefect, setSelectedDefect] = useState<Defect | null>(null);
   const [defectFormMode, setDefectFormMode] = useState<'view' | 'edit' | 'new'>('new');
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
-  const [closeModal, setCloseModal] = useState<{ open: boolean; defect: Defect | null }>({ 
-    open: false, 
-    defect: null 
-  });
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
   const [unverifyDialog, setUnverifyDialog] = useState<{ open: boolean; defect: Defect | null }>({
     open: false,
@@ -342,10 +323,6 @@ export default function DefectsCoC() {
 
   const handleLinkClick = useCallback((defect: Defect) => {
     setLinkModal({ open: true, defectId: defect.id, linkedDefects: defect.linkedDefects || [] });
-  }, []);
-
-  const handleCloseClick = useCallback((defect: Defect) => {
-    setCloseModal({ open: true, defect });
   }, []);
 
   const canVerify = useCallback(() => {
@@ -679,7 +656,6 @@ export default function DefectsCoC() {
                 handleViewClick: handleViewDefect,
                 handleEditClick: handleEditDefect,
                 handleLinkClick,
-                handleCloseClick,
                 handleVerifyClick,
                 canVerify,
                 isVerifying: verifyMutation.isPending
@@ -689,34 +665,6 @@ export default function DefectsCoC() {
         )}
       </div>
       
-      {/* Close Defect Modal */}
-      {closeModal.defect && (
-        <Dialog 
-          open={closeModal.open} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setCloseModal({ open: false, defect: null });
-              invalidateCoCQueries();
-            }
-          }}
-        >
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
-            <VisuallyHidden>
-              <DialogTitle>Close CoC Defect</DialogTitle>
-            </VisuallyHidden>
-            <DefectFormWizard
-              defect={closeModal.defect}
-              mode="edit"
-              initialStep={3}
-              onCompleted={() => {
-                setCloseModal({ open: false, defect: null });
-                invalidateCoCQueries();
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
       {/* Link Defects Modal */}
       {linkModal.defectId && (
         <LinkDefectsModal
