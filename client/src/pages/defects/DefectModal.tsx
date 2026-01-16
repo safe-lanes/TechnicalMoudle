@@ -15,6 +15,7 @@ interface DefectModalProps {
   defectId?: string | null;
   vesselId?: string;
   mode?: "new" | "edit" | "view";
+  isCoc?: boolean;
 }
 
 export default function DefectModal({
@@ -23,6 +24,7 @@ export default function DefectModal({
   defectId,
   vesselId,
   mode = "new",
+  isCoc = false,
 }: DefectModalProps) {
   const { data: defect, isLoading } = useQuery({
     queryKey: ['/technical/api/defects', defectId],
@@ -42,24 +44,26 @@ export default function DefectModal({
   };
 
   const getTitle = () => {
+    const type = isCoc ? "CoC Defect" : "Defect Report";
     switch (mode) {
       case "edit":
-        return "Edit Defect Report";
+        return `Edit ${type}`;
       case "view":
-        return "View Defect Report";
+        return `View ${type}`;
       default:
-        return "New Defect Report";
+        return `New ${type}`;
     }
   };
 
   const getDescription = () => {
+    const type = isCoc ? "CoC defect" : "defect report";
     switch (mode) {
       case "edit":
-        return "Edit the defect report details below";
+        return `Edit the ${type} details below`;
       case "view":
-        return "View the defect report details";
+        return `View the ${type} details`;
       default:
-        return "Create a new defect report by filling out the form below";
+        return `Create a new ${type} by filling out the form below`;
     }
   };
 
@@ -86,6 +90,7 @@ export default function DefectModal({
               defect={mode !== "new" ? defect : undefined}
               onCompleted={handleCompleted}
               onBack={onClose}
+              isCoc={isCoc}
             />
           )}
         </div>

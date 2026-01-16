@@ -15,8 +15,7 @@ import {
   Link as LinkIcon, 
   Plus, 
   Filter,
-  Search,
-  X
+  Search
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -27,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import DefectFormWizard from "./DefectFormWizard";
+import DefectModal from "./DefectModal";
 import AddNoteModal from "./AddNoteModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
@@ -651,37 +651,18 @@ export default function DefectsCoC() {
         />
       )}
 
-      {/* Inline Form Overlay (no Portal) */}
-      {showNewDefectForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-black/80" 
-            onClick={() => setShowNewDefectForm(false)}
-          />
-          <div className="relative z-[101] w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-background rounded-lg shadow-lg">
-            <button
-              onClick={() => {
-                setShowNewDefectForm(false);
-                setSelectedDefect(null);
-              }}
-              className="absolute right-4 top-4 z-[102] rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
-              data-testid="button-close-form"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <DefectFormWizard 
-              defect={selectedDefect}
-              mode={defectFormMode}
-              isCoc={true}
-              onCompleted={() => {
-                setShowNewDefectForm(false);
-                setSelectedDefect(null);
-                invalidateCoCQueries();
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Defect Form Modal - uses same DefectModal as Defect Reports */}
+      <DefectModal
+        open={showNewDefectForm}
+        onClose={() => {
+          setShowNewDefectForm(false);
+          setSelectedDefect(null);
+          invalidateCoCQueries();
+        }}
+        defectId={selectedDefect?.id}
+        mode={defectFormMode}
+        isCoc={true}
+      />
     </div>
   );
 }
