@@ -2108,6 +2108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assignedTo: (wo.assignedTo && wo.assignedTo !== 'Unassigned') 
             ? wo.assignedTo 
             : (job?.assignedTo || 'Unassigned'),
+          // Hydrate criticality from job if work order has empty value
+          criticality: wo.criticality || job?.criticality || null,
           computedStatus: computeWorkOrderStatus({
             dueDate: wo.dueDate,
             dueRH,
