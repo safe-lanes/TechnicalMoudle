@@ -178,6 +178,19 @@ const migrations: Migration[] = [
       ) AS defaults(name, sort_order)
       WHERE NOT EXISTS (SELECT 1 FROM defect_types LIMIT 1)
     `
+  },
+  {
+    id: '011_c1_c2_closeout_columns',
+    name: 'Add C1 Closeout and C2 Verification columns',
+    description: 'Adds columns for C1 Closeout (closedOutByName, closedOutByRank) and C2 Verification (verified, dateVerified, verifiedByName, verifiedByOfficePosition) to defects table',
+    sql: `
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_out_by_name TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS closed_out_by_rank TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS date_verified TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_name TEXT;
+      ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_office_position TEXT
+    `
   }
 ];
 
