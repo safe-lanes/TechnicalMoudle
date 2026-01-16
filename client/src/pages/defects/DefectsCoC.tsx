@@ -17,7 +17,8 @@ import {
   Filter,
   Search
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { 
   Tooltip,
   TooltipContent,
@@ -486,7 +487,12 @@ export default function DefectsCoC() {
                   New CoC Defect
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
+                <VisuallyHidden>
+                  <DialogTitle>
+                    {defectFormMode === 'new' ? 'New CoC Defect' : defectFormMode === 'edit' ? 'Edit CoC Defect' : 'View CoC Defect'}
+                  </DialogTitle>
+                </VisuallyHidden>
                 <DefectFormWizard 
                   defect={selectedDefect}
                   mode={defectFormMode}
@@ -625,7 +631,10 @@ export default function DefectsCoC() {
             }
           }}
         >
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-0" aria-describedby={undefined}>
+            <VisuallyHidden>
+              <DialogTitle>Close CoC Defect</DialogTitle>
+            </VisuallyHidden>
             <DefectFormWizard
               defect={closeModal.defect}
               mode="edit"
