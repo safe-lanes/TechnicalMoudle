@@ -62,6 +62,7 @@ export default function DefectFormWizard({
   onBack,
   isCoc = false
 }: DefectFormWizardProps = {}) {
+  console.log('[DefectFormWizard] Rendering with mode:', mode, 'defect:', defect?.id);
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const { data: vessels = [] } = useVessels();
