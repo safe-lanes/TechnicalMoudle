@@ -108,8 +108,8 @@ export default function BulkUpdateSpares() {
   };
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async (updates: any[]) => {
-      const response = await apiRequest('POST', '/technical/api/spares/bulk-update', updates);
+    mutationFn: async (payload: { vesselId: string, tz: string, rows: any[] }) => {
+      const response = await apiRequest('POST', '/technical/api/spares/bulk-update', payload);
       return response;
     },
     onSuccess: () => {
@@ -137,19 +137,26 @@ export default function BulkUpdateSpares() {
       return;
     }
 
-    const updates = Object.entries(bulkUpdateData)
+    const rows = Object.entries(bulkUpdateData)
       .filter(([_, data]) => data.consumedA > 0 || data.consumedB > 0 || data.receivedA > 0 || data.receivedB > 0)
       .map(([id, data]) => ({
-        spareId: Number(id),
-        ...data
+        componentSpareId: Number(id),
+        consumedA: data.consumedA || 0,
+        consumedB: data.consumedB || 0,
+        receivedA: data.receivedA || 0,
+        receivedB: data.receivedB || 0,
+        receivedDate: data.receivedDate,
+        receivedPlace: data.receivedPlace,
+        remarks: data.comments,
+        userId: 'user'
       }));
 
-    if (updates.length === 0) {
+    if (rows.length === 0) {
       toast({ title: "No Changes", description: "No updates to save", variant: "default" });
       return;
     }
 
-    bulkUpdateMutation.mutate(updates);
+    bulkUpdateMutation.mutate({ vesselId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, rows });
   };
 
   const hasAnyChanges = Object.values(bulkUpdateData).some(data => 
@@ -186,8 +193,8 @@ export default function BulkUpdateSpares() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-4">
+      <div className="flex-1 overflow-hidden p-6 flex flex-col">
+        <div className="max-w-7xl mx-auto flex flex-col flex-1 min-h-0 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -271,8 +278,8 @@ export default function BulkUpdateSpares() {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-            <div className="overflow-x-auto">
+          <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
+            <div className="overflow-auto flex-1">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>

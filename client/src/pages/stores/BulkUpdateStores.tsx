@@ -131,9 +131,28 @@ export default function BulkUpdateStores() {
   };
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async (updates: any[]) => {
-      const response = await apiRequest('POST', '/technical/api/stores/bulk-update', updates);
-      return response;
+    mutationFn: async (payload: { consumeItems: any[], receiveItems: any[] }) => {
+      const results = [];
+      
+      // Process consume items
+      if (payload.consumeItems.length > 0) {
+        const consumeRes = await apiRequest('POST', `/technical/api/stores/${vesselId}/batch-consume`, {
+          items: payload.consumeItems,
+          consumedBy: 'user'
+        });
+        results.push(consumeRes);
+      }
+      
+      // Process receive items
+      if (payload.receiveItems.length > 0) {
+        const receiveRes = await apiRequest('POST', `/technical/api/stores/${vesselId}/batch-receive`, {
+          items: payload.receiveItems,
+          receivedBy: 'user'
+        });
+        results.push(receiveRes);
+      }
+      
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/technical/api/stores/${vesselId}?itemType=${activeTab}`] });
@@ -160,21 +179,36 @@ export default function BulkUpdateStores() {
       return;
     }
 
-    const updates = Object.entries(bulkUpdateData)
-      .filter(([_, data]) => data.consumedLocationA > 0 || data.consumedLocationB > 0 || data.receivedLocationA > 0 || data.receivedLocationB > 0)
-      .map(([id, data]) => ({
-        storeId: Number(id),
-        ...data,
-        receivedDate: dateReceived,
-        receivedPlace: placeReceived
-      }));
+    const consumeItems: any[] = [];
+    const receiveItems: any[] = [];
 
-    if (updates.length === 0) {
+    Object.entries(bulkUpdateData).forEach(([id, data]) => {
+      const itemId = Number(id);
+      
+      // Location A consumption
+      if (data.consumedLocationA > 0) {
+        consumeItems.push({ itemId, quantity: data.consumedLocationA, location: 'A', notes: data.comments });
+      }
+      // Location B consumption
+      if (data.consumedLocationB > 0) {
+        consumeItems.push({ itemId, quantity: data.consumedLocationB, location: 'B', notes: data.comments });
+      }
+      // Location A receipt
+      if (data.receivedLocationA > 0) {
+        receiveItems.push({ itemId, quantity: data.receivedLocationA, location: 'A', place: placeReceived, dateLocal: dateReceived, notes: data.comments });
+      }
+      // Location B receipt
+      if (data.receivedLocationB > 0) {
+        receiveItems.push({ itemId, quantity: data.receivedLocationB, location: 'B', place: placeReceived, dateLocal: dateReceived, notes: data.comments });
+      }
+    });
+
+    if (consumeItems.length === 0 && receiveItems.length === 0) {
       toast({ title: "No Changes", description: "No updates to save", variant: "default" });
       return;
     }
 
-    bulkUpdateMutation.mutate(updates);
+    bulkUpdateMutation.mutate({ consumeItems, receiveItems });
   };
 
   const hasAnyChanges = Object.values(bulkUpdateData).some(data => 
@@ -220,8 +254,8 @@ export default function BulkUpdateStores() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-4">
+      <div className="flex-1 overflow-hidden p-6 flex flex-col">
+        <div className="max-w-7xl mx-auto flex flex-col flex-1 min-h-0 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -289,8 +323,8 @@ export default function BulkUpdateStores() {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-            <div className="overflow-x-auto">
+          <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col flex-1 min-h-0">
+            <div className="overflow-auto flex-1">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
