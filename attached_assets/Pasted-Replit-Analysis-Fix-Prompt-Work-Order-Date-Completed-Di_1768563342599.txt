@@ -1,0 +1,60 @@
+Replit Analysis & Fix Prompt — Work Order “Date Completed” Display Binding Issue
+Context
+There is a display issue in the Work Order listing / display screen where the “Date Completed” column is showing an incorrect date.
+This impacts reporting accuracy and user confidence, especially for audits and historical work order reviews.
+Shape
+❌ Current Incorrect Behavior
+The “Date Completed” column in the Work Order UI is displaying:
+The record creation or entry timestamp
+This represents:
+The date on which the Work Order entry was made in the system
+It does not represent:
+The actual date the Work Order was completed
+As a result:
+Completed work orders show misleading completion dates in the UI
+Shape
+✅ Expected Correct Behavior
+The “Date Completed” column must display:
+date_completed
+This column represents:
+The actual business date on which the Work Order was completed
+Specifically:
+The displayed date must match the value stored in date_completed
+It must not show system timestamps or record creation dates
+Shape
+🧠 Analysis Required (Before Any Fix)
+Replit must:
+Trace the current UI binding for:
+Work Order “Date Completed” column
+Identify:
+Which field is currently being used (e.g., created_at / updated_at / entry timestamp)
+Explain:
+Why this field was originally chosen
+Whether it was intended for system-level tracking rather than UI display
+Confirm:
+That date_completed is already being correctly populated during Work Order completion flow
+That no backend or calculation changes are required
+No code changes must be made during this phase.
+Shape
+🛠️ Fix Requirements (Strict — After Explicit Approval Only)
+Replit must:
+Change UI binding only
+Replace the displayed field:
+From the current entry/creation date
+To date_completed
+Apply the change:
+Only to the Work Order display screen
+Ensure:
+No functional logic is modified
+No workflow behavior is changed
+No backend persistence is altered
+No side effects to reporting or audits
+Proceed only after receiving an explicit “PROCEED” instruction.
+Shape
+🚫 What Must NOT Be Changed
+❌ Work Order completion logic
+❌ Status transition flow
+❌ Backend APIs or database schema
+❌ Date calculation logic
+❌ Audit or system timestamps
+❌ Any other PMS module
