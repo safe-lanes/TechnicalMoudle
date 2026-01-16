@@ -1896,8 +1896,12 @@ export class PostgresStorage {
 
   async updateSpare(id: number, data: Partial<Spare>): Promise<Spare> {
     const db = await getDb();
+    // Filter out undefined/null partCode to prevent NOT NULL constraint violation
+    const { partCode, ...restData } = data;
+    const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
+    
     const result = await db.update(spares)
-      .set({ ...data, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(spares.id, id))
       .returning();
     if (!result[0]) {
@@ -2316,8 +2320,12 @@ export class PostgresStorage {
       const id = parseInt(robId, 10);
       if (isNaN(id)) continue;
       
+      // Filter out undefined/null partCode to prevent NOT NULL constraint violation
+      const { partCode, ...restData } = data;
+      const updateData = partCode != null ? { ...restData, partCode, updatedAt: new Date() } : { ...restData, updatedAt: new Date() };
+      
       const result = await db.update(spares)
-        .set({ ...data, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(spares.id, id))
         .returning();
       if (result[0]) {
@@ -2345,11 +2353,19 @@ export class PostgresStorage {
         : null;
       
       if (existing) {
+        // Filter out undefined/null partCode to preserve existing value and prevent NOT NULL constraint violation
+        const { partCode, ...restSpare } = spare;
+        const updateData = partCode != null ? { ...restSpare, partCode, updatedAt: new Date() } : { ...restSpare, updatedAt: new Date() };
+        
         await db.update(spares)
-          .set({ ...spare, updatedAt: new Date() })
+          .set(updateData)
           .where(eq(spares.id, existing.id));
         updated++;
       } else {
+        // For inserts, partCode is required - fail early if not provided
+        if (!spare.partCode) {
+          throw new Error('partCode is required when creating a new spare');
+        }
         await db.insert(spares).values({
           ...spare,
           dataScope: spare.dataScope || 'vessel',
