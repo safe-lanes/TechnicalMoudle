@@ -254,8 +254,8 @@ export default function BulkUpdateStores() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-6 flex flex-col">
-        <div className="max-w-7xl mx-auto flex flex-col flex-1 min-h-0 space-y-4">
+      <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
+        <div className="w-full flex flex-col flex-1 min-h-0 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -529,7 +529,7 @@ export default function BulkUpdateStores() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-t px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-end gap-3">
+        <div className="w-full flex justify-end gap-3">
           <Button 
             variant="outline" 
             onClick={() => setLocation("/stores")}

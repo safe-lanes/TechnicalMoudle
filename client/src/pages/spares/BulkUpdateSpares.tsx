@@ -139,17 +139,22 @@ export default function BulkUpdateSpares() {
 
     const rows = Object.entries(bulkUpdateData)
       .filter(([_, data]) => data.consumedA > 0 || data.consumedB > 0 || data.receivedA > 0 || data.receivedB > 0)
-      .map(([id, data]) => ({
-        componentSpareId: Number(id),
-        consumedA: data.consumedA || 0,
-        consumedB: data.consumedB || 0,
-        receivedA: data.receivedA || 0,
-        receivedB: data.receivedB || 0,
-        receivedDate: data.receivedDate,
-        receivedPlace: data.receivedPlace,
-        remarks: data.comments,
-        userId: 'user'
-      }));
+      .map(([id, data]) => {
+        const spare = (sparesData as Spare[]).find(s => s.id === Number(id));
+        return {
+          componentSpareId: Number(id),
+          spareId: spare?.id,
+          partCode: spare?.partCode,
+          consumedA: data.consumedA || 0,
+          consumedB: data.consumedB || 0,
+          receivedA: data.receivedA || 0,
+          receivedB: data.receivedB || 0,
+          receivedDate: data.receivedDate,
+          receivedPlace: data.receivedPlace,
+          remarks: data.comments,
+          userId: 'user'
+        };
+      });
 
     if (rows.length === 0) {
       toast({ title: "No Changes", description: "No updates to save", variant: "default" });
@@ -193,8 +198,8 @@ export default function BulkUpdateSpares() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-6 flex flex-col">
-        <div className="max-w-7xl mx-auto flex flex-col flex-1 min-h-0 space-y-4">
+      <div className="flex-1 overflow-hidden px-6 py-4 flex flex-col">
+        <div className="w-full flex flex-col flex-1 min-h-0 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
@@ -478,7 +483,7 @@ export default function BulkUpdateSpares() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border-t px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-end gap-3">
+        <div className="w-full flex justify-end gap-3">
           <Button 
             variant="outline" 
             onClick={() => setLocation("/spares")}
