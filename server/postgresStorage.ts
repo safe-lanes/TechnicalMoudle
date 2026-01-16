@@ -4489,9 +4489,14 @@ export class PostgresStorage {
     meterReplaced?: boolean;
     oldMeterFinal?: string;
     newMeterStart?: string;
+    isRenewalReset?: boolean;
+    renewalActionType?: string;
+    renewalReason?: string;
+    renewalReference?: string;
+    renewalEvidenceUrls?: string[];
   }): Promise<{ updatedComponents: number; auditsCreated: number; workOrdersGenerated: number; workOrders: any[] }> {
     const db = await getDb();
-    const { parentComponentId, mode, value, dateUpdated, comments } = params;
+    const { parentComponentId, mode, value, dateUpdated, comments, isRenewalReset, renewalActionType, renewalReason, renewalReference, renewalEvidenceUrls } = params;
     const now = new Date();
     
     // Get all child components (by parentId - structural hierarchy)
@@ -4510,6 +4515,45 @@ export class PostgresStorage {
     if (parentResult.length > 0) {
       const parent = parentResult[0];
       const currentRH = parseFloat(parent.currentCumulativeRH || parent.rhCurrentMaster || '0');
+      
+      // VALIDATION 1: Date Rule - Check if entry date is not earlier than latest saved RH entry date
+      const latestAudit = await db.select()
+        .from(runningHoursAudit)
+        .where(eq(runningHoursAudit.componentId, parentComponentId))
+        .orderBy(desc(runningHoursAudit.enteredAtUTC))
+        .limit(1);
+      
+      if (latestAudit.length > 0) {
+        const latestDate = latestAudit[0].dateUpdatedLocal;
+        // Parse dates for comparison (format: DD-MMM-YYYY HH:mm)
+        const parseDate = (dateStr: string): Date => {
+          const months: Record<string, number> = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+          const parts = dateStr.match(/(\d{2})-([A-Za-z]{3})-(\d{4})\s*(\d{2})?:?(\d{2})?/);
+          if (parts) {
+            const [, day, month, year, hours = '00', minutes = '00'] = parts;
+            return new Date(parseInt(year), months[month], parseInt(day), parseInt(hours), parseInt(minutes));
+          }
+          return new Date(dateStr);
+        };
+        
+        const latestParsedDate = parseDate(latestDate);
+        const newParsedDate = parseDate(dateUpdated);
+        
+        if (newParsedDate < latestParsedDate) {
+          throw new Error(`Invalid date. You cannot add a Running Hours entry earlier than the latest saved entry date (${latestDate}).`);
+        }
+      }
+      
+      // VALIDATION 2: Value Rule - RH must never go backwards (except when isRenewalReset is true for 0)
+      if (mode === 'setTotal' && value < currentRH && !isRenewalReset) {
+        throw new Error(`Invalid Running Hours. Reading cannot be less than the last saved reading (Last: ${currentRH}).`);
+      }
+      
+      // VALIDATION 3: When value is 0, isRenewalReset must be true
+      if (mode === 'setTotal' && value === 0 && !isRenewalReset) {
+        throw new Error('Running Hours cannot be set to 0 without confirming renewal/replacement.');
+      }
+      
       newRH = mode === 'addDelta' ? currentRH + value : value;
       
       // Build update object - always update currentCumulativeRH
@@ -4542,7 +4586,14 @@ export class PostgresStorage {
         enteredAtUTC: now,
         userId: 'system',
         source: 'cascade',
-        comments: comments,
+        notes: comments,
+        isRenewalReset: isRenewalReset || false,
+        renewalActionType: renewalActionType || null,
+        renewalReason: renewalReason || null,
+        renewalReference: renewalReference || null,
+        renewalEvidenceUrls: renewalEvidenceUrls || null,
+        componentCode: parent.componentCode || null,
+        componentName: parent.name || null,
       });
       
       updatedComponents++;

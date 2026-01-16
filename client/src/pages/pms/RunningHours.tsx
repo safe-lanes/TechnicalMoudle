@@ -17,6 +17,8 @@ import { useLocation } from "wouter";
 import { formatProfessionalDateTime } from "@/lib/dateUtils";
 import { useVessel } from "@/contexts/VesselContext";
 import { Marker } from "@/components/Marker";
+import ZeroRHConfirmationDialog from "@/components/ZeroRHConfirmationDialog";
+import { RENEWAL_ACTION_TYPES } from "@shared/schema";
 
 interface ChildRHData {
   id: string;
@@ -79,6 +81,18 @@ const RunningHours = () => {
   const [editingChildId, setEditingChildId] = useState<string | null>(null);
   const [editingChildRH, setEditingChildRH] = useState<string>("");
   const [editingChildComments, setEditingChildComments] = useState<string>("");
+  
+  // Zero RH Renewal Confirmation Dialog state
+  const [isZeroRHDialogOpen, setIsZeroRHDialogOpen] = useState(false);
+  const [pendingZeroRHUpdate, setPendingZeroRHUpdate] = useState<{
+    componentId: string;
+    componentName: string;
+    componentCode: string;
+    previousRH: number;
+    dateUpdated: string;
+    dateLocal: string;
+    comments: string;
+  } | null>(null);
   
   const { toast } = useToast();
   const { vesselId } = useVessel(); // Get vessel ID from context
@@ -243,6 +257,16 @@ const RunningHours = () => {
       return;
     }
     
+    // Block zero values for child components - must use parent component reset for renewal
+    if (newValue === 0) {
+      toast({
+        title: "Cannot Set RH to 0",
+        description: "Setting Running Hours to 0 requires using the parent component's renewal/replacement process.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     updateChildRHMutation.mutate({
       componentId: editingChildId,
       newRHValue: newValue,
@@ -370,16 +394,67 @@ const RunningHours = () => {
       hour12: false
     });
     
+    const newValue = parseFloat(updateForm.newValue);
+    const previousRH = parseFloat(updateForm.oldValue.replace(/,/g, ''));
+    
+    // Check if user is trying to set RH to 0 - require confirmation
+    if (updateMode === 'setTotal' && newValue === 0) {
+      setPendingZeroRHUpdate({
+        componentId: selectedComponent.id,
+        componentName: selectedComponent.component,
+        componentCode: selectedComponent.componentCode || '',
+        previousRH: previousRH,
+        dateUpdated: updateForm.dateUpdated,
+        dateLocal: dateLocal,
+        comments: updateForm.comments,
+      });
+      setIsZeroRHDialogOpen(true);
+      return;
+    }
+    
     cascadeUpdateMutation.mutate({
       parentComponentId: selectedComponent.id,
       mode: updateMode,
-      value: parseFloat(updateForm.newValue),
+      value: newValue,
       dateUpdated: dateLocal,
       comments: updateForm.comments,
       meterReplaced,
       oldMeterFinal: meterReplaced ? updateForm.oldMeterFinal : undefined,
       newMeterStart: meterReplaced ? updateForm.newMeterStart : undefined
     });
+  };
+  
+  // Handle confirmation from Zero RH Dialog
+  const handleZeroRHConfirm = (renewalData: {
+    renewalActionType: typeof RENEWAL_ACTION_TYPES[number];
+    renewalReason: string;
+    renewalReference?: string;
+    renewalEvidenceUrls?: string[];
+  }) => {
+    if (!pendingZeroRHUpdate) return;
+    
+    cascadeUpdateMutation.mutate({
+      parentComponentId: pendingZeroRHUpdate.componentId,
+      mode: 'setTotal',
+      value: 0,
+      dateUpdated: pendingZeroRHUpdate.dateLocal,
+      comments: pendingZeroRHUpdate.comments,
+      meterReplaced: true,
+      isRenewalReset: true,
+      renewalActionType: renewalData.renewalActionType,
+      renewalReason: renewalData.renewalReason,
+      renewalReference: renewalData.renewalReference,
+      renewalEvidenceUrls: renewalData.renewalEvidenceUrls,
+    });
+    
+    setPendingZeroRHUpdate(null);
+  };
+  
+  // Handle cancel from Zero RH Dialog - restore input
+  const handleZeroRHCancel = () => {
+    setIsZeroRHDialogOpen(false);
+    setPendingZeroRHUpdate(null);
+    // Keep the dialog open so user can change the value
   };
 
   const handleCancelUpdate = () => {
@@ -462,6 +537,12 @@ const RunningHours = () => {
       const inputValue = parseFloat(updateData.value.replace(/,/g, ''));
       if (isNaN(inputValue)) {
         errors[component.id] = "Please enter a valid number";
+        continue;
+      }
+      
+      // Block zero values in bulk update - must use individual update with renewal confirmation
+      if (bulkUpdateMode === 'setTotal' && inputValue === 0) {
+        errors[component.id] = "Cannot set RH to 0 in bulk update. Use individual update for renewal/replacement.";
         continue;
       }
       
@@ -1042,6 +1123,19 @@ const RunningHours = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Zero RH Renewal Confirmation Dialog */}
+      {pendingZeroRHUpdate && (
+        <ZeroRHConfirmationDialog
+          isOpen={isZeroRHDialogOpen}
+          onClose={handleZeroRHCancel}
+          componentName={pendingZeroRHUpdate.componentName}
+          componentCode={pendingZeroRHUpdate.componentCode}
+          previousRH={pendingZeroRHUpdate.previousRH}
+          entryDate={pendingZeroRHUpdate.dateLocal}
+          onConfirm={handleZeroRHConfirm}
+        />
+      )}
 
       {/* Modify Mode Sticky Footer */}
       {isModifyMode && (

@@ -103,15 +103,24 @@ export const runningHoursAudit = pgTable("running_hours_audit", {
   dateUpdatedTZ: text("date_updated_tz").notNull(), // e.g., Asia/Kolkata
   enteredAtUTC: timestamp("entered_at_utc").notNull(),
   userId: text("user_id").notNull(),
-  source: text("source").notNull(), // 'single' | 'bulk'
+  source: text("source").notNull(), // 'single' | 'bulk' | 'cascade' | 'inherited_cascade'
   notes: text("notes"),
   meterReplaced: boolean("meter_replaced").notNull().default(false),
   oldMeterFinal: decimal("old_meter_final", { precision: 10, scale: 2 }),
   newMeterStart: decimal("new_meter_start", { precision: 10, scale: 2 }),
   version: integer("version").notNull().default(1),
+  // Renewal/Replacement fields (populated when RH is reset to 0)
+  isRenewalReset: boolean("is_renewal_reset").notNull().default(false), // True when RH reset to 0 via renewal/replacement
+  renewalActionType: text("renewal_action_type"), // 'Renewed' | 'Replaced' | 'Overhauled'
+  renewalReason: text("renewal_reason"), // Mandatory reason when isRenewalReset = true
+  renewalReference: text("renewal_reference"), // Optional work order / job ID reference
+  renewalEvidenceUrls: json("renewal_evidence_urls"), // Optional array of uploaded file URLs
+  componentCode: text("component_code"), // Component code for reporting
+  componentName: text("component_name"), // Component name for reporting
 }, (table) => ({
   componentIdIdx: index("idx_component_entered").on(table.componentId, table.enteredAtUTC),
   componentDateIdx: index("idx_component_date").on(table.componentId, table.dateUpdatedLocal),
+  renewalResetIdx: index("idx_renewal_reset").on(table.isRenewalReset, table.vesselId),
 }));
 
 export const insertRunningHoursAuditSchema = createInsertSchema(runningHoursAudit).omit({
@@ -120,6 +129,10 @@ export const insertRunningHoursAuditSchema = createInsertSchema(runningHoursAudi
 
 export type InsertRunningHoursAudit = z.infer<typeof insertRunningHoursAuditSchema>;
 export type RunningHoursAudit = typeof runningHoursAudit.$inferSelect;
+
+// Renewal Action Types for RH reset to 0
+export const RENEWAL_ACTION_TYPES = ['Renewed', 'Replaced', 'Overhauled'] as const;
+export type RenewalActionType = typeof RENEWAL_ACTION_TYPES[number];
 
 // Running Hours Cascade Schema - for updating parent and cascading to children
 export const cascadeRunningHoursSchema = z.object({
@@ -132,10 +145,28 @@ export const cascadeRunningHoursSchema = z.object({
   meterReplaced: z.boolean().optional().default(false),
   oldMeterFinal: z.string().optional(),
   newMeterStart: z.string().optional(),
-  userId: z.string().default('admin')
+  userId: z.string().default('admin'),
+  // Renewal/Replacement fields (required when value = 0)
+  isRenewalReset: z.boolean().optional().default(false),
+  renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),
+  renewalReason: z.string().optional(),
+  renewalReference: z.string().optional(),
+  renewalEvidenceUrls: z.array(z.string()).optional(),
 }).refine(data => data.mode === 'setTotal' || data.value > 0, {
   message: "addDelta mode requires value > 0",
   path: ["value"]
+}).refine(data => {
+  // When value is 0 in setTotal mode, isRenewalReset must be true with required fields
+  if (data.mode === 'setTotal' && data.value === 0) {
+    return data.isRenewalReset === true && 
+           !!data.renewalActionType && 
+           !!data.renewalReason && 
+           data.renewalReason.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "When setting RH to 0, renewal confirmation with action type and reason is required",
+  path: ["renewalReason"]
 });
 
 export type CascadeRunningHoursRequest = z.infer<typeof cascadeRunningHoursSchema>;
