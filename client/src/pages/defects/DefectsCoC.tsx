@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +18,16 @@ import {
   Search
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { 
   Tooltip,
@@ -141,6 +152,9 @@ interface ActionsCellContext {
   handleEditClick: (data: Defect) => void;
   handleLinkClick: (data: Defect) => void;
   handleCloseClick: (data: Defect) => void;
+  handleVerifyClick: (data: Defect) => void;
+  canVerify: () => boolean;
+  isVerifying: boolean;
 }
 
 const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCellContext }) => {
@@ -148,7 +162,8 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
   
   const defect = params.data as Defect;
   const isActiveDefect = ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
-  const { handleViewClick, handleEditClick, handleLinkClick, handleCloseClick } = params.context;
+  const isVerified = defect.verified === true;
+  const { handleViewClick, handleEditClick, handleLinkClick, handleCloseClick, handleVerifyClick, canVerify, isVerifying } = params.context;
   
   return (
     <div className="flex gap-1 justify-center items-center">
@@ -205,6 +220,24 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
                 <Button 
                   size="icon" 
                   variant="ghost" 
+                  className={cn("h-6 w-6", (!canVerify() || isVerifying) && "opacity-50 cursor-not-allowed")}
+                  onClick={() => handleVerifyClick(defect)}
+                  disabled={!canVerify() || isVerifying}
+                  data-testid={`button-verified-coc-${defect.id}`}
+                >
+                  <CheckCircle className={cn("h-4 w-4", isVerified ? "text-green-600" : "text-gray-400")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isVerifying ? "Processing..." : !canVerify() ? "Verify (No Permission)" : isVerified ? "Verified - Click to remove" : "Click to verify"}</p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
                   className="h-6 w-6"
                   onClick={() => handleCloseClick(defect)}
                   data-testid={`button-close-coc-${defect.id}`}
@@ -223,6 +256,7 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsCoC() {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const [filters, setFilters] = useState<DefectsFilters>({ status: 'active' });
   const [showFilters, setShowFilters] = useState(false);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
@@ -234,6 +268,10 @@ export default function DefectsCoC() {
     defect: null 
   });
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ open: false, defectId: null, linkedDefects: [] });
+  const [unverifyDialog, setUnverifyDialog] = useState<{ open: boolean; defect: Defect | null }>({
+    open: false,
+    defect: null
+  });
 
   // Get CoC defects only
   const { data: allDefects = [], isLoading } = useQuery({
@@ -309,6 +347,74 @@ export default function DefectsCoC() {
   const handleCloseClick = useCallback((defect: Defect) => {
     setCloseModal({ open: true, defect });
   }, []);
+
+  const canVerify = useCallback(() => {
+    const role = currentUser?.role || '';
+    return ['Office', 'PMS Admin'].includes(role);
+  }, [currentUser?.role]);
+
+  const verifyMutation = useMutation({
+    mutationFn: async ({ defectId, verificationData }: { defectId: string; verificationData: Partial<Defect> }) => {
+      const response = await apiRequest('PATCH', `/technical/api/defects/${defectId}`, verificationData);
+      return response.json();
+    },
+    onSuccess: () => {
+      invalidateCoCQueries();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update verification status",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleVerifyClick = useCallback((defect: Defect) => {
+    if (!canVerify()) return;
+    
+    if (defect.verified) {
+      setUnverifyDialog({ open: true, defect });
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      const verificationData = {
+        verified: true,
+        dateVerified: today,
+        verifiedByName: currentUser?.fullName || '',
+        verifiedByOfficePosition: currentUser?.crewDesignation || currentUser?.role || ''
+      };
+      
+      verifyMutation.mutate({ defectId: defect.id, verificationData }, {
+        onSuccess: () => {
+          toast({
+            title: "Verified",
+            description: `CoC Defect ${defect.id} has been verified successfully.`
+          });
+        }
+      });
+    }
+  }, [canVerify, currentUser, verifyMutation, toast]);
+
+  const handleConfirmUnverify = useCallback(() => {
+    if (!unverifyDialog.defect) return;
+    
+    const verificationData = {
+      verified: false,
+      dateVerified: null,
+      verifiedByName: null,
+      verifiedByOfficePosition: null
+    };
+    
+    verifyMutation.mutate({ defectId: unverifyDialog.defect.id, verificationData }, {
+      onSuccess: () => {
+        toast({
+          title: "Verification Removed",
+          description: `Verification record for CoC defect ${unverifyDialog.defect?.id} has been deleted.`
+        });
+        setUnverifyDialog({ open: false, defect: null });
+      }
+    });
+  }, [unverifyDialog.defect, verifyMutation, toast]);
 
   const onGridReady = useCallback((event: GridReadyEvent) => {
     setGridApi(event.api);
@@ -573,7 +679,10 @@ export default function DefectsCoC() {
                 handleViewClick: handleViewDefect,
                 handleEditClick: handleEditDefect,
                 handleLinkClick,
-                handleCloseClick
+                handleCloseClick,
+                handleVerifyClick,
+                canVerify,
+                isVerifying: verifyMutation.isPending
               }}
             />
           </div>
@@ -630,6 +739,24 @@ export default function DefectsCoC() {
         mode={defectFormMode}
         isCoc={true}
       />
+
+      {/* Unverify Confirmation Dialog */}
+      <AlertDialog open={unverifyDialog.open} onOpenChange={(open) => !open && !verifyMutation.isPending && setUnverifyDialog({ open: false, defect: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Verification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove the verification record for CoC defect {unverifyDialog.defect?.id}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={verifyMutation.isPending}>No</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmUnverify} disabled={verifyMutation.isPending}>
+              {verifyMutation.isPending ? "Processing..." : "Yes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
