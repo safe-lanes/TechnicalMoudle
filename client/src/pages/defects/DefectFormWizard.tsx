@@ -585,11 +585,15 @@ export default function DefectFormWizard({
                                 form.setValue('vesselName', selectedVessel.name);
                               }
                             }} 
-                            value={field.value} 
+                            value={field.value || ""} 
                             disabled={isViewMode}
                           >
                             <SelectTrigger data-testid="select-vessel" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select vessel">
+                                {field.value && vessels.length > 0 
+                                  ? (vessels.find((v: any) => v.id === field.value)?.name || field.value)
+                                  : (field.value || "Select vessel")}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {vessels.map((vessel: any) => (
@@ -609,7 +613,9 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-equipment-category" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select category" />
+                              <SelectValue placeholder="Select category">
+                                {field.value || "Select category"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {equipmentCategories.map((cat) => (
@@ -641,7 +647,11 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-source" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select source" />
+                              <SelectValue placeholder="Select source">
+                                {field.value 
+                                  ? (defectSources.find(s => s.id === field.value)?.name || field.value)
+                                  : "Select source"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent className="max-h-[300px]">
                               {defectSources.map((source) => (
@@ -696,7 +706,9 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-category" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select defect category" />
+                              <SelectValue placeholder="Select defect category">
+                                {field.value || "Select defect category"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {defectCategoriesData.map((cat) => (
@@ -716,7 +728,9 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-make" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select make">
+                                {field.value || "Select make"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Caterpillar">Caterpillar</SelectItem>
@@ -749,7 +763,9 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-defect-type" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select defect type" />
+                              <SelectValue placeholder="Select defect type">
+                                {field.value || "Select defect type"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {defectTypesData.map((type) => (
@@ -769,7 +785,9 @@ export default function DefectFormWizard({
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
                             <SelectTrigger data-testid="select-model" className="h-10 text-sm border-gray-300">
-                              <SelectValue />
+                              <SelectValue placeholder="Select model">
+                                {field.value || "Select model"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="3516">3516</SelectItem>
@@ -819,7 +837,11 @@ export default function DefectFormWizard({
                             disabled={isViewMode}
                           >
                             <SelectTrigger data-testid="select-raised-by" className="h-10 text-sm border-gray-300">
-                              <SelectValue placeholder="Select person" />
+                              <SelectValue placeholder="Select person">
+                                {form.watch("raisedByRank") && field.value 
+                                  ? `${form.watch("raisedByRank")} - ${field.value}`
+                                  : "Select person"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Master - System User">Master - System User</SelectItem>
