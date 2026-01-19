@@ -81,7 +81,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[90vw] h-[calc(100vh-10vw)] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="pb-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]">
               {title}
@@ -133,8 +133,8 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
                           </span>
                         </TableCell>
                         <TableCell>{defect.componentHardwareLevel3 || '-'}</TableCell>
-                        <TableCell title={defect.description}>
-                          {truncateText(defect.description)}
+                        <TableCell className="whitespace-normal break-words max-w-[300px]">
+                          {defect.description || '-'}
                         </TableCell>
                         <TableCell>{formatDate(defect.targetCloseDate)}</TableCell>
                         <TableCell>{formatDate(defect.dateCompleted)}</TableCell>
