@@ -1,0 +1,74 @@
+Replit Prompt — Correct Migration Creation for Schema Changes on 16-01-2026
+Context
+Based on the completed analysis of schema changes made on Friday 16-01-2026, the following issues were identified:
+Multiple new columns were added to existing tables
+Instead of generating independent ALTER TABLE migrations, these changes were absorbed into a baseline Drizzle migration:
+This has caused:
+Migration flow breakage
+Inability to add future columns cleanly
+Schema–migration inconsistency risk
+This task is to correct the migration strategy, not to redesign schema.
+🎯 Objective
+Create proper, independent migrations for the schema changes identified on 16-01-2026, instead of relying on the Drizzle-generated CREATE TABLE baseline.
+🧠 Changes That Must Be Migrated Properly
+Table: running_hours_audit
+The following columns must be added via ALTER TABLE migration:
+is_renewal_reset (boolean, not null, default false)
+renewal_action_type (text)
+renewal_reason (text)
+renewal_reference (text)
+renewal_evidence_urls (json)
+component_code (text)
+component_name (text)
+Also add index:
+idx_renewal_reset on (is_renewal_reset, vessel_id)
+❗ These columns must not be introduced via CREATE TABLE.
+⚠️ Defects Table Consistency Check (Mandatory)
+Analysis has shown a schema–migration mismatch for the defects table:
+The following columns were:
+Added
+Then removed from shared/schema.ts
+But a migration (011_c1_c2_closeout_columns) still exists in server/migrations.ts and would add them at runtime
+Replit must:
+Reconcile schema vs migration state
+Decide and confirm:
+Either schema includes these columns
+Or the migration must be removed / disabled
+Ensure:
+Schema definition and migrations represent the same final structure
+No silent divergence is allowed.
+🛠️ Migration Fix Requirements (Strict)
+Replit must:
+Create new, independent migration file(s) using:
+ALTER TABLE ADD COLUMN
+CREATE INDEX where required
+Ensure:
+No tables are dropped or recreated
+No baseline CREATE TABLE migration is modified further
+Keep:
+Existing data intact
+Current application logic unchanged
+🧠 Root Cause Explanation (Required)
+Replit must also explain:
+Why Drizzle treated these changes as part of a baseline migration
+Why migration history was not respected
+What workflow or configuration caused this behavior
+How this will be prevented going forward
+🚫 What Must NOT Be Done
+❌ Do not regenerate schema snapshots
+❌ Do not modify 0000_overrated_natasha_romanoff.sql further
+❌ Do not drop tables or enums
+❌ Do not reset migration history
+📄 Expected Final Output
+Replit must provide:
+New ALTER-based migration(s) for:
+running_hours_audit
+Clear resolution for:
+defects table migration inconsistency
+Confirmation that:
+Future column additions will always generate ALTER migrations
+Migration flow is now incremental and stable
+🔐 Authoritative Rule (Final)
+Baseline CREATE migrations are one-time only.
+All schema evolution must use independent ALTER migrations.
+0000_overrated_natasha_romanoff.sql 
