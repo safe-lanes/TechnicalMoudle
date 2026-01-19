@@ -49,33 +49,30 @@ import {
 interface KPICardProps {
   title: string;
   value: string | number;
-  icon: any;
-  color: string;
+  borderColor: string;
+  textColor: string;
   onClick?: () => void;
 }
 
-const KPICard = ({ title, value, icon: Icon, color, onClick }: KPICardProps) => {
+const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps) => {
   return (
     <Card 
-      className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} ${color}`}
+      className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} bg-white border-l-4 ${borderColor}`}
       onClick={onClick}
     >
       <CardContent className="py-3 px-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-bold mt-1" data-testid={`kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-              {value}
-            </p>
-          </div>
-          <Icon className="h-7 w-7 opacity-60" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+          <p className={`text-2xl font-bold mt-1 ${textColor}`} data-testid={`kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+            {value}
+          </p>
         </div>
       </CardContent>
     </Card>
   );
 };
 
-type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | null;
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | 'criticalEquipment' | 'highPriority' | null;
 
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
@@ -140,7 +137,8 @@ export default function DefectsDashboard() {
     totalResolved: resolvedDefects.length,
     conditionOfClass: activeDefects.filter(d => d.is_coc).length,
     overdueDefects: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length,
-    highPriority: activeDefects.filter(d => d.priority === 'High' || d.critical).length,
+    criticalEquipment: activeDefects.filter(d => d.critical).length,
+    highPriority: activeDefects.filter(d => d.priority === 'High').length,
   };
 
   const resolutionRate = kpis.totalActive + kpis.totalResolved > 0
@@ -217,6 +215,10 @@ export default function DefectsDashboard() {
         return defectsWithComputedStatus.filter(d => d.is_coc && isActiveComputedStatus(d.computedStatus.label));
       case 'overdue':
         return defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue');
+      case 'criticalEquipment':
+        return activeDefects.filter(d => d.critical);
+      case 'highPriority':
+        return activeDefects.filter(d => d.priority === 'High');
       default:
         return [];
     }
@@ -232,6 +234,10 @@ export default function DefectsDashboard() {
         return 'Condition of Class Defects';
       case 'overdue':
         return 'Overdue Defects';
+      case 'criticalEquipment':
+        return 'Critical Equipment Defects';
+      case 'highPriority':
+        return 'High Priority Defects';
       default:
         return 'Defects';
     }
@@ -308,37 +314,45 @@ export default function DefectsDashboard() {
       {/* Dashboard Content */}
       <div className="px-4 flex-1 overflow-y-auto space-y-6">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <KPICard
-          title="Total Active Defects"
-          value={kpis.totalActive}
-          icon={AlertTriangle}
-          color="bg-white text-red-600 border-gray-200"
-          onClick={() => setActiveModal('active')}
+          title="Overdue Defects"
+          value={kpis.overdueDefects}
+          borderColor="border-red-500"
+          textColor="text-red-600"
+          onClick={() => setActiveModal('overdue')}
         />
         
         <KPICard
-          title="Total Resolved"
-          value={kpis.totalResolved}
-          icon={CheckCircle}
-          color="bg-white text-green-600 border-gray-200"
-          onClick={() => setActiveModal('resolved')}
+          title="Critical Equipment Defects"
+          value={kpis.criticalEquipment}
+          borderColor="border-red-500"
+          textColor="text-red-600"
+          onClick={() => setActiveModal('criticalEquipment')}
+        />
+        
+        <KPICard
+          title="High Priority Defects"
+          value={kpis.highPriority}
+          borderColor="border-orange-500"
+          textColor="text-orange-600"
+          onClick={() => setActiveModal('highPriority')}
         />
         
         <KPICard
           title="Condition of Class"
           value={kpis.conditionOfClass}
-          icon={Shield}
-          color="bg-white text-blue-600 border-gray-200"
+          borderColor="border-orange-500"
+          textColor="text-orange-600"
           onClick={() => setActiveModal('coc')}
         />
         
         <KPICard
-          title="Overdue Defects"
-          value={kpis.overdueDefects}
-          icon={Clock}
-          color="bg-white text-orange-600 border-gray-200"
-          onClick={() => setActiveModal('overdue')}
+          title="Total Active Defects"
+          value={kpis.totalActive}
+          borderColor="border-gray-400"
+          textColor="text-gray-700"
+          onClick={() => setActiveModal('active')}
         />
       </div>
 
