@@ -68,6 +68,7 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
   };
 
   const getDisplayActionText = (defect: Defect): string | null => {
+    // Prioritize actions array over actionTakenRequested since actions are updated via the form
     if (defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0) {
       const firstAction = defect.actions[0] as { actionDescription?: string };
       if (firstAction?.actionDescription) {

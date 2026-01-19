@@ -309,12 +309,13 @@ export default function DefectsLogWithTabs() {
       const data = await response.json();
       
       // Transform data to include first action's description in actionTakenRequested
+      // Prioritize actions array over actionTakenRequested field since actions are updated via the form
       return data.map((defect: Defect) => ({
         ...defect,
-        actionTakenRequested: defect.actionTakenRequested || 
-          (defect.actions && defect.actions.length > 0 
+        actionTakenRequested: 
+          (defect.actions && defect.actions.length > 0 && defect.actions[0].actionDescription)
             ? defect.actions[0].actionDescription 
-            : '')
+            : (defect.actionTakenRequested || '')
       }));
     },
   });
