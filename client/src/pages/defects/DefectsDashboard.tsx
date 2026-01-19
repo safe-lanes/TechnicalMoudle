@@ -57,7 +57,7 @@ interface KPICardProps {
 const KPICard = ({ title, value, borderColor, textColor, onClick }: KPICardProps) => {
   return (
     <Card 
-      className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} bg-white border-l-4 ${borderColor}`}
+      className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} bg-white border-0 border-l-4 ${borderColor}`}
       onClick={onClick}
     >
       <CardContent className="py-3 px-4">
