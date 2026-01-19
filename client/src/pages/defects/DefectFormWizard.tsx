@@ -1288,40 +1288,74 @@ export default function DefectFormWizard({
                     </div>
                   </div>
 
-                  {/* B3. Risk */}
+                  {/* B3. Risk & Priority */}
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B3. Risk</h3>
-                    <div className="flex flex-col w-48">
-                      <label className="text-sm text-gray-600 mb-1.5">Risk Level</label>
-                      <Controller
-                        name="riskLevel"
-                        control={form.control}
-                        render={({ field }) => {
-                          const getRiskColor = (value: string) => {
-                            switch (value) {
-                              case 'Low': return 'bg-green-500 text-white border-green-500';
-                              case 'Medium': return 'bg-orange-500 text-white border-orange-500';
-                              case 'High': return 'bg-red-500 text-white border-red-500';
-                              default: return 'bg-white text-gray-900 border-gray-300';
-                            }
-                          };
-                          return (
-                            <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
-                              <SelectTrigger 
-                                data-testid="select-risk-level" 
-                                className={`h-10 text-sm ${getRiskColor(field.value || '')}`}
-                              >
-                                <SelectValue placeholder="Select risk" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Low">Low</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="High">High</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          );
-                        }}
-                      />
+                    <h3 className="text-sm font-semibold" style={{ color: '#16569e' }}>B3. Risk & Priority</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Risk Level</label>
+                        <Controller
+                          name="riskLevel"
+                          control={form.control}
+                          render={({ field }) => {
+                            const getRiskColor = (value: string) => {
+                              switch (value) {
+                                case 'Low': return 'bg-green-500 text-white border-green-500';
+                                case 'Medium': return 'bg-orange-500 text-white border-orange-500';
+                                case 'High': return 'bg-red-500 text-white border-red-500';
+                                default: return 'bg-white text-gray-900 border-gray-300';
+                              }
+                            };
+                            return (
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                                <SelectTrigger 
+                                  data-testid="select-risk-level" 
+                                  className={`h-10 text-sm ${getRiskColor(field.value || '')}`}
+                                >
+                                  <SelectValue placeholder="Select risk" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Low">Low</SelectItem>
+                                  <SelectItem value="Medium">Medium</SelectItem>
+                                  <SelectItem value="High">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            );
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-sm text-gray-600 mb-1.5">Priority</label>
+                        <Controller
+                          name="priority"
+                          control={form.control}
+                          render={({ field }) => {
+                            const getPriorityColor = (value: string) => {
+                              switch (value) {
+                                case 'Low': return 'bg-green-500 text-white border-green-500';
+                                case 'Medium': return 'bg-orange-500 text-white border-orange-500';
+                                case 'High': return 'bg-red-500 text-white border-red-500';
+                                default: return 'bg-white text-gray-900 border-gray-300';
+                              }
+                            };
+                            return (
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isViewMode}>
+                                <SelectTrigger 
+                                  data-testid="select-priority" 
+                                  className={`h-10 text-sm ${getPriorityColor(field.value || '')}`}
+                                >
+                                  <SelectValue placeholder="Select Priority" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Low">Low</SelectItem>
+                                  <SelectItem value="Medium">Medium</SelectItem>
+                                  <SelectItem value="High">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            );
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
 
