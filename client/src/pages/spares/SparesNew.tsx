@@ -79,6 +79,9 @@ interface SpareHistory {
   userId: string;
   remarks?: string;
   reference?: string;
+  dateLocal?: string;
+  tz?: string;
+  place?: string;
 }
 
 const Spares: React.FC = () => {
@@ -1720,9 +1723,8 @@ const Spares: React.FC = () => {
         consumedB: data.consumedB || 0,
         receivedA: data.receivedA || 0,
         receivedB: data.receivedB || 0,
-        receivedDate: ((data.receivedA || 0) > 0 || (data.receivedB || 0) > 0) ? data.receivedDate : undefined,
+        receivedDate: data.receivedDate || undefined,
         receivedPlace: data.receivedPlace || undefined,
-        dateLocal: new Date().toISOString().split('T')[0],
         remarks: data.comments || undefined,
         userId: 'user'
       }));
@@ -2234,7 +2236,7 @@ const Spares: React.FC = () => {
                     <div key={history.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid grid-cols-9 gap-4 text-sm items-center">
                         <div className="text-gray-900">
-                          {format(new Date(history.timestampUTC), 'dd-MMM-yyyy HH:mm')}
+                          {history.dateLocal || format(new Date(history.timestampUTC), 'dd-MMM-yyyy')}
                         </div>
                         <div className="text-gray-700">{history.partCode}</div>
                         <div className="text-gray-700">{history.partName}</div>
