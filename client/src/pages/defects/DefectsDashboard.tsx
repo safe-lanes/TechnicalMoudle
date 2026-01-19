@@ -167,7 +167,7 @@ export default function DefectsDashboard() {
     { name: 'Reported', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Reported').length, color: '#6b7280' },
     { name: 'In Progress', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'In Progress').length, color: '#3b82f6' },
     { name: 'Extended', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Extended').length, color: '#6366f1' },
-    { name: 'Overdue', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length, color: '#ef4444' },
+    { name: 'Overdue', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length, color: '#ff6961' },
     { name: 'Closed', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Closed').length, color: '#5dc86f' },
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
   ].filter(s => s.value > 0);
@@ -318,16 +318,16 @@ export default function DefectsDashboard() {
         <KPICard
           title="Overdue Defects"
           value={kpis.overdueDefects}
-          borderColor="border-red-500"
-          textColor="text-red-600"
+          borderColor="border-[#ff6961]"
+          textColor="text-[#ff6961]"
           onClick={() => setActiveModal('overdue')}
         />
         
         <KPICard
           title="Critical Equipment Defects"
           value={kpis.criticalEquipment}
-          borderColor="border-red-500"
-          textColor="text-red-600"
+          borderColor="border-[#ff6961]"
+          textColor="text-[#ff6961]"
           onClick={() => setActiveModal('criticalEquipment')}
         />
         
@@ -416,7 +416,7 @@ export default function DefectsDashboard() {
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="active" fill="#ef4444" name="Active" />
+                  <Bar dataKey="active" fill="#ff6961" name="Active" />
                   <Bar dataKey="closed" fill="#5dc86f" name="Closed" />
                 </BarChart>
               </ResponsiveContainer>
