@@ -5246,6 +5246,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId = 'user'
         } = row;
         
+        // Normalize transaction date - ensure empty strings are treated as undefined
+        // and only valid ISO date strings are used
+        const transactionDate = (receivedDate && receivedDate.trim()) 
+          ? receivedDate.trim() 
+          : ((dateLocal && dateLocal.trim()) ? dateLocal.trim() : undefined);
+        
         try {
           let totalChange = 0;
           const errors: string[] = [];
@@ -5259,7 +5265,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'A',
                 userId,
                 remarks,
-                undefined // workOrderRef
+                undefined, // workOrderRef
+                transactionDate // Use selected date for history
               );
               totalChange -= consumedA;
             } catch (e: any) {
@@ -5276,7 +5283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'B',
                 userId,
                 remarks,
-                undefined // workOrderRef
+                undefined, // workOrderRef
+                transactionDate // Use selected date for history
               );
               totalChange -= consumedB;
             } catch (e: any) {
@@ -5294,7 +5302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId,
                 remarks,
                 receivedPlace,
-                receivedDate || dateLocal
+                transactionDate // Use selected date for history
               );
               totalChange += receivedA;
             } catch (e: any) {
@@ -5312,7 +5320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId,
                 remarks,
                 receivedPlace,
-                receivedDate || dateLocal
+                transactionDate // Use selected date for history
               );
               totalChange += receivedB;
             } catch (e: any) {

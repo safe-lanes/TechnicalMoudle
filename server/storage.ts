@@ -316,13 +316,17 @@ export interface IStorage {
   updateSpare(id: number, data: Partial<Spare>): Promise<Spare>;
   deleteSpare(id: number): Promise<void>;
   consumeSpare(id: number, quantity: number, userId: string, remarks?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
-  consumeSpareFromLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string): Promise<{
+  consumeSpareFromLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, workOrderRef?: string, dateLocal?: string): Promise<{
     spare: Spare;
     deducted: number;
     requested: number;
     shortageQty: number;
   }>;
   receiveSpare(id: number, quantity: number, userId: string, remarks?: string, supplierPO?: string, place?: string, dateLocal?: string, tz?: string): Promise<Spare>;
+  receiveSpareToLocation(id: number, quantity: number, location: 'A' | 'B', userId: string, remarks?: string, supplierPO?: string, dateLocal?: string): Promise<{
+    spare: Spare;
+    received: number;
+  }>;
   bulkUpdateSpares(updates: Array<{id: number, consumed?: number, received?: number, receivedDate?: string, receivedPlace?: string}>, userId: string, remarks?: string): Promise<Spare[]>;
   adjustSpareQuantity(
     spareId: number,

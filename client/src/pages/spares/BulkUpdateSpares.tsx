@@ -131,7 +131,9 @@ export default function BulkUpdateSpares() {
       const robA = spare.robLocationA ?? 0;
       const robB = spare.robLocationB ?? 0;
       const totalReceived = (data.receivedA || 0) + (data.receivedB || 0);
-      return (data.consumedA > robA) || (data.consumedB > robB) || (totalReceived > 0 && !data.receivedDate);
+      const totalConsumed = (data.consumedA || 0) + (data.consumedB || 0);
+      const hasAnyTransaction = totalReceived > 0 || totalConsumed > 0;
+      return (data.consumedA > robA) || (data.consumedB > robB) || (hasAnyTransaction && !data.receivedDate);
     });
 
     if (hasErrors) {
@@ -228,11 +230,11 @@ export default function BulkUpdateSpares() {
           
           <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <div>
-              <Label htmlFor="bulk-received-date">Received Date (Apply to all)</Label>
+              <Label htmlFor="bulk-received-date">Transaction Date (Apply to all)</Label>
               <Input
                 id="bulk-received-date"
                 type="date"
-                data-testid="input-bulk-received-date"
+                data-testid="input-bulk-transaction-date"
                 onChange={(e) => {
                   const date = e.target.value;
                   setBulkUpdateData(prev => {
@@ -330,8 +332,10 @@ export default function BulkUpdateSpares() {
                     const hasInsufficientStockA = consumedA > robA;
                     const hasInsufficientStockB = consumedB > robB;
                     const totalReceived = receivedA + receivedB;
-                    const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.id]?.receivedDate;
-                    const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
+                    const totalConsumed = consumedA + consumedB;
+                    const hasAnyTransaction = totalReceived > 0 || totalConsumed > 0;
+                    const needsTransactionDate = hasAnyTransaction && !bulkUpdateData[spare.id]?.receivedDate;
+                    const hasError = hasInsufficientStockA || hasInsufficientStockB || needsTransactionDate;
                     
                     const spareLocA = spare.location || locationNames.locationA;
                     const spareLocB = spare.location2 || locationNames.locationB;
@@ -400,7 +404,7 @@ export default function BulkUpdateSpares() {
                             {(hasInsufficientStockA || hasInsufficientStockB) && (
                               <div className="text-[10px] text-red-600">Insufficient</div>
                             )}
-                            {needsReceivedDate && (
+                            {needsTransactionDate && (
                               <div className="text-[10px] text-red-600">Date required</div>
                             )}
                           </div>

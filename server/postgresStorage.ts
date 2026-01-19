@@ -1974,7 +1974,8 @@ export class PostgresStorage {
     location: 'A' | 'B',
     userId: string,
     remarks?: string,
-    workOrderRef?: string
+    workOrderRef?: string,
+    dateLocal?: string
   ): Promise<{ spare: Spare; deducted: number; requested: number; shortageQty: number }> {
     const db = await getDb();
     const spare = await this.getSpare(id);
@@ -2028,7 +2029,7 @@ export class PostgresStorage {
       userId,
       remarks: remarks ? `${remarks} (Location ${location})${workOrderRef ? ` WO: ${workOrderRef}` : ''}` : `Location ${location}`,
       reference: workOrderRef ?? null,
-      dateLocal: null,
+      dateLocal: dateLocal ?? null,
       tz: null,
       place: null,
     });
