@@ -50,38 +50,21 @@ interface KPICardProps {
   value: string | number;
   icon: any;
   color: string;
-  change?: string;
-  changeType?: "positive" | "negative" | "neutral";
-  subtitle?: string;
   onClick?: () => void;
 }
 
-const KPICard = ({ title, value, icon: Icon, color, change, changeType, subtitle, onClick }: KPICardProps) => {
+const KPICard = ({ title, value, icon: Icon, color, onClick }: KPICardProps) => {
   return (
     <Card className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} ${color}`}>
-      <CardContent className="p-6">
+      <CardContent className="py-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-3xl font-bold mt-2" data-testid={`kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+            <p className="text-2xl font-bold mt-1" data-testid={`kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
               {value}
             </p>
-            {subtitle && (
-              <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
-            )}
-            {change && (
-              <div className="flex items-center mt-2">
-                <span className={`text-xs font-medium ${
-                  changeType === 'positive' ? 'text-green-600' : 
-                  changeType === 'negative' ? 'text-red-600' : 
-                  'text-gray-600'
-                }`}>
-                  {change}
-                </span>
-              </div>
-            )}
           </div>
-          <Icon className="h-8 w-8 opacity-60" />
+          <Icon className="h-7 w-7 opacity-60" />
         </div>
       </CardContent>
     </Card>
@@ -273,14 +256,12 @@ export default function DefectsDashboard() {
       {/* Dashboard Content */}
       <div className="px-4 flex-1 overflow-y-auto space-y-6">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total Active Defects"
           value={kpis.totalActive}
           icon={AlertTriangle}
           color="bg-white text-red-600 border-gray-200"
-          change={kpis.totalActive > 0 ? `${kpis.totalActive} requiring attention` : "All clear"}
-          changeType={kpis.totalActive > 0 ? "negative" : "positive"}
           onClick={() => navigateToDefectLog('active')}
         />
         
@@ -289,8 +270,6 @@ export default function DefectsDashboard() {
           value={kpis.totalResolved}
           icon={CheckCircle}
           color="bg-white text-green-600 border-gray-200"
-          change={`${resolutionRate}% resolution rate`}
-          changeType="positive"
           onClick={() => navigateToDefectLog('resolved')}
         />
         
@@ -299,9 +278,6 @@ export default function DefectsDashboard() {
           value={kpis.conditionOfClass}
           icon={Shield}
           color="bg-white text-blue-600 border-gray-200"
-          change={kpis.conditionOfClass > 0 ? "Active regulatory items" : "No active CoC items"}
-          changeType={kpis.conditionOfClass > 0 ? "negative" : "positive"}
-          subtitle="Regulatory compliance"
           onClick={() => navigateToDefectLog('coc')}
         />
         
@@ -310,8 +286,6 @@ export default function DefectsDashboard() {
           value={kpis.overdueDefects}
           icon={Clock}
           color="bg-white text-orange-600 border-gray-200"
-          change={kpis.overdueDefects > 0 ? `${kpis.overdueDefects} past target date` : "All on schedule"}
-          changeType={kpis.overdueDefects > 0 ? "negative" : "neutral"}
           onClick={() => navigateToDefectLog('overdue')}
         />
       </div>
