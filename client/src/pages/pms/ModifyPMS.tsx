@@ -54,6 +54,7 @@ import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { useChangeMode } from "@/contexts/ChangeModeContext";
 import { useToast } from "@/hooks/use-toast";
+import { useVessel } from "@/contexts/VesselContext";
 
 interface RevisionHistoryEntry {
   revisionNumber: number;
@@ -124,7 +125,7 @@ export default function ModifyPMS() {
   const [, setLocation] = useLocation();
   const { enterChangeMode } = useChangeMode();
   const { toast } = useToast();
-  const [selectedVessel] = useState('V001');
+  const { vesselId } = useVessel();
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,10 +154,10 @@ export default function ModifyPMS() {
 
   // Fetch change requests
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['/technical/api/change-requests', categoryFilter, statusFilter, searchQuery],
+    queryKey: ['/technical/api/change-requests', vesselId, categoryFilter, statusFilter, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('vesselId', selectedVessel);
+      params.append('vesselId', vesselId);
       if (categoryFilter !== 'all') params.append('category', categoryFilter);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (searchQuery) params.append('q', searchQuery);
@@ -172,7 +173,7 @@ export default function ModifyPMS() {
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest('POST', '/technical/api/change-requests', {
         ...data,
-        vesselId: selectedVessel,
+        vesselId: vesselId,
         requestedByUserId: 'current_user'
       });
       return res.json();
@@ -189,7 +190,7 @@ export default function ModifyPMS() {
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
       const res = await apiRequest('PUT', `/technical/api/change-requests/${id}`, {
         ...data,
-        vesselId: selectedVessel,
+        vesselId: vesselId,
         requestedByUserId: 'current_user'
       });
       return res.json();
@@ -736,7 +737,7 @@ export default function ModifyPMS() {
                         body: JSON.stringify({
                           proposedChangesJson: changes,
                           movePreviewJson: movePreview,
-                          vesselId: selectedVessel,
+                          vesselId: vesselId,
                           requestedByUserId: 'current_user'
                         })
                       }).catch(console.error);
@@ -1135,7 +1136,7 @@ export default function ModifyPMS() {
           open={showTargetPicker}
           onOpenChange={setShowTargetPicker}
           category={formData.category}
-          vesselId={selectedVessel}
+          vesselId={vesselId}
           onTargetSelect={handleTargetSelect}
         />
       )}
