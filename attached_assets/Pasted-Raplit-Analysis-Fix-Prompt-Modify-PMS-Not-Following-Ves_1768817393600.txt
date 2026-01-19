@@ -1,0 +1,72 @@
+Raplit Analysis & Fix Prompt — Modify PMS Not Following Vessel Concept
+Context
+The Modify PMS section is expected to work strictly on a vessel-specific basis.
+Currently, changes made in Modify PMS for one vessel (e.g., Vessel 1) are also visible when switching to another vessel (e.g., Vessel 2), which violates the vessel concept.
+This creates a data isolation issue and impacts operational accuracy.
+Shape
+❌ Current Incorrect Behavior
+User selects Vessel 1 from the global vessel filter
+Makes changes in Modify PMS
+Switches to Vessel 2
+The same Modify PMS changes are still visible
+This indicates:
+Modify PMS data is not being filtered or persisted per vessel
+Vessel context is being ignored or incorrectly handled
+Shape
+✅ Expected Correct Behavior
+Modify PMS data must be:
+Scoped strictly to the selected vessel
+Loaded and displayed based on the global vessel dropdown selection
+Changes made for Vessel 1 must:
+Be visible only when Vessel 1 is selected
+Not appear for any other vessel (e.g., Vessel 2)
+🔒 Mandatory Constraints (Very Strict)
+DO NOT change any functionality
+DO NOT change any existing logic
+DO NOT modify UI or screens
+DO NOT change APIs or database schema
+DO NOT affect any other PMS module
+READ-ONLY analysis mode
+❗Apply fixes only after explicit PROCEED instruction.
+🧠 Analysis Required (Before Any Fix)
+Raplit must analyse only and explain:
+1. Vessel Context Handling
+Trace how the selected vessel (from global vessel filter) is:
+Passed to Modify PMS
+Used (or not used) in data fetch and save operations
+2. Data Fetch Logic
+Identify:
+Whether Modify PMS data is fetched with vessel_id
+Or if it is being fetched globally without vessel filtering
+3. Data Persistence Scope
+Analyse:
+Whether Modify PMS changes are being saved:
+Without vessel association
+Or with a default / global vessel
+Identify:
+Where vessel linkage should exist but is missing
+4. UI Binding (Read-Only Analysis)
+Confirm:
+UI correctly reflects data returned from backend
+Issue is not a UI caching or state carry-over problem
+5. Impact Assessment
+Confirm:
+Which other modules rely on the same data source
+Whether fixing vessel scoping could impact shared PMS logic
+🛠️ Fix Requirements (ONLY After PROCEED)
+After approval, Raplit must:
+Enforce vessel-specific data isolation for Modify PMS
+Ensure:
+Fetch, display, and save operations respect the selected vessel_id
+Apply fix:
+Without changing existing logic structure
+Without UI changes
+Without impacting other modules
+🚫 What Must NOT Be Changed
+❌ Modify PMS business logic
+❌ PMS scheduling logic
+❌ Job generation logic
+❌ UI components
+❌ Validation rules
+❌ Database schema
+❌ Any other PMS functionality
