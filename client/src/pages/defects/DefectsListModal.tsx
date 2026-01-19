@@ -82,13 +82,13 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader className="border-b pb-4">
+          <DialogHeader className="pb-4">
             <DialogTitle className="text-xl font-semibold text-[#0f4c81]">
               {title}
             </DialogTitle>
           </DialogHeader>
           
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
             <Table>
               <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                 <TableRow>
