@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVessels } from "@/hooks/useVessels";
 import { formatProfessionalDate, calculateLeadTimeStatus } from "@/lib/dateUtils";
 import { Marker } from "@/components/Marker";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 // Extend WorkOrderWithLeadTime to include computed status and RH data from backend
 type WorkOrderWithHydratedData = WorkOrderWithLeadTime & {
@@ -85,6 +86,7 @@ const WorkOrders: React.FC = () => {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
+  const { isSailAdmin } = useUIRole();
   const { data: vessels = [] } = useVessels();
   
   // Fetch work orders using React Query (includes computedStatus and lead time from backend)
@@ -461,6 +463,7 @@ const WorkOrders: React.FC = () => {
             <Marker id="C1" />Work Orders (W.O)
           </h1>
           <div className="flex gap-2">
+            {isSailAdmin && (
             <Button 
               size="sm" 
               className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
@@ -471,6 +474,7 @@ const WorkOrders: React.FC = () => {
               <Plus className="h-4 w-4 mr-1" />
               Add W.O
             </Button>
+            )}
             <Button 
               size="sm" 
               className="bg-green-600 hover:bg-green-700 text-white"
