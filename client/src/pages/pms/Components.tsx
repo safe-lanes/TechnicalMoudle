@@ -183,6 +183,14 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     }
   }, [selectedComponent, isModifyMode, isChangeMode]);
 
+  // Capture original component data when change mode is activated on an already-loaded component
+  useEffect(() => {
+    if ((isChangeMode || isModifyMode) && componentData.componentCode && !originalComponentData) {
+      // Change mode was activated while a component was already selected - capture current data as original
+      setOriginalComponentData({ ...componentData });
+    }
+  }, [isChangeMode, isModifyMode, componentData, originalComponentData]);
+
   // Auto-update componentCategory when componentCode changes (for new components)
   useEffect(() => {
     if (componentData.componentCode) {
@@ -2516,30 +2524,44 @@ const Components: React.FC = () => {
     }
   }, [location]);
   
-  // Handle change mode - capture original snapshot when component is selected
+  // Handle change mode - capture original snapshot when component data is fully loaded
   useEffect(() => {
-    if (isChangeMode && selectedComponent) {
-      // Set the original snapshot for change tracking
+    if (isChangeMode && selectedComponent && originalComponentData) {
+      // Set the original snapshot for change tracking using the fully-loaded component data
       const snapshot = {
         id: selectedComponent.id,
         displayKey: selectedComponent.code,
         displayName: selectedComponent.name,
         displayPath: `${selectedComponent.code} ${selectedComponent.name}`,
-        componentCode: selectedComponent.code,
-        name: selectedComponent.name,
-        maker: "MAN B&W", // These would come from actual data
-        model: "6S60MC-C",
-        serialNo: "MB2020001",
-        category: getComponentCategory(selectedComponent.code),
-        deptCategory: "Engineering",
-        location: "Engine Room",
-        critical: "Yes",
-        classItem: "Yes",
-        commissionedDate: "01-Jan-2020"
+        componentCode: originalComponentData.componentCode,
+        name: originalComponentData.componentName,
+        maker: originalComponentData.maker,
+        makerCode: originalComponentData.makerCode,
+        model: originalComponentData.model,
+        modelCode: originalComponentData.modelCode,
+        serialNo: originalComponentData.serialNo,
+        drawingNo: originalComponentData.drawingNo,
+        category: originalComponentData.componentCategory,
+        deptCategory: originalComponentData.eqptSystemDept,
+        location: originalComponentData.location,
+        critical: originalComponentData.critical,
+        classItem: originalComponentData.classItem,
+        conditionBased: originalComponentData.conditionBased,
+        commissionedDate: originalComponentData.commissionedDate,
+        installationDate: originalComponentData.installationDate,
+        rating: originalComponentData.rating,
+        fleetEquipmentCode: originalComponentData.fleetEquipmentCode,
+        fleetEquipmentName: originalComponentData.fleetEquipmentName,
+        parentComponent: originalComponentData.parentComponent,
+        vesselCode: originalComponentData.vesselCode,
+        isParent: originalComponentData.isParent,
+        isActive: originalComponentData.isActive,
+        runningHours: originalComponentData.runningHours,
+        notes: originalComponentData.notes
       };
       setOriginalSnapshot(snapshot);
     }
-  }, [isChangeMode, selectedComponent]);
+  }, [isChangeMode, selectedComponent, originalComponentData]);
   
   // Initialize modify mode from URL parameter
   useEffect(() => {
@@ -2807,9 +2829,10 @@ const Components: React.FC = () => {
     }
 
     // Create proper change request structure matching the schema
-    // Use actual database values (currently empty) - will be populated from Excel upload
+    // Use actual component data from selectedComponent (which has all fields via spread operator)
+    const comp = selectedComponent as any;
     const changeRequest = {
-      vesselId: 'V001',  // Required field
+      vesselId: vesselId,  // Required field - use global vessel context
       category: 'components',  // Required field
       title: `Modify Component: ${selectedComponent.code} ${selectedComponent.name}`,  // Required field
       reason: 'Component modification request',  // Required field
@@ -2822,24 +2845,35 @@ const Components: React.FC = () => {
         displayPath: `${selectedComponent.code} ${selectedComponent.name}`,
         fields: {
           id: selectedComponent.actualId || selectedComponent.id,  // Use actual database ID
-          code: selectedComponent.code,
-          name: selectedComponent.name,
-          maker: "",
-          model: "",
-          serialNo: "",
-          department: "",
-          location: "",
-          critical: "",
-          classItem: "",
-          commissionedDate: "",
-          installationDate: "",
-          rating: "",
-          conditionBased: "",
-          noOfUnits: "",
-          eqptSystemDept: "",
-          parentComponent: "",
-          dimensionsSize: "",
-          notes: ""
+          code: comp.componentCode || selectedComponent.code,
+          name: comp.name || selectedComponent.name,
+          fleetEquipmentCode: comp.fleetEquipmentCode || "",
+          fleetEquipmentName: comp.fleetEquipmentName || "",
+          parentComponent: comp.parentId || "",
+          componentCode: comp.componentCode || "",
+          componentName: comp.name || "",
+          componentCategory: comp.componentCategory || comp.category || "",
+          maker: comp.maker || "",
+          makerCode: comp.makerCode || "",
+          model: comp.model || "",
+          modelCode: comp.modelCode || "",
+          serialNo: comp.serialNo || "",
+          drawingNo: comp.drawingNo || "",
+          location: comp.location || "",
+          critical: comp.critical === true || comp.critical === "Yes" ? "Yes" : (comp.critical === false || comp.critical === "No" ? "No" : ""),
+          conditionBased: comp.conditionBased === true || comp.conditionBased === "Yes" ? "Yes" : (comp.conditionBased === false || comp.conditionBased === "No" ? "No" : ""),
+          installationDate: comp.installationDate || "",
+          commissionedDate: comp.commissionedDate || "",
+          rating: comp.rating || "",
+          eqptSystemDept: comp.eqptSystemDept || comp.deptCategory || comp.department || "",
+          notes: comp.notes || "",
+          runningHours: comp.runningHours || comp.currentCumulativeRH || "",
+          isActive: comp.isActive !== undefined ? (comp.isActive ? "Yes" : "No") : "",
+          vesselCode: comp.vesselCode || "",
+          isParent: comp.isParent !== undefined ? (comp.isParent ? "Yes" : "No") : "",
+          classItem: comp.classItem === true || comp.classItem === "Yes" ? "Yes" : (comp.classItem === false || comp.classItem === "No" ? "No" : ""),
+          noOfUnits: comp.noOfUnits || "",
+          dimensionsSize: comp.dimensionsSize || ""
         }
       },
       proposedChangesJson: proposedChanges,  // Now populated with actual changes
