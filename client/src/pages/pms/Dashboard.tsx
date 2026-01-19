@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useVessel } from "@/contexts/VesselContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import {
   RefreshCw,
   AlertTriangle,
@@ -60,6 +61,7 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
+  const { isSailAdmin } = useUIRole();
 
   const isAllVessels = vesselId === 'all';
 
@@ -422,27 +424,29 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Vessel Selector */}
-          <div className="flex items-center gap-4 mt-4">
-            <div className="flex items-center gap-2">
-              <Ship className="w-4 h-4 text-gray-500" />
-              <Select value={vesselId} onValueChange={handleVesselChange}>
-                <SelectTrigger className="w-48" data-testid="select-vessel">
-                  <SelectValue placeholder="Select vessel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-vessels">
-                    All Vessels
-                  </SelectItem>
-                  {vessels.map(vessel => (
-                    <SelectItem key={vessel.id} value={vessel.id}>
-                      {vessel.name}
+          {/* Vessel Selector - Only visible for Sail_Admin */}
+          {isSailAdmin && (
+            <div className="flex items-center gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <Ship className="w-4 h-4 text-gray-500" />
+                <Select value={vesselId} onValueChange={handleVesselChange}>
+                  <SelectTrigger className="w-48" data-testid="select-vessel">
+                    <SelectValue placeholder="Select vessel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="option-all-vessels">
+                      All Vessels
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {vessels.map(vessel => (
+                      <SelectItem key={vessel.id} value={vessel.id}>
+                        {vessel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
