@@ -56,7 +56,10 @@ interface KPICardProps {
 
 const KPICard = ({ title, value, icon: Icon, color, onClick }: KPICardProps) => {
   return (
-    <Card className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} ${color}`}>
+    <Card 
+      className={`${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''} ${color}`}
+      onClick={onClick}
+    >
       <CardContent className="py-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
