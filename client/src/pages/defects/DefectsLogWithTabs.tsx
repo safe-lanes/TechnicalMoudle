@@ -127,6 +127,25 @@ const HtmlTextCellRenderer = (params: ICellRendererParams) => {
   );
 };
 
+const PriorityCellRenderer = (params: ICellRendererParams) => {
+  if (!params.colDef) return null;
+  
+  const priority = params.value;
+  if (!priority) return <span className="text-gray-400 text-xs">-</span>;
+  
+  const colorClass = priority === 'Low' ? 'bg-green-500' : 
+                    priority === 'Medium' ? 'bg-orange-500' : 
+                    priority === 'High' ? 'bg-red-500' : 'bg-gray-500';
+  
+  return (
+    <div className="flex items-center justify-center">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${colorClass}`}>
+        {priority}
+      </span>
+    </div>
+  );
+};
+
 const TwoLineDateCellRenderer = (params: ICellRendererParams) => {
   if (!params.value) return null;
   
@@ -547,14 +566,7 @@ export default function DefectsLogWithTabs() {
       headerName: 'Priority',
       field: 'priority',
       flex: 0.6,
-      cellRenderer: (params: any) => {
-        const priority = params.value;
-        if (!priority) return '<span class="text-gray-400 text-xs">-</span>';
-        const colorClass = priority === 'Low' ? 'bg-green-500' : 
-                          priority === 'Medium' ? 'bg-orange-500' : 
-                          priority === 'High' ? 'bg-red-500' : 'bg-gray-500';
-        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${colorClass}">${priority}</span>`;
-      },
+      cellRenderer: PriorityCellRenderer,
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
       sortable: true,
