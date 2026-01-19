@@ -395,7 +395,7 @@ export default function DefectsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white">
+        <Card className="bg-white lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Defects by Vessel</span>
@@ -421,57 +421,6 @@ export default function DefectsDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Critical Defects</span>
-              <AlertCircle className="h-5 w-5 text-red-400" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Shield className="h-5 w-5 text-blue-500" />
-                  <div>
-                    <p className="font-medium">Condition of Class</p>
-                    <p className="text-sm text-gray-600">Regulatory items</p>
-                  </div>
-                </div>
-                <Badge variant={kpis.conditionOfClass > 0 ? "destructive" : "secondary"}>
-                  {kpis.conditionOfClass}
-                </Badge>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Clock className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="font-medium">Overdue</p>
-                    <p className="text-sm text-gray-600">Past target date</p>
-                  </div>
-                </div>
-                <Badge variant={kpis.overdueDefects > 0 ? "destructive" : "secondary"}>
-                  {kpis.overdueDefects}
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <p className="font-medium">High Priority</p>
-                    <p className="text-sm text-gray-600">Immediate attention</p>
-                  </div>
-                </div>
-                <Badge variant={kpis.highPriority > 0 ? "destructive" : "secondary"} className={kpis.highPriority > 0 ? "" : "bg-gray-100 text-gray-800"}>
-                  {kpis.highPriority}
-                </Badge>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
