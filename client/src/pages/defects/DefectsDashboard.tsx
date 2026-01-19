@@ -29,6 +29,7 @@ import {
   isActiveComputedStatus,
   isResolvedComputedStatus 
 } from "@/lib/defectStatusUtils";
+import { DefectsListModal } from "./DefectsListModal";
 import {
   PieChart,
   Pie,
@@ -71,10 +72,13 @@ const KPICard = ({ title, value, icon: Icon, color, onClick }: KPICardProps) => 
   );
 };
 
+type ModalType = 'active' | 'resolved' | 'coc' | 'overdue' | null;
+
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [showFilters, setShowFilters] = useState(true);
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
     queryKey: ['/technical/api/defects?includeClosedDefects=true'],
@@ -185,6 +189,36 @@ export default function DefectsDashboard() {
     window.location.href = `/defects/defect-log${queryString ? `?${queryString}` : ''}`;
   };
 
+  const getModalDefects = () => {
+    switch (activeModal) {
+      case 'active':
+        return activeDefects;
+      case 'resolved':
+        return resolvedDefects;
+      case 'coc':
+        return defectsWithComputedStatus.filter(d => d.is_coc && isActiveComputedStatus(d.computedStatus.label));
+      case 'overdue':
+        return defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue');
+      default:
+        return [];
+    }
+  };
+
+  const getModalTitle = () => {
+    switch (activeModal) {
+      case 'active':
+        return 'Active Defects';
+      case 'resolved':
+        return 'Resolved Defects';
+      case 'coc':
+        return 'Condition of Class Defects';
+      case 'overdue':
+        return 'Overdue Defects';
+      default:
+        return 'Defects';
+    }
+  };
+
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Header */}
@@ -262,7 +296,7 @@ export default function DefectsDashboard() {
           value={kpis.totalActive}
           icon={AlertTriangle}
           color="bg-white text-red-600 border-gray-200"
-          onClick={() => navigateToDefectLog('active')}
+          onClick={() => setActiveModal('active')}
         />
         
         <KPICard
@@ -270,7 +304,7 @@ export default function DefectsDashboard() {
           value={kpis.totalResolved}
           icon={CheckCircle}
           color="bg-white text-green-600 border-gray-200"
-          onClick={() => navigateToDefectLog('resolved')}
+          onClick={() => setActiveModal('resolved')}
         />
         
         <KPICard
@@ -278,7 +312,7 @@ export default function DefectsDashboard() {
           value={kpis.conditionOfClass}
           icon={Shield}
           color="bg-white text-blue-600 border-gray-200"
-          onClick={() => navigateToDefectLog('coc')}
+          onClick={() => setActiveModal('coc')}
         />
         
         <KPICard
@@ -286,7 +320,7 @@ export default function DefectsDashboard() {
           value={kpis.overdueDefects}
           icon={Clock}
           color="bg-white text-orange-600 border-gray-200"
-          onClick={() => navigateToDefectLog('overdue')}
+          onClick={() => setActiveModal('overdue')}
         />
       </div>
 
@@ -509,6 +543,13 @@ export default function DefectsDashboard() {
         </CardContent>
       </Card>
       </div>
+
+      <DefectsListModal
+        open={activeModal !== null}
+        onClose={() => setActiveModal(null)}
+        title={getModalTitle()}
+        defects={getModalDefects()}
+      />
     </div>
   );
 }
