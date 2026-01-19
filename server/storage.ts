@@ -331,6 +331,16 @@ export interface IStorage {
     reference?: string,
     notes?: string
   ): Promise<Spare>;
+  adjustSpareAtLocation(
+    id: number,
+    newRob: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<Spare>;
   
   // Fleet Spares methods
   getFleetSpares(): Promise<Spare[]>;

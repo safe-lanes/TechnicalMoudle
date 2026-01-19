@@ -2109,6 +2109,82 @@ export class PostgresStorage {
     };
   }
 
+  async adjustSpareAtLocation(
+    id: number,
+    newRob: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<Spare> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    if (isNaN(newRob) || newRob < 0) {
+      throw new Error('newRob must be a valid non-negative number');
+    }
+    
+    const oldLocA = spare.robLocationA ?? 0;
+    const oldLocB = spare.robLocationB ?? 0;
+    const oldTotal = oldLocA + oldLocB;
+    
+    let newLocA = oldLocA;
+    let newLocB = oldLocB;
+    
+    if (location === 'A') {
+      newLocA = newRob;
+    } else {
+      newLocB = newRob;
+    }
+    
+    const newTotal = newLocA + newLocB;
+    const netChange = newTotal - oldTotal;
+    
+    if (netChange === 0) {
+      return spare;
+    }
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newTotal,
+        robLocationA: newLocA,
+        robLocationB: newLocB,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+
+    const adjustmentRemarks = remarks || `Adjustment at Location ${location}: ${location === 'A' ? oldLocA : oldLocB}→${newRob}`;
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'ADJUST',
+      qtyChange: netChange,
+      robAfter: newTotal,
+      userId,
+      remarks: adjustmentRemarks,
+      reference: null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null,
+    });
+
+    return updated[0];
+  }
+
   async receiveSpare(
     id: number, 
     quantity: number, 

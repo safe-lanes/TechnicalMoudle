@@ -5423,6 +5423,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Adjust spare ROB at specific location (for audit-compliant adjustments)
+  app.post("/technical/api/spares/:vesselId/:id/adjustment", async (req, res) => {
+    try {
+      const adjustmentPayloadSchema = z.object({
+        newRob: z.number().min(0),
+        location: z.enum(['A', 'B']),
+        remarks: z.string().optional(),
+        place: z.string().optional(),
+        dateLocal: z.string().optional(),
+        tz: z.string().optional()
+      });
+      
+      const payload = adjustmentPayloadSchema.parse(req.body);
+      const userId = (req as any).user?.id?.toString() || 'System';
+      const vesselId = req.params.vesselId;
+      const spareId = parseInt(req.params.id);
+      
+      // Security check: Verify spare belongs to the specified vessel
+      const existingSpare = await storage.getSpare(spareId);
+      if (!existingSpare) {
+        return res.status(404).json({ error: `Spare with ID ${spareId} not found` });
+      }
+      if (existingSpare.vesselId !== vesselId) {
+        return res.status(403).json({ error: "Access denied: Spare does not belong to this vessel" });
+      }
+      
+      const spare = await storage.adjustSpareAtLocation(
+        spareId,
+        payload.newRob,
+        payload.location,
+        userId,
+        payload.remarks,
+        payload.place,
+        payload.dateLocal,
+        payload.tz
+      );
+      
+      res.json(spare);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid request payload", details: error.errors });
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes('non-negative')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message || "Failed to adjust spare ROB" });
+    }
+  });
+  
   // Adjust spare quantity (for +/- buttons)
   app.post("/technical/api/spares/:vesselId/:id/adjust", async (req, res) => {
     try {

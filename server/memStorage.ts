@@ -1229,6 +1229,68 @@ class MemStorage {
     return results;
   }
 
+  async adjustSpareAtLocation(
+    id: number,
+    newRob: number,
+    location: 'A' | 'B',
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<any> {
+    console.log('[MemStorage] adjustSpareAtLocation called - stub in file mode');
+    const spare = this.data.spares ? this.data.spares[id] : null;
+    if (!spare) {
+      throw new Error(`Spare with ID ${id} not found`);
+    }
+    
+    const currentRob = location === 'A' 
+      ? (spare.robLocationA || 0) 
+      : (spare.robLocationB || 0);
+    const qtyChange = newRob - currentRob;
+    
+    if (location === 'A') {
+      spare.robLocationA = newRob;
+    } else {
+      spare.robLocationB = newRob;
+    }
+    spare.rob = (spare.robLocationA || 0) + (spare.robLocationB || 0);
+    
+    this.data.spares[id] = spare;
+    this.saveData();
+    
+    const historyEntry = {
+      id: this.getNextId('sparesHistory'),
+      spareId: id,
+      vesselId: spare.vesselId,
+      partCode: spare.partCode || spare.componentSpareCode || `SP-${id}`,
+      partName: spare.partName || 'Unknown Part',
+      partNumber: spare.partNumber || null,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode || null,
+      componentName: spare.componentName || 'Unknown Component',
+      componentSpareCode: spare.componentSpareCode || null,
+      eventType: 'ADJUST',
+      qtyChange,
+      robAfter: spare.rob,
+      location,
+      remarks,
+      reference: null,
+      place,
+      dateLocal,
+      tz,
+      timestampUTC: new Date().toISOString(),
+      userId
+    };
+    
+    if (!this.data.sparesHistory) this.data.sparesHistory = [];
+    this.data.sparesHistory.push(historyEntry);
+    this.saveData();
+    
+    return spare;
+  }
+
   async getMasterDataList(): Promise<any[]> {
     console.log('[MemStorage] getMasterDataList called - stub in file mode');
     return [];

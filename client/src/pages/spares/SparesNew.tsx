@@ -6,7 +6,7 @@ import { Marker } from "@/components/Marker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Edit, Edit2, Trash2, Plus, PlusCircle, Square, FileSpreadsheet, X, Minus, AlertCircle, CheckCircle, HelpCircle, MapPin, Info, Download, Settings2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { ModifyStickyFooter } from "@/components/modify/ModifyStickyFooter";
 // ComponentNode interface - matches the one used in Components.tsx
@@ -146,12 +146,14 @@ const Spares: React.FC = () => {
   const [isConsumeReceiveModalOpen, setIsConsumeReceiveModalOpen] = useState(false);
   const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [selectedSpare, setSelectedSpare] = useState<Spare | null>(null);
   
   // Form states
   const [consumeForm, setConsumeForm] = useState({ qtyA: "", qtyB: "", date: "", workOrder: "", remarks: "" });
   const [receiveForm, setReceiveForm] = useState({ qtyA: "", qtyB: "", date: "", supplier: "", remarks: "" });
+  const [adjustForm, setAdjustForm] = useState({ location: "A" as "A" | "B", newRob: "", date: "", place: "", remarks: "" });
   const [bulkUpdateData, setBulkUpdateData] = useState<{[key: number]: {consumedA: number, consumedB: number, receivedA: number, receivedB: number, receivedDate?: string, receivedPlace?: string, comments?: string}}>({});
   const [bulkSearchQuery, setBulkSearchQuery] = useState("");
   const [addSpareForm, setAddSpareForm] = useState({
@@ -955,6 +957,28 @@ const Spares: React.FC = () => {
     }
   });
 
+  // Adjust spare ROB mutation (for audit-compliant adjustments)
+  const adjustSpareMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number, newRob: number, location: 'A' | 'B', remarks?: string, place?: string, dateLocal?: string, tz?: string }) => {
+      const response = await apiRequest('POST', `/technical/api/spares/${vesselId}/${id}/adjustment`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/inventory/spares-with-inventory', vesselId] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/spares/history', vesselId] });
+      toast({ title: "Success", description: "Spare ROB adjusted successfully" });
+      setIsAdjustModalOpen(false);
+      setAdjustForm({ location: "A", newRob: "", date: format(new Date(), 'yyyy-MM-dd'), place: "", remarks: "" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to adjust spare ROB",
+        variant: "destructive"
+      });
+    }
+  });
+
   // Create spare mutation
   const createSpareMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1312,6 +1336,52 @@ const Spares: React.FC = () => {
       remarks: ""
     });
     setIsReceiveModalOpen(true);
+  };
+
+  // Open adjustment modal (for audit-compliant ROB adjustments)
+  const openAdjustModal = (spare: Spare) => {
+    setSelectedSpare(spare);
+    setAdjustForm({
+      location: "A",
+      newRob: String(spare.robLocationA ?? 0),
+      date: format(new Date(), 'yyyy-MM-dd'),
+      place: "",
+      remarks: ""
+    });
+    setIsAdjustModalOpen(true);
+  };
+
+  // Handle adjustment submit
+  const handleAdjustSubmit = async () => {
+    if (!selectedSpare || !adjustForm.date) {
+      toast({ title: "Error", description: "Please fill in the date", variant: "destructive" });
+      return;
+    }
+    
+    const newRob = parseInt(adjustForm.newRob);
+    if (isNaN(newRob) || newRob < 0) {
+      toast({ title: "Error", description: "Please enter a valid non-negative ROB value", variant: "destructive" });
+      return;
+    }
+    
+    const currentRob = adjustForm.location === 'A' 
+      ? (selectedSpare.robLocationA ?? 0) 
+      : (selectedSpare.robLocationB ?? 0);
+    
+    if (newRob === currentRob) {
+      toast({ title: "No Change", description: "The new ROB is the same as the current value", variant: "default" });
+      return;
+    }
+    
+    adjustSpareMutation.mutate({
+      id: selectedSpare.id,
+      newRob,
+      location: adjustForm.location,
+      remarks: adjustForm.remarks || undefined,
+      place: adjustForm.place || undefined,
+      dateLocal: adjustForm.date,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
   };
 
   // Handle consume submit - processes both locations with proper error tracking
@@ -2062,6 +2132,15 @@ const Spares: React.FC = () => {
                           <Button 
                             size="sm" 
                             variant="ghost"
+                            onClick={() => openAdjustModal(spare)}
+                            title="Adjust ROB"
+                            data-testid={`button-adjust-${spare.id}`}
+                          >
+                            <Settings2 className="h-4 w-4 text-orange-500" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
                             onClick={() => handleDeleteSpare(spare.id)}
                             title="Delete"
                             data-testid={isFirstRow ? "E36" : `button-delete-${spare.id}`}
@@ -2164,9 +2243,11 @@ const Spares: React.FC = () => {
                         <div>
                           <span className={`px-2 py-1 rounded text-xs ${
                             history.eventType === 'CONSUME' 
-                              ? 'bg-orange-100 text-orange-800' 
+                              ? 'bg-red-100 text-red-800' 
                               : history.eventType === 'RECEIVE'
                               ? 'bg-green-100 text-green-800'
+                              : history.eventType === 'ADJUST'
+                              ? 'bg-orange-100 text-orange-800'
                               : 'bg-blue-100 text-blue-800'
                           }`}>
                             {history.eventType}
@@ -3176,6 +3257,119 @@ const Spares: React.FC = () => {
             </Button>
             <Button data-testid="button-receive-save" onClick={handleReceiveSubmit} disabled={receiveSpareMutation.isPending}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjustment Modal - For audit-compliant ROB adjustments */}
+      <Dialog open={isAdjustModalOpen} onOpenChange={setIsAdjustModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-orange-500" />
+              Adjust Spare ROB
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Part: {selectedSpare?.partCode} - {selectedSpare?.partName}</Label>
+              <p className="text-sm text-gray-500">Current Total ROB: {selectedSpare?.rob}</p>
+            </div>
+            <div className="border rounded-lg p-3 space-y-3 bg-orange-50">
+              <div className="text-xs font-medium text-gray-500">Adjustment Details</div>
+              <div>
+                <Label htmlFor="adjust-location">Location *</Label>
+                <Select 
+                  value={adjustForm.location} 
+                  onValueChange={(value: "A" | "B") => {
+                    setAdjustForm({
+                      ...adjustForm, 
+                      location: value,
+                      newRob: String(value === 'A' ? (selectedSpare?.robLocationA ?? 0) : (selectedSpare?.robLocationB ?? 0))
+                    });
+                  }}
+                >
+                  <SelectTrigger data-testid="select-adjust-location">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">{locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})</SelectItem>
+                    <SelectItem value="B">{locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="adjust-new-rob">New ROB *</Label>
+                <Input
+                  id="adjust-new-rob"
+                  data-testid="input-adjust-new-rob"
+                  type="number"
+                  min="0"
+                  value={adjustForm.newRob}
+                  onChange={(e) => setAdjustForm({...adjustForm, newRob: e.target.value})}
+                  placeholder="Enter new ROB value"
+                />
+                {selectedSpare && (() => {
+                  const currentRob = adjustForm.location === 'A' 
+                    ? (selectedSpare.robLocationA ?? 0) 
+                    : (selectedSpare.robLocationB ?? 0);
+                  const newRob = parseInt(adjustForm.newRob) || 0;
+                  const diff = newRob - currentRob;
+                  if (diff !== 0) {
+                    return (
+                      <p className={`text-xs mt-1 ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        Change: {diff > 0 ? '+' : ''}{diff}
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="adjust-date">Date *</Label>
+              <Input
+                id="adjust-date"
+                data-testid="input-adjust-date"
+                type="date"
+                value={adjustForm.date}
+                onChange={(e) => setAdjustForm({...adjustForm, date: e.target.value})}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="adjust-place">Place</Label>
+              <Input
+                id="adjust-place"
+                data-testid="input-adjust-place"
+                value={adjustForm.place}
+                onChange={(e) => setAdjustForm({...adjustForm, place: e.target.value})}
+                placeholder="Optional - e.g., Singapore Port"
+              />
+            </div>
+            <div>
+              <Label htmlFor="adjust-remarks">Remarks *</Label>
+              <Input
+                id="adjust-remarks"
+                data-testid="input-adjust-remarks"
+                value={adjustForm.remarks}
+                onChange={(e) => setAdjustForm({...adjustForm, remarks: e.target.value})}
+                placeholder="Reason for adjustment (required for audit)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAdjustModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              data-testid="button-adjust-save" 
+              onClick={handleAdjustSubmit} 
+              disabled={adjustSpareMutation.isPending || !adjustForm.remarks}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {adjustSpareMutation.isPending ? "Saving..." : "Save Adjustment"}
             </Button>
           </DialogFooter>
         </DialogContent>
