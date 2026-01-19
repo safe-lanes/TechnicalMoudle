@@ -79,18 +79,18 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
           
           <div className="flex-1 overflow-auto">
             <Table>
-              <TableHeader className="sticky top-0 bg-[#0f4c81] z-10">
+              <TableHeader className="sticky top-0 bg-[#eff6ff] z-10">
                 <TableRow>
-                  <TableHead className="text-white font-medium w-[120px]">ID</TableHead>
-                  <TableHead className="text-white font-medium w-[100px]">Vessel</TableHead>
-                  <TableHead className="text-white font-medium w-[100px]">Issue Date</TableHead>
-                  <TableHead className="text-white font-medium w-[80px]">Category</TableHead>
-                  <TableHead className="text-white font-medium min-w-[180px]">Description</TableHead>
-                  <TableHead className="text-white font-medium min-w-[180px]">Action Taken / Requested</TableHead>
-                  <TableHead className="text-white font-medium w-[100px]">Target Date</TableHead>
-                  <TableHead className="text-white font-medium w-[100px]">Date Compl.</TableHead>
-                  <TableHead className="text-white font-medium w-[100px]">Status</TableHead>
-                  <TableHead className="text-white font-medium w-[80px] text-center">Actions</TableHead>
+                  <TableHead className="font-medium w-[120px] bg-[#eff6ff] text-[#0e4c81]">ID</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Vessel</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Issue Date</TableHead>
+                  <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81]">Category</TableHead>
+                  <TableHead className="font-medium min-w-[180px] bg-[#eff6ff] text-[#0e4c81]">Description</TableHead>
+                  <TableHead className="font-medium min-w-[180px] bg-[#eff6ff] text-[#0e4c81]">Action Taken / Requested</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Target Date</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Date Compl.</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Status</TableHead>
+                  <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
