@@ -1,13 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BulkDataImport from "../admin/BulkDataImport";
 import Alerts from "../admin/Alerts";
 import Forms from "@/components/admin/Forms";
 import Admin4Dashboard from "../admin/Admin4Dashboard";
 import { Marker } from "@/components/Marker";
+import { useUIRole } from "@/contexts/UIRoleContext";
 
 export default function PMSAdmin() {
-  const [activeTab, setActiveTab] = useState("bulk-data-imp");
+  const { isSailAdmin } = useUIRole();
+  const [activeTab, setActiveTab] = useState(isSailAdmin ? "bulk-data-imp" : "alerts");
+
+  // Reset to "alerts" tab when switching to Vessel role (since hidden tabs shouldn't be active)
+  useEffect(() => {
+    if (!isSailAdmin && (activeTab === "bulk-data-imp" || activeTab === "admin-4")) {
+      setActiveTab("alerts");
+    }
+  }, [isSailAdmin, activeTab]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -33,6 +42,7 @@ export default function PMSAdmin() {
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full justify-start px-6 py-0 h-12 bg-transparent border-b rounded-none">
+            {isSailAdmin && (
             <TabsTrigger 
               value="bulk-data-imp" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
@@ -41,6 +51,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.2" />
               Bulk Data Imp
             </TabsTrigger>
+            )}
             <TabsTrigger 
               value="alerts" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
@@ -57,6 +68,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.4" />
               Forms
             </TabsTrigger>
+            {isSailAdmin && (
             <TabsTrigger 
               value="admin-4" 
               className="data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none"
@@ -65,6 +77,7 @@ export default function PMSAdmin() {
               <Marker id="I4.QL.3.5" />
               Master Data
             </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="bulk-data-imp" className="m-0">
