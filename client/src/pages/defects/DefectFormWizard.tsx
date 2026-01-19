@@ -298,7 +298,7 @@ export default function DefectFormWizard({
   };
 
   const onSubmit = async (data: DefectFormData) => {
-    await saveDefect(data, true, true);
+    await saveDefect(data, true, false);
   };
 
   const handleStepSubmit = async (stepNumber: number): Promise<boolean> => {
@@ -400,7 +400,14 @@ export default function DefectFormWizard({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    // Auto-save before closing only if form has been modified by the user
+    if (form.formState.isDirty) {
+      const data = form.getValues();
+      await saveDefect(data, false, false);
+      toast({ title: "Defect saved automatically" });
+    }
+    
     if (onBack) {
       onBack();
     } else {
