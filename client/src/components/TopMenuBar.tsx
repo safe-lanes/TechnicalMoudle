@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import sailLogoPath from "@assets/SAIL logo Transparent_1753957135582.png";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
+import { RoleSwitcher } from "./RoleSwitcher";
 
 interface TopMenuBarProps {
   selectedSubModule: string;
@@ -108,6 +109,11 @@ export const TopMenuBar: React.FC<TopMenuBarProps> = ({
         
         {/* Right side spacer */}
         <div className="flex-1" />
+        
+        {/* Role Switcher */}
+        <div className="flex items-center px-4">
+          <RoleSwitcher />
+        </div>
         
         {/* Sync Status Indicator */}
         <div className="flex items-center px-4">

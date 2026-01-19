@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Switch, Route, useLocation } from "wouter";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { UIRoleProvider } from "@/contexts/UIRoleContext";
 import { ChangeRequestProvider } from "@/contexts/ChangeRequestContext";
 import { ChangeModeProvider } from "@/contexts/ChangeModeContext";
 import { VesselProvider } from "@/contexts/VesselContext";
@@ -25,12 +26,13 @@ function App() {
   return (
     <MarkerProvider>
       <AuthProvider>
-        <QueryClientProvider client={queryClient}>
-          <VesselProvider>
-            <OfflineProvider>
-              <ChangeRequestProvider>
-                <ChangeModeProvider>
-                  <TooltipProvider>
+        <UIRoleProvider>
+          <QueryClientProvider client={queryClient}>
+            <VesselProvider>
+              <OfflineProvider>
+                <ChangeRequestProvider>
+                  <ChangeModeProvider>
+                    <TooltipProvider>
             <div className="min-h-screen bg-gray-50">
               <Switch>
                 <Route path="/" component={TechnicalModule} />
@@ -87,13 +89,14 @@ function App() {
                 <Route component={NotFound} />
               </Switch>
             </div>
-            <Toaster />
-                  </TooltipProvider>
-                </ChangeModeProvider>
-              </ChangeRequestProvider>
-            </OfflineProvider>
-          </VesselProvider>
-        </QueryClientProvider>
+              <Toaster />
+                    </TooltipProvider>
+                  </ChangeModeProvider>
+                </ChangeRequestProvider>
+              </OfflineProvider>
+            </VesselProvider>
+          </QueryClientProvider>
+        </UIRoleProvider>
       </AuthProvider>
     </MarkerProvider>
   );
