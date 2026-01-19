@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { useVessel } from "@/contexts/VesselContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUIRole } from "@/contexts/UIRoleContext";
 import { AdminOnly } from "@/components/RoleGuard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -2231,6 +2232,7 @@ const Components: React.FC = () => {
   const { toast } = useToast();
   const { vesselId, setVesselId } = useVessel();
   const { data: vessels = [] } = useVessels();
+  const { isSailAdmin } = useUIRole();
   
   // Fetch components from API and build tree
   const { data: fetchedComponents = [], isLoading: isLoadingComponents } = useQuery<any[]>({
@@ -2929,7 +2931,7 @@ const Components: React.FC = () => {
               <Marker id="B1" /> Components {isChangeMode ? '- Edit Mode' : isChangeRequestMode ? '- Change Request Mode' : ''}
             </h1>
           </div>
-          {!isChangeRequestMode && !isChangeMode && (
+          {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
             <Button 
               className="bg-[#52baf3] hover:bg-[#40a8e0] text-white"
               onClick={() => {
@@ -2946,6 +2948,7 @@ const Components: React.FC = () => {
         
         {/* Filters Row */}
         <div className="flex gap-4 mb-4">
+          {isSailAdmin && (
           <div className="flex items-center gap-2" data-testid="B2">
             <Marker id="B2" />
             <span className={`text-sm font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'}`}>Vessel:</span>
@@ -2962,6 +2965,7 @@ const Components: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+          )}
           
           <div className="flex items-center gap-2" data-testid="B3">
             <Marker id="B3" />
@@ -3015,7 +3019,7 @@ const Components: React.FC = () => {
                   <h3 className="text-lg font-semibold text-[#15569e]" data-testid="B7.1">
                     <Marker id="B7.1" /> {selectedComponent.code} {selectedComponent.name}
                   </h3>
-                  {!isChangeRequestMode && !isChangeMode && (
+                  {!isChangeRequestMode && !isChangeMode && isSailAdmin && (
                     <Button
                       size="sm"
                       variant="outline"
