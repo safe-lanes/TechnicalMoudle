@@ -11,6 +11,11 @@ router.get("/", async (req, res) => {
   try {
     const { vesselId, status, category, requestedBy } = req.query;
     
+    // Validate vesselId is provided - vessel-wise data isolation is mandatory
+    if (!vesselId) {
+      return res.status(400).json({ error: "vesselId is required for change requests" });
+    }
+    
     let requests = await storage.getChangeRequests({ vesselId: vesselId as string });
     
     // Apply filters
@@ -60,10 +65,15 @@ router.post("/", async (req, res) => {
   try {
     const validatedData = insertChangeRequestSchema.parse(req.body);
     
-    // Add default values
+    // Validate vesselId is provided - vessel-wise data isolation is mandatory
+    if (!validatedData.vesselId) {
+      return res.status(400).json({ error: "vesselId is required for change requests" });
+    }
+    
+    // Add default values (vesselId must be provided by frontend, no fallback)
     const requestData = {
       ...validatedData,
-      vesselId: validatedData.vesselId || 'V001',
+      vesselId: validatedData.vesselId,
       status: validatedData.status || 'draft' as const,
       requestedByUserId: validatedData.requestedByUserId || 'system'
     };

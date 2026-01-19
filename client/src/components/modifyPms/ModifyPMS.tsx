@@ -27,6 +27,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ChangeRequestModal } from '@/components/modify/ChangeRequestModal';
+import { useVessel } from '@/contexts/VesselContext';
 
 interface ModifyOption {
   id: string;
@@ -94,13 +95,15 @@ export function ModifyPMS() {
   const [viewingRequest, setViewingRequest] = useState<ChangeRequest | null>(null);
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { vesselId } = useVessel();
 
-  // Fetch change requests
+  // Fetch change requests - filtered by selected vessel
+  // Only fetch when vesselId is available to ensure vessel isolation
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ['/technical/api/change-requests', categoryFilter],
+    queryKey: ['/technical/api/change-requests', vesselId, categoryFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.append('vesselId', 'V001');
+      params.append('vesselId', vesselId);
       
       if (categoryFilter !== 'all') {
         params.append('category', categoryFilter);
@@ -109,7 +112,8 @@ export function ModifyPMS() {
       const response = await fetch(`/technical/api/change-requests?${params}`);
       if (!response.ok) throw new Error('Failed to fetch requests');
       return response.json();
-    }
+    },
+    enabled: !!vesselId  // Only fetch when vesselId is defined
   });
 
   // Filter requests based on search query
@@ -142,8 +146,8 @@ export function ModifyPMS() {
         queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
       }
       
-      // Force refetch to ensure UI updates immediately
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', categoryFilter] });
+      // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', vesselId, categoryFilter] });
       
       setViewingRequest(null);
       toast({
@@ -177,8 +181,8 @@ export function ModifyPMS() {
         queryClient.invalidateQueries({ queryKey: [`/technical/api/change-requests/${viewingRequest.id}`] });
       }
       
-      // Force refetch to ensure UI updates immediately
-      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', categoryFilter] });
+      // Force refetch to ensure UI updates immediately - include vesselId for proper cache matching
+      queryClient.refetchQueries({ queryKey: ['/technical/api/change-requests', vesselId, categoryFilter] });
       
       setViewingRequest(null);
       toast({
