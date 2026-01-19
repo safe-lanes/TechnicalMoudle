@@ -63,6 +63,7 @@ interface ComponentNode {
 const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedComponent: ComponentNode | null; isModifyMode?: boolean; onDataChange?: (data: any) => void; previewChanges?: any[]; isPreviewMode?: boolean }> = ({ isExpanded, selectedComponent, isModifyMode = false, onDataChange, previewChanges = [], isPreviewMode = false }) => {
   const { isChangeRequestMode } = useChangeRequest();
   const { collectDiff } = useChangeMode();
+  const { isSailAdmin } = useUIRole();
   const isChangeMode = isModifyMode;
 
   // Helper function to check if a field has changes in preview mode
@@ -227,6 +228,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
     <div className="space-y-4">
       {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
       <div className="grid grid-cols-4 gap-4">
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
           {isChangeMode ? (
@@ -245,6 +247,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.3"><Marker id="B7.A.3" /> Fleet Equipment Name</label>
           {isChangeMode ? (
@@ -263,6 +267,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.5"><Marker id="B7.A.5" /> Parent Component Code</label>
           {isChangeMode ? (
@@ -281,6 +287,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.7"><Marker id="B7.A.7" /> Component Code</label>
           <div className="text-sm text-gray-900" data-testid="B7.A.8">
@@ -332,6 +339,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.15"><Marker id="B7.A.15" /> Maker Code</label>
           {isChangeMode ? (
@@ -350,6 +358,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
       </div>
       {/* Row 3: Model, Model Code, Serial No, Drawing No */}
       <div className="grid grid-cols-4 gap-4">
@@ -371,6 +380,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.19"><Marker id="B7.A.19" /> Model Code</label>
           {isChangeMode ? (
@@ -389,6 +399,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.21"><Marker id="B7.A.21" /> Serial No</label>
           {isChangeMode ? (
@@ -638,6 +649,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.43"><Marker id="B7.A.43" /> Vessel Code</label>
           {isChangeMode ? (
@@ -656,6 +668,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
+        {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.45"><Marker id="B7.A.45" /> IS Parent</label>
           {isChangeMode ? (
@@ -683,6 +697,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Row 7: Notes (full width) */}
