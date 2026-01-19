@@ -18,10 +18,17 @@ import {
   FileText,
   Loader2
 } from "lucide-react";
-import { isAfter, parseISO, subDays, startOfYear, isWithinInterval, format } from "date-fns";
+import { isAfter, subDays, startOfYear, isWithinInterval } from "date-fns";
 import { useVessels } from "@/hooks/useVessels";
 import { formatForDisplay, parseDate } from "@/lib/dateUtils";
 import type { Defect } from "@shared/schema";
+import { 
+  getComputedStatus, 
+  COMPUTED_ACTIVE_STATUSES, 
+  COMPUTED_RESOLVED_STATUSES,
+  isActiveComputedStatus,
+  isResolvedComputedStatus 
+} from "@/lib/defectStatusUtils";
 import {
   PieChart,
   Pie,
@@ -36,8 +43,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const ACTIVE_STATUSES = ['Open', 'In-Progress', 'Pending', 'Awaiting Parts', 'Deferred'];
-const RESOLVED_STATUSES = ['Closed', 'Cancelled'];
+// Use ACTIVE_STATUSES and RESOLVED_STATUSES imported from @shared/defectStatus
 
 interface KPICardProps {
   title: string;
@@ -84,7 +90,7 @@ const KPICard = ({ title, value, icon: Icon, color, change, changeType, subtitle
 
 export default function DefectsDashboard() {
   const [selectedVessel, setSelectedVessel] = useState("all");
-  const [dateRange, setDateRange] = useState("thisyear");
+  const [dateRange, setDateRange] = useState("all");
   const [showFilters, setShowFilters] = useState(true);
 
   const { data: defects = [], isLoading, refetch } = useQuery<Defect[]>({
@@ -118,7 +124,8 @@ export default function DefectsDashboard() {
     
     if (dateRange !== 'all' && d.issueDate) {
       try {
-        const issueDate = parseISO(d.issueDate);
+        const issueDate = parseDate(d.issueDate);
+        if (!issueDate) return true;
         const rangeStart = getDateRangeStart();
         const rangeEnd = new Date();
         return isWithinInterval(issueDate, { start: rangeStart, end: rangeEnd });
@@ -130,21 +137,19 @@ export default function DefectsDashboard() {
     return true;
   });
 
-  const activeDefects = filteredDefects.filter(d => ACTIVE_STATUSES.includes(d.status || ''));
-  const resolvedDefects = filteredDefects.filter(d => RESOLVED_STATUSES.includes(d.status || ''));
+  const defectsWithComputedStatus = filteredDefects.map(d => ({
+    ...d,
+    computedStatus: getComputedStatus(d)
+  }));
+  
+  const activeDefects = defectsWithComputedStatus.filter(d => isActiveComputedStatus(d.computedStatus.label));
+  const resolvedDefects = defectsWithComputedStatus.filter(d => isResolvedComputedStatus(d.computedStatus.label));
 
   const kpis = {
     totalActive: activeDefects.length,
     totalResolved: resolvedDefects.length,
     conditionOfClass: activeDefects.filter(d => d.is_coc).length,
-    overdueDefects: activeDefects.filter(d => {
-      if (!d.targetCloseDate) return false;
-      try {
-        return isAfter(new Date(), parseISO(d.targetCloseDate));
-      } catch {
-        return false;
-      }
-    }).length,
+    overdueDefects: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length,
     highPriority: activeDefects.filter(d => d.priority === 'High' || d.critical).length,
   };
 
@@ -157,30 +162,32 @@ export default function DefectsDashboard() {
     : Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean).map(id => ({ id, name: id, code: id }));
 
   const statusData = [
-    { name: 'Open', value: filteredDefects.filter(d => d.status === 'Open').length, color: '#ef4444' },
-    { name: 'In-Progress', value: filteredDefects.filter(d => d.status === 'In-Progress').length, color: '#f59e0b' },
-    { name: 'Pending', value: filteredDefects.filter(d => d.status === 'Pending').length, color: '#8b5cf6' },
-    { name: 'Awaiting Parts', value: filteredDefects.filter(d => d.status === 'Awaiting Parts').length, color: '#06b6d4' },
-    { name: 'Deferred', value: filteredDefects.filter(d => d.status === 'Deferred').length, color: '#6366f1' },
-    { name: 'Closed', value: filteredDefects.filter(d => d.status === 'Closed').length, color: '#10b981' },
+    { name: 'Reported', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Reported').length, color: '#6b7280' },
+    { name: 'In Progress', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'In Progress').length, color: '#3b82f6' },
+    { name: 'Extended', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Extended').length, color: '#6366f1' },
+    { name: 'Overdue', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length, color: '#ef4444' },
+    { name: 'Closed', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Closed').length, color: '#10b981' },
+    { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#22c55e' },
   ].filter(s => s.value > 0);
 
   const vesselData = vessels.map(vessel => ({
     vessel: vessel.name || vessel.id,
-    active: filteredDefects.filter(d => d.vesselId === vessel.id && ACTIVE_STATUSES.includes(d.status || '')).length,
-    closed: filteredDefects.filter(d => d.vesselId === vessel.id && RESOLVED_STATUSES.includes(d.status || '')).length
+    active: defectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isActiveComputedStatus(d.computedStatus.label)).length,
+    closed: defectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isResolvedComputedStatus(d.computedStatus.label)).length
   }));
 
   const recentDefects = [...activeDefects]
     .sort((a, b) => {
-      if (!a.issueDate || !b.issueDate) return 0;
-      return new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime();
+      const dateA = parseDate(a.issueDate);
+      const dateB = parseDate(b.issueDate);
+      if (!dateA || !dateB) return 0;
+      return dateB.getTime() - dateA.getTime();
     })
     .slice(0, 5);
 
   const handleClearFilters = () => {
     setSelectedVessel('all');
-    setDateRange('thisyear');
+    setDateRange('all');
   };
 
   const navigateToDefectLog = (filter?: string) => {
@@ -496,16 +503,17 @@ export default function DefectsDashboard() {
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={defect.status === 'Open' ? 'destructive' : 'secondary'}
+                        variant={defect.computedStatus.label === 'Overdue' ? 'destructive' : 'secondary'}
                         className={
-                          defect.status === 'In-Progress' ? 'bg-yellow-100 text-yellow-800' :
-                          defect.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
-                          defect.status === 'Awaiting Parts' ? 'bg-cyan-100 text-cyan-800' :
-                          defect.status === 'Deferred' ? 'bg-indigo-100 text-indigo-800' :
+                          defect.computedStatus.label === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                          defect.computedStatus.label === 'Reported' ? 'bg-gray-100 text-gray-800' :
+                          defect.computedStatus.label === 'Verified' ? 'bg-green-100 text-green-800' :
+                          defect.computedStatus.label === 'Closed' ? 'bg-green-100 text-green-800' :
+                          defect.computedStatus.label === 'Extended' ? 'bg-indigo-100 text-indigo-800' :
                           ''
                         }
                       >
-                        {defect.status}
+                        {defect.computedStatus.label}
                       </Badge>
                     </TableCell>
                     <TableCell>
