@@ -43,11 +43,11 @@ export const getComputedStatus = (defect: Partial<Defect>): ComputedStatus => {
   const isExtended = defect.isDeferred === true;
   
   if (defect.verified === true) {
-    return { label: COMPUTED_STATUS.VERIFIED, color: 'text-green-600' };
+    return { label: COMPUTED_STATUS.VERIFIED, color: 'text-[#00AF7B]' };
   }
   
   if (dateCompleted && targetCloseDate && dateCompleted <= targetCloseDate) {
-    return { label: COMPUTED_STATUS.CLOSED, color: 'text-green-600' };
+    return { label: COMPUTED_STATUS.CLOSED, color: 'text-[#5dc86f]' };
   }
   
   if (dateCompleted && targetCloseDate && dateCompleted > targetCloseDate) {
@@ -55,7 +55,7 @@ export const getComputedStatus = (defect: Partial<Defect>): ComputedStatus => {
   }
   
   if (dateCompleted) {
-    return { label: COMPUTED_STATUS.CLOSED, color: 'text-green-600' };
+    return { label: COMPUTED_STATUS.CLOSED, color: 'text-[#5dc86f]' };
   }
   
   if (!dateCompleted && targetCloseDate && today > targetCloseDate && !isExtended) {

@@ -170,8 +170,8 @@ export default function DefectsDashboard() {
     { name: 'In Progress', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'In Progress').length, color: '#3b82f6' },
     { name: 'Extended', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Extended').length, color: '#6366f1' },
     { name: 'Overdue', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Overdue').length, color: '#ef4444' },
-    { name: 'Closed', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Closed').length, color: '#10b981' },
-    { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#22c55e' },
+    { name: 'Closed', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Closed').length, color: '#5dc86f' },
+    { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#00AF7B' },
   ].filter(s => s.value > 0);
 
   // Use ALL defects for vessel chart to show complete multi-vessel comparison
@@ -403,7 +403,7 @@ export default function DefectsDashboard() {
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="active" fill="#ef4444" name="Active" />
-                  <Bar dataKey="closed" fill="#10b981" name="Closed" />
+                  <Bar dataKey="closed" fill="#5dc86f" name="Closed" />
                 </BarChart>
               </ResponsiveContainer>
             )}
