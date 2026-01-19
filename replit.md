@@ -40,6 +40,62 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Part A Immutability**: Work Order Part A is read-only for existing work orders.
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
 
+## Database Migration Strategy
+
+### Migration Architecture
+This project uses a **dual migration system**:
+1. **Drizzle-generated baseline migrations** (`migrations/0000_*.sql`) - Created once during initial schema setup via `drizzle-kit generate`
+2. **Custom ALTER migrations** (`server/migrations.ts`) - Incremental changes registered in a TypeScript migrations array
+
+### Critical Rules for Schema Changes
+1. **NEVER regenerate Drizzle baseline migrations** (`0000_overrated_natasha_romanoff.sql`) after initial database setup
+2. **ALWAYS add new columns via ALTER TABLE migrations** in `server/migrations.ts`
+3. **Schema definition (`shared/schema.ts`) must match database state** - add columns to both schema AND migration
+
+### How to Add New Columns (Required Workflow)
+1. Add the column definition to the appropriate table in `shared/schema.ts`
+2. Add a new migration entry to the `migrations` array in `server/migrations.ts`:
+```typescript
+{
+  id: 'NNN_descriptive_name',
+  name: 'Short description',
+  description: 'Detailed explanation',
+  sql: `ALTER TABLE table_name ADD COLUMN IF NOT EXISTS column_name TYPE DEFAULT value`
+}
+```
+3. Optionally create a standalone `.sql` file in `migrations/` folder for documentation
+
+### Root Cause of 16-01-2026 Migration Issues
+The `running_hours_audit` renewal columns were added to `shared/schema.ts` but Drizzle absorbed them into the baseline `CREATE TABLE` migration instead of generating separate `ALTER TABLE` migrations. This happened because:
+1. Drizzle's `generate` command compares schema to existing migrations and creates comprehensive diffs
+2. When run on a schema with new columns but no matching migration history, Drizzle treats changes as part of the baseline
+3. The project's migration tracking in `schema_migrations` table wasn't connected to Drizzle's own tracking
+
+### Prevention Strategy
+1. All schema evolution now goes through `server/migrations.ts` (runtime ALTER migrations)
+2. Never run `drizzle-kit generate` after initial setup
+3. The `0000_overrated_natasha_romanoff.sql` baseline is frozen and should not be modified
+4. Each new column requires BOTH schema update AND corresponding migration entry
+
+### Migration History (Recent Changes)
+- **011_c1_c2_closeout_columns** (2026-01-16): Added C1 Closeout and C2 Verification columns to `defects` table
+  - `closed_out_by_name` (text)
+  - `closed_out_by_rank` (text)
+  - `verified` (boolean, default false)
+  - `date_verified` (text)
+  - `verified_by_name` (text)
+  - `verified_by_office_position` (text)
+
+- **012_running_hours_renewal_columns** (2026-01-19): Added renewal tracking columns to `running_hours_audit` table
+  - `is_renewal_reset` (boolean, NOT NULL, default false)
+  - `renewal_action_type` (text)
+  - `renewal_reason` (text)
+  - `renewal_reference` (text)
+  - `renewal_evidence_urls` (json)
+  - `component_code` (text)
+  - `component_name` (text)
+  - Index: `idx_renewal_reset` on (is_renewal_reset, vessel_id)
+
 ## External Dependencies
 *   **Frontend**: `@radix-ui/*`, `@tanstack/react-query`, `wouter`, `tailwindcss`, `lucide-react`
 *   **Backend**: `express`, `drizzle-orm`, `@neondatabase/serverless`, `connect-pg-simple`

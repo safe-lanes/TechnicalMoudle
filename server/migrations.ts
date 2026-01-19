@@ -191,6 +191,21 @@ const migrations: Migration[] = [
       ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_name TEXT;
       ALTER TABLE defects ADD COLUMN IF NOT EXISTS verified_by_office_position TEXT
     `
+  },
+  {
+    id: '012_running_hours_renewal_columns',
+    name: 'Add renewal/replacement tracking columns to running_hours_audit',
+    description: 'Adds columns for tracking component renewals/replacements when RH is reset to 0, plus component identification fields',
+    sql: `
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS is_renewal_reset BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS renewal_action_type TEXT;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS renewal_reason TEXT;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS renewal_reference TEXT;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS renewal_evidence_urls JSON;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS component_code TEXT;
+      ALTER TABLE running_hours_audit ADD COLUMN IF NOT EXISTS component_name TEXT;
+      CREATE INDEX IF NOT EXISTS idx_renewal_reset ON running_hours_audit (is_renewal_reset, vessel_id)
+    `
   }
 ];
 
