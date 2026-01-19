@@ -122,6 +122,16 @@ export default function DefectsLog() {
   const handleClearFilters = () => {
     setFilters({ includeClosedDefects: false });
   };
+
+  const getDisplayActionText = (defect: Defect): string | null => {
+    if (defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0) {
+      const firstAction = defect.actions[0] as { actionDescription?: string };
+      if (firstAction?.actionDescription) {
+        return firstAction.actionDescription;
+      }
+    }
+    return defect.actionTakenRequested || null;
+  };
   
   // Permission checking functions
   const canView = () => true; // All users can view
@@ -386,8 +396,8 @@ export default function DefectsLog() {
                     <div className="col-span-2 text-gray-700 truncate" title={defect.description}>
                       {defect.description}
                     </div>
-                    <div className="col-span-2 text-gray-700 truncate" title={defect.actionTakenRequested || ""}>
-                      {defect.actionTakenRequested}
+                    <div className="col-span-2 text-gray-700 truncate" title={getDisplayActionText(defect) || ""}>
+                      {getDisplayActionText(defect)}
                     </div>
                     <div className="col-span-1 text-gray-700">{formatForDisplay(defect.targetCloseDate)}</div>
                     <div className="col-span-1 text-gray-700">{formatForDisplay(defect.dateCompleted)}</div>

@@ -67,6 +67,16 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
     return text.substring(0, maxLength) + "...";
   };
 
+  const getDisplayActionText = (defect: Defect): string | null => {
+    if (defect.actions && Array.isArray(defect.actions) && defect.actions.length > 0) {
+      const firstAction = defect.actions[0] as { actionDescription?: string };
+      if (firstAction?.actionDescription) {
+        return firstAction.actionDescription;
+      }
+    }
+    return defect.actionTakenRequested || null;
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -123,8 +133,8 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
                         <TableCell title={defect.description}>
                           {truncateText(defect.description)}
                         </TableCell>
-                        <TableCell title={defect.actionTakenRequested || ""}>
-                          {truncateText(defect.actionTakenRequested)}
+                        <TableCell title={getDisplayActionText(defect) || ""}>
+                          {truncateText(getDisplayActionText(defect))}
                         </TableCell>
                         <TableCell>{formatDate(defect.targetCloseDate)}</TableCell>
                         <TableCell>{formatDate(defect.dateCompleted)}</TableCell>
