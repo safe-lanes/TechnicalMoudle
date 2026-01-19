@@ -397,10 +397,11 @@ export default function DefectsActive() {
                   <TableHead className="w-32">Vessel</TableHead>
                   <TableHead className="w-28">Issue Date</TableHead>
                   <TableHead className="w-24">Category</TableHead>
+                  <TableHead className="w-32">Component</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Action Taken/Requested</TableHead>
                   <TableHead className="w-28">Target Date</TableHead>
                   <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-24">Priority</TableHead>
                   <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -429,8 +430,8 @@ export default function DefectsActive() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="text-xs">{defect.componentHardwareLevel3 || '-'}</TableCell>
                       <TableCell className="text-xs max-w-xs truncate">{defect.description}</TableCell>
-                      <TableCell className="text-xs max-w-xs truncate">{defect.actionTakenRequested}</TableCell>
                       <TableCell className="text-xs">
                         <div className="flex items-center gap-1">
                           {defect.targetCloseDate}
@@ -442,6 +443,20 @@ export default function DefectsActive() {
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(defect.status, defect.critical)}</TableCell>
+                      <TableCell>
+                        {defect.priority ? (
+                          <Badge className={cn(
+                            'text-xs',
+                            defect.priority === 'Low' && 'bg-green-500 text-white',
+                            defect.priority === 'Medium' && 'bg-orange-500 text-white',
+                            defect.priority === 'High' && 'bg-red-500 text-white'
+                          )}>
+                            {defect.priority}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button 
