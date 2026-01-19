@@ -355,19 +355,20 @@ export default function DefectsLog() {
         <Card>
           <CardContent className="p-0">
             {/* Table Header */}
-            <div className="bg-sky-100 px-4 py-2 border-b">
-              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-700">
-                <div className="col-span-1">ID</div>
-                <div className="col-span-1">Vessel</div>
-                <div className="col-span-1">Issue Date</div>
-                <div className="col-span-1">Category</div>
-                <div className="col-span-2">Description</div>
-                <div className="col-span-2">Action Taken / Requested</div>
-                <div className="col-span-1">Target Date</div>
-                <div className="col-span-1">Date Compl.</div>
-                <div className="col-span-1">Status</div>
-                <div className="col-span-1">Actions</div>
-                <div className="col-span-1">Search</div>
+            <div className="bg-sky-100 px-4 py-2 border-b overflow-x-auto">
+              <div className="grid gap-3 text-xs font-medium text-gray-700" style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(80px,1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}>
+                <div>ID</div>
+                <div>Vessel</div>
+                <div>Issue Date</div>
+                <div>Category</div>
+                <div>Component</div>
+                <div>Description</div>
+                <div>Action Taken / Requested</div>
+                <div>Target Date</div>
+                <div>Date Compl.</div>
+                <div>Status</div>
+                <div>Priority</div>
+                <div>Actions</div>
               </div>
             </div>
 
@@ -382,30 +383,47 @@ export default function DefectsLog() {
                   <div
                     key={defect.id}
                     className={cn(
-                      "grid grid-cols-12 gap-4 px-4 py-3 text-xs hover:bg-gray-50",
+                      "grid gap-3 px-4 py-3 text-xs hover:bg-gray-50",
                       index % 2 === 0 ? "bg-white" : "bg-gray-25"
                     )}
+                    style={{ gridTemplateColumns: 'minmax(90px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(80px,1fr) minmax(140px,2fr) minmax(110px,1.5fr) minmax(70px,1fr) minmax(70px,1fr) minmax(70px,1fr) minmax(60px,1fr) minmax(100px,1fr)' }}
                   >
-                    <div className="col-span-1 font-mono text-blue-600">{defect.id}</div>
-                    <div className="col-span-1 text-gray-700">{defect.vesselName}</div>
-                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.issueDate)}</div>
-                    <div className="col-span-1">
+                    <div className="font-mono text-blue-600">{defect.id}</div>
+                    <div className="text-gray-700">{defect.vesselName}</div>
+                    <div className="text-gray-700">{formatForDisplay(defect.issueDate)}</div>
+                    <div>
                       <Badge variant={defect.category === 'COC' ? 'destructive' : 'secondary'} className="text-xs">
                         {defect.category}
                       </Badge>
                     </div>
-                    <div className="col-span-2 text-gray-700 truncate" title={defect.description}>
+                    <div className="text-gray-700 truncate" title={defect.componentHardwareLevel3 || ''}>
+                      {defect.componentHardwareLevel3 || '-'}
+                    </div>
+                    <div className="text-gray-700 truncate" title={defect.description}>
                       {defect.description}
                     </div>
-                    <div className="col-span-2 text-gray-700 truncate" title={getDisplayActionText(defect) || ""}>
+                    <div className="text-gray-700 truncate" title={getDisplayActionText(defect) || ""}>
                       {getDisplayActionText(defect)}
                     </div>
-                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.targetCloseDate)}</div>
-                    <div className="col-span-1 text-gray-700">{formatForDisplay(defect.dateCompleted)}</div>
-                    <div className="col-span-1 flex items-center gap-1">
+                    <div className="text-gray-700">{formatForDisplay(defect.targetCloseDate)}</div>
+                    <div className="text-gray-700">{formatForDisplay(defect.dateCompleted)}</div>
+                    <div className="flex items-center gap-1">
                       {getStatusBadge(defect.status, defect.critical)}
                     </div>
-                    <div className="col-span-1 flex items-center gap-1">
+                    <div className="flex items-center">
+                      {defect.priority ? (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-white ${
+                          defect.priority === 'Low' ? 'bg-green-500' : 
+                          defect.priority === 'Medium' ? 'bg-orange-500' : 
+                          defect.priority === 'High' ? 'bg-red-500' : 'bg-gray-500'
+                        }`}>
+                          {defect.priority}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>

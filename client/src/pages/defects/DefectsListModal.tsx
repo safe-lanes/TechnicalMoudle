@@ -96,18 +96,19 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Vessel</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Issue Date</TableHead>
                   <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81]">Category</TableHead>
+                  <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Component</TableHead>
                   <TableHead className="font-medium min-w-[180px] bg-[#eff6ff] text-[#0e4c81]">Description</TableHead>
-                  <TableHead className="font-medium min-w-[180px] bg-[#eff6ff] text-[#0e4c81]">Action Taken / Requested</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Target Date</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Date Compl.</TableHead>
                   <TableHead className="font-medium w-[100px] bg-[#eff6ff] text-[#0e4c81]">Status</TableHead>
+                  <TableHead className="font-medium w-[80px] bg-[#eff6ff] text-[#0e4c81]">Priority</TableHead>
                   <TableHead className="font-medium w-[80px] text-center bg-[#eff6ff] text-[#0e4c81]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {defects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                       No defects found
                     </TableCell>
                   </TableRow>
@@ -131,11 +132,9 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
                             )}
                           </span>
                         </TableCell>
+                        <TableCell>{defect.componentHardwareLevel3 || '-'}</TableCell>
                         <TableCell title={defect.description}>
                           {truncateText(defect.description)}
-                        </TableCell>
-                        <TableCell title={getDisplayActionText(defect) || ""}>
-                          {truncateText(getDisplayActionText(defect))}
                         </TableCell>
                         <TableCell>{formatDate(defect.targetCloseDate)}</TableCell>
                         <TableCell>{formatDate(defect.dateCompleted)}</TableCell>
@@ -143,6 +142,19 @@ export function DefectsListModal({ open, onClose, title, defects, canEdit = true
                           <span className={computedStatus.color}>
                             {computedStatus.label}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {defect.priority ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${
+                              defect.priority === 'Low' ? 'bg-green-500' : 
+                              defect.priority === 'Medium' ? 'bg-orange-500' : 
+                              defect.priority === 'High' ? 'bg-red-500' : 'bg-gray-500'
+                            }`}>
+                              {defect.priority}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-center">

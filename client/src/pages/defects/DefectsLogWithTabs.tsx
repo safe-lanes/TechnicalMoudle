@@ -481,6 +481,16 @@ export default function DefectsLogWithTabs() {
       resizable: true
     },
     {
+      headerName: 'Component',
+      field: 'componentHardwareLevel3',
+      flex: 0.8,
+      cellStyle: { fontSize: '13px', color: '#4f5863' },
+      filter: 'agTextColumnFilter',
+      sortable: true,
+      resizable: true,
+      valueFormatter: (params) => params.value || '-'
+    },
+    {
       headerName: 'Description',
       field: 'description',
       flex: 1.5,
@@ -502,6 +512,7 @@ export default function DefectsLogWithTabs() {
       filter: 'agTextColumnFilter',
       sortable: true,
       resizable: true,
+      hide: true,
       tooltipValueGetter: (params) => stripHtmlTags(params.value)
     },
     {
@@ -527,6 +538,23 @@ export default function DefectsLogWithTabs() {
       field: 'status',
       flex: 0.6,
       cellRenderer: StatusCellRenderer,
+      cellClass: 'flex items-center justify-center',
+      filter: 'agSetColumnFilter',
+      sortable: true,
+      resizable: true
+    },
+    {
+      headerName: 'Priority',
+      field: 'priority',
+      flex: 0.6,
+      cellRenderer: (params: any) => {
+        const priority = params.value;
+        if (!priority) return '<span class="text-gray-400 text-xs">-</span>';
+        const colorClass = priority === 'Low' ? 'bg-green-500' : 
+                          priority === 'Medium' ? 'bg-orange-500' : 
+                          priority === 'High' ? 'bg-red-500' : 'bg-gray-500';
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white ${colorClass}">${priority}</span>`;
+      },
       cellClass: 'flex items-center justify-center',
       filter: 'agSetColumnFilter',
       sortable: true,
