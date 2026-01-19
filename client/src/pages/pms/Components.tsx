@@ -954,6 +954,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { vesselId } = useVessel();
+  const { isSailAdmin } = useUIRole();
   
   // Pagination state
   const [isTableExpanded, setIsTableExpanded] = useState(false);
@@ -1042,6 +1043,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
   return (
     <>
       <div className="overflow-x-auto">
+        {isSailAdmin && (
         <div className="flex justify-end mb-3">
           <Button
             onClick={handleAddWorkOrder}
@@ -1053,6 +1055,7 @@ const WorkOrdersSection: React.FC<{ componentCode: string; componentName: string
             Add Job
           </Button>
         </div>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
