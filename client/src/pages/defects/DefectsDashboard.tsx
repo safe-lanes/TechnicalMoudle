@@ -147,9 +147,23 @@ export default function DefectsDashboard() {
     ? Math.round((kpis.totalResolved / (kpis.totalActive + kpis.totalResolved)) * 100)
     : 0;
 
-  const vessels = masterVessels.length > 0 
-    ? masterVessels 
-    : Array.from(new Set(defects.map(d => d.vesselId))).filter(Boolean).map(id => ({ id, name: id, code: id }));
+  // For vessel chart, use ALL defects (not filtered) to always show multi-vessel comparison
+  const allDefectsWithComputedStatus = defects.map(d => ({
+    ...d,
+    computedStatus: getComputedStatus(d)
+  }));
+  
+  // Get unique vessel IDs from ALL defects, then enrich with vessel names from masterVessels
+  const vesselIdsFromDefects = Array.from(new Set(allDefectsWithComputedStatus.map(d => d.vesselId))).filter(Boolean);
+  const vessels = vesselIdsFromDefects.map(vesselId => {
+    // Normalize lookup - check both id and vesselId fields
+    const masterVessel = masterVessels.find(v => v.id === vesselId || (v as any).vesselId === vesselId);
+    return {
+      id: vesselId,
+      name: masterVessel?.name || vesselId,
+      code: masterVessel?.code || vesselId
+    };
+  });
 
   const statusData = [
     { name: 'Reported', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Reported').length, color: '#6b7280' },
@@ -160,11 +174,12 @@ export default function DefectsDashboard() {
     { name: 'Verified', value: defectsWithComputedStatus.filter(d => d.computedStatus.label === 'Verified').length, color: '#22c55e' },
   ].filter(s => s.value > 0);
 
+  // Use ALL defects for vessel chart to show complete multi-vessel comparison
   const vesselData = vessels.map(vessel => ({
     vessel: vessel.name || vessel.id,
-    active: defectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isActiveComputedStatus(d.computedStatus.label)).length,
-    closed: defectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isResolvedComputedStatus(d.computedStatus.label)).length
-  }));
+    active: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isActiveComputedStatus(d.computedStatus.label)).length,
+    closed: allDefectsWithComputedStatus.filter(d => d.vesselId === vessel.id && isResolvedComputedStatus(d.computedStatus.label)).length
+  })).filter(v => v.active > 0 || v.closed > 0);
 
   const recentDefects = [...activeDefects]
     .sort((a, b) => {
