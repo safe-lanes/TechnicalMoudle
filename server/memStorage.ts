@@ -792,7 +792,13 @@ class MemStorage {
   async getChangeRequest(id: string): Promise<any> { return undefined; }
   async createChangeRequest(request: any): Promise<any> { return { ...request, id: `cr-${this.getNextId('changeRequests')}` }; }
   async updateChangeRequest(id: string, data: any): Promise<any> { return data; }
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<any> { return {}; }
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<any> { return {}; }
   async deleteChangeRequest(id: string): Promise<void> {}
+  async submitChangeRequest(id: number, userId: string): Promise<any> { return { id, status: 'submitted' }; }
+  async approveChangeRequest(id: number, reviewerId: string, comment: string, appliedChanges?: any[]): Promise<any> { return { id, status: 'approved' }; }
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<any> { return { id, status: 'rejected' }; }
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<any> { return { id, status: 'returned' }; }
   async getChangeRequestAttachments(requestId: string): Promise<any[]> { return []; }
   async createChangeRequestAttachment(attachment: any): Promise<any> { return { ...attachment, id: this.getNextId('crAttachments') }; }
   async deleteChangeRequestAttachment(id: number): Promise<void> {}
