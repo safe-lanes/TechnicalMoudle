@@ -642,7 +642,7 @@ export default function DefectsLogWithTabs() {
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-gray-500" />
               <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-white text-gray-700">
+                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -660,7 +660,7 @@ export default function DefectsLogWithTabs() {
                 placeholder="Search Defect"
                 value={filters.search || ""}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-[140px] h-8 text-xs pl-8 border-gray-300 bg-white text-gray-700"
+                className="w-[140px] h-8 text-xs pl-8 border-gray-300 bg-transparent text-gray-700"
               />
             </div>
 
@@ -671,7 +671,7 @@ export default function DefectsLogWithTabs() {
             />
 
             <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-white text-gray-700">
+              <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                 <SelectValue placeholder="Due / Overdue" />
               </SelectTrigger>
               <SelectContent>
@@ -682,7 +682,7 @@ export default function DefectsLogWithTabs() {
             </Select>
 
             <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="w-[90px] h-8 text-xs border-gray-300 bg-white text-gray-700">
+              <SelectTrigger className="w-[90px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -696,7 +696,7 @@ export default function DefectsLogWithTabs() {
             <Button 
               onClick={handleClearFilters}
               variant="outline" 
-              className="h-8 px-4 text-xs border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+              className="h-8 px-4 text-xs border-gray-300 bg-transparent text-gray-700 hover:bg-gray-100"
             >
               Clear
             </Button>
