@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import {
   Link, 
   Check, 
   Search, 
-  Plus 
+  Plus,
+  Filter
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { 
@@ -34,8 +35,18 @@ import LinkDefectsModal from "./LinkDefectsModal";
 import DefectFormWizard from "./DefectFormWizard";
 import { cn } from "@/lib/utils";
 import { formatForDisplay } from "@/lib/dateUtils";
-import { useVessels } from "@/hooks/useVessels";
+import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import type { Defect } from "@shared/schema";
+
+interface VesselFleetGroupFilterResult {
+  mode: 'vessel' | 'fleet' | 'group';
+  selectedVessels: string[];
+  selectedFleets: string[];
+  selectedGroups: string[];
+  selectedVesselNames: string[];
+  selectedFleetNames: string[];
+  selectedGroupNames: string[];
+}
 
 interface DefectsFilters {
   period?: string;
@@ -52,11 +63,23 @@ interface DefectsFilters {
 const CURRENT_USER_ROLE = "Admin"; // Can be: "Viewer", "Master", "Chief Engineer", "Superintendent", "Admin"
 
 export default function DefectsLog() {
-  const { data: vessels = [] } = useVessels();
   const [filters, setFilters] = useState<DefectsFilters>({
     includeClosedDefects: false,
   });
+  const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
+  const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(true);
   const [showNewDefectForm, setShowNewDefectForm] = useState(false);
+
+  const handleVesselFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
+    setVesselFilterValue({
+      mode: result.mode,
+      selectedVessels: result.selectedVessels,
+      selectedFleets: result.selectedFleets,
+      selectedGroups: result.selectedGroups,
+    });
+    setSelectedVesselNames(result.selectedVesselNames);
+  }, []);
   
   // Modal states
   const [viewModal, setViewModal] = useState<{ open: boolean; defectId: string | null }>({ 
@@ -100,6 +123,18 @@ export default function DefectsLog() {
       return response.json();
     },
   });
+
+  const filteredDefects = useMemo(() => {
+    let result = defects;
+    
+    if (selectedVesselNames.length > 0) {
+      result = result.filter((defect: Defect) => 
+        selectedVesselNames.includes(defect.vesselName || '')
+      );
+    }
+    
+    return result;
+  }, [defects, selectedVesselNames]);
 
   const getStatusBadge = (status: string, critical: boolean) => {
     if (status === "Closed") {
@@ -200,17 +235,15 @@ export default function DefectsLog() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" className="text-gray-600">
-              All Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
-              My Vessel
-            </Button>
-            <Button variant="outline" size="sm" className="text-gray-600">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 border border-gray-400"></div>
-                Filters
-              </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`text-gray-600 ${showFilters ? 'bg-gray-100' : ''}`}
+              data-testid="button-toggle-filters"
+            >
+              <Filter className="h-3 w-3 mr-1" />
+              Filters
             </Button>
             <Dialog open={showNewDefectForm} onOpenChange={setShowNewDefectForm}>
               <DialogTrigger asChild>
@@ -230,125 +263,100 @@ export default function DefectsLog() {
       </div>
 
       {/* Filter Controls */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Period */}
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-400" />
-              <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-24 h-8 text-xs">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
+      {showFilters && (
+        <div className="bg-white border-b border-gray-200">
+          <VesselFleetGroupFilter
+            value={vesselFilterValue}
+            onChange={handleVesselFilterChange}
+            showClearButton={true}
+          />
+          
+          <div className="px-6 pb-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Period */}
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
+                    <SelectTrigger className="w-24 h-8 text-xs">
+                      <SelectValue placeholder="Period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search */}
+                <Input
+                  placeholder="Search Defect"
+                  value={filters.search || ""}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="w-36 h-8 text-xs"
+                />
+
+                {/* Due/Overdue */}
+                <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
+                  <SelectTrigger className="w-28 h-8 text-xs">
+                    <SelectValue placeholder="Due / Overdue" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="due">Due</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Type */}
+                <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
+                  <SelectTrigger className="w-20 h-8 text-xs">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Defect">Defect</SelectItem>
+                    <SelectItem value="COC">COC</SelectItem>
+                    <SelectItem value="Observation">Observation</SelectItem>
+                    <SelectItem value="NCR">NCR</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Apply/Clear buttons */}
+                <Button 
+                  onClick={handleApplyFilters}
+                  className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs"
+                >
+                  Apply
+                </Button>
+                <Button 
+                  onClick={handleClearFilters}
+                  variant="outline" 
+                  className="h-8 px-4 text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+
+              {/* Include Closed Defects */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="includeClosedDefects"
+                  checked={filters.includeClosedDefects}
+                  onCheckedChange={(checked) => handleFilterChange('includeClosedDefects', checked)}
+                />
+                <label 
+                  htmlFor="includeClosedDefects" 
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Include Closed Defects
+                </label>
+              </div>
             </div>
-
-            {/* Search */}
-            <Input
-              placeholder="Search Defect"
-              value={filters.search || ""}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-36 h-8 text-xs"
-            />
-
-            {/* Vessel */}
-            <Select value={filters.vesselId || "all"} onValueChange={(value) => handleFilterChange('vesselId', value === "all" ? "" : value)}>
-              <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue placeholder="Vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vessels</SelectItem>
-                {vessels.map((vessel: any) => (
-                  <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Fleet */}
-            <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="w-20 h-8 text-xs">
-                <SelectValue placeholder="Fleet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleet1">Fleet 1</SelectItem>
-                <SelectItem value="fleet2">Fleet 2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Add Group */}
-            <Select value={filters.addGroup} onValueChange={(value) => handleFilterChange('addGroup', value)}>
-              <SelectTrigger className="w-28 h-8 text-xs">
-                <SelectValue placeholder="Add Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="department">Department</SelectItem>
-                <SelectItem value="priority">Priority</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Due/Overdue */}
-            <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-              <SelectTrigger className="w-28 h-8 text-xs">
-                <SelectValue placeholder="Due / Overdue" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="due">Due</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Type */}
-            <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="w-20 h-8 text-xs">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Defect">Defect</SelectItem>
-                <SelectItem value="COC">COC</SelectItem>
-                <SelectItem value="Observation">Observation</SelectItem>
-                <SelectItem value="NCR">NCR</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Apply/Clear buttons */}
-            <Button 
-              onClick={handleApplyFilters}
-              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs"
-            >
-              Apply
-            </Button>
-            <Button 
-              onClick={handleClearFilters}
-              variant="outline" 
-              className="h-8 px-4 text-xs"
-            >
-              Clear
-            </Button>
-          </div>
-
-          {/* Include Closed Defects */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="includeClosedDefects"
-              checked={filters.includeClosedDefects}
-              onCheckedChange={(checked) => handleFilterChange('includeClosedDefects', checked)}
-            />
-            <label 
-              htmlFor="includeClosedDefects" 
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Include Closed Defects
-            </label>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="p-6">
@@ -376,10 +384,10 @@ export default function DefectsLog() {
             <div className="divide-y divide-gray-200">
               {isLoading ? (
                 <div className="text-center py-8 text-gray-500">Loading defects...</div>
-              ) : defects.length === 0 ? (
+              ) : filteredDefects.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No defects found</div>
               ) : (
-                defects.map((defect: Defect, index: number) => (
+                filteredDefects.map((defect: Defect, index: number) => (
                   <div
                     key={defect.id}
                     className={cn(
@@ -550,10 +558,10 @@ export default function DefectsLog() {
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4 px-2">
           <div className="text-sm text-gray-500">
-            {defects.length > 0 ? `0 to 0 of ${defects.length}` : "0 to 0 of 0"}
+            {filteredDefects.length > 0 ? `0 to 0 of ${filteredDefects.length}` : "0 to 0 of 0"}
           </div>
           <div className="text-sm text-gray-500">
-            Page 0 of {defects.length > 0 ? 1 : 0}
+            Page 0 of {filteredDefects.length > 0 ? 1 : 0}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useLocation } from "wouter";
-import { useVessels } from "@/hooks/useVessels";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import LinkDefectsModal from "./LinkDefectsModal";
@@ -44,6 +43,7 @@ import { getComputedStatus } from "@/lib/defectStatusUtils";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
 import AgGridTableActions from "@/components/AgGrid/AgGridTableActions";
 import { ICellRendererParams, GridReadyEvent, GridApi, ColDef } from "ag-grid-community";
+import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 
 interface DefectsFilters {
   period?: string;
@@ -283,10 +283,11 @@ const ActionsCellRenderer = (params: ICellRendererParams & { context: ActionsCel
 
 export default function DefectsLogWithTabs() {
   const [, setLocation] = useLocation();
-  const { data: vessels = [] } = useVessels();
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [filters, setFilters] = useState<DefectsFilters>({});
+  const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
+  const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   
   const [linkModal, setLinkModal] = useState<{ open: boolean; defectId: string | null; linkedDefects: string[] }>({ 
@@ -308,6 +309,16 @@ export default function DefectsLogWithTabs() {
     open: false,
     defect: null
   });
+
+  const handleVesselFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
+    setVesselFilterValue({
+      mode: result.mode,
+      selectedVessels: result.selectedVessels,
+      selectedFleets: result.selectedFleets,
+      selectedGroups: result.selectedGroups,
+    });
+    setSelectedVesselNames(result.selectedVesselNames);
+  }, []);
 
   const { data: defects = [], isLoading } = useQuery({
     queryKey: ['defects', 'active', filters],
@@ -345,7 +356,22 @@ export default function DefectsLogWithTabs() {
 
   const handleClearFilters = () => {
     setFilters({});
+    setVesselFilterValue(createDefaultFilterValue());
+    setSelectedVesselNames([]);
   };
+
+  const filteredDefects = useMemo(() => {
+    if (selectedVesselNames.length === 0) {
+      return defects;
+    }
+    const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
+    return defects.filter((defect: Defect) => {
+      const defectVessel = (defect.vessel || defect.vesselName || '').toLowerCase().trim();
+      return normalizedFilterNames.some(filterName => 
+        filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
+      );
+    });
+  }, [defects, selectedVesselNames]);
   
   const canEdit = () => {
     const role = currentUser?.role || '';
@@ -638,37 +664,10 @@ export default function DefectsLogWithTabs() {
               />
             </div>
 
-            <Select value={filters.vesselId || "all"} onValueChange={(value) => handleFilterChange('vesselId', value === "all" ? "" : value)}>
-              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
-                <SelectValue placeholder="Vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vessels</SelectItem>
-                {vessels.map((vessel: any) => (
-                  <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
-                <SelectValue placeholder="Fleet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleet1">Fleet 1</SelectItem>
-                <SelectItem value="fleet2">Fleet 2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filters.addGroup} onValueChange={(value) => handleFilterChange('addGroup', value)}>
-              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
-                <SelectValue placeholder="Add Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="department">Department</SelectItem>
-                <SelectItem value="priority">Priority</SelectItem>
-              </SelectContent>
-            </Select>
+            <VesselFleetGroupFilter 
+              value={vesselFilterValue}
+              onChange={handleVesselFilterChange}
+            />
 
             <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
               <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
@@ -711,7 +710,7 @@ export default function DefectsLogWithTabs() {
           <>
             <div className="flex-1 min-h-0">
               <AgGridTable
-                rowData={defects}
+                rowData={filteredDefects}
                 columnDefs={columnDefs}
                 onGridReady={onGridReady}
                 enableSideBar={true}

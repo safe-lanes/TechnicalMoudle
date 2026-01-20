@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/filters/VesselFilter';
+import { FiltersToggle } from '@/components/filters/VesselFilter';
+import { VesselFleetGroupFilter, VesselFleetGroupFilterValue, VesselFleetGroupFilterResult, createDefaultFilterValue } from '@/components/filters/VesselFleetGroupFilter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
-import { useExternalVessels, useExternalFleetGroups, useExternalAdditionalGroups } from '@/hooks/useExternalMasterData';
 
 type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
@@ -142,13 +142,6 @@ const DateCellEditor = forwardRef<DateCellEditorHandle, ICellEditorParams>((prop
 
 DateCellEditor.displayName = 'DateCellEditor';
 
-const defaultFilterValue: VesselFilterValue = {
-  mode: 'vessel',
-  selectedVessels: [],
-  selectedFleets: [],
-  selectedGroups: [],
-};
-
 interface CertificateData {
   id: string;
   certificateName: string;
@@ -232,7 +225,8 @@ const ActionsCellRenderer = (params: ActionsCellRendererProps) => {
 
 export default function CertificatesPage() {
   const [showFilters, setShowFilters] = useState(true);
-  const [filterValue, setFilterValue] = useState<VesselFilterValue>(defaultFilterValue);
+  const [filterValue, setFilterValue] = useState<VesselFleetGroupFilterValue>(createDefaultFilterValue());
+  const [selectedVesselNames, setSelectedVesselNames] = useState<string[]>([]);
   const [dueInFilter, setDueInFilter] = useState<DueInFilter>('all');
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [attachmentSheetOpen, setAttachmentSheetOpen] = useState(false);
@@ -243,9 +237,15 @@ export default function CertificatesPage() {
     queryKey: ['/technical/api/certificates'],
   });
 
-  const { data: externalVessels = [] } = useExternalVessels();
-  const { data: externalFleetGroups = [] } = useExternalFleetGroups();
-  const { data: externalAdditionalGroups = [] } = useExternalAdditionalGroups();
+  const handleFilterChange = useCallback((result: VesselFleetGroupFilterResult) => {
+    setFilterValue({
+      mode: result.mode,
+      selectedVessels: result.selectedVessels,
+      selectedFleets: result.selectedFleets,
+      selectedGroups: result.selectedGroups,
+    });
+    setSelectedVesselNames(result.selectedVesselNames);
+  }, []);
 
   const updateCertificateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CertificateData> }) => {
@@ -349,47 +349,17 @@ export default function CertificatesPage() {
     });
   }, [updateCertificateMutation]);
 
-  const getFieldValue = (entry: any, fieldOptions: string[]): string => {
-    for (const field of fieldOptions) {
-      if (entry[field] !== undefined && entry[field] !== null) {
-        return String(entry[field]);
-      }
-    }
-    return '';
-  };
-
-  const vesselOptions = useMemo(() => {
-    return externalVessels.map((v: any) => ({
-      id: getFieldValue(v, ['vuid', 'vesselId', 'id']),
-      name: getFieldValue(v, ['vessel', 'vesselName', 'name']),
-    })).filter((v: { id: string; name: string }) => v.id && v.name);
-  }, [externalVessels]);
-
-  const fleetOptions = useMemo(() => {
-    return externalFleetGroups.map((f: any) => ({
-      id: getFieldValue(f, ['fleet_group_id', 'fleetGroupId', 'id']),
-      name: getFieldValue(f, ['fleet_group_name', 'fleetGroupName', 'name', 'group_name']),
-    })).filter((f: { id: string; name: string }) => f.id && f.name);
-  }, [externalFleetGroups]);
-
-  const groupOptions = useMemo(() => {
-    return externalAdditionalGroups.map((g: any) => ({
-      id: getFieldValue(g, ['id', 'groupId', 'additional_group_id']),
-      name: getFieldValue(g, ['group_name', 'groupName', 'name', 'additional_group_name']),
-    })).filter((g: { id: string; name: string }) => g.id && g.name);
-  }, [externalAdditionalGroups]);
-
   const filteredCertificates = useMemo(() => {
     let result = certificates;
     
-    if (filterValue.selectedVessels.length > 0) {
-      const selectedVesselNames = filterValue.selectedVessels
-        .map(vesselId => vesselOptions.find((v: { id: string; name: string }) => v.id === vesselId)?.name)
-        .filter(Boolean);
-      
-      result = result.filter(cert => 
-        selectedVesselNames.includes(cert.vessel)
-      );
+    if (selectedVesselNames.length > 0) {
+      const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
+      result = result.filter(cert => {
+        const certVessel = (cert.vessel || '').toLowerCase().trim();
+        return normalizedFilterNames.some(filterName => 
+          filterName === certVessel || certVessel.includes(filterName) || filterName.includes(certVessel)
+        );
+      });
     }
     
     if (dueInFilter !== 'all') {
@@ -422,7 +392,7 @@ export default function CertificatesPage() {
     }
     
     return result;
-  }, [certificates, filterValue.selectedVessels, vesselOptions, dueInFilter]);
+  }, [certificates, selectedVesselNames, dueInFilter]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
@@ -672,12 +642,9 @@ export default function CertificatesPage() {
 
       {showFilters && (
         <div className="flex items-center gap-4 px-6 flex-shrink-0">
-          <VesselFilter
+          <VesselFleetGroupFilter
             value={filterValue}
-            onChange={setFilterValue}
-            vessels={vesselOptions}
-            fleets={fleetOptions}
-            groups={groupOptions}
+            onChange={handleFilterChange}
           />
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-500" />
