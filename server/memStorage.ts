@@ -1291,6 +1291,72 @@ class MemStorage {
     return spare;
   }
 
+  async transferSpareLocation(
+    id: number,
+    newRobLocationA: number,
+    newRobLocationB: number,
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<{ spare: any; isTransfer: boolean }> {
+    console.log('[MemStorage] transferSpareLocation called - stub in file mode');
+    const spare = this.data.spares ? this.data.spares[id] : null;
+    if (!spare) {
+      throw new Error(`Spare with ID ${id} not found`);
+    }
+    
+    const oldLocA = spare.robLocationA || 0;
+    const oldLocB = spare.robLocationB || 0;
+    const deltaA = newRobLocationA - oldLocA;
+    const deltaB = newRobLocationB - oldLocB;
+    
+    if (deltaA === 0 && deltaB === 0) {
+      return { spare, isTransfer: false };
+    }
+    
+    spare.robLocationA = newRobLocationA;
+    spare.robLocationB = newRobLocationB;
+    spare.rob = newRobLocationA + newRobLocationB;
+    spare.updatedAt = new Date();
+    
+    const oldTotalRob = oldLocA + oldLocB;
+    const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && spare.rob === oldTotalRob;
+    const netChange = (newRobLocationA + newRobLocationB) - (oldLocA + oldLocB);
+    
+    const historyEntry = {
+      id: Date.now(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode || spare.componentSpareCode || `SP-${spare.id}`,
+      partName: spare.partName,
+      partNumber: spare.partNumber || null,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode || null,
+      componentName: spare.componentName || 'Unknown Component',
+      componentSpareCode: spare.componentSpareCode || null,
+      eventType: isTrueTransfer ? 'TRANSFER' : 'ADJUSTMENT',
+      qtyChange: isTrueTransfer ? 0 : netChange,
+      robAfter: spare.rob,
+      remarks: remarks || (isTrueTransfer 
+        ? `Transfer between locations`
+        : `Adjustment: ${netChange >= 0 ? '+' : ''}${netChange}`),
+      reference: null,
+      place,
+      dateLocal,
+      tz,
+      timestampUTC: new Date().toISOString(),
+      userId
+    };
+    
+    if (!this.data.sparesHistory) this.data.sparesHistory = [];
+    this.data.sparesHistory.push(historyEntry);
+    this.saveData();
+    
+    return { spare, isTransfer: isTrueTransfer };
+  }
+
   async getMasterDataList(): Promise<any[]> {
     console.log('[MemStorage] getMasterDataList called - stub in file mode');
     return [];

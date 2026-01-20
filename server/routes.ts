@@ -5406,7 +5406,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/technical/api/spares/:vesselId/:id", async (req, res) => {
     try {
       console.log('[PATCH Spare] Updating spare', req.params.id, 'with data:', JSON.stringify(req.body));
-      const spare = await storage.updateSpare(parseInt(req.params.id), req.body);
+      const spareId = parseInt(req.params.id);
+      const { robLocationA, robLocationB, remarks, place, dateLocal, tz, ...otherUpdates } = req.body;
+      const userId = (req as any).user?.id?.toString() || 'System';
+      
+      // Check if location ROB values are being changed - route to transfer/adjustment method
+      if (robLocationA !== undefined || robLocationB !== undefined) {
+        // Validate numeric inputs
+        if (robLocationA !== undefined && (isNaN(Number(robLocationA)) || Number(robLocationA) < 0)) {
+          return res.status(400).json({ error: "robLocationA must be a valid non-negative number" });
+        }
+        if (robLocationB !== undefined && (isNaN(Number(robLocationB)) || Number(robLocationB) < 0)) {
+          return res.status(400).json({ error: "robLocationB must be a valid non-negative number" });
+        }
+        
+        // Get current spare to determine location values
+        const currentSpare = await storage.getSpare(spareId);
+        if (!currentSpare) {
+          return res.status(404).json({ error: "Spare not found" });
+        }
+        
+        const newLocA = robLocationA !== undefined ? Number(robLocationA) : (currentSpare.robLocationA ?? 0);
+        const newLocB = robLocationB !== undefined ? Number(robLocationB) : (currentSpare.robLocationB ?? 0);
+        
+        // Use transfer method which creates ledger history for true transfers or ADJUSTMENT for ROB changes
+        const result = await storage.transferSpareLocation(
+          spareId,
+          newLocA,
+          newLocB,
+          userId,
+          remarks,
+          place,
+          dateLocal,
+          tz
+        );
+        
+        // Also handle other updates if provided
+        if (Object.keys(otherUpdates).length > 0) {
+          const updatedSpare = await storage.updateSpare(spareId, otherUpdates);
+          return res.json(updatedSpare);
+        }
+        
+        return res.json(result.spare);
+      }
+      
+      // Handle non-ROB updates (location names, etc.) through regular update
+      const spare = await storage.updateSpare(spareId, otherUpdates);
       console.log('[PATCH Spare] Result - location:', spare.location, 'location2:', spare.location2);
       res.json(spare);
     } catch (error: any) {

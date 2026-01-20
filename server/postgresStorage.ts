@@ -2186,6 +2186,120 @@ export class PostgresStorage {
     return updated[0];
   }
 
+  async transferSpareLocation(
+    id: number,
+    newRobLocationA: number,
+    newRobLocationB: number,
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<{ spare: Spare; isTransfer: boolean }> {
+    const db = await getDb();
+    const spare = await this.getSpare(id);
+    if (!spare) {
+      throw new Error(`Spare ${id} not found`);
+    }
+    
+    const oldLocA = spare.robLocationA ?? 0;
+    const oldLocB = spare.robLocationB ?? 0;
+    const newLocA = Number(newRobLocationA) || 0;
+    const newLocB = Number(newRobLocationB) || 0;
+    
+    // Validate numeric inputs
+    if (isNaN(newLocA) || newLocA < 0) {
+      throw new Error('robLocationA must be a valid non-negative number');
+    }
+    if (isNaN(newLocB) || newLocB < 0) {
+      throw new Error('robLocationB must be a valid non-negative number');
+    }
+    
+    const deltaA = newLocA - oldLocA;
+    const deltaB = newLocB - oldLocB;
+    
+    if (deltaA === 0 && deltaB === 0) {
+      return { spare, isTransfer: false };
+    }
+    
+    const newTotalRob = newLocA + newLocB;
+    
+    const updated = await db.update(spares)
+      .set({
+        rob: newTotalRob,
+        robLocationA: newLocA,
+        robLocationB: newLocB,
+        updatedAt: new Date()
+      })
+      .where(eq(spares.id, id))
+      .returning();
+
+    // Only create transfer history entries if this is a true transfer
+    // (total ROB unchanged AND stock moved between locations)
+    const oldTotalRob = oldLocA + oldLocB;
+    const isTrueTransfer = deltaA !== 0 && deltaB !== 0 && newTotalRob === oldTotalRob;
+    
+    if (isTrueTransfer) {
+      const transferQty = Math.abs(deltaA);
+      const fromLocation = deltaA < 0 ? 'A' : 'B';
+      const toLocation = deltaA < 0 ? 'B' : 'A';
+      const transferRemarks = remarks || `Transfer ${transferQty} from Location ${fromLocation} to Location ${toLocation}`;
+
+      await this.createSpareHistory({
+        timestampUTC: new Date(),
+        vesselId: spare.vesselId || 'V001',
+        spareId: spare.id,
+        partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+        partName: spare.partName,
+        componentId: spare.componentId || '',
+        componentCode: spare.componentCode ?? null,
+        componentName: spare.componentName,
+        componentSpareCode: spare.componentSpareCode ?? null,
+        eventType: 'TRANSFER',
+        qtyChange: 0,
+        robAfter: newTotalRob,
+        userId,
+        remarks: transferRemarks,
+        reference: null,
+        dateLocal: dateLocal ?? null,
+        tz: tz ?? null,
+        place: place ?? null,
+      });
+      
+      return { spare: updated[0], isTransfer: true };
+    }
+    
+    // Not a true transfer - create ADJUSTMENT history entry
+    // This handles: single location changes, net ROB increases/decreases
+    const netChange = (newLocA + newLocB) - (oldLocA + oldLocB);
+    const adjustmentRemarks = remarks || (netChange >= 0 
+      ? `Adjustment: +${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`
+      : `Adjustment: ${netChange} (Location A: ${oldLocA}→${newLocA}, Location B: ${oldLocB}→${newLocB})`);
+    
+    await this.createSpareHistory({
+      timestampUTC: new Date(),
+      vesselId: spare.vesselId || 'V001',
+      spareId: spare.id,
+      partCode: spare.partCode ?? spare.componentSpareCode ?? `SP-${spare.id}`,
+      partName: spare.partName,
+      componentId: spare.componentId || '',
+      componentCode: spare.componentCode ?? null,
+      componentName: spare.componentName,
+      componentSpareCode: spare.componentSpareCode ?? null,
+      eventType: 'ADJUSTMENT',
+      qtyChange: netChange,
+      robAfter: newTotalRob,
+      userId,
+      remarks: adjustmentRemarks,
+      reference: null,
+      dateLocal: dateLocal ?? null,
+      tz: tz ?? null,
+      place: place ?? null,
+    });
+    
+    return { spare: updated[0], isTransfer: false };
+  }
+
   async receiveSpare(
     id: number, 
     quantity: number, 

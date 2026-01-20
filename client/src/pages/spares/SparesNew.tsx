@@ -293,61 +293,28 @@ const Spares: React.FC = () => {
     let successCount = 0;
     let attemptCount = 0;
     
-    // Create transactions for Location A if changed
-    if (deltaA !== 0) {
+    // Handle ROB changes via PATCH endpoint (creates ADJUSTMENT or TRANSFER events automatically)
+    if (deltaA !== 0 || deltaB !== 0) {
       attemptCount++;
       try {
-        const quantity = Math.abs(deltaA);
-        const endpoint = deltaA > 0 ? 'receive-to-location' : 'consume-from-location';
-        
-        const resA = await fetch(`/technical/api/spares/${spareId}/${endpoint}`, {
-          method: 'POST',
+        const res = await fetch(`/technical/api/spares/${vesselId}/${spareId}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            location: 'A',
-            quantity: quantity,
+            robLocationA: newRobA,
+            robLocationB: newRobB,
             dateLocal: format(new Date(), 'yyyy-MM-dd'),
-            remarks: `Quick adjustment via ROB panel`,
-            userId: 'user'
+            remarks: `ROB adjustment via panel`
           }),
         });
-        if (!resA.ok) {
-          const err = await resA.json();
-          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+        if (!res.ok) {
+          const err = await res.json();
+          errors.push(err.error || err.message || 'Failed to update ROB');
         } else {
           successCount++;
         }
       } catch (e: any) {
-        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
-      }
-    }
-    
-    // Create transactions for Location B if changed
-    if (deltaB !== 0) {
-      attemptCount++;
-      try {
-        const quantity = Math.abs(deltaB);
-        const endpoint = deltaB > 0 ? 'receive-to-location' : 'consume-from-location';
-        
-        const resB = await fetch(`/technical/api/spares/${spareId}/${endpoint}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'B',
-            quantity: quantity,
-            dateLocal: format(new Date(), 'yyyy-MM-dd'),
-            remarks: `Quick adjustment via ROB panel`,
-            userId: 'user'
-          }),
-        });
-        if (!resB.ok) {
-          const err = await resB.json();
-          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
-        } else {
-          successCount++;
-        }
-      } catch (e: any) {
-        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+        errors.push(e.message || 'Network error');
       }
     }
     

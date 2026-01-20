@@ -345,6 +345,16 @@ export interface IStorage {
     dateLocal?: string,
     tz?: string
   ): Promise<Spare>;
+  transferSpareLocation(
+    id: number,
+    newRobLocationA: number,
+    newRobLocationB: number,
+    userId: string,
+    remarks?: string,
+    place?: string,
+    dateLocal?: string,
+    tz?: string
+  ): Promise<{ spare: Spare; isTransfer: boolean }>;
   
   // Fleet Spares methods
   getFleetSpares(): Promise<Spare[]>;
