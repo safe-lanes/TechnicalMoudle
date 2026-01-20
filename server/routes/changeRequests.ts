@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import type { IStorage } from "../storage";
 import { insertChangeRequestSchema, insertChangeRequestCommentSchema, insertChangeRequestAttachmentSchema } from "@shared/schema";
-import { ChangeRequestApplicationService } from "../services/changeRequestApplicationService";
 
 export default function createChangeRequestsRouter(storage: IStorage) {
   const router = Router();
@@ -191,60 +190,22 @@ router.put("/:id/approve", async (req, res) => {
       return res.status(400).json({ error: "Comment is required for approval" });
     }
     
-    // Get the change request to validate and log its details
+    // Get the change request to log its details
     const existing = await storage.getChangeRequest(id);
-    if (!existing) {
-      return res.status(404).json({ error: "Change request not found" });
-    }
-    
     console.log(`[CR_ROUTE] Change request found:`, {
-      id: existing.id,
-      targetType: existing.targetType,
-      targetId: existing.targetId,
-      proposedChangesCount: Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson.length : 0
+      id: existing?.id,
+      targetType: existing?.targetType,
+      targetId: existing?.targetId,
+      proposedChangesCount: Array.isArray(existing?.proposedChangesJson) ? existing.proposedChangesJson.length : 0
     });
     
-    // Step 1: Apply the proposed changes to the target entity
-    const applicationService = new ChangeRequestApplicationService(storage);
-    const applicationResult = await applicationService.applyChangeRequest(existing);
-    
-    console.log(`[CR_ROUTE] Application result:`, {
-      success: applicationResult.success,
-      appliedCount: applicationResult.appliedChanges.length,
-      errors: applicationResult.errors
-    });
-    
-    // Step 2: Gate approval on successful application - do NOT approve if changes failed to apply
-    if (!applicationResult.success) {
-      console.error(`[CR_ROUTE] Application failed, not approving change request ${id}`);
-      return res.status(422).json({
-        error: "Failed to apply proposed changes",
-        details: applicationResult.errors,
-        appliedChanges: applicationResult.appliedChanges,
-        message: "Change request was not approved because the changes could not be applied to the target entity."
-      });
-    }
-    
-    // Step 3: Update the change request status to approved with applied changes details
     const updated = await storage.approveChangeRequest(
       id, 
       reviewerId || 'reviewer', 
-      comment,
-      applicationResult.appliedChanges  // Pass actual applied changes to store in revision history
+      comment
     );
-    
     console.log(`[CR_ROUTE] Approval complete, status: ${updated.status}`);
-    
-    // Return both the updated change request and application results
-    res.json({
-      ...updated,
-      applicationResult: {
-        success: applicationResult.success,
-        appliedChanges: applicationResult.appliedChanges,
-        errors: applicationResult.errors,
-        targetUpdated: applicationResult.targetUpdated
-      }
-    });
+    res.json(updated);
   } catch (error: any) {
     console.error('[CR_ROUTE] Error approving change request:', error);
     res.status(500).json({ error: error.message || 'Failed to approve change request' });
@@ -273,31 +234,6 @@ router.put("/:id/reject", async (req, res) => {
   } catch (error: any) {
     console.error('Error rejecting change request:', error);
     res.status(500).json({ error: error.message || 'Failed to reject change request' });
-  }
-});
-
-// Return a change request for revisions
-router.put("/:id/return", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { comment, reviewerId } = req.body;
-    
-    console.log('Returning change request:', id, 'for revisions with comment:', comment);
-    
-    if (!comment) {
-      return res.status(400).json({ error: "Comment is required for returning" });
-    }
-    
-    const updated = await storage.returnChangeRequest(
-      id, 
-      reviewerId || 'reviewer', 
-      comment
-    );
-    console.log('Successfully returned request:', updated);
-    res.json(updated);
-  } catch (error: any) {
-    console.error('Error returning change request:', error);
-    res.status(500).json({ error: error.message || 'Failed to return change request' });
   }
 });
 

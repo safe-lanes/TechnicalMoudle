@@ -16,4 +16,3 @@ export { runningHoursService, RunningHoursService } from './runningHoursService'
 export { componentService, ComponentService } from './componentService';
 export { jobDueScanner, JobDueScannerService } from './jobDueScanner';
 export { workOrderStatusRecalculator, WorkOrderStatusRecalculatorService } from './workOrderStatusRecalculator';
-export { ChangeRequestApplicationService } from './changeRequestApplicationService';

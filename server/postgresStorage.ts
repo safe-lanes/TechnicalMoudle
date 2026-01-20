@@ -3851,26 +3851,20 @@ export class PostgresStorage {
     });
   }
 
-  async approveChangeRequest(id: number, reviewerId: string, comment: string, appliedChanges?: any[]): Promise<ChangeRequest> {
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
     
     const now = new Date();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
-    
-    // Use provided appliedChanges if available, otherwise fall back to proposedChangesJson
-    const changesForHistory = appliedChanges || existing.proposedChangesJson || [];
-    
     const revisionHistoryEntry = {
       revisionNumber: newRevisionNumber,
       approvedBy: reviewerId,
       approvedAt: now.toISOString(),
-      appliedChanges: changesForHistory,
+      appliedChanges: existing.proposedChangesJson || [],
       comments: comment
     };
     const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
-    
-    console.log(`[CR_STORAGE] Approving CR-${id} with ${changesForHistory.length} applied changes recorded in history`);
     
     return this.updateChangeRequest(id, { 
       status: 'approved', 
