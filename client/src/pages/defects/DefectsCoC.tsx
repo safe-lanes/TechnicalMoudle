@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -345,15 +345,50 @@ export default function DefectsCoC() {
     },
   });
 
-  // Filter defects based on status filter
-  const defects = allDefects.filter((defect: Defect) => {
-    if (!filters.status || filters.status === 'active') {
-      return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
-    } else if (filters.status === 'resolved') {
-      return ['Closed', 'Cancelled'].includes(defect.status);
+  // Filter defects based on status filter and Due/Overdue filter
+  const defects = useMemo(() => {
+    let result = allDefects;
+    
+    // Status filter
+    result = result.filter((defect: Defect) => {
+      if (!filters.status || filters.status === 'active') {
+        return ['Open', 'Pending', 'In-Progress', 'Awaiting Parts', 'Deferred'].includes(defect.status);
+      } else if (filters.status === 'resolved') {
+        return ['Closed', 'Cancelled'].includes(defect.status);
+      }
+      return true;
+    });
+    
+    // Due/Overdue filter based on Target Date (only for active status)
+    if (filters.status === 'active' && filters.dueOverdue && filters.dueOverdue !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = result.filter((defect: Defect) => {
+        const targetDateStr = defect.targetCloseDate;
+        if (!targetDateStr) return false;
+        
+        const targetDate = new Date(targetDateStr);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        switch (filters.dueOverdue) {
+          case 'overdue':
+            return diffDays < 0;
+          case 'due1month':
+            return diffDays >= 0 && diffDays <= 30;
+          case 'due2months':
+            return diffDays >= 0 && diffDays <= 60;
+          default:
+            return true;
+        }
+      });
     }
-    return true;
-  });
+    
+    return result;
+  }, [allDefects, filters.status, filters.dueOverdue]);
 
   const includesResolved = filters.status === 'resolved' || filters.status === 'all';
 
@@ -671,13 +706,14 @@ export default function DefectsCoC() {
 
             {filters.status === 'active' && (
               <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
+                <SelectTrigger className="w-[130px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                   <SelectValue placeholder="Due / Overdue" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="due">Due Soon</SelectItem>
+                  <SelectItem value="due2months">Due in 2 months</SelectItem>
+                  <SelectItem value="due1month">Due in 1 month</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
             )}

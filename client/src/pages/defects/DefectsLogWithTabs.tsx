@@ -361,17 +361,49 @@ export default function DefectsLogWithTabs() {
   };
 
   const filteredDefects = useMemo(() => {
-    if (selectedVesselNames.length === 0) {
-      return defects;
+    let result = defects;
+    
+    // Vessel filter
+    if (selectedVesselNames.length > 0) {
+      const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
+      result = result.filter((defect: Defect) => {
+        const defectVessel = (defect.vesselId || defect.vesselName || '').toLowerCase().trim();
+        return normalizedFilterNames.some(filterName => 
+          filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
+        );
+      });
     }
-    const normalizedFilterNames = selectedVesselNames.map(n => n.toLowerCase().trim());
-    return defects.filter((defect: Defect) => {
-      const defectVessel = (defect.vessel || defect.vesselName || '').toLowerCase().trim();
-      return normalizedFilterNames.some(filterName => 
-        filterName === defectVessel || defectVessel.includes(filterName) || filterName.includes(defectVessel)
-      );
-    });
-  }, [defects, selectedVesselNames]);
+    
+    // Due/Overdue filter based on Target Date
+    if (filters.dueOverdue && filters.dueOverdue !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = result.filter((defect: Defect) => {
+        const targetDateStr = defect.targetCloseDate;
+        if (!targetDateStr) return false;
+        
+        const targetDate = new Date(targetDateStr);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        switch (filters.dueOverdue) {
+          case 'overdue':
+            return diffDays < 0;
+          case 'due1month':
+            return diffDays >= 0 && diffDays <= 30;
+          case 'due2months':
+            return diffDays >= 0 && diffDays <= 60;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    return result;
+  }, [defects, selectedVesselNames, filters.dueOverdue]);
   
   const canEdit = () => {
     const role = currentUser?.role || '';
@@ -671,11 +703,12 @@ export default function DefectsLogWithTabs() {
             />
 
             <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
+              <SelectTrigger className="w-[130px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                 <SelectValue placeholder="Due / Overdue" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="due">Due</SelectItem>
+                <SelectItem value="due2months">Due in 2 months</SelectItem>
+                <SelectItem value="due1month">Due in 1 month</SelectItem>
                 <SelectItem value="overdue">Overdue</SelectItem>
                 <SelectItem value="all">All</SelectItem>
               </SelectContent>
