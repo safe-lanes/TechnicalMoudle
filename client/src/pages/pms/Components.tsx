@@ -234,8 +234,8 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
 
   return (
     <div className="space-y-4">
-      {/* Row 1: Fleet Equipment Code, Fleet Equipment Name, Parent Component Code, Component Code */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Auto-flowing grid for component fields - visible fields fill gaps automatically */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {isSailAdmin && (
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.1"><Marker id="B7.A.1" /> Fleet Equipment Code</label>
@@ -302,9 +302,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             <Marker id="B7.A.8" /> {componentData.componentCode}
           </div>
         </div>
-      </div>
-      {/* Row 2: Component Name, Component Category, Maker, Maker Code */}
-      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.9"><Marker id="B7.A.9" /> Component Name</label>
           {isChangeMode ? (
@@ -367,9 +364,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
           )}
         </div>
         )}
-      </div>
-      {/* Row 3: Model, Model Code, Serial No, Drawing No */}
-      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.17"><Marker id="B7.A.17" /> Model</label>
           {isChangeMode ? (
@@ -444,10 +438,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-      </div>
-      
-      {/* Row 4: Location, Critical (Yes/No), Condition Based (Yes/No), Installation Date */}
-      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.25"><Marker id="B7.A.25" /> Location</label>
           {isChangeMode ? (
@@ -538,10 +528,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-      </div>
-      
-      {/* Row 5: Commissioning Date, Rating, Equip/System Department, (spacer) */}
-      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.33"><Marker id="B7.A.33" /> Commissioned Date</label>
           {isChangeMode ? (
@@ -596,13 +582,6 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
             </div>
           )}
         </div>
-        <div>
-          {/* Empty spacer field */}
-        </div>
-      </div>
-
-      {/* Row 6: Class Item, IS Active, Vessel Code, IS Parent */}
-      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.39"><Marker id="B7.A.39" /> Class Item</label>
           {isChangeMode ? (
@@ -708,7 +687,7 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
         )}
       </div>
 
-      {/* Row 7: Notes (full width) */}
+      {/* Notes (full width) */}
       <div>
         <label className={`text-xs font-medium ${isChangeRequestMode ? 'text-white' : 'text-gray-600'} block mb-1`} data-testid="B7.A.47"><Marker id="B7.A.47" /> Notes</label>
         {isChangeMode ? (
