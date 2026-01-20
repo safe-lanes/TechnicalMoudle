@@ -38,6 +38,7 @@ import DefectFormWizard from "./DefectFormWizard";
 import DefectModal from "./DefectModal";
 import LinkDefectsModal from "./LinkDefectsModal";
 import { cn } from "@/lib/utils";
+import { VesselFleetGroupFilter, type VesselFleetGroupFilterValue } from "@/components/filters/VesselFleetGroupFilter";
 import { useToast } from "@/hooks/use-toast";
 import type { Defect } from "@shared/schema";
 import AgGridTable from "@/components/AgGrid/AgGridTable";
@@ -302,6 +303,28 @@ export default function DefectsCoC() {
     open: false,
     defect: null
   });
+  const [vesselFilterValue, setVesselFilterValue] = useState<VesselFleetGroupFilterValue>({
+    mode: 'vessel',
+    selectedVessels: [],
+    selectedFleets: [],
+    selectedGroups: []
+  });
+
+  // Handle vessel filter change
+  const handleVesselFilterChange = (value: VesselFleetGroupFilterValue) => {
+    setVesselFilterValue(value);
+    // Update filters with selected vessels
+    if (value.selectedVessels.length > 0) {
+      setFilters(prev => ({ ...prev, vesselId: value.selectedVessels[0] }));
+    } else {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters.vesselId;
+        delete newFilters.fleet;
+        return newFilters;
+      });
+    }
+  };
 
   // Get CoC defects only
   const { data: allDefects = [], isLoading } = useQuery({
@@ -603,11 +626,11 @@ export default function DefectsCoC() {
 
         {/* Collapsible Filters */}
         {showFilters && (
-          <div className="flex flex-wrap gap-2 mb-4 bg-transparent rounded-lg">
+          <div className="flex items-center gap-3 mb-4 bg-transparent">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-[#8798ad]" />
+              <Clock className="h-4 w-4 text-gray-500" />
               <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
+                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -620,37 +643,23 @@ export default function DefectsCoC() {
             </div>
 
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8798ad]" />
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Search CoC Defect"
                 value={filters.search || ""}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-[160px] h-8 text-xs pl-8 text-[#8798ad]"
+                className="w-[140px] h-8 text-xs pl-8 border-gray-300 bg-transparent text-gray-700"
               />
             </div>
 
-            <Select value={filters.vesselId} onValueChange={(value) => handleFilterChange('vesselId', value)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
-                <SelectValue placeholder="Vessel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="V001">Vessel 1</SelectItem>
-                <SelectItem value="V002">Vessel 2</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filters.fleet} onValueChange={(value) => handleFilterChange('fleet', value)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
-                <SelectValue placeholder="Fleet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleet1">Fleet 1</SelectItem>
-                <SelectItem value="fleet2">Fleet 2</SelectItem>
-              </SelectContent>
-            </Select>
+            <VesselFleetGroupFilter 
+              value={vesselFilterValue}
+              onChange={handleVesselFilterChange}
+              showClearButton={false}
+            />
 
             <Select value={filters.status || 'active'} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs text-[#8798ad]">
+              <SelectTrigger className="w-[100px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -662,7 +671,7 @@ export default function DefectsCoC() {
 
             {filters.status === 'active' && (
               <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-                <SelectTrigger className="w-[130px] h-8 text-xs text-[#8798ad]">
+                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
                   <SelectValue placeholder="Due / Overdue" />
                 </SelectTrigger>
                 <SelectContent>
@@ -675,8 +684,8 @@ export default function DefectsCoC() {
 
             <Button 
               onClick={handleClearFilters}
-              variant="ghost" 
-              className="h-8 px-4 text-xs"
+              variant="outline" 
+              className="h-8 px-4 text-xs border-gray-300 bg-transparent text-gray-700 hover:bg-gray-100"
             >
               Clear
             </Button>
