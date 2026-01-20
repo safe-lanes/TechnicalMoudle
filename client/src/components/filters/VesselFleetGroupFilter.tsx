@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -225,20 +224,13 @@ export const VesselFleetGroupFilter = ({
         onValueChange={(val) => handleModeChange(val as FilterMode)}
         className="flex items-center gap-6"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <RadioGroupItem 
             value="vessel" 
             id="filter-vessel" 
             className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-vessel"
           />
-          <Label 
-            htmlFor="filter-vessel" 
-            className="text-gray-700 text-sm font-normal cursor-pointer"
-          >
-            Vessel
-          </Label>
-
           <Popover open={vesselDropdownOpen} onOpenChange={setVesselDropdownOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -285,20 +277,13 @@ export const VesselFleetGroupFilter = ({
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <RadioGroupItem 
             value="fleet" 
             id="filter-fleet" 
             className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-fleet"
           />
-          <Label 
-            htmlFor="filter-fleet" 
-            className="text-gray-700 text-sm font-normal cursor-pointer"
-          >
-            Fleet
-          </Label>
-
           <Popover open={fleetDropdownOpen} onOpenChange={setFleetDropdownOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -345,20 +330,13 @@ export const VesselFleetGroupFilter = ({
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <RadioGroupItem 
             value="group" 
             id="filter-group" 
             className="border-gray-400 text-gray-700 data-[state=checked]:bg-gray-700 data-[state=checked]:text-white"
             data-testid="radio-filter-group"
           />
-          <Label 
-            htmlFor="filter-group" 
-            className="text-gray-700 text-sm font-normal cursor-pointer"
-          >
-            Add Group
-          </Label>
-
           <Popover open={groupDropdownOpen} onOpenChange={setGroupDropdownOpen}>
             <PopoverTrigger asChild>
               <Button
