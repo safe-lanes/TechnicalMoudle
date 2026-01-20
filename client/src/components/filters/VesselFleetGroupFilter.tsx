@@ -218,11 +218,11 @@ export const VesselFleetGroupFilter = ({
   };
 
   return (
-    <div className={`flex items-center gap-6 px-4 py-3 ${className || ''}`}>
+    <div className={`flex items-center gap-4 ${className || ''}`}>
       <RadioGroup 
         value={value.mode} 
         onValueChange={(val) => handleModeChange(val as FilterMode)}
-        className="flex items-center gap-6"
+        className="flex items-center gap-4"
       >
         <div className="flex items-center gap-1">
           <RadioGroupItem 
@@ -235,7 +235,7 @@ export const VesselFleetGroupFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="h-8 w-32 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-vessel"
               >
                 <span className="truncate">{getVesselDisplayText()}</span>
@@ -288,7 +288,7 @@ export const VesselFleetGroupFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="h-8 w-32 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-fleet"
               >
                 <span className="truncate">{getFleetDisplayText()}</span>
@@ -341,7 +341,7 @@ export const VesselFleetGroupFilter = ({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-8 w-40 justify-between text-xs bg-transparent border-gray-300 text-gray-700 hover:bg-gray-100"
+                className="h-8 w-32 justify-between text-xs bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
                 data-testid="dropdown-group"
               >
                 <span className="truncate">{getGroupDisplayText()}</span>

@@ -638,11 +638,11 @@ export default function DefectsLogWithTabs() {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-2 mb-4 bg-transparent rounded-lg">
+          <div className="flex items-center gap-3 mb-4 bg-transparent">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-[#8798ad]" />
+              <Clock className="h-4 w-4 text-gray-500" />
               <Select value={filters.period} onValueChange={(value) => handleFilterChange('period', value)}>
-                <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+                <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-white text-gray-700">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -655,22 +655,23 @@ export default function DefectsLogWithTabs() {
             </div>
 
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#8798ad]" />
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Search Defect"
                 value={filters.search || ""}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-[180px] h-8 text-xs pl-8 text-[#8798ad]"
+                className="w-[140px] h-8 text-xs pl-8 border-gray-300 bg-white text-gray-700"
               />
             </div>
 
             <VesselFleetGroupFilter 
               value={vesselFilterValue}
               onChange={handleVesselFilterChange}
+              showClearButton={false}
             />
 
             <Select value={filters.dueOverdue} onValueChange={(value) => handleFilterChange('dueOverdue', value)}>
-              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectTrigger className="w-[120px] h-8 text-xs border-gray-300 bg-white text-gray-700">
                 <SelectValue placeholder="Due / Overdue" />
               </SelectTrigger>
               <SelectContent>
@@ -681,7 +682,7 @@ export default function DefectsLogWithTabs() {
             </Select>
 
             <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="w-[150px] h-8 text-xs text-[#8798ad]">
+              <SelectTrigger className="w-[90px] h-8 text-xs border-gray-300 bg-white text-gray-700">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -694,8 +695,8 @@ export default function DefectsLogWithTabs() {
 
             <Button 
               onClick={handleClearFilters}
-              variant="ghost" 
-              className="h-8 px-4 text-xs"
+              variant="outline" 
+              className="h-8 px-4 text-xs border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
             >
               Clear
             </Button>
