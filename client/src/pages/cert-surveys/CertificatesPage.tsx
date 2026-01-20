@@ -12,7 +12,7 @@ import { VesselFilter, FiltersToggle, VesselFilterValue } from '@/components/fil
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileAttachmentDialog, FileAttachment } from '@/components/FileAttachmentDialog';
-import type { Vessel, Fleet } from '@shared/schema';
+import { useExternalVessels, useExternalFleetGroups, useExternalAdditionalGroups } from '@/hooks/useExternalMasterData';
 
 type DueInFilter = 'all' | '3months' | '2months' | '1month' | 'overdue';
 
@@ -243,13 +243,9 @@ export default function CertificatesPage() {
     queryKey: ['/technical/api/certificates'],
   });
 
-  const { data: vessels = [] } = useQuery<Vessel[]>({
-    queryKey: ['/technical/api/vessels'],
-  });
-
-  const { data: fleets = [] } = useQuery<Fleet[]>({
-    queryKey: ['/technical/api/fleets'],
-  });
+  const { data: externalVessels = [] } = useExternalVessels();
+  const { data: externalFleetGroups = [] } = useExternalFleetGroups();
+  const { data: externalAdditionalGroups = [] } = useExternalAdditionalGroups();
 
   const updateCertificateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CertificateData> }) => {
@@ -353,16 +349,42 @@ export default function CertificatesPage() {
     });
   }, [updateCertificateMutation]);
 
-  const vesselOptions = vessels.map(v => ({ id: v.id, name: v.name }));
-  const fleetOptions = fleets.map(f => ({ id: f.id, name: f.name }));
-  const groupOptions: { id: string; name: string }[] = [];
+  const getFieldValue = (entry: any, fieldOptions: string[]): string => {
+    for (const field of fieldOptions) {
+      if (entry[field] !== undefined && entry[field] !== null) {
+        return String(entry[field]);
+      }
+    }
+    return '';
+  };
+
+  const vesselOptions = useMemo(() => {
+    return externalVessels.map((v: any) => ({
+      id: getFieldValue(v, ['vuid', 'vesselId', 'id']),
+      name: getFieldValue(v, ['vessel', 'vesselName', 'name']),
+    })).filter((v: { id: string; name: string }) => v.id && v.name);
+  }, [externalVessels]);
+
+  const fleetOptions = useMemo(() => {
+    return externalFleetGroups.map((f: any) => ({
+      id: getFieldValue(f, ['fleet_group_id', 'fleetGroupId', 'id']),
+      name: getFieldValue(f, ['fleet_group_name', 'fleetGroupName', 'name', 'group_name']),
+    })).filter((f: { id: string; name: string }) => f.id && f.name);
+  }, [externalFleetGroups]);
+
+  const groupOptions = useMemo(() => {
+    return externalAdditionalGroups.map((g: any) => ({
+      id: getFieldValue(g, ['id', 'groupId', 'additional_group_id']),
+      name: getFieldValue(g, ['group_name', 'groupName', 'name', 'additional_group_name']),
+    })).filter((g: { id: string; name: string }) => g.id && g.name);
+  }, [externalAdditionalGroups]);
 
   const filteredCertificates = useMemo(() => {
     let result = certificates;
     
     if (filterValue.selectedVessels.length > 0) {
       const selectedVesselNames = filterValue.selectedVessels
-        .map(vesselId => vessels.find(v => v.id === vesselId)?.name)
+        .map(vesselId => vesselOptions.find((v: { id: string; name: string }) => v.id === vesselId)?.name)
         .filter(Boolean);
       
       result = result.filter(cert => 
@@ -400,7 +422,7 @@ export default function CertificatesPage() {
     }
     
     return result;
-  }, [certificates, filterValue.selectedVessels, vessels, dueInFilter]);
+  }, [certificates, filterValue.selectedVessels, vesselOptions, dueInFilter]);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
