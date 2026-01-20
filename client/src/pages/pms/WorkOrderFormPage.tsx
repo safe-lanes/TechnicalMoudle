@@ -2630,40 +2630,39 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                   <div className="space-y-2">
                     <Label className="text-sm text-[#8798ad]" data-testid="WOF.B2.9"><Marker id="WOF.B2.9" />Completion Date</Label>
-                    <Input
-                      type="date"
-                      value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
-                      onChange={(e) => {
-                        const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
-                        handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
-                        handleExecutionChange('dateOfCompletion', e.target.value);
-                      }}
-                      className="text-sm"
-                      placeholder="dd-mm-yyyy"
-                      data-testid="WOF.B2.10"
-                    />
-                  </div>
-
-                  <div className="flex items-end pb-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
-                        if (startDate) {
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="date"
+                        value={executionData.completionDateTime ? executionData.completionDateTime.split('T')[0] : (executionData.dateOfCompletion || '')}
+                        onChange={(e) => {
                           const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
-                          handleExecutionChange('completionDateTime', currentTime ? `${startDate}T${currentTime}` : startDate);
-                          handleExecutionChange('dateOfCompletion', startDate);
-                        }
-                      }}
-                      className="text-xs whitespace-nowrap"
-                      title="Same as Start Date"
-                      data-testid="button-copy-start-date"
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Same as Start Date
-                    </Button>
+                          handleExecutionChange('completionDateTime', currentTime ? `${e.target.value}T${currentTime}` : e.target.value);
+                          handleExecutionChange('dateOfCompletion', e.target.value);
+                        }}
+                        className="text-sm flex-1"
+                        placeholder="dd-mm-yyyy"
+                        data-testid="WOF.B2.10"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+                          if (startDate) {
+                            const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
+                            handleExecutionChange('completionDateTime', currentTime ? `${startDate}T${currentTime}` : startDate);
+                            handleExecutionChange('dateOfCompletion', startDate);
+                          }
+                        }}
+                        className="text-xs whitespace-nowrap"
+                        title="Same as Start Date"
+                        data-testid="button-copy-start-date"
+                      >
+                        <Copy className="h-3 w-3 mr-1" />
+                        Same as Start Date
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
