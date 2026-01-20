@@ -7636,6 +7636,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =====================================================
 
   // Generate work order on demand from job
+  // Uses jobDueScanner.generateWorkOrderForJob for spec-compliant behavior:
+  // - Proper duplicate protection (job + component + cycle)
+  // - Correct status calculation using shared computeWorkOrderStatus
+  // - Cycle snapshot alignment with auto-generation
   app.post("/technical/api/jobs/:id/generate-wo", async (req, res) => {
     try {
       const jobId = req.params.id;
@@ -7645,16 +7649,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid reason. Must be 'Planning', 'Breakdown', or 'Other'" });
       }
 
-      const job = await storage.getJob(jobId);
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-
-      // Generate work order from job with on-demand reason
-      // Pass activeComponentCode to bind the WO to the correct component context (for multi-linked jobs)
-      const workOrder = await storage.generateOnDemandWorkOrder(jobId, reason, activeComponentCode);
+      // Use jobDueScanner for spec-compliant manual WO generation (TRIGGER 3)
+      const { jobDueScanner } = await import("./services/jobDueScanner");
+      const result = await jobDueScanner.generateWorkOrderForJob(jobId, reason, activeComponentCode);
       
-      res.status(201).json(workOrder);
+      if (!result.success) {
+        // Return HTTP 400 with blocking WO details for duplicate detection
+        // Response includes { success:false, message, blockingWorkOrder }
+        return res.status(400).json(result);
+      }
+      
+      res.status(201).json(result.workOrder);
     } catch (error: any) {
       console.error("Error generating on-demand work order:", error);
       res.status(500).json({ error: error.message || "Failed to generate work order" });

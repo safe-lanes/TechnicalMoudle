@@ -3,6 +3,7 @@ import { jobService } from "./jobService";
 import { storage } from "../storage";
 import { generatePlannedWorkOrderNumber } from "../utils/workOrderNumbering";
 import { WORK_ORDER_THRESHOLDS } from "@shared/workOrders/constants";
+import { computeWorkOrderStatus, type VesselGraceSettings } from "@shared/workOrders/status";
 import { 
   isBlockingStatus, 
   extractJobNoFromWorkOrderNo,
@@ -11,7 +12,7 @@ import {
   buildCalendarCycleWOMap,
   findBlockingWOForJob
 } from "../utils/workOrderStatus";
-import type { InsertWorkOrder, Job, PmsVesselSettings } from "@shared/schema";
+import type { InsertWorkOrder, Job, PmsVesselSettings, Component } from "@shared/schema";
 
 /**
  * Determine if a job is "critical" based on its jobPriority
@@ -201,6 +202,7 @@ export class JobDueScannerService {
 
     for (const job of rhJobs) {
       // Get the component from cache to check RH counter type and current RH
+      if (!job.componentId) continue; // Skip jobs without component
       const component = await getComponentFromCache(job.componentId, job.vesselId);
       if (!component) continue;
 
@@ -394,118 +396,243 @@ export class JobDueScannerService {
    * 
    * Manual trigger can override timing (can generate before generate date/RH_generate)
    * but CANNOT bypass cycle uniqueness or open-WO restriction
+   * 
+   * @param jobId - The job ID to generate WO for
+   * @param reason - The reason for generating (Planning/Breakdown/Other)
+   * @param activeComponentCode - Optional component code for multi-linked jobs
    */
-  async generateWorkOrderForJob(jobId: string): Promise<{ success: boolean; workOrder?: any; message: string }> {
+  async generateWorkOrderForJob(
+    jobId: string, 
+    reason: 'Planning' | 'Breakdown' | 'Other' = 'Planning',
+    activeComponentCode?: string
+  ): Promise<{ success: boolean; workOrder?: any; message: string }> {
     const job = await storage.getJob(jobId);
     if (!job) {
       return { success: false, message: 'Job not found' };
     }
 
-    // Get all work orders for this vessel
-    const allWorkOrders = await storage.getWorkOrders(job.vesselId || undefined);
+    // Determine the component code to use
+    // Priority: activeComponentCode (from Section C context) > job.componentCode
+    const effectiveComponentCode = activeComponentCode || job.componentCode;
     
-    // JOB-LEVEL LOCK: Check if job already has an active WO
-    // Uses case-insensitive status matching via findBlockingWOForJob()
-    const existingActiveWO = findBlockingWOForJob(allWorkOrders, job.id, job.jobNo);
-    
-    if (existingActiveWO) {
+    if (!effectiveComponentCode) {
       return { 
         success: false, 
-        message: `Work Order already exists for this job: ${existingActiveWO.workOrderNo}` 
+        message: `Component code is required for work order generation` 
       };
     }
+
+    // Get all work orders for this vessel for duplicate checking
+    const allWorkOrders = await storage.getWorkOrders(job.vesselId || undefined);
+    
+    // ============= DUPLICATE PROTECTION (uses Trigger 1 utilities) =============
+    // Build blocking sets and cycle maps using SAME utilities as Trigger 1
+    const activeWOSets = buildJobsWithActiveWOSet(allWorkOrders, job.vesselId || undefined);
+    const rhCycleMap = buildRhCycleWOMap(allWorkOrders, job.vesselId || undefined);
+    const calendarCycleMap = buildCalendarCycleWOMap(allWorkOrders, job.vesselId || undefined);
+    
+    // Step 1: Check for legacy WOs without componentCode - blocks entire job
+    // Find blocking WO using Trigger 1's findBlockingWOForJob utility
+    const legacyBlockingWO = allWorkOrders.find(wo => {
+      if (!isBlockingStatus(wo.status)) return false;
+      if (wo.componentCode && wo.componentCode !== '') return false; // Not a legacy WO
+      
+      // Must match this specific job
+      if (wo.jobId === job.id) return true;
+      const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo) || (wo as any).jobNo;
+      if (woJobNo === job.jobNo && wo.vesselId === job.vesselId) return true;
+      
+      return false;
+    });
+    
+    if (legacyBlockingWO) {
+      return { 
+        success: false, 
+        message: `Work Order already exists for this job: ${legacyBlockingWO.workOrderNo}. A legacy work order (without component code) blocks this job.`,
+        blockingWorkOrder: {
+          id: legacyBlockingWO.id,
+          workOrderNo: legacyBlockingWO.workOrderNo,
+          status: legacyBlockingWO.status,
+          componentCode: legacyBlockingWO.componentCode
+        }
+      };
+    }
+    
+    // Step 2: COMPONENT-LEVEL CHECK using blocking sets (direct lookup)
+    // Check if this job already has an active WO (any component)
+    const vesselJobNoKey = `${job.vesselId || 'unknown'}|${job.jobNo}`;
+    const isJobBlockedByJobId = activeWOSets.byJobId.has(job.id);
+    const isJobBlockedByJobNo = activeWOSets.byJobNo.has(vesselJobNoKey);
+    
+    if (isJobBlockedByJobId || isJobBlockedByJobNo) {
+      // Find the specific blocking WO for error message
+      const existingWOForComponent = allWorkOrders.find(wo => {
+        if (!isBlockingStatus(wo.status)) return false;
+        if (wo.componentCode !== effectiveComponentCode) return false;
+        if (wo.jobId === job.id) return true;
+        const woJobNo = extractJobNoFromWorkOrderNo(wo.workOrderNo) || (wo as any).jobNo;
+        return woJobNo === job.jobNo && wo.vesselId === job.vesselId;
+      });
+      
+      if (existingWOForComponent) {
+        return { 
+          success: false, 
+          message: `Work Order already exists for this job and component: ${existingWOForComponent.workOrderNo}. Only one active work order is allowed per job-component combination.`,
+          blockingWorkOrder: {
+            id: existingWOForComponent.id,
+            workOrderNo: existingWOForComponent.workOrderNo,
+            status: existingWOForComponent.status,
+            componentCode: existingWOForComponent.componentCode
+          }
+        };
+      }
+    }
+
+    // Get component data for RH calculations and name
+    // Resolution order: activeComponentCode > linked components > job.componentId
+    let componentData: Component | undefined;
+    let effectiveComponentName = job.componentName || '';
+    
+    if (activeComponentCode && job.vesselId) {
+      // Look up component by activeComponentCode, scoped by vessel
+      const components = await storage.getComponents(job.vesselId);
+      componentData = components.find(c => c.componentCode === activeComponentCode);
+      if (componentData) {
+        effectiveComponentName = componentData.name || effectiveComponentName;
+      }
+    } else if (!componentData && job.vesselId) {
+      // Try linked components lookup
+      const linkedComponents = await storage.getLinkedComponentsForJob(job.id);
+      if (linkedComponents.length > 0) {
+        // Use the first linked component (should match effectiveComponentCode)
+        const linkedComponent = linkedComponents.find(lc => lc.componentCode === effectiveComponentCode);
+        if (linkedComponent && linkedComponent.componentId) {
+          componentData = await storage.getComponent(linkedComponent.componentId);
+          if (componentData) {
+            effectiveComponentName = componentData.name || linkedComponent.componentName || effectiveComponentName;
+          }
+        }
+      }
+    }
+    
+    if (!componentData && job.componentId) {
+      componentData = await storage.getComponent(job.componentId);
+    }
+
+    // Get vessel settings for lead time and grace period configuration
+    const settings = job.vesselId ? await storage.getPmsVesselSettings(job.vesselId) : null;
 
     // Determine job type and compute cycle values
     const isRHJob = job.maintenanceBasis === 'Running Hours';
     
     let cycleSnapshots: Partial<InsertWorkOrder> = {};
-    let rhEffectiveCurrent: number | undefined;
+    let dueRH: number | null = null;
+    let currentRH: number | null = null;
+    let rhLeadTimeHours: number | undefined;
     
     if (isRHJob) {
       // RH Job: compute cycle values
-      const component = await storage.getComponent(job.componentId);
-      if (!component) {
+      if (!componentData) {
         return { success: false, message: 'Component not found for job' };
       }
       
+      // Get lead time hours using shared utility
+      rhLeadTimeHours = getRhLeadHours(job, settings);
+      
       // Determine effective current RH based on counter type
-      const rhCounterType = component.rhCounterType;
+      const rhCounterType = componentData.rhCounterType;
       if (rhCounterType === 'MASTER') {
-        rhEffectiveCurrent = parseFloat(component.rhCurrentMaster || '0');
+        currentRH = parseFloat(componentData.rhCurrentMaster || '0');
       } else if (rhCounterType === 'INHERITED') {
-        rhEffectiveCurrent = parseFloat(component.rhCurrentInheritedCached || '0');
+        currentRH = parseFloat(componentData.rhCurrentInheritedCached || '0');
       } else {
-        // Fallback for non-RH tracked components
-        rhEffectiveCurrent = parseFloat(component.runningHours || '0');
+        currentRH = parseFloat(componentData.runningHours || '0');
       }
       
       const rhLastDone = parseFloat(job.lastDoneRH || '0');
       const frequencyRH = job.intervalRunningHour || 0;
       
-      // Get vessel settings for lead time
-      const settings = job.vesselId ? await storage.getPmsVesselSettings(job.vesselId) : null;
-      const leadTimeRH = getRhLeadHours(job, settings);
-      
       // Calculate cycle values
-      const rhDue = rhLastDone + frequencyRH;
-      const rhGenerate = Math.max(0, rhDue - leadTimeRH);
+      const rhDueValue = rhLastDone + frequencyRH;
+      const rhGenerate = Math.max(0, rhDueValue - rhLeadTimeHours);
+      dueRH = rhDueValue;
       
-      // Check for existing WO with same cycle (cycle uniqueness)
-      // Uses case-insensitive status matching via isBlockingStatus()
-      const existingCycleWO = allWorkOrders.find(wo => 
-        wo.jobId === job.id &&
-        wo.cycleDueRhSnapshot === String(rhDue) &&
-        isBlockingStatus(wo.status)
-      );
+      // Step 3: CYCLE-LEVEL CHECK (RH) using Trigger 1's cycle map (direct lookup)
+      // Key format: `${vesselId}|${jobNo}|${componentCode}|${cycleDueRhSnapshot}`
+      const rhDueStr = String(rhDueValue);
+      const vesselId = job.vesselId || 'unknown';
+      const compCode = effectiveComponentCode || 'unknown';
       
-      if (existingCycleWO) {
+      // Build cycle key matching Trigger 1's format
+      const rhCycleKey = `${vesselId}|${job.jobNo}|${compCode}|${rhDueStr}`;
+      const rhCycleKeyUnknown = `${vesselId}|${job.jobNo}|unknown|${rhDueStr}`;
+      
+      // Direct lookup against cycle map (same as Trigger 1)
+      const componentCycleWO = rhCycleMap.get(rhCycleKey) || rhCycleMap.get(rhCycleKeyUnknown);
+      
+      if (componentCycleWO) {
         return { 
           success: false, 
-          message: `Work Order already exists for this job cycle: ${existingCycleWO.workOrderNo}` 
+          message: `Work Order already exists for this job cycle: ${componentCycleWO.workOrderNo}`,
+          blockingWorkOrder: {
+            id: componentCycleWO.id,
+            workOrderNo: componentCycleWO.workOrderNo,
+            status: componentCycleWO.status,
+            componentCode: componentCycleWO.componentCode
+          }
         };
       }
       
       cycleSnapshots = {
         driverType: 'RH',
-        cycleDueRhSnapshot: String(rhDue),
+        cycleDueRhSnapshot: String(rhDueValue),
         generateRhSnapshot: String(rhGenerate),
-        dueRhSnapshot: String(rhDue),
-        effectiveRhAtGeneration: String(rhEffectiveCurrent),
+        dueRhSnapshot: String(rhDueValue),
+        effectiveRhAtGeneration: String(currentRH),
         rhLastDoneSnapshot: String(rhLastDone),
-        nextDueReading: String(rhDue),
-        currentReading: String(rhEffectiveCurrent),
+        nextDueReading: String(rhDueValue),
+        currentReading: String(currentRH),
+        intervalRunningHour: job.intervalRunningHour,
       };
       
-      console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${leadTimeRH}`);
-      console.log(`   RH_due=${rhDue}, RH_generate=${rhGenerate}, RH_current=${rhEffectiveCurrent}`);
+      console.log(`[Manual Trigger 3] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${rhLeadTimeHours}`);
+      console.log(`   RH_due=${rhDueValue}, RH_generate=${rhGenerate}, RH_current=${currentRH}`);
     } else {
       // Calendar Job: compute cycle values
       const dueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
       dueDate.setHours(0, 0, 0, 0);
       const dueDateStr = dueDate.toISOString().split('T')[0];
       
-      // Get vessel settings for lead time
-      const settings = job.vesselId ? await storage.getPmsVesselSettings(job.vesselId) : null;
       const leadTimeDays = isJobCritical(job) 
-        ? (settings?.calendarLeadDaysCritical || 0) 
-        : (settings?.calendarLeadDaysNonCritical || 0);
+        ? (settings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS) 
+        : (settings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS);
       
       const generateDate = new Date(dueDate);
       generateDate.setDate(generateDate.getDate() - leadTimeDays);
       const generateDateStr = generateDate.toISOString().split('T')[0];
       
-      // Check for existing WO with same cycle (cycle uniqueness)
-      // Uses case-insensitive status matching via isBlockingStatus()
-      const existingCycleWO = allWorkOrders.find(wo => 
-        wo.jobId === job.id &&
-        wo.cycleDueDateSnapshot === dueDateStr &&
-        isBlockingStatus(wo.status)
-      );
+      // Step 3: CYCLE-LEVEL CHECK (Calendar) using Trigger 1's cycle map (direct lookup)
+      // Key format: `${vesselId}|${jobNo}|${componentCode}|${cycleDueDateSnapshot}`
+      const calVesselId = job.vesselId || 'unknown';
+      const calCompCode = effectiveComponentCode || 'unknown';
       
-      if (existingCycleWO) {
+      // Build cycle key matching Trigger 1's format
+      const calCycleKey = `${calVesselId}|${job.jobNo}|${calCompCode}|${dueDateStr}`;
+      const calCycleKeyUnknown = `${calVesselId}|${job.jobNo}|unknown|${dueDateStr}`;
+      
+      // Direct lookup against cycle map (same as Trigger 1)
+      const calendarCycleWO = calendarCycleMap.get(calCycleKey) || calendarCycleMap.get(calCycleKeyUnknown);
+      
+      if (calendarCycleWO) {
         return { 
           success: false, 
-          message: `Work Order already exists for this job cycle: ${existingCycleWO.workOrderNo}` 
+          message: `Work Order already exists for this job cycle: ${calendarCycleWO.workOrderNo}`,
+          blockingWorkOrder: {
+            id: calendarCycleWO.id,
+            workOrderNo: calendarCycleWO.workOrderNo,
+            status: calendarCycleWO.status,
+            componentCode: calendarCycleWO.componentCode
+          }
         };
       }
       
@@ -522,37 +649,56 @@ export class JobDueScannerService {
       console.log(`   DUE_DATE=${dueDateStr}, GENERATE_DATE=${generateDateStr}`);
     }
 
-    // Get componentCode - fallback to component record if not on job
-    let componentCode = job.componentCode;
-    if (!componentCode && job.componentId) {
-      const component = await storage.getComponent(job.componentId);
-      componentCode = component?.componentCode || '';
-    }
-    if (!componentCode) {
-      return { 
-        success: false, 
-        message: `Component code is required for work order generation` 
-      };
+    // ============= COMPUTE STATUS USING SHARED UTILITY =============
+    // Build vessel grace settings for the shared status computation function
+    const vesselGraceSettings: VesselGraceSettings | undefined = settings ? {
+      calendarGraceMode: (settings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS') || 'COMPANY_STANDARD',
+      calendarGraceDays: settings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: settings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+      rhLeadTimeHours: rhLeadTimeHours
+    } : undefined;
+    
+    // Use the shared computeWorkOrderStatus function for spec-compliant status
+    const computedStatusResult = computeWorkOrderStatus({
+      dueDate: job.nextDueDate,
+      dueRH,
+      currentRH,
+      isExecution: false,
+      status: undefined, // New WO, no existing status
+      completionDateTime: null,
+      maintenanceBasis: job.maintenanceBasis || undefined,
+      vesselGraceSettings,
+      rhLeadTimeHours
+    });
+    
+    // Map computed status to database status field
+    // "Due (Grace P)" maps to "Due" in the database (grace is a display concept)
+    let dbStatus: string;
+    if (computedStatusResult === 'Due (Grace P)') {
+      dbStatus = 'Due';
+    } else {
+      dbStatus = computedStatusResult;
     }
     
-    // Generate WO number with correct format: <JOB_CODE>-<COMPONENT_CODE>-<YYYY>-<RUNNING_3DIGIT>
-    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, componentCode, job.vesselId || undefined);
+    console.log(`   Computed status: ${computedStatusResult} → DB status: ${dbStatus}`);
+    
+    // Generate WO number with correct format
+    const workOrderNo = await generatePlannedWorkOrderNumber(storage, job.jobNo, effectiveComponentCode, job.vesselId || undefined);
     
     const workOrderData: InsertWorkOrder = {
       vesselId: job.vesselId,
-      component: job.componentName,
-      componentCode: componentCode, // Use resolved componentCode
-      jobId: job.id, // Link to job for cycle tracking
+      component: effectiveComponentName,
+      componentCode: effectiveComponentCode,
+      jobId: job.id,
       workOrderNo: workOrderNo,
       templateCode: workOrderNo,
       jobTitle: job.jobTitle,
       assignedTo: job.assignedTo || 'Unassigned',
-      status: 'Due', // Manual generation starts as Due
+      status: dbStatus, // Use computed status from shared utility
       taskType: job.maintenanceType,
       maintenanceBasis: job.maintenanceBasis,
       frequencyValue: job.frequencyValue?.toString(),
       frequencyUnit: job.frequencyUnit,
-      intervalRunningHour: job.intervalRunningHour,
       jobPriority: job.jobPriority,
       classRelated: job.classRelated,
       briefWorkDescription: job.briefWorkDescription,
@@ -564,13 +710,14 @@ export class JobDueScannerService {
         permitRequirements: [],
         otherRequirements: []
       },
+      remarks: `On-demand work order generated. Reason: ${reason}`,
       // Spread cycle snapshots based on job type
       ...cycleSnapshots,
     };
     
     const createdWO = await workOrderService.createWorkOrder(workOrderData);
     
-    console.log(`✅ [Manual Trigger 3] On-demand work order ${workOrderNo} created for job ${job.jobNo}`);
+    console.log(`✅ [Manual Trigger 3] On-demand work order ${workOrderNo} created for job ${job.jobNo} with status: ${dbStatus}`);
     
     return { 
       success: true, 

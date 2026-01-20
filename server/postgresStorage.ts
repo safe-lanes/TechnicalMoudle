@@ -5192,6 +5192,12 @@ export class PostgresStorage {
   async generateOnDemandWorkOrder(jobId: string, reason: 'Planning' | 'Breakdown' | 'Other', activeComponentCode?: string): Promise<WorkOrder> {
     const db = await getDb();
     
+    // Import shared utilities for consistent blocking status checks
+    const { isBlockingStatus } = await import('./utils/workOrderStatus');
+    const { computeWorkOrderStatus } = await import('@shared/workOrders/status');
+    const { WORK_ORDER_THRESHOLDS } = await import('@shared/workOrders/constants');
+    const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
+    
     // Get the job
     const jobResult = await db.select().from(jobs)
       .where(eq(jobs.id, jobId))
@@ -5211,16 +5217,34 @@ export class PostgresStorage {
       throw new Error(`Component code is required for work order generation. Job: ${jobId}`);
     }
     
-    // Import and use the spec-compliant work order numbering utility
-    // Format: {job_no}-{component_code}-{year}-{auto_increment}
-    // Example: MKR-IN-00041-702.005.01-2026-001
-    const { generatePlannedWorkOrderNumber } = await import('./utils/workOrderNumbering');
-    const workOrderNo = await generatePlannedWorkOrderNumber(this, job.jobNo, componentCodeForWO, job.vesselId || undefined);
+    // ============= DUPLICATE PROTECTION (Rule #1) =============
+    // Vessel-scoped check for existing blocking WOs for this job + component
+    // Match behavior from auto-generation: check ALL WOs for vessel, not just isActive=true
+    const allVesselWOs = job.vesselId 
+      ? await db.select().from(workOrders).where(eq(workOrders.vesselId, job.vesselId))
+      : await db.select().from(workOrders).where(eq(workOrders.jobId, jobId));
     
-    // FIX: Resolve component details from activeComponentCode if provided
-    // This ensures WO is bound to the correct component context for multi-linked jobs
+    // Find any blocking WO for this job + component combination
+    const blockingWO = allVesselWOs.find(wo => {
+      if (!isBlockingStatus(wo.status)) return false;
+      
+      // Match by jobId
+      if (wo.jobId !== jobId) return false;
+      
+      // Match by componentCode (exact match, including both being null)
+      const woComponentCode = wo.componentCode || null;
+      const targetComponentCode = componentCodeForWO || null;
+      return woComponentCode === targetComponentCode;
+    });
+    
+    if (blockingWO) {
+      throw new Error(`Work Order already exists for this job and component: ${blockingWO.workOrderNo}. Only one active work order is allowed per job-component combination.`);
+    }
+    
+    // Resolve component details from activeComponentCode if provided
     let effectiveComponentCode = activeComponentCode || job.componentCode;
     let effectiveComponentName = job.componentName || '';
+    let componentData: any = null;
     
     // If activeComponentCode is provided, look up the correct component details
     // IMPORTANT: Scope by vesselId to avoid matching wrong component in multi-vessel setup
@@ -5232,19 +5256,162 @@ export class PostgresStorage {
         ))
         .limit(1);
       if (componentResult.length > 0) {
-        effectiveComponentName = componentResult[0].name || effectiveComponentName;
+        componentData = componentResult[0];
+        effectiveComponentName = componentData.name || effectiveComponentName;
       }
     } else if (activeComponentCode) {
-      // Fallback without vessel scope if vesselId is not available
       const componentResult = await db.select().from(components)
         .where(eq(components.componentCode, activeComponentCode))
         .limit(1);
       if (componentResult.length > 0) {
-        effectiveComponentName = componentResult[0].name || effectiveComponentName;
+        componentData = componentResult[0];
+        effectiveComponentName = componentData.name || effectiveComponentName;
+      }
+    } else if (job.componentId) {
+      const componentResult = await db.select().from(components)
+        .where(eq(components.id, job.componentId))
+        .limit(1);
+      if (componentResult.length > 0) {
+        componentData = componentResult[0];
       }
     }
     
-    // Create the work order
+    // Get vessel PMS settings for lead time and grace period configuration
+    let vesselSettings: PmsVesselSettings | null = null;
+    if (job.vesselId) {
+      const settingsResult = await db.select().from(pmsVesselSettings)
+        .where(eq(pmsVesselSettings.vesselId, job.vesselId))
+        .limit(1);
+      if (settingsResult.length > 0) {
+        vesselSettings = settingsResult[0];
+      }
+    }
+    
+    // Determine if job is critical (Critical or High priority)
+    const isJobCritical = (job.jobPriority?.toLowerCase() === 'critical' || job.jobPriority?.toLowerCase() === 'high');
+    
+    // ============= BUILD CYCLE SNAPSHOTS AND RH FIELDS =============
+    let cycleSnapshots: Partial<InsertWorkOrder> = {};
+    let rhFields: Partial<InsertWorkOrder> = {};
+    let dueRH: number | null = null;
+    let currentRH: number | null = null;
+    let rhLeadTimeHours: number | undefined = undefined;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (job.maintenanceBasis === 'Running Hours') {
+      // Get lead time hours based on criticality (use centralized thresholds as fallback)
+      rhLeadTimeHours = isJobCritical
+        ? (vesselSettings?.rhLeadHoursCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_CRITICAL)
+        : (vesselSettings?.rhLeadHoursNonCritical ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS_NON_CRITICAL);
+      
+      // Get current RH from component
+      let rhEffectiveCurrent = 0;
+      if (componentData) {
+        const rhCounterType = componentData.rhCounterType;
+        if (rhCounterType === 'MASTER') {
+          rhEffectiveCurrent = parseFloat(componentData.rhCurrentMaster || '0');
+        } else if (rhCounterType === 'INHERITED') {
+          rhEffectiveCurrent = parseFloat(componentData.rhCurrentInheritedCached || '0');
+        } else {
+          rhEffectiveCurrent = parseFloat(componentData.runningHours || '0');
+        }
+      }
+      
+      // Calculate RH due
+      const rhLastDone = parseFloat(job.lastDoneRH || '0');
+      const frequencyRH = job.intervalRunningHour || 0;
+      const rhDueValue = rhLastDone + frequencyRH;
+      const rhGenerate = Math.max(0, rhDueValue - rhLeadTimeHours);
+      
+      dueRH = rhDueValue;
+      currentRH = rhEffectiveCurrent;
+      
+      // Set RH cycle snapshots (matching auto-gen format)
+      cycleSnapshots = {
+        driverType: 'RH',
+        cycleDueRhSnapshot: String(rhDueValue),
+        generateRhSnapshot: String(rhGenerate),
+        dueRhSnapshot: String(rhDueValue),
+        effectiveRhAtGeneration: String(rhEffectiveCurrent),
+        rhLastDoneSnapshot: String(rhLastDone),
+      };
+      
+      rhFields = {
+        nextDueReading: String(rhDueValue),
+        currentReading: String(rhEffectiveCurrent),
+        intervalRunningHour: job.intervalRunningHour,
+      };
+      
+      console.log(`[Manual Generate WO] RH Job: RH_last_done=${rhLastDone}, F=${frequencyRH}, LT=${rhLeadTimeHours}hrs`);
+      console.log(`   RH_due=${rhDueValue}, RH_current=${rhEffectiveCurrent}`);
+      
+    } else {
+      // Calendar-based: compute cycle snapshots
+      const leadTimeDays = isJobCritical
+        ? (vesselSettings?.calendarLeadDaysCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS)
+        : (vesselSettings?.calendarLeadDaysNonCritical ?? WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS);
+      
+      const dueDate = job.nextDueDate ? new Date(job.nextDueDate) : new Date();
+      dueDate.setHours(0, 0, 0, 0);
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+      
+      const generateDate = new Date(dueDate);
+      generateDate.setDate(generateDate.getDate() - leadTimeDays);
+      const generateDateStr = generateDate.toISOString().split('T')[0];
+      
+      // Set Calendar cycle snapshots (matching auto-gen format)
+      cycleSnapshots = {
+        driverType: 'CALENDAR',
+        cycleDueDateSnapshot: dueDateStr,
+        generateDateSnapshot: generateDateStr,
+        dueDateSnapshot: dueDateStr,
+        lastDoneDateSnapshot: job.lastDoneDate || null,
+      };
+      
+      console.log(`[Manual Generate WO] Calendar Job: due=${dueDateStr}, LT=${leadTimeDays}d`);
+    }
+    
+    // ============= COMPUTE STATUS USING SHARED UTILITY =============
+    // Build vessel grace settings for the shared status computation function
+    const vesselGraceSettings = vesselSettings ? {
+      calendarGraceMode: (vesselSettings.calendarGraceMode as 'COMPANY_STANDARD' | 'CUSTOM_DAYS') || 'COMPANY_STANDARD',
+      calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+      rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+      rhLeadTimeHours: rhLeadTimeHours
+    } : undefined;
+    
+    // Use the shared computeWorkOrderStatus function for spec-compliant status
+    const computedStatusResult = computeWorkOrderStatus({
+      dueDate: job.nextDueDate,
+      dueRH,
+      currentRH,
+      isExecution: false,
+      status: undefined, // New WO, no existing status
+      completionDateTime: null,
+      maintenanceBasis: job.maintenanceBasis || undefined,
+      vesselGraceSettings,
+      rhLeadTimeHours
+    });
+    
+    // Map computed status to database status field
+    // The computeWorkOrderStatus returns: Active, Due, Due (Grace P), Overdue, Completed, Pending Approval, Rejected, Postponed
+    // For new WOs, we want to use the timing-based status (Active, Due, Overdue)
+    // Note: "Due (Grace P)" maps to "Due" in the database status field (grace is a display concept)
+    let dbStatus: string;
+    if (computedStatusResult === 'Due (Grace P)') {
+      dbStatus = 'Due'; // Store as Due, grace is handled at display time
+    } else {
+      dbStatus = computedStatusResult;
+    }
+    
+    console.log(`   Computed status: ${computedStatusResult} → DB status: ${dbStatus}`);
+    
+    // Generate WO number
+    const workOrderNo = await generatePlannedWorkOrderNumber(this, job.jobNo, componentCodeForWO, job.vesselId || undefined);
+    
+    // Create the work order with proper status and cycle snapshots
     const newWorkOrder: InsertWorkOrder = {
       id: `WO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       vesselId: job.vesselId,
@@ -5255,7 +5422,7 @@ export class PostgresStorage {
       jobTitle: job.jobTitle,
       component: effectiveComponentName,
       componentCode: effectiveComponentCode,
-      status: 'Active',
+      status: dbStatus, // Use computed status from shared utility
       dueDate: job.nextDueDate || new Date().toISOString().split('T')[0],
       remarks: `On-demand work order generated. Reason: ${reason}`,
       isActive: true,
@@ -5263,9 +5430,26 @@ export class PostgresStorage {
       maintenanceBasis: job.maintenanceBasis,
       taskType: job.maintenanceType,
       assignedTo: job.assignedTo || 'Unassigned',
+      jobPriority: job.jobPriority,
+      classRelated: job.classRelated,
+      briefWorkDescription: job.briefWorkDescription,
+      department: job.department,
+      frequencyValue: job.frequencyValue?.toString(),
+      frequencyUnit: job.frequencyUnit,
+      requiredSpareParts: job.requiredSpareParts || [],
+      requiredTools: job.requiredTools || [],
+      safetyRequirements: job.safetyRequirements || {
+        ppeRequirements: [],
+        permitRequirements: [],
+        otherRequirements: []
+      },
+      // Spread cycle snapshots and RH fields
+      ...cycleSnapshots,
+      ...rhFields,
     };
     
     const result = await db.insert(workOrders).values(newWorkOrder).returning();
+    console.log(`✅ [Manual Generate WO] Created ${workOrderNo} with status: ${dbStatus}`);
     return result[0];
   }
 
