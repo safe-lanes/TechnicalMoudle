@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip } from "lucide-react";
+import { FileText, ArrowLeft, Plus, Eye, Upload, Download, Menu, Check, X, Edit2, Trash2, Link2, Paperclip, Copy } from "lucide-react";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
   Sheet,
@@ -2642,6 +2642,28 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       placeholder="dd-mm-yyyy"
                       data-testid="WOF.B2.10"
                     />
+                  </div>
+
+                  <div className="flex items-end pb-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const startDate = executionData.startDateTime ? executionData.startDateTime.split('T')[0] : '';
+                        if (startDate) {
+                          const currentTime = executionData.completionDateTime ? executionData.completionDateTime.split('T')[1] || '' : '';
+                          handleExecutionChange('completionDateTime', currentTime ? `${startDate}T${currentTime}` : startDate);
+                          handleExecutionChange('dateOfCompletion', startDate);
+                        }
+                      }}
+                      className="text-xs whitespace-nowrap"
+                      title="Same as Start Date"
+                      data-testid="button-copy-start-date"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Same as Start Date
+                    </Button>
                   </div>
 
                   <div className="space-y-2">
