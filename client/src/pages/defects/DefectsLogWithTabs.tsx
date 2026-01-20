@@ -714,18 +714,6 @@ export default function DefectsLogWithTabs() {
               </SelectContent>
             </Select>
 
-            <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger className="w-[90px] h-8 text-xs border-gray-300 bg-transparent text-gray-700">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Defect">Defect</SelectItem>
-                <SelectItem value="COC">COC</SelectItem>
-                <SelectItem value="Observation">Observation</SelectItem>
-                <SelectItem value="NCR">NCR</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Button 
               onClick={handleClearFilters}
               variant="outline" 
