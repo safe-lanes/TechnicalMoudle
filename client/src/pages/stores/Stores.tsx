@@ -54,6 +54,8 @@ interface StoreItem {
   isArchived?: boolean;
   robLocationA?: number;
   robLocationB?: number;
+  locationAName?: string;
+  locationBName?: string;
   // IHM fields
   ihmPresence?: typeof IHM_PRESENCE[number];
   ihmEvidenceType?: typeof IHM_EVIDENCE_TYPES[number];
@@ -202,6 +204,8 @@ const Stores: React.FC = () => {
           isArchived: item.isArchived || false,
           robLocationA: locationARob,
           robLocationB: locationBRob,
+          locationAName: item.locationA || '',
+          locationBName: item.locationB || '',
           ihmPresence: (item.ihmPresence as typeof IHM_PRESENCE[number]) || 'Unknown',
           ihmEvidenceType: (item.ihmEvidenceType as typeof IHM_EVIDENCE_TYPES[number]) || 'None',
         };
@@ -318,7 +322,9 @@ const Stores: React.FC = () => {
       ...prev,
       [item.id]: {
         locationA: String(item.robLocationA ?? 0),
-        locationB: String(item.robLocationB ?? 0)
+        locationB: String(item.robLocationB ?? 0),
+        nameA: item.locationAName || locationNames.locationA || 'Location A',
+        nameB: item.locationBName || locationNames.locationB || 'Location B'
       }
     }));
   };
@@ -2086,9 +2092,9 @@ const Stores: React.FC = () => {
                         const needsReceivedDate = totalReceived > 0 && !dateReceived;
                         const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
                         
-                        // Get item-specific location names with fallbacks
-                        const itemLocA = locationNames.locationA || 'Location A';
-                        const itemLocB = locationNames.locationB || 'Location B';
+                        // Get item-specific location names from item data, fall back to vessel-level names
+                        const itemLocA = item.locationAName || locationNames.locationA || 'Location A';
+                        const itemLocB = item.locationBName || locationNames.locationB || 'Location B';
                         
                         return (
                           <tr key={item.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
