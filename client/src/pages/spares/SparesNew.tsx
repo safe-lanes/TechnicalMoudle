@@ -254,8 +254,10 @@ const Spares: React.FC = () => {
     setOpenLocationDropdown(spare.id);
     const origA = spare.robLocationA ?? 0;
     const origB = spare.robLocationB ?? 0;
-    const origNameA = spare.location || locationNames.locationA || 'Location A';
-    const origNameB = spare.location2 || locationNames.locationB || 'Location B';
+    // Use spare-specific location names directly - these are the actual ROB locations
+    // Do NOT fall back to vessel-location-names API (those are generic column labels)
+    const origNameA = spare.location || 'Location A';
+    const origNameB = spare.location2 || 'Location B';
     setOriginalLocationValues(prev => ({
       ...prev,
       [spare.id]: { locationA: origA, locationB: origB, nameA: origNameA, nameB: origNameB }
@@ -266,8 +268,8 @@ const Spares: React.FC = () => {
       [spare.id]: {
         locationA: String(origA),
         locationB: String(origB),
-        nameA: spare.location || locationNames.locationA,
-        nameB: spare.location2 || locationNames.locationB
+        nameA: spare.location || 'Location A',
+        nameB: spare.location2 || 'Location B'
       }
     }));
   };
@@ -319,8 +321,9 @@ const Spares: React.FC = () => {
     }
     
     // Save spare-specific location names if they were edited
-    const origNameA = original?.nameA || spare.location || locationNames.locationA || 'Location A';
-    const origNameB = original?.nameB || spare.location2 || locationNames.locationB || 'Location B';
+    // Use spare-specific location names directly, NOT vessel-location-names API
+    const origNameA = original?.nameA || spare.location || 'Location A';
+    const origNameB = original?.nameB || spare.location2 || 'Location B';
     const nameAChanged = locations.nameA !== origNameA;
     const nameBChanged = locations.nameB !== origNameB;
     
@@ -357,13 +360,17 @@ const Spares: React.FC = () => {
     const hadInventoryChanges = deltaA !== 0 || deltaB !== 0;
     const hadNameChanges = nameAChanged || nameBChanged;
     
+    // Use spare-specific location names for toast notifications (not vessel-level defaults)
+    const spareLocNameA = spare.location || 'Location A';
+    const spareLocNameB = spare.location2 || 'Location B';
+    
     if (errors.length === 0 && attemptCount > 0) {
       if (hadInventoryChanges) {
         const actions = [];
-        if (deltaA > 0) actions.push(`+${deltaA} to ${locationNames.locationA}`);
-        if (deltaA < 0) actions.push(`${deltaA} from ${locationNames.locationA}`);
-        if (deltaB > 0) actions.push(`+${deltaB} to ${locationNames.locationB}`);
-        if (deltaB < 0) actions.push(`${deltaB} from ${locationNames.locationB}`);
+        if (deltaA > 0) actions.push(`+${deltaA} to ${spareLocNameA}`);
+        if (deltaA < 0) actions.push(`${deltaA} from ${spareLocNameA}`);
+        if (deltaB > 0) actions.push(`+${deltaB} to ${spareLocNameB}`);
+        if (deltaB < 0) actions.push(`${deltaB} from ${spareLocNameB}`);
         toast({ title: "Inventory Updated", description: actions.join(', ') });
       } else if (hadNameChanges) {
         toast({ title: "Saved", description: "Location names updated" });
@@ -845,14 +852,32 @@ const Spares: React.FC = () => {
     enabled: !!vesselId
   });
   
-  // Get actual location names - prefer spare-specific names, then vessel settings, then defaults
-  // Find the first spare with location names defined to use as reference
+  // Get default location labels from vessel settings (only used as column headers, NOT for value binding)
+  // For actual ROB location values, always use spare-specific location/location2 fields
   const sparesArray = Array.isArray(sparesData) ? sparesData : [];
-  const firstSpareWithLocations = sparesArray.find((s: Spare) => s.location || s.location2);
   
+  // Column header labels - these are generic labels, NOT the actual ROB locations
+  const locationColumnLabels = {
+    labelA: locationNamesData?.locationAName || 'Location A',
+    labelB: locationNamesData?.locationBName || 'Location B'
+  };
+  
+  // Helper function to get spare-specific location names (for ROB value binding)
+  // This ensures each spare shows its own location names (e.g., "Bridge", "Main Deck")
+  const getSpareLocationName = (spare: Spare, locationSlot: 'A' | 'B'): string => {
+    if (locationSlot === 'A') {
+      return spare.location || 'Location A';
+    } else {
+      return spare.location2 || 'Location B';
+    }
+  };
+  
+  // Legacy locationNames object for backward compatibility with existing code
+  // Note: For accurate ROB display, prefer using getSpareLocationName() with specific spare
+  const firstSpareWithLocations = sparesArray.find((s: Spare) => s.location || s.location2);
   const locationNames = {
-    locationA: firstSpareWithLocations?.location || locationNamesData?.locationAName || 'Location A',
-    locationB: firstSpareWithLocations?.location2 || locationNamesData?.locationBName || 'Location B'
+    locationA: firstSpareWithLocations?.location || 'Location A',
+    locationB: firstSpareWithLocations?.location2 || 'Location B'
   };
 
   // Consume spare mutation (location-aware)
@@ -1369,13 +1394,16 @@ const Spares: React.FC = () => {
       return;
     }
     
-    // Check stock at each location
+    // Check stock at each location (use spare-specific location names)
+    const selSpareLocA = selectedSpare.location || 'Location A';
+    const selSpareLocB = selectedSpare.location2 || 'Location B';
+    
     if (qtyA > (selectedSpare.robLocationA ?? 0)) {
-      toast({ title: "Error", description: `Insufficient stock at ${locationNames.locationA}. Available: ${selectedSpare.robLocationA ?? 0}`, variant: "destructive" });
+      toast({ title: "Error", description: `Insufficient stock at ${selSpareLocA}. Available: ${selectedSpare.robLocationA ?? 0}`, variant: "destructive" });
       return;
     }
     if (qtyB > (selectedSpare.robLocationB ?? 0)) {
-      toast({ title: "Error", description: `Insufficient stock at ${locationNames.locationB}. Available: ${selectedSpare.robLocationB ?? 0}`, variant: "destructive" });
+      toast({ title: "Error", description: `Insufficient stock at ${selSpareLocB}. Available: ${selectedSpare.robLocationB ?? 0}`, variant: "destructive" });
       return;
     }
     
@@ -1402,7 +1430,7 @@ const Spares: React.FC = () => {
         });
         if (!resA.ok) {
           const err = await resA.json();
-          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+          errors.push(`${selSpareLocA}: ${err.message || 'Failed'}`);
         } else {
           successCount++;
           const data = await resA.json();
@@ -1411,7 +1439,7 @@ const Spares: React.FC = () => {
           }
         }
       } catch (e: any) {
-        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
+        errors.push(`${selSpareLocA}: ${e.message || 'Network error'}`);
       }
     }
     
@@ -1433,7 +1461,7 @@ const Spares: React.FC = () => {
         });
         if (!resB.ok) {
           const err = await resB.json();
-          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
+          errors.push(`${selSpareLocB}: ${err.message || 'Failed'}`);
         } else {
           successCount++;
           const data = await resB.json();
@@ -1442,7 +1470,7 @@ const Spares: React.FC = () => {
           }
         }
       } catch (e: any) {
-        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+        errors.push(`${selSpareLocB}: ${e.message || 'Network error'}`);
       }
     }
     
@@ -1484,6 +1512,10 @@ const Spares: React.FC = () => {
       return;
     }
     
+    // Use spare-specific location names for error messages
+    const recSpareLocA = selectedSpare.location || 'Location A';
+    const recSpareLocB = selectedSpare.location2 || 'Location B';
+    
     const errors: string[] = [];
     const warnings: string[] = [];
     let successCount = 0;
@@ -1507,7 +1539,7 @@ const Spares: React.FC = () => {
         });
         if (!resA.ok) {
           const err = await resA.json();
-          errors.push(`${locationNames.locationA}: ${err.message || 'Failed'}`);
+          errors.push(`${recSpareLocA}: ${err.message || 'Failed'}`);
         } else {
           successCount++;
           const data = await resA.json();
@@ -1516,7 +1548,7 @@ const Spares: React.FC = () => {
           }
         }
       } catch (e: any) {
-        errors.push(`${locationNames.locationA}: ${e.message || 'Network error'}`);
+        errors.push(`${recSpareLocA}: ${e.message || 'Network error'}`);
       }
     }
     
@@ -1538,7 +1570,7 @@ const Spares: React.FC = () => {
         });
         if (!resB.ok) {
           const err = await resB.json();
-          errors.push(`${locationNames.locationB}: ${err.message || 'Failed'}`);
+          errors.push(`${recSpareLocB}: ${err.message || 'Failed'}`);
         } else {
           successCount++;
           const data = await resB.json();
@@ -1547,7 +1579,7 @@ const Spares: React.FC = () => {
           }
         }
       } catch (e: any) {
-        errors.push(`${locationNames.locationB}: ${e.message || 'Network error'}`);
+        errors.push(`${recSpareLocB}: ${e.message || 'Network error'}`);
       }
     }
     
@@ -1986,10 +2018,10 @@ const Spares: React.FC = () => {
                               <div className="space-y-3">
                                 <div className="text-xs font-medium text-gray-500 mb-2">ROB by Location</div>
                                 <div>
-                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">Location A</div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-a">{getSpareLocationName(spare, 'A')}</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameA || locationNames.locationA || 'Location A'}
+                                    value={editingLocations[spare.id]?.nameA || spare.location || 'Location A'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], nameA: e.target.value }
@@ -2012,10 +2044,10 @@ const Spares: React.FC = () => {
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">Location B</div>
+                                  <div className="text-[10px] font-semibold text-blue-600 mb-1" data-testid="label-dropdown-location-b">{getSpareLocationName(spare, 'B')}</div>
                                   <Input
                                     type="text"
-                                    value={editingLocations[spare.id]?.nameB || locationNames.locationB || 'Location B'}
+                                    value={editingLocations[spare.id]?.nameB || spare.location2 || 'Location B'}
                                     onChange={(e) => setEditingLocations(prev => ({
                                       ...prev,
                                       [spare.id]: { ...prev[spare.id], nameB: e.target.value }
@@ -2401,9 +2433,10 @@ const Spares: React.FC = () => {
                       const needsReceivedDate = totalReceived > 0 && !bulkUpdateData[spare.id]?.receivedDate;
                       const hasError = hasInsufficientStockA || hasInsufficientStockB || needsReceivedDate;
                       
-                      // Get spare-specific location names with fallbacks
-                      const spareLocA = spare.location || locationNamesData?.locationAName || 'Location A';
-                      const spareLocB = spare.location2 || locationNamesData?.locationBName || 'Location B';
+                      // Get spare-specific location names - use actual ROB locations stored on the spare
+                      // Do NOT fall back to vessel-location-names API (those are generic column labels)
+                      const spareLocA = spare.location || 'Location A';
+                      const spareLocB = spare.location2 || 'Location B';
                       
                       return (
                         <tr key={spare.id} className={`border-t ${hasError ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
@@ -3095,7 +3128,7 @@ const Spares: React.FC = () => {
             <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
               <div className="text-xs font-medium text-gray-500">Quantity to Consume by Location</div>
               <div>
-                <Label htmlFor="consume-qty-a">{locationNames.locationA} (Available: {selectedSpare?.robLocationA ?? 0})</Label>
+                <Label htmlFor="consume-qty-a">{selectedSpare?.location || 'Location A'} (Available: {selectedSpare?.robLocationA ?? 0})</Label>
                 <Input
                   id="consume-qty-a"
                   data-testid="input-consume-qty-a"
@@ -3108,7 +3141,7 @@ const Spares: React.FC = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="consume-qty-b">{locationNames.locationB} (Available: {selectedSpare?.robLocationB ?? 0})</Label>
+                <Label htmlFor="consume-qty-b">{selectedSpare?.location2 || 'Location B'} (Available: {selectedSpare?.robLocationB ?? 0})</Label>
                 <Input
                   id="consume-qty-b"
                   data-testid="input-consume-qty-b"
@@ -3181,7 +3214,7 @@ const Spares: React.FC = () => {
             <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
               <div className="text-xs font-medium text-gray-500">Quantity to Receive by Location</div>
               <div>
-                <Label htmlFor="receive-qty-a">{locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})</Label>
+                <Label htmlFor="receive-qty-a">{selectedSpare?.location || 'Location A'} (Current: {selectedSpare?.robLocationA ?? 0})</Label>
                 <Input
                   id="receive-qty-a"
                   data-testid="input-receive-qty-a"
@@ -3193,7 +3226,7 @@ const Spares: React.FC = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="receive-qty-b">{locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})</Label>
+                <Label htmlFor="receive-qty-b">{selectedSpare?.location2 || 'Location B'} (Current: {selectedSpare?.robLocationB ?? 0})</Label>
                 <Input
                   id="receive-qty-b"
                   data-testid="input-receive-qty-b"
@@ -3283,8 +3316,8 @@ const Spares: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="A">{locationNames.locationA} (Current: {selectedSpare?.robLocationA ?? 0})</SelectItem>
-                    <SelectItem value="B">{locationNames.locationB} (Current: {selectedSpare?.robLocationB ?? 0})</SelectItem>
+                    <SelectItem value="A">{selectedSpare?.location || 'Location A'} (Current: {selectedSpare?.robLocationA ?? 0})</SelectItem>
+                    <SelectItem value="B">{selectedSpare?.location2 || 'Location B'} (Current: {selectedSpare?.robLocationB ?? 0})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
