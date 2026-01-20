@@ -226,7 +226,7 @@ const Stores: React.FC = () => {
   // Map history API data to StoresHistoryItem format
   // Uses storesLedger schema fields: itemId, eventType, timestampUTC, qtyChangeBase, robAfterBase, userId, remarks, ref, itemName, partCode
   
-  // Helper to format date consistently - show time only if present in source
+  // Helper to format date consistently - always show only date, no time
   const formatHistoryDate = (dateLocal: string | undefined, timestampUTC: string | undefined): string => {
     try {
       // Check if dateLocal is a date-only string (YYYY-MM-DD format)
@@ -237,14 +237,13 @@ const Stores: React.FC = () => {
         const dateStr = isDateOnly ? `${dateLocal.trim()}T00:00:00` : dateLocal;
         const date = new Date(dateStr);
         if (!isNaN(date.getTime())) {
-          // Only show time if original data includes time component
-          return isDateOnly ? format(date, 'dd-MMM-yyyy') : format(date, 'dd-MMM-yyyy HH:mm');
+          return format(date, 'dd-MMM-yyyy');
         }
       }
       if (timestampUTC) {
         const date = new Date(timestampUTC);
         if (!isNaN(date.getTime())) {
-          return format(date, 'dd-MMM-yyyy HH:mm');
+          return format(date, 'dd-MMM-yyyy');
         }
       }
       return '-';
@@ -1501,7 +1500,7 @@ const Stores: React.FC = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="bg-[#52baf3] text-white p-4">
           <div className="grid grid-cols-12 gap-4 items-center text-sm font-medium">
-            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.14")}><Marker id={getMarkerId(activeTab, "2.14")} />Date/Time</div>
+            <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.14")}><Marker id={getMarkerId(activeTab, "2.14")} />Date</div>
             <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.15")}><Marker id={getMarkerId(activeTab, "2.15")} />Event</div>
             <div className="col-span-2" data-testid={getMarkerId(activeTab, "2.16")}><Marker id={getMarkerId(activeTab, "2.16")} />Item Name</div>
             <div className="col-span-1" data-testid={getMarkerId(activeTab, "2.17")}><Marker id={getMarkerId(activeTab, "2.17")} />Part Code</div>

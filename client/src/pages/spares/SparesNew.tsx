@@ -2213,7 +2213,7 @@ const Spares: React.FC = () => {
               {/* History Table Header */}
               <div className="bg-[#52baf3] px-4 py-3">
                 <div className="grid grid-cols-9 gap-4 text-sm font-medium text-white">
-                  <div>Date/Time</div>
+                  <div>Date</div>
                   <div>Part Code</div>
                   <div>Part Name</div>
                   <div>Component</div>
@@ -2236,7 +2236,27 @@ const Spares: React.FC = () => {
                     <div key={history.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
                       <div className="grid grid-cols-9 gap-4 text-sm items-center">
                         <div className="text-gray-900">
-                          {history.dateLocal || format(new Date(history.timestampUTC), 'dd-MMM-yyyy')}
+                          {(() => {
+                            try {
+                              const isDateOnly = history.dateLocal && /^\d{4}-\d{2}-\d{2}$/.test(history.dateLocal.trim());
+                              if (history.dateLocal) {
+                                const dateStr = isDateOnly ? `${history.dateLocal.trim()}T00:00:00` : history.dateLocal;
+                                const date = new Date(dateStr);
+                                if (!isNaN(date.getTime())) {
+                                  return format(date, 'dd-MMM-yyyy');
+                                }
+                              }
+                              if (history.timestampUTC) {
+                                const date = new Date(history.timestampUTC);
+                                if (!isNaN(date.getTime())) {
+                                  return format(date, 'dd-MMM-yyyy');
+                                }
+                              }
+                              return '-';
+                            } catch {
+                              return '-';
+                            }
+                          })()}
                         </div>
                         <div className="text-gray-700">{history.partCode}</div>
                         <div className="text-gray-700">{history.partName}</div>
