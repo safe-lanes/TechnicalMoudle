@@ -2050,6 +2050,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch all components to hydrate currentRH for RH-based status computation
       const components = await storage.getComponents(vesselId);
+      // Create map by component_code for matching with work order's componentCode field
+      const componentsByCodeMap = new Map(components.map(comp => [comp.componentCode, comp]));
+      // Also keep map by id for fallback
       const componentsMap = new Map(components.map(comp => [comp.id, comp]));
       
       // Fetch vessel-specific grace settings for status calculation
@@ -2070,8 +2073,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? jobs.find(j => j.jobNo === wo.templateCode)
             : null;
         
-        // Get component to fetch currentCumulativeRH
-        const component = wo.component ? componentsMap.get(wo.component) : null;
+        // Get component to fetch currentCumulativeRH - match by componentCode first, then by id
+        const component = wo.componentCode 
+          ? componentsByCodeMap.get(wo.componentCode) 
+          : (wo.component ? componentsMap.get(wo.component) : null);
         
         // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
         // FALLBACK: If job/component data is missing, use work order's own nextDueReading/currentReading
@@ -2194,7 +2199,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch component to hydrate currentRH for RH-based status computation
-      const component = workOrder.component ? await storage.getComponent(workOrder.component) : null;
+      // Match by componentCode first (more reliable), then fall back to component name lookup
+      let component = null;
+      if (workOrder.componentCode && workOrder.vesselId) {
+        component = await storage.getComponentByCode(workOrder.componentCode, workOrder.vesselId);
+      }
+      if (!component && workOrder.component) {
+        component = await storage.getComponent(workOrder.component);
+      }
       
       // For RH-based jobs, use job's nextDueRH as dueRH and component's currentCumulativeRH as currentRH
       // FALLBACK: If job/component data is missing, use work order's own nextDueReading/currentReading
@@ -8082,7 +8094,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobMap = new Map(allJobs.map(j => [j.id, j]));
       
       const allComponents = await storage.getComponents();
-      const componentMap = new Map(allComponents.map(c => [c.id, c]));
+      // Create map by componentCode for matching with work order's componentCode field
+      const componentByCodeMap = new Map(allComponents.map(c => [c.componentCode, c]));
       
       const stats = {
         totalProcessed: 0,
@@ -8097,7 +8110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stats.totalProcessed++;
           
           const job = wo.jobId ? jobMap.get(wo.jobId) : undefined;
-          const component = wo.componentId ? componentMap.get(wo.componentId) : undefined;
+          const component = wo.componentCode ? componentByCodeMap.get(wo.componentCode) : undefined;
           const vesselSettings = wo.vesselId ? vesselSettingsMap.get(wo.vesselId) : undefined;
           const vesselGraceSettings = wo.vesselId ? graceSettingsMap.get(wo.vesselId) : undefined;
           
