@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Filter, Plus, Pencil, Trash2, Search, Save, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TabType = "master" | "company" | "vessel";
@@ -497,16 +497,6 @@ export default function ShipsCertificatesAdmin() {
         </Tabs>
         
         <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="gap-2"
-              data-testid="button-filters"
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-            
             {viewMode === "view" ? (
               <Button 
                 variant="outline" 
@@ -556,14 +546,16 @@ export default function ShipsCertificatesAdmin() {
               </>
             )}
             
-            <Button 
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 gap-1"
-              data-testid="button-new"
-            >
-              <Plus className="h-4 w-4" />
-              New
-            </Button>
+            {viewMode === "edit" && (
+              <Button 
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 gap-1"
+                data-testid="button-new"
+              >
+                <Plus className="h-4 w-4" />
+                New
+              </Button>
+            )}
           </div>
       </div>
 
