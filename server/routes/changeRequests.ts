@@ -2,9 +2,88 @@ import { Router } from "express";
 import { z } from "zod";
 import type { IStorage } from "../storage";
 import { insertChangeRequestSchema, insertChangeRequestCommentSchema, insertChangeRequestAttachmentSchema } from "@shared/schema";
+import { getFieldDefinitions, getEditableFields, type TargetType } from "@shared/changeRequestFields";
 
 export default function createChangeRequestsRouter(storage: IStorage) {
   const router = Router();
+
+// Get field definitions for a target type
+router.get("/field-definitions/:targetType", async (req, res) => {
+  try {
+    const { targetType } = req.params;
+    const { editableOnly } = req.query;
+    
+    const validTypes: TargetType[] = ['component', 'job', 'work_order', 'spare', 'store'];
+    if (!validTypes.includes(targetType as TargetType)) {
+      return res.status(400).json({ error: `Invalid target type: ${targetType}` });
+    }
+    
+    const fields = editableOnly === 'true' 
+      ? getEditableFields(targetType as TargetType)
+      : getFieldDefinitions(targetType as TargetType);
+    
+    res.json(fields);
+  } catch (error) {
+    console.error("Error fetching field definitions:", error);
+    res.status(500).json({ error: "Failed to fetch field definitions" });
+  }
+});
+
+// Get target entity data for populating oldValue
+router.get("/target-entity/:targetType/:targetId", async (req, res) => {
+  try {
+    const { targetType, targetId } = req.params;
+    
+    let entity: any = null;
+    
+    switch (targetType) {
+      case 'component':
+        entity = await storage.getComponent(targetId);
+        break;
+      case 'job':
+        entity = await storage.getJob(targetId);
+        break;
+      case 'work_order':
+        entity = await storage.getWorkOrder(targetId);
+        break;
+      case 'spare':
+        entity = await storage.getSpare(parseInt(targetId));
+        break;
+      case 'store':
+        entity = await storage.getStoresItem(parseInt(targetId));
+        break;
+      default:
+        return res.status(400).json({ error: `Invalid target type: ${targetType}` });
+    }
+    
+    if (!entity) {
+      return res.status(404).json({ error: `${targetType} with ID ${targetId} not found` });
+    }
+    
+    // Get field definitions and build field values map
+    const fields = getFieldDefinitions(targetType as TargetType);
+    const fieldValues: Record<string, { displayName: string; currentValue: any; editable: boolean; type: string }> = {};
+    
+    for (const field of fields) {
+      fieldValues[field.columnName] = {
+        displayName: field.displayName,
+        currentValue: entity[field.columnName] ?? null,
+        editable: field.editable,
+        type: field.type
+      };
+    }
+    
+    res.json({
+      entity,
+      fieldValues,
+      targetType,
+      targetId
+    });
+  } catch (error) {
+    console.error("Error fetching target entity:", error);
+    res.status(500).json({ error: "Failed to fetch target entity" });
+  }
+});
 
 // Get all change requests with filtering
 router.get("/", async (req, res) => {
