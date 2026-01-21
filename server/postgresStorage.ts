@@ -4081,12 +4081,28 @@ export class PostgresStorage {
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
     
-    // Legacy field translation for jobs: taskType -> maintenanceType
-    // Jobs don't have taskType column, it's called maintenanceType in the schema
+    // Legacy field translations for jobs - UI uses different field names than schema
+    // woTitle -> jobTitle (UI uses woTitle for display, schema uses jobTitle)
+    if ('woTitle' in safeUpdateData) {
+      console.log(`[CR_APPLY] Job field translation: woTitle -> jobTitle`);
+      safeUpdateData.jobTitle = safeUpdateData.woTitle;
+      delete safeUpdateData.woTitle;
+    }
+    
+    // taskType -> maintenanceType (UI uses taskType, schema uses maintenanceType)
     if ('taskType' in safeUpdateData) {
       console.log(`[CR_APPLY] Job field translation: taskType -> maintenanceType`);
       safeUpdateData.maintenanceType = safeUpdateData.taskType;
       delete safeUpdateData.taskType;
+    }
+    
+    // Remove any fields that don't exist in the jobs table schema
+    const invalidFields = ['woTemplateCode', 'componentName', 'componentCode', 'nextDueReading'];
+    for (const field of invalidFields) {
+      if (field in safeUpdateData) {
+        console.log(`[CR_APPLY] Removing invalid job field: ${field}`);
+        delete safeUpdateData[field];
+      }
     }
     
     if (Object.keys(safeUpdateData).length === 0) {
