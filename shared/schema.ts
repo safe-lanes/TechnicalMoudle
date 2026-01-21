@@ -629,6 +629,11 @@ export const changeRequest = pgTable("change_request", {
     approvedAt: string;
     appliedChanges: any[];
     comments?: string;
+    // Applied status tracking (added for complete workflow)
+    appliedStatus?: 'success' | 'failed' | 'pending';
+    appliedAt?: string;
+    appliedFieldCount?: number;
+    appliedError?: string;
   }>>().default([]), // History of all revisions
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdateFn(() => new Date()),

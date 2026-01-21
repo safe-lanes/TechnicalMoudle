@@ -798,6 +798,13 @@ class MemStorage {
   async deleteChangeRequestAttachment(id: number): Promise<void> {}
   async getChangeRequestComments(requestId: string): Promise<any[]> { return []; }
   async createChangeRequestComment(comment: any): Promise<any> { return { ...comment, id: this.getNextId('crComments') }; }
+  async submitChangeRequest(id: number, userId: string): Promise<any> { return { id, status: 'submitted' }; }
+  async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<any> { return { id, status: 'approved' }; }
+  async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<any> { return { id, status: 'rejected' }; }
+  async returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<any> { return { id, status: 'returned' }; }
+  async applyApprovedChanges(changeRequest: any): Promise<{ appliedFieldCount: number }> { return { appliedFieldCount: 0 }; }
+  async updateChangeRequestTarget(id: number, targetType: string | null, targetId: string | null, snapshotBeforeJson: any): Promise<any> { return { id }; }
+  async updateChangeRequestProposed(id: number, proposedChangesJson: any, movePreviewJson?: any): Promise<any> { return { id }; }
 
   // IHM methods
   async getIhmItems(vesselId: string): Promise<any[]> { return []; }

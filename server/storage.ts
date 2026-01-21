@@ -380,6 +380,7 @@ export interface IStorage {
   approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
   returnChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest>;
+  applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }>;
   
   // Change Request Attachments
   getChangeRequestAttachments(changeRequestId: number): Promise<ChangeRequestAttachment[]>;

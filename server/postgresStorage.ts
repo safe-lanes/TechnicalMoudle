@@ -3871,27 +3871,262 @@ export class PostgresStorage {
   }
 
   async approveChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
+    const db = await getDb();
     const existing = await this.getChangeRequest(id);
     if (!existing) throw new Error('Change request not found');
     
     const now = new Date();
     const newRevisionNumber = (existing.revisionNumber || 0) + 1;
-    const revisionHistoryEntry = {
-      revisionNumber: newRevisionNumber,
-      approvedBy: reviewerId,
-      approvedAt: now.toISOString(),
-      appliedChanges: existing.proposedChangesJson || [],
-      comments: comment
-    };
-    const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
     
-    return this.updateChangeRequest(id, { 
-      status: 'approved', 
-      reviewedByUserId: reviewerId, 
-      reviewedAt: now,
-      revisionNumber: newRevisionNumber,
-      revisionHistory: updatedHistory
-    });
+    // Execute entire approval workflow within a single transaction
+    // If any step fails, all changes are rolled back automatically
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Apply the proposed changes to the target entity within the transaction
+        const appliedChangesResult = await this.applyApprovedChangesInTx(tx, existing);
+        
+        // Build revision history entry with applied status
+        const revisionHistoryEntry = {
+          revisionNumber: newRevisionNumber,
+          approvedBy: reviewerId,
+          approvedAt: now.toISOString(),
+          appliedChanges: Array.isArray(existing.proposedChangesJson) ? existing.proposedChangesJson : [],
+          appliedStatus: 'success' as const,
+          appliedAt: now.toISOString(),
+          appliedFieldCount: appliedChangesResult.appliedFieldCount,
+          comments: comment
+        };
+        const updatedHistory = [...(existing.revisionHistory || []), revisionHistoryEntry];
+        
+        // Update the change request status within the same transaction
+        const updateResult = await tx.update(changeRequest)
+          .set({ 
+            status: 'approved', 
+            reviewedByUserId: reviewerId, 
+            reviewedAt: now,
+            revisionNumber: newRevisionNumber,
+            revisionHistory: updatedHistory,
+            updatedAt: now
+          })
+          .where(eq(changeRequest.id, id))
+          .returning();
+        
+        if (!updateResult[0]) {
+          throw new Error('Failed to update change request status');
+        }
+        
+        return updateResult[0];
+      });
+      
+      console.log(`[CR_APPLY] Successfully approved and applied CR ${id}`);
+      return result;
+    } catch (error: any) {
+      console.error(`[CR_APPLY] Transaction failed for CR ${id}, all changes rolled back:`, error);
+      // Transaction failed - all changes are automatically rolled back
+      // Do NOT update the change request status here as that would be outside the transaction
+      throw new Error(`Failed to approve change request: ${error.message}`);
+    }
+  }
+
+  /**
+   * Apply approved changes to the target PMS entity (non-transactional version)
+   * Routes changes to the correct handler based on targetType
+   * Note: For transactional safety, use applyApprovedChangesInTx instead
+   */
+  async applyApprovedChanges(changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }> {
+    const db = await getDb();
+    return this.applyApprovedChangesInTx(db, changeRequest);
+  }
+
+  /**
+   * Apply approved changes within a transaction context
+   * Routes changes to the correct handler based on targetType
+   * All updates use the provided transaction for atomicity
+   */
+  private async applyApprovedChangesInTx(tx: any, changeRequest: ChangeRequest): Promise<{ appliedFieldCount: number }> {
+    const { targetType, targetId, proposedChangesJson } = changeRequest;
+    
+    if (!targetType || !targetId) {
+      console.log(`[CR_APPLY] No target specified for CR ${changeRequest.id}, skipping apply`);
+      return { appliedFieldCount: 0 };
+    }
+    
+    if (!proposedChangesJson || !Array.isArray(proposedChangesJson) || proposedChangesJson.length === 0) {
+      console.log(`[CR_APPLY] No proposed changes for CR ${changeRequest.id}, skipping apply`);
+      return { appliedFieldCount: 0 };
+    }
+    
+    console.log(`[CR_APPLY] Applying ${proposedChangesJson.length} changes to ${targetType} ${targetId}`);
+    
+    // Build update object from proposed changes
+    // Each change has structure: { id, field, oldValue, newValue, justification }
+    const updateData: Record<string, any> = {};
+    for (const change of proposedChangesJson as Array<{ field: string; newValue: any }>) {
+      if (change.field && change.newValue !== undefined) {
+        updateData[change.field] = change.newValue;
+      }
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      console.log(`[CR_APPLY] No valid field updates extracted for CR ${changeRequest.id}`);
+      return { appliedFieldCount: 0 };
+    }
+    
+    // Route to appropriate update handler based on target type
+    switch (targetType) {
+      case 'component':
+        await this.applyComponentChangesInTx(tx, targetId, updateData);
+        break;
+      case 'job':
+        await this.applyJobChangesInTx(tx, targetId, updateData);
+        break;
+      case 'work_order':
+        await this.applyWorkOrderChangesInTx(tx, targetId, updateData);
+        break;
+      case 'spare':
+        await this.applySpareChangesInTx(tx, parseInt(targetId), updateData);
+        break;
+      case 'store':
+        await this.applyStoreChangesInTx(tx, parseInt(targetId), updateData);
+        break;
+      default:
+        console.warn(`[CR_APPLY] Unknown target type: ${targetType}`);
+        throw new Error(`Unknown target type: ${targetType}`);
+    }
+    
+    console.log(`[CR_APPLY] Successfully applied ${Object.keys(updateData).length} field changes to ${targetType} ${targetId}`);
+    return { appliedFieldCount: Object.keys(updateData).length };
+  }
+
+  /**
+   * Apply changes to a Component record within a transaction
+   */
+  private async applyComponentChangesInTx(tx: any, componentId: string, updateData: Record<string, any>): Promise<void> {
+    // Verify component exists
+    const existing = await tx.select().from(components).where(eq(components.id, componentId));
+    if (!existing[0]) {
+      throw new Error(`Component ${componentId} not found`);
+    }
+    
+    // Filter out fields that shouldn't be updated directly
+    const safeUpdateData = { ...updateData };
+    delete safeUpdateData.id;
+    delete safeUpdateData.createdAt;
+    
+    await tx.update(components)
+      .set({ ...safeUpdateData, updatedAt: new Date() })
+      .where(eq(components.id, componentId));
+    console.log(`[CR_APPLY] Component ${componentId} updated with fields: ${Object.keys(safeUpdateData).join(', ')}`);
+  }
+
+  /**
+   * Apply changes to a Job record within a transaction
+   */
+  private async applyJobChangesInTx(tx: any, jobId: string, updateData: Record<string, any>): Promise<void> {
+    // Verify job exists
+    const existing = await tx.select().from(jobs).where(eq(jobs.id, jobId));
+    if (!existing[0]) {
+      throw new Error(`Job ${jobId} not found`);
+    }
+    
+    // Filter out fields that shouldn't be updated directly
+    const safeUpdateData = { ...updateData };
+    delete safeUpdateData.id;
+    delete safeUpdateData.createdAt;
+    
+    await tx.update(jobs)
+      .set({ ...safeUpdateData, updatedAt: new Date() })
+      .where(eq(jobs.id, jobId));
+    console.log(`[CR_APPLY] Job ${jobId} updated with fields: ${Object.keys(safeUpdateData).join(', ')}`);
+  }
+
+  /**
+   * Apply changes to a Work Order record within a transaction
+   */
+  private async applyWorkOrderChangesInTx(tx: any, workOrderId: string, updateData: Record<string, any>): Promise<void> {
+    // Verify work order exists
+    const existing = await tx.select().from(workOrders).where(eq(workOrders.id, workOrderId));
+    if (!existing[0]) {
+      throw new Error(`Work Order ${workOrderId} not found`);
+    }
+    
+    // Filter out fields that shouldn't be updated directly
+    const safeUpdateData = { ...updateData };
+    delete safeUpdateData.id;
+    delete safeUpdateData.createdAt;
+    
+    await tx.update(workOrders)
+      .set({ ...safeUpdateData, updatedAt: new Date() })
+      .where(eq(workOrders.id, workOrderId));
+    console.log(`[CR_APPLY] Work Order ${workOrderId} updated with fields: ${Object.keys(safeUpdateData).join(', ')}`);
+  }
+
+  /**
+   * Apply changes to a Spare record within a transaction
+   */
+  private async applySpareChangesInTx(tx: any, spareId: number, updateData: Record<string, any>): Promise<void> {
+    // Verify spare exists
+    const existing = await tx.select().from(spares).where(eq(spares.id, spareId));
+    if (!existing[0]) {
+      throw new Error(`Spare ${spareId} not found`);
+    }
+    
+    // Filter out fields that shouldn't be updated directly
+    // ROB updates should go through dedicated methods, but CR might include them for audit
+    const safeUpdateData = { ...updateData };
+    delete safeUpdateData.id;
+    delete safeUpdateData.createdAt;
+    
+    // Handle ROB-related fields through proper methods if present
+    const robFields = ['rob', 'robLocationA', 'robLocationB'];
+    const hasRobChanges = robFields.some(f => f in safeUpdateData);
+    
+    if (hasRobChanges) {
+      console.log(`[CR_APPLY] Spare ${spareId} has ROB changes - these require dedicated adjustment methods`);
+      // Remove ROB fields from direct update
+      robFields.forEach(f => delete safeUpdateData[f]);
+    }
+    
+    if (Object.keys(safeUpdateData).length > 0) {
+      await tx.update(spares)
+        .set({ ...safeUpdateData, updatedAt: new Date() })
+        .where(eq(spares.id, spareId));
+      console.log(`[CR_APPLY] Spare ${spareId} updated with fields: ${Object.keys(safeUpdateData).join(', ')}`);
+    }
+  }
+
+  /**
+   * Apply changes to a Store Item record within a transaction
+   */
+  private async applyStoreChangesInTx(tx: any, storeId: number, updateData: Record<string, any>): Promise<void> {
+    // Verify store item exists
+    const existing = await tx.select().from(storesItems).where(eq(storesItems.id, storeId));
+    if (!existing[0]) {
+      throw new Error(`Store item ${storeId} not found`);
+    }
+    
+    // Filter out fields that shouldn't be updated directly
+    // ROB updates should go through dedicated methods
+    const safeUpdateData = { ...updateData };
+    delete safeUpdateData.id;
+    delete safeUpdateData.createdAt;
+    
+    // Handle ROB-related fields through proper methods if present
+    const robFields = ['rob', 'robLocationA', 'robLocationB'];
+    const hasRobChanges = robFields.some(f => f in safeUpdateData);
+    
+    if (hasRobChanges) {
+      console.log(`[CR_APPLY] Store ${storeId} has ROB changes - these require dedicated adjustment methods`);
+      // Remove ROB fields from direct update
+      robFields.forEach(f => delete safeUpdateData[f]);
+    }
+    
+    if (Object.keys(safeUpdateData).length > 0) {
+      await tx.update(storesItems)
+        .set({ ...safeUpdateData, updatedAt: new Date() })
+        .where(eq(storesItems.id, storeId));
+      console.log(`[CR_APPLY] Store item ${storeId} updated with fields: ${Object.keys(safeUpdateData).join(', ')}`);
+    }
   }
 
   async rejectChangeRequest(id: number, reviewerId: string, comment: string): Promise<ChangeRequest> {
