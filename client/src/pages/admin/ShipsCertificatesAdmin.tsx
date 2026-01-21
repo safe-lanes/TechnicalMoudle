@@ -75,15 +75,31 @@ const vessels = ["Vessel 1", "Vessel 2", "Vessel 3"];
 
 export default function ShipsCertificatesAdmin() {
   const [activeTab, setActiveTab] = useState<TabType>("master");
-  const [viewMode, setViewMode] = useState<ViewMode>("view");
+  const [viewModes, setViewModes] = useState<Record<TabType, ViewMode>>({
+    master: "view",
+    company: "view",
+    vessel: "view"
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
   const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
   const [nextRGDate, setNextRGDate] = useState("21/01/2026");
 
+  const currentViewMode = viewModes[activeTab];
+
   const toggleViewMode = () => {
-    setViewMode(viewMode === "view" ? "edit" : "view");
+    setViewModes(prev => ({
+      ...prev,
+      [activeTab]: prev[activeTab] === "view" ? "edit" : "view"
+    }));
+  };
+
+  const exitEditMode = () => {
+    setViewModes(prev => ({
+      ...prev,
+      [activeTab]: "view"
+    }));
   };
 
   const renderMasterTab = () => {
@@ -143,7 +159,7 @@ export default function ShipsCertificatesAdmin() {
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-center font-medium">Applicable to Company</th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
-                  {viewMode === "edit" && (
+                  {viewModes.master === "edit" && (
                     <th className="px-3 py-3 text-center font-medium">Actions</th>
                   )}
                 </tr>
@@ -160,12 +176,12 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-center">
                       <Checkbox 
                         checked={cert.applicableToCompany} 
-                        disabled={viewMode === "view"}
+                        disabled={viewModes.master === "view"}
                         data-testid={`checkbox-applicable-${cert.id}`}
                       />
                     </td>
                     <td className="px-3 py-3 text-sm">
-                      {viewMode === "edit" ? (
+                      {viewModes.master === "edit" ? (
                         <Input 
                           defaultValue={cert.certificateLabel} 
                           className="h-8 text-sm"
@@ -175,7 +191,7 @@ export default function ShipsCertificatesAdmin() {
                         cert.certificateLabel
                       )}
                     </td>
-                    {viewMode === "edit" && (
+                    {viewModes.master === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-${cert.id}`}>
@@ -189,7 +205,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
+                {viewModes.master === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
@@ -267,7 +283,7 @@ export default function ShipsCertificatesAdmin() {
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
                   <th className="px-3 py-3 text-left font-medium">Ranking</th>
-                  {viewMode === "edit" && (
+                  {viewModes.company === "edit" && (
                     <th className="px-3 py-3 text-center font-medium">Actions</th>
                   )}
                 </tr>
@@ -282,7 +298,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
                     <td className="px-3 py-3 text-sm">{cert.companyGroup}</td>
                     <td className="px-3 py-3 text-sm">{cert.ranking}</td>
-                    {viewMode === "edit" && (
+                    {viewModes.company === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-company-${cert.id}`}>
@@ -296,7 +312,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
+                {viewModes.company === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-company-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
@@ -358,7 +374,7 @@ export default function ShipsCertificatesAdmin() {
           </Button>
         </div>
 
-        {viewMode === "edit" && (
+        {viewModes.vessel === "edit" && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -376,7 +392,7 @@ export default function ShipsCertificatesAdmin() {
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
-                  {viewMode === "edit" && (
+                  {viewModes.vessel === "edit" && (
                     <th className="px-3 py-3 text-center font-medium w-12">Applicable</th>
                   )}
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
@@ -385,7 +401,7 @@ export default function ShipsCertificatesAdmin() {
                   <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
-                  {viewMode === "edit" && (
+                  {viewModes.vessel === "edit" && (
                     <th className="px-3 py-3 text-center font-medium">Actions</th>
                   )}
                 </tr>
@@ -393,7 +409,7 @@ export default function ShipsCertificatesAdmin() {
               <tbody className="divide-y">
                 {mockVesselData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
-                    {viewMode === "edit" && (
+                    {viewModes.vessel === "edit" && (
                       <td className="px-3 py-3 text-center">
                         <Checkbox 
                           checked={cert.applicable}
@@ -408,7 +424,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
                     <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
                     <td className="px-3 py-3 text-sm">{cert.companyGroup}</td>
-                    {viewMode === "edit" && (
+                    {viewModes.vessel === "edit" && (
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-vessel-${cert.id}`}>
@@ -422,7 +438,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
+                {viewModes.vessel === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
                   <tr key={`empty-vessel-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-center"><Checkbox className="border-blue-500" /></td>
                     <td className="px-3 py-3 text-sm text-muted-foreground">{mockVesselData.length + idx + 1}</td>
@@ -497,7 +513,7 @@ export default function ShipsCertificatesAdmin() {
         </Tabs>
         
         <div className="flex items-center gap-2">
-            {viewMode === "view" ? (
+            {currentViewMode === "view" ? (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -508,6 +524,14 @@ export default function ShipsCertificatesAdmin() {
               </Button>
             ) : (
               <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={exitEditMode}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
                 {activeTab === "company" && (
                   <Button 
                     variant="outline" 
@@ -520,9 +544,6 @@ export default function ShipsCertificatesAdmin() {
                 )}
                 {activeTab === "vessel" && (
                   <>
-                    <Button variant="outline" size="sm" data-testid="button-cancel">
-                      Cancel
-                    </Button>
                     <Button variant="outline" size="sm" className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300" data-testid="button-save-draft">
                       Save Draft
                     </Button>
@@ -546,7 +567,7 @@ export default function ShipsCertificatesAdmin() {
               </>
             )}
             
-            {viewMode === "edit" && (
+            {currentViewMode === "edit" && (
               <Button 
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 gap-1"
