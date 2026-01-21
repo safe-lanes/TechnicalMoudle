@@ -4918,11 +4918,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate running hours increase against daily limits
-      const validation = await validateRunningHoursIncrease({
-        componentId: validatedData.parentComponentId,
+      const validation = validateRunningHoursIncrease({
         currentRH: currentRH,
         newRH: targetRH,
-        updateDateUTC: new Date(),
+        componentLastUpdated: parentComponent.lastUpdated || null,
+        newUpdateDate: validatedData.dateUpdated,
         userRole: validatedData.userRole || 'Ship',
         adminOverride: validatedData.adminOverride || false
       });

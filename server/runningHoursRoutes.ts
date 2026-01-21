@@ -17,7 +17,8 @@ const updateMasterRHSchema = z.object({
   userId: z.string().optional().default('system'),
   userRole: z.string().optional().default('Ship'),
   adminOverride: z.boolean().optional().default(false),
-  comments: z.string().optional()
+  comments: z.string().optional(),
+  dateUpdated: z.string().optional()
 });
 
 export function registerRunningHoursRoutes(app: Express) {
@@ -142,13 +143,14 @@ export function registerRunningHoursRoutes(app: Express) {
       
       const previousRH = component.currentCumulativeRH || '0.00';
       const currentRHValue = parseFloat(previousRH);
+      const { dateUpdated } = req.body;
       
       // Validate running hours increase against daily limits
-      const validation = await validateRunningHoursIncrease({
-        componentId,
+      const validation = validateRunningHoursIncrease({
         currentRH: currentRHValue,
         newRH: newRHValue,
-        updateDateUTC: new Date(),
+        componentLastUpdated: component.lastUpdated || null,
+        newUpdateDate: dateUpdated || new Date().toISOString(),
         userRole: userRole || 'Ship',
         adminOverride: adminOverride || false
       });
@@ -441,7 +443,7 @@ export function registerRunningHoursRoutes(app: Express) {
         });
       }
       
-      const { newRHValue, updateSource, userId, userRole, adminOverride, comments } = parseResult.data;
+      const { newRHValue, updateSource, userId, userRole, adminOverride, comments, dateUpdated } = parseResult.data;
 
       // Verify component exists and is a MASTER type
       const component = await storage.getComponent(componentId);
@@ -458,11 +460,12 @@ export function registerRunningHoursRoutes(app: Express) {
       // Validate running hours increase against daily limits (only for MANUAL updates)
       if (updateSource === 'MANUAL') {
         const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
-        const validation = await validateRunningHoursIncrease({
-          componentId,
+        const lastUpdate = component.lastUpdated || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null);
+        const validation = validateRunningHoursIncrease({
           currentRH: currentRHValue,
           newRH: newRHValue,
-          updateDateUTC: new Date(),
+          componentLastUpdated: lastUpdate,
+          newUpdateDate: dateUpdated || new Date().toISOString(),
           userRole: userRole || 'Ship',
           adminOverride: adminOverride || false
         });

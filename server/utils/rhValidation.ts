@@ -1,7 +1,3 @@
-import { getDb } from '../db';
-import { runningHoursAudit } from '@shared/schema';
-import { eq, and, desc, gte, sql } from 'drizzle-orm';
-
 export interface RHValidationResult {
   allowed: boolean;
   maxAllowedIncrease: number;
@@ -13,20 +9,30 @@ export interface RHValidationResult {
 }
 
 export interface RHValidationInput {
-  componentId: string;
   currentRH: number;
   newRH: number;
-  updateDateUTC: Date;
+  componentLastUpdated: string | null;
+  newUpdateDate: string;
   userRole: string;
   adminOverride?: boolean;
 }
 
 const MAX_HOURS_PER_DAY = 25;
 
-export async function validateRunningHoursIncrease(
+function getCalendarDate(dateStr: string): Date {
+  const date = new Date(dateStr);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function getDaysBetweenCalendarDates(date1: Date, date2: Date): number {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((date2.getTime() - date1.getTime()) / msPerDay);
+}
+
+export function validateRunningHoursIncrease(
   input: RHValidationInput
-): Promise<RHValidationResult> {
-  const { componentId, currentRH, newRH, updateDateUTC, userRole, adminOverride } = input;
+): RHValidationResult {
+  const { currentRH, newRH, componentLastUpdated, newUpdateDate, userRole, adminOverride } = input;
   
   const requestedIncrease = newRH - currentRH;
   
@@ -36,82 +42,45 @@ export async function validateRunningHoursIncrease(
       maxAllowedIncrease: 0,
       requestedIncrease,
       daysSinceLastUpdate: 0,
-      lastUpdateDate: null,
+      lastUpdateDate: componentLastUpdated,
       message: 'No increase or decrease - no validation needed',
       requiresAdminOverride: false
     };
   }
   
-  const db = await getDb();
-  
-  const lastAudit = await db.select()
-    .from(runningHoursAudit)
-    .where(eq(runningHoursAudit.componentId, componentId))
-    .orderBy(desc(runningHoursAudit.enteredAtUTC))
-    .limit(1);
-  
   let daysSinceLastUpdate = 0;
-  let lastUpdateDate: string | null = null;
   let sameDayUpdate = false;
   
-  if (lastAudit.length > 0) {
-    const lastEntryDate = new Date(lastAudit[0].enteredAtUTC);
-    lastUpdateDate = lastEntryDate.toISOString().split('T')[0];
+  if (componentLastUpdated) {
+    const lastCalendarDate = getCalendarDate(componentLastUpdated);
+    const newCalendarDate = getCalendarDate(newUpdateDate);
     
-    const updateDateStr = updateDateUTC.toISOString().split('T')[0];
-    const lastDateStr = lastEntryDate.toISOString().split('T')[0];
+    daysSinceLastUpdate = getDaysBetweenCalendarDates(lastCalendarDate, newCalendarDate);
     
-    if (updateDateStr === lastDateStr) {
+    if (daysSinceLastUpdate === 0) {
       sameDayUpdate = true;
-      daysSinceLastUpdate = 0;
-    } else {
-      const diffTime = updateDateUTC.getTime() - lastEntryDate.getTime();
-      daysSinceLastUpdate = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     }
+  } else {
+    daysSinceLastUpdate = 1;
   }
   
   let maxAllowedIncrease: number;
   
   if (sameDayUpdate) {
-    const todayStart = new Date(updateDateUTC);
-    todayStart.setUTCHours(0, 0, 0, 0);
-    const todayEnd = new Date(updateDateUTC);
-    todayEnd.setUTCHours(23, 59, 59, 999);
+    const canOverride = userRole === 'Sail Admin' && adminOverride === true;
     
-    const todayUpdates = await db.select()
-      .from(runningHoursAudit)
-      .where(and(
-        eq(runningHoursAudit.componentId, componentId),
-        gte(runningHoursAudit.enteredAtUTC, todayStart)
-      ));
-    
-    if (todayUpdates.length > 0) {
-      maxAllowedIncrease = 0;
-      
-      const canOverride = userRole === 'PMS Admin' && adminOverride === true;
-      
-      return {
-        allowed: canOverride,
-        maxAllowedIncrease: 0,
-        requestedIncrease,
-        daysSinceLastUpdate: 0,
-        lastUpdateDate,
-        message: canOverride 
-          ? 'Admin override applied for same-day duplicate update'
-          : 'Same-day update already performed. Only one update of max 25 hours is allowed per day.',
-        requiresAdminOverride: !canOverride
-      };
-    }
-    
-    maxAllowedIncrease = MAX_HOURS_PER_DAY;
-  } else if (lastAudit.length === 0) {
-    // First ever update - allow 25 hours max
-    maxAllowedIncrease = MAX_HOURS_PER_DAY;
+    return {
+      allowed: canOverride,
+      maxAllowedIncrease: 0,
+      requestedIncrease,
+      daysSinceLastUpdate: 0,
+      lastUpdateDate: componentLastUpdated,
+      message: canOverride
+        ? 'Sail Admin override applied for same-day duplicate update'
+        : 'Same-day update already performed. Only one update of max 25 hours is allowed per day.',
+      requiresAdminOverride: !canOverride
+    };
   } else {
-    // Formula: days × 25 hours
-    // If 1 day has elapsed → 25 hours max
-    // If 2 days have elapsed → 50 hours max
-    // etc.
     maxAllowedIncrease = daysSinceLastUpdate * MAX_HOURS_PER_DAY;
   }
   
@@ -123,27 +92,27 @@ export async function validateRunningHoursIncrease(
       maxAllowedIncrease,
       requestedIncrease,
       daysSinceLastUpdate,
-      lastUpdateDate,
+      lastUpdateDate: componentLastUpdated,
       message: `Increase of ${requestedIncrease} hours is within the allowed limit of ${maxAllowedIncrease} hours`,
       requiresAdminOverride: false
     };
   }
   
-  const canOverride = userRole === 'PMS Admin' && adminOverride === true;
+  const canOverride = userRole === 'Sail Admin' && adminOverride === true;
   
   return {
     allowed: canOverride,
     maxAllowedIncrease,
     requestedIncrease,
     daysSinceLastUpdate,
-    lastUpdateDate,
+    lastUpdateDate: componentLastUpdated,
     message: canOverride
-      ? `Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days × 25 hours/day).`
+      ? `Sail Admin override applied. Increase of ${requestedIncrease} hours exceeds normal limit of ${maxAllowedIncrease} hours (${daysSinceLastUpdate} days × 25 hours/day).`
       : `Increase of ${requestedIncrease} hours exceeds maximum allowed of ${maxAllowedIncrease} hours. Maximum allowed is ${daysSinceLastUpdate} day(s) × 25 hours/day = ${maxAllowedIncrease} hours.`,
     requiresAdminOverride: !canOverride
   };
 }
 
 export function canAdminOverride(userRole: string): boolean {
-  return userRole === 'PMS Admin';
+  return userRole === 'Sail Admin';
 }
