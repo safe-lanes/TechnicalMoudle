@@ -73,6 +73,14 @@ const groups = ["All Groups", "Safety", "Environment", "Cargo", "Navigation"];
 const companyGroups = ["A. Statutory", "B. Trading", "C. Class", "D. Other"];
 const vessels = ["Vessel 1", "Vessel 2", "Vessel 3"];
 
+// TODO: Replace these dropdown options with actual values from backend/configuration
+// Master Tab - Category dropdown options (A-F for now, will be replaced later)
+const MASTER_CATEGORY_OPTIONS = ["A", "B", "C", "D", "E", "F"];
+
+// TODO: Replace these dropdown options with actual values from backend/configuration
+// Master Tab - Group dropdown options (1-10 for now, will be replaced later)
+const MASTER_GROUP_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+
 export default function ShipsCertificatesAdmin() {
   const [activeTab, setActiveTab] = useState<TabType>("master");
   const [viewModes, setViewModes] = useState<Record<TabType, ViewMode>>({
@@ -170,9 +178,51 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
                     <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
                     <td className="px-3 py-3 text-sm">{cert.certificateName}</td>
-                    <td className="px-3 py-3 text-sm">{cert.category}</td>
-                    <td className="px-3 py-3 text-sm">{cert.group}</td>
-                    <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.master === "edit" ? (
+                        <Select defaultValue={cert.category}>
+                          <SelectTrigger className="h-8 text-sm" data-testid={`select-category-${cert.id}`}>
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* TODO: Replace MASTER_CATEGORY_OPTIONS with actual values */}
+                            {MASTER_CATEGORY_OPTIONS.map(cat => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        cert.category
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.master === "edit" ? (
+                        <Select defaultValue={cert.group}>
+                          <SelectTrigger className="h-8 text-sm" data-testid={`select-group-${cert.id}`}>
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* TODO: Replace MASTER_GROUP_OPTIONS with actual values */}
+                            {MASTER_GROUP_OPTIONS.map(grp => (
+                              <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        cert.group
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.master === "edit" ? (
+                        <Input 
+                          defaultValue={cert.requirementRef} 
+                          className="h-8 text-sm"
+                          data-testid={`input-requirement-${cert.id}`}
+                        />
+                      ) : (
+                        cert.requirementRef
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-center">
                       <Checkbox 
                         checked={cert.applicableToCompany} 
@@ -208,13 +258,14 @@ export default function ShipsCertificatesAdmin() {
                 {viewModes.master === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
+                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-masterid-empty-${idx}`} /></td>
+                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-certname-empty-${idx}`} /></td>
                     <td className="px-3 py-3">
                       <Select>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-sm" data-testid={`select-category-empty-${idx}`}><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
-                          {categories.filter(c => c !== "All Categories").map(cat => (
+                          {/* TODO: Replace MASTER_CATEGORY_OPTIONS with actual values */}
+                          {MASTER_CATEGORY_OPTIONS.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
                         </SelectContent>
@@ -222,17 +273,18 @@ export default function ShipsCertificatesAdmin() {
                     </td>
                     <td className="px-3 py-3">
                       <Select>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-sm" data-testid={`select-group-empty-${idx}`}><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
-                          {groups.filter(g => g !== "All Groups").map(grp => (
+                          {/* TODO: Replace MASTER_GROUP_OPTIONS with actual values */}
+                          {MASTER_GROUP_OPTIONS.map(grp => (
                             <SelectItem key={grp} value={grp}>{grp}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3 text-center"><Checkbox /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
+                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-requirement-empty-${idx}`} /></td>
+                    <td className="px-3 py-3 text-center"><Checkbox data-testid={`checkbox-applicable-empty-${idx}`} /></td>
+                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-label-empty-${idx}`} /></td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <Button size="icon" variant="ghost" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
