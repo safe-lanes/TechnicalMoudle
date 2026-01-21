@@ -133,7 +133,7 @@ export default function ShipsCertificatesAdmin() {
         <div className="bg-white rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#16569e] text-white text-sm">
+              <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
@@ -258,7 +258,7 @@ export default function ShipsCertificatesAdmin() {
         <div className="bg-white rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#16569e] text-white text-sm">
+              <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
@@ -374,7 +374,7 @@ export default function ShipsCertificatesAdmin() {
         <div className="bg-white rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#16569e] text-white text-sm">
+              <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
                   {viewMode === "edit" && (
                     <th className="px-3 py-3 text-center font-medium w-12">Applicable</th>
