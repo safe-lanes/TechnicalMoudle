@@ -458,12 +458,11 @@ export default function ShipsCertificatesAdmin() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between relative">
         <h1 className="text-2xl font-semibold text-gray-800">Ship Certificates Admin</h1>
         
-        <div className="flex items-center gap-3">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="w-auto">
-            <TabsList className="bg-gray-100">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="absolute left-1/2 -translate-x-1/2">
+          <TabsList className="bg-gray-100">
               <TabsTrigger 
                 value="master" 
                 className={cn(
@@ -494,10 +493,10 @@ export default function ShipsCertificatesAdmin() {
               >
                 Vessel
               </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          <div className="flex items-center gap-2">
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
               size="sm"
@@ -566,7 +565,6 @@ export default function ShipsCertificatesAdmin() {
               New
             </Button>
           </div>
-        </div>
       </div>
 
       <div className="mt-4">
