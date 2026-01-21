@@ -39,7 +39,12 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Master-Slave Parity**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) maintain exact field parity.
 - **Part A Immutability**: Work Order Part A is read-only for existing work orders.
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
-- **Change Request Workflow** (2026-01-21): Complete implementation of "Apply Approved Changes" step. When a Change Request is approved, the system now automatically applies the proposed changes to the target PMS entity (Component, Job, Work Order, Spare, or Store). The entire approval + apply workflow is wrapped in a database transaction for atomicity - if any step fails, all changes are rolled back. The revision history tracks applied status (success/failed), timestamp, field count, and any error messages.
+- **Change Request Workflow** (2026-01-21): Complete implementation of "Apply Approved Changes" step. When a Change Request is approved, the system now automatically applies the proposed changes to the target PMS entity (Component, Job, Work Order, Spare, or Store). The entire approval + apply workflow is wrapped in a database transaction for atomicity - if any step fails, all changes are rolled back. The revision history tracks applied status (success/failed), timestamp, field count, and any error messages. Key implementation details:
+  - **Field Definitions** (`shared/changeRequestFields.ts`): Maps display names to actual database column names (camelCase matching Drizzle schema property names) for Components, Jobs, Work Orders, Spares, and Stores
+  - **Target Entity API**: `/technical/api/change-requests/target-entity/:type/:id` returns entity data with current field values for form auto-population
+  - **Legacy Field Translation**: The apply handler translates old-style nested field paths (e.g., `componentInfo.serialNo`) to direct column names (e.g., `serialNo`) for backward compatibility
+  - **Before/After Verification**: All apply handlers use `.returning()` to verify updates succeeded and log field-by-field comparisons
+  - **ROB Protection**: Spares and Stores ROB fields are marked as non-editable to enforce use of dedicated adjustment methods
 
 ## Database Migration Strategy
 

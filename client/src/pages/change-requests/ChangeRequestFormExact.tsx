@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Eye, Upload, Plus, Edit, Trash2, Calendar, GitPullRequest } from "lucide-react";
+import { ArrowLeft, Eye, Upload, Plus, Edit, Trash2, Calendar, GitPullRequest, Loader2, AlertCircle } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { insertChangeRequestSchema, type InsertChangeRequest, type ChangeRequest } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,6 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useVessel } from "@/contexts/VesselContext";
+import { type FieldDefinition } from "@shared/changeRequestFields";
+
+interface TargetEntityData {
+  entity: any;
+  fieldValues: Record<string, { displayName: string; currentValue: any; editable: boolean; type: string }>;
+  targetType: string;
+  targetId: string;
+}
 
 // Generate change request reference number
 const generateRequestRef = () => {
@@ -60,6 +68,9 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showChangesModal, setShowChangesModal] = useState(false);
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
+  const [targetEntityData, setTargetEntityData] = useState<TargetEntityData | null>(null);
+  const [targetEntityError, setTargetEntityError] = useState<string | null>(null);
+  const [isLoadingTarget, setIsLoadingTarget] = useState(false);
 
   const { data: vessels = [] } = useQuery({
     queryKey: ['/technical/api/vessels'],
@@ -93,6 +104,61 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
 
   const isViewMode = mode === 'view';
   const isEditMode = mode === 'edit';
+
+  // Watch targetType and targetId for changes
+  const watchedTargetType = form.watch('targetType');
+  const watchedTargetId = form.watch('targetId');
+
+  // Fetch target entity when target type and ID are set
+  const fetchTargetEntity = async (targetType: string, targetId: string) => {
+    if (!targetType || !targetId) {
+      setTargetEntityData(null);
+      setTargetEntityError(null);
+      return;
+    }
+
+    setIsLoadingTarget(true);
+    setTargetEntityError(null);
+
+    try {
+      const response = await fetch(`/technical/api/change-requests/target-entity/${targetType}/${targetId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        setTargetEntityError(error.error || `Failed to fetch ${targetType}`);
+        setTargetEntityData(null);
+        return;
+      }
+      const data = await response.json();
+      setTargetEntityData(data);
+    } catch (error: any) {
+      setTargetEntityError(error.message || 'Failed to fetch target entity');
+      setTargetEntityData(null);
+    } finally {
+      setIsLoadingTarget(false);
+    }
+  };
+
+  // Effect to fetch target entity when type/id changes
+  useEffect(() => {
+    if (watchedTargetType && watchedTargetId) {
+      fetchTargetEntity(watchedTargetType, watchedTargetId);
+    } else {
+      setTargetEntityData(null);
+      setTargetEntityError(null);
+    }
+  }, [watchedTargetType, watchedTargetId]);
+
+  // Get available fields for the selected target type
+  const availableFields = targetEntityData?.fieldValues 
+    ? Object.entries(targetEntityData.fieldValues)
+        .filter(([, value]) => value.editable)
+        .map(([columnName, value]) => ({
+          columnName,
+          displayName: value.displayName,
+          currentValue: value.currentValue,
+          type: value.type
+        }))
+    : [];
 
   // Create change request mutation
   const createMutation = useMutation({
@@ -505,6 +571,34 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
                               </FormItem>
                             )}
                           />
+
+                          {/* Target Entity Status */}
+                          {watchedTargetType && watchedTargetId && (
+                            <div className="mt-4 p-3 border rounded-md">
+                              {isLoadingTarget ? (
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Loading target entity...</span>
+                                </div>
+                              ) : targetEntityError ? (
+                                <div className="flex items-start gap-2 text-red-600">
+                                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                  <span>{targetEntityError}</span>
+                                </div>
+                              ) : targetEntityData ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-green-600">
+                                    <Eye className="h-4 w-4" />
+                                    <span className="font-medium">Target Found</span>
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    <p><strong>Name:</strong> {targetEntityData.entity.name || targetEntityData.entity.title || 'N/A'}</p>
+                                    <p><strong>Available editable fields:</strong> {availableFields.length}</p>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     )}
@@ -716,30 +810,70 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
               <DialogTitle>{editingChange?.id ? 'Edit' : 'Add'} Proposed Change</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
+              {!targetEntityData && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-amber-700">
+                    Please select a target type and ID in the "Target Selection" section first to enable field selection with auto-populated current values.
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium">Field Name *</label>
-                <Input
-                  value={editingChange?.field || ''}
-                  onChange={(e) => setEditingChange(prev => prev ? { ...prev, field: e.target.value } : null)}
-                  placeholder="e.g., Component Name, Stock Level"
-                  data-testid="input-change-field"
-                />
+                {targetEntityData && availableFields.length > 0 ? (
+                  <Select
+                    value={editingChange?.field || ''}
+                    onValueChange={(value) => {
+                      const selectedField = availableFields.find(f => f.columnName === value);
+                      setEditingChange(prev => prev ? { 
+                        ...prev, 
+                        field: value,
+                        oldValue: selectedField?.currentValue != null ? String(selectedField.currentValue) : ''
+                      } : null);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-change-field">
+                      <SelectValue placeholder="Select a field to change" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFields.map((field) => (
+                        <SelectItem key={field.columnName} value={field.columnName}>
+                          {field.displayName} (current: {field.currentValue != null ? String(field.currentValue) : 'empty'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={editingChange?.field || ''}
+                    onChange={(e) => setEditingChange(prev => prev ? { ...prev, field: e.target.value } : null)}
+                    placeholder="e.g., Component Name, Stock Level"
+                    data-testid="input-change-field"
+                  />
+                )}
               </div>
               <div>
-                <label className="text-sm font-medium">Old Value</label>
+                <label className="text-sm font-medium">Current Value (from database)</label>
                 <Input
                   value={editingChange?.oldValue || ''}
-                  onChange={(e) => setEditingChange(prev => prev ? { ...prev, oldValue: e.target.value } : null)}
-                  placeholder="Current value"
+                  readOnly
+                  disabled
+                  className="bg-gray-50"
+                  placeholder={targetEntityData ? "Select a field above" : "Enter current value"}
                   data-testid="input-change-old"
                 />
+                {targetEntityData && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-populated from database when field is selected
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">New Value *</label>
                 <Input
                   value={editingChange?.newValue || ''}
                   onChange={(e) => setEditingChange(prev => prev ? { ...prev, newValue: e.target.value } : null)}
-                  placeholder="Proposed new value"
+                  placeholder="Enter the proposed new value"
                   data-testid="input-change-new"
                 />
               </div>
