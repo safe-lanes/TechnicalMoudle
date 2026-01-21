@@ -4918,14 +4918,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate running hours increase against daily limits
+      // Use same fallback logic as the Running Hours display: lastUpdated || rhMasterUpdatedAt || updatedAt
+      const componentLastUpdated = parentComponent.lastUpdated 
+        || (parentComponent.rhMasterUpdatedAt ? new Date(parentComponent.rhMasterUpdatedAt).toISOString() : null)
+        || (parentComponent.updatedAt ? new Date(parentComponent.updatedAt).toISOString() : null);
+      
+      console.log('[RH Validation Debug] componentLastUpdated:', componentLastUpdated);
+      console.log('[RH Validation Debug] newUpdateDate:', validatedData.dateUpdated);
+      console.log('[RH Validation Debug] currentRH:', currentRH, 'targetRH:', targetRH);
+      
       const validation = validateRunningHoursIncrease({
         currentRH: currentRH,
         newRH: targetRH,
-        componentLastUpdated: parentComponent.lastUpdated || null,
+        componentLastUpdated: componentLastUpdated,
         newUpdateDate: validatedData.dateUpdated,
         userRole: validatedData.userRole || 'Ship',
         adminOverride: validatedData.adminOverride || false
       });
+      
+      console.log('[RH Validation Debug] result:', validation);
       
       if (!validation.allowed) {
         return res.status(400).json({

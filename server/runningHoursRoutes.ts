@@ -145,11 +145,16 @@ export function registerRunningHoursRoutes(app: Express) {
       const currentRHValue = parseFloat(previousRH);
       const { dateUpdated } = req.body;
       
+      // Use same fallback logic as the Running Hours display
+      const componentLastUpdated = component.lastUpdated 
+        || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null)
+        || (component.updatedAt ? new Date(component.updatedAt).toISOString() : null);
+      
       // Validate running hours increase against daily limits
       const validation = validateRunningHoursIncrease({
         currentRH: currentRHValue,
         newRH: newRHValue,
-        componentLastUpdated: component.lastUpdated || null,
+        componentLastUpdated: componentLastUpdated,
         newUpdateDate: dateUpdated || new Date().toISOString(),
         userRole: userRole || 'Ship',
         adminOverride: adminOverride || false
@@ -460,7 +465,10 @@ export function registerRunningHoursRoutes(app: Express) {
       // Validate running hours increase against daily limits (only for MANUAL updates)
       if (updateSource === 'MANUAL') {
         const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
-        const lastUpdate = component.lastUpdated || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null);
+        // Use same fallback logic as the Running Hours display
+        const lastUpdate = component.lastUpdated 
+          || (component.rhMasterUpdatedAt ? new Date(component.rhMasterUpdatedAt).toISOString() : null)
+          || (component.updatedAt ? new Date(component.updatedAt).toISOString() : null);
         const validation = validateRunningHoursIncrease({
           currentRH: currentRHValue,
           newRH: newRHValue,
