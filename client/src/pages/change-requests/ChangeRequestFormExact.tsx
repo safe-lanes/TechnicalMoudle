@@ -438,9 +438,11 @@ export default function ChangeRequestFormExact({ onClose, changeRequest, mode = 
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    <SelectItem value="V001">MV SEAFARER</SelectItem>
-                                    <SelectItem value="V002">MV VOYAGER</SelectItem>
-                                    <SelectItem value="V003">MV EXPLORER</SelectItem>
+                                    {vessels.map((vessel: any) => (
+                                      <SelectItem key={vessel.id} value={vessel.id}>
+                                        {vessel.name || vessel.code || vessel.id}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </FormItem>

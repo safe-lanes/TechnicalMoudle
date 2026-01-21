@@ -36,6 +36,15 @@ export default function EditChangeRequestModal({ open, onClose, requestId }: Edi
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [editingChange, setEditingChange] = useState<ProposedChange | null>(null);
 
+  const { data: vessels = [] } = useQuery({
+    queryKey: ['/technical/api/vessels'],
+    queryFn: async () => {
+      const response = await fetch('/technical/api/vessels');
+      if (!response.ok) throw new Error('Failed to fetch vessels');
+      return response.json();
+    }
+  });
+
   const { data: changeRequest, isLoading } = useQuery<ChangeRequest>({
     queryKey: ['/technical/api/change-requests', requestId],
     queryFn: async () => {
@@ -212,9 +221,11 @@ export default function EditChangeRequestModal({ open, onClose, requestId }: Edi
                       <SelectValue placeholder="Select vessel" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="V001">MV SEAFARER</SelectItem>
-                      <SelectItem value="V002">MV VOYAGER</SelectItem>
-                      <SelectItem value="V003">MV EXPLORER</SelectItem>
+                      {vessels.map((vessel: any) => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          {vessel.name || vessel.code || vessel.id}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

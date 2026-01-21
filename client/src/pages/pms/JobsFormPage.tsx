@@ -22,6 +22,7 @@ import { PartHeader } from "@/components/PartHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useVessel } from "@/contexts/VesselContext";
 
 const ReadOnlyField: React.FC<{ label: string; value: string | undefined; labelMarker?: string; valueMarker?: string }> = ({ label, value, labelMarker, valueMarker }) => (
   <div className="space-y-1">
@@ -110,6 +111,7 @@ const JobsFormPage: React.FC = () => {
   const [, params] = useRoute("/pms/job/:id");
   const jobId = params?.id;
   const { toast } = useToast();
+  const { vesselId } = useVessel();
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -248,7 +250,7 @@ const JobsFormPage: React.FC = () => {
       
       // Create change request via backend API
       await apiRequest('POST', '/technical/api/change-requests', {
-        vesselId: 'V001',
+        vesselId: vesselId,
         category: 'jobs',
         title: `Job Change: ${templateData.woTemplateCode || templateData.woTitle || 'Unknown'}`,
         reason: `Modification request for job ${templateData.woTemplateCode}`,
