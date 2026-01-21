@@ -72,6 +72,17 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
     enabled: open && !!requestId
   });
 
+  // Fetch current database values for the target entity
+  const { data: targetEntityData } = useQuery({
+    queryKey: ['/technical/api/change-requests/target-entity', changeRequest?.targetType, changeRequest?.targetId],
+    queryFn: async () => {
+      const response = await fetch(`/technical/api/change-requests/target-entity/${changeRequest?.targetType}/${changeRequest?.targetId}`);
+      if (!response.ok) throw new Error('Failed to fetch target entity');
+      return response.json();
+    },
+    enabled: open && !!changeRequest?.targetType && !!changeRequest?.targetId
+  });
+
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -134,6 +145,35 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
     (typeof changeRequest.proposedChangesJson === 'string' ? 
       JSON.parse(changeRequest.proposedChangesJson) : 
       changeRequest.proposedChangesJson) : [];
+
+  // Helper to get current database value for a field
+  const getCurrentValue = (fieldName: string): string => {
+    if (!targetEntityData?.entity) return '-';
+    
+    // Handle legacy nested paths like "componentInfo.serialNo" -> "serialNo"
+    let normalizedField = fieldName;
+    if (fieldName.includes('.')) {
+      const parts = fieldName.split('.');
+      normalizedField = parts[parts.length - 1];
+    }
+    
+    // Special field translations for different entity types
+    const fieldMappings: Record<string, Record<string, string>> = {
+      job: {
+        taskType: 'maintenanceType'
+      },
+      work_order: {}
+    };
+    
+    const entityType = changeRequest?.targetType || '';
+    const mappings = fieldMappings[entityType] || {};
+    const actualField = mappings[normalizedField] || normalizedField;
+    
+    const value = targetEntityData.entity[actualField];
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    return String(value);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -274,28 +314,62 @@ export default function ViewChangeRequestModal({ open, onClose, requestId }: Vie
                 {expandedSections.proposedChanges && (
                   <CardContent>
                     <div className="space-y-3">
-                      {proposedChanges.map((change: any, index: number) => (
-                        <div key={index} className="border rounded-lg p-3 bg-gray-50">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-xs text-gray-600">Field</Label>
-                              <p className="font-medium">{change.field}</p>
+                      {proposedChanges.map((change: any, index: number) => {
+                        const currentDbValue = getCurrentValue(change.field);
+                        const originalValue = change.oldValue || '-';
+                        
+                        // Normalize for comparison (handle boolean variants and type differences)
+                        const normalizeForCompare = (val: string): string => {
+                          const v = String(val).toLowerCase().trim();
+                          if (v === 'true' || v === 'yes' || v === '1') return 'true';
+                          if (v === 'false' || v === 'no' || v === '0') return 'false';
+                          return v;
+                        };
+                        
+                        const currentNormalized = normalizeForCompare(currentDbValue);
+                        const originalNormalized = normalizeForCompare(originalValue);
+                        const hasChanged = currentDbValue !== '-' && currentNormalized !== originalNormalized;
+                        
+                        return (
+                        <div key={index} className="border rounded-lg p-3 bg-gray-50" data-testid={`change-item-${index}`}>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="col-span-3 grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-xs text-gray-600">Field</Label>
+                                <p className="font-medium">{change.field}</p>
+                              </div>
+                              <div>
+                                <Label className="text-xs text-gray-600">Justification</Label>
+                                <p className="text-sm text-gray-700">{change.justification || '-'}</p>
+                              </div>
                             </div>
                             <div>
-                              <Label className="text-xs text-gray-600">Justification</Label>
-                              <p className="text-sm text-gray-700">{change.justification}</p>
+                              <Label className="text-xs text-gray-600">Original Value (at CR creation)</Label>
+                              <p className="text-red-600 font-medium" data-testid={`original-value-${index}`}>
+                                {originalValue}
+                              </p>
                             </div>
                             <div>
-                              <Label className="text-xs text-gray-600">Old Value</Label>
-                              <p className="text-red-600">{change.oldValue || '-'}</p>
+                              <Label className="text-xs text-gray-600">Current Database Value</Label>
+                              <div>
+                                <p className={`font-medium ${hasChanged ? 'text-orange-600' : 'text-gray-700'}`} data-testid={`current-value-${index}`}>
+                                  {currentDbValue}
+                                </p>
+                                {hasChanged && (
+                                  <p className="text-xs text-orange-500 mt-1">
+                                    Value changed since CR creation
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div>
-                              <Label className="text-xs text-gray-600">New Value</Label>
-                              <p className="text-green-600">{change.newValue}</p>
+                              <Label className="text-xs text-gray-600">Proposed Value</Label>
+                              <p className="text-green-600 font-medium" data-testid={`proposed-value-${index}`}>{change.newValue}</p>
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 )}
