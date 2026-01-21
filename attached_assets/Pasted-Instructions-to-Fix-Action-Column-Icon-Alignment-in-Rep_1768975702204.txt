@@ -1,0 +1,77 @@
+Instructions to Fix Action Column Icon Alignment in Replit
+Problem
+The icons (info, edit, add, delete) in the "Actions" column are not vertically centered with the row content.
+​
+
+Solution Steps
+1. Locate the Stores Inventory Component File
+
+In your Replit project file explorer, find the component that renders the Stores table
+
+This is likely in a path like: src/components/Stores/StoresInventory.jsx or similar
+
+2. Find the Table Row Rendering Code
+
+Look for the section that renders the table rows with the Actions column
+
+You should see code that renders buttons for Edit, Consume/Receive, and Delete actions
+
+3. Add CSS Classes or Inline Styles
+
+Option A: Add inline styles to the Actions cell
+
+jsx
+<td style={{ verticalAlign: 'middle' }}>
+  <button onClick={handleEdit}>...</button>
+  <button onClick={handleConsume}>...</button>
+  <button onClick={handleDelete}>...</button>
+</td>
+Option B: Add a wrapper div with flexbox
+
+jsx
+<td>
+  <div style={{ 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: '8px' 
+  }}>
+    <button onClick={handleEdit}>...</button>
+    <button onClick={handleConsume}>...</button>
+    <button onClick={handleDelete}>...</button>
+  </div>
+</td>
+4. If Using a CSS File
+
+Find your CSS file (e.g., styles.css, StoresInventory.css, or index.css)
+
+Add this rule:
+
+css
+/* For all table cells */
+table td {
+  vertical-align: middle;
+}
+
+/* Or specifically for actions column */
+.actions-column {
+  vertical-align: middle;
+}
+5. Apply the CSS Class
+
+If you added a CSS class, apply it to your Actions column cells:
+
+jsx
+<td className="actions-column">
+  ...buttons...
+</td>
+6. Save and Refresh
+
+Save all files in Replit
+
+The development server should auto-reload
+
+Check the browser to verify the icons are now vertically centered
+
+Recommended Approach
+Use Option B (flexbox wrapper) as it provides the best control over icon spacing and alignment, and works consistently across different row heights.
