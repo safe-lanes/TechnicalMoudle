@@ -39,6 +39,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Master-Slave Parity**: `JobsFormPage.tsx` (MASTER) and `WorkOrderFormPage.tsx` (SLAVE - Part A) maintain exact field parity.
 - **Part A Immutability**: Work Order Part A is read-only for existing work orders.
 - **API Route Prefix**: All API endpoints use the `/technical/api` prefix for namespace separation.
+- **Change Request Workflow** (2026-01-21): Complete implementation of "Apply Approved Changes" step. When a Change Request is approved, the system now automatically applies the proposed changes to the target PMS entity (Component, Job, Work Order, Spare, or Store). The entire approval + apply workflow is wrapped in a database transaction for atomicity - if any step fails, all changes are rolled back. The revision history tracks applied status (success/failed), timestamp, field count, and any error messages.
 
 ## Database Migration Strategy
 
