@@ -4081,14 +4081,6 @@ export class PostgresStorage {
     delete safeUpdateData.createdAt;
     delete safeUpdateData.vesselId;
     
-    // Legacy field translation for jobs: taskType -> maintenanceType
-    // Jobs don't have taskType column, it's called maintenanceType in the schema
-    if ('taskType' in safeUpdateData) {
-      console.log(`[CR_APPLY] Job field translation: taskType -> maintenanceType`);
-      safeUpdateData.maintenanceType = safeUpdateData.taskType;
-      delete safeUpdateData.taskType;
-    }
-    
     if (Object.keys(safeUpdateData).length === 0) {
       console.log(`[CR_APPLY] Job ${jobId}: No valid fields to update`);
       return;
