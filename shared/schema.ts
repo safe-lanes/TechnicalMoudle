@@ -148,6 +148,8 @@ export const cascadeRunningHoursSchema = z.object({
   oldMeterFinal: z.string().optional(),
   newMeterStart: z.string().optional(),
   userId: z.string().default('admin'),
+  userRole: z.string().optional().default('Ship'), // User role for validation (Ship, Office, PMS Admin)
+  adminOverride: z.boolean().optional().default(false), // Admin override for exceeding daily limits
   // Renewal/Replacement fields (required when value = 0)
   isRenewalReset: z.boolean().optional().default(false),
   renewalActionType: z.enum(RENEWAL_ACTION_TYPES).optional(),

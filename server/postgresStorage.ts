@@ -1064,6 +1064,25 @@ export class PostgresStorage {
     // Get all inherited components linked to this master
     const inheritedComponents = await this.getInheritedComponents(params.componentId, masterVesselId);
     
+    // Create audit entry for the master component update
+    await db.insert(runningHoursAudit).values({
+      vesselId: masterVesselId,
+      componentId: params.componentId,
+      previousRH: previousMasterRH.toFixed(2),
+      newRH: params.newRHValue.toFixed(2),
+      cumulativeRH: params.newRHValue.toFixed(2),
+      dateUpdatedLocal: now.toISOString().split('T')[0],
+      dateUpdatedTZ: 'UTC',
+      enteredAtUTC: now,
+      userId: params.userId,
+      source: params.updateSource.toLowerCase(),
+      notes: params.comments || null,
+      meterReplaced: false,
+      version: 1,
+      componentCode: masterComponentCode,
+      componentName: component.name || null,
+    });
+
     // Apply DELTA to each inherited component's currentCumulativeRH (actual running hours)
     // rhCurrentInheritedCached stores the master's absolute value (for display/config)
     // currentCumulativeRH tracks the child's individual running hours (delta-based)

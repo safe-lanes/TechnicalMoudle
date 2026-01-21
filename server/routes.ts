@@ -23,6 +23,7 @@ import { ObjectStorageService, objectStorageClient, parseObjectPath, ObjectNotFo
 import { registerRunningHoursRoutes } from "./runningHoursRoutes";
 import { requireAuth, requireRole, requirePMSAdmin, requireOfficeOrAdmin, requireVesselAccess, mockAuthMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { ensureMaintenanceHistoryImmutability } from "./initDb";
+import { validateRunningHoursIncrease, canAdminOverride } from "./utils/rhValidation";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CRITICAL: Ensure immutability trigger exists BEFORE registering routes
@@ -4899,8 +4900,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/technical/api/running-hours/cascade", async (req, res) => {
     try {
       const validatedData = cascadeRunningHoursSchema.parse(req.body);
+      
+      // Get the parent component to determine current RH
+      const parentComponent = await storage.getComponent(validatedData.parentComponentId);
+      if (!parentComponent) {
+        return res.status(404).json({ error: "Parent component not found" });
+      }
+      
+      const currentRH = parseFloat(parentComponent.currentCumulativeRH || '0');
+      let targetRH: number;
+      
+      if (validatedData.mode === 'setTotal') {
+        targetRH = validatedData.value;
+      } else {
+        // addDelta mode
+        targetRH = currentRH + validatedData.value;
+      }
+      
+      // Validate running hours increase against daily limits
+      const validation = await validateRunningHoursIncrease({
+        componentId: validatedData.parentComponentId,
+        currentRH: currentRH,
+        newRH: targetRH,
+        updateDateUTC: new Date(),
+        userRole: validatedData.userRole || 'Ship',
+        adminOverride: validatedData.adminOverride || false
+      });
+      
+      if (!validation.allowed) {
+        return res.status(400).json({
+          error: validation.message,
+          validation: {
+            maxAllowedIncrease: validation.maxAllowedIncrease,
+            requestedIncrease: validation.requestedIncrease,
+            daysSinceLastUpdate: validation.daysSinceLastUpdate,
+            lastUpdateDate: validation.lastUpdateDate,
+            requiresAdminOverride: validation.requiresAdminOverride,
+            canOverride: canAdminOverride(validatedData.userRole || 'Ship')
+          }
+        });
+      }
+      
       const result = await storage.cascadeRunningHoursUpdate(validatedData);
-      res.json(result);
+      res.json({
+        ...result,
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          actualIncrease: validation.requestedIncrease
+        }
+      });
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid cascade data", details: error.errors });

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "./storage";
 import { z } from "zod";
 import { jobDueScanner } from "./services/jobDueScanner";
+import { validateRunningHoursIncrease, canAdminOverride } from "./utils/rhValidation";
 
 // Zod schemas for RH configuration API validation
 const updateRHConfigSchema = z.object({
@@ -14,6 +15,8 @@ const updateMasterRHSchema = z.object({
   newRHValue: z.number().nonnegative("Running hours must be non-negative"),
   updateSource: z.enum(['MANUAL', 'IMPORT', 'AUTOMATION']).optional().default('MANUAL'),
   userId: z.string().optional().default('system'),
+  userRole: z.string().optional().default('Ship'),
+  adminOverride: z.boolean().optional().default(false),
   comments: z.string().optional()
 });
 
@@ -116,7 +119,7 @@ export function registerRunningHoursRoutes(app: Express) {
   app.put("/technical/api/running-hours/child/:componentId", async (req, res) => {
     try {
       const { componentId } = req.params;
-      const { newRHValue, comments, userId } = req.body;
+      const { newRHValue, comments, userId, userRole, adminOverride } = req.body;
       
       // Validate newRHValue
       if (typeof newRHValue !== 'number' || newRHValue < 0) {
@@ -138,6 +141,32 @@ export function registerRunningHoursRoutes(app: Express) {
       }
       
       const previousRH = component.currentCumulativeRH || '0.00';
+      const currentRHValue = parseFloat(previousRH);
+      
+      // Validate running hours increase against daily limits
+      const validation = await validateRunningHoursIncrease({
+        componentId,
+        currentRH: currentRHValue,
+        newRH: newRHValue,
+        updateDateUTC: new Date(),
+        userRole: userRole || 'Ship',
+        adminOverride: adminOverride || false
+      });
+      
+      if (!validation.allowed) {
+        return res.status(400).json({
+          error: validation.message,
+          validation: {
+            maxAllowedIncrease: validation.maxAllowedIncrease,
+            requestedIncrease: validation.requestedIncrease,
+            daysSinceLastUpdate: validation.daysSinceLastUpdate,
+            lastUpdateDate: validation.lastUpdateDate,
+            requiresAdminOverride: validation.requiresAdminOverride,
+            canOverride: canAdminOverride(userRole || 'Ship')
+          }
+        });
+      }
+      
       const newRHFormatted = newRHValue.toFixed(2);
       
       // Update component RH - only update currentCumulativeRH (child's actual hours)
@@ -169,7 +198,11 @@ export function registerRunningHoursRoutes(app: Express) {
         success: true,
         message: `Running hours updated to ${newRHFormatted} for ${component.name}`,
         previousRH,
-        newRH: newRHFormatted
+        newRH: newRHFormatted,
+        validation: {
+          maxAllowedIncrease: validation.maxAllowedIncrease,
+          actualIncrease: validation.requestedIncrease
+        }
       });
     } catch (error: any) {
       console.error("Error updating child RH:", error);
@@ -408,7 +441,7 @@ export function registerRunningHoursRoutes(app: Express) {
         });
       }
       
-      const { newRHValue, updateSource, userId, comments } = parseResult.data;
+      const { newRHValue, updateSource, userId, userRole, adminOverride, comments } = parseResult.data;
 
       // Verify component exists and is a MASTER type
       const component = await storage.getComponent(componentId);
@@ -420,6 +453,33 @@ export function registerRunningHoursRoutes(app: Express) {
         return res.status(400).json({ 
           error: "Running hours can only be updated for MASTER counter type components" 
         });
+      }
+
+      // Validate running hours increase against daily limits (only for MANUAL updates)
+      if (updateSource === 'MANUAL') {
+        const currentRHValue = parseFloat(component.rhCurrentMaster || component.currentCumulativeRH || '0');
+        const validation = await validateRunningHoursIncrease({
+          componentId,
+          currentRH: currentRHValue,
+          newRH: newRHValue,
+          updateDateUTC: new Date(),
+          userRole: userRole || 'Ship',
+          adminOverride: adminOverride || false
+        });
+        
+        if (!validation.allowed) {
+          return res.status(400).json({
+            error: validation.message,
+            validation: {
+              maxAllowedIncrease: validation.maxAllowedIncrease,
+              requestedIncrease: validation.requestedIncrease,
+              daysSinceLastUpdate: validation.daysSinceLastUpdate,
+              lastUpdateDate: validation.lastUpdateDate,
+              requiresAdminOverride: validation.requiresAdminOverride,
+              canOverride: canAdminOverride(userRole || 'Ship')
+            }
+          });
+        }
       }
 
       const result = await storage.updateMasterRunningHours({

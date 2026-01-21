@@ -24,7 +24,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **PMS Dashboard**: Provides analytics and data visualizations, including an "Outstanding Tasks" pie chart.
 - **PMS Submodules**: Offers comprehensive CRUD functionalities for Components, Work Orders, Running Hours, Spares, Reports, Modify PMS, and Admin.
 - **Work Order Automation**: Features real-time status computation, vessel-specific filtering, numbering, lead time warnings, and grace period logic.
-- **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations.
+- **Running Hours Module**: Supports MASTER, INHERITED, and NOT_RH_DRIVEN counter types with delta propagation and safety validations. Includes daily increase limit validation (max 25 hours × number of days since last update), same-day duplicate prevention (only one update per component per day allowed), and PMS Admin override capability for exceptional cases.
 - **Defects Module**: Tracks Condition of Class and recurring defects, integrating with SIRE VIQ 7. Features Part A/B/C structured form with target date extension workflow (B5 section) enabling ship staff to request deadline extensions from office users with approval tracking.
 - **Spares Module**: Comprehensive inventory management with many-to-many linking between spares and components, location-based stock tracking, and a full audit trail. Uses three event types: RECEIVE (inbound), CONSUME (outbound), and ADJUSTMENT (stock corrections). Direct ROB edits that change net total create ADJUSTMENT events; transfers between locations without net change create TRANSFER events.
 - **Auto-Generation Scheduler**: Automates work order creation for calendar and RH-based jobs.
