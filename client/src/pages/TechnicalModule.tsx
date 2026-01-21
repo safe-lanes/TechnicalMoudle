@@ -24,6 +24,7 @@ import CertificatesPage from "./cert-surveys/CertificatesPage";
 import SurveysPage from "./cert-surveys/SurveysPage";
 import { useLocation, useParams } from "wouter";
 import DataMasters from "./admin/DataMasters";
+import ShipsCertificatesAdmin from "./admin/ShipsCertificatesAdmin";
 
 export const TechnicalModule = () => {
   const [location, setLocation] = useLocation();
@@ -147,8 +148,9 @@ export const TechnicalModule = () => {
             <MaintenanceRecords />
           ) : selectedSubModule === "admin" && selectedMenuItem === "masters" ? (
             <DataMasters />
-          )
-          : selectedSubModule === "admin" ? (
+          ) : selectedSubModule === "admin" && selectedMenuItem === "ships-certificates" ? (
+            <ShipsCertificatesAdmin />
+          ) : selectedSubModule === "admin" ? (
             <PMSAdmin />
           ) : selectedSubModule === "pms" && selectedMenuItem === "reports" ? (
             <ReportsModule />
