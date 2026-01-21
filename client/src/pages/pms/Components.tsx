@@ -207,15 +207,21 @@ const ComponentInformationSection: React.FC<{ isExpanded: boolean; selectedCompo
   const handleFieldChange = (fieldName: string, value: string) => {
     if (!isChangeMode && !isModifyMode) return;
     
-    const originalValue = componentData[fieldName as keyof typeof componentData];
+    // Get the original value from originalComponentData (the snapshot before any edits)
+    // This ensures oldValue reflects the persisted value, not the currently edited value
+    const originalValue = originalComponentData 
+      ? originalComponentData[fieldName as keyof typeof originalComponentData] 
+      : null;
+    
     setComponentData(prev => ({ ...prev, [fieldName]: value }));
     
     // Component change tracking is handled through onDataChange callback
     
-    // Track the change
+    // Track the change - compare new value against original persisted value
     if (value !== originalValue) {
       setChangedFields(prev => new Set(prev).add(fieldName));
       if (isModifyMode && collectDiff) {
+        // Pass the original persisted value (from snapshotBeforeJson equivalent), not the current form value
         collectDiff(`componentInfo.${fieldName}`, originalValue, value);
       }
     } else {
