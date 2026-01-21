@@ -466,7 +466,7 @@ const WorkOrders: React.FC = () => {
             {isSailAdmin && (
             <Button 
               size="sm" 
-              className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white"
+              className="bg-[#52baf3] hover:bg-[#4aa3d9] text-white hidden"
               onClick={handleAddWorkOrderClick}
               data-testid="C2"
             >
