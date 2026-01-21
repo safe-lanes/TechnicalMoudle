@@ -189,7 +189,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && Array.from({ length: 10 - filteredData.length }).map((_, idx) => (
+                {viewMode === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
@@ -296,7 +296,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && Array.from({ length: 10 - filteredData.length }).map((_, idx) => (
+                {viewMode === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-company-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
@@ -422,7 +422,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewMode === "edit" && Array.from({ length: 10 - mockVesselData.length }).map((_, idx) => (
+                {viewMode === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
                   <tr key={`empty-vessel-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-center"><Checkbox className="border-blue-500" /></td>
                     <td className="px-3 py-3 text-sm text-muted-foreground">{mockVesselData.length + idx + 1}</td>
