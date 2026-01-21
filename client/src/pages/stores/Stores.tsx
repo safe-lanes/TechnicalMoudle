@@ -1458,7 +1458,7 @@ const Stores: React.FC = () => {
                     )}
                   </div>
                 )}
-                <div className="flex gap-1 justify-end pr-2 whitespace-nowrap">
+                <div className="flex gap-1 items-center justify-end pr-2 whitespace-nowrap">
                   <Button 
                     variant="ghost" 
                     size="sm" 
