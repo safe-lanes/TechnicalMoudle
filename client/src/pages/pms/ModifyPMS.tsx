@@ -417,6 +417,16 @@ export default function ModifyPMS() {
                 1. Components
               </button>
               <button
+                onClick={() => setCategoryFilter('jobs')}
+                className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
+                  categoryFilter === 'jobs'
+                    ? 'bg-[#52BAF3] text-white font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                2. Jobs
+              </button>
+              <button
                 onClick={() => setCategoryFilter('work_orders')}
                 className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
                   categoryFilter === 'work_orders'
@@ -424,7 +434,7 @@ export default function ModifyPMS() {
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                2. Work orders
+                3. Work orders
               </button>
               <button
                 onClick={() => setCategoryFilter('spares')}
@@ -434,7 +444,7 @@ export default function ModifyPMS() {
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                3. Spares
+                4. Spares
               </button>
               <button
                 onClick={() => setCategoryFilter('stores')}
@@ -444,7 +454,7 @@ export default function ModifyPMS() {
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                4. Stores
+                5. Stores
               </button>
             </div>
           </div>
