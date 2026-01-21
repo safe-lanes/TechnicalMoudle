@@ -1,0 +1,96 @@
+Prompt for Replit – Re-analyse & Fix Change Request Apply Logic (Old Value + Non-Applied Changes)
+You previously confirmed that the “Apply Approved Changes” workflow is implemented, but based on verification, the issue is NOT actually fixed.
+There are two critical problems that must be analysed and corrected.
+Problem 1: Approved Changes Are Still Not Reflected Correctly
+Despite your summary claiming:
+“The workflow is now complete: Request → Submit → Approve → Apply → Reflect”
+In reality:
+Approved Change Requests do not consistently reflect in the target sections (component, job, spare, store)
+UI data remains unchanged or partially updated
+This indicates the apply logic is either:
+not being triggered reliably, or
+applying incorrect values, or
+silently failing while still marking status as applied
+You must re-trace the full execution path from:
+approval action
+transaction start
+proposedChangesJson parsing
+handler execution
+update persistence
+commit / rollback
+and verify where the break actually occurs.
+Problem 2 (Critical): oldValue Is Incorrectly Captured
+This is a serious logical flaw.
+Observed Issue
+In the change_request data:
+oldValue is NOT the actual previous value
+Instead, it is being populated as:
+trimmed version of newValue
+or copied from user input
+or derived post-edit instead of pre-edit
+This completely breaks:
+audit integrity
+approval validity
+rollback capability
+trust in Change Request history
+Expected Behavior
+oldValue must be captured:
+from the current persisted target record
+at the moment the Change Request is created
+BEFORE any user modifications are applied
+It must never be derived from:
+newValue
+trimmed input
+frontend state after editing
+Required Analysis (Do This First – No Fix Yet)
+You must closely analyse and explain:
+A. Old Value Capture Flow
+Where exactly oldValue is currently populated
+Whether it is:
+coming from frontend form state
+derived during diff creation
+overwritten during approval
+Why trimming or normalization is happening
+Why original persisted value is not used
+B. Apply Logic Verification
+Confirm whether applyApprovedChanges() is:
+always invoked
+conditionally skipped
+failing silently inside transaction
+Validate whether update handlers:
+receive correct old/new values
+actually persist changes
+are overridden by later logic
+Verify whether transaction commits or rolls back unintentionally
+C. Data Integrity Check
+Compare:
+snapshotBeforeJson
+proposedChangesJson
+actual target record before approval
+target record after approval
+Identify mismatches
+Required Fix (After Analysis)
+Only after analysis, implement fixes to ensure:
+Correct Old Value Handling
+oldValue must be fetched from persisted target data
+captured once at Change Request creation
+never recalculated or mutated later
+Reliable Apply Execution
+Approved changes must always propagate to target entities
+No silent failures
+No “success” status without real updates
+Audit Accuracy
+Change Request history must represent:
+what existed
+what was requested
+what was actually applied
+Constraints
+Do NOT assume it is fixed — verify with evidence
+Do NOT rely on frontend state for oldValue
+Do NOT mark appliedStatus = success unless persistence is confirmed
+Do NOT change unrelated workflows
+Deliverables
+Root cause explanation for incorrect oldValue
+Root cause explanation for non-reflected updates
+Precise fix with justification
+Confirmation checklist to prove it is truly fixed
