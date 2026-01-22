@@ -46,6 +46,43 @@ The application employs a modern full-stack architecture with a mobile-first, re
   - **Before/After Verification**: All apply handlers use `.returning()` to verify updates succeeded and log field-by-field comparisons
   - **ROB Protection**: Spares and Stores ROB fields are marked as non-editable to enforce use of dedicated adjustment methods
 
+## Bulk Import Format Rules
+
+### Job Import - Required Spare Parts (Column U)
+**Format**: `PartCode:Qty, PartCode:Qty, PartCode:Qty` (comma-separated)
+
+**Rules**:
+1. **Separator**: Use comma (`,`) to separate multiple spare parts (semicolon `;` also supported for legacy compatibility)
+2. **Format per spare**: `PartCode:Quantity` where colon (`:`) separates Part Code from quantity
+3. **Part Code**: Must match existing `partCode` in `spares` table
+4. **Quantity**: Integer value; defaults to 1 if missing or invalid
+5. **Lookup**: System looks up each Part Code in Spares table to retrieve Part Number, Part Name
+
+**Example**:
+```
+PC-001:2, PC-002:1, PC-003:4
+```
+This creates 3 spare parts entries:
+- PC-001 with Qty Required = 2
+- PC-002 with Qty Required = 1  
+- PC-003 with Qty Required = 4
+
+**Data Flow (Column U → Job A.2)**:
+| Excel Input | Job A.2 Field | Source |
+|-------------|---------------|--------|
+| `PC-001` (before colon) | Part Number | `spares.partNumber` lookup via `partCode` |
+| `PC-001` (before colon) | Description | `spares.partName` lookup via `partCode` |
+| `2` (after colon) | Qty Required | From Excel input |
+| N/A | ROB | Dynamic lookup from `spares.rob` at view time |
+| N/A | Status | Calculated: ROB vs Qty Required |
+
+**Important Notes**:
+- ROB is **read-only** and **dynamically fetched** from Spare Master when viewing Job A.2
+- Import does **NOT** consume, reserve, or create inventory transactions
+- Invalid Part Codes show as `[NOT FOUND: {PartCode}]` but do not block import
+
+**Code Location**: `server/routes/bulk.ts` - `parseStringList()` and `parseSpareParts()` functions
+
 ## Database Migration Strategy
 
 ### Migration Architecture
