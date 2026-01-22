@@ -83,7 +83,7 @@ interface PlannerJob {
   nextDueDate: string | null;
   remainingHours: number | null;
   parentRH: number | null;
-  status: "OVERDUE" | "DUE_SOON" | "FUTURE";
+  status: "OVERDUE" | "DUE_GRACE" | "DUE_SOON" | "FUTURE";
   woId: string | null;
   woNo: string | null;
   woStatus: string | null;
@@ -99,7 +99,7 @@ interface PlannerSummary {
   totalManHours: number;
   byRank: { rank: string; jobs: number; manHours: number }[];
   byDepartment: { department: string; jobs: number; manHours: number }[];
-  byStatus: { OVERDUE: number; DUE_SOON: number; FUTURE: number };
+  byStatus: { OVERDUE: number; DUE_GRACE: number; DUE_SOON: number; FUTURE: number };
 }
 
 interface PlannerResponse {
@@ -266,6 +266,8 @@ export default function MaintenancePlanner() {
     switch (status) {
       case "OVERDUE":
         return <Badge variant="destructive" className="text-xs">Overdue</Badge>;
+      case "DUE_GRACE":
+        return <Badge className="bg-amber-500 text-white text-xs">Grace Period</Badge>;
       case "DUE_SOON":
         return <Badge className="bg-orange-500 text-white text-xs">Due Soon</Badge>;
       case "FUTURE":
@@ -448,7 +450,7 @@ export default function MaintenancePlanner() {
                   </CardContent>
                 </Card>
 
-                {/* Status Breakdown Card */}
+                {/* Status Breakdown Card - aligned with work order table statuses */}
                 <Card data-testid="G21.9">
                   <CardContent className="pt-6">
                     <p className="text-sm text-gray-500 mb-2"><Marker id="G21.9" />By Status</p>
@@ -458,6 +460,12 @@ export default function MaintenancePlanner() {
                           {data.summary.byStatus.OVERDUE}
                         </p>
                         <p className="text-xs text-gray-500">Overdue</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-amber-500">
+                          {data.summary.byStatus.DUE_GRACE}
+                        </p>
+                        <p className="text-xs text-gray-500">Grace Period</p>
                       </div>
                       <div className="text-center">
                         <p className="text-2xl font-bold text-orange-500">
@@ -712,6 +720,8 @@ export default function MaintenancePlanner() {
                         className={
                           job.status === "OVERDUE"
                             ? "bg-red-50"
+                            : job.status === "DUE_GRACE"
+                            ? "bg-amber-50"
                             : job.status === "DUE_SOON"
                             ? "bg-orange-50"
                             : ""
