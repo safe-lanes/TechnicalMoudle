@@ -4694,10 +4694,10 @@ async function performImport(
       // Parse spare parts from comma or semicolon-separated string into structured objects
       // FORMAT: "PartCode1:Quantity1, PartCode2:Quantity2" or "PartCode1:Quantity1; PartCode2:Quantity2"
       // Example: "PC-001:2, PC-002:1, PC-003:4" => looks up spare by partCode and fills in details
-      // Falls back to old format if no colon present: "Part Name 1, Part Name 2" => [{partNo: '', description: 'Part Name 1', ...}]
-      const parseSpareParts = (value: any): Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> => {
+      // Falls back to old format if no colon present: "Part Name 1, Part Name 2" => [{partCode: '', partNo: '', description: 'Part Name 1', ...}]
+      const parseSpareParts = (value: any): Array<{partCode: string, partNo: string, description: string, quantityRequired: string, remarks: string}> => {
         const items = parseStringList(value);
-        const result: Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> = [];
+        const result: Array<{partCode: string, partNo: string, description: string, quantityRequired: string, remarks: string}> = [];
         
         for (const item of items) {
           // Check if item contains colon (new format: PartCode:Quantity)
@@ -4709,16 +4709,18 @@ async function performImport(
             const spare = sparesByPartCode.get(partCode);
             if (spare) {
               result.push({
-                partNo: spare.partNumber || partCode, // Use Part Number for display, fallback to partCode
+                partCode: partCode, // Store Part Code as the primary reference key for ROB lookup
+                partNo: spare.partNumber || '', // Part Number is optional, for display only
                 description: spare.partName || '',
                 quantityRequired: String(quantity),
-                remarks: `PartCode: ${partCode}` // Store partCode in remarks for reference
+                remarks: ''
               });
               console.log(`✅ Linked spare: ${partCode} (${spare.partName}) x${quantity}`);
             } else {
               // Spare not found - still add entry but mark as not found
               result.push({
-                partNo: partCode,
+                partCode: partCode, // Still store the partCode for potential future matching
+                partNo: '',
                 description: `[NOT FOUND: ${partCode}]`,
                 quantityRequired: String(quantity),
                 remarks: `PartCode not found in spares database`
@@ -4726,8 +4728,9 @@ async function performImport(
               console.warn(`⚠️ Spare not found for PartCode: ${partCode}`);
             }
           } else {
-            // Old format: just a description string
+            // Old format: just a description string (no partCode available)
             result.push({
+              partCode: '',
               partNo: '',
               description: item,
               quantityRequired: '',

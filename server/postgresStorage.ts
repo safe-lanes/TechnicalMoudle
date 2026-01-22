@@ -6608,6 +6608,41 @@ export class PostgresStorage {
     
     return result;
   }
+
+  async getSpareInventoryByPartCodes(vesselId: string, partCodes: string[]): Promise<Map<string, { rob: number; robLocationA: number; robLocationB: number; partNumber: string | null }>> {
+    const db = await getDb();
+    const result = new Map<string, { rob: number; robLocationA: number; robLocationB: number; partNumber: string | null }>();
+    
+    if (!partCodes || partCodes.length === 0) {
+      return result;
+    }
+    
+    const matchingSpares = await db.select({
+      partCode: spares.partCode,
+      partNumber: spares.partNumber,
+      rob: spares.rob,
+      robLocationA: spares.robLocationA,
+      robLocationB: spares.robLocationB
+    })
+    .from(spares)
+    .where(
+      and(
+        eq(spares.vesselId, vesselId),
+        inArray(spares.partCode, partCodes)
+      )
+    );
+    
+    for (const spare of matchingSpares) {
+      result.set(spare.partCode, {
+        rob: spare.rob,
+        robLocationA: spare.robLocationA,
+        robLocationB: spare.robLocationB,
+        partNumber: spare.partNumber
+      });
+    }
+    
+    return result;
+  }
 }
 
 export const postgresStorage = new PostgresStorage();

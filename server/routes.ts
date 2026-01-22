@@ -623,11 +623,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safetyReqs = job.safetyRequirements || { ppeRequirements: [], permitRequirements: [], otherRequirements: [] };
       
       // Enrich spare parts with ROB (Remaining On Board) inventory data
+      // Primary: Use Part Code (correct design)
+      // Fallback: Use Part Number for backward compatibility with legacy data
+      const partCodes = rawSpareParts.map((sp: any) => sp.partCode).filter(Boolean);
       const partNumbers = rawSpareParts.map((sp: any) => sp.partNo).filter(Boolean);
-      const inventoryMap = await storage.getSpareInventoryByPartNumbers(job.vesselId, partNumbers);
+      
+      const inventoryByPartCode = await storage.getSpareInventoryByPartCodes(job.vesselId, partCodes);
+      const inventoryByPartNumber = partNumbers.length > 0 
+        ? await storage.getSpareInventoryByPartNumbers(job.vesselId, partNumbers)
+        : new Map();
       
       const spareParts = rawSpareParts.map((sp: any) => {
-        const inventory = inventoryMap.get(sp.partNo);
+        // Primary lookup: by Part Code (correct design)
+        let inventory = sp.partCode ? inventoryByPartCode.get(sp.partCode) : null;
+        // Fallback: by Part Number for legacy data compatibility
+        if (!inventory && sp.partNo) {
+          inventory = inventoryByPartNumber.get(sp.partNo);
+        }
         return {
           ...sp,
           rob: inventory ? inventory.rob : null,
@@ -1180,8 +1192,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let hasLow = false;
           
           for (const reqSpare of requiredSpares) {
+            // Primary match: by Part Code (correct design)
+            // Fallback: by Part Number or description for legacy compatibility
             const spare = allSpares.find(s => 
-              s.partCode === reqSpare.partNo || 
+              (reqSpare.partCode && s.partCode === reqSpare.partCode) ||
+              (reqSpare.partNo && s.partCode === reqSpare.partNo) ||
               s.partName === reqSpare.description
             );
             if (spare) {
@@ -2353,12 +2368,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Enrich spare parts with ROB (Remaining On Board) inventory data
+      // Primary: Use Part Code (correct design)
+      // Fallback: Use Part Number for backward compatibility with legacy data
       const enrichSparePartsWithROB = async (spareParts: any[], vesselId: string) => {
         if (!spareParts || spareParts.length === 0) return spareParts;
+        
+        const partCodes = spareParts.map((sp: any) => sp.partCode).filter(Boolean);
         const partNumbers = spareParts.map((sp: any) => sp.partNo).filter(Boolean);
-        const inventoryMap = await storage.getSpareInventoryByPartNumbers(vesselId, partNumbers);
+        
+        const inventoryByPartCode = await storage.getSpareInventoryByPartCodes(vesselId, partCodes);
+        const inventoryByPartNumber = partNumbers.length > 0 
+          ? await storage.getSpareInventoryByPartNumbers(vesselId, partNumbers)
+          : new Map();
+        
         return spareParts.map((sp: any) => {
-          const inventory = inventoryMap.get(sp.partNo);
+          // Primary lookup: by Part Code (correct design)
+          let inventory = sp.partCode ? inventoryByPartCode.get(sp.partCode) : null;
+          // Fallback: by Part Number for legacy data compatibility
+          if (!inventory && sp.partNo) {
+            inventory = inventoryByPartNumber.get(sp.partNo);
+          }
           return {
             ...sp,
             rob: inventory ? inventory.rob : null,
