@@ -1238,16 +1238,21 @@ class MemStorage {
 
   async getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<any[]> {
     const allSpares = toArray(this.data.spares);
+    const allComponents = toArray(this.data.components);
     
-    // Get spares that match the componentCode for this vessel
+    // Get spares that match the componentCode for this vessel (direct assignment)
     const directSpares = allSpares.filter((s: any) => 
       s.vesselId === vesselId && s.componentCode === componentCode
     );
     
-    // Get spares linked via spare_component_links where componentCode matches
-    const links = toArray(this.data.spareComponentLinks).filter(
-      (link: any) => link.componentCode === componentCode
-    );
+    // Get spares linked via spare_component_links by looking up component by componentCode first
+    // (spare_component_links has componentId, not componentCode)
+    const matchingComponent = allComponents.find((c: any) => c.componentCode === componentCode && c.vesselId === vesselId);
+    const links = matchingComponent 
+      ? toArray(this.data.spareComponentLinks).filter(
+          (link: any) => link.componentId === matchingComponent.id && link.vesselId === vesselId
+        )
+      : [];
     const linkedSpareIds = new Set(links.map((link: any) => link.spareId));
     const linkedSpares = allSpares.filter((s: any) => 
       s.vesselId === vesselId && linkedSpareIds.has(s.id)

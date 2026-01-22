@@ -6577,7 +6577,7 @@ export class PostgresStorage {
   async getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]> {
     const db = await getDb();
     
-    // Get spares that match the componentCode for this vessel
+    // Get spares that match the componentCode for this vessel (direct assignment)
     const matchingSpares = await db.select().from(spares)
       .where(
         and(
@@ -6586,12 +6586,19 @@ export class PostgresStorage {
         )
       );
     
-    // Also get spares linked via spare_component_links where componentCode matches
+    // Also get spares linked via spare_component_links by joining with components table
+    // (spare_component_links has componentId, so we need to join with components to match by componentCode)
     const linkedSpares = await db.select({
       spareId: spareComponentLinks.spareId
     })
     .from(spareComponentLinks)
-    .where(eq(spareComponentLinks.componentCode, componentCode));
+    .innerJoin(components, eq(spareComponentLinks.componentId, components.id))
+    .where(
+      and(
+        eq(components.componentCode, componentCode),
+        eq(spareComponentLinks.vesselId, vesselId)
+      )
+    );
     
     const linkedSpareIds = new Set(linkedSpares.map(l => l.spareId));
     
