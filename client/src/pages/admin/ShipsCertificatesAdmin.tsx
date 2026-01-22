@@ -224,11 +224,18 @@ export default function ShipsCertificatesAdmin() {
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <Checkbox 
-                        checked={cert.applicableToCompany} 
-                        disabled={viewModes.master === "view"}
-                        data-testid={`checkbox-applicable-${cert.id}`}
-                      />
+                      {viewModes.master === "edit" ? (
+                        <Checkbox 
+                          defaultChecked={cert.applicableToCompany}
+                          data-testid={`checkbox-applicable-${cert.id}`}
+                        />
+                      ) : (
+                        <Checkbox 
+                          checked={cert.applicableToCompany}
+                          disabled
+                          data-testid={`checkbox-applicable-${cert.id}`}
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
