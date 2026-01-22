@@ -502,9 +502,12 @@ const WorkOrderForm: React.FC<WorkOrderFormProps> = ({
       };
       
       // Parse required spare parts from workOrder
+      // NOTE: Do NOT fallback partNo to partCode - they are separate fields
+      // partNo should remain blank/null if not provided in source data
       const parsedSpareParts = Array.isArray(workOrder.requiredSpareParts) 
         ? workOrder.requiredSpareParts.map((spare: any) => ({
-            partNo: spare.partNo || spare.partCode || '',
+            partNo: spare.partNo || '',
+            partCode: spare.partCode || '',
             description: spare.description || spare.partName || '',
             quantityRequired: spare.quantityRequired || spare.quantity || '',
             remarks: spare.remarks || ''

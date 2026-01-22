@@ -318,7 +318,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     briefWorkDescription: "",
     nextDueDate: "",
     nextDueReading: "",
-    requiredSpareParts: [] as Array<{partNo: string, description: string, quantityRequired: string, remarks: string}>,
+    requiredSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityRequired: string, remarks: string}>,
     requiredTools: [] as Array<{toolName: string, quantity: string, remarks: string}>,
     safetyRequirements: {
       ppeRequirements: [] as string[],
@@ -349,7 +349,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     previousReading: "",
     currentReading: "",
     uploadedDocuments: [] as Array<{type: string, fileName: string, fileKey: string, uploadedAt: string, uploadedBy: string}>,
-    consumedSpareParts: [] as Array<{partNo: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', locationId: number | null, comments: string}>,
+    consumedSpareParts: [] as Array<{partNo: string, partCode?: string, description: string, quantityConsumed: string, location: 'Location A' | 'Location B' | '', locationId: number | null, comments: string}>,
     ihmUpdate: {
       enabled: false,
       action: "",
@@ -1078,13 +1078,14 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       // PHASE 3A: Validate spare parts consumed - locationId must be selected for inventory-tracked items
-      // Only require locationId for items that exist in inventory (have partNo matching a spare.partCode)
+      // Use partCode for inventory matching (not partNo - they are separate fields)
       const sparesWithMissingLocation = executionData.consumedSpareParts.filter(spare => {
         const hasQuantity = spare.quantityConsumed && parseFloat(spare.quantityConsumed) > 0;
         if (!hasQuantity) return false;
         
-        // Check if this spare exists in inventory
-        const isInInventory = spare.partNo && sparesWithInventory.some(s => s.spare.partCode === spare.partNo);
+        // Check if this spare exists in inventory using partCode (primary) or partNo (fallback)
+        const lookupKey = spare.partCode || spare.partNo;
+        const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
         if (!isInInventory) return false; // Skip validation for manual entries not in inventory
         
         const hasLocationId = spare.locationId != null && spare.locationId > 0;
@@ -1102,22 +1103,25 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
       }
 
       // PHASE 3A: Validate stock availability at selected locations (only for inventory-tracked items)
+      // Use partCode for inventory matching (not partNo - they are separate fields)
       const sparesWithInsufficientStock = executionData.consumedSpareParts.filter(spare => {
         const qty = parseFloat(spare.quantityConsumed);
         if (!qty || qty <= 0 || !spare.locationId) return false;
         
-        // Only validate stock for items in inventory
-        const isInInventory = spare.partNo && sparesWithInventory.some(s => s.spare.partCode === spare.partNo);
+        // Only validate stock for items in inventory using partCode (primary) or partNo (fallback)
+        const lookupKey = spare.partCode || spare.partNo;
+        const isInInventory = lookupKey && sparesWithInventory.some(s => s.spare.partCode === lookupKey);
         if (!isInInventory) return false;
         
-        const stockAtLocation = getStockAtLocation(spare.partNo, spare.locationId);
+        const stockAtLocation = getStockAtLocation(lookupKey, spare.locationId);
         return qty > stockAtLocation;
       });
 
       if (sparesWithInsufficientStock.length > 0) {
         const insufficientParts = sparesWithInsufficientStock.map(s => {
-          const stockAtLoc = getStockAtLocation(s.partNo, s.locationId!);
-          return `${s.partNo} (need ${s.quantityConsumed}, have ${stockAtLoc})`;
+          const lookupKey = s.partCode || s.partNo;
+          const stockAtLoc = getStockAtLocation(lookupKey, s.locationId!);
+          return `${s.partNo || s.partCode} (need ${s.quantityConsumed}, have ${stockAtLoc})`;
         }).join(', ');
         toast({
           title: "Insufficient Stock",
@@ -1967,7 +1971,11 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                       </tr>
                     ) : (
                       (templateData.requiredSpareParts || []).map((part: any, index) => {
-                        const robValue = part.rob !== null && part.rob !== undefined ? part.rob : null;
+                        // ROB lookup: Use partCode for inventory lookup (not partNo)
+                        // partCode is the reliable identifier for spare inventory matching
+                        const lookupKey = part.partCode || '';
+                        const inventoryMatch = lookupKey ? sparesWithInventory.find(s => s.spare.partCode === lookupKey) : null;
+                        const robValue = inventoryMatch ? inventoryMatch.robTotal : (part.rob !== null && part.rob !== undefined ? part.rob : null);
                         const qtyRequired = parseInt(part.quantityRequired) || 0;
                         const isAvailable = robValue !== null && robValue >= qtyRequired;
                         const isLowStock = robValue !== null && robValue > 0 && robValue < qtyRequired;
@@ -2938,15 +2946,23 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                   <tbody>
                     {/* Pre-loaded spares from Part A (requiredSpareParts) */}
                     {templateData.requiredSpareParts.map((spare, index) => {
-                      const consumedIndex = executionData.consumedSpareParts.findIndex(c => c.partNo === spare.partNo);
+                      // Use partCode for inventory matching (not partNo)
+                      const sparePartCode = (spare as any).partCode || '';
+                      // Match consumedSpareParts by partCode first (reliable), then partNo as fallback for legacy data
+                      // Avoid cross-matching: only match partNo to partNo, partCode to partCode
+                      const consumedIndex = executionData.consumedSpareParts.findIndex(c => 
+                        (sparePartCode && c.partCode === sparePartCode) || 
+                        (!sparePartCode && spare.partNo && c.partNo === spare.partNo)
+                      );
                       const consumedData = consumedIndex >= 0 ? executionData.consumedSpareParts[consumedIndex] : null;
-                      const autoSelectedLocation = getAutoSelectedLocation(spare.partNo);
+                      const autoSelectedLocation = getAutoSelectedLocation(sparePartCode || spare.partNo);
                       
-                      const stockInfo = sparesWithInventory.find(s => s.spare.partCode === spare.partNo);
+                      // Use partCode for inventory lookup (partNo is just display value)
+                      const stockInfo = sparePartCode ? sparesWithInventory.find(s => s.spare.partCode === sparePartCode) : null;
                       
                       return (
                         <tr key={`preloaded-${index}`} className="border-b border-gray-100">
-                          <td className="py-3 text-gray-900">{spare.partNo}</td>
+                          <td className="py-3 text-gray-900">{spare.partNo || '-'}</td>
                           <td className="py-3 text-gray-700">{spare.description}</td>
                           <td className="py-3">
                             <Input
@@ -2965,6 +2981,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   } else {
                                     consumed.push({
                                       partNo: spare.partNo,
+                                      partCode: sparePartCode,
                                       description: spare.description,
                                       quantityConsumed: newValue,
                                       location: autoSelectedLocation || '',
@@ -2976,7 +2993,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 });
                               }}
                               className="text-sm h-8 w-20"
-                              data-testid={`input-consumed-qty-${spare.partNo}`}
+                              data-testid={`input-consumed-qty-${sparePartCode || spare.partNo || index}`}
                             />
                           </td>
                           <td className="py-3">
@@ -2996,6 +3013,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   } else {
                                     consumed.push({
                                       partNo: spare.partNo,
+                                      partCode: sparePartCode,
                                       description: spare.description,
                                       quantityConsumed: '',
                                       location: location?.locationName as any || '',
@@ -3007,7 +3025,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 });
                               }}
                             >
-                              <SelectTrigger className="h-8 text-xs" data-testid={`select-location-${spare.partNo}`}>
+                              <SelectTrigger className="h-8 text-xs" data-testid={`select-location-${sparePartCode || spare.partNo || index}`}>
                                 <SelectValue placeholder="Select location" />
                               </SelectTrigger>
                               <SelectContent>
@@ -3041,6 +3059,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                   } else {
                                     consumed.push({
                                       partNo: spare.partNo,
+                                      partCode: sparePartCode,
                                       description: spare.description,
                                       quantityConsumed: '',
                                       location: '' as const,
@@ -3052,7 +3071,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                                 });
                               }}
                               className="text-sm h-8"
-                              data-testid={`input-consumed-comments-${spare.partNo}`}
+                              data-testid={`input-consumed-comments-${sparePartCode || spare.partNo || index}`}
                             />
                           </td>
                         </tr>
@@ -3061,7 +3080,13 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                     {/* Manually added consumed spare parts (not from Part A) */}
                     {executionData.consumedSpareParts
-                      .filter(consumed => !templateData.requiredSpareParts.some(s => s.partNo === consumed.partNo))
+                      .filter(consumed => !templateData.requiredSpareParts.some(s => {
+                        // Match by partCode first (reliable), then partNo for legacy data
+                        const reqPartCode = (s as any).partCode || '';
+                        if (reqPartCode && consumed.partCode) return reqPartCode === consumed.partCode;
+                        if (s.partNo && consumed.partNo) return s.partNo === consumed.partNo;
+                        return false;
+                      }))
                       .map((consumed, index) => {
                         const actualIndex = executionData.consumedSpareParts.findIndex(c => c === consumed);
                         const isEditing = editingConsumedSparePart === actualIndex;
