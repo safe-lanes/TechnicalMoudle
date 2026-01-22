@@ -2038,14 +2038,19 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
 
                 <div className="space-y-2">
                   <Label className="text-sm text-[#8798ad]" data-testid="WOF.A1.30"><Marker id="WOF.A1.30" />Criticality</Label>
-                  <Input
+                  <Select
                     value={templateData.criticality}
-                    onChange={(e) => handleTemplateChange('criticality', e.target.value)}
-                    className="text-sm"
-                    placeholder="Enter criticality"
+                    onValueChange={(value) => handleTemplateChange('criticality', value)}
                     disabled={isPartAReadOnly}
-                    data-testid="WOF.A1.31"
-                  />
+                  >
+                    <SelectTrigger className="text-sm" data-testid="WOF.A1.31">
+                      <SelectValue placeholder="Select criticality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

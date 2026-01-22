@@ -452,13 +452,18 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
 
                     <div className="space-y-2">
                       <Label className="text-sm text-[#8798ad]">Criticality</Label>
-                      <Input
+                      <Select
                         value={formData.criticality}
-                        onChange={(e) => handleFormChange('criticality', e.target.value)}
-                        className="text-sm"
-                        placeholder="Enter criticality"
-                        data-testid="input-criticality"
-                      />
+                        onValueChange={(value) => handleFormChange('criticality', value)}
+                      >
+                        <SelectTrigger className="text-sm" data-testid="select-criticality">
+                          <SelectValue placeholder="Select criticality" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">
