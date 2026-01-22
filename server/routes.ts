@@ -3738,8 +3738,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           comments?: string;
         }>;
         
-        console.log(`🔍 [B4 Spare Consumption] Processing ${consumedSpares.length} consumed spare parts for WO: ${workOrder.workOrderNo}`);
-        
         for (const consumedSpare of consumedSpares) {
           const qtyConsumed = typeof consumedSpare.quantityConsumed === 'string' 
             ? parseFloat(consumedSpare.quantityConsumed) 
@@ -3748,23 +3746,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (qtyConsumed && qtyConsumed > 0) {
             try {
               // Get spare from inventory
-              // PRIORITY: Use partCode first (reliable unique identifier), then fallback to partNo
+              // PRIORITY: Use partCode first (reliable unique identifier), then fallback to partNo/partNumber
               const spares = await storage.getSpares(workOrder.vesselId || 'V001');
-              const lookupKey = consumedSpare.partCode || consumedSpare.partNo;
-              console.log(`🔍 [B4 Spare Consumption] Looking up spare with partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}", using lookupKey="${lookupKey}"`);
               
-              // Try exact partCode match first, then partNo match as fallback
-              let spare = spares.find(s => s.partCode === lookupKey);
-              if (!spare && consumedSpare.partNo && consumedSpare.partNo !== lookupKey) {
-                // Fallback: try matching by partNo if partCode lookup failed
-                spare = spares.find(s => s.partCode === consumedSpare.partNo || s.partNumber === consumedSpare.partNo);
-                if (spare) {
-                  console.log(`🔍 [B4 Spare Consumption] Found spare via fallback lookup by partNo: ${consumedSpare.partNo} -> spareId=${spare.id}`);
-                }
+              // Multi-step lookup strategy:
+              // 1. Try exact match on partCode field (most reliable)
+              // 2. If partCode empty, try matching partNo against spares.partCode
+              // 3. As last resort, try matching partNo against spares.partNumber
+              let spare = null;
+              
+              // Step 1: Try partCode first if available
+              if (consumedSpare.partCode) {
+                spare = spares.find(s => s.partCode === consumedSpare.partCode);
+              }
+              
+              // Step 2: If not found and partNo available, try matching partNo against partCode
+              if (!spare && consumedSpare.partNo) {
+                spare = spares.find(s => s.partCode === consumedSpare.partNo);
+              }
+              
+              // Step 3: Last resort - try matching partNo against partNumber field
+              if (!spare && consumedSpare.partNo) {
+                spare = spares.find(s => s.partNumber === consumedSpare.partNo);
               }
               
               if (spare) {
-                console.log(`✅ [B4 Spare Consumption] Found spare: id=${spare.id}, partCode=${spare.partCode}, partName=${spare.partName}, currentROB=${spare.rob}`);
                 
                 // Check if locationId is provided for new location-based tracking
                 // Coerce to number in case frontend sends string
@@ -3799,7 +3805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   throw new Error(`LOCATION_REQUIRED: Spare part ${consumedSpare.partNo} requires a storage location for inventory tracking. Please select a location in the work order form.`);
                 }
               } else {
-                console.warn(`⚠️ [B4 Spare Consumption] Spare NOT FOUND in inventory - skipping deduction. Searched with: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}", lookupKey="${lookupKey}". Total spares in vessel: ${spares.length}`);
+                console.warn(`⚠️ [B4 Spare Consumption] Spare NOT FOUND in inventory - skipping deduction. Searched with: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Total spares in vessel: ${spares.length}`);
               }
             } catch (spareError: any) {
               // PHASE 3B: Propagate LOCATION_REQUIRED and INSUFFICIENT_STOCK errors to fail the request
