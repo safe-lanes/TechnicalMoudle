@@ -47,7 +47,7 @@ const UnplannedWorkOrderForm: React.FC<UnplannedWorkOrderFormProps> = ({
       const response = await fetch(`/technical/api/components/${vesselId}`);
       if (!response.ok) throw new Error('Failed to fetch components');
       const allComponents = await response.json() as Component[];
-      const activeComponents = allComponents.filter(c => c.isActive === true);
+      const activeComponents = allComponents.filter(c => c.isActive === true && c.isParent !== true);
       return activeComponents;
     },
     enabled: isOpen && !!vesselId,
