@@ -9,6 +9,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -269,6 +278,21 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
   const [documentToDelete, setDocumentToDelete] = useState<{type: string, fileKey: string} | null>(null);
   
   const [editingConsumedSparePart, setEditingConsumedSparePart] = useState<number | null>(null);
+  
+  // Spare parts selection modal state
+  const [isSparePartsModalOpen, setIsSparePartsModalOpen] = useState(false);
+  const [linkedSpares, setLinkedSpares] = useState<Array<{
+    spare: any;
+    robTotal: number;
+    stockStatus: string;
+    locations: Array<{ locationId: number; locationName: string; qty: number }>;
+    linkedComponents: any[];
+    selected: boolean;
+    consumeQty: string;
+    selectedLocationId: number | null;
+    comments: string;
+  }>>([]);
+  const [isLoadingSpares, setIsLoadingSpares] = useState(false);
   
   // Cache the last Calendar unit selection to preserve user choice when toggling maintenance basis
   const [lastCalendarUnit, setLastCalendarUnit] = useState('Months');
@@ -685,6 +709,137 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
     }));
     setOriginalSparePart(null); // New parts have no original state
     setEditingSparePart(templateData.requiredSpareParts.length);
+  };
+
+  // Fetch and open spare parts selection modal for Section B4
+  const handleOpenSparePartsModal = async () => {
+    if (isReadOnly) return;
+    
+    const componentCode = templateData.componentCode;
+    if (!componentCode) {
+      toast({
+        title: "Component Code Required",
+        description: "Please select a component code first before adding spare parts.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!vesselId) {
+      toast({
+        title: "Vessel Required",
+        description: "Vessel ID is required to fetch spare parts.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoadingSpares(true);
+    setIsSparePartsModalOpen(true);
+    
+    try {
+      const response = await fetch(`/technical/api/inventory/spares-by-component-code/${vesselId}/${encodeURIComponent(componentCode)}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // Initialize spares with selection state
+        const sparesWithState = data.data.map((item: any) => ({
+          ...item,
+          selected: false,
+          consumeQty: '',
+          selectedLocationId: null,
+          comments: ''
+        }));
+        setLinkedSpares(sparesWithState);
+      } else {
+        setLinkedSpares([]);
+        toast({
+          title: "No Spares Found",
+          description: `No spare parts are linked to component ${componentCode}.`,
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching linked spares:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch spare parts for this component.",
+        variant: "destructive"
+      });
+      setLinkedSpares([]);
+    } finally {
+      setIsLoadingSpares(false);
+    }
+  };
+
+  // Add selected spares to consumed spare parts
+  const handleAddSelectedSpares = () => {
+    const selectedSpares = linkedSpares.filter(s => s.selected && s.consumeQty && parseInt(s.consumeQty) > 0);
+    
+    if (selectedSpares.length === 0) {
+      toast({
+        title: "No Spares Selected",
+        description: "Please select at least one spare part with a consumption quantity.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validate location selection and quantities
+    for (const spare of selectedSpares) {
+      const qty = parseInt(spare.consumeQty);
+      
+      // Require location selection
+      if (!spare.selectedLocationId) {
+        toast({
+          title: "Location Required",
+          description: `Please select a location for ${spare.spare.partCode || spare.spare.partName}.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Validate quantity doesn't exceed stock at selected location
+      const selectedLocation = spare.locations.find((l: any) => l.locationId === spare.selectedLocationId);
+      const availableQty = selectedLocation ? selectedLocation.qty : 0;
+      
+      if (qty > availableQty) {
+        toast({
+          title: "Quantity Exceeds Stock",
+          description: `Consumption quantity for ${spare.spare.partCode} (${qty}) exceeds available stock at ${selectedLocation?.locationName || 'selected location'} (${availableQty}).`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    // Add selected spares to consumedSpareParts
+    const newConsumedParts = selectedSpares.map(s => {
+      const selectedLocation = s.locations.find((l: any) => l.locationId === s.selectedLocationId);
+      const locationName = selectedLocation?.locationName || '';
+      return {
+        partNo: s.spare.partCode || s.spare.partNumber || '',
+        partCode: s.spare.partCode || '',
+        description: s.spare.partName || '',
+        quantityConsumed: s.consumeQty,
+        location: (locationName === 'Location A' || locationName === 'Location B' ? locationName : '') as 'Location A' | 'Location B' | '',
+        locationId: s.selectedLocationId,
+        comments: s.comments
+      };
+    });
+    
+    setExecutionData(prev => ({
+      ...prev,
+      consumedSpareParts: [...prev.consumedSpareParts, ...newConsumedParts]
+    }));
+    
+    setIsSparePartsModalOpen(false);
+    setLinkedSpares([]);
+    
+    toast({
+      title: "Spare Parts Added",
+      description: `Added ${selectedSpares.length} spare part(s) to consumed list.`,
+    });
   };
 
   const handleEditSparePart = (index: number) => {
@@ -2914,16 +3069,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setExecutionData(prev => ({
-                      ...prev,
-                      consumedSpareParts: [
-                        ...prev.consumedSpareParts,
-                        { partNo: '', description: '', quantityConsumed: '', location: '' as const, locationId: null, comments: '' }
-                      ]
-                    }));
-                    setEditingConsumedSparePart(executionData.consumedSpareParts.length);
-                  }}
+                  onClick={handleOpenSparePartsModal}
                   data-testid="WOF.B4.10"
                 >
                   <Marker id="WOF.B4.10" />
@@ -3379,6 +3525,136 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Spare Parts Selection Modal for Section B4 */}
+      <Dialog open={isSparePartsModalOpen} onOpenChange={setIsSparePartsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Spare Parts for Component: {templateData.componentCode}</DialogTitle>
+            <DialogDescription>
+              Select spare parts to consume and enter the quantity used from each location.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            {isLoadingSpares ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading spare parts...</div>
+              </div>
+            ) : linkedSpares.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">No spare parts linked to this component.</div>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2 font-medium w-12">Select</th>
+                    <th className="text-left py-2 px-2 font-medium">Part Code</th>
+                    <th className="text-left py-2 px-2 font-medium">Description</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB Loc A</th>
+                    <th className="text-center py-2 px-2 font-medium">ROB Loc B</th>
+                    <th className="text-center py-2 px-2 font-medium">Total ROB</th>
+                    <th className="text-left py-2 px-2 font-medium w-24">Qty to Use</th>
+                    <th className="text-left py-2 px-2 font-medium w-32">From Location</th>
+                    <th className="text-left py-2 px-2 font-medium">Comments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedSpares.map((item, index) => {
+                    const locA = item.locations.find(l => l.locationName === 'Location A')?.qty || item.spare.robLocationA || 0;
+                    const locB = item.locations.find(l => l.locationName === 'Location B')?.qty || item.spare.robLocationB || 0;
+                    
+                    return (
+                      <tr key={item.spare.id || index} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="py-2 px-2">
+                          <Checkbox
+                            checked={item.selected}
+                            onCheckedChange={(checked) => {
+                              setLinkedSpares(prev => prev.map((s, i) => 
+                                i === index ? { ...s, selected: !!checked } : s
+                              ));
+                            }}
+                            data-testid={`spare-select-${index}`}
+                          />
+                        </td>
+                        <td className="py-2 px-2 font-mono text-xs">{item.spare.partCode || item.spare.partNumber || '-'}</td>
+                        <td className="py-2 px-2">{item.spare.partName || '-'}</td>
+                        <td className="py-2 px-2 text-center font-medium">{locA}</td>
+                        <td className="py-2 px-2 text-center font-medium">{locB}</td>
+                        <td className="py-2 px-2 text-center font-semibold">{item.robTotal}</td>
+                        <td className="py-2 px-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max={item.robTotal}
+                            value={item.consumeQty}
+                            onChange={(e) => {
+                              setLinkedSpares(prev => prev.map((s, i) => 
+                                i === index ? { ...s, consumeQty: e.target.value, selected: e.target.value ? true : s.selected } : s
+                              ));
+                            }}
+                            className="h-8 w-20"
+                            placeholder="0"
+                            data-testid={`spare-qty-${index}`}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <Select
+                            value={item.selectedLocationId?.toString() || ''}
+                            onValueChange={(value) => {
+                              setLinkedSpares(prev => prev.map((s, i) => 
+                                i === index ? { ...s, selectedLocationId: parseInt(value) } : s
+                              ));
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-28" data-testid={`spare-location-${index}`}>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {vesselLocations.map((loc: any) => (
+                                <SelectItem key={loc.id} value={loc.id.toString()}>
+                                  {loc.locationName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 px-2">
+                          <Input
+                            value={item.comments}
+                            onChange={(e) => {
+                              setLinkedSpares(prev => prev.map((s, i) => 
+                                i === index ? { ...s, comments: e.target.value } : s
+                              ));
+                            }}
+                            className="h-8"
+                            placeholder="Comments..."
+                            data-testid={`spare-comments-${index}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+          
+          <DialogFooter className="pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsSparePartsModalOpen(false)} data-testid="spare-modal-cancel">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddSelectedSpares} 
+              disabled={!linkedSpares.some(s => s.selected && s.consumeQty)}
+              data-testid="spare-modal-add"
+            >
+              Add Selected Spares
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

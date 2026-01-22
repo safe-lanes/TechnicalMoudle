@@ -6574,6 +6574,56 @@ export class PostgresStorage {
     return results;
   }
 
+  async getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]> {
+    const db = await getDb();
+    
+    // Get spares that match the componentCode for this vessel
+    const matchingSpares = await db.select().from(spares)
+      .where(
+        and(
+          eq(spares.vesselId, vesselId),
+          eq(spares.componentCode, componentCode)
+        )
+      );
+    
+    // Also get spares linked via spare_component_links where componentCode matches
+    const linkedSpares = await db.select({
+      spareId: spareComponentLinks.spareId
+    })
+    .from(spareComponentLinks)
+    .where(eq(spareComponentLinks.componentCode, componentCode));
+    
+    const linkedSpareIds = new Set(linkedSpares.map(l => l.spareId));
+    
+    // Combine and deduplicate by spare ID
+    const spareIdSet = new Set<number>();
+    const results: SpareWithInventory[] = [];
+    
+    // Add direct spares first
+    for (const spare of matchingSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        const withInventory = await this.getSpareWithInventory(spare.id);
+        if (withInventory) {
+          results.push(withInventory);
+        }
+      }
+    }
+    
+    // Add linked spares (deduplicated)
+    for (const spareId of linkedSpareIds) {
+      if (!spareIdSet.has(spareId)) {
+        spareIdSet.add(spareId);
+        const withInventory = await this.getSpareWithInventory(spareId);
+        if (withInventory) {
+          results.push(withInventory);
+        }
+      }
+    }
+    
+    return results;
+  }
+
   async getSpareInventoryByPartNumbers(vesselId: string, partNumbers: string[]): Promise<Map<string, { rob: number; robLocationA: number; robLocationB: number }>> {
     const db = await getDb();
     const result = new Map<string, { rob: number; robLocationA: number; robLocationB: number }>();

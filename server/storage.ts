@@ -850,6 +850,7 @@ export interface IStorage {
   getSpareWithInventory(spareId: number): Promise<SpareWithInventory | null>;
   getSparesWithInventoryByVessel(vesselId: string): Promise<SpareWithInventory[]>;
   getSparesWithInventoryByComponent(componentId: string): Promise<SpareWithInventory[]>;
+  getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<SpareWithInventory[]>;
 }
 
 // Helper function to normalize and validate immediateCause structure

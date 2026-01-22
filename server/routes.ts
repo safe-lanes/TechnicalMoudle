@@ -6304,6 +6304,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  app.get("/technical/api/inventory/spares-by-component-code/:vesselId/:componentCode", async (req, res) => {
+    try {
+      const { vesselId, componentCode } = req.params;
+      const spares = await storage.getSparesWithInventoryByComponentCode(vesselId, componentCode);
+      res.json({ success: true, data: spares });
+    } catch (error: any) {
+      console.error("Error fetching spares by component code:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
   
   // Stores endpoints - ZERO PMS linkages (isolated from Components/Jobs/Work Orders per Global Business Rule Section 7.2)
   // Note: Auth removed to match spares endpoint pattern for development

@@ -1236,6 +1236,62 @@ class MemStorage {
     return results;
   }
 
+  async getSparesWithInventoryByComponentCode(vesselId: string, componentCode: string): Promise<any[]> {
+    const allSpares = toArray(this.data.spares);
+    
+    // Get spares that match the componentCode for this vessel
+    const directSpares = allSpares.filter((s: any) => 
+      s.vesselId === vesselId && s.componentCode === componentCode
+    );
+    
+    // Get spares linked via spare_component_links where componentCode matches
+    const links = toArray(this.data.spareComponentLinks).filter(
+      (link: any) => link.componentCode === componentCode
+    );
+    const linkedSpareIds = new Set(links.map((link: any) => link.spareId));
+    const linkedSpares = allSpares.filter((s: any) => 
+      s.vesselId === vesselId && linkedSpareIds.has(s.id)
+    );
+    
+    // Combine and deduplicate
+    const spareIdSet = new Set<number>();
+    const results: any[] = [];
+    
+    for (const spare of directSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        results.push({
+          spare,
+          robTotal: spare.rob || 0,
+          stockStatus: (spare.rob || 0) <= (spare.min || 0) ? 'At Min' : 'OK',
+          locations: [
+            { locationId: 1, locationName: 'Location A', qty: spare.robLocationA || 0 },
+            { locationId: 2, locationName: 'Location B', qty: spare.robLocationB || 0 }
+          ],
+          linkedComponents: [],
+        });
+      }
+    }
+    
+    for (const spare of linkedSpares) {
+      if (!spareIdSet.has(spare.id)) {
+        spareIdSet.add(spare.id);
+        results.push({
+          spare,
+          robTotal: spare.rob || 0,
+          stockStatus: (spare.rob || 0) <= (spare.min || 0) ? 'At Min' : 'OK',
+          locations: [
+            { locationId: 1, locationName: 'Location A', qty: spare.robLocationA || 0 },
+            { locationId: 2, locationName: 'Location B', qty: spare.robLocationB || 0 }
+          ],
+          linkedComponents: [],
+        });
+      }
+    }
+    
+    return results;
+  }
+
   async adjustSpareAtLocation(
     id: number,
     newRob: number,
