@@ -3730,12 +3730,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
         const consumedSpares = workOrder.consumedSpareParts as Array<{
           partNo: string;
+          partCode?: string;
           description?: string;
           quantityConsumed: number | string;
           locationId?: number | null;
           location?: string;
           comments?: string;
         }>;
+        
+        console.log(`🔍 [B4 Spare Consumption] Processing ${consumedSpares.length} consumed spare parts for WO: ${workOrder.workOrderNo}`);
         
         for (const consumedSpare of consumedSpares) {
           const qtyConsumed = typeof consumedSpare.quantityConsumed === 'string' 
@@ -3744,11 +3747,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
           if (qtyConsumed && qtyConsumed > 0) {
             try {
-              // Get spare from inventory (match by partNo which corresponds to partCode)
+              // Get spare from inventory
+              // PRIORITY: Use partCode first (reliable unique identifier), then fallback to partNo
               const spares = await storage.getSpares(workOrder.vesselId || 'V001');
-              const spare = spares.find(s => s.partCode === consumedSpare.partNo);
+              const lookupKey = consumedSpare.partCode || consumedSpare.partNo;
+              console.log(`🔍 [B4 Spare Consumption] Looking up spare with partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}", using lookupKey="${lookupKey}"`);
+              
+              // Try exact partCode match first, then partNo match as fallback
+              let spare = spares.find(s => s.partCode === lookupKey);
+              if (!spare && consumedSpare.partNo && consumedSpare.partNo !== lookupKey) {
+                // Fallback: try matching by partNo if partCode lookup failed
+                spare = spares.find(s => s.partCode === consumedSpare.partNo || s.partNumber === consumedSpare.partNo);
+                if (spare) {
+                  console.log(`🔍 [B4 Spare Consumption] Found spare via fallback lookup by partNo: ${consumedSpare.partNo} -> spareId=${spare.id}`);
+                }
+              }
               
               if (spare) {
+                console.log(`✅ [B4 Spare Consumption] Found spare: id=${spare.id}, partCode=${spare.partCode}, partName=${spare.partName}, currentROB=${spare.rob}`);
+                
                 // Check if locationId is provided for new location-based tracking
                 // Coerce to number in case frontend sends string
                 const locationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
@@ -3782,7 +3799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   throw new Error(`LOCATION_REQUIRED: Spare part ${consumedSpare.partNo} requires a storage location for inventory tracking. Please select a location in the work order form.`);
                 }
               } else {
-                console.warn(`⚠️ Spare ${consumedSpare.partNo} not found in inventory - skipping deduction`);
+                console.warn(`⚠️ [B4 Spare Consumption] Spare NOT FOUND in inventory - skipping deduction. Searched with: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}", lookupKey="${lookupKey}". Total spares in vessel: ${spares.length}`);
               }
             } catch (spareError: any) {
               // PHASE 3B: Propagate LOCATION_REQUIRED and INSUFFICIENT_STOCK errors to fail the request
