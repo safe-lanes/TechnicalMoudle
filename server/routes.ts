@@ -976,6 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         remainingHoursMin, // For RH jobs
         remainingHoursMax,
         includeOverdue, // boolean string
+        includeGrace, // boolean string - whether to include DUE_GRACE items
         ranks, // comma-separated ranks
         department,
         criticalOnly // boolean string
@@ -984,6 +985,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vesselId) {
         return res.status(400).json({ error: "vesselId is required" });
       }
+
+      // Fetch vessel PMS settings for grace period configuration
+      // This aligns with work order table status logic
+      const vesselSettings = await storage.getPmsVesselSettings(vesselId as string);
+      const vesselGraceSettings = vesselSettings ? {
+        calendarGraceMode: (vesselSettings.calendarGraceMode || 'COMPANY_STANDARD') as 'COMPANY_STANDARD' | 'CUSTOM_DAYS',
+        calendarGraceDays: vesselSettings.calendarGraceDays ?? WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+        rhGraceHours: vesselSettings.rhGraceHours ?? WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+        rhLeadTimeHours: vesselSettings.rhLeadTimeHours ?? WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+      } : {
+        calendarGraceMode: 'COMPANY_STANDARD' as const,
+        calendarGraceDays: WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS,
+        rhGraceHours: WORK_ORDER_THRESHOLDS.RH_GRACE_PERIOD_HOURS,
+        rhLeadTimeHours: WORK_ORDER_THRESHOLDS.RH_LEAD_TIME_HOURS
+      };
 
       // Fetch all active jobs for the vessel
       const allJobs = await storage.getJobs(vesselId as string);
@@ -1084,10 +1100,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!isCritical) continue;
         }
 
-        // Calculate status and dates
+        // Calculate status and dates - ALIGNED WITH WORK ORDER TABLE LOGIC
+        // Uses grace period configuration from vessel settings
         let nextDueDate: Date | null = null;
         let remainingHours: number | null = null;
-        let status: 'OVERDUE' | 'DUE_SOON' | 'FUTURE' = 'FUTURE';
+        let status: 'OVERDUE' | 'DUE_GRACE' | 'DUE_SOON' | 'FUTURE' = 'FUTURE';
         let parentRH: number | null = null;
 
         if (isCalendarJob) {
@@ -1108,11 +1125,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (nextDueDate) {
-            const daysUntilDue = Math.floor((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            const dueDateTime = new Date(nextDueDate);
+            dueDateTime.setHours(0, 0, 0, 0);
             
+            const daysUntilDue = Math.floor((dueDateTime.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Calculate grace end date based on vessel settings (same as work order logic)
+            let graceEndDate: Date;
+            if (vesselGraceSettings.calendarGraceMode === 'CUSTOM_DAYS') {
+              // Use custom fixed grace period
+              graceEndDate = new Date(dueDateTime);
+              graceEndDate.setDate(graceEndDate.getDate() + vesselGraceSettings.calendarGraceDays);
+              graceEndDate.setHours(0, 0, 0, 0);
+            } else {
+              // COMPANY_STANDARD: If due date is in last 7 days of month → grace = 7 days
+              // Otherwise → grace extends to end of the due month
+              const endOfMonth = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth() + 1, 0);
+              endOfMonth.setHours(0, 0, 0, 0);
+              const daysUntilEndOfMonth = endOfMonth.getDate() - dueDateTime.getDate();
+              
+              if (daysUntilEndOfMonth <= 7) {
+                // Due date is in last 7 days of month - use fixed 7-day grace
+                graceEndDate = new Date(dueDateTime);
+                graceEndDate.setDate(graceEndDate.getDate() + WORK_ORDER_THRESHOLDS.CALENDAR_GRACE_PERIOD_DAYS);
+                graceEndDate.setHours(0, 0, 0, 0);
+              } else {
+                // Grace extends to end of month
+                graceEndDate = endOfMonth;
+              }
+            }
+            
+            // Status logic aligned with work order table:
+            // - OVERDUE: today is past grace end date
+            // - DUE_GRACE: past due date but within grace (today <= grace end date)
+            // - DUE_SOON: approaching but not yet due (positive days within lead time)
+            // - FUTURE: more than lead time away
             if (daysUntilDue < 0) {
-              status = 'OVERDUE';
-            } else if (daysUntilDue <= 30) {
+              // Past due date - check if we're still in grace period
+              if (today > graceEndDate) {
+                status = 'OVERDUE';
+              } else {
+                status = 'DUE_GRACE';
+              }
+            } else if (daysUntilDue <= WORK_ORDER_THRESHOLDS.CALENDAR_LEAD_TIME_DAYS) {
               status = 'DUE_SOON';
             } else {
               status = 'FUTURE';
@@ -1123,9 +1178,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const from = fromDate ? new Date(fromDate as string) : new Date(0);
               const to = toDate ? new Date(toDate as string) : new Date('2099-12-31');
               
-              // Skip overdue items only if includeOverdue is false
+              // Skip overdue/grace items based on filter settings
               if (status === 'OVERDUE' && includeOverdue !== 'true') continue;
-              if (status !== 'OVERDUE' && (nextDueDate < from || nextDueDate > to)) continue;
+              if (status === 'DUE_GRACE' && includeOverdue !== 'true' && includeGrace !== 'true') continue;
+              if (status !== 'OVERDUE' && status !== 'DUE_GRACE' && (nextDueDate < from || nextDueDate > to)) continue;
             }
           }
         } else if (isRHJob) {
@@ -1141,14 +1197,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lastDoneRH = parseFloat(job.lastDoneRH || '0') || 0;
           const frequencyRH = parseInt(job.frequencyValue || '0') || job.intervalRunningHour || 0;
           
-          // Calculate remaining hours
-          const usedSinceLastDone = parentRH - lastDoneRH;
-          remainingHours = Math.max(0, frequencyRH - usedSinceLastDone);
+          // Calculate RH due and remaining using work order logic
+          const rhDue = lastDoneRH + frequencyRH;
+          const rhRemaining = rhDue - parentRH;
+          remainingHours = Math.max(0, rhRemaining);
 
-          // Determine status
-          if (remainingHours <= 0) {
+          // Get lead time from vessel settings or job-level settings
+          const leadTimeHours = vesselGraceSettings.rhLeadTimeHours;
+          const graceHours = vesselGraceSettings.rhGraceHours;
+
+          // Status logic aligned with work order table (spec-compliant):
+          // - OVERDUE: Past due RH AND past grace period (rhRemaining < -graceHours)
+          // - DUE_GRACE: Past due RH but within grace period (-graceHours <= rhRemaining < 0)
+          // - DUE_SOON: Within lead time (0 <= rhRemaining <= leadTimeHours)
+          // - FUTURE: Beyond lead time (rhRemaining > leadTimeHours)
+          if (rhRemaining < -graceHours) {
             status = 'OVERDUE';
-          } else if (remainingHours <= (job.leadTimeValue || 168)) {
+          } else if (rhRemaining < 0) {
+            status = 'DUE_GRACE';
+          } else if (rhRemaining <= leadTimeHours) {
             status = 'DUE_SOON';
           } else {
             status = 'FUTURE';
@@ -1159,14 +1226,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const minRH = parseFloat(remainingHoursMin as string) || 0;
             const maxRH = parseFloat(remainingHoursMax as string) || Infinity;
             
-            // Skip overdue items only if includeOverdue is false
+            // Skip overdue/grace items based on filter settings
             if (status === 'OVERDUE' && includeOverdue !== 'true') continue;
-            if (status !== 'OVERDUE' && (remainingHours < minRH || remainingHours > maxRH)) continue;
+            if (status === 'DUE_GRACE' && includeOverdue !== 'true' && includeGrace !== 'true') continue;
+            if (status !== 'OVERDUE' && status !== 'DUE_GRACE' && (remainingHours < minRH || remainingHours > maxRH)) continue;
           }
         }
 
-        // FIXED: Actually skip overdue items when includeOverdue is false
-        if (includeOverdue !== 'true' && status === 'OVERDUE') {
+        // Skip overdue/grace items when filters exclude them
+        if (status === 'OVERDUE' && includeOverdue !== 'true') {
+          continue;
+        }
+        if (status === 'DUE_GRACE' && includeOverdue !== 'true' && includeGrace !== 'true') {
           continue;
         }
 
@@ -1241,10 +1312,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Sort by status priority and due date/remaining hours
+      // Priority order aligned with work order table: OVERDUE > DUE_GRACE > DUE_SOON > FUTURE
       const statusPriority: Record<string, number> = {
         'OVERDUE': 0,
-        'DUE_SOON': 1,
-        'FUTURE': 2
+        'DUE_GRACE': 1,
+        'DUE_SOON': 2,
+        'FUTURE': 3
       };
 
       plannerItems.sort((a, b) => {
@@ -1286,7 +1359,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         byDepartment[dept].manHours += item.estimatedManHours;
       }
 
-      const byStatus: Record<string, number> = { OVERDUE: 0, DUE_SOON: 0, FUTURE: 0 };
+      // byStatus now includes DUE_GRACE to align with work order table logic
+      const byStatus: Record<string, number> = { OVERDUE: 0, DUE_GRACE: 0, DUE_SOON: 0, FUTURE: 0 };
       for (const item of plannerItems) {
         byStatus[item.status]++;
       }
