@@ -45,6 +45,12 @@ The application employs a modern full-stack architecture with a mobile-first, re
   - **Legacy Field Translation**: The apply handler translates old-style nested field paths (e.g., `componentInfo.serialNo`) to direct column names (e.g., `serialNo`) for backward compatibility
   - **Before/After Verification**: All apply handlers use `.returning()` to verify updates succeeded and log field-by-field comparisons
   - **ROB Protection**: Spares and Stores ROB fields are marked as non-editable to enforce use of dedicated adjustment methods
+- **ROB Lookup Reference Correction** (2026-01-22): Fixed ROB (Remaining On Board) fetch logic to use Part Code instead of Part Number as the primary lookup key. This resolves issues where spares with empty/NULL Part Numbers couldn't have their inventory data fetched. Key implementation details:
+  - **Primary Key**: `partCode` is the required unique identifier in the spares table; `partNumber` is optional (manufacturer's reference)
+  - **Dual Lookup Strategy**: ROB enrichment first tries Part Code lookup, then falls back to Part Number for backward compatibility with legacy data
+  - **Storage Function**: `getSpareInventoryByPartCodes()` added to postgresStorage.ts for efficient Part Code-based inventory queries
+  - **Bulk Import Update**: `parseSpareParts()` now stores `partCode` as a proper field in requiredSpareParts JSON structure
+  - **Backward Compatibility**: Legacy jobs with only `partNo` stored continue to work via the Part Number fallback mechanism
 
 ## Bulk Import Format Rules
 
