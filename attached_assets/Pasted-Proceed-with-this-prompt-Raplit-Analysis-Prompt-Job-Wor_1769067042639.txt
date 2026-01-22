@@ -1,0 +1,145 @@
+Proceed with this prompt : Raplit Analysis Prompt — Job / Work Order Spare Linkage
+ROB Fetch Reference Correction (Part Code vs Part Number)
+Context
+In the PMS application, required spares are linked to Jobs / Work Orders via bulk job import and displayed in:
+Jobs → A.2 Required Spare Parts
+Currently, ROB (Remaining On Board) is being fetched using Part Number as the reference key.
+This behavior is functionally incorrect.
+The correct and intended design rule is:
+ROB must always be fetched from the spares table using Part Code as the reference key — irrespective of whether Part Number exists or not.
+This analysis is to trace, document, and validate the current behavior, identify why it is incorrect, and propose a safe correction approach — without changing any logic or UI at this stage.
+🔒 Mandatory Constraints (Must Follow)
+ANALYSE ONLY
+DO NOT change any functionality
+DO NOT refactor logic
+DO NOT modify UI
+DO NOT change APIs
+DO NOT change database schema
+DO NOT affect PMS, Inventory, or WO lifecycle
+Any change is allowed ONLY after explicit PROCEED instruction
+🧠 Analysis Required
+Raplit must analyse and clearly explain the following.
+1. Spare Master Data Model
+Identify and document:
+Table
+spares
+Relevant Columns
+Column Name
+	
+Description
+	
+Mandatory
+
+
+part_code
+	
+System-generated unique spare reference
+	
+✅ Yes
+
+
+part_number
+	
+Manufacturer part number
+	
+❌ Optional
+
+
+part_name
+	
+Description
+	
+✅ Yes
+
+
+rob / rob_location_*
+	
+Live stock
+	
+✅ Yes
+Key Clarification
+part_code is the only guaranteed unique identifier
+part_number may be NULL / empty / blank
+Inventory stock exists even when part_number is NULL
+2. Required Spare Storage in Job / WO
+Analyse how required spares are stored after import:
+Where required spare data is stored (JSON / table)
+Which identifiers are persisted:
+partCode
+partNo
+Description
+Quantity Required
+Confirm:
+Whether Part Code is stored or discarded
+Whether Part Number is treated as a primary key
+3. ROB Fetch Logic — Current Behavior
+Trace and explain:
+Backend Flow
+Where ROB enrichment happens
+Which function fetches ROB data
+What identifier is used in queries
+Confirm explicitly:
+ROB is currently fetched using Part Number
+Queries fail when:
+part_number is NULL
+part_number is empty
+Even when Part Number exists, using it as a reference is logically incorrect
+4. Correct Functional Rule (Authoritative)
+Raplit must validate against this rule:
+ROB must ALWAYS be fetched using part_code as the reference key.
+This rule applies to both scenarios:
+Case 1: Part Number Exists
+UI displays Part Number
+ROB is fetched using Part Code
+Case 2: Part Number is NULL / Empty
+UI shows blank or -
+ROB is still fetched correctly using Part Code
+🚫 Part Number must never be used as the lookup key for ROB
+5. UI Behavior Verification (No Change Allowed)
+Analyse and confirm:
+Part No column behavior when Part Number is empty
+ROB column showing - today is due to backend lookup failure
+UI logic itself is correct and should not be modified
+6. Impact Analysis (Read-Only)
+Confirm that correcting ROB lookup reference would:
+✅ Not affect inventory transactions
+✅ Not affect spare consumption
+✅ Not affect PMS scheduling
+✅ Not affect WO due dates or statuses
+✅ Not affect bulk import logic
+✅ Not affect spares with valid Part Numbers
+7. Gap Identification (Analysis Only)
+Raplit must explicitly identify:
+Gap
+	
+Description
+
+
+Wrong Lookup Key
+	
+ROB fetched using Part Number instead of Part Code
+
+
+Nullable Dependency
+	
+ROB fails when Part Number is NULL
+
+
+Design Violation
+	
+Inventory stock is not keyed on Part Number
+
+
+Data Loss Risk
+	
+Spares exist but appear out-of-stock
+📄 Expected Output from Raplit
+Raplit must provide:
+Clear explanation of current incorrect behavior
+Table- and column-level clarity
+Explicit confirmation that:
+Part Code must be the sole ROB reference
+Identification of why current behavior violates design intent
+A clear, analysis-only correction approach
+Final statement:
+“READY FOR PROCEED”
