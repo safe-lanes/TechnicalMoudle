@@ -2041,7 +2041,7 @@ const WorkOrderFormPage: React.FC<WorkOrderFormPageProps> = ({
                               </>
                             ) : (
                               <>
-                                <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || '-'}</td>
+                                <td className="p-2" data-testid={`text-spare-part-no-${index}`}>{part.partNo || ''}</td>
                                 <td className="p-2" data-testid={`text-spare-description-${index}`}>{part.description || '-'}</td>
                                 <td className="p-2" data-testid={`text-spare-quantity-${index}`}>{part.quantityRequired || '-'}</td>
                                 <td className="p-2 text-center" data-testid={`text-spare-rob-${index}`}>{robValue !== null ? robValue : '-'}</td>
