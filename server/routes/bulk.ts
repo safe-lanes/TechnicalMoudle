@@ -1425,7 +1425,7 @@ async function generateJobsTemplate(vesselId: string): Promise<Buffer> {
     { header: 'Is Active', key: 'isActive', width: 12 },
     { header: 'Vessel Code', key: 'vesselCode', width: 15 },
     // Part A fields - Work Order Form fields
-    // Required Spare Parts format: "PartCode1:Quantity1; PartCode2:Quantity2" (e.g., "MV0001-00001:2; MV0001-00002:1")
+    // Required Spare Parts format: "PartCode1:Qty1, PartCode2:Qty2" or "PartCode1:Qty1; PartCode2:Qty2" (e.g., "PC-001:2, PC-002:1, PC-003:4")
     { header: 'Required Spare Parts', key: 'requiredSpareParts', width: 40 },
     { header: 'Required Tools', key: 'requiredTools', width: 40 },
     { header: 'PPE Requirements', key: 'ppeRequirements', width: 35 },
@@ -4677,19 +4677,24 @@ async function performImport(
         nextDueRH = String(lastRH + intervalRH);
       }
       
-      // Parse spare parts, tools, and safety requirements from Excel (semicolon-separated)
+      // Parse spare parts, tools, and safety requirements from Excel
+      // Supports both comma-separated and semicolon-separated formats
       // Returns string array for safety requirements
       const parseStringList = (value: any): string[] => {
         if (!value) return [];
         const str = String(value).trim();
         if (!str) return [];
-        return str.split(';').map(s => s.trim()).filter(s => s.length > 0);
+        // Support both comma and semicolon separators
+        // If semicolon is present, use it as primary separator (for backwards compatibility)
+        // Otherwise fall back to comma separator
+        const separator = str.includes(';') ? ';' : ',';
+        return str.split(separator).map(s => s.trim()).filter(s => s.length > 0);
       };
       
-      // Parse spare parts from semicolon-separated string into structured objects
-      // NEW FORMAT: "PartCode1:Quantity1; PartCode2:Quantity2" => looks up spare by partCode and fills in details
-      // Example: "MV0001-00001:2; MV0001-00002:1" => [{partNo: '4095', description: 'Brake Spring', quantityRequired: '2', remarks: 'PartCode: MV0001-00001'}, ...]
-      // Falls back to old format if no colon present: "Part Name 1; Part Name 2" => [{partNo: '', description: 'Part Name 1', ...}]
+      // Parse spare parts from comma or semicolon-separated string into structured objects
+      // FORMAT: "PartCode1:Quantity1, PartCode2:Quantity2" or "PartCode1:Quantity1; PartCode2:Quantity2"
+      // Example: "PC-001:2, PC-002:1, PC-003:4" => looks up spare by partCode and fills in details
+      // Falls back to old format if no colon present: "Part Name 1, Part Name 2" => [{partNo: '', description: 'Part Name 1', ...}]
       const parseSpareParts = (value: any): Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> => {
         const items = parseStringList(value);
         const result: Array<{partNo: string, description: string, quantityRequired: string, remarks: string}> = [];
