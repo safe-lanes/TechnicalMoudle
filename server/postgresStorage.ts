@@ -6489,15 +6489,101 @@ export class PostgresStorage {
       userId: input.userId,
     });
     
-    // Update legacy ROB field on spare table for backwards compatibility
+    // Update legacy ROB fields on spare table for backwards compatibility
+    // IMPORTANT: Must update both location-specific ROB and total ROB to maintain data integrity
+    // 
+    // LOCATION MAPPING STRATEGY:
+    // The vessel has exactly 2 fixed locations (A and B) as per business rules.
+    // We use STRICT NAME MATCHING ONLY to ensure correct A/B designation:
+    // - spare.location = text label for Location A
+    // - spare.location2 = text label for Location B
+    // If the transaction's location name matches one of these, we update that location's ROB.
+    // If it matches neither, the transaction fails to prevent inventory corruption.
+    
+    const locationName = (location.locationName || '').toLowerCase().trim();
+    const spareLocationA = (spare.location || '').toLowerCase().trim();
+    const spareLocationB = (spare.location2 || '').toLowerCase().trim();
+    
+    // Determine which location (A or B) this transaction applies to using STRICT NAME MATCHING
+    let targetLocation: 'A' | 'B' | null = null;
+    
+    if (spareLocationA && locationName === spareLocationA) {
+      targetLocation = 'A';
+    } else if (spareLocationB && locationName === spareLocationB) {
+      targetLocation = 'B';
+    }
+    
+    // Special case: If spare has only one location configured, use that
+    if (!targetLocation) {
+      if (spareLocationA && !spareLocationB) {
+        // Spare only has Location A configured
+        targetLocation = 'A';
+        console.log(`[performInventoryTransaction] Spare ${input.spareId} has only Location A configured ("${spareLocationA}"). Using Location A.`);
+      } else if (!spareLocationA && spareLocationB) {
+        // Spare only has Location B configured
+        targetLocation = 'B';
+        console.log(`[performInventoryTransaction] Spare ${input.spareId} has only Location B configured ("${spareLocationB}"). Using Location B.`);
+      } else if (!spareLocationA && !spareLocationB) {
+        // Spare has no legacy locations configured - use A as default (backward compatibility)
+        targetLocation = 'A';
+        console.warn(`[performInventoryTransaction] Spare ${input.spareId} has no legacy locations configured. Defaulting to Location A.`);
+      }
+    }
+    
+    // If name matching failed and spare has both locations configured, fail the transaction
+    // This is a data integrity safeguard - ambiguous location mapping must be resolved
+    if (!targetLocation) {
+      const errorMsg = `LOCATION_MAPPING_FAILED: Location name "${locationName}" does not match ` +
+        `spare's configured locations: A="${spareLocationA}", B="${spareLocationB}". ` +
+        `Please ensure location names are consistent between the locations table and spare configuration. ` +
+        `Spare ID: ${input.spareId}, Location ID: ${input.locationId}.`;
+      console.error(`[performInventoryTransaction] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
+    // Calculate the new location-specific ROB values
+    const currentRobA = spare.robLocationA ?? 0;
+    const currentRobB = spare.robLocationB ?? 0;
+    
+    let newRobA = currentRobA;
+    let newRobB = currentRobB;
+    
+    if (targetLocation === 'A') {
+      newRobA = Math.max(0, currentRobA + input.qtyChange);
+    } else {
+      newRobB = Math.max(0, currentRobB + input.qtyChange);
+    }
+    
+    // Total ROB is the sum of both locations (derived value)
+    const calculatedTotalRob = newRobA + newRobB;
+    
+    // Consistency check: Verify the calculated total matches what we expect
+    // This helps catch any discrepancies between the new inventory system and legacy fields
+    if (calculatedTotalRob !== newTotalRob) {
+      console.warn(`[performInventoryTransaction] CONSISTENCY_WARNING: Calculated legacy ROB (${calculatedTotalRob}) ` +
+        `differs from new inventory system ROB (${newTotalRob}) for spare ${input.spareId}. ` +
+        `Using legacy calculated value for data integrity.`);
+    }
+    
     await db.update(spares)
-      .set({ rob: newTotalRob, updatedAt: new Date(), updatedBy: input.userId })
+      .set({ 
+        rob: calculatedTotalRob,
+        robLocationA: newRobA,
+        robLocationB: newRobB,
+        updatedAt: new Date(), 
+        updatedBy: input.userId 
+      })
       .where(eq(spares.id, input.spareId));
+    
+    console.log(`[performInventoryTransaction] Updated legacy ROB fields for spare ${input.spareId}: ` +
+      `Location ${targetLocation} (${locationName}), ` +
+      `robLocationA: ${currentRobA} → ${newRobA}, robLocationB: ${currentRobB} → ${newRobB}, ` +
+      `total ROB: ${calculatedTotalRob}`);
     
     return {
       transaction,
       newLocationQty,
-      newTotalRob,
+      newTotalRob: calculatedTotalRob,
     };
   }
 
