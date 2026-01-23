@@ -1,0 +1,109 @@
+Raplit Analysis Prompt — B4 Spare Parts Consumed: ROB Not Showing Correctly by Location
+Context
+In the Work Order → B4. Spare Parts Consumed section:
+Spares are displayed correctly
+Location selection (Location A / Location B) is working correctly
+However, the ROB (Remaining On Board) displayed for the selected location is incorrect or missing
+Important observation:
+In DEV environment, this feature works correctly and shows location-wise ROB
+In the current environment, ROB is not reflecting correctly per location
+This creates confusion for users and may lead to incorrect spare consumption decisions.
+🔒 Mandatory Constraints (Very Strict)
+ANALYSE ONLY
+DO NOT change any functionality
+DO NOT change any business logic
+DO NOT modify UI or UI behavior
+DO NOT change APIs
+DO NOT change database schema
+DO NOT affect any other PMS modules
+WAIT for explicit PROCEED instruction before making any change
+This task is analysis and planning only.
+🧠 Analysis Required
+Raplit must perform a deep comparison and trace to identify why ROB is not showing correctly in B4.
+1. Data Source Analysis (ROB Display)
+Identify:
+From which table(s) ROB is fetched for B4
+Whether ROB is sourced from:
+spares.rob
+spares.rob_location_a / rob_location_b
+spare_location_stock
+Explain:
+Which column is used for display when a location is selected
+2. Location Mapping Logic
+Analyse:
+How the selected location in B4 is mapped
+Whether location_id or location_code is used
+Verify:
+If the selected location correctly determines:
+Location A ROB
+Location B ROB
+Identify:
+Any mismatch between UI-selected location and backend lookup
+3. Environment Difference Analysis (DEV vs Current)
+Compare:
+DEV environment logic
+Current environment logic
+Identify:
+Missing joins
+Missing data
+Conditional guards
+Feature flags
+Version mismatch
+Explain:
+Why DEV shows correct location-wise ROB
+Why current environment does not
+4. API / Backend Response Validation
+Analyse:
+API response used to populate B4 spares
+Confirm:
+Whether location-wise ROB values are:
+Not returned
+Returned but ignored
+Returned but overwritten
+Identify:
+Any transformation or mapping error
+5. Vessel Context Validation
+Verify:
+vessel_id is correctly applied
+Ensure:
+ROB data fetched belongs only to the selected vessel
+Confirm:
+No cross-vessel data suppression is occurring
+✅ Correct Expected Behavior (Reference Rule)
+When a spare is selected in B4:
+ROB must reflect only the selected location
+The value must come from the correct inventory source
+Behavior must match DEV environment
+This rule applies only to B4 Spare Parts Consumed
+Must not affect:
+Stores
+Bulk update
+Inventory history
+Any other PMS screen
+🛠️ Plan of Approach (NO IMPLEMENTATION)
+Raplit must:
+Identify the exact root cause
+Propose a safe, minimal correction plan
+Ensure:
+No logic changes
+No side effects
+No impact on other modules
+⚠️ Do NOT implement
+⚠️ Do NOT refactor
+⚠️ Only explain the plan
+🚫 What Must NOT Be Changed
+❌ Work Order workflow
+❌ Spare consumption logic
+❌ Inventory calculation logic
+❌ Location master
+❌ Vessel filtering
+❌ UI layout or controls
+📄 Expected Output
+Raplit must provide:
+Root cause of missing/incorrect ROB display
+Difference between DEV and current behavior
+Exact data source used for ROB
+Why location-wise ROB is not resolved
+A safe, isolated plan to correct it
+Confirmation of no impact on other functionality
+Explicit “READY FOR PROCEED” statement
