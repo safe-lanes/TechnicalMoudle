@@ -10,8 +10,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Interface for company group label configuration
+interface GroupLabel {
+  letter: string;
+  label: string;
+}
+
+// Initial group labels (A-I) - configurable via modal
+const INITIAL_GROUP_LABELS: GroupLabel[] = [
+  { letter: "A", label: "Statutory" },
+  { letter: "B", label: "Value Add" },
+  { letter: "C", label: "Others" },
+  { letter: "D", label: "" },
+  { letter: "E", label: "" },
+  { letter: "F", label: "" },
+  { letter: "G", label: "" },
+  { letter: "H", label: "" },
+  { letter: "I", label: "" },
+];
 
 type TabType = "master" | "company" | "vessel";
 type ViewMode = "view" | "edit";
@@ -97,6 +123,60 @@ export default function ShipsCertificatesAdmin() {
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
   const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
   const [nextRGDate, setNextRGDate] = useState("21/01/2026");
+  
+  // Configure Group Labels modal state
+  const [isConfigureLabelsOpen, setIsConfigureLabelsOpen] = useState(false);
+  const [groupLabels, setGroupLabels] = useState<GroupLabel[]>(INITIAL_GROUP_LABELS);
+  const [tempGroupLabels, setTempGroupLabels] = useState<GroupLabel[]>(INITIAL_GROUP_LABELS);
+  
+  // Helper to get next letter in alphabet
+  const getNextLetter = (labels: GroupLabel[]): string => {
+    if (labels.length === 0) return "A";
+    const lastLetter = labels[labels.length - 1].letter;
+    return String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+  };
+  
+  // Open configure labels modal
+  const openConfigureLabels = () => {
+    setTempGroupLabels([...groupLabels]);
+    setIsConfigureLabelsOpen(true);
+  };
+  
+  // Save configured labels
+  const saveGroupLabels = () => {
+    setGroupLabels([...tempGroupLabels]);
+    setIsConfigureLabelsOpen(false);
+  };
+  
+  // Cancel and close modal
+  const cancelConfigureLabels = () => {
+    setTempGroupLabels([...groupLabels]);
+    setIsConfigureLabelsOpen(false);
+  };
+  
+  // Add new row to group labels
+  const addGroupLabelRow = () => {
+    const nextLetter = getNextLetter(tempGroupLabels);
+    if (nextLetter <= "Z") {
+      setTempGroupLabels([...tempGroupLabels, { letter: nextLetter, label: "" }]);
+    }
+  };
+  
+  // Update a specific label
+  const updateGroupLabel = (index: number, newLabel: string) => {
+    const updated = [...tempGroupLabels];
+    updated[index] = { ...updated[index], label: newLabel };
+    setTempGroupLabels(updated);
+  };
+  
+  // Get formatted label for dropdown (e.g., "A. Statutory" or just "A")
+  const getFormattedGroupLabel = (letter: string): string => {
+    const found = groupLabels.find(g => g.letter === letter);
+    if (found && found.label) {
+      return `${found.letter}. ${found.label}`;
+    }
+    return letter;
+  };
 
   const currentViewMode = viewModes[activeTab];
 
@@ -393,17 +473,18 @@ export default function ShipsCertificatesAdmin() {
                       {viewModes.company === "edit" ? (
                         <Select defaultValue={cert.companyGroup}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${cert.id}`}>
-                            <SelectValue placeholder="A. Statutory" />
+                            <SelectValue placeholder={getFormattedGroupLabel("A")} />
                           </SelectTrigger>
                           <SelectContent>
-                            {/* TODO: Replace COMPANY_GROUP_OPTIONS with actual values */}
-                            {COMPANY_GROUP_OPTIONS.map(grp => (
-                              <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                            {groupLabels.map(grp => (
+                              <SelectItem key={grp.letter} value={grp.letter}>
+                                {getFormattedGroupLabel(grp.letter)}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        cert.companyGroup || "A. Statutory"
+                        cert.companyGroup ? getFormattedGroupLabel(cert.companyGroup) : getFormattedGroupLabel("A")
                       )}
                     </td>
                     <td className="px-3 py-3">
@@ -629,6 +710,7 @@ export default function ShipsCertificatesAdmin() {
                     variant="outline" 
                     size="sm"
                     className="gap-2"
+                    onClick={openConfigureLabels}
                     data-testid="button-configure-labels"
                   >
                     Configure Labels
@@ -677,6 +759,54 @@ export default function ShipsCertificatesAdmin() {
         {activeTab === "company" && renderCompanyTab()}
         {activeTab === "vessel" && renderVesselTab()}
       </div>
+
+      {/* Configure Group Labels Modal */}
+      <Dialog open={isConfigureLabelsOpen} onOpenChange={setIsConfigureLabelsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure Group Labels</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define custom labels for each company group. Leave blank to show just the letter.
+            </p>
+          </DialogHeader>
+          
+          <div className="space-y-3 max-h-[400px] overflow-y-auto py-4">
+            {tempGroupLabels.map((group, index) => (
+              <div key={group.letter} className="flex items-center gap-3">
+                <span className="w-6 text-sm font-medium text-muted-foreground">{group.letter}.</span>
+                <Input
+                  value={group.label}
+                  onChange={(e) => updateGroupLabel(index, e.target.value)}
+                  placeholder={`Label for group ${group.letter}`}
+                  className="flex-1"
+                  data-testid={`input-group-label-${group.letter}`}
+                />
+              </div>
+            ))}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addGroupLabelRow}
+            className="w-full gap-2"
+            disabled={tempGroupLabels.length >= 26}
+            data-testid="button-add-group-row"
+          >
+            <Plus className="h-4 w-4" />
+            Add Row
+          </Button>
+          
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={cancelConfigureLabels} data-testid="button-cancel-labels">
+              Cancel
+            </Button>
+            <Button onClick={saveGroupLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-labels">
+              Save Labels
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
