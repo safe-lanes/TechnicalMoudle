@@ -279,14 +279,7 @@ export default function ShipsCertificatesAdmin() {
     }
   };
   
-  // Auto-select all vessels when vessel data is loaded (only on initial load)
-  const [vesselsInitialized, setVesselsInitialized] = useState(false);
-  useEffect(() => {
-    if (vesselOptions.length > 0 && !vesselsInitialized) {
-      setSelectedVessels([...vesselOptions]);
-      setVesselsInitialized(true);
-    }
-  }, [vesselOptions, vesselsInitialized]);
+  // Note: Vessels are not auto-selected on load - user must select vessels to see certificate configuration
   
   // Load saved certificates from database on mount
   useEffect(() => {
@@ -1396,7 +1389,16 @@ export default function ShipsCertificatesAdmin() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {mockVesselData.map((cert, idx) => (
+                {selectedVessels.length === 0 ? (
+                  <tr>
+                    <td colSpan={viewModes.vessel === "edit" ? 8 : 6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Ship className="h-12 w-12 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">Select at least one vessel to view certificate configuration</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : mockVesselData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
                     {viewModes.vessel === "edit" && (
                       <td className="px-3 py-3 text-center">
@@ -1427,7 +1429,7 @@ export default function ShipsCertificatesAdmin() {
                     )}
                   </tr>
                 ))}
-                {viewModes.vessel === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
+                {selectedVessels.length > 0 && viewModes.vessel === "edit" && mockVesselData.length < 10 && Array.from({ length: Math.max(0, 10 - mockVesselData.length) }).map((_, idx) => (
                   <tr key={`empty-vessel-${idx}`} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-center"><Checkbox className="border-blue-500" /></td>
                     <td className="px-3 py-3 text-sm text-muted-foreground">{mockVesselData.length + idx + 1}</td>
