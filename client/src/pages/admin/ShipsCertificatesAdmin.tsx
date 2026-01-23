@@ -1264,7 +1264,7 @@ export default function ShipsCertificatesAdmin() {
                     </Button>
                     <Button 
                       size="sm"
-                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                      className="gap-2"
                       onClick={handleSave}
                       disabled={saveMutation.isPending}
                       data-testid="button-save-master"
