@@ -1061,7 +1061,7 @@ export default function ShipsCertificatesAdmin() {
         id: cert.id,
         masterId: cert.masterId,
         certificateLabel: cert.certificateLabel,
-        companyId: "", // Editable - user enters this
+        companyId: "C" + cert.masterId, // Default to "C" + Master ID, but user-editable
         requirementRef: cert.requirementRef, // Pre-filled from Master, but editable
         companyGroup: "", // Editable dropdown
       }));
