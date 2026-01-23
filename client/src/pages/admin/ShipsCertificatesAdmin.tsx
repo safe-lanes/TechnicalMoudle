@@ -412,9 +412,25 @@ export default function ShipsCertificatesAdmin() {
     setIsConfigureLabelsOpen(true);
   };
   
-  const saveCompanyGroupLabels = () => {
+  const saveCompanyGroupLabels = async () => {
     setCompanyGroupLabels([...tempCompanyGroupLabels]);
     setIsConfigureLabelsOpen(false);
+    
+    // Save to database
+    try {
+      await saveLabelsMutation.mutateAsync({ configType: 'company_group', labels: tempCompanyGroupLabels });
+      toast({
+        title: "Labels saved",
+        description: "Company group labels have been saved successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving company labels:", error);
+      toast({
+        title: "Error saving labels",
+        description: "Failed to save company group labels. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   const cancelConfigureLabels = () => {
