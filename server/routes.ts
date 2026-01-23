@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getPool } from "./db";
 import * as fs from "fs";
 import * as path from "path";
-import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig } from "@shared/schema";
+import { insertRunningHoursAuditSchema, cascadeRunningHoursSchema, insertWorkOrderSchema, insertWorkOrderExecutionSchema, insertDefectSchema, insertDefectActionSchema, insertDefectAttachmentSchema, insertComponentSchema, insertSpareSchema, insertMakerSchema, insertMasterListSchema, insertComponentDocumentSchema, insertComponentClassRegulatorySchema, insertComponentRequisitionSchema, equipmentCategories, defectCategories, defectTypes, shipCertificatesMaster, insertShipCertificateMasterSchema, shipCertificatesLabelsConfig, vesselCertificateApplicability, insertVesselCertificateApplicabilitySchema } from "@shared/schema";
 import { getPostgresClient } from "./postgresClient";
 import { eq } from "drizzle-orm";
 import { computeWorkOrderStatus } from "@shared/workOrders/status";
@@ -9241,6 +9241,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error saving ship certificates labels config:", error);
       res.status(500).json({ error: "Failed to save labels configuration", details: error.message });
+    }
+  });
+
+  // ========== VESSEL CERTIFICATE APPLICABILITY ROUTES ==========
+  
+  // Get vessel certificate applicability for selected vessels
+  app.get("/technical/api/admin/vessel-certificate-applicability", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const vesselIds = req.query.vesselIds;
+      
+      if (!vesselIds) {
+        return res.status(400).json({ error: "vesselIds query parameter required" });
+      }
+      
+      // Parse vessel IDs (comma-separated)
+      const vesselIdList = typeof vesselIds === 'string' ? vesselIds.split(',').filter(Boolean) : [];
+      
+      if (vesselIdList.length === 0) {
+        return res.json([]);
+      }
+      
+      // Get applicability records for selected vessels
+      const { inArray } = await import('drizzle-orm');
+      const applicability = await db.select()
+        .from(vesselCertificateApplicability)
+        .where(inArray(vesselCertificateApplicability.vesselId, vesselIdList));
+      
+      res.json(applicability);
+    } catch (error: any) {
+      console.error("Error fetching vessel certificate applicability:", error);
+      res.status(500).json({ error: "Failed to fetch vessel certificate applicability", details: error.message });
+    }
+  });
+
+  // Initialize or update vessel certificate applicability for a vessel
+  // When a vessel has no records, create records for all company certificates with isApplicable = true
+  app.post("/technical/api/admin/vessel-certificate-applicability/initialize", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { vesselId, vesselName } = req.body;
+      
+      if (!vesselId || !vesselName) {
+        return res.status(400).json({ error: "vesselId and vesselName are required" });
+      }
+      
+      // Check if vessel already has records
+      const existingRecords = await db.select()
+        .from(vesselCertificateApplicability)
+        .where(eq(vesselCertificateApplicability.vesselId, vesselId));
+      
+      if (existingRecords.length > 0) {
+        return res.json({ success: true, message: "Vessel already initialized", records: existingRecords });
+      }
+      
+      // Get all company certificates (applicableToCompany = true)
+      const companyCertificates = await db.select()
+        .from(shipCertificatesMaster)
+        .where(eq(shipCertificatesMaster.applicableToCompany, true));
+      
+      if (companyCertificates.length === 0) {
+        return res.json({ success: true, message: "No company certificates to initialize", records: [] });
+      }
+      
+      // Create applicability records for all company certificates (all checked by default)
+      const insertData = companyCertificates.map(cert => ({
+        vesselId,
+        vesselName,
+        masterId: cert.masterId,
+        isApplicable: true,
+      }));
+      
+      const insertedRecords = await db.insert(vesselCertificateApplicability)
+        .values(insertData)
+        .returning();
+      
+      console.log(`✅ Initialized ${insertedRecords.length} certificate applicability records for vessel ${vesselName}`);
+      
+      res.json({ success: true, message: `Initialized ${insertedRecords.length} certificates for vessel`, records: insertedRecords });
+    } catch (error: any) {
+      console.error("Error initializing vessel certificate applicability:", error);
+      res.status(500).json({ error: "Failed to initialize vessel certificate applicability", details: error.message });
+    }
+  });
+
+  // Update applicability for a specific vessel-certificate combination
+  app.patch("/technical/api/admin/vessel-certificate-applicability", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { vesselId, vesselName, masterId, isApplicable } = req.body;
+      
+      if (!vesselId || !masterId || isApplicable === undefined) {
+        return res.status(400).json({ error: "vesselId, masterId, and isApplicable are required" });
+      }
+      
+      const { and } = await import('drizzle-orm');
+      
+      // Check if record exists
+      const existingRecord = await db.select()
+        .from(vesselCertificateApplicability)
+        .where(and(
+          eq(vesselCertificateApplicability.vesselId, vesselId),
+          eq(vesselCertificateApplicability.masterId, masterId)
+        ));
+      
+      if (existingRecord.length === 0) {
+        // Create new record
+        const newRecord = await db.insert(vesselCertificateApplicability)
+          .values({ vesselId, vesselName: vesselName || vesselId, masterId, isApplicable })
+          .returning();
+        
+        return res.json({ success: true, record: newRecord[0] });
+      }
+      
+      // Update existing record
+      const updatedRecord = await db.update(vesselCertificateApplicability)
+        .set({ isApplicable, updatedAt: new Date() })
+        .where(and(
+          eq(vesselCertificateApplicability.vesselId, vesselId),
+          eq(vesselCertificateApplicability.masterId, masterId)
+        ))
+        .returning();
+      
+      res.json({ success: true, record: updatedRecord[0] });
+    } catch (error: any) {
+      console.error("Error updating vessel certificate applicability:", error);
+      res.status(500).json({ error: "Failed to update vessel certificate applicability", details: error.message });
+    }
+  });
+
+  // Bulk update applicability for multiple vessels (for multi-select)
+  app.post("/technical/api/admin/vessel-certificate-applicability/bulk-update", async (req, res) => {
+    try {
+      const postgres = await getPostgresClient();
+      if (!postgres) {
+        return res.status(503).json({ error: "Database not available" });
+      }
+      
+      const { db } = postgres;
+      const { vessels, masterId, isApplicable } = req.body;
+      
+      if (!Array.isArray(vessels) || vessels.length === 0 || !masterId || isApplicable === undefined) {
+        return res.status(400).json({ error: "vessels array, masterId, and isApplicable are required" });
+      }
+      
+      const { and, inArray } = await import('drizzle-orm');
+      const vesselIds = vessels.map(v => v.id);
+      
+      // Update all matching records
+      const updatedRecords = await db.update(vesselCertificateApplicability)
+        .set({ isApplicable, updatedAt: new Date() })
+        .where(and(
+          inArray(vesselCertificateApplicability.vesselId, vesselIds),
+          eq(vesselCertificateApplicability.masterId, masterId)
+        ))
+        .returning();
+      
+      // For vessels without existing records, create them
+      const updatedVesselIds = new Set(updatedRecords.map(r => r.vesselId));
+      const missingVessels = vessels.filter(v => !updatedVesselIds.has(v.id));
+      
+      if (missingVessels.length > 0) {
+        const newRecords = await db.insert(vesselCertificateApplicability)
+          .values(missingVessels.map(v => ({
+            vesselId: v.id,
+            vesselName: v.name,
+            masterId,
+            isApplicable,
+          })))
+          .returning();
+        
+        updatedRecords.push(...newRecords);
+      }
+      
+      res.json({ success: true, records: updatedRecords });
+    } catch (error: any) {
+      console.error("Error bulk updating vessel certificate applicability:", error);
+      res.status(500).json({ error: "Failed to bulk update vessel certificate applicability", details: error.message });
     }
   });
   
