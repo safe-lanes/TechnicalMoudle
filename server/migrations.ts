@@ -247,6 +247,16 @@ const migrations: Migration[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_ship_cert_labels_config_type ON ship_certificates_labels_config (config_type)
     `
+  },
+  {
+    id: '015_ship_certificates_company_columns',
+    name: 'Add company-specific columns to ship_certificates_master',
+    description: 'Adds companyId, companyGroup, and companySequence columns for Company tab persistence',
+    sql: `
+      ALTER TABLE ship_certificates_master ADD COLUMN IF NOT EXISTS company_id TEXT;
+      ALTER TABLE ship_certificates_master ADD COLUMN IF NOT EXISTS company_group TEXT;
+      ALTER TABLE ship_certificates_master ADD COLUMN IF NOT EXISTS company_sequence INTEGER
+    `
   }
 ];
 

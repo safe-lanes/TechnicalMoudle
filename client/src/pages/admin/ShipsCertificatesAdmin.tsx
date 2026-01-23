@@ -81,6 +81,10 @@ interface MasterCertificate {
   requirementRef: string;
   applicableToCompany: boolean;
   certificateLabel: string;
+  // Company-specific fields (only used when applicableToCompany is true)
+  companyId?: string;
+  companyGroup?: string;
+  companySequence?: number;
 }
 
 interface CompanyCertificate {
@@ -244,17 +248,25 @@ export default function ShipsCertificatesAdmin() {
   useEffect(() => {
     if (savedCertificates && Array.isArray(savedCertificates) && savedCertificates.length > 0) {
       // Map database fields to component interface (camelCase to our format)
-      const mappedCerts = savedCertificates.map((cert: any) => ({
-        id: cert.id,
-        sequence: cert.sequence,
-        masterId: cert.masterId || cert.master_id,
-        certificateName: cert.certificateName || cert.certificate_name,
-        category: cert.category,
-        group: cert.group,
-        requirementRef: cert.requirementRef || cert.requirement_ref || "",
-        applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
-        certificateLabel: cert.certificateLabel || cert.certificate_label || "",
-      }));
+      const mappedCerts = savedCertificates.map((cert: any) => {
+        const masterId = cert.masterId || cert.master_id;
+        const storedCompanyId = cert.companyId || cert.company_id;
+        return {
+          id: cert.id,
+          sequence: cert.sequence,
+          masterId,
+          certificateName: cert.certificateName || cert.certificate_name,
+          category: cert.category,
+          group: cert.group,
+          requirementRef: cert.requirementRef || cert.requirement_ref || "",
+          applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
+          certificateLabel: cert.certificateLabel || cert.certificate_label || "",
+          // Company-specific fields - use stored value or generate default
+          companyId: storedCompanyId || ("C" + masterId),
+          companyGroup: cert.companyGroup || cert.company_group || "",
+          companySequence: cert.companySequence || cert.company_sequence || undefined,
+        };
+      });
       setMasterData(mappedCerts);
       setHasUnsavedChanges(false);
     }
@@ -652,7 +664,7 @@ export default function ShipsCertificatesAdmin() {
     ));
   };
   
-  // Handle applicableToCompany checkbox toggle - auto-populate label with certificate name
+  // Handle applicableToCompany checkbox toggle - auto-populate label with certificate name and default companyId
   const handleApplicableToCompanyChange = (certId: number, checked: boolean) => {
     setMasterData(prev => prev.map(cert => {
       if (cert.id !== certId) return cert;
@@ -660,7 +672,9 @@ export default function ShipsCertificatesAdmin() {
         ...cert,
         applicableToCompany: checked,
         // Auto-populate Certificate Label with Certificate Name when checked (only if label is empty)
-        certificateLabel: checked && !cert.certificateLabel ? cert.certificateName : cert.certificateLabel
+        certificateLabel: checked && !cert.certificateLabel ? cert.certificateName : cert.certificateLabel,
+        // Generate default Company ID when checked (if not already set)
+        companyId: checked && !cert.companyId ? ("C" + cert.masterId) : cert.companyId,
       };
     }));
     setHasUnsavedChanges(true);
@@ -1069,6 +1083,16 @@ export default function ShipsCertificatesAdmin() {
     );
   };
 
+  // Handler to update company-specific fields in masterData
+  const updateCompanyField = (certId: number, field: 'companyId' | 'companyGroup' | 'companySequence', value: string | number) => {
+    setMasterData(prev => prev.map(cert => 
+      cert.id === certId 
+        ? { ...cert, [field]: value }
+        : cert
+    ));
+    setHasUnsavedChanges(true);
+  };
+
   const renderCompanyTab = () => {
     // Derive company data from Master tab - only certificates with applicableToCompany checked
     const companyDataFromMaster = masterData
@@ -1077,10 +1101,13 @@ export default function ShipsCertificatesAdmin() {
         id: cert.id,
         masterId: cert.masterId,
         certificateLabel: cert.certificateLabel,
-        companyId: "C" + cert.masterId, // Default to "C" + Master ID, but user-editable
+        // Use stored companyId if exists, otherwise default to "C" + Master ID
+        companyId: cert.companyId || ("C" + cert.masterId),
         requirementRef: cert.requirementRef, // Pre-filled from Master, but editable
-        companyGroup: "", // Editable dropdown
-        sequence: companySequences[cert.id] ?? cert.sequence, // Use override if set, otherwise inherit from Master
+        // Use stored companyGroup if exists
+        companyGroup: cert.companyGroup || "",
+        // Use stored companySequence if exists, or fall back to companySequences state, or inherit from Master
+        sequence: cert.companySequence ?? companySequences[cert.id] ?? cert.sequence,
       }));
 
     const filteredData = companyDataFromMaster.filter(cert => {
@@ -1134,7 +1161,7 @@ export default function ShipsCertificatesAdmin() {
                           onBlur={(e) => {
                             const newSeq = parseInt(e.target.value, 10);
                             if (!isNaN(newSeq) && newSeq > 0) {
-                              setCompanySequences(prev => ({ ...prev, [cert.id]: newSeq }));
+                              updateCompanyField(cert.id, 'companySequence', newSeq);
                             }
                           }}
                           data-testid={`input-sequence-company-${cert.id}`}
@@ -1149,6 +1176,7 @@ export default function ShipsCertificatesAdmin() {
                           defaultValue={cert.companyId}
                           className="h-8 text-sm"
                           placeholder=""
+                          onBlur={(e) => updateCompanyField(cert.id, 'companyId', e.target.value)}
                           data-testid={`input-companyid-${cert.id}`}
                         />
                       ) : (
@@ -1169,7 +1197,10 @@ export default function ShipsCertificatesAdmin() {
                     </td>
                     <td className="px-3 py-3 text-sm">
                       {viewModes.company === "edit" ? (
-                        <Select defaultValue={cert.companyGroup}>
+                        <Select 
+                          defaultValue={cert.companyGroup}
+                          onValueChange={(value) => updateCompanyField(cert.id, 'companyGroup', value)}
+                        >
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${cert.id}`}>
                             <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
                           </SelectTrigger>
@@ -1182,7 +1213,7 @@ export default function ShipsCertificatesAdmin() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : getFormattedCompanyGroupLabel("A")
+                        cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : "-"
                       )}
                     </td>
                   </tr>

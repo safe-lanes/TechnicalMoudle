@@ -9106,6 +9106,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               applicableToCompany: cert.applicableToCompany || false,
               certificateLabel: cert.certificateLabel || null,
               isActive: cert.isActive !== false,
+              // Company-specific fields
+              companyId: cert.companyId || null,
+              companyGroup: cert.companyGroup || null,
+              companySequence: cert.companySequence || null,
               updatedAt: new Date(),
             })
             .where(eq(shipCertificatesMaster.masterId, cert.masterId));
@@ -9122,6 +9126,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             applicableToCompany: cert.applicableToCompany || false,
             certificateLabel: cert.certificateLabel || null,
             isActive: cert.isActive !== false,
+            // Company-specific fields
+            companyId: cert.companyId || null,
+            companyGroup: cert.companyGroup || null,
+            companySequence: cert.companySequence || null,
           });
           insertedCount++;
         }
