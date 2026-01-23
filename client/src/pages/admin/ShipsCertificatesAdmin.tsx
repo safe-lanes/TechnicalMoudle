@@ -1612,11 +1612,11 @@ export default function ShipsCertificatesAdmin() {
                           <Checkbox 
                             checked={isMixed ? false : isChecked}
                             onCheckedChange={(checked) => {
-                              if (!conflictCheck.hasConflict) {
+                              if (!conflictCheck.hasConflict && viewModes.vessel === "edit") {
                                 handleApplicabilityChange(cert.masterId, !!checked);
                               }
                             }}
-                            disabled={conflictCheck.hasConflict}
+                            disabled={conflictCheck.hasConflict || viewModes.vessel !== "edit"}
                             className={cn(
                               "border-blue-500 data-[state=checked]:bg-blue-500",
                               isMixed && "border-amber-500 bg-amber-100"
