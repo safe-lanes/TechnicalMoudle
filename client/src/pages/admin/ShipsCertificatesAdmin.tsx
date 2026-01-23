@@ -70,6 +70,7 @@ type ViewMode = "view" | "edit";
 
 interface MasterCertificate {
   id: number;
+  sequence: number;
   masterId: string;
   certificateName: string;
   category: string;
@@ -100,10 +101,10 @@ interface VesselCertificate {
 }
 
 const mockMasterData: MasterCertificate[] = [
-  { id: 1, masterId: "C0001", certificateName: "Safety Equipment Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Equi. Cert." },
-  { id: 2, masterId: "C0002", certificateName: "Safety Construction Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Const. Cert." },
-  { id: 3, masterId: "C0003", certificateName: "International Anti Fouling System Certificate", category: "A", group: "2", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Anti Fouling Cert." },
-  { id: 4, masterId: "C0004", certificateName: "Certificate of Fitness", category: "B", group: "3", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Fitness Cert." },
+  { id: 1, sequence: 1, masterId: "C0001", certificateName: "Safety Equipment Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Equi. Cert." },
+  { id: 2, sequence: 2, masterId: "C0002", certificateName: "Safety Construction Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Const. Cert." },
+  { id: 3, sequence: 3, masterId: "C0003", certificateName: "International Anti Fouling System Certificate", category: "A", group: "2", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Anti Fouling Cert." },
+  { id: 4, sequence: 4, masterId: "C0004", certificateName: "Certificate of Fitness", category: "B", group: "3", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Fitness Cert." },
 ];
 
 const mockCompanyData: CompanyCertificate[] = [
@@ -148,6 +149,44 @@ export default function ShipsCertificatesAdmin() {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
   const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
+  
+  // Master data state with sequence management
+  const [masterData, setMasterData] = useState<MasterCertificate[]>(mockMasterData);
+  
+  // Function to update sequence with auto-adjustment for conflicts
+  const updateMasterSequence = (certId: number, newSequence: number) => {
+    setMasterData(prevData => {
+      const currentCert = prevData.find(c => c.id === certId);
+      if (!currentCert) return prevData;
+      
+      const oldSequence = currentCert.sequence;
+      if (newSequence === oldSequence) return prevData;
+      
+      return prevData.map(c => {
+        if (c.id === certId) {
+          return { ...c, sequence: newSequence };
+        }
+        
+        // Moving up (e.g., 4 → 2): shift items in [newSequence, oldSequence-1] down by 1
+        if (newSequence < oldSequence) {
+          if (c.sequence >= newSequence && c.sequence < oldSequence) {
+            return { ...c, sequence: c.sequence + 1 };
+          }
+        }
+        // Moving down (e.g., 1 → 4): shift items in [oldSequence+1, newSequence] up by 1
+        else {
+          if (c.sequence > oldSequence && c.sequence <= newSequence) {
+            return { ...c, sequence: c.sequence - 1 };
+          }
+        }
+        
+        return c;
+      });
+    });
+  };
+  
+  // Sort master data by sequence
+  const sortedMasterData = [...masterData].sort((a, b) => a.sequence - b.sequence);
   
   // Configure Company Group Labels modal state
   const [isConfigureLabelsOpen, setIsConfigureLabelsOpen] = useState(false);
@@ -290,7 +329,7 @@ export default function ShipsCertificatesAdmin() {
   };
 
   const renderMasterTab = () => {
-    const filteredData = mockMasterData.filter(cert => {
+    const filteredData = sortedMasterData.filter(cert => {
       const matchesSearch = cert.certificateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === "All Categories" || cert.category === selectedCategory;
@@ -338,6 +377,7 @@ export default function ShipsCertificatesAdmin() {
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
+                  <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Name</th>
@@ -354,6 +394,25 @@ export default function ShipsCertificatesAdmin() {
               <tbody className="divide-y">
                 {filteredData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3 text-sm text-center">
+                      {viewModes.master === "edit" ? (
+                        <Input
+                          type="number"
+                          defaultValue={cert.sequence}
+                          className="h-8 text-sm w-16 text-center"
+                          min={1}
+                          onBlur={(e) => {
+                            const newSeq = parseInt(e.target.value, 10);
+                            if (!isNaN(newSeq) && newSeq > 0) {
+                              updateMasterSequence(cert.id, newSeq);
+                            }
+                          }}
+                          data-testid={`input-sequence-${cert.id}`}
+                        />
+                      ) : (
+                        cert.sequence
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
                     <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
                     <td className="px-3 py-3 text-sm">{cert.certificateName}</td>
@@ -445,6 +504,15 @@ export default function ShipsCertificatesAdmin() {
                 ))}
                 {viewModes.master === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
                   <tr key={`empty-${idx}`} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <Input 
+                        type="number" 
+                        className="h-8 text-sm w-16 text-center" 
+                        placeholder={String(masterData.length + idx + 1)}
+                        min={1}
+                        data-testid={`input-sequence-empty-${idx}`}
+                      />
+                    </td>
                     <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-masterid-empty-${idx}`} /></td>
                     <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" data-testid={`input-certname-empty-${idx}`} /></td>
