@@ -498,6 +498,26 @@ export default function ShipsCertificatesAdmin() {
     setNewEntryError("");
   };
   
+  // Update master certificate fields in state
+  const updateMasterField = (certId: number, field: keyof MasterCertificate, value: any) => {
+    setMasterData(prev => prev.map(cert => 
+      cert.id === certId ? { ...cert, [field]: value } : cert
+    ));
+  };
+  
+  // Handle applicableToCompany checkbox toggle - auto-populate label with certificate name
+  const handleApplicableToCompanyChange = (certId: number, checked: boolean) => {
+    setMasterData(prev => prev.map(cert => {
+      if (cert.id !== certId) return cert;
+      return {
+        ...cert,
+        applicableToCompany: checked,
+        // Auto-populate Certificate Label with Certificate Name when checked (only if label is empty)
+        certificateLabel: checked && !cert.certificateLabel ? cert.certificateName : cert.certificateLabel
+      };
+    }));
+  };
+  
   // Reorder the newly added certificate to the end of its Category+Group section
   const reorderToGroupSection = () => {
     if (pendingNewEntryId === null) return;
@@ -685,7 +705,8 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-center">
                       {viewModes.master === "edit" ? (
                         <Checkbox 
-                          defaultChecked={cert.applicableToCompany}
+                          checked={cert.applicableToCompany}
+                          onCheckedChange={(checked) => handleApplicableToCompanyChange(cert.id, !!checked)}
                           data-testid={`checkbox-applicable-${cert.id}`}
                         />
                       ) : (
@@ -699,7 +720,8 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm">
                       {viewModes.master === "edit" ? (
                         <Input 
-                          defaultValue={cert.certificateLabel} 
+                          value={cert.certificateLabel} 
+                          onChange={(e) => updateMasterField(cert.id, 'certificateLabel', e.target.value)}
                           className="h-8 text-sm"
                           data-testid={`input-label-${cert.id}`}
                         />
@@ -738,7 +760,17 @@ export default function ShipsCertificatesAdmin() {
                         className="h-8 text-sm" 
                         placeholder="Certificate Name *"
                         value={newEntryData.certificateName || ""}
-                        onChange={(e) => setNewEntryData(prev => ({ ...prev, certificateName: e.target.value }))}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          setNewEntryData(prev => ({ 
+                            ...prev, 
+                            certificateName: newName,
+                            // Sync label with name if applicable is checked and label is empty or matches previous name
+                            certificateLabel: prev.applicableToCompany && (!prev.certificateLabel || prev.certificateLabel === prev.certificateName) 
+                              ? newName 
+                              : prev.certificateLabel
+                          }));
+                        }}
                         data-testid="input-new-certname"
                       />
                     </td>
@@ -788,7 +820,15 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-center">
                       <Checkbox 
                         checked={newEntryData.applicableToCompany || false}
-                        onCheckedChange={(checked) => setNewEntryData(prev => ({ ...prev, applicableToCompany: !!checked }))}
+                        onCheckedChange={(checked) => {
+                          const isChecked = !!checked;
+                          setNewEntryData(prev => ({ 
+                            ...prev, 
+                            applicableToCompany: isChecked,
+                            // Auto-populate Certificate Label with Certificate Name when checked
+                            certificateLabel: isChecked && !prev.certificateLabel ? (prev.certificateName || "") : prev.certificateLabel
+                          }));
+                        }}
                         data-testid="checkbox-new-applicable"
                       />
                     </td>
