@@ -368,6 +368,9 @@ export default function ShipsCertificatesAdmin() {
   const [companyGroupLabels, setCompanyGroupLabels] = useState<LabelConfig[]>(INITIAL_COMPANY_GROUP_LABELS);
   const [tempCompanyGroupLabels, setTempCompanyGroupLabels] = useState<LabelConfig[]>(INITIAL_COMPANY_GROUP_LABELS);
   
+  // Company sequence overrides - stores { certId: sequence } for independent Company sequences
+  const [companySequences, setCompanySequences] = useState<Record<number, number>>({});
+  
   // Configure Master Labels modal state (Category & Group tabs)
   const [isMasterLabelsOpen, setIsMasterLabelsOpen] = useState(false);
   const [masterLabelTab, setMasterLabelTab] = useState<MasterLabelTab>("category");
@@ -766,7 +769,9 @@ export default function ShipsCertificatesAdmin() {
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
-                  <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>
+                  {viewModes.master === "edit" && (
+                    <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>
+                  )}
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Name</th>
@@ -804,8 +809,8 @@ export default function ShipsCertificatesAdmin() {
               <tbody className="divide-y">
                 {filteredData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm text-center">
-                      {viewModes.master === "edit" ? (
+                    {viewModes.master === "edit" && (
+                      <td className="px-3 py-3 text-sm text-center">
                         <Input
                           key={`seq-${cert.id}-${cert.sequence}`}
                           type="number"
@@ -820,10 +825,8 @@ export default function ShipsCertificatesAdmin() {
                           }}
                           data-testid={`input-sequence-${cert.id}`}
                         />
-                      ) : (
-                        cert.sequence
-                      )}
-                    </td>
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
                     <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
                     <td className="px-3 py-3 text-sm">{cert.certificateName}</td>
@@ -1064,6 +1067,7 @@ export default function ShipsCertificatesAdmin() {
         companyId: "C" + cert.masterId, // Default to "C" + Master ID, but user-editable
         requirementRef: cert.requirementRef, // Pre-filled from Master, but editable
         companyGroup: "", // Editable dropdown
+        sequence: companySequences[cert.id] ?? cert.sequence, // Use override if set, otherwise inherit from Master
       }));
 
     const filteredData = companyDataFromMaster.filter(cert => {
@@ -1092,18 +1096,38 @@ export default function ShipsCertificatesAdmin() {
             <table className="w-full">
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
+                  {viewModes.company === "edit" && (
+                    <th className="px-3 py-3 text-center font-medium w-20">Sequence</th>
+                  )}
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
                   <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Company ID</th>
                   <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
                   <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
-                  <th className="px-3 py-3 text-center font-medium">Reorder</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
+                    {viewModes.company === "edit" && (
+                      <td className="px-3 py-3 text-sm text-center">
+                        <Input
+                          key={`seq-company-${cert.id}-${cert.sequence}`}
+                          type="number"
+                          defaultValue={cert.sequence}
+                          className="h-8 text-sm w-16 text-center"
+                          min={1}
+                          onBlur={(e) => {
+                            const newSeq = parseInt(e.target.value, 10);
+                            if (!isNaN(newSeq) && newSeq > 0) {
+                              setCompanySequences(prev => ({ ...prev, [cert.id]: newSeq }));
+                            }
+                          }}
+                          data-testid={`input-sequence-company-${cert.id}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
                     <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
                     <td className="px-3 py-3 text-sm">
@@ -1147,28 +1171,6 @@ export default function ShipsCertificatesAdmin() {
                       ) : (
                         cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : getFormattedCompanyGroupLabel("A")
                       )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6"
-                          disabled={viewModes.company === "view"}
-                          data-testid={`button-moveup-${cert.id}`}
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6"
-                          disabled={viewModes.company === "view"}
-                          data-testid={`button-movedown-${cert.id}`}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </td>
                   </tr>
                 ))}
