@@ -107,24 +107,6 @@ interface PlannerResponse {
   jobs: PlannerJob[];
 }
 
-const RANKS = [
-  "Chief Engineer",
-  "2nd Engineer",
-  "3rd Engineer",
-  "4th Engineer",
-  "Electrical Officer",
-  "Fitter",
-  "Motorman",
-  "Oiler",
-  "Wiper",
-  "Chief Officer",
-  "2nd Officer",
-  "3rd Officer",
-  "Bosun",
-  "AB",
-  "OS",
-];
-
 const DEPARTMENTS = ["Engine", "Deck", "Electrical", "Catering", "Safety"];
 
 export default function MaintenancePlanner() {
@@ -211,6 +193,16 @@ export default function MaintenancePlanner() {
     const endIndex = startIndex + pageSize;
     return data.jobs.slice(startIndex, endIndex);
   }, [data?.jobs, currentPage, pageSize]);
+
+  // Extract unique ranks from jobs data for dynamic filter (similar to WorkOrders)
+  const uniqueRanks = useMemo(() => {
+    if (!data?.jobs) return [];
+    const ranks = data.jobs
+      .map(job => job.assignedRank?.trim())
+      .filter((rank): rank is string => !!rank && rank.length > 0);
+    const uniqueSet = Array.from(new Set(ranks));
+    return uniqueSet.sort((a, b) => a.localeCompare(b));
+  }, [data?.jobs]);
 
   // Reset to page 1 when filters change (tracked via queryParams)
   const queryParamsString = JSON.stringify(queryParams);
@@ -642,25 +634,31 @@ export default function MaintenancePlanner() {
                       <DialogHeader>
                         <DialogTitle>Select Ranks</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
-                        {RANKS.map((rank) => (
-                          <div key={rank} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`rank-${rank}`}
-                              checked={selectedRanks.includes(rank)}
-                              onCheckedChange={() => toggleRank(rank)}
-                            />
-                            <Label htmlFor={`rank-${rank}`} className="text-sm cursor-pointer">
-                              {rank}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
+                      {uniqueRanks.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500 text-sm">
+                          No ranks available. Load data first.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
+                          {uniqueRanks.map((rank) => (
+                            <div key={rank} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`rank-${rank}`}
+                                checked={selectedRanks.includes(rank)}
+                                onCheckedChange={() => toggleRank(rank)}
+                              />
+                              <Label htmlFor={`rank-${rank}`} className="text-sm cursor-pointer">
+                                {rank}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex justify-between mt-4">
                         <Button variant="outline" size="sm" onClick={() => setSelectedRanks([])}>
                           Clear All
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedRanks([...RANKS])}>
+                        <Button variant="outline" size="sm" onClick={() => setSelectedRanks([...uniqueRanks])}>
                           Select All
                         </Button>
                       </div>
