@@ -1382,15 +1382,29 @@ export default function ShipsCertificatesAdmin() {
                   </>
                 )}
                 {activeTab === "company" && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="gap-2"
-                    onClick={openConfigureLabels}
-                    data-testid="button-configure-labels"
-                  >
-                    Configure Labels
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 gap-1"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      data-testid="button-save-company"
+                    >
+                      {saveMutation.isPending && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                      {saveMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2"
+                      onClick={openConfigureLabels}
+                      data-testid="button-configure-labels"
+                    >
+                      Configure Labels
+                    </Button>
+                  </>
                 )}
                 {activeTab === "vessel" && (
                   <>
