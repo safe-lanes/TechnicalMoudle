@@ -148,7 +148,6 @@ export default function ShipsCertificatesAdmin() {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedGroup, setSelectedGroup] = useState("All Groups");
   const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
-  const [nextRGDate, setNextRGDate] = useState("21/01/2026");
   
   // Configure Company Group Labels modal state
   const [isConfigureLabelsOpen, setIsConfigureLabelsOpen] = useState(false);
@@ -633,18 +632,6 @@ export default function ShipsCertificatesAdmin() {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Next RG:</span>
-            <Input 
-              value={nextRGDate} 
-              onChange={(e) => setNextRGDate(e.target.value)}
-              className="w-[130px] h-9"
-              data-testid="input-next-rg"
-            />
-          </div>
-          <Button variant="default" className="bg-green-600 hover:bg-green-700" data-testid="button-review">
-            + Review
-          </Button>
         </div>
 
         {viewModes.vessel === "edit" && (
@@ -831,9 +818,6 @@ export default function ShipsCertificatesAdmin() {
                   <>
                     <Button variant="outline" size="sm" className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300" data-testid="button-save-draft">
                       Save Draft
-                    </Button>
-                    <Button variant="outline" size="sm" className="bg-red-100 hover:bg-red-200 text-red-800 border-red-300" data-testid="button-reject">
-                      Reject
                     </Button>
                     <Button size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="button-submit">
                       Submit
