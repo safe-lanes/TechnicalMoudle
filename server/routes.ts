@@ -3330,6 +3330,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // ========== SPARE CONSUMPTION ON APPROVAL ==========
+      // Auto-deduct consumed spares from inventory when work order is approved
+      // This mirrors the logic in POST /complete route but triggers on PATCH approval
+      if (updateData.approvalAction === 'approved' && updateData.status === 'Completed') {
+        if (workOrder && workOrder.consumedSpareParts && Array.isArray(workOrder.consumedSpareParts)) {
+          const consumedSpares = workOrder.consumedSpareParts as Array<{
+            partNo: string;
+            partCode?: string;
+            description?: string;
+            quantityConsumed: number | string;
+            locationId?: number | null;
+            location?: string;
+            comments?: string;
+          }>;
+          
+          console.log(`🔧 [PATCH Approval] Processing ${consumedSpares.length} consumed spares for WO ${workOrder.workOrderNo}`);
+          
+          for (const consumedSpare of consumedSpares) {
+            const qtyConsumed = typeof consumedSpare.quantityConsumed === 'string' 
+              ? parseFloat(consumedSpare.quantityConsumed) 
+              : consumedSpare.quantityConsumed;
+              
+            if (qtyConsumed && qtyConsumed > 0) {
+              try {
+                // Get spares from inventory for this vessel
+                const vesselId = workOrder.vesselId || 'V001';
+                const allSpares = await storage.getSpares(vesselId);
+                
+                // Multi-step lookup strategy (same as POST /complete):
+                // 1. Try exact match on partCode field (most reliable)
+                // 2. If partCode empty, try matching partNo against spares.partCode
+                // 3. As last resort, try matching partNo against spares.partNumber
+                let spare = null;
+                
+                // Step 1: Try partCode first if available
+                if (consumedSpare.partCode) {
+                  spare = allSpares.find(s => s.partCode === consumedSpare.partCode);
+                }
+                
+                // Step 2: If not found and partNo available, try matching partNo against partCode
+                if (!spare && consumedSpare.partNo) {
+                  spare = allSpares.find(s => s.partCode === consumedSpare.partNo);
+                }
+                
+                // Step 3: Last resort - try matching partNo against partNumber field
+                if (!spare && consumedSpare.partNo) {
+                  spare = allSpares.find(s => s.partNumber === consumedSpare.partNo);
+                }
+                
+                if (spare) {
+                  // Check if locationId is provided for new location-based tracking
+                  const locationId = consumedSpare.locationId ? parseInt(String(consumedSpare.locationId)) : null;
+                  
+                  if (locationId && !isNaN(locationId)) {
+                    // Use new inventory transaction system with location tracking
+                    try {
+                      await storage.performInventoryTransaction({
+                        vesselId: vesselId,
+                        spareId: spare.id,
+                        locationId: locationId,
+                        eventType: 'CONSUME',
+                        qtyChange: -Math.abs(qtyConsumed), // Negative for consumption
+                        referenceType: 'WORK_ORDER',
+                        referenceId: workOrder.id,
+                        referenceNote: `WO Approval: ${workOrder.workOrderNo} - ${consumedSpare.comments || 'Consumed during work approval'}`,
+                        userId: workOrder.approver || 'system'
+                      });
+                      console.log(`✅ [PATCH Approval] Consumed ${qtyConsumed} units of ${consumedSpare.partCode || consumedSpare.partNo} from location ${locationId} (WO: ${workOrder.workOrderNo})`);
+                    } catch (txnError: any) {
+                      if (txnError.message?.includes('INSUFFICIENT_STOCK') || txnError.message?.includes('NEGATIVE_STOCK_PREVENTED')) {
+                        console.warn(`⚠️ [PATCH Approval] Insufficient stock for ${consumedSpare.partCode || consumedSpare.partNo} at location ${locationId}: ${txnError.message}`);
+                        // Log warning but don't fail the approval - spare was already consumed via other means or stock discrepancy
+                      } else {
+                        console.error(`❌ [PATCH Approval] Transaction error for ${consumedSpare.partCode || consumedSpare.partNo}:`, txnError);
+                      }
+                    }
+                  } else {
+                    // PHASE 3B: locationId is REQUIRED for inventory-tracked spares
+                    console.warn(`⚠️ [PATCH Approval] Missing locationId for ${consumedSpare.partCode || consumedSpare.partNo} - skipping deduction. Ensure location is selected in work order form.`);
+                  }
+                } else {
+                  console.warn(`⚠️ [PATCH Approval] Spare NOT FOUND - skipping deduction. Searched: partCode="${consumedSpare.partCode}", partNo="${consumedSpare.partNo}". Vessel ${vesselId} has ${allSpares.length} spares.`);
+                }
+              } catch (spareError: any) {
+                console.error(`❌ [PATCH Approval] Failed to process spare ${consumedSpare.partCode || consumedSpare.partNo}:`, spareError);
+                // Don't fail the approval for spare processing errors - log and continue
+              }
+            }
+          }
+        }
+      }
+      // ========== END SPARE CONSUMPTION ON APPROVAL ==========
+      
       res.json(workOrder);
     } catch (error: any) {
       console.error('❌ Work order update error:', error);
