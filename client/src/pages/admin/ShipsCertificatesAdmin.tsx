@@ -20,24 +20,50 @@ import {
 import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Interface for company group label configuration
-interface GroupLabel {
-  letter: string;
+// Interface for label configuration (used by Company Group, Master Category, Master Group)
+interface LabelConfig {
+  key: string;  // Letter for Category/Company Group, Number for Master Group
   label: string;
 }
 
-// Initial group labels (A-I) - configurable via modal
-const INITIAL_GROUP_LABELS: GroupLabel[] = [
-  { letter: "A", label: "Statutory" },
-  { letter: "B", label: "Value Add" },
-  { letter: "C", label: "Others" },
-  { letter: "D", label: "" },
-  { letter: "E", label: "" },
-  { letter: "F", label: "" },
-  { letter: "G", label: "" },
-  { letter: "H", label: "" },
-  { letter: "I", label: "" },
+// Initial Company Group labels (A-I) - configurable via modal
+const INITIAL_COMPANY_GROUP_LABELS: LabelConfig[] = [
+  { key: "A", label: "Statutory" },
+  { key: "B", label: "Value Add" },
+  { key: "C", label: "Others" },
+  { key: "D", label: "" },
+  { key: "E", label: "" },
+  { key: "F", label: "" },
+  { key: "G", label: "" },
+  { key: "H", label: "" },
+  { key: "I", label: "" },
 ];
+
+// Initial Master Category labels (A-F) - configurable via modal
+const INITIAL_MASTER_CATEGORY_LABELS: LabelConfig[] = [
+  { key: "A", label: "Statutory" },
+  { key: "B", label: "Value Add" },
+  { key: "C", label: "Others" },
+  { key: "D", label: "" },
+  { key: "E", label: "" },
+  { key: "F", label: "" },
+];
+
+// Initial Master Group labels (1-10) - configurable via modal
+const INITIAL_MASTER_GROUP_LABELS: LabelConfig[] = [
+  { key: "1", label: "Safety" },
+  { key: "2", label: "Environment" },
+  { key: "3", label: "Cargo" },
+  { key: "4", label: "Navigation" },
+  { key: "5", label: "" },
+  { key: "6", label: "" },
+  { key: "7", label: "" },
+  { key: "8", label: "" },
+  { key: "9", label: "" },
+  { key: "10", label: "" },
+];
+
+type MasterLabelTab = "category" | "group";
 
 type TabType = "master" | "company" | "vessel";
 type ViewMode = "view" | "edit";
@@ -74,10 +100,10 @@ interface VesselCertificate {
 }
 
 const mockMasterData: MasterCertificate[] = [
-  { id: 1, masterId: "C0001", certificateName: "Safety Equipment Certificate", category: "Statutory", group: "Safety", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Equi. Cert." },
-  { id: 2, masterId: "C0002", certificateName: "Safety Construction Certificate", category: "Statutory", group: "Safety", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Const. Cert." },
-  { id: 3, masterId: "C0003", certificateName: "International Anti Fouling System Certificate", category: "Statutory", group: "Environment", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Anti Fouling Cert." },
-  { id: 4, masterId: "C0004", certificateName: "Certificate of Fitness", category: "Trading", group: "Cargo", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Fitness Cert." },
+  { id: 1, masterId: "C0001", certificateName: "Safety Equipment Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Equi. Cert." },
+  { id: 2, masterId: "C0002", certificateName: "Safety Construction Certificate", category: "A", group: "1", requirementRef: "SOLAS XXX", applicableToCompany: true, certificateLabel: "Safety Const. Cert." },
+  { id: 3, masterId: "C0003", certificateName: "International Anti Fouling System Certificate", category: "A", group: "2", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Anti Fouling Cert." },
+  { id: 4, masterId: "C0004", certificateName: "Certificate of Fitness", category: "B", group: "3", requirementRef: "SOLAS XXX", applicableToCompany: false, certificateLabel: "Fitness Cert." },
 ];
 
 const mockCompanyData: CompanyCertificate[] = [
@@ -124,58 +150,128 @@ export default function ShipsCertificatesAdmin() {
   const [selectedVessel, setSelectedVessel] = useState("Vessel 1");
   const [nextRGDate, setNextRGDate] = useState("21/01/2026");
   
-  // Configure Group Labels modal state
+  // Configure Company Group Labels modal state
   const [isConfigureLabelsOpen, setIsConfigureLabelsOpen] = useState(false);
-  const [groupLabels, setGroupLabels] = useState<GroupLabel[]>(INITIAL_GROUP_LABELS);
-  const [tempGroupLabels, setTempGroupLabels] = useState<GroupLabel[]>(INITIAL_GROUP_LABELS);
+  const [companyGroupLabels, setCompanyGroupLabels] = useState<LabelConfig[]>(INITIAL_COMPANY_GROUP_LABELS);
+  const [tempCompanyGroupLabels, setTempCompanyGroupLabels] = useState<LabelConfig[]>(INITIAL_COMPANY_GROUP_LABELS);
+  
+  // Configure Master Labels modal state (Category & Group tabs)
+  const [isMasterLabelsOpen, setIsMasterLabelsOpen] = useState(false);
+  const [masterLabelTab, setMasterLabelTab] = useState<MasterLabelTab>("category");
+  const [masterCategoryLabels, setMasterCategoryLabels] = useState<LabelConfig[]>(INITIAL_MASTER_CATEGORY_LABELS);
+  const [masterGroupLabels, setMasterGroupLabels] = useState<LabelConfig[]>(INITIAL_MASTER_GROUP_LABELS);
+  const [tempMasterCategoryLabels, setTempMasterCategoryLabels] = useState<LabelConfig[]>(INITIAL_MASTER_CATEGORY_LABELS);
+  const [tempMasterGroupLabels, setTempMasterGroupLabels] = useState<LabelConfig[]>(INITIAL_MASTER_GROUP_LABELS);
   
   // Helper to get next letter in alphabet
-  const getNextLetter = (labels: GroupLabel[]): string => {
+  const getNextLetter = (labels: LabelConfig[]): string => {
     if (labels.length === 0) return "A";
-    const lastLetter = labels[labels.length - 1].letter;
-    return String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+    const lastKey = labels[labels.length - 1].key;
+    return String.fromCharCode(lastKey.charCodeAt(0) + 1);
   };
   
-  // Open configure labels modal
+  // Helper to get next number
+  const getNextNumber = (labels: LabelConfig[]): string => {
+    if (labels.length === 0) return "1";
+    const lastKey = parseInt(labels[labels.length - 1].key);
+    return String(lastKey + 1);
+  };
+  
+  // ===== Company Group Labels Modal Functions =====
   const openConfigureLabels = () => {
-    setTempGroupLabels([...groupLabels]);
+    setTempCompanyGroupLabels([...companyGroupLabels]);
     setIsConfigureLabelsOpen(true);
   };
   
-  // Save configured labels
-  const saveGroupLabels = () => {
-    setGroupLabels([...tempGroupLabels]);
+  const saveCompanyGroupLabels = () => {
+    setCompanyGroupLabels([...tempCompanyGroupLabels]);
     setIsConfigureLabelsOpen(false);
   };
   
-  // Cancel and close modal
   const cancelConfigureLabels = () => {
-    setTempGroupLabels([...groupLabels]);
+    setTempCompanyGroupLabels([...companyGroupLabels]);
     setIsConfigureLabelsOpen(false);
   };
   
-  // Add new row to group labels
-  const addGroupLabelRow = () => {
-    const nextLetter = getNextLetter(tempGroupLabels);
+  const addCompanyGroupLabelRow = () => {
+    const nextLetter = getNextLetter(tempCompanyGroupLabels);
     if (nextLetter <= "Z") {
-      setTempGroupLabels([...tempGroupLabels, { letter: nextLetter, label: "" }]);
+      setTempCompanyGroupLabels([...tempCompanyGroupLabels, { key: nextLetter, label: "" }]);
     }
   };
   
-  // Update a specific label
-  const updateGroupLabel = (index: number, newLabel: string) => {
-    const updated = [...tempGroupLabels];
+  const updateCompanyGroupLabel = (index: number, newLabel: string) => {
+    const updated = [...tempCompanyGroupLabels];
     updated[index] = { ...updated[index], label: newLabel };
-    setTempGroupLabels(updated);
+    setTempCompanyGroupLabels(updated);
   };
   
-  // Get formatted label for dropdown (e.g., "A. Statutory" or just "A")
-  const getFormattedGroupLabel = (letter: string): string => {
-    const found = groupLabels.find(g => g.letter === letter);
+  const getFormattedCompanyGroupLabel = (key: string): string => {
+    const found = companyGroupLabels.find(g => g.key === key);
     if (found && found.label) {
-      return `${found.letter}. ${found.label}`;
+      return `${found.key}. ${found.label}`;
     }
-    return letter;
+    return key;
+  };
+  
+  // ===== Master Labels Modal Functions (Category & Group) =====
+  const openMasterLabels = () => {
+    setTempMasterCategoryLabels([...masterCategoryLabels]);
+    setTempMasterGroupLabels([...masterGroupLabels]);
+    setMasterLabelTab("category");
+    setIsMasterLabelsOpen(true);
+  };
+  
+  const saveMasterLabels = () => {
+    setMasterCategoryLabels([...tempMasterCategoryLabels]);
+    setMasterGroupLabels([...tempMasterGroupLabels]);
+    setIsMasterLabelsOpen(false);
+  };
+  
+  const cancelMasterLabels = () => {
+    setTempMasterCategoryLabels([...masterCategoryLabels]);
+    setTempMasterGroupLabels([...masterGroupLabels]);
+    setIsMasterLabelsOpen(false);
+  };
+  
+  const addMasterCategoryRow = () => {
+    const nextLetter = getNextLetter(tempMasterCategoryLabels);
+    if (nextLetter <= "Z") {
+      setTempMasterCategoryLabels([...tempMasterCategoryLabels, { key: nextLetter, label: "" }]);
+    }
+  };
+  
+  const addMasterGroupRow = () => {
+    const nextNumber = getNextNumber(tempMasterGroupLabels);
+    setTempMasterGroupLabels([...tempMasterGroupLabels, { key: nextNumber, label: "" }]);
+  };
+  
+  const updateMasterCategoryLabel = (index: number, newLabel: string) => {
+    const updated = [...tempMasterCategoryLabels];
+    updated[index] = { ...updated[index], label: newLabel };
+    setTempMasterCategoryLabels(updated);
+  };
+  
+  const updateMasterGroupLabel = (index: number, newLabel: string) => {
+    const updated = [...tempMasterGroupLabels];
+    updated[index] = { ...updated[index], label: newLabel };
+    setTempMasterGroupLabels(updated);
+  };
+  
+  const getFormattedMasterCategoryLabel = (key: string): string => {
+    const found = masterCategoryLabels.find(g => g.key === key);
+    if (found && found.label) {
+      return `${found.key}. ${found.label}`;
+    }
+    return key;
+  };
+  
+  const getFormattedMasterGroupLabel = (key: string): string => {
+    const found = masterGroupLabels.find(g => g.key === key);
+    if (found && found.label) {
+      return `${found.key}. ${found.label}`;
+    }
+    return key;
   };
 
   const currentViewMode = viewModes[activeTab];
@@ -269,14 +365,15 @@ export default function ShipsCertificatesAdmin() {
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {/* TODO: Replace MASTER_CATEGORY_OPTIONS with actual values */}
-                            {MASTER_CATEGORY_OPTIONS.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            {masterCategoryLabels.map((cat: LabelConfig) => (
+                              <SelectItem key={cat.key} value={cat.key}>
+                                {getFormattedMasterCategoryLabel(cat.key)}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        cert.category
+                        cert.category ? getFormattedMasterCategoryLabel(cert.category) : cert.category
                       )}
                     </td>
                     <td className="px-3 py-3 text-sm">
@@ -286,14 +383,15 @@ export default function ShipsCertificatesAdmin() {
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {/* TODO: Replace MASTER_GROUP_OPTIONS with actual values */}
-                            {MASTER_GROUP_OPTIONS.map(grp => (
-                              <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                            {masterGroupLabels.map((grp: LabelConfig) => (
+                              <SelectItem key={grp.key} value={grp.key}>
+                                {getFormattedMasterGroupLabel(grp.key)}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        cert.group
+                        cert.group ? getFormattedMasterGroupLabel(cert.group) : cert.group
                       )}
                     </td>
                     <td className="px-3 py-3 text-sm">
@@ -355,9 +453,10 @@ export default function ShipsCertificatesAdmin() {
                       <Select>
                         <SelectTrigger className="h-8 text-sm" data-testid={`select-category-empty-${idx}`}><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
-                          {/* TODO: Replace MASTER_CATEGORY_OPTIONS with actual values */}
-                          {MASTER_CATEGORY_OPTIONS.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          {masterCategoryLabels.map((cat: LabelConfig) => (
+                            <SelectItem key={cat.key} value={cat.key}>
+                              {getFormattedMasterCategoryLabel(cat.key)}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -366,9 +465,10 @@ export default function ShipsCertificatesAdmin() {
                       <Select>
                         <SelectTrigger className="h-8 text-sm" data-testid={`select-group-empty-${idx}`}><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
-                          {/* TODO: Replace MASTER_GROUP_OPTIONS with actual values */}
-                          {MASTER_GROUP_OPTIONS.map(grp => (
-                            <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                          {masterGroupLabels.map((grp: LabelConfig) => (
+                            <SelectItem key={grp.key} value={grp.key}>
+                              {getFormattedMasterGroupLabel(grp.key)}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -473,18 +573,18 @@ export default function ShipsCertificatesAdmin() {
                       {viewModes.company === "edit" ? (
                         <Select defaultValue={cert.companyGroup}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${cert.id}`}>
-                            <SelectValue placeholder={getFormattedGroupLabel("A")} />
+                            <SelectValue placeholder={getFormattedCompanyGroupLabel("A")} />
                           </SelectTrigger>
                           <SelectContent>
-                            {groupLabels.map(grp => (
-                              <SelectItem key={grp.letter} value={grp.letter}>
-                                {getFormattedGroupLabel(grp.letter)}
+                            {companyGroupLabels.map((grp: LabelConfig) => (
+                              <SelectItem key={grp.key} value={grp.key}>
+                                {getFormattedCompanyGroupLabel(grp.key)}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        cert.companyGroup ? getFormattedGroupLabel(cert.companyGroup) : getFormattedGroupLabel("A")
+                        cert.companyGroup ? getFormattedCompanyGroupLabel(cert.companyGroup) : getFormattedCompanyGroupLabel("A")
                       )}
                     </td>
                     <td className="px-3 py-3">
@@ -705,6 +805,17 @@ export default function ShipsCertificatesAdmin() {
                 >
                   Cancel
                 </Button>
+                {activeTab === "master" && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="gap-2"
+                    onClick={openMasterLabels}
+                    data-testid="button-configure-master-labels"
+                  >
+                    Configure Labels
+                  </Button>
+                )}
                 {activeTab === "company" && (
                   <Button 
                     variant="outline" 
@@ -760,7 +871,7 @@ export default function ShipsCertificatesAdmin() {
         {activeTab === "vessel" && renderVesselTab()}
       </div>
 
-      {/* Configure Group Labels Modal */}
+      {/* Configure Company Group Labels Modal */}
       <Dialog open={isConfigureLabelsOpen} onOpenChange={setIsConfigureLabelsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -771,15 +882,15 @@ export default function ShipsCertificatesAdmin() {
           </DialogHeader>
           
           <div className="space-y-3 max-h-[400px] overflow-y-auto py-4">
-            {tempGroupLabels.map((group, index) => (
-              <div key={group.letter} className="flex items-center gap-3">
-                <span className="w-6 text-sm font-medium text-muted-foreground">{group.letter}.</span>
+            {tempCompanyGroupLabels.map((group: LabelConfig, index: number) => (
+              <div key={group.key} className="flex items-center gap-3">
+                <span className="w-6 text-sm font-medium text-muted-foreground">{group.key}.</span>
                 <Input
                   value={group.label}
-                  onChange={(e) => updateGroupLabel(index, e.target.value)}
-                  placeholder={`Label for group ${group.letter}`}
+                  onChange={(e) => updateCompanyGroupLabel(index, e.target.value)}
+                  placeholder={`Label for group ${group.key}`}
                   className="flex-1"
-                  data-testid={`input-group-label-${group.letter}`}
+                  data-testid={`input-group-label-${group.key}`}
                 />
               </div>
             ))}
@@ -788,9 +899,9 @@ export default function ShipsCertificatesAdmin() {
           <Button
             variant="outline"
             size="sm"
-            onClick={addGroupLabelRow}
+            onClick={addCompanyGroupLabelRow}
             className="w-full gap-2"
-            disabled={tempGroupLabels.length >= 26}
+            disabled={tempCompanyGroupLabels.length >= 26}
             data-testid="button-add-group-row"
           >
             <Plus className="h-4 w-4" />
@@ -801,7 +912,113 @@ export default function ShipsCertificatesAdmin() {
             <Button variant="outline" onClick={cancelConfigureLabels} data-testid="button-cancel-labels">
               Cancel
             </Button>
-            <Button onClick={saveGroupLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-labels">
+            <Button onClick={saveCompanyGroupLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-labels">
+              Save Labels
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configure Master Labels Modal (Category & Group tabs) */}
+      <Dialog open={isMasterLabelsOpen} onOpenChange={setIsMasterLabelsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure {masterLabelTab === "category" ? "Category" : "Group"} Labels</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define custom labels for each {masterLabelTab === "category" ? "category" : "group"}. Leave blank to show just the {masterLabelTab === "category" ? "letter" : "number"}.
+            </p>
+          </DialogHeader>
+          
+          {/* Tabs for Category and Group */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant={masterLabelTab === "category" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMasterLabelTab("category")}
+              className={masterLabelTab === "category" ? "bg-blue-600 hover:bg-blue-700" : ""}
+              data-testid="tab-master-category"
+            >
+              Category
+            </Button>
+            <Button
+              variant={masterLabelTab === "group" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMasterLabelTab("group")}
+              className={masterLabelTab === "group" ? "bg-blue-600 hover:bg-blue-700" : ""}
+              data-testid="tab-master-group"
+            >
+              Group
+            </Button>
+          </div>
+          
+          {/* Category Tab Content */}
+          {masterLabelTab === "category" && (
+            <>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto py-2">
+                {tempMasterCategoryLabels.map((cat: LabelConfig, index: number) => (
+                  <div key={cat.key} className="flex items-center gap-3">
+                    <span className="w-6 text-sm font-medium text-muted-foreground">{cat.key}.</span>
+                    <Input
+                      value={cat.label}
+                      onChange={(e) => updateMasterCategoryLabel(index, e.target.value)}
+                      placeholder={`Label for category ${cat.key}`}
+                      className="flex-1"
+                      data-testid={`input-category-label-${cat.key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addMasterCategoryRow}
+                className="w-full gap-2"
+                disabled={tempMasterCategoryLabels.length >= 26}
+                data-testid="button-add-category-row"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </Button>
+            </>
+          )}
+          
+          {/* Group Tab Content */}
+          {masterLabelTab === "group" && (
+            <>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto py-2">
+                {tempMasterGroupLabels.map((grp: LabelConfig, index: number) => (
+                  <div key={grp.key} className="flex items-center gap-3">
+                    <span className="w-8 text-sm font-medium text-muted-foreground">{grp.key}.</span>
+                    <Input
+                      value={grp.label}
+                      onChange={(e) => updateMasterGroupLabel(index, e.target.value)}
+                      placeholder={`Label for group ${grp.key}`}
+                      className="flex-1"
+                      data-testid={`input-master-group-label-${grp.key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addMasterGroupRow}
+                className="w-full gap-2"
+                data-testid="button-add-master-group-row"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </Button>
+            </>
+          )}
+          
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={cancelMasterLabels} data-testid="button-cancel-master-labels">
+              Cancel
+            </Button>
+            <Button onClick={saveMasterLabels} className="bg-blue-600 hover:bg-blue-700" data-testid="button-save-master-labels">
               Save Labels
             </Button>
           </DialogFooter>
