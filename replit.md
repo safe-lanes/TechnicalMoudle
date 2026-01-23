@@ -51,6 +51,12 @@ The application employs a modern full-stack architecture with a mobile-first, re
   - **Storage Function**: `getSpareInventoryByPartCodes()` added to postgresStorage.ts for efficient Part Code-based inventory queries
   - **Bulk Import Update**: `parseSpareParts()` now stores `partCode` as a proper field in requiredSpareParts JSON structure
   - **Backward Compatibility**: Legacy jobs with only `partNo` stored continue to work via the Part Number fallback mechanism
+- **Work Order Approval Spare Consumption Fix** (2026-01-23): Fixed critical bug where spare parts listed in B4 (Consumed Spare Parts) were not being deducted from inventory when work orders were approved. The fix adds spare consumption logic to the PATCH `/technical/api/work-orders/:id` route that mirrors the existing POST `/complete` route. Key implementation details:
+  - **Root Cause**: Frontend uses PATCH route for approvals but spare consumption only existed in POST /complete route
+  - **Multi-Step Lookup**: Consumes use partCode → partNo as partCode → partNo as partNumber lookup strategy for backward compatibility
+  - **Transaction Creation**: Creates CONSUME inventory_transactions with WORK_ORDER reference and work order ID
+  - **Error Handling**: Logs warnings for missing locationId, insufficient stock, or unfound spares but doesn't fail approval
+  - **Location**: `server/routes.ts` lines 3336-3423 (approx) - inside PATCH approval+completed condition block
 
 ## Bulk Import Format Rules
 
