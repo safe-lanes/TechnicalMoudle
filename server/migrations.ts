@@ -257,6 +257,26 @@ const migrations: Migration[] = [
       ALTER TABLE ship_certificates_master ADD COLUMN IF NOT EXISTS company_group TEXT;
       ALTER TABLE ship_certificates_master ADD COLUMN IF NOT EXISTS company_sequence INTEGER
     `
+  },
+  {
+    id: '016_vessel_certificate_applicability_table',
+    name: 'Create vessel_certificate_applicability table',
+    description: 'Creates table to track which certificates are applicable for each vessel',
+    sql: `
+      CREATE TABLE IF NOT EXISTS vessel_certificate_applicability (
+        id SERIAL PRIMARY KEY,
+        vessel_id TEXT NOT NULL,
+        vessel_name TEXT NOT NULL,
+        master_id TEXT NOT NULL,
+        is_applicable BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(vessel_id, master_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_vessel_master ON vessel_certificate_applicability(vessel_id, master_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_vessel ON vessel_certificate_applicability(vessel_id);
+      CREATE INDEX IF NOT EXISTS idx_vessel_cert_master ON vessel_certificate_applicability(master_id)
+    `
   }
 ];
 

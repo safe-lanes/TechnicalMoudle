@@ -2395,3 +2395,27 @@ export const insertShipCertificatesLabelsConfigSchema = createInsertSchema(shipC
 
 export type InsertShipCertificatesLabelsConfig = z.infer<typeof insertShipCertificatesLabelsConfigSchema>;
 export type ShipCertificatesLabelsConfig = typeof shipCertificatesLabelsConfig.$inferSelect;
+
+// Vessel Certificate Applicability - tracks which certificates are applicable for each vessel
+export const vesselCertificateApplicability = pgTable("vessel_certificate_applicability", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  vesselId: text("vessel_id").notNull(), // External vessel ID from Vessel Master API
+  vesselName: text("vessel_name").notNull(), // Vessel name for display
+  masterId: text("master_id").notNull(), // References ship_certificates_master.master_id
+  isApplicable: boolean("is_applicable").notNull().default(true), // Whether this certificate is applicable to this vessel
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  vesselMasterIdx: index("idx_vessel_cert_vessel_master").on(table.vesselId, table.masterId),
+  vesselIdx: index("idx_vessel_cert_vessel").on(table.vesselId),
+  masterIdx: index("idx_vessel_cert_master").on(table.masterId),
+}));
+
+export const insertVesselCertificateApplicabilitySchema = createInsertSchema(vesselCertificateApplicability).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertVesselCertificateApplicability = z.infer<typeof insertVesselCertificateApplicabilitySchema>;
+export type VesselCertificateApplicability = typeof vesselCertificateApplicability.$inferSelect;
