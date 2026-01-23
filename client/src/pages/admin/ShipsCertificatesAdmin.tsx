@@ -1299,15 +1299,6 @@ export default function ShipsCertificatesAdmin() {
                     </Button>
                   </>
                 )}
-                {activeTab !== "vessel" && (
-                  <Button 
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                    data-testid="button-save"
-                  >
-                    Save
-                  </Button>
-                )}
               </>
             )}
             
