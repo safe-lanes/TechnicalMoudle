@@ -31,6 +31,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useVessels } from "@/hooks/useVessels";
 
 // Interface for label configuration (used by Company Group, Master Category, Master Group)
 interface LabelConfig {
@@ -254,13 +255,11 @@ export default function ShipsCertificatesAdmin() {
   });
   
   // Fetch vessels from Vessel Master (Admin > Masters > Vessel Master ID:001)
-  // Note: Vessel Master data uses 'vessel' field for name (from external API sync)
-  const { data: vesselMasterData, isLoading: isLoadingVessels } = useQuery<{ id: string; vessel: string; vuid?: string; imoNumber?: string; vesselType?: string; }[]>({
-    queryKey: ['/technical/api/vessels'],
-  });
+  // Uses the external API via useVessels hook which maps vessel data correctly
+  const { data: vesselMasterData = [], isLoading: isLoadingVessels } = useVessels();
   
-  // Extract vessel names for the dropdown (using 'vessel' field from Vessel Master)
-  const vesselOptions = vesselMasterData?.map(v => v.vessel).filter(Boolean) || [];
+  // Extract vessel names for the dropdown
+  const vesselOptions = vesselMasterData.map(v => v.name).filter(Boolean);
   
   // Toggle vessel selection
   const toggleVesselSelection = (vesselName: string) => {
