@@ -1,0 +1,66 @@
+Prompt for Replit – Fix ROB Update After Work Order Completion (Spare Consumption)
+Objective
+Analyse and implement the correct ROB update flow when a Work Order is completed and spares are consumed from Location A and/or Location B.
+Current Understanding (Use This as Baseline)
+When a Work Order is completed, spare consumption details are stored in the work order under consume_spare.
+Each consumed spare entry contains:
+part_code
+quantityConsumed
+location indicator (Location A / Location B)
+The spares master maintains ROB values per location.
+Problem Statement
+Currently:
+Consumed spare quantities recorded in the Work Order do not propagate to the Spare master.
+ROB values in the spare record remain unchanged even after consumption.
+This causes incorrect inventory and ROB mismatch.
+Required Behaviour
+When a Work Order is marked Completed:
+Read consume_spare data from the Work Order.
+For each consumed spare entry:
+Identify the spare record using part_code
+Identify the correct ROB bucket (Location A or Location B)
+Deduct quantityConsumed from:
+robLocationA or
+robLocationB
+Update the spare record with the new ROB value.
+Critical Constraints
+Deduction must be:
+Location-specific
+Quantity-accurate
+Do not:
+Reset ROB
+Override unrelated locations
+Allow negative ROB values
+Multiple consumed spares must be processed independently.
+Edge Cases to Handle
+Same spare consumed from both locations
+Multiple consumption entries for the same part_code
+Zero or invalid quantity (must be ignored)
+Spare record not found for given part_code (log and skip)
+Analysis Required
+Before implementing:
+Identify where Work Order completion is finalized
+Trace how consume_spare is currently stored
+Confirm why no inventory update is triggered
+Identify the correct insertion point for ROB deduction logic
+Implementation Expectation
+ROB update must occur:
+Only after successful Work Order completion
+Once per completion action
+Use a transaction-safe approach so that:
+Work Order completion and ROB update remain consistent
+Verification Criteria
+After implementation:
+Completing a Work Order that consumes spares:
+Immediately reflects reduced ROB in spare master
+Location A and B values update correctly
+No unintended changes to other spares
+Strict Scope
+Target only:
+Work Order completion
+Spare consumption
+ROB update logic
+Do not modify:
+Change Request flow
+Bulk update logic
+UI behaviour
