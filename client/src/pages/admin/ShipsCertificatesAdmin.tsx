@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,8 +17,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 // Interface for label configuration (used by Company Group, Master Category, Master Group)
 interface LabelConfig {
@@ -207,6 +210,9 @@ const MASTER_GROUP_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 const COMPANY_GROUP_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 
 export default function ShipsCertificatesAdmin() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const [activeTab, setActiveTab] = useState<TabType>("master");
   const [viewModes, setViewModes] = useState<Record<TabType, ViewMode>>({
     master: "view",
@@ -220,6 +226,69 @@ export default function ShipsCertificatesAdmin() {
   
   // Master data state with sequence management
   const [masterData, setMasterData] = useState<MasterCertificate[]>(STARTER_KIT_MASTER_DATA);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Fetch saved certificates from database
+  const { data: savedCertificates, isLoading: isLoadingCertificates } = useQuery({
+    queryKey: ['/technical/api/admin/ship-certificates-master'],
+  });
+  
+  // Load saved certificates from database on mount
+  useEffect(() => {
+    if (savedCertificates && Array.isArray(savedCertificates) && savedCertificates.length > 0) {
+      // Map database fields to component interface (camelCase to our format)
+      const mappedCerts = savedCertificates.map((cert: any) => ({
+        id: cert.id,
+        sequence: cert.sequence,
+        masterId: cert.masterId || cert.master_id,
+        certificateName: cert.certificateName || cert.certificate_name,
+        category: cert.category,
+        group: cert.group,
+        requirementRef: cert.requirementRef || cert.requirement_ref || "",
+        applicableToCompany: cert.applicableToCompany || cert.applicable_to_company || false,
+        certificateLabel: cert.certificateLabel || cert.certificate_label || "",
+      }));
+      setMasterData(mappedCerts);
+      setHasUnsavedChanges(false);
+    }
+  }, [savedCertificates]);
+  
+  // Save certificates mutation
+  const saveMutation = useMutation({
+    mutationFn: async (certificates: MasterCertificate[]) => {
+      const response = await apiRequest('POST', '/technical/api/admin/ship-certificates-master', { certificates });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Saved successfully",
+        description: `${data.inserted || 0} new certificates added, ${data.updated || 0} updated`,
+      });
+      setHasUnsavedChanges(false);
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/admin/ship-certificates-master'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save failed",
+        description: error.message || "Failed to save certificates",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Handle save button click
+  const handleSave = () => {
+    saveMutation.mutate(masterData);
+  };
+  
+  // Track changes to master data
+  const updateMasterDataWithTracking = (updater: (prev: MasterCertificate[]) => MasterCertificate[]) => {
+    setMasterData(prev => {
+      const newData = updater(prev);
+      setHasUnsavedChanges(true);
+      return newData;
+    });
+  };
   
   // Function to update sequence with auto-adjustment for conflicts
   const updateMasterSequence = (certId: number, newSequence: number) => {
@@ -1183,15 +1252,31 @@ export default function ShipsCertificatesAdmin() {
                   Cancel
                 </Button>
                 {activeTab === "master" && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="gap-2"
-                    onClick={openMasterLabels}
-                    data-testid="button-configure-master-labels"
-                  >
-                    Configure Labels
-                  </Button>
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2"
+                      onClick={openMasterLabels}
+                      data-testid="button-configure-master-labels"
+                    >
+                      Configure Labels
+                    </Button>
+                    <Button 
+                      size="sm"
+                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                      onClick={handleSave}
+                      disabled={saveMutation.isPending}
+                      data-testid="button-save-master"
+                    >
+                      {saveMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {saveMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </>
                 )}
                 {activeTab === "company" && (
                   <Button 
