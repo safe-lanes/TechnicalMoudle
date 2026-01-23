@@ -254,12 +254,13 @@ export default function ShipsCertificatesAdmin() {
   });
   
   // Fetch vessels from Vessel Master (Admin > Masters > Vessel Master ID:001)
-  const { data: vesselMasterData, isLoading: isLoadingVessels } = useQuery<{ id: string; name: string; }[]>({
+  // Note: Vessel Master data uses 'vessel' field for name (from external API sync)
+  const { data: vesselMasterData, isLoading: isLoadingVessels } = useQuery<{ id: string; vessel: string; vuid?: string; imoNumber?: string; vesselType?: string; }[]>({
     queryKey: ['/technical/api/vessels'],
   });
   
-  // Extract vessel names for the dropdown
-  const vesselOptions = vesselMasterData?.map(v => v.name) || [];
+  // Extract vessel names for the dropdown (using 'vessel' field from Vessel Master)
+  const vesselOptions = vesselMasterData?.map(v => v.vessel).filter(Boolean) || [];
   
   // Toggle vessel selection
   const toggleVesselSelection = (vesselName: string) => {
