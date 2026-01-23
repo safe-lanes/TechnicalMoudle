@@ -397,6 +397,7 @@ export default function ShipsCertificatesAdmin() {
                     <td className="px-3 py-3 text-sm text-center">
                       {viewModes.master === "edit" ? (
                         <Input
+                          key={`seq-${cert.id}-${cert.sequence}`}
                           type="number"
                           defaultValue={cert.sequence}
                           className="h-8 text-sm w-16 text-center"
