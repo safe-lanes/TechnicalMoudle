@@ -1,0 +1,19 @@
+{
+  "id": "119a1f04-bff4-41fe-945d-6e1215a3341c",
+  "type": "jobs",
+  "mode": "upsert",
+  "vesselId": "7446783c-841a-11ed-aa7c-7003bca91a86",
+  "userId": 1,
+  "startedAt": "2026-01-23T07:11:53.368Z",
+  "completedAt": "2026-01-23T07:11:54.874Z",
+  "status": "complete",
+  "created": 0,
+  "updated": 293,
+  "skipped": 0,
+  "archived": 0,
+  "originalName": "jobs_template Test Vessel_01 Rev_01.xlsx",
+  "storedFilePath": "local:/home/runner/workspace/uploads/bulk-imports/jobs/1769152314873_jobs_template_Test_Vessel_01_Rev_01.xlsx",
+  "errorReport": null,
+  "jobComponentLinksCreated": 0,
+  "spareComponentLinksCreated": 0
+}

@@ -1,0 +1,508 @@
+You are editing an existing Planned Maintenance System (PMS) Dashboard page for a ship management application.
+The current HTML/DOM text of the dashboard looks like this (this is just for context, do not re-create it as raw text):
+
+Top navigation text:
+SAIL Logo Technical Dashboard Cert. & Surveys Defects PMS Admin
+Then a user <select> with value Sail Admin.
+
+Page title:
+PMS Dashboard
+Subtitle: Planned Maintenance System Control Center.
+
+Status area:
+E-PMS Active
+Last updated: 11:31:18
+Vessel <select> with value Vessel 4.
+
+KPI blocks (plain stacked text):
+
+Overdue Work Orders → 104 → View all overdue
+
+Due Work Orders → 47 → View all due
+
+Pending Approval → 0 → Review pending
+
+Completed → 12 → View completed
+
+Total Work Orders → 167 → View all work orders
+
+Charts (shown as “interactive chart”):
+
+Work Order Status Distribution
+With checkboxes: Overdue, Due, Completed
+
+Outstanding Tasks as % of Monthly Planned Maintenance
+Text: 138 of 144 tasks outstanding (96%)
+With checkboxes: Outstanding, Completed
+
+Spares Stock Status
+With checkboxes: OK, At Min, Low
+
+Lists:
+
+Overdue Work Orders → subtitle Immediate attention required → View All (104) → list of WO entries like:
+WO-WO-... ME Cylinder Liner, Overhaul - 6000H → Overdue
+
+Low Stock Spares → subtitle Reorder recommended → View All (303) → list of spares with ROB and Min and sometimes Critical.
+
+Small stats:
+
+Components 270 270 active
+
+Spares Inventory 1113 303 low stock
+
+Stores Inventory 40 39 low stock
+
+Running hours: Running Hours → Track → Update component hours.
+
+Stores inventory breakdown: Stores Inventory Breakdown → Click on category to view → categories Stores, Lubes, Chemicals, Others with value 10.
+
+Quick actions:
+Quick Actions → Navigate to sub-modules Work Orders Components Spares Reports.
+
+Assume the app is built using React (or a similar component-based SPA framework) with existing data bindings and event handlers already working.
+
+Your job is to transform this old-school dashboard into a “next-generation operations cockpit” UI with a day/night (light/dark) theme toggle on the top-right.
+You MUST NOT break existing data or behavior. You are allowed to restructure the layout and styling, but keep the same data fields and connect them to the new UI.
+
+CORE REQUIREMENTS
+1. Implement a global light/dark theme (day/night) toggle
+Add a toggle on the top-right of the main dashboard header (near the user select / Sail Admin and vessel select).
+
+The toggle must:
+
+Be clearly visible and labeled, for example:
+
+An icon switch (sun / moon) plus text: “Day / Night”.
+
+Or a simple switch with labels: “Light” and “Dark”.
+
+Call it something like ThemeToggle.
+
+Implement theme state:
+
+Store theme in a React state variable, e.g. const [theme, setTheme] = useState("light");.
+
+Allow two values only: "light" and "dark".
+
+When the toggle is clicked:
+
+If current theme is "light", change it to "dark".
+
+If current theme is "dark", change it to "light".
+
+Apply theme:
+
+Attach a class to a top-level container, for example:
+
+<div className={pms-dashboard theme-${theme}}> ... </div>
+
+In CSS (or styled-components / tailwind / whatever you can use), define styles for both:
+
+.theme-light { background: light color (e.g., #f5f7fb); text colors dark; cards light; charts with light background. }
+
+.theme-dark { background: dark color (e.g., #0b1220); text colors light; cards darker; charts with dark background. }
+
+Make sure all major elements (header, cards, charts, lists) visually change to match the theme.
+
+Ensure contrast is good: text must be readable in both themes.
+
+Optional persistence (if easy):
+
+Read initial theme from localStorage key like "pmsTheme".
+
+Whenever theme changes, save to localStorage.
+
+If this is complicated, you can skip it, but structure code so it could be added later.
+
+2. Restructure layout into a next-gen cockpit
+Reorganize the dashboard into three main zones:
+
+A top global header.
+
+A three-part horizontal layout below:
+
+Left: vertical navigation and quick actions.
+
+Center: “Today’s Situation” core content (KPIs, charts, overdue WOs).
+
+Right: “Signals” rail (alerts, low stock, risk items).
+
+2.1 Top header
+Create a top header component, e.g. DashboardHeader, with:
+
+Left section:
+
+SAIL Logo (can be just text “SAIL” if you don’t have an SVG).
+
+Main navigation items: Technical, Dashboard, Cert. & Surveys, Defects, PMS, Admin.
+
+Highlight PMS / Dashboard appropriately to show current section.
+
+Center section:
+
+System status summary, showing:
+
+E-PMS Active as a colored pill/badge.
+
+Use green for Active.
+
+Last updated: 11:31:18 as a smaller muted text under or next to the badge.
+
+A short text label “Planned Maintenance System Control Center”.
+
+Right section:
+
+User selector (existing <select> with “Sail Admin”).
+
+Vessel selector (existing <select> with “Vessel 4”).
+
+Theme toggle (day/night) as described above.
+
+Place everything in a flex container, responsive, with proper spacing.
+
+3. Center area: “Today’s Situation” cockpit
+In the center column, create a clear section called “Today’s Situation” or similar.
+
+3.1 Intelligent summary strip
+At the top of the center column, add a “summary strip” component, e.g. SituationSummary, which:
+
+Shows a dynamic sentence built from existing data, for example:
+
+"Vessel 4: 104 overdue WOs, 96% of monthly tasks outstanding, 303 spares low stock. Risk: High. Suggested focus: Main Engine cylinder liner and turbocharger jobs today."
+
+You do NOT need AI. Just build this sentence by:
+
+Reading values:
+
+Overdue WOs: 104
+
+Outstanding tasks: 138 of 144 (96%)
+
+Low stock spares: 303
+
+Always show Risk as “High” if overdue WOs > 50 or outstanding % > 80, else “Medium” or “Low” (simple threshold logic).
+
+If there are overdue WOs containing “ME Cylinder Liner” or “Turbocharger” in their descriptions, mention those as suggested focus.
+
+Make this strip visually distinct:
+
+Use a card with a subtle gradient background.
+
+On light theme: light blue/grey.
+
+On dark theme: darker blue/purple with white text.
+
+3.2 Next-gen KPI tiles
+Replace the old text KPIs with a row of interactive KPI tiles using a component, e.g. KpiTile.
+
+For each KPI:
+
+Overdue Work Orders (104)
+
+Due Work Orders (47)
+
+Pending Approval (0)
+
+Completed (12)
+
+Total Work Orders (167)
+
+Each tile must show:
+
+A large number (e.g., 104).
+
+A label (e.g., “Overdue WOs”).
+
+A small radial progress or mini bar that hints at progress:
+
+For example:
+
+Overdue: value vs total (104 / 167).
+
+Completed: value vs total (12 / 167).
+
+A visual accent color:
+
+Overdue: red.
+
+Due: amber.
+
+Pending Approval: blue/neutral.
+
+Completed: green.
+
+Total: neutral/grey.
+
+Interaction:
+
+The entire tile is clickable.
+
+Clicking a tile should perform the same action as the old “View all …” text:
+
+Overdue → show filtered overdue WOs.
+
+Due → show due WOs.
+
+etc.
+
+If the existing code uses specific handlers, call them from the tile.
+
+Also add time filter chips above the KPI row, such as:
+
+Today, 7 days, 30 days, Drydock window.
+
+For now:
+
+When a chip is clicked, update a local state timeFilter and visually highlight the active chip.
+
+You do NOT need to actually change the data (if complicated), but structure it so it could be wired later (e.g., pass timeFilter as a prop to KPI tiles and charts).
+
+3.3 Charts as system views
+Update the charts section:
+
+Work Order Status Distribution:
+
+Above the chart, show a concise summary line:
+
+Overdue: 104 | Due: 47 | Completed: 12
+
+Replace checkbox list with a horizontal legend:
+
+Legend items: “Overdue”, “Due”, “Completed”.
+
+Same colors: red, amber, green.
+
+Clicking legend items toggles their visibility in the chart (reuse existing checkbox handling logic internally).
+
+Outstanding Tasks %:
+
+Show:
+
+138 of 144 tasks outstanding (96%)
+
+Visualize as:
+
+A progress bar or donut with Outstanding (amber/red) and Completed (green).
+
+Again, legend or segments consistent with theme.
+
+Spares Stock Status:
+
+Keep the idea (OK / At Min / Low).
+
+Use consistent color mapping:
+
+OK: green.
+
+At Min: amber.
+
+Low: red.
+
+Use a donut or bar chart with legend under it.
+
+Clicking a segment should still filter spares (reuse existing behavior).
+
+Keep charts responsive and theme-aware:
+
+Light theme: light grid, dark labels.
+
+Dark theme: dark background, light labels.
+
+3.4 Overdue Work Orders as rich cards
+Convert each overdue WO into a rich card:
+
+Each card should show:
+
+Top line:
+
+WO code (e.g., WO-WO-...).
+
+A priority badge (text only logic if real priority not available):
+
+If description contains “Overhaul” or “Turbocharger” or “Steering”, mark as “High”.
+
+Else “Medium”.
+
+Status badge “Overdue” in red.
+
+Middle line:
+
+Full description (e.g., “ME Cylinder Liner, Overhaul - 6000H”).
+
+Bottom line:
+
+System tag:
+
+If description contains “ME” or “Main Engine”: tag Main Engine.
+
+If contains “Steering”: tag Steering.
+
+If contains “Turbocharger”: tag Turbocharger.
+
+Else General.
+
+“Days overdue: X” (if no real date info, hardcode a fake range like 3–30 based on index, but keep code ready for real dates later).
+
+Place these cards in a scrollable container under the “Overdue Work Orders” heading.
+
+4. Right column: Signals rail
+Create a right-side column called “Signals”.
+
+This should have groups like:
+
+“Critical now”
+
+“Soon risky”
+
+“Good news”
+
+Populate them with:
+
+“Critical now”:
+
+Items derived from:
+
+Overdue WOs that are High priority.
+
+Low stock spares where ROB < Min and Critical is present.
+
+“Soon risky”:
+
+Items where outstanding % is very high.
+
+Spares where ROB is equal to Min.
+
+“Good news”:
+
+Completed tasks count > 0.
+
+Systems with no overdue WOs (you can assume any system tag not present in overdue list is “OK”).
+
+Each signal item:
+
+Show a short text summary.
+
+On click, expand inline to show linked WOs or spares (reuse the same data lists but filtered).
+
+5. Left column: vertical nav & quick actions
+Move the Quick Actions into a vertical nav on the left, along with module navigation.
+
+Left column should contain:
+
+Top: App / PMS label.
+
+Middle: vertical buttons with icons + labels:
+
+Work Orders
+
+Components
+
+Spares
+
+Reports
+
+Bottom (optional): shortcut to “Settings” or “Help”.
+
+These buttons should:
+
+Call the same navigation actions as the existing “Work Orders / Components / Spares / Reports” quick action buttons.
+
+Highlight the current section (e.g., Work Orders when on dashboard).
+
+6. Small stats and running hours
+In the right or center column (choose where it fits cleanly), create small cards:
+
+Components card:
+
+Title: “Components”.
+
+Body: “270 active”.
+
+Spares Inventory card:
+
+Title: “Spares Inventory”.
+
+Body: “1113 total, 303 low stock”.
+
+Stores Inventory card:
+
+Title: “Stores Inventory”.
+
+Body: “40 items, 39 low stock”.
+
+Running Hours card:
+
+Title: “Running Hours”.
+
+Subtitle: “Components with hours not updated in last 7 days: X” (for now use X = 0 or a dummy number).
+
+Button: “Update component hours” that triggers the existing “Update component hours” navigation.
+
+These should look like modern cards, not plain text.
+
+7. Stores Inventory Breakdown
+Keep the same categories and values (Stores, Lubes, Chemicals, Others all 10) but:
+
+Use a donut or horizontal stacked bar.
+
+Show the text: “Click on a category to view details”.
+
+Make each segment clickable, calling the same handler as current “Click on category to view”.
+
+Ensure the chart colors follow the theme:
+
+Light: bright colors on white background.
+
+Dark: more neon/bright colors on dark background.
+
+8. General visual style
+Use a modern, flat design with:
+
+Rounded card corners.
+
+Subtle shadows or borders.
+
+Consistent spacing (e.g., 16–24px padding).
+
+Typography hierarchy:
+
+Card titles: slightly larger and semi-bold.
+
+Subtitles: smaller, muted color.
+
+Body: regular.
+
+Make sure the theme toggle updates:
+
+Background colors.
+
+Text colors.
+
+Card backgrounds.
+
+Chart background and grid colors.
+
+9. Technical constraints
+DO NOT change backend APIs or the shape of data objects.
+
+DO NOT remove existing functionality; only wrap / reuse it.
+
+You CAN:
+
+Extract pieces into new components (e.g., KpiTile, SituationSummary, ThemeToggle, SignalsRail, WorkOrderCard, SpareCard).
+
+Change HTML structure and class names.
+
+Add new CSS / styles.
+
+Make sure:
+
+The page still loads without errors.
+
+All previous buttons/links still work (View all overdue, View all work orders, navigation links).
+
+The theme toggle works reliably.
+
+Now, refactor the existing PMS dashboard code to implement all of the above, including the day/night theme toggle on the top-right that actually changes the whole dashboard theme between light and dark.
+
