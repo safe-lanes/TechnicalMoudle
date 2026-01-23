@@ -1,0 +1,103 @@
+Raplit Analysis Prompt — Work Order B4 Spare Consumption: Location-Based ROB Logic
+Context
+In the Work Order (WO) → B4. Spare Parts Consumed section:
+User selects a Spare
+Selects a Location (Location A or Location B)
+Enters Qty Used
+Closes / completes the Work Order
+❌ Current Observed Behavior
+Currently, when Qty Used is entered and the WO is closed:
+The system directly reduces the total ROB in the spares.rob column
+The reduction does not first apply to the selected location
+Location-wise ROB (rob_location_a / rob_location_b) is bypassed or not respected
+This leads to:
+Incorrect location-wise stock
+Inventory inconsistency
+Misalignment with physical spare storage
+✅ Correct Business Logic (Expected)
+Spare consumption must always be location-driven first.
+Important Design Constraint (Must Be Respected)
+In the Spares table, there are ONLY TWO locations:
+Location A
+Location B
+These are fixed and permanent
+No new locations will be created in the future
+Location meaning is defined as:
+location → text label for Location A
+location_2 → text label for Location B
+🔁 Correct Consumption Flow (Reference Rule)
+When a WO is closed and spares are consumed from B4:
+User selects:
+Spare
+Location (A or B)
+Qty Used
+System must:
+Reduce ROB ONLY for the selected location:
+If Location A → reduce spares.rob_location_a
+If Location B → reduce spares.rob_location_b
+Total ROB (spares.rob) must then reflect the location reduction
+Total ROB should be derived from location values
+It must not be reduced independently
+📌 Example Scenario
+Spare used: AAA-BBB-CCC
+Selected Location: Location A
+Qty Used: 5
+Expected result in Spares table:
+Column	Expected Change
+location	Shows Location A label
+rob_location_a	Reduced by 5
+rob_location_b	No change
+rob	Reduced implicitly based on location totals
+🔒 Mandatory Constraints (Very Strict)
+ANALYSE ONLY
+DO NOT change any functionality
+DO NOT change any business logic outside this scope
+DO NOT modify UI
+DO NOT change APIs
+DO NOT change database schema
+DO NOT introduce new locations
+WAIT for explicit PROCEED instruction before making any changes
+🧠 Analysis Required
+Raplit must analyse and explain:
+1. Current Consumption Implementation
+Where and how:
+spares.rob is being reduced
+Why:
+Location-specific columns are not being used first
+2. Location Mapping Logic
+How B4 selected location maps to:
+rob_location_a
+rob_location_b
+Whether the mapping is correct but skipped, or incorrect
+3. Data Integrity Risk
+Explain:
+Why directly reducing total ROB is unsafe
+How it causes location-wise inconsistency
+4. Alignment With Fixed Location Model
+Confirm:
+That the solution must work only with Location A and Location B
+No extensibility or dynamic location logic is required
+🛠️ Plan of Approach (NO IMPLEMENTATION)
+Raplit must:
+Identify the exact root cause
+Propose a safe, minimal correction plan that:
+Applies reduction at location level first
+Allows total ROB to reflect location totals
+Does not affect any other PMS functionality
+⚠️ Do NOT implement
+⚠️ Do NOT refactor
+⚠️ Only explain the plan
+🚫 What Must NOT Be Changed
+❌ Work Order workflow
+❌ Spare master structure
+❌ Location master
+❌ Inventory audit logic
+❌ Any module outside B4 Spare Consumption
+📄 Expected Output
+Raplit must provide:
+Root cause explanation
+Confirmation of current incorrect behavior
+Clear explanation of correct location-based logic
+Safe and isolated plan of correction
+Explicit confirmation that only Location A & B exist
+“READY FOR PROCEED” statement
