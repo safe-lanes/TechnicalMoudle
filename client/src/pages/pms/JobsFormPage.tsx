@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X } from "lucide-react";
+import { FileText, ArrowLeft, Menu, AlertTriangle, Save, X, Pencil } from "lucide-react";
 import { Marker } from "@/components/Marker";
 import sailLogo from "@assets/SAIL logo Transparent_1753957135582.png";
 import {
@@ -44,6 +44,7 @@ interface EditableFieldProps {
   originalValue: string | undefined;
   onChange: (field: string, value: string) => void;
   isModifyMode: boolean;
+  isEditMode?: boolean;
   type?: "text" | "select" | "textarea";
   options?: string[];
   labelMarker?: string;
@@ -57,26 +58,28 @@ const EditableField: React.FC<EditableFieldProps> = ({
   originalValue,
   onChange, 
   isModifyMode,
+  isEditMode = false,
   type = "text",
   options = [],
   labelMarker,
   valueMarker
 }) => {
   const isChanged = value !== originalValue;
+  const canEdit = isModifyMode || isEditMode;
   
-  if (!isModifyMode) {
+  if (!canEdit) {
     return <ReadOnlyField label={label} value={value} labelMarker={labelMarker} valueMarker={valueMarker} />;
   }
   
   return (
     <div className="space-y-1">
-      <Label className={`text-sm ${isChanged ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid={labelMarker}>
+      <Label className={`text-sm ${isChanged && isModifyMode ? 'text-red-600 font-semibold' : 'text-[#8798ad]'}`} data-testid={labelMarker}>
         {labelMarker && <Marker id={labelMarker} />}
-        {label} {isChanged && '(Modified)'}
+        {label} {isChanged && isModifyMode && '(Modified)'}
       </Label>
       {type === "select" ? (
         <Select value={value || ''} onValueChange={(val) => onChange(field, val)}>
-          <SelectTrigger className={`text-sm ${isChanged ? 'border-red-500 bg-red-50' : ''}`}>
+          <SelectTrigger className={`text-sm ${isChanged && isModifyMode ? 'border-red-500 bg-red-50' : ''}`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -89,17 +92,17 @@ const EditableField: React.FC<EditableFieldProps> = ({
         <Textarea
           value={value || ''}
           onChange={(e) => onChange(field, e.target.value)}
-          className={`text-sm ${isChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+          className={`text-sm ${isChanged && isModifyMode ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
           rows={3}
         />
       ) : (
         <Input
           value={value || ''}
           onChange={(e) => onChange(field, e.target.value)}
-          className={`text-sm ${isChanged ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
+          className={`text-sm ${isChanged && isModifyMode ? 'border-red-500 bg-red-50 text-red-700' : ''}`}
         />
       )}
-      {isChanged && (
+      {isChanged && isModifyMode && (
         <p className="text-xs text-gray-500">Original: {originalValue || '-'}</p>
       )}
     </div>
@@ -115,6 +118,8 @@ const JobsFormPage: React.FC = () => {
   
   const [isWorkInstructionsOpen, setIsWorkInstructionsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const navSteps = [{ id: 'part-a', label: 'A', title: 'Job Details' }];
   const [activeStep, setActiveStep] = useState('part-a');
@@ -202,12 +207,10 @@ const JobsFormPage: React.FC = () => {
           ...newTemplateData
         }));
         
-        if (isModifyMode) {
-          setOriginalData(newTemplateData);
-        }
+        setOriginalData(newTemplateData);
       }
     }
-  }, [jobContext, isModifyMode, activeComponentCode]);
+  }, [jobContext, activeComponentCode]);
 
   const handleFieldChange = (field: string, value: string) => {
     setTemplateData(prev => ({
@@ -296,6 +299,91 @@ const JobsFormPage: React.FC = () => {
 
   const handleCancelModify = () => {
     navigate("/pms/modify-pms");
+  };
+
+  const handleEditClick = () => {
+    setOriginalData({ ...templateData });
+    setIsEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setTemplateData(prev => ({
+      ...prev,
+      ...originalData
+    }));
+    setIsEditMode(false);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!jobId) return;
+    
+    setIsSaving(true);
+    try {
+      const updatePayload: Record<string, any> = {};
+      
+      if (templateData.woTitle !== originalData.woTitle) {
+        updatePayload.jobTitle = templateData.woTitle;
+      }
+      if (templateData.assignedTo !== originalData.assignedTo) {
+        updatePayload.assignedTo = templateData.assignedTo;
+      }
+      if (templateData.approver !== originalData.approver) {
+        updatePayload.approver = templateData.approver;
+      }
+      if (templateData.jobPriority !== originalData.jobPriority) {
+        updatePayload.jobPriority = templateData.jobPriority;
+      }
+      if (templateData.classRelated !== originalData.classRelated) {
+        updatePayload.classRelated = templateData.classRelated;
+      }
+      if (templateData.isActive !== originalData.isActive) {
+        updatePayload.isActive = templateData.isActive;
+      }
+      if (templateData.briefWorkDescription !== originalData.briefWorkDescription) {
+        updatePayload.briefWorkDescription = templateData.briefWorkDescription;
+      }
+      if (templateData.frequencyValue !== originalData.frequencyValue) {
+        updatePayload.frequencyValue = templateData.frequencyValue;
+      }
+      if (templateData.frequencyUnit !== originalData.frequencyUnit) {
+        updatePayload.frequencyUnit = templateData.frequencyUnit;
+      }
+      if (templateData.taskType !== originalData.taskType) {
+        updatePayload.maintenanceType = templateData.taskType;
+      }
+      
+      if (Object.keys(updatePayload).length === 0) {
+        toast({
+          title: "No changes",
+          description: "No changes were made to save.",
+        });
+        setIsEditMode(false);
+        setIsSaving(false);
+        return;
+      }
+      
+      await apiRequest('PATCH', `/technical/api/jobs/${jobId}`, updatePayload);
+      
+      queryClient.invalidateQueries({ queryKey: [`/technical/api/jobs/${jobId}/context`] });
+      queryClient.invalidateQueries({ queryKey: ['/technical/api/jobs'] });
+      
+      toast({
+        title: "Changes saved",
+        description: "Job details have been updated successfully.",
+      });
+      
+      setOriginalData({ ...templateData });
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error saving job changes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const formatFrequency = () => {
@@ -444,6 +532,40 @@ const JobsFormPage: React.FC = () => {
                   Cancel
                 </Button>
               )}
+              {!isModifyMode && !isEditMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEditClick}
+                  data-testid="button-edit-job"
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Edit
+                </Button>
+              )}
+              {isEditMode && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    data-testid="button-cancel-edit"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveChanges}
+                    disabled={isSaving}
+                    data-testid="button-save-job"
+                  >
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -525,6 +647,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.woTitle}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     labelMarker="JF.A1.3"
                     valueMarker="JF.A1.4"
                   />
@@ -539,6 +662,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.frequencyValue}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     labelMarker="JF.A1.13"
                     valueMarker="JF.A1.14"
                   />
@@ -549,6 +673,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.taskType}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['Inspection', 'Overhaul', 'Service', 'Repair', 'Test', 'Calibration', 'Survey', 'Other']}
                     labelMarker="JF.A1.15"
@@ -561,6 +686,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.assignedTo}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['Chief Engineer', '2nd Engineer', '3rd Engineer', '4th Engineer', 'Electrician', 'Fitter', 'Bosun', 'Chief Officer', '2nd Officer']}
                     labelMarker="JF.A1.17"
@@ -573,6 +699,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.approver}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['Chief Engineer', 'Master', 'Technical Superintendent', '2nd Engineer']}
                     labelMarker="JF.A1.19"
@@ -585,6 +712,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.jobPriority}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['High', 'Medium', 'Low']}
                     labelMarker="JF.A1.21"
@@ -597,6 +725,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.classRelated}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['Yes', 'No']}
                     labelMarker="JF.A1.23"
@@ -621,6 +750,7 @@ const JobsFormPage: React.FC = () => {
                     originalValue={originalData.isActive}
                     onChange={handleFieldChange}
                     isModifyMode={isModifyMode}
+                    isEditMode={isEditMode}
                     type="select"
                     options={['Yes', 'No']}
                     labelMarker="JF.A1.31"
@@ -635,6 +765,7 @@ const JobsFormPage: React.FC = () => {
                   originalValue={originalData.briefWorkDescription}
                   onChange={handleFieldChange}
                   isModifyMode={isModifyMode}
+                  isEditMode={isEditMode}
                   type="textarea"
                   labelMarker="JF.A1.33"
                   valueMarker="JF.A1.34"
