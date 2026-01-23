@@ -42,7 +42,7 @@ The application employs a modern full-stack architecture with a mobile-first, re
 - **Change Request Workflow**: Implements an "Apply Approved Changes" step where approved changes are automatically applied to the target PMS entity within a database transaction for atomicity.
 - **ROB Lookup Reference Correction**: Fixed ROB fetch logic to use `PartCode` as the primary lookup key, with fallback to `PartNumber` for backward compatibility.
 - **Work Order Approval Spare Consumption Fix**: Ensured spare parts listed in B4 (Consumed Spare Parts) are deducted from inventory upon work order approval by adding consumption logic to the PATCH `/technical/api/work-orders/:id` route.
-- **Ship Certificates Admin Module**: Admin sub-module for managing ship certificate requirements with a 3-tab interface (Master, Company, Vessel), including configurable categories, groups, and company labels.
+- **Ship Certificates Admin Module**: Admin sub-module for managing ship certificate requirements with a 3-tab interface (Master, Company, Vessel), including configurable categories, groups, and company labels. Company tab persists company-specific fields (Company ID, Company Group, Company Sequence) to the database.
 - **Database Migration Strategy**: Uses a dual migration system with Drizzle-generated baseline migrations and custom `ALTER TABLE` migrations managed in `server/migrations.ts` for incremental schema changes. New columns must be added to both `shared/schema.ts` and `server/migrations.ts`.
 
 ## External Dependencies
