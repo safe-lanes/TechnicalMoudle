@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, Search, Save, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Save, X, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TabType = "master" | "company" | "vessel";
@@ -80,6 +80,10 @@ const MASTER_CATEGORY_OPTIONS = ["A", "B", "C", "D", "E", "F"];
 // TODO: Replace these dropdown options with actual values from backend/configuration
 // Master Tab - Group dropdown options (1-10 for now, will be replaced later)
 const MASTER_GROUP_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+
+// TODO: Replace these dropdown options with actual values from backend/configuration
+// Company Tab - Company Group dropdown options (A-I for now, will be replaced later)
+const COMPANY_GROUP_OPTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 
 export default function ShipsCertificatesAdmin() {
   const [activeTab, setActiveTab] = useState<TabType>("master");
@@ -309,7 +313,19 @@ export default function ShipsCertificatesAdmin() {
   };
 
   const renderCompanyTab = () => {
-    const filteredData = mockCompanyData.filter(cert => {
+    // Derive company data from Master tab - only certificates with applicableToCompany checked
+    const companyDataFromMaster = mockMasterData
+      .filter(cert => cert.applicableToCompany)
+      .map((cert, idx) => ({
+        id: cert.id,
+        masterId: cert.masterId,
+        certificateLabel: cert.certificateLabel,
+        companyId: "", // Editable - user enters this
+        requirementRef: cert.requirementRef, // Pre-filled from Master, but editable
+        companyGroup: "", // Editable dropdown
+      }));
+
+    const filteredData = companyDataFromMaster.filter(cert => {
       const matchesSearch = cert.certificateLabel.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            cert.masterId.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSearch;
@@ -336,63 +352,76 @@ export default function ShipsCertificatesAdmin() {
               <thead className="bg-[#52baf3] text-white text-sm">
                 <tr>
                   <th className="px-3 py-3 text-left font-medium w-12">#</th>
-                  <th className="px-3 py-3 text-left font-medium">Master ID</th>
                   <th className="px-3 py-3 text-left font-medium">Company ID</th>
-                  <th className="px-3 py-3 text-left font-medium">Certificate Label</th>
-                  <th className="px-3 py-3 text-left font-medium">Requirement/Ref</th>
+                  <th className="px-3 py-3 text-left font-medium">Requirement</th>
                   <th className="px-3 py-3 text-left font-medium">Company Group</th>
-                  <th className="px-3 py-3 text-left font-medium">Ranking</th>
-                  {viewModes.company === "edit" && (
-                    <th className="px-3 py-3 text-center font-medium">Actions</th>
-                  )}
+                  <th className="px-3 py-3 text-center font-medium">Reorder</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredData.map((cert, idx) => (
                   <tr key={cert.id} className="hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm">{idx + 1}</td>
-                    <td className="px-3 py-3 text-sm font-medium text-blue-600">{cert.masterId}</td>
-                    <td className="px-3 py-3 text-sm">{cert.companyId}</td>
-                    <td className="px-3 py-3 text-sm">{cert.certificateLabel}</td>
-                    <td className="px-3 py-3 text-sm">{cert.requirementRef}</td>
-                    <td className="px-3 py-3 text-sm">{cert.companyGroup}</td>
-                    <td className="px-3 py-3 text-sm">{cert.ranking}</td>
-                    {viewModes.company === "edit" && (
-                      <td className="px-3 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" data-testid={`button-edit-company-${cert.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" data-testid={`button-delete-company-${cert.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {viewModes.company === "edit" && filteredData.length < 10 && Array.from({ length: Math.max(0, 10 - filteredData.length) }).map((_, idx) => (
-                  <tr key={`empty-company-${idx}`} className="hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm text-muted-foreground">{filteredData.length + idx + 1}</td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
-                    <td className="px-3 py-3">
-                      <Select>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                          {companyGroups.map(grp => (
-                            <SelectItem key={grp} value={grp}>{grp}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Input 
+                          defaultValue={cert.companyId}
+                          className="h-8 text-sm"
+                          placeholder=""
+                          data-testid={`input-companyid-${cert.id}`}
+                        />
+                      ) : (
+                        cert.companyId || "-"
+                      )}
                     </td>
-                    <td className="px-3 py-3"><Input className="h-8 text-sm" placeholder="" /></td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Input 
+                          defaultValue={cert.requirementRef}
+                          className="h-8 text-sm"
+                          data-testid={`input-requirement-company-${cert.id}`}
+                        />
+                      ) : (
+                        cert.requirementRef
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {viewModes.company === "edit" ? (
+                        <Select defaultValue={cert.companyGroup}>
+                          <SelectTrigger className="h-8 text-sm" data-testid={`select-companygroup-${cert.id}`}>
+                            <SelectValue placeholder="A. Statutory" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* TODO: Replace COMPANY_GROUP_OPTIONS with actual values */}
+                            {COMPANY_GROUP_OPTIONS.map(grp => (
+                              <SelectItem key={grp} value={grp}>{grp}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        cert.companyGroup || "A. Statutory"
+                      )}
+                    </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-6 w-6"
+                          disabled={viewModes.company === "view"}
+                          data-testid={`button-moveup-${cert.id}`}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-6 w-6"
+                          disabled={viewModes.company === "view"}
+                          data-testid={`button-movedown-${cert.id}`}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
